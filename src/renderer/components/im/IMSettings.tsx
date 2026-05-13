@@ -3,7 +3,7 @@
  * Configuration UI for DingTalk, Feishu and Telegram IM bots
  */
 
-import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/20/solid';
 import { CheckCircleIcon, ExclamationTriangleIcon,SignalIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import type { Platform } from '@shared/platform';
@@ -16,7 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { i18nService } from '../../services/i18n';
 import { imService } from '../../services/im';
 import { RootState } from '../../store';
-import { clearError,setDingTalkConfig, setDingTalkInstanceConfig, setDiscordConfig, setDiscordInstanceConfig, setEmailInstanceConfig, setFeishuConfig, setFeishuInstanceConfig, setNimConfig, setNimInstanceConfig, setQQConfig, setQQInstanceConfig, setTelegramInstanceConfig, setTelegramOpenClawConfig, setWecomConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
+import { clearError, setDingTalkInstanceConfig, setDiscordInstanceConfig, setEmailInstanceConfig, setFeishuInstanceConfig, setNimInstanceConfig, setQQInstanceConfig, setTelegramInstanceConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
 import type { EmailInstanceConfig, IMConnectivityCheck, IMConnectivityTestResult, IMGatewayConfig, WeixinOpenClawConfig } from '../../types/im';
 import { MAX_DINGTALK_INSTANCES, MAX_DISCORD_INSTANCES, MAX_EMAIL_INSTANCES, MAX_FEISHU_INSTANCES, MAX_NIM_INSTANCES, MAX_QQ_INSTANCES, MAX_TELEGRAM_INSTANCES, MAX_WECOM_INSTANCES } from '../../types/im';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
@@ -78,21 +78,6 @@ const checkLevelColorClass: Record<IMConnectivityCheck['level'], string> = {
   warn: 'text-yellow-700 dark:text-yellow-300',
   fail: 'text-red-600 dark:text-red-400',
 };
-
-// Map of backend error messages to i18n keys
-const errorMessageI18nMap: Record<string, string> = {
-  '账号已在其它地方登录': 'kickedByOtherClient',
-};
-
-// Helper function to translate IM error messages
-function translateIMError(error: string | null): string {
-  if (!error) return '';
-  const i18nKey = errorMessageI18nMap[error];
-  if (i18nKey) {
-    return i18nService.t(i18nKey);
-  }
-  return error;
-}
 
 const IMSettings: React.FC = () => {
   const dispatch = useDispatch();
@@ -434,54 +419,7 @@ const IMSettings: React.FC = () => {
     }
   };
 
-
-  const handleSaveConfig = async () => {
-    if (!configLoaded) return;
-
-    // For Telegram, save telegram config directly
-    if (activePlatform === 'telegram') {
-      await imService.persistConfig({ telegram: tgMultiConfig });
-      return;
-    }
-
-    // For Discord, save discord config directly
-    if (activePlatform === 'discord') {
-      await imService.persistConfig({ discord: discordMultiConfig });
-      return;
-    }
-
-    // For Feishu, save feishu config directly
-    if (activePlatform === 'feishu') {
-      await imService.persistConfig({ feishu: feishuMultiConfig });
-      return;
-    }
-
-    // For QQ, save qq config directly (OpenClaw mode)
-    if (activePlatform === 'qq') {
-      await imService.persistConfig({ qq: qqMultiConfig });
-      return;
-    }
-
-    // For WeCom, save is handled per-instance in WecomInstanceSettings
-    if (activePlatform === 'wecom') {
-      await imService.persistConfig({ wecom: config.wecom });
-      return;
-    }
-
-    // For Weixin, save weixin config directly (OpenClaw mode)
-    if (activePlatform === 'weixin') {
-      await imService.persistConfig({ weixin: weixinOpenClawConfig });
-      return;
-    }
-
-    // For Email, save the full email multi-instance config
-    if (activePlatform === 'email') {
-      await imService.persistConfig({ email: config.email ?? { instances: [] } });
-      return;
-    }
-
-    await imService.persistConfig({ [activePlatform]: config[activePlatform] });
-  };
+;
 
   const getCheckTitle = (code: IMConnectivityCheck['code']): string => {
     return i18nService.t(`imConnectivityCheckTitle_${code}`);
@@ -572,33 +510,6 @@ const IMSettings: React.FC = () => {
         return;
       }
 
-      const isEnabled = config[platform].enabled;
-      const newEnabled = !isEnabled;
-
-      // Map platform to its Redux action
-      const setConfigAction = getSetConfigAction(platform);
-
-      // Update Redux state
-      dispatch(setConfigAction({ enabled: newEnabled }));
-
-      // Persist the updated config (construct manually since Redux state hasn't re-rendered yet)
-      await imService.updateConfig({ [platform]: { ...config[platform], enabled: newEnabled } });
-
-      if (newEnabled) {
-        dispatch(clearError());
-        const success = await imService.startGateway(platform);
-        if (!success) {
-          // Rollback enabled state on failure
-          dispatch(setConfigAction({ enabled: false }));
-          await imService.updateConfig({ [platform]: { ...config[platform], enabled: false } });
-        } else {
-          await runConnectivityTest(platform, {
-            [platform]: { ...config[platform], enabled: true },
-          } as Partial<IMGatewayConfig>);
-        }
-      } else {
-        await imService.stopGateway(platform);
-      }
     } finally {
       setTogglingPlatform(null);
     }
@@ -922,21 +833,6 @@ const IMSettings: React.FC = () => {
   };
 
   // Toggle gateway on/off - map platform to Redux action
-  const getSetConfigAction = (platform: Platform) => {
-    const actionMap: Record<Platform, any> = {
-      dingtalk: setDingTalkConfig,
-      feishu: setFeishuConfig,
-      telegram: setTelegramOpenClawConfig,
-      qq: setQQConfig,
-      discord: setDiscordConfig,
-      nim: setNimConfig,
-      wecom: setWecomConfig,
-      weixin: setWeixinConfig,
-      email: null, // Email is multi-instance; toggle handled per-instance in EmailSettings
-    };
-    return actionMap[platform];
-  };
-
   const renderConnectivityTestButton = (platform: Platform) => (
     <button
       type="button"
