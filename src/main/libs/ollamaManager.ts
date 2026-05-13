@@ -256,7 +256,6 @@ function buildOllamaServeEnv(baseEnv: NodeJS.ProcessEnv, config: OllamaServiceCo
   return {
     ...baseEnv,
     ...(config.cudaVisibleDevices ? { CUDA_VISIBLE_DEVICES: config.cudaVisibleDevices } : {}),
-    ...(config.numGpu ? { OLLAMA_NUM_GPU: config.numGpu } : {}),
     ...(config.maxLoadedModels ? { OLLAMA_MAX_LOADED_MODELS: config.maxLoadedModels } : {}),
     ...(config.numParallel ? { OLLAMA_NUM_PARALLEL: config.numParallel } : {}),
     ...(typeof config.schedSpread === 'boolean' ? { OLLAMA_SCHED_SPREAD: String(config.schedSpread) } : {}),

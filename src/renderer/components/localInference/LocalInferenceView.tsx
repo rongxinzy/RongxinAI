@@ -63,9 +63,7 @@ type LaunchFormState = {
   numThread: string;
   numBatch: string;
   mainGpu: string;
-  lowVram: string;
   useMmap: string;
-  useMlock: string;
 };
 
 type SuggestedLaunchOptions = {
@@ -74,13 +72,11 @@ type SuggestedLaunchOptions = {
   numGpu?: number;
   numThread: number;
   mainGpu?: number;
-  lowVram?: boolean;
   summary: string;
 };
 
 type OllamaServiceConfigFormState = {
   cudaVisibleDevices: string;
-  numGpu: string;
   maxLoadedModels: string;
   numParallel: string;
   schedSpread: string;
@@ -750,7 +746,6 @@ function OllamaServiceConfigPanel({
   const save = () => {
     onSave({
       cudaVisibleDevices: form.cudaVisibleDevices,
-      numGpu: form.numGpu,
       maxLoadedModels: form.maxLoadedModels,
       numParallel: form.numParallel,
       ...(form.schedSpread ? { schedSpread: form.schedSpread === 'true' } : {}),
@@ -777,13 +772,6 @@ function OllamaServiceConfigPanel({
               placeholder="0,1"
               hint={i18nService.t('localInferenceServiceConfigCudaHint')}
               onChange={(value) => updateForm('cudaVisibleDevices', value)}
-            />
-            <ServiceConfigInput
-              label="OLLAMA_NUM_GPU"
-              value={form.numGpu}
-              placeholder={i18nService.t('localInferenceLaunchDefault')}
-              hint={i18nService.t('localInferenceServiceConfigNumGpuHint')}
-              onChange={(value) => updateForm('numGpu', value)}
             />
             <ServiceConfigInput
               label="OLLAMA_MAX_LOADED_MODELS"
@@ -1067,9 +1055,7 @@ function LaunchModelDialog({
     numThread: '',
     numBatch: '',
     mainGpu: '',
-    lowVram: '',
     useMmap: '',
-    useMlock: '',
   });
   const [optimizationSummary, setOptimizationSummary] = useState('');
   const [detectingHardware, setDetectingHardware] = useState(false);
@@ -1083,17 +1069,13 @@ function LaunchModelDialog({
     const parsedNumThread = parseOptionalInteger(form.numThread);
     const parsedNumBatch = parseOptionalInteger(form.numBatch);
     const parsedMainGpu = parseOptionalInteger(form.mainGpu);
-    const parsedLowVram = parseOptionalBoolean(form.lowVram);
     const parsedUseMmap = parseOptionalBoolean(form.useMmap);
-    const parsedUseMlock = parseOptionalBoolean(form.useMlock);
 
     if (parsedNumCtx !== undefined) options.num_ctx = parsedNumCtx;
     if (parsedNumBatch !== undefined) options.num_batch = parsedNumBatch;
     if (parsedNumGpu !== undefined) options.num_gpu = parsedNumGpu;
     if (parsedMainGpu !== undefined) options.main_gpu = parsedMainGpu;
-    if (parsedLowVram !== undefined) options.low_vram = parsedLowVram;
     if (parsedUseMmap !== undefined) options.use_mmap = parsedUseMmap;
-    if (parsedUseMlock !== undefined) options.use_mlock = parsedUseMlock;
     if (parsedNumThread !== undefined) options.num_thread = parsedNumThread;
 
     return {
@@ -1121,7 +1103,6 @@ function LaunchModelDialog({
       numThread: String(next.numThread),
       numBatch: String(next.numBatch),
       mainGpu: next.mainGpu === undefined ? '' : String(next.mainGpu),
-      lowVram: next.lowVram ? 'true' : '',
     }));
     setOptimizationSummary(next.summary);
   };
@@ -1230,22 +1211,10 @@ function LaunchModelDialog({
                 onChange={(value) => updateForm('mainGpu', value)}
               />
               <LaunchSelect
-                label={i18nService.t('localInferenceLaunchLowVram')}
-                value={form.lowVram}
-                hint={i18nService.t('localInferenceLaunchLowVramHint')}
-                onChange={(value) => updateForm('lowVram', value)}
-              />
-              <LaunchSelect
                 label={i18nService.t('localInferenceLaunchUseMmap')}
                 value={form.useMmap}
                 hint={i18nService.t('localInferenceLaunchUseMmapHint')}
                 onChange={(value) => updateForm('useMmap', value)}
-              />
-              <LaunchSelect
-                label={i18nService.t('localInferenceLaunchUseMlock')}
-                value={form.useMlock}
-                hint={i18nService.t('localInferenceLaunchUseMlockHint')}
-                onChange={(value) => updateForm('useMlock', value)}
               />
             </div>
           </section>
@@ -1606,7 +1575,6 @@ function parseOptionalBoolean(value: string): boolean | undefined {
 function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFormState {
   return {
     cudaVisibleDevices: config.cudaVisibleDevices ?? '',
-    numGpu: config.numGpu ?? '',
     maxLoadedModels: config.maxLoadedModels ?? '',
     numParallel: config.numParallel ?? '',
     schedSpread: config.schedSpread === undefined ? '' : String(config.schedSpread),
@@ -1661,7 +1629,6 @@ function suggestLaunchOptions(
   const numGpu = detectedVramMiB <= 0
     ? memoryGb <= 3 ? 16 : memoryGb <= 9 ? 32 : undefined
     : estimateGpuLayers(estimatedMemoryBytes, detectedVramMiB);
-  const lowVram = memoryGb <= 4;
   const summaryKey = detectedVramMiB > 0
     ? 'localInferenceLaunchAutoAppliedWithGpu'
     : 'localInferenceLaunchAutoAppliedFallback';
@@ -1678,7 +1645,6 @@ function suggestLaunchOptions(
     numGpu,
     numThread,
     mainGpu: undefined,
-    lowVram,
     summary,
   };
 }
