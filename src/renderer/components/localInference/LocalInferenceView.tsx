@@ -2,6 +2,7 @@ import {
   AdjustmentsHorizontalIcon,
   ArrowDownTrayIcon,
   ArrowPathIcon,
+  ArrowTopRightOnSquareIcon,
   BeakerIcon,
   CheckCircleIcon,
   CpuChipIcon,
@@ -91,6 +92,8 @@ const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
   seed: -1,
   stop: '',
 };
+const MARKETPLACE_INITIAL_VISIBLE_COUNT = 24;
+const MARKETPLACE_VISIBLE_INCREMENT = 24;
 const smallOutlineButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 
@@ -139,7 +142,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceTask, setMarketplaceTask] = useState<string>('all');
   const [marketplaceSize, setMarketplaceSize] = useState<string>('all');
-  const [marketplaceQuant, setMarketplaceQuant] = useState<string>('all');
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
@@ -167,7 +169,20 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleMarketplaceInstall = async (model: MarketplaceModel) => {
     const name = model.installName ?? model.name;
-    await window.electron.ollama.pullModel(name);
+    setActivePullName(name);
+    setPullProgress((current) => ({
+      ...current,
+      [name]: { status: 'starting' },
+    }));
+    setError(null);
+    setNotice(null);
+    try {
+      await window.electron.ollama.pullModel(name);
+      await refreshLocalModels();
+      setNotice(i18nService.t('marketplacePullDone').replace('{name}', name));
+    } catch (installError) {
+      setError(installError instanceof Error ? installError.message : String(installError));
+    }
   };
 
   const runningModelNames = useMemo(
@@ -269,11 +284,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         query: marketplaceQuery.trim() || undefined,
         task: marketplaceTask === 'all' ? undefined : marketplaceTask as any,
         size: marketplaceSize === 'all' ? undefined : marketplaceSize as any,
-        quantization: marketplaceQuant === 'all' ? undefined : marketplaceQuant as any,
+        limit: 120,
       });
     }, 200);
     return () => window.clearTimeout(timeout);
-  }, [marketplaceQuery, marketplaceTask, marketplaceSize, marketplaceQuant, searchMarketplace]);
+  }, [marketplaceQuery, marketplaceTask, marketplaceSize, searchMarketplace]);
 
   const handlePrepare = () => {
     void runAction(async () => {
@@ -558,22 +573,24 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               models={marketplaceModels}
               marketplaceLoading={marketplaceLoading}
               marketplaceError={marketplaceError}
+              activePullName={activePullName}
+              activePullProgress={activePullProgress}
+              pulling={pulling}
               query={marketplaceQuery}
               task={marketplaceTask}
               size={marketplaceSize}
-              quantization={marketplaceQuant}
               installedModelNames={installedModelNames}
               onQueryChange={setMarketplaceQuery}
               onTaskChange={setMarketplaceTask}
               onSizeChange={setMarketplaceSize}
-              onQuantizationChange={setMarketplaceQuant}
               onSearch={() => void searchMarketplace({
                 query: marketplaceQuery.trim() || undefined,
                 task: marketplaceTask === 'all' ? undefined : marketplaceTask as any,
                 size: marketplaceSize === 'all' ? undefined : marketplaceSize as any,
-                quantization: marketplaceQuant === 'all' ? undefined : marketplaceQuant as any,
+                limit: 120,
               })}
               onInstall={handleMarketplaceInstall}
+              onCancelPull={handleCancelPull}
               onOpenInference={(modelName) => {
                 setSelectedModel(modelName);
                 setActiveTab('inference');
@@ -1752,17 +1769,19 @@ function MarketplacePanel({
   models,
   marketplaceLoading,
   marketplaceError,
+  activePullName,
+  activePullProgress,
+  pulling,
   query,
   task,
   size,
-  quantization,
   installedModelNames,
   onQueryChange,
   onTaskChange,
   onSizeChange,
-  onQuantizationChange,
   onSearch,
   onInstall,
+  onCancelPull,
   onOpenInference,
 }: {
   isRunning: boolean;
@@ -1770,21 +1789,30 @@ function MarketplacePanel({
   models: MarketplaceModel[];
   marketplaceLoading: boolean;
   marketplaceError: string | null;
+  activePullName: string | null;
+  activePullProgress?: Record<string, unknown>;
+  pulling: boolean;
   query: string;
   task: string;
   size: string;
-  quantization: string;
   installedModelNames: Set<string>;
   onQueryChange: (v: string) => void;
   onTaskChange: (v: string) => void;
   onSizeChange: (v: string) => void;
-  onQuantizationChange: (v: string) => void;
   onSearch: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
+  onCancelPull: () => void;
   onOpenInference: (name: string) => void;
 }) {
   const [installingModel, setInstallingModel] = useState<string | null>(null);
-  const hasActiveFilters = Boolean(query.trim()) || task !== 'all' || size !== 'all' || quantization !== 'all';
+  const [visibleCount, setVisibleCount] = useState(MARKETPLACE_INITIAL_VISIBLE_COUNT);
+  const hasActiveFilters = Boolean(query.trim()) || task !== 'all' || size !== 'all';
+  const visibleModels = models.slice(0, visibleCount);
+  const hasMoreModels = visibleCount < models.length;
+
+  useEffect(() => {
+    setVisibleCount(MARKETPLACE_INITIAL_VISIBLE_COUNT);
+  }, [models, query, task, size]);
 
   const handleInstall = async (model: MarketplaceModel) => {
     setInstallingModel(model.id);
@@ -1824,50 +1852,55 @@ function MarketplacePanel({
         </form>
       </div>
 
-      <div className="grid gap-2 rounded-lg border border-border bg-surface p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-        <FilterSelect
-          label={i18nService.t('marketplaceTaskFilterLabel')}
-          value={task}
-          onChange={onTaskChange}
-          options={[
-            { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
-            { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
-            { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
-            { value: 'embedding', label: i18nService.t('marketplaceFilterTaskEmbedding') },
-            { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
-          ]}
-        />
-        <FilterSelect
-          label={i18nService.t('marketplaceSizeFilterLabel')}
-          value={size}
-          onChange={onSizeChange}
-          options={[
-            { value: 'all', label: i18nService.t('marketplaceFilterSizeAll') },
-            { value: 'small', label: i18nService.t('marketplaceFilterSizeSmall') },
-            { value: 'desktop', label: i18nService.t('marketplaceFilterSizeDesktop') },
-            { value: 'workstation', label: i18nService.t('marketplaceFilterSizeWorkstation') },
-            { value: 'large', label: i18nService.t('marketplaceFilterSizeLarge') },
-          ]}
-        />
-        <FilterSelect
-          label={i18nService.t('marketplaceQuantizationLabel')}
-          value={quantization}
-          onChange={onQuantizationChange}
-          options={[
-            { value: 'all', label: i18nService.t('marketplaceFilterQuantizationAll') },
-            { value: 'q4', label: i18nService.t('marketplaceFilterQuantizationQ4') },
-            { value: 'q5', label: i18nService.t('marketplaceFilterQuantizationQ5') },
-            { value: 'q8', label: i18nService.t('marketplaceFilterQuantizationQ8') },
-          ]}
-        />
-        <button
-          type="button"
-          onClick={() => { onQueryChange(''); onTaskChange('all'); onSizeChange('all'); onQuantizationChange('all'); }}
-          disabled={!hasActiveFilters}
-          className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {i18nService.t('marketplaceFilterReset')}
-        </button>
+      <div className="space-y-3 rounded-lg border border-border bg-surface p-3">
+        <div>
+          <span className="text-[11px] font-medium text-secondary">{i18nService.t('marketplaceTaskFilterLabel')}</span>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[
+              { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
+              { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
+              { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
+              { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
+              { value: 'embedding', label: i18nService.t('marketplaceFilterTaskEmbedding') },
+              { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onTaskChange(option.value)}
+                className={`inline-flex h-8 items-center rounded-full border px-3 text-xs transition-colors ${
+                  task === option.value
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-secondary hover:bg-surface-raised hover:text-foreground'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <FilterSelect
+            label={i18nService.t('marketplaceSizeFilterLabel')}
+            value={size}
+            onChange={onSizeChange}
+            options={[
+              { value: 'all', label: i18nService.t('marketplaceFilterSizeAll') },
+              { value: 'small', label: i18nService.t('marketplaceFilterSizeSmall') },
+              { value: 'desktop', label: i18nService.t('marketplaceFilterSizeDesktop') },
+              { value: 'workstation', label: i18nService.t('marketplaceFilterSizeWorkstation') },
+              { value: 'large', label: i18nService.t('marketplaceFilterSizeLarge') },
+            ]}
+          />
+          <button
+            type="button"
+            onClick={() => { onQueryChange(''); onTaskChange('all'); onSizeChange('all'); }}
+            disabled={!hasActiveFilters}
+            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-border px-2.5 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {i18nService.t('marketplaceFilterReset')}
+          </button>
+        </div>
       </div>
 
       {marketplaceError && (
@@ -1885,6 +1918,25 @@ function MarketplacePanel({
         </div>
       )}
 
+      {activePullName && activePullProgress && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-secondary md:flex-row md:items-center md:justify-between">
+          <div>
+            <span className="font-mono text-foreground">{activePullName}</span>
+            <span className="ml-2">{formatPullProgress(activePullProgress)}</span>
+          </div>
+          {pulling && (
+            <button
+              type="button"
+              onClick={onCancelPull}
+              className={smallOutlineButtonClass}
+            >
+              <StopIcon className="h-3.5 w-3.5" />
+              {i18nService.t('localInferenceCancelPull')}
+            </button>
+          )}
+        </div>
+      )}
+
       {!hasActiveFilters && models.length > 0 && (
         <section className="space-y-2">
           <div className="flex items-center gap-2">
@@ -1895,6 +1947,17 @@ function MarketplacePanel({
         </section>
       )}
 
+      {models.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
+          <span>
+            {i18nService.t('marketplaceResultSummary')
+              .replace('{shown}', String(Math.min(visibleCount, models.length)))
+              .replace('{total}', String(models.length))}
+          </span>
+          <span>{i18nService.t('marketplaceDataSourceHint')}</span>
+        </div>
+      )}
+
       {marketplaceLoading ? (
         <div className="flex items-center justify-center py-12 text-sm text-secondary">
           <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
@@ -1903,8 +1966,9 @@ function MarketplacePanel({
       ) : models.length === 0 ? (
         <EmptyState title={i18nService.t('marketplaceNoModels')} />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {models.map((model) => {
+        <>
+          <div className="grid gap-3 md:grid-cols-2">
+          {visibleModels.map((model) => {
             const installName = model.installName ?? model.name;
             const installed = installedModelNames.has(installName);
             const installing = installingModel === model.id;
@@ -1942,38 +2006,60 @@ function MarketplacePanel({
                   </div>
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-2">
-                  <span className="text-xs text-secondary">
-                    {model.downloads ? `${(model.downloads / 1000).toFixed(1)}k downloads` : ''}
-                  </span>
-                  {installed ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenInference(installName)}
-                      className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
-                    >
-                      <PlayIcon className="h-3.5 w-3.5" />
-                      {i18nService.t('marketplaceInfer')}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void handleInstall(model)}
-                      disabled={!isRunning || installing || loading}
-                      className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-                    >
-                      {installing ? (
-                        <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-                      )}
-                      {installing ? i18nService.t('marketplaceInstallProgress') : i18nService.t('marketplaceInstall')}
-                    </button>
-                  )}
+                  <span className="text-xs text-secondary">{formatDownloadCount(model.downloads)}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {model.detailUrl && (
+                      <button
+                        type="button"
+                        onClick={() => void openExternalUrl(model.detailUrl!)}
+                        className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
+                      >
+                        <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                        {i18nService.t('marketplaceOpenOllama')}
+                      </button>
+                    )}
+                    {installed ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenInference(installName)}
+                        className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
+                      >
+                        <PlayIcon className="h-3.5 w-3.5" />
+                        {i18nService.t('marketplaceInfer')}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleInstall(model)}
+                        disabled={!isRunning || installing || loading}
+                        className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                      >
+                        {installing ? (
+                          <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                        )}
+                        {installing ? i18nService.t('marketplaceInstallProgress') : i18nService.t('marketplaceInstall')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
-        </div>
+          </div>
+          {hasMoreModels && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((count) => count + MARKETPLACE_VISIBLE_INCREMENT)}
+                className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
+              >
+                {i18nService.t('marketplaceLoadMore')}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -2004,6 +2090,23 @@ function FilterSelect({
       </select>
     </label>
   );
+}
+
+async function openExternalUrl(url: string): Promise<void> {
+  const result = await window.electron.shell.openExternal(url);
+  if (!result.success) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
+function formatDownloadCount(downloads?: number): string {
+  if (!downloads || downloads <= 0) return '';
+  const value = downloads >= 1_000_000
+    ? `${(downloads / 1_000_000).toFixed(downloads >= 10_000_000 ? 0 : 1)}M`
+    : downloads >= 1_000
+      ? `${(downloads / 1_000).toFixed(downloads >= 100_000 ? 0 : 1)}k`
+      : String(downloads);
+  return i18nService.t('marketplaceDownloads').replace('{count}', value);
 }
 
 function SearchIcon({ className }: { className?: string }) {

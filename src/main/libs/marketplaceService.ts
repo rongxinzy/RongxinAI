@@ -18,11 +18,11 @@ type CuratedModelEntry = {
 
 export class MarketplaceService {
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
-    const limit = params.limit && params.limit > 0 ? params.limit : 50;
+    const limit = params.limit && params.limit > 0 ? params.limit : 120;
     const localModels = this.searchLocal(params);
     try {
       const onlineModels = await this.searchOnline(params);
-      const merged = filterMarketplaceModels(onlineModels, params);
+      const merged = sortMarketplaceModels(filterMarketplaceModels(onlineModels, params), params);
       return { models: merged.slice(0, limit) };
     } catch {
       return { models: localModels.slice(0, limit) };
@@ -30,9 +30,12 @@ export class MarketplaceService {
   }
 
   searchLocal(params: MarketplaceSearchParams = {}): MarketplaceModel[] {
-    const limit = params.limit && params.limit > 0 ? params.limit : 50;
-    return filterMarketplaceModels(
-      (curatedModels as CuratedModelEntry[]).map(toMarketplaceModel),
+    const limit = params.limit && params.limit > 0 ? params.limit : 120;
+    return sortMarketplaceModels(
+      filterMarketplaceModels(
+        (curatedModels as CuratedModelEntry[]).map(toMarketplaceModel),
+        params,
+      ),
       params,
     ).slice(0, limit);
   }
@@ -62,12 +65,13 @@ export class MarketplaceService {
 }
 
 function toMarketplaceModel(entry: CuratedModelEntry): MarketplaceModel {
+  const tags = unique([...entry.tags, ...classifyTaskTags(entry.name, entry.description, entry.tags)]);
   return {
     source: 'ollama-library',
     id: entry.name,
     name: entry.name,
     description: entry.description,
-    tags: entry.tags,
+    tags,
     sizes: entry.sizes,
     recommendedTag: entry.recommendedTag,
     downloads: entry.downloads,
@@ -122,7 +126,7 @@ function parseModelBlock(block: string): MarketplaceModel | null {
   );
 
   const installName = toInstallName(hrefMatch[1], rawName);
-  const allTags = unique([...tags, ...inferTaskTags(rawName, description, tags)]);
+  const allTags = unique([...tags, ...classifyTaskTags(rawName, description, tags)]);
 
   return {
     source: 'ollama-library',
@@ -157,9 +161,21 @@ function toInstallName(href: string, fallback: string): string {
 
 function parsePullCount(value: string | undefined): number | undefined {
   if (!value) return undefined;
-  const cleaned = stripTags(value).replace(/[^0-9.]/g, '');
-  const num = Number(cleaned);
-  return Number.isFinite(num) ? Math.round(num) : undefined;
+  const text = decodeHtml(stripTags(value)).replace(/\s+/g, ' ').trim().toLowerCase();
+  const match = text.match(/(\d+(?:\.\d+)?)\s*([kmb])?\s*(?:downloads?|pulls?)/i)
+    ?? text.match(/(?:downloads?|pulls?)\s*(\d+(?:\.\d+)?)\s*([kmb])?/i)
+    ?? text.match(/(\d+(?:\.\d+)?)\s*([kmb])/i);
+  if (!match) return undefined;
+  const num = Number(match[1]);
+  if (!Number.isFinite(num)) return undefined;
+  const multiplier = match[2] === 'b'
+    ? 1_000_000_000
+    : match[2] === 'm'
+      ? 1_000_000
+      : match[2] === 'k'
+        ? 1_000
+        : 1;
+  return Math.round(num * multiplier);
 }
 
 function formatSizeText(value: string): string {
@@ -207,16 +223,25 @@ function unique<T>(items: T[]): T[] {
   return [...new Set(items)];
 }
 
-function inferTaskTags(
-  _name: string,
-  _description: string,
+function classifyTaskTags(
+  name: string,
+  description: string,
   tags: string[],
 ): string[] {
-  const inferred: string[] = [];
-  if (tags.includes('code')) inferred.push('code');
-  if (tags.includes('reasoning') || tags.includes('thinking')) inferred.push('reasoning');
-  if (tags.includes('chat')) inferred.push('chat');
-  return inferred;
+  const source = `${name} ${description} ${tags.join(' ')}`.toLowerCase();
+  const inferred = new Set<string>();
+
+  if (/\b(chat|instruct|assistant|conversation|dialogue)\b/.test(source)) inferred.add('chat');
+  if (/\b(reasoning|thinking|reasoner|math|stem)\b/.test(source)) inferred.add('reasoning');
+  if (/\b(code|coder|coding|programming|developer|swe|devstral)\b/.test(source)) inferred.add('code');
+  if (/\b(embed|embedding|retrieval|rerank|reranker)\b/.test(source)) inferred.add('embedding');
+  if (/\b(vision|visual|vl|multimodal|ocr|image)\b/.test(source)) inferred.add('vision');
+
+  // Most Ollama Library generative models can be used for chat even when the
+  // search page omits an explicit chat capability.
+  if (!inferred.has('embedding')) inferred.add('chat');
+
+  return [...inferred];
 }
 
 function inferSizesFromName(name: string): string[] {
@@ -251,8 +276,18 @@ function filterMarketplaceModels(
     .filter((m) => !params.source || params.source === 'all' || params.source === m.source)
     .filter((m) => matchesQuery(m, params.query))
     .filter((m) => matchesTags(m, requiredTags))
-    .filter((m) => matchesSizeFilter(m, params.size))
-    .filter((m) => matchesQuantizationFilter(m, params.quantization));
+    .filter((m) => matchesSizeFilter(m, params.size));
+}
+
+function sortMarketplaceModels(
+  models: MarketplaceModel[],
+  _params: MarketplaceSearchParams,
+): MarketplaceModel[] {
+  return [...models].sort((a, b) => {
+    const downloadsDiff = (b.downloads ?? 0) - (a.downloads ?? 0);
+    if (downloadsDiff !== 0) return downloadsDiff;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function matchesQuery(model: MarketplaceModel, query?: string): boolean {
@@ -276,6 +311,7 @@ function tagsForTask(task?: MarketplaceSearchParams['task']): string[] {
     case 'reasoning': return ['reasoning'];
     case 'embedding': return ['embedding'];
     case 'code': return ['code'];
+    case 'vision': return ['vision'];
     default: return [];
   }
 }
@@ -292,12 +328,6 @@ function matchesSizeFilter(model: MarketplaceModel, size?: MarketplaceSearchPara
     case 'large': return billions > 14;
     default: return true;
   }
-}
-
-function matchesQuantizationFilter(model: MarketplaceModel, quantization?: MarketplaceSearchParams['quantization']): boolean {
-  if (!quantization || quantization === 'all') return true;
-  const text = [model.id, model.name, model.description, ...model.tags, ...model.sizes].join(' ').toLowerCase();
-  return text.includes(quantization);
 }
 
 function resolveParamCount(model: MarketplaceModel): number | null {
