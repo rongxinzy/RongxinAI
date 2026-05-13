@@ -498,20 +498,6 @@ const IMSettings: React.FC = () => {
     await imService.persistConfig({ [activePlatform]: config[activePlatform] });
   };
 
-  // ==================== Email instance helpers ====================
-
-  const handleEmailGetApiKey = async () => {
-    if (!activeEmailInstanceId) return;
-    const apiKeyUrl = 'https://claw.163.com/projects/dashboard/?channel=LobsterAI#/api-keys';
-    try {
-      await window.electron.shell.openExternal(apiKeyUrl);
-    } catch {
-      alert('Failed to open browser. Please visit: ' + apiKeyUrl);
-    }
-  };
-
-  // ==================== End email instance helpers ====================
-
   const getCheckTitle = (code: IMConnectivityCheck['code']): string => {
     return i18nService.t(`imConnectivityCheckTitle_${code}`);
   };
@@ -2026,13 +2012,6 @@ const IMSettings: React.FC = () => {
                         : <EyeSlashIcon className="h-4 w-4" />}
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleEmailGetApiKey()}
-                    className="px-3 py-2 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-                  >
-                    {i18nService.t('getApiKey')}
-                  </button>
                 </div>
                 <p className="text-xs text-secondary mt-1">{i18nService.t('apiKeyHint')}</p>
               </div>

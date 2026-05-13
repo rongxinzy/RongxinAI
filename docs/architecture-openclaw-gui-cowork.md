@@ -1,9 +1,9 @@
-# LobsterAI 架构说明：OpenClaw、GUI 与 Cowork 的关系
+# RongxinAI 架构说明：OpenClaw、GUI 与 Cowork 的关系
 
 ## 1. 一句话结论
 
 - `Cowork` 是产品能力层（会话、消息、权限、状态流转）。
-- `OpenClaw` 是 `Cowork` 的一个可切换执行引擎（另一个是内置 `yd_cowork`）。
+- `OpenClaw` 是 `Cowork` 的一个可切换执行引擎（另一个是历史内置 runner）。
 - `GUI` 通过 Electron IPC 驱动 `Cowork`，并通过独立的 `openclaw:engine:*` 通道管理 OpenClaw 运行时状态。
 
 换句话说：**GUI 不直接承载业务语义，Cowork 承载业务，OpenClaw 承载其中一种运行时执行能力。**
@@ -33,7 +33,7 @@ flowchart LR
   end
 
   subgraph Engines["Engine Runtime"]
-    YD["yd_cowork (built-in runner)"]
+    YD["legacy built-in runner"]
     OCG["OpenClaw Gateway"]
   end
 
@@ -56,7 +56,7 @@ flowchart LR
 
 - `CoworkView` 负责任务输入、会话展示、流式输出。
 - `Settings` 提供两类关键配置：
-  - `agentEngine`: `yd_cowork` / `openclaw`
+  - `agentEngine`: legacy runner / `openclaw`
   - `executionMode`: `auto` / `local` / `sandbox`
 - GUI 通过 `coworkService` 统一访问：
   - 会话类接口走 `window.electron.cowork.*`

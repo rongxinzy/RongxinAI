@@ -1,9 +1,8 @@
 {
-  "name": "lobsterai",
+  "name": "rongxinai",
   "private": true,
   "author": {
-    "name": "LobsterAI",
-    "email": "lobsterai.project@rd.netease.com"
+    "name": "RongxinAI"
   },
   "license": "MIT",
   "version": "2026.5.9",

@@ -12,9 +12,7 @@ import React, { useRef, useState } from 'react';
 import { i18nService } from '../../services/i18n';
 import { NimQrLoginErrorCode, NimQrLoginStatus, pollQrLogin, startQrLogin } from '../../services/nimQrLogin';
 import type { IMConnectivityTestResult, NimInstanceConfig, NimInstanceStatus, NimOpenClawConfig } from '../../types/im';
-import Modal from '../common/Modal';
 import TrashIcon from '../icons/TrashIcon';
-import { NimDownloadPlatform, NimDownloadQrImage } from './constants';
 import type { UiHint } from './SchemaForm';
 import { SchemaForm } from './SchemaForm';
 
@@ -54,18 +52,6 @@ function deepSet(obj: Record<string, unknown>, path: string, value: unknown): Re
   return result;
 }
 
-const AndroidIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M7.56 5.16a.75.75 0 0 1 1.03.28l.68 1.18A8.24 8.24 0 0 1 12 6.15c.97 0 1.9.17 2.73.47l.68-1.18a.75.75 0 1 1 1.3.75l-.67 1.16a6.26 6.26 0 0 1 3.09 5.4v4.2c0 .97-.78 1.75-1.75 1.75h-.63v2.1a1.5 1.5 0 1 1-3 0v-2.1h-3.5v2.1a1.5 1.5 0 1 1-3 0v-2.1h-.63A1.75 1.75 0 0 1 4.87 17v-4.2c0-2.3 1.24-4.3 3.09-5.4l-.68-1.16a.75.75 0 0 1 .28-1.03Zm2.82 4.24a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6Zm3.24 0a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6Z" />
-  </svg>
-);
-
-const AppleIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M15.08 2.25c.12 1.22-.37 2.39-1.01 3.13-.7.8-1.85 1.42-2.94 1.34-.15-1.17.42-2.38 1.05-3.08.7-.8 1.9-1.38 2.9-1.39ZM18.68 12.78c.02 2.57 2.26 3.43 2.28 3.44-.02.06-.36 1.2-1.17 2.37-.7 1.02-1.44 2.04-2.58 2.06-1.12.02-1.48-.66-2.77-.66-1.3 0-1.7.64-2.75.68-1.1.04-1.94-1.1-2.65-2.12-1.46-2.1-2.57-5.94-1.08-8.52.74-1.27 2.05-2.08 3.48-2.1 1.09-.03 2.12.73 2.78.73.66 0 1.9-.9 3.2-.77.54.02 2.06.22 3.04 1.66-.08.05-1.8 1.05-1.78 3.23Z" />
-  </svg>
-);
-
 const NimInstanceSettings: React.FC<NimInstanceSettingsProps> = ({
   instance,
   instanceStatus,
@@ -87,8 +73,6 @@ const NimInstanceSettings: React.FC<NimInstanceSettingsProps> = ({
   const [qrValue, setQrValue] = useState('');
   const [qrTimeLeft, setQrTimeLeft] = useState(0);
   const [qrError, setQrError] = useState('');
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
-  const [downloadPlatform, setDownloadPlatform] = useState<NimDownloadPlatform>(NimDownloadPlatform.Android);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeUuidRef = useRef('');
@@ -238,16 +222,6 @@ const NimInstanceSettings: React.FC<NimInstanceSettingsProps> = ({
   const result = connectivityResults.nim;
   const shouldShowBasicField = (path: string) => path === 'appKey' || path === 'account' || path === 'token';
   const shouldShowAdvancedField = (path: string) => !shouldShowBasicField(path) && path !== 'nimToken';
-  const openNimDemo = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    setIsDownloadModalOpen(true);
-  };
-
-  const downloadPlatformOptions: Array<{ value: NimDownloadPlatform; label: string }> = [
-    { value: NimDownloadPlatform.Android, label: i18nService.t('imNimDownloadPlatformAndroid') },
-    { value: NimDownloadPlatform.Ios, label: i18nService.t('imNimDownloadPlatformIos') },
-  ];
-  const selectedPlatformLabel = downloadPlatformOptions.find((option) => option.value === downloadPlatform)?.label || downloadPlatform;
 
   return (
     <>
@@ -331,17 +305,7 @@ const NimInstanceSettings: React.FC<NimInstanceSettingsProps> = ({
                 {i18nService.t('imNimQrLogin')}
               </button>
               <p className="text-xs text-secondary">
-                {i18nService.t('imNimQrLoginHintPrefix')}
-                {' '}
-                <a
-                  href={NimDownloadQrImage[downloadPlatform]}
-                  onClick={openNimDemo}
-                  className="text-primary hover:underline underline-offset-2"
-                >
-                  {i18nService.t('imNimQrDemoLink')}
-                </a>
-                {' '}
-                {i18nService.t('imNimQrLoginHintSuffix')}
+                {i18nService.t('imNimQrLoginHint')}
               </p>
               {qrStatus === 'error' && qrError && (
                 <div className="flex flex-col items-center gap-2">
@@ -372,17 +336,7 @@ const NimInstanceSettings: React.FC<NimInstanceSettingsProps> = ({
                 <QRCodeSVG value={qrValue} size={160} />
               </div>
               <p className="text-xs text-secondary max-w-[240px]">
-                {i18nService.t('imNimQrScanPromptPrefix')}
-                {' '}
-                <a
-                  href={NimDownloadQrImage[downloadPlatform]}
-                  onClick={openNimDemo}
-                  className="text-primary hover:underline underline-offset-2"
-                >
-                  {i18nService.t('imNimQrDemoLink')}
-                </a>
-                {' '}
-                {i18nService.t('imNimQrScanPromptSuffix')}
+                {i18nService.t('imNimQrScanPrompt')}
               </p>
               <p className="text-xs text-secondary">
                 {i18nService.t('imNimQrExpiresIn').replace('{seconds}', String(qrTimeLeft))}
@@ -575,76 +529,6 @@ const NimInstanceSettings: React.FC<NimInstanceSettingsProps> = ({
           </div>
         )}
       </div>
-
-      {isDownloadModalOpen && (
-        <Modal
-          onClose={() => setIsDownloadModalOpen(false)}
-          overlayClassName="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          className="w-full max-w-md bg-surface rounded-2xl shadow-modal border border-border overflow-hidden"
-        >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">{i18nService.t('imNimDownloadModalTitle')}</h3>
-              <p className="text-xs text-secondary mt-1">{i18nService.t('imNimDownloadModalDesc')}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsDownloadModalOpen(false)}
-              className="text-secondary hover:text-foreground transition-colors"
-              aria-label={i18nService.t('close')}
-            >
-              <XCircleIcon className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="p-5 space-y-4">
-            <div className="flex justify-center">
-              <div className="inline-flex rounded-xl bg-surface-raised p-1 border border-border-subtle">
-              {downloadPlatformOptions.map((option) => {
-                const isActive = option.value === downloadPlatform;
-                const Icon = option.value === NimDownloadPlatform.Android ? AndroidIcon : AppleIcon;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setDownloadPlatform(option.value)}
-                    className={`inline-flex h-11 w-20 items-center justify-center rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-secondary hover:text-foreground'
-                    }`}
-                    aria-label={option.label}
-                    title={option.label}
-                  >
-                    <Icon className="h-6 w-6" />
-                  </button>
-                );
-              })}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border-subtle bg-surface-raised/60 p-4 flex flex-col items-center gap-3">
-              <div className="flex h-64 w-64 items-center justify-center rounded-xl bg-white p-3 shadow-sm">
-                <img
-                  src={NimDownloadQrImage[downloadPlatform]}
-                  alt={i18nService.t('imNimDownloadQrAlt').replace('{platform}', selectedPlatformLabel)}
-                  className="block h-56 w-56 object-contain"
-                />
-              </div>
-              <p className="text-xs text-secondary text-center">
-                <span className="inline-flex items-center gap-1.5">
-                  {downloadPlatform === NimDownloadPlatform.Android ? (
-                    <AndroidIcon className="h-4 w-4" />
-                  ) : (
-                    <AppleIcon className="h-4 w-4" />
-                  )}
-                  {i18nService.t('imNimDownloadModalHint').replace('{platform}', selectedPlatformLabel)}
-                </span>
-              </p>
-            </div>
-          </div>
-        </Modal>
-      )}
     </>
   );
 };
