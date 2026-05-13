@@ -11,7 +11,7 @@ import { imService } from '../../services/im';
 import { RootState } from '../../store';
 import type { Model } from '../../store/slices/modelSlice';
 import type { Agent } from '../../types/agent';
-import type { DingTalkInstanceConfig, DingTalkInstanceStatus, DiscordInstanceConfig, DiscordInstanceStatus, FeishuInstanceConfig, FeishuInstanceStatus, IMGatewayConfig, IMGatewayStatus, NimInstanceConfig, NimInstanceStatus, PopoInstanceConfig, PopoInstanceStatus, QQInstanceConfig, QQInstanceStatus, TelegramInstanceConfig, TelegramInstanceStatus, WecomInstanceConfig, WecomInstanceStatus } from '../../types/im';
+import type { DingTalkInstanceConfig, DingTalkInstanceStatus, DiscordInstanceConfig, DiscordInstanceStatus, FeishuInstanceConfig, FeishuInstanceStatus, IMGatewayConfig, IMGatewayStatus, NimInstanceConfig, NimInstanceStatus, QQInstanceConfig, QQInstanceStatus, TelegramInstanceConfig, TelegramInstanceStatus, WecomInstanceConfig, WecomInstanceStatus } from '../../types/im';
 import { getAgentDisplayName, getAgentDisplayNameById, isDefaultAgentId } from '../../utils/agentDisplay';
 import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
@@ -23,11 +23,11 @@ import AgentDetailToolbar from './AgentDetailToolbar';
 import AgentSkillSelector from './AgentSkillSelector';
 import { AgentConfirmDialogVariant, AgentDetailTab } from './constants';
 
-type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'qq' | 'wecom' | 'nim' | 'telegram' | 'discord' | 'popo';
-type MultiInstanceConfig = DingTalkInstanceConfig | FeishuInstanceConfig | QQInstanceConfig | WecomInstanceConfig | NimInstanceConfig | TelegramInstanceConfig | DiscordInstanceConfig | PopoInstanceConfig;
-type MultiInstanceStatus = DingTalkInstanceStatus | FeishuInstanceStatus | QQInstanceStatus | WecomInstanceStatus | NimInstanceStatus | TelegramInstanceStatus | DiscordInstanceStatus | PopoInstanceStatus;
+type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'qq' | 'wecom' | 'nim' | 'telegram' | 'discord';
+type MultiInstanceConfig = DingTalkInstanceConfig | FeishuInstanceConfig | QQInstanceConfig | WecomInstanceConfig | NimInstanceConfig | TelegramInstanceConfig | DiscordInstanceConfig;
+type MultiInstanceStatus = DingTalkInstanceStatus | FeishuInstanceStatus | QQInstanceStatus | WecomInstanceStatus | NimInstanceStatus | TelegramInstanceStatus | DiscordInstanceStatus;
 
-const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = ['dingtalk', 'feishu', 'qq', 'wecom', 'nim', 'telegram', 'discord', 'popo'];
+const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = ['dingtalk', 'feishu', 'qq', 'wecom', 'nim', 'telegram', 'discord'];
 
 const isMultiInstancePlatform = (platform: Platform): platform is MultiInstancePlatform =>
   MULTI_INSTANCE_PLATFORMS.includes(platform as MultiInstancePlatform);

@@ -12,7 +12,7 @@ export function initScheduledTaskHelpers(d: ScheduledTaskHelperDeps): void {
   deps = d;
 }
 
-const MULTI_INSTANCE_CONFIG_KEYS = new Set(['dingtalk', 'feishu', 'nim', 'qq', 'wecom', 'telegram', 'discord', 'popo']);
+const MULTI_INSTANCE_CONFIG_KEYS = new Set(['dingtalk', 'feishu', 'nim', 'qq', 'wecom', 'telegram', 'discord']);
 
 function deriveNimRuntimeAccountId(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;

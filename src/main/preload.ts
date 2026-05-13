@@ -490,16 +490,6 @@ contextBridge.exposeInMainWorld('electron', {
     weixinQrLoginWait: (accountId?: string) =>
       ipcRenderer.invoke('im:weixin:qr-login-wait', accountId),
 
-    // POPO QR login
-    popoQrLoginStart: () => ipcRenderer.invoke('im:popo:qr-login-start'),
-    popoQrLoginPoll: (taskToken: string) => ipcRenderer.invoke('im:popo:qr-login-poll', taskToken),
-
-    // POPO Multi-Instance
-    addPopoInstance: (name: string) => ipcRenderer.invoke('im:popo:instance:add', name),
-    deletePopoInstance: (instanceId: string) => ipcRenderer.invoke('im:popo:instance:delete', instanceId),
-    setPopoInstanceConfig: (instanceId: string, config: Record<string, unknown>, options?: { syncGateway?: boolean }) =>
-      ipcRenderer.invoke('im:popo:instance:config:set', instanceId, config, options),
-
     // Pairing
     listPairingRequests: (platform: string) => ipcRenderer.invoke('im:pairing:list', platform),
     approvePairingCode: (platform: string, code: string) =>

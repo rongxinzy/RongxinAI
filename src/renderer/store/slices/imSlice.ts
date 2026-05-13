@@ -20,13 +20,9 @@ import type {
   IMGatewayConfig,
   IMGatewayStatus,
   IMSettings,
-  NeteaseBeeChanConfig,
   NimConfig,
   NimInstanceConfig,
   NimMultiInstanceConfig,
-  PopoInstanceConfig,
-  PopoMultiInstanceConfig,
-  PopoOpenClawConfig,
   QQInstanceConfig,
   QQMultiInstanceConfig,
   QQOpenClawConfig,
@@ -217,9 +213,6 @@ const imSlice = createSlice({
         i => i.instanceId !== action.payload
       );
     },
-    setNeteaseBeeChanConfig: (state, action: PayloadAction<Partial<NeteaseBeeChanConfig>>) => {
-      state.config['netease-bee'] = { ...state.config['netease-bee'], ...action.payload };
-    },
     /** @deprecated Use setWecomInstanceConfig instead */
     setWecomConfig: (state, action: PayloadAction<Partial<WecomOpenClawConfig>>) => {
       // Backward compat: update first instance if exists
@@ -243,29 +236,6 @@ const imSlice = createSlice({
     },
     removeWecomInstance: (state, action: PayloadAction<string>) => {
       state.config.wecom.instances = state.config.wecom.instances.filter(
-        i => i.instanceId !== action.payload
-      );
-    },
-    /** @deprecated Use setPopoInstanceConfig instead */
-    setPopoConfig: (state, action: PayloadAction<Partial<PopoOpenClawConfig>>) => {
-      const first = state.config.popo.instances[0];
-      if (first) Object.assign(first, action.payload);
-    },
-    setPopoInstances: (state, action: PayloadAction<PopoInstanceConfig[]>) => {
-      state.config.popo = { instances: action.payload };
-    },
-    setPopoMultiInstanceConfig: (state, action: PayloadAction<PopoMultiInstanceConfig>) => {
-      state.config.popo = action.payload;
-    },
-    setPopoInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<PopoOpenClawConfig> }>) => {
-      const inst = state.config.popo.instances.find(i => i.instanceId === action.payload.instanceId);
-      if (inst) Object.assign(inst, action.payload.config);
-    },
-    addPopoInstance: (state, action: PayloadAction<PopoInstanceConfig>) => {
-      state.config.popo.instances.push(action.payload);
-    },
-    removePopoInstance: (state, action: PayloadAction<string>) => {
-      state.config.popo.instances = state.config.popo.instances.filter(
         i => i.instanceId !== action.payload
       );
     },
@@ -346,19 +316,12 @@ export const {
   setNimInstanceConfig,
   addNimInstance,
   removeNimInstance,
-  setNeteaseBeeChanConfig,
   setWecomConfig,
   setWecomInstances,
   setWecomMultiInstanceConfig,
   setWecomInstanceConfig,
   addWecomInstance,
   removeWecomInstance,
-  setPopoConfig,
-  setPopoInstances,
-  setPopoMultiInstanceConfig,
-  setPopoInstanceConfig,
-  addPopoInstance,
-  removePopoInstance,
   setWeixinConfig,
   setEmailInstances,
   setEmailMultiInstanceConfig,

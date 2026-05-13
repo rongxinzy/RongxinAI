@@ -16,9 +16,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { i18nService } from '../../services/i18n';
 import { imService } from '../../services/im';
 import { RootState } from '../../store';
-import { clearError,setDingTalkConfig, setDingTalkInstanceConfig, setDiscordConfig, setDiscordInstanceConfig, setEmailInstanceConfig, setFeishuConfig, setFeishuInstanceConfig, setNeteaseBeeChanConfig, setNimConfig, setNimInstanceConfig, setPopoInstanceConfig, setQQConfig, setQQInstanceConfig, setTelegramInstanceConfig, setTelegramOpenClawConfig, setWecomConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
+import { clearError,setDingTalkConfig, setDingTalkInstanceConfig, setDiscordConfig, setDiscordInstanceConfig, setEmailInstanceConfig, setFeishuConfig, setFeishuInstanceConfig, setNimConfig, setNimInstanceConfig, setQQConfig, setQQInstanceConfig, setTelegramInstanceConfig, setTelegramOpenClawConfig, setWecomConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
 import type { EmailInstanceConfig, IMConnectivityCheck, IMConnectivityTestResult, IMGatewayConfig, WeixinOpenClawConfig } from '../../types/im';
-import { MAX_DINGTALK_INSTANCES, MAX_DISCORD_INSTANCES, MAX_EMAIL_INSTANCES, MAX_FEISHU_INSTANCES, MAX_NIM_INSTANCES, MAX_POPO_INSTANCES, MAX_QQ_INSTANCES, MAX_TELEGRAM_INSTANCES, MAX_WECOM_INSTANCES } from '../../types/im';
+import { MAX_DINGTALK_INSTANCES, MAX_DISCORD_INSTANCES, MAX_EMAIL_INSTANCES, MAX_FEISHU_INSTANCES, MAX_NIM_INSTANCES, MAX_QQ_INSTANCES, MAX_TELEGRAM_INSTANCES, MAX_WECOM_INSTANCES } from '../../types/im';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
 import TrashIcon from '../icons/TrashIcon';
@@ -27,7 +27,6 @@ import DiscordInstanceSettings from './DiscordInstanceSettings';
 import FeishuInstanceSettings from './FeishuInstanceSettings';
 import NimInstanceSettings from './NimInstanceSettings';
 import { nimFallbackInstanceSchema, nimFallbackUiHints } from './nimSchemaFallback';
-import PopoInstanceSettings from './PopoInstanceSettings';
 import QQInstanceSettings from './QQInstanceSettings';
 import type { UiHint } from './SchemaForm';
 import TelegramInstanceSettings from './TelegramInstanceSettings';
@@ -115,8 +114,6 @@ const IMSettings: React.FC = () => {
   const [telegramExpanded, setTelegramExpanded] = useState(false);
   const [activeDiscordInstanceId, setActiveDiscordInstanceId] = useState<string | null>(null);
   const [discordExpanded, setDiscordExpanded] = useState(false);
-  const [activePopoInstanceId, setActivePopoInstanceId] = useState<string | null>(null);
-  const [popoExpanded, setPopoExpanded] = useState(false);
   const [testingPlatform, setTestingPlatform] = useState<Platform | null>(null);
   const [connectivityResults, setConnectivityResults] = useState<Partial<Record<Platform, IMConnectivityTestResult>>>({});
   const [connectivityModalPlatform, setConnectivityModalPlatform] = useState<Platform | null>(null);
@@ -138,7 +135,6 @@ const IMSettings: React.FC = () => {
   const [weixinQrError, setWeixinQrError] = useState<string>('');
   const [weixinAllowFromInput, setWeixinAllowFromInput] = useState<string>('');
   const weixinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [_localIp, setLocalIp] = useState<string>('');
   const isMountedRef = useRef(true);
 
   // OpenClaw config schema for schema-driven forms
@@ -156,13 +152,6 @@ const IMSettings: React.FC = () => {
   useEffect(() => {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
-  }, []);
-
-  // Fetch local IP for POPO webhook placeholder
-  useEffect(() => {
-    window.electron?.im?.getLocalIp?.().then((ip: string) => {
-      if (isMountedRef.current) setLocalIp(ip);
-    }).catch(() => {});
   }, []);
 
   // Cleanup feishu QR timers on unmount
@@ -390,10 +379,6 @@ const IMSettings: React.FC = () => {
   const discordMultiConfig = config.discord;
 
 
-  // Handle NetEase Bee config change
-  const handleNeteaseBeeChanChange = (field: 'clientId' | 'secret', value: string) => {
-    dispatch(setNeteaseBeeChanConfig({ [field]: value }));
-  };
 
   // Handle Weixin OpenClaw config
   const weixinOpenClawConfig = config.weixin;
@@ -587,11 +572,6 @@ const IMSettings: React.FC = () => {
         return;
       }
 
-      if (platform === 'popo') {
-        // POPO multi-instance: toggle is handled per-instance in PopoInstanceSettings
-        return;
-      }
-
       const isEnabled = config[platform].enabled;
       const newEnabled = !isEnabled;
 
@@ -629,11 +609,9 @@ const IMSettings: React.FC = () => {
   const telegramConnected = status.telegram?.instances?.some(i => i.connected) ?? false;
   const discordConnected = status.discord?.instances?.some(i => i.connected) ?? false;
   const nimConnected = status.nim?.instances?.some(i => i.connected) ?? false;
-  const neteaseBeeChanConnected = status['netease-bee']?.connected ?? false;
   const qqConnected = status.qq?.instances?.some(i => i.connected) ?? false;
   const wecomConnected = status.wecom?.instances?.some(i => i.connected) ?? false;
   const weixinConnected = status.weixin?.connected ?? false;
-  const popoConnected = status.popo?.instances?.some(i => i.connected) ?? false;
   const emailConnected = status.email.instances.some(i => i.connected);
 
   // Compute visible platforms based on language
@@ -663,9 +641,6 @@ const IMSettings: React.FC = () => {
     if (platform === 'nim') {
       return config.nim.instances.some(i => !!(i.nimToken || (i.appKey && i.account && i.token)));
     }
-    if (platform === 'netease-bee') {
-      return !!(config['netease-bee'].clientId && config['netease-bee'].secret);
-    }
     if (platform === 'qq') {
       return config.qq.instances.some(i => !!(i.appId && i.appSecret));
     }
@@ -674,9 +649,6 @@ const IMSettings: React.FC = () => {
     }
     if (platform === 'weixin') {
       return true; // No credentials needed, connects via QR code in CLI
-    }
-    if (platform === 'popo') {
-      return true; // Credentials provisioned via QR scan or manual input in openclaw.json
     }
     return config.feishu.instances?.some(i => !!(i.appId && i.appSecret));
   };
@@ -707,9 +679,6 @@ const IMSettings: React.FC = () => {
     if (platform === 'discord') {
       return config.discord.instances?.some(i => i.enabled);
     }
-    if (platform === 'popo') {
-      return config.popo.instances?.some(i => i.enabled);
-    }
     return (config[platform] as { enabled: boolean }).enabled;
   };
 
@@ -719,11 +688,9 @@ const IMSettings: React.FC = () => {
     if (platform === 'telegram') return telegramConnected;
     if (platform === 'discord') return discordConnected;
     if (platform === 'nim') return nimConnected;
-    if (platform === 'netease-bee') return neteaseBeeChanConnected;
     if (platform === 'qq') return qqConnected;
     if (platform === 'wecom') return wecomConnected;
     if (platform === 'weixin') return weixinConnected;
-    if (platform === 'popo') return popoConnected;
     if (platform === 'email') return emailConnected;
     return feishuConnected;
   };
@@ -963,10 +930,8 @@ const IMSettings: React.FC = () => {
       qq: setQQConfig,
       discord: setDiscordConfig,
       nim: setNimConfig,
-      'netease-bee': setNeteaseBeeChanConfig,
       wecom: setWecomConfig,
       weixin: setWeixinConfig,
-      popo: null, // POPO is multi-instance; toggle handled per-instance in PopoInstanceSettings
       email: null, // Email is multi-instance; toggle handled per-instance in EmailSettings
     };
     return actionMap[platform];
@@ -1490,65 +1455,6 @@ const IMSettings: React.FC = () => {
             );
           }
 
-          if (platform === 'popo') {
-            return (
-              <div key="popo">
-                <div
-                  onClick={() => { setActivePlatform('popo'); setActivePopoInstanceId(null); setPopoExpanded(!popoExpanded); }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
-                    activePlatform === 'popo'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
-                >
-                  <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
-                      <img src={PlatformRegistry.logo('popo')} alt="POPO" className="w-6 h-6 object-contain rounded-md" />
-                    </div>
-                    <span className={`text-sm font-medium truncate ${activePlatform === 'popo' ? 'text-primary' : 'text-foreground'}`}>
-                      {i18nService.t('popo')}
-                    </span>
-                  </div>
-                  <span className="text-xs opacity-50">{popoExpanded ? '\u25BC' : '\u25B6'}</span>
-                </div>
-                {popoExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
-                    {config.popo.instances.map((inst) => {
-                      const instStatus = status.popo?.instances?.find(s => s.instanceId === inst.instanceId);
-                      const isSelected = activePlatform === 'popo' && activePopoInstanceId === inst.instanceId;
-                      const dotColor = !inst.enabled ? 'bg-gray-400' : (instStatus?.connected ? 'bg-green-500' : 'bg-yellow-500');
-                      return (
-                        <div
-                          key={inst.instanceId}
-                          onClick={() => { setActivePlatform('popo'); setActivePopoInstanceId(inst.instanceId); }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected ? 'bg-primary/10 dark:bg-primary/20' : 'hover:bg-surface-raised'
-                          }`}
-                        >
-                          <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${dotColor}`} />
-                          <span className="truncate">{inst.instanceName}</span>
-                        </div>
-                      );
-                    })}
-                    {config.popo.instances.length < MAX_POPO_INSTANCES && (
-                      <button
-                        type="button"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const inst = await imService.addPopoInstance(`POPO Bot ${config.popo.instances.length + 1}`);
-                          if (inst) { setActivePopoInstanceId(inst.instanceId); setPopoExpanded(true); }
-                        }}
-                        className="w-full text-left p-1.5 pl-2 rounded-lg text-xs text-secondary hover:text-primary hover:bg-surface-raised transition-colors"
-                      >
-                        + {language === 'zh' ? '添加实例' : 'Add Instance'}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          }
-
           return (
             <div
               key={platform}
@@ -1602,7 +1508,7 @@ const IMSettings: React.FC = () => {
       {/* Platform Settings - Right Side */}
       <div className="flex-1 min-w-0 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
         {/* Header with status (only for single-instance platforms without per-instance headers) */}
-        {(activePlatform === 'weixin' || activePlatform === 'netease-bee') && (
+        {activePlatform === 'weixin' && (
         <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
           <div className="flex items-center gap-2">
              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
@@ -2392,95 +2298,6 @@ const IMSettings: React.FC = () => {
           );
         })()}
 
-        {/* 小蜜蜂设置*/}
-        {activePlatform === 'netease-bee' && (
-          <div className="space-y-3">
-            {/* Client ID */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
-                Client ID
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={config['netease-bee'].clientId}
-                  onChange={(e) => handleNeteaseBeeChanChange('clientId', e.target.value)}
-                  onBlur={handleSaveConfig}
-                  className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 pr-8 text-sm transition-colors"
-                  placeholder={i18nService.t('neteaseBeeChanClientIdPlaceholder') || '您的Client ID'}
-                />
-                {config['netease-bee'].clientId && (
-                  <div className="absolute right-2 inset-y-0 flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => { handleNeteaseBeeChanChange('clientId', ''); void imService.persistConfig({ 'netease-bee': { ...config['netease-bee'], clientId: '' } }); }}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
-                      title={i18nService.t('clear') || 'Clear'}
-                    >
-                      <XCircleIconSolid className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Client Secret */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
-                Client Secret
-              </label>
-              <div className="relative">
-                <input
-                  type={showSecrets['netease-bee.secret'] ? 'text' : 'password'}
-                  value={config['netease-bee'].secret}
-                  onChange={(e) => handleNeteaseBeeChanChange('secret', e.target.value)}
-                  onBlur={handleSaveConfig}
-                  className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 pr-16 text-sm transition-colors"
-                  placeholder="••••••••••••"
-                />
-                <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                  {config['netease-bee'].secret && (
-                    <button
-                      type="button"
-                      onClick={() => { handleNeteaseBeeChanChange('secret', ''); void imService.persistConfig({ 'netease-bee': { ...config['netease-bee'], secret: '' } }); }}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
-                      title={i18nService.t('clear') || 'Clear'}
-                    >
-                      <XCircleIconSolid className="h-4 w-4" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowSecrets(prev => ({ ...prev, 'netease-bee.secret': !prev['netease-bee.secret'] }))}
-                    className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
-                    title={showSecrets['netease-bee.secret'] ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
-                  >
-                    {showSecrets['netease-bee.secret'] ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-1">
-              {renderConnectivityTestButton('netease-bee')}
-            </div>
-
-            {/* Bot account display */}
-            {status['netease-bee']?.botAccount && (
-              <div className="text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-                Account: {status['netease-bee'].botAccount}
-              </div>
-            )}
-
-            {/* Error display */}
-            {status['netease-bee']?.lastError && (
-              <div className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                {translateIMError(status['netease-bee'].lastError)}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Weixin (微信) Settings */}
         {activePlatform === 'weixin' && (
           <div className="space-y-3">
@@ -2752,76 +2569,6 @@ const IMSettings: React.FC = () => {
                 </button>
               )}
             </div>
-          );
-        })()}
-
-        {activePlatform === 'popo' && !activePopoInstanceId && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <img src={PlatformRegistry.logo('popo')} alt="POPO" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
-              {config.popo.instances.length === 0
-                ? (language === 'zh' ? '尚未添加 POPO 实例，点击下方按钮添加' : 'No POPO instances yet. Click below to add one.')
-                : (language === 'zh' ? '请在左侧选择一个 POPO 实例' : 'Select a POPO instance from the sidebar.')}
-            </p>
-            {config.popo.instances.length < MAX_POPO_INSTANCES && (
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const inst = await imService.addPopoInstance(`POPO Bot ${config.popo.instances.length + 1}`);
-                  if (inst) { setActivePopoInstanceId(inst.instanceId); setPopoExpanded(true); }
-                }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              >
-                + {language === 'zh' ? '添加 POPO 实例' : 'Add POPO Instance'}
-              </button>
-            )}
-          </div>
-        )}
-        {activePlatform === 'popo' && activePopoInstanceId && (() => {
-          const selectedInstance = config.popo.instances.find(i => i.instanceId === activePopoInstanceId);
-          if (!selectedInstance) return null;
-          const selectedStatus = status.popo?.instances?.find(s => s.instanceId === activePopoInstanceId);
-          return (
-            <PopoInstanceSettings
-              instance={selectedInstance}
-              instanceStatus={selectedStatus}
-              onConfigChange={(update) => {
-                dispatch(setPopoInstanceConfig({ instanceId: activePopoInstanceId, config: update }));
-              }}
-              onSave={async (override) => {
-                const configToSave = override ? { ...selectedInstance, ...override } : selectedInstance;
-                if (selectedInstance.enabled) {
-                  await imService.updatePopoInstanceConfig(activePopoInstanceId, configToSave);
-                } else {
-                  await imService.persistPopoInstanceConfig(activePopoInstanceId, configToSave);
-                }
-              }}
-              onRename={async (newName) => {
-                dispatch(setPopoInstanceConfig({ instanceId: activePopoInstanceId, config: { instanceName: newName } as any }));
-                await imService.persistPopoInstanceConfig(activePopoInstanceId, { instanceName: newName } as any);
-              }}
-              onDelete={async () => {
-                await imService.deletePopoInstance(activePopoInstanceId);
-                const remaining = config.popo.instances.filter(i => i.instanceId !== activePopoInstanceId);
-                setActivePopoInstanceId(remaining.length > 0 ? remaining[0].instanceId : null);
-              }}
-              onToggleEnabled={async () => {
-                const newEnabled = !selectedInstance.enabled;
-                if (newEnabled && !(selectedInstance.appKey && selectedInstance.appSecret && selectedInstance.aesKey)) return;
-                const success = await imService.updatePopoInstanceConfig(activePopoInstanceId, { enabled: newEnabled });
-                if (success) {
-                  dispatch(setPopoInstanceConfig({ instanceId: activePopoInstanceId, config: { enabled: newEnabled } }));
-                  if (newEnabled) dispatch(clearError());
-                }
-              }}
-              onTestConnectivity={() => {
-                void handleConnectivityTest('popo');
-              }}
-              testingPlatform={testingPlatform}
-              connectivityResults={connectivityResults}
-              language={language}
-            />
           );
         })()}
 
