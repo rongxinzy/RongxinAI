@@ -1,10 +1,8 @@
 export type MarketplaceSource = 'ollama-library';
 
-export type MarketplaceTaskFilter = 'all' | 'chat' | 'reasoning' | 'embedding' | 'code';
+export type MarketplaceTaskFilter = 'all' | 'chat' | 'reasoning' | 'embedding' | 'code' | 'vision';
 
 export type MarketplaceSizeFilter = 'all' | 'small' | 'desktop' | 'workstation' | 'large';
-
-export type MarketplaceQuantizationFilter = 'all' | 'q4' | 'q5' | 'q8';
 
 export type MarketplaceModel = {
   source: MarketplaceSource;
@@ -26,7 +24,6 @@ export type MarketplaceSearchParams = {
   tags?: string[];
   task?: MarketplaceTaskFilter;
   size?: MarketplaceSizeFilter;
-  quantization?: MarketplaceQuantizationFilter;
   limit?: number;
 };
 
