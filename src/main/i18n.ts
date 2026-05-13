@@ -28,14 +28,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     channelPrefixFeishu: '飞书',
     channelPrefixDingtalk: '钉钉',
     channelPrefixWecom: '企微',
-    channelPrefixNim: '云信',
     channelPrefixWeixin: '微信',
     channelPrefixEmail: '邮件',
-    // NIM chat type labels
-    nimQChat: '圈组',
-    nimGroup: '群聊',
-
-    // Timeout hint
     taskTimedOut: '[任务超时] 任务因超过最大允许时长而被自动停止。你可以继续对话以从中断处继续。',
     imSessionStoppedReply: '任务已被手动停止。你可以继续发送消息开始新的对话。',
 
@@ -188,15 +182,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imChannelNoSessions: '{channel} 频道暂无活跃会话，Bot 可能未连接。',
     imChannelNoSessionsSuggestion: '请确认已正确扫码绑定，并检查 Bot 配置是否正确。',
     imChannelProbeError: '频道探活失败：{error}',
-
-    // NIM
-    imNimFillCredentials: '请补全 AppKey、Account 和 Token 后重新测试连通性。',
-    imNimConfigReady: '云信配置已就绪（Account: {account}）。',
-    imNimOpenClawHint: '云信通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
-    imNimP2pOnly: '云信 IM 当前仅支持 P2P（私聊）消息。',
-    imNimP2pOnlySuggestion: '请通过私聊方式向机器人账号发送消息触发对话。',
-
-    // Email Channel
     emailSettings: '邮件设置',
     emailInstance: '邮箱账号',
     addEmailInstance: '添加邮箱账号',
@@ -275,14 +260,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     channelPrefixFeishu: 'Feishu',
     channelPrefixDingtalk: 'DingTalk',
     channelPrefixWecom: 'WeCom',
-    channelPrefixNim: 'NIM',
     channelPrefixWeixin: 'WeChat',
     channelPrefixEmail: 'Email',
-    // NIM chat type labels
-    nimQChat: 'QChat',
-    nimGroup: 'Group',
-
-    // Timeout hint
     taskTimedOut:
       '[Task timed out] The task was automatically stopped because it exceeded the maximum allowed duration. You can continue the conversation to pick up where it left off.',
     imSessionStoppedReply:
@@ -469,18 +448,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imChannelNoSessions: '{channel} channel has no active sessions. The bot may not be connected.',
     imChannelNoSessionsSuggestion: 'Please confirm the binding is correct and check the bot configuration.',
     imChannelProbeError: 'Channel health check failed: {error}',
-
-    // NIM
-    imNimFillCredentials:
-      'Please provide the AppKey, Account, and Token and test connectivity again.',
-    imNimConfigReady: 'NIM configuration is ready (Account: {account}).',
-    imNimOpenClawHint:
-      'NIM runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
-    imNimP2pOnly: 'NIM currently only supports P2P (direct) messages.',
-    imNimP2pOnlySuggestion:
-      'Please send a direct message to the bot account to start a conversation.',
-
-    // Email Channel
     emailSettings: 'Email Settings',
     emailInstance: 'Email Account',
     addEmailInstance: 'Add Email Account',

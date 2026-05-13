@@ -146,7 +146,6 @@
     "jszip": "^3.10.1",
     "katex": "^0.16.21",
     "mermaid": "^10.9.5",
-    "nim-web-sdk-ng": "10.9.77-alpha.4",
     "npm": "^11.11.0",
     "pdfjs-dist": "^4.10.38",
     "pptx-preview": "^1.0.7",

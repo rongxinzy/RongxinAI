@@ -76,15 +76,6 @@ const DEFINITIONS = [
     logo: 'qq_bot.jpeg',
     guideUrl: '',
   },
-  {
-    id: 'nim',
-    label: 'NIM',
-    region: 'china',
-    channel: 'nim',
-    channelAliases: [],
-    logo: 'nim.png',
-    guideUrl: '',
-  },
   // ── Global ──
   {
     id: 'telegram',

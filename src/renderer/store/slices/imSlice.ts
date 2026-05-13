@@ -20,9 +20,6 @@ import type {
   IMGatewayConfig,
   IMGatewayStatus,
   IMSettings,
-  NimConfig,
-  NimInstanceConfig,
-  NimMultiInstanceConfig,
   QQInstanceConfig,
   QQMultiInstanceConfig,
   QQOpenClawConfig,
@@ -188,31 +185,6 @@ const imSlice = createSlice({
         i => i.instanceId !== action.payload
       );
     },
-    /** @deprecated Use setNimInstanceConfig instead */
-    setNimConfig: (state, action: PayloadAction<Partial<NimConfig>>) => {
-      const first = state.config.nim.instances[0];
-      if (first) {
-        Object.assign(first, action.payload);
-      }
-    },
-    setNimInstances: (state, action: PayloadAction<NimInstanceConfig[]>) => {
-      state.config.nim = { instances: action.payload };
-    },
-    setNimMultiInstanceConfig: (state, action: PayloadAction<NimMultiInstanceConfig>) => {
-      state.config.nim = action.payload;
-    },
-    setNimInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<NimConfig> }>) => {
-      const inst = state.config.nim.instances.find(i => i.instanceId === action.payload.instanceId);
-      if (inst) Object.assign(inst, action.payload.config);
-    },
-    addNimInstance: (state, action: PayloadAction<NimInstanceConfig>) => {
-      state.config.nim.instances.push(action.payload);
-    },
-    removeNimInstance: (state, action: PayloadAction<string>) => {
-      state.config.nim.instances = state.config.nim.instances.filter(
-        i => i.instanceId !== action.payload
-      );
-    },
     /** @deprecated Use setWecomInstanceConfig instead */
     setWecomConfig: (state, action: PayloadAction<Partial<WecomOpenClawConfig>>) => {
       // Backward compat: update first instance if exists
@@ -310,12 +282,6 @@ export const {
   setDiscordInstanceConfig,
   addDiscordInstance,
   removeDiscordInstance,
-  setNimConfig,
-  setNimInstances,
-  setNimMultiInstanceConfig,
-  setNimInstanceConfig,
-  addNimInstance,
-  removeNimInstance,
   setWecomConfig,
   setWecomInstances,
   setWecomMultiInstanceConfig,

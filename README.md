@@ -34,7 +34,7 @@ It is not just a chat client. RongxinAI is designed as an execution environment 
 - **Skills system**: Built-in skills for documents, spreadsheets, presentations, PDFs, web search, browser automation, video generation, investment research, and email.
 - **MCP extensions**: Configure MCP servers to connect external tools and data sources to the Agent.
 - **Scheduled tasks**: Create recurring jobs from natural language or the GUI, such as daily briefings, inbox cleanup, and periodic reports.
-- **IM/email reachability**: Supports WeChat, WeCom, DingTalk, Feishu/Lark, QQ, email, and optional NIM/POPO-compatible enterprise channels.
+- **IM/email reachability**: Supports WeChat, WeCom, DingTalk, Feishu/Lark, QQ, and email.
 - **Permission gating**: Sensitive file, terminal, and network tool calls require user approval.
 - **Local data storage**: Sessions, configuration, memories, and task metadata are stored in local SQLite.
 - **Cross-platform desktop**: macOS, Windows, and Linux; Windows packages can include a portable Python runtime.
@@ -160,7 +160,6 @@ This README documents the channels currently intended for product exposure and m
 | Feishu/Lark | Feishu/Lark application bot integration |
 | QQ | QQ bot integration |
 | Email | Trigger and respond through email |
-| NIM/POPO-compatible channels | Optional enterprise IM channels enabled by deployment needs |
 
 ## Data And Security
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * IM Gateway Types for Renderer Process
  * Mirrors src/main/im/types.ts for use in React components
  */
@@ -14,7 +14,7 @@ export interface DingTalkOpenClawConfig {
   dmPolicy: 'open' | 'pairing' | 'allowlist';
   allowFrom: string[];
   groupPolicy: 'open' | 'allowlist';
-  /** @deprecated since dingtalk-connector v0.7.5 – use Gateway session.reset.idleMinutes instead */
+  /** @deprecated since dingtalk-connector v0.7.5 鈥?use Gateway session.reset.idleMinutes instead */
   sessionTimeout: number;
   separateSessionByConversation: boolean;
   groupSessionScope: 'group' | 'group_sender';
@@ -240,86 +240,6 @@ export interface DiscordMultiInstanceStatus {
   instances: DiscordInstanceStatus[];
 }
 
-// ==================== NIM (NetEase IM) Types ====================
-
-export type NimTeamPolicy = 'open' | 'allowlist' | 'disabled';
-
-export interface NimP2pConfig {
-  policy: 'open' | 'allowlist' | 'disabled';
-  allowFrom?: (string | number)[];
-}
-
-export interface NimTeamConfig {
-  policy: 'open' | 'allowlist' | 'disabled';
-  allowFrom?: (string | number)[];
-}
-
-export interface NimQChatConfig {
-  policy: 'open' | 'allowlist' | 'disabled';
-  allowFrom?: (string | number)[];
-}
-
-export interface NimAdvancedConfig {
-  mediaMaxMb?: number;
-  textChunkLimit?: number;
-  debug?: boolean;
-  legacyLogin?: boolean;
-  weblbsUrl?: string;
-  link_web?: string;
-  nos_uploader?: string;
-  nos_downloader_v2?: string;
-  nosSsl?: boolean;
-  nos_accelerate?: string;
-  nos_accelerate_host?: string;
-}
-
-export interface NimOpenClawConfig {
-  enabled: boolean;
-  nimToken?: string;
-  appKey: string;
-  account: string;
-  token: string;
-  antispamEnabled?: boolean;
-  p2p?: NimP2pConfig;
-  team?: NimTeamConfig;
-  qchat?: NimQChatConfig;
-  advanced?: NimAdvancedConfig;
-}
-
-export interface NimInstanceConfig extends NimOpenClawConfig {
-  instanceId: string;
-  instanceName: string;
-}
-
-export interface NimGatewayStatus {
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  botAccount: string | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
-// NIM supports max 3 instances (enabled or not), may use different accounts or AppKeys.
-// See: https://doc.yunxin.163.com/messaging2/ai-guide/TMwNzk4MzU?platform=client#多实例配置
-export const MAX_NIM_INSTANCES = 3;
-
-export interface NimInstanceStatus extends NimGatewayStatus {
-  instanceId: string;
-  instanceName: string;
-}
-
-export interface NimMultiInstanceConfig {
-  instances: NimInstanceConfig[];
-}
-
-export interface NimMultiInstanceStatus {
-  instances: NimInstanceStatus[];
-}
-
-/** @deprecated Use NimOpenClawConfig instead. */
-export type NimConfig = NimOpenClawConfig;
-
 // ==================== QQ Types ====================
 
 export interface QQOpenClawConfig {
@@ -369,7 +289,7 @@ export interface QQMultiInstanceStatus {
   instances: QQInstanceStatus[];
 }
 
-// ==================== WeCom (企业微信) Types ====================
+// ==================== WeCom (浼佷笟寰俊) Types ====================
 
 export interface WecomOpenClawConfig {
   enabled: boolean;
@@ -417,7 +337,7 @@ export interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
 }
 
-// ==================== Weixin (微信) Types ====================
+// ==================== Weixin (寰俊) Types ====================
 
 export interface WeixinOpenClawConfig {
   enabled: boolean;
@@ -505,7 +425,6 @@ export interface IMGatewayConfig {
   telegram: TelegramMultiInstanceConfig;
   qq: QQMultiInstanceConfig;
   discord: DiscordMultiInstanceConfig;
-  nim: NimMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
   email: EmailMultiInstanceConfig;
@@ -525,7 +444,6 @@ export interface IMGatewayStatus {
   qq: QQMultiInstanceStatus;
   telegram: TelegramMultiInstanceStatus;
   discord: DiscordMultiInstanceStatus;
-  nim: NimMultiInstanceStatus;
   wecom: WecomMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
   email: EmailMultiInstanceStatus;
@@ -537,13 +455,13 @@ export type IMMediaType = 'image' | 'video' | 'audio' | 'voice' | 'document' | '
 
 export interface IMMediaAttachment {
   type: IMMediaType;
-  localPath: string;          // 下载后的本地路径
-  mimeType: string;           // MIME 类型
-  fileName?: string;          // 原始文件名
-  fileSize?: number;          // 文件大小（字节）
-  width?: number;             // 图片/视频宽度
-  height?: number;            // 图片/视频高度
-  duration?: number;          // 音视频时长（秒）
+  localPath: string;          // 涓嬭浇鍚庣殑鏈湴璺緞
+  mimeType: string;           // MIME 绫诲瀷
+  fileName?: string;          // 鍘熷鏂囦欢鍚?
+  fileSize?: number;          // 鏂囦欢澶у皬锛堝瓧鑺傦級
+  width?: number;             // 鍥剧墖/瑙嗛瀹藉害
+  height?: number;            // 鍥剧墖/瑙嗛楂樺害
+  duration?: number;          // 闊宠棰戞椂闀匡紙绉掞級
 }
 
 export interface IMMessage {
@@ -556,7 +474,7 @@ export interface IMMessage {
   chatType: 'direct' | 'group';
   timestamp: number;
   attachments?: IMMediaAttachment[];
-  mediaGroupId?: string;      // 媒体组 ID（用于合并多张图片）
+  mediaGroupId?: string;      // 濯掍綋缁?ID锛堢敤浜庡悎骞跺寮犲浘鐗囷級
 }
 
 // ==================== IPC Result Types ====================
@@ -596,7 +514,6 @@ export type IMConnectivityCheckCode =
   | 'discord_group_requires_mention'
   | 'telegram_privacy_mode_hint'
   | 'dingtalk_bot_membership_hint'
-  | 'nim_p2p_only_hint'
   | 'openclaw_gateway_not_running'
   | 'qq_guild_mention_hint'
   | 'weixin_not_logged_in'
@@ -695,22 +612,6 @@ export const DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG: DiscordMultiInstanceConfig =
   instances: [],
 };
 
-export const DEFAULT_NIM_OPENCLAW_CONFIG: NimOpenClawConfig = {
-  enabled: false,
-  nimToken: '',
-  appKey: '',
-  account: '',
-  token: '',
-  antispamEnabled: true,
-};
-
-export const DEFAULT_NIM_MULTI_INSTANCE_CONFIG: NimMultiInstanceConfig = {
-  instances: [],
-};
-
-/** @deprecated Use DEFAULT_NIM_OPENCLAW_CONFIG instead. */
-export const DEFAULT_NIM_CONFIG = DEFAULT_NIM_OPENCLAW_CONFIG;
-
 export const DEFAULT_TELEGRAM_OPENCLAW_CONFIG: TelegramOpenClawConfig = {
   enabled: false,
   botToken: '',
@@ -791,7 +692,6 @@ export const DEFAULT_IM_CONFIG: IMGatewayConfig = {
   telegram: DEFAULT_TELEGRAM_MULTI_INSTANCE_CONFIG,
   qq: DEFAULT_QQ_MULTI_INSTANCE_CONFIG,
   discord: DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG,
-  nim: DEFAULT_NIM_MULTI_INSTANCE_CONFIG,
   wecom: DEFAULT_WECOM_MULTI_INSTANCE_CONFIG,
   weixin: DEFAULT_WEIXIN_CONFIG,
   email: DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG,
@@ -807,9 +707,6 @@ export const DEFAULT_IM_STATUS: IMGatewayStatus = {
   },
   telegram: { instances: [] },
   discord: {
-    instances: [],
-  },
-  nim: {
     instances: [],
   },
   qq: {
@@ -829,3 +726,4 @@ export const DEFAULT_IM_STATUS: IMGatewayStatus = {
     instances: [],
   },
 };
+

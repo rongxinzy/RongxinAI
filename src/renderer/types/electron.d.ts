@@ -691,33 +691,6 @@ interface IElectronAPI {
       platform: string,
       code: string,
     ) => Promise<{ success: boolean; error?: string }>;
-    nimQrLoginStart: () => Promise<{
-      uuid: string;
-      qrValue: string;
-      expiresIn: number;
-      pollInterval: number;
-      credentialKind: 'split';
-      rawData: Record<string, unknown> | null;
-    }>;
-    nimQrLoginPoll: (uuid: string) => Promise<{
-      status: 'pending' | 'success' | 'failed';
-      credentials?: {
-        appKey: string;
-        account: string;
-        token: string;
-      };
-      errorCode?: string;
-      error?: string;
-    }>;
-    addNimInstance: (
-      name: string,
-    ) => Promise<{ success: boolean; instance?: NimInstanceConfig; error?: string }>;
-    deleteNimInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
-    setNimInstanceConfig: (
-      instanceId: string,
-      config: any,
-      options?: { syncGateway?: boolean },
-    ) => Promise<{ success: boolean; error?: string }>;
     addQQInstance: (
       name: string,
     ) => Promise<{ success: boolean; instance?: QQInstanceConfig; error?: string }>;
@@ -1088,7 +1061,6 @@ interface IMGatewayConfig {
   telegram: TelegramMultiInstanceConfig;
   qq: QQMultiInstanceConfig;
   discord: DiscordMultiInstanceConfig;
-  nim: NimMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
   email: EmailMultiInstanceConfig;
@@ -1247,58 +1219,6 @@ interface DiscordOpenClawConfig {
   debug: boolean;
 }
 
-interface NimP2pConfig {
-  policy: 'open' | 'allowlist' | 'disabled';
-  allowFrom?: (string | number)[];
-}
-
-interface NimTeamConfig {
-  policy: 'open' | 'allowlist' | 'disabled';
-  allowFrom?: (string | number)[];
-}
-
-interface NimQChatConfig {
-  policy: 'open' | 'allowlist' | 'disabled';
-  allowFrom?: (string | number)[];
-}
-
-interface NimAdvancedConfig {
-  mediaMaxMb?: number;
-  textChunkLimit?: number;
-  debug?: boolean;
-  legacyLogin?: boolean;
-  weblbsUrl?: string;
-  link_web?: string;
-  nos_uploader?: string;
-  nos_downloader_v2?: string;
-  nosSsl?: boolean;
-  nos_accelerate?: string;
-  nos_accelerate_host?: string;
-}
-
-interface NimOpenClawConfig {
-  enabled: boolean;
-  nimToken?: string;
-  appKey: string;
-  account: string;
-  token: string;
-  antispamEnabled?: boolean;
-  p2p?: NimP2pConfig;
-  team?: NimTeamConfig;
-  qchat?: NimQChatConfig;
-  advanced?: NimAdvancedConfig;
-}
-
-interface NimInstanceConfig extends NimOpenClawConfig {
-  instanceId: string;
-  instanceName: string;
-}
-
-interface NimMultiInstanceConfig {
-  instances: NimInstanceConfig[];
-}
-
-
 interface QQConfig {
   enabled: boolean;
   appId: string;
@@ -1387,19 +1307,9 @@ interface IMGatewayStatus {
   qq: QQMultiInstanceStatus;
   telegram: TelegramMultiInstanceStatus;
   discord: DiscordMultiInstanceStatus;
-  nim: NimMultiInstanceStatus;
   wecom: WecomMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
   email: EmailMultiInstanceStatus;
-}
-
-interface NimInstanceStatus extends NimGatewayStatus {
-  instanceId: string;
-  instanceName: string;
-}
-
-interface NimMultiInstanceStatus {
-  instances: NimInstanceStatus[];
 }
 
 type IMConnectivityVerdict = 'pass' | 'warn' | 'fail';
@@ -1418,7 +1328,6 @@ type IMConnectivityCheckCode =
   | 'discord_group_requires_mention'
   | 'telegram_privacy_mode_hint'
   | 'dingtalk_bot_membership_hint'
-  | 'nim_p2p_only_hint'
   | 'qq_guild_mention_hint';
 
 interface IMConnectivityCheck {
@@ -1488,16 +1397,6 @@ interface DiscordMultiInstanceConfig {
 interface DiscordMultiInstanceStatus {
   instances: DiscordInstanceStatus[];
 }
-
-interface NimGatewayStatus {
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  botAccount: string | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
 
 interface QQGatewayStatus {
   connected: boolean;

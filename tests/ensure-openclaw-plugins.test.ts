@@ -96,12 +96,12 @@ describe('ensure-openclaw-plugins', () => {
       id: 'moltbot-popo',
       npm: 'moltbot-popo',
       version: '2.0.7',
-      registry: 'https://npm.nie.netease.com',
+      registry: 'https://registry.example.com',
     })).toEqual({
       kind: 'packed',
       packSpec: 'moltbot-popo@2.0.7',
       pinnedDisplaySpec: 'moltbot-popo@2.0.7',
-      registry: 'https://npm.nie.netease.com',
+      registry: 'https://registry.example.com',
     });
 
     expect(resolvePluginInstallSource({

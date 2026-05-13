@@ -630,8 +630,6 @@ const CHANNEL_PLATFORM_MAP: Record<string, IMPlatform> = {
   'feishu': 'feishu',
   'telegram': 'telegram',
   'discord': 'discord',
-  'netease-im': 'netease-im',
-  'netease-bee': 'netease-bee',
 };
 
 const PLATFORM_TO_CHANNEL_MAP: Record<IMPlatform, string> = {
@@ -639,8 +637,6 @@ const PLATFORM_TO_CHANNEL_MAP: Record<IMPlatform, string> = {
   'feishu': 'feishu',
   'telegram': 'telegram',
   'discord': 'discord',
-  'netease-im': 'netease-im',
-  'netease-bee': 'netease-bee',
 };
 ```
 

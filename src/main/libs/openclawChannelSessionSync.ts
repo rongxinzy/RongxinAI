@@ -196,7 +196,7 @@ export function extractAccountIdFromKey(sessionKey: string): string | null {
   return null;
 }
 
-const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'email', 'nim', 'wecom', 'telegram', 'discord']);
+const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'email', 'wecom', 'telegram', 'discord']);
 
 /**
  * Resolve the agent binding for a platform, supporting per-instance bindings.
@@ -255,7 +255,6 @@ function getChannelTitlePrefix(platform: string): string {
     dingtalk: t('channelPrefixDingtalk'),
     wecom: t('channelPrefixWecom'),
     'wecom-openclaw-plugin': t('channelPrefixWecom'),
-    nim: t('channelPrefixNim'),
     weixin: t('channelPrefixWeixin'),
   };
   const staticMap: Record<string, string> = {
