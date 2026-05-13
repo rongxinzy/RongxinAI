@@ -7,7 +7,6 @@ import {
   DeepSeekIcon,
   GeminiIcon,
   GitHubCopilotIcon,
-  LmStudioIcon,
   MiniMaxIcon,
   MoonshotIcon,
   OllamaIcon,
@@ -18,7 +17,6 @@ import {
   StepfunIcon,
   VolcengineIcon,
   XiaomiIcon,
-  YouDaoZhiYunIcon,
   ZhipuIcon,
 } from '../components/icons/providers';
 
@@ -30,7 +28,6 @@ const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
   [ProviderName.Moonshot]:     <MoonshotIcon />,
   [ProviderName.Zhipu]:        <ZhipuIcon />,
   [ProviderName.Minimax]:      <MiniMaxIcon />,
-  [ProviderName.Youdaozhiyun]: <YouDaoZhiYunIcon />,
   [ProviderName.Qwen]:         <QwenIcon />,
   [ProviderName.Xiaomi]:       <XiaomiIcon />,
   [ProviderName.StepFun]:      <StepfunIcon />,
@@ -38,7 +35,6 @@ const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
   [ProviderName.OpenRouter]:   <OpenRouterIcon />,
   [ProviderName.Copilot]:      <GitHubCopilotIcon />,
   [ProviderName.Ollama]:       <OllamaIcon />,
-  [ProviderName.LmStudio]:     <LmStudioIcon />,
   [ProviderName.Qianfan]:      <QianfanIcon />,
 };
 

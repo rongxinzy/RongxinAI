@@ -154,9 +154,9 @@ interface ProvidersImportPayload {
 }
 
 
-const providerRequiresApiKey = (provider: ProviderType) => provider !== 'ollama' && provider !== 'lm-studio' && provider !== 'github-copilot';
+const providerRequiresApiKey = (provider: ProviderType) => provider !== 'ollama' && provider !== 'github-copilot';
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
-  if (provider === 'ollama' || provider === 'lm-studio') {
+  if (provider === 'ollama') {
     return true;
   }
 
@@ -220,7 +220,7 @@ const getFixedApiFormatForProvider = (provider: string): 'anthropic' | 'openai' 
   if (provider === 'openai' || provider === 'stepfun') {
     return 'openai';
   }
-  if (provider === 'youdaozhiyun' || provider === 'github-copilot' || provider === 'qianfan') {
+  if (provider === 'github-copilot' || provider === 'qianfan') {
     return 'openai';
   }
   // Moonshot /anthropic endpoint does not fully implement the Anthropic Messages
@@ -853,17 +853,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               baseUrl: config.api.baseUrl
             }
           }));
-        } else if (normalizedApiBaseUrl.includes('openapi.youdao.com')) {
-          setActiveProvider('youdaozhiyun');
-          setProviders(prev => ({
-            ...prev,
-            youdaozhiyun: {
-              ...prev.youdaozhiyun,
-              enabled: true,
-              apiKey: config.api.key,
-              baseUrl: config.api.baseUrl
-            }
-          }));
         } else if (normalizedApiBaseUrl.includes('dashscope')) {
           setActiveProvider('qwen');
           setProviders(prev => ({
@@ -925,17 +914,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             ...prev,
             ollama: {
               ...prev.ollama,
-              enabled: true,
-              apiKey: config.api.key,
-              baseUrl: config.api.baseUrl
-            }
-          }));
-        } else if (normalizedApiBaseUrl.includes('lm-studio') || normalizedApiBaseUrl.includes(':1234')) {
-          setActiveProvider('lm-studio');
-          setProviders(prev => ({
-            ...prev,
-            'lm-studio': {
-              ...prev['lm-studio'],
               enabled: true,
               apiKey: config.api.key,
               baseUrl: config.api.baseUrl
@@ -1940,10 +1918,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const handleSaveNewModel = () => {
     const modelId = newModelId.trim();
 
-    if (activeProvider === 'ollama' || activeProvider === 'lm-studio') {
-      // For Ollama/LM Studio, only the model name (stored as modelId) is required
+    if (activeProvider === 'ollama') {
+      // For Ollama, only the model name (stored as modelId) is required.
       if (!modelId) {
-        setModelFormError(i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelNameRequired' : 'ollamaModelNameRequired'));
+        setModelFormError(i18nService.t('ollamaModelNameRequired'));
         return;
       }
     } else {
@@ -1955,7 +1933,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     }
 
     // For Ollama, auto-fill display name from modelId if not provided
-    const modelName = activeProvider === 'ollama' || activeProvider === 'lm-studio'
+    const modelName = activeProvider === 'ollama'
       ? (newModelName.trim() && newModelName.trim() !== modelId ? newModelName.trim() : modelId)
       : newModelName.trim();
 
@@ -4613,11 +4591,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 )}
 
                 <div className="space-y-3">
-                  {(activeProvider === 'ollama' || activeProvider === 'lm-studio') ? (
+                  {activeProvider === 'ollama' ? (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-secondary mb-1">
-                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelName' : 'ollamaModelName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                          {i18nService.t('ollamaModelName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         <input
                           autoFocus
@@ -4633,15 +4611,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             }
                           }}
                           className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
-                          placeholder={i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelNamePlaceholder' : 'ollamaModelNamePlaceholder')}
+                          placeholder={i18nService.t('ollamaModelNamePlaceholder')}
                         />
                         <p className="mt-1 text-[11px] text-muted">
-                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioModelNameHint' : 'ollamaModelNameHint')}
+                          {i18nService.t('ollamaModelNameHint')}
                         </p>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-secondary mb-1">
-                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioDisplayName' : 'ollamaDisplayName')}
+                          {i18nService.t('ollamaDisplayName')}
                         </label>
                         <input
                           type="text"
@@ -4653,10 +4631,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             }
                           }}
                           className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
-                          placeholder={i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioDisplayNamePlaceholder' : 'ollamaDisplayNamePlaceholder')}
+                          placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
                         />
                         <p className="mt-1 text-[11px] text-muted">
-                          {i18nService.t(activeProvider === 'lm-studio' ? 'lmStudioDisplayNameHint' : 'ollamaDisplayNameHint')}
+                          {i18nService.t('ollamaDisplayNameHint')}
                         </p>
                       </div>
                     </>

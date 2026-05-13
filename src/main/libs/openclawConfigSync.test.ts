@@ -178,11 +178,6 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     resolveApi: ({ apiType }) => mapApiTypeToOpenClawApi(apiType),
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
-  [ProviderName.Youdaozhiyun]: {
-    providerId: OpenClawProviderId.Youdaozhiyun,
-    resolveApi: () => OpenClawApi.OpenAICompletions as OpenClawProviderApi,
-    normalizeBaseUrl: stripChatCompletionsSuffix,
-  },
   [ProviderName.StepFun]: {
     providerId: OpenClawProviderId.StepFun,
     resolveApi: () => OpenClawApi.OpenAICompletions as OpenClawProviderApi,
@@ -273,12 +268,6 @@ describe('resolveDescriptor', () => {
     expect(d.resolveApi({ apiType: 'anthropic', baseURL: '' })).toBe(OpenClawApi.AnthropicMessages);
   });
 
-  test('youdaozhiyun always uses openai-completions', () => {
-    const d = resolveDescriptor(ProviderName.Youdaozhiyun, false);
-    expect(d.providerId).toBe(OpenClawProviderId.Youdaozhiyun);
-    expect(d.resolveApi({ apiType: 'anthropic', baseURL: '' })).toBe(OpenClawApi.OpenAICompletions);
-  });
-
   test('ollama always uses openai-completions', () => {
     const d = resolveDescriptor(ProviderName.Ollama, false);
     expect(d.providerId).toBe(OpenClawProviderId.Ollama);
@@ -322,14 +311,13 @@ describe('provider registry coverage', () => {
     ProviderName.Zhipu,
     ProviderName.Volcengine,
     ProviderName.Minimax,
-    ProviderName.Youdaozhiyun,
     ProviderName.StepFun,
     ProviderName.Xiaomi,
     ProviderName.OpenRouter,
     ProviderName.Ollama,
   ] as const;
 
-  test('all 14 providers have registry entries', () => {
+  test('all active providers have registry entries', () => {
     for (const name of allRegistryProviders) {
       expect(name in PROVIDER_REGISTRY, `${name} missing from registry`).toBe(true);
     }

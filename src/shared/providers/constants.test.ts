@@ -88,9 +88,9 @@ describe('ProviderRegistry', () => {
     expect(en[2]).toBe(ProviderName.Gemini);
   });
 
-  test('idsForEnLocale puts lm-studio at end', () => {
+  test('idsForEnLocale puts ollama at end', () => {
     const en = ProviderRegistry.idsForEnLocale();
-    expect(en[en.length - 1]).toBe(ProviderName.LmStudio);
+    expect(en[en.length - 1]).toBe(ProviderName.Ollama);
     expect(en).not.toContain(ProviderName.Custom);
   });
 
