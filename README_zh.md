@@ -291,7 +291,6 @@ LobsterAI 内置 29 种技能，覆盖办公、创作、投研、自动化等多
 | local-tools | 本地系统工具 | 文件管理、系统操作 |
 | imap-smtp-email | 邮件收发 | 邮件处理、自动回复 |
 | create-plan | 计划编排 | 项目规划、任务分解 |
-| youdaonote | 有道云笔记 | 笔记管理、待办管理、网页剪藏 |
 | skill-vetter | 技能安全审查 | 安装第三方技能前的安全检验 |
 | skill-creator | 自定义技能创建 | 扩展新能力 |
 

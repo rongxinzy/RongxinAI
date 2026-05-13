@@ -290,7 +290,6 @@ LobsterAI ships with 29 built-in skills covering productivity, creative, investm
 | local-tools | Local system tools | File management, system operations |
 | imap-smtp-email | Email send/receive | Email processing, auto-replies |
 | create-plan | Plan authoring | Project planning, task breakdown |
-| youdaonote | Youdao Note | Note management, to-dos, web clipping |
 | skill-vetter | Skill security audit | Safety check before installing third-party skills |
 | skill-creator | Custom skill creation | Extend new capabilities |
 

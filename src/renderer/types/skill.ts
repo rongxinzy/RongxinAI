@@ -32,6 +32,14 @@ export interface MarketplaceSkill {
   name: string;
   description: string | LocalizedText;
   tags?: string[];
+  stats?: {
+    comments?: number;
+    downloads?: number;
+    installsAllTime?: number;
+    installsCurrent?: number;
+    stars?: number;
+    versions?: number;
+  };
   url: string;              // Download URL (.zip)
   version: string;
   source: {
