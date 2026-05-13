@@ -38,8 +38,7 @@ const DEFINITIONS = [
     channel: 'openclaw-weixin',
     channelAliases: [],
     logo: 'weixin.png',
-    guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E5%BE%AE%E4%BF%A1-im-%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+    guideUrl: '',
   },
   {
     id: 'dingtalk',
@@ -48,8 +47,7 @@ const DEFINITIONS = [
     channel: 'dingtalk-connector',
     channelAliases: ['dingtalk'],
     logo: 'dingding.png',
-    guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E9%92%89%E9%92%89-im-%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+    guideUrl: '',
   },
   {
     id: 'feishu',
@@ -58,8 +56,7 @@ const DEFINITIONS = [
     channel: 'feishu',
     channelAliases: [],
     logo: 'feishu.png',
-    guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E9%A3%9E%E4%B9%A6-im-%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+    guideUrl: '',
   },
   {
     id: 'wecom',
@@ -68,8 +65,7 @@ const DEFINITIONS = [
     channel: 'wecom',
     channelAliases: ['wecom-openclaw-plugin'],
     logo: 'wecom.png',
-    guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+    guideUrl: '',
   },
   {
     id: 'qq',
@@ -78,7 +74,7 @@ const DEFINITIONS = [
     channel: 'qqbot',
     channelAliases: [],
     logo: 'qq_bot.jpeg',
-    guideUrl: 'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/qqqq-bot',
+    guideUrl: '',
   },
   {
     id: 'nim',
@@ -115,8 +111,7 @@ const DEFINITIONS = [
     channel: 'telegram',
     channelAliases: [],
     logo: 'telegram.svg',
-    guideUrl:
-      'https://lobsterai.youdao.com/#/en/docs/lobsterai_im_bot_config_guide/telegram-bot-configuration',
+    guideUrl: '',
   },
   {
     id: 'discord',
@@ -125,8 +120,7 @@ const DEFINITIONS = [
     channel: 'discord',
     channelAliases: [],
     logo: 'discord.svg',
-    guideUrl:
-      'https://lobsterai.youdao.com/#/en/docs/lobsterai_im_bot_config_guide/discord-bot-configuration',
+    guideUrl: '',
   },
   {
     id: 'email',

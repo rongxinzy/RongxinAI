@@ -244,15 +244,15 @@ describe('OpenClawConfigSync runtime config output', () => {
   test('merges all server models into existing lobsterai provider and updates image input', async () => {
     mockRuntimeState.proxyPort = 56646;
     mockRuntimeState.serverModels = [
-      { modelId: 'qwen3.5-plus-YoudaoInner', supportsImage: true },
-      { modelId: 'qwen3.6-plus-YoudaoInner', supportsImage: true },
-      { modelId: 'deepseek-v3.2-YoudaoInner', supportsImage: false },
+      { modelId: 'qwen3.5-plus', supportsImage: true },
+      { modelId: 'qwen3.6-plus', supportsImage: true },
+      { modelId: 'deepseek-v3.2', supportsImage: false },
     ];
     mockRuntimeState.rawApiConfig = {
       config: {
-        baseURL: 'https://lobsterai-server.youdao.com/api/proxy/v1',
+        baseURL: 'https://api.lobsterai.local/proxy/v1',
         apiKey: 'access-token',
-        model: 'qwen3.5-plus-YoudaoInner',
+        model: 'qwen3.5-plus',
         apiType: 'openai',
       },
       providerMetadata: {
@@ -309,15 +309,15 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(provider.baseUrl).toBe('http://127.0.0.1:56646/v1');
     expect(provider.models).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        id: 'qwen3.5-plus-YoudaoInner',
+        id: 'qwen3.5-plus',
         input: ['text', 'image'],
       }),
       expect.objectContaining({
-        id: 'qwen3.6-plus-YoudaoInner',
+        id: 'qwen3.6-plus',
         input: ['text', 'image'],
       }),
       expect.objectContaining({
-        id: 'deepseek-v3.2-YoudaoInner',
+        id: 'deepseek-v3.2',
         input: ['text'],
       }),
     ]));

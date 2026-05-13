@@ -30,7 +30,6 @@ export const ProviderName = {
   Moonshot: 'moonshot',
   Zhipu: 'zhipu',
   Minimax: 'minimax',
-  Youdaozhiyun: 'youdaozhiyun',
   Qwen: 'qwen',
   Qianfan: 'qianfan',
   Xiaomi: 'xiaomi',
@@ -38,7 +37,6 @@ export const ProviderName = {
   Volcengine: 'volcengine',
   OpenRouter: 'openrouter',
   Ollama: 'ollama',
-  LmStudio: 'lm-studio',
   Custom: 'custom',
   LobsteraiServer: 'lobsterai-server',
   Copilot: 'github-copilot',
@@ -60,14 +58,12 @@ export const OpenClawProviderId = {
   Zai: 'zai', // OpenClaw official provider ID for Zhipu/GLM
   Volcengine: 'volcengine',
   Minimax: 'minimax',
-  Youdaozhiyun: 'youdaozhiyun',
   StepFun: 'stepfun',
   Xiaomi: 'xiaomi',
   OpenRouter: 'openrouter',
   Copilot: 'github-copilot',
   LobsteraiCopilot: 'lobsterai-copilot',
   Ollama: 'ollama',
-  LmStudio: 'lm-studio',
   Lobster: 'lobster',
 } as const;
 export type OpenClawProviderId = typeof OpenClawProviderId[keyof typeof OpenClawProviderId];
@@ -327,28 +323,6 @@ const PROVIDER_DEFINITIONS = [
     ],
   },
   {
-    id: ProviderName.Youdaozhiyun,
-    label: 'Youdao',
-    website: 'https://ai.youdao.com',
-    apiKeyUrl: 'https://ai.youdao.com/console',
-    openClawProviderId: OpenClawProviderId.Youdaozhiyun,
-    defaultBaseUrl: 'https://openapi.youdao.com/llmgateway/api/v1/chat/completions',
-    defaultApiFormat: ApiFormat.OpenAI,
-    codingPlanSupported: false,
-    region: 'china',
-    enPriority: 0,
-    defaultModels: [
-      { id: 'deepseek-chat', name: 'DeepSeek Chat', supportsImage: false },
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false },
-      { id: 'deepseek-inhouse-chat', name: 'DeepSeek Chat (\u5b89\u5168)', supportsImage: false },
-      {
-        id: 'deepseek-inhouse-reasoner',
-        name: 'DeepSeek Reasoner (\u5b89\u5168)',
-        supportsImage: false,
-      },
-    ],
-  },
-  {
     id: ProviderName.Qianfan,
     label: 'Qianfan',
     apiKeyUrl: 'https://console.bce.baidu.com/qianfan/ais/console/apiKey',
@@ -426,22 +400,6 @@ const PROVIDER_DEFINITIONS = [
       { id: 'qwen3-coder-next', name: 'Qwen3-Coder-Next', supportsImage: false },
       { id: 'glm-4.7-flash', name: 'GLM 4.7 Flash', supportsImage: false },
     ],
-  },
-  {
-    id: ProviderName.LmStudio,
-    label: 'LM Studio',
-    website: 'https://lmstudio.ai',
-    openClawProviderId: OpenClawProviderId.LmStudio,
-    defaultBaseUrl: 'http://localhost:1234/v1',
-    defaultApiFormat: ApiFormat.OpenAI,
-    codingPlanSupported: false,
-    switchableBaseUrls: {
-      anthropic: 'http://localhost:1234',
-      openai: 'http://localhost:1234/v1',
-    },
-    region: 'china',
-    enPriority: 0,
-    defaultModels: [],
   },
   // ── Global ──
   {
@@ -695,17 +653,12 @@ class ProviderRegistryImpl {
     const orderedProviders = [...priority, ...china, ...global];
     const unique = [...new Set(orderedProviders)];
 
-    // Move local providers (ollama, lm-studio) to the end
+    // Move local providers to the end.
     const ollamaIdx = unique.indexOf(ProviderName.Ollama);
     if (ollamaIdx !== -1) {
       unique.splice(ollamaIdx, 1);
     }
-    const lmStudioIdx = unique.indexOf(ProviderName.LmStudio);
-    if (lmStudioIdx !== -1) {
-      unique.splice(lmStudioIdx, 1);
-    }
     unique.push(ProviderName.Ollama);
-    unique.push(ProviderName.LmStudio);
     return unique;
   }
 }

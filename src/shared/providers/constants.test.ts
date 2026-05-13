@@ -16,9 +16,9 @@ describe('ProviderName constants', () => {
 });
 
 describe('ProviderRegistry', () => {
-  test('providerIds returns 17 providers (no custom)', () => {
+  test('providerIds returns 15 providers (no custom)', () => {
     const ids = ProviderRegistry.providerIds;
-    expect(ids.length).toBe(17);
+    expect(ids.length).toBe(15);
     expect(ids).not.toContain(ProviderName.Custom);
     expect(ids).not.toContain(ProviderName.LobsteraiServer);
   });
@@ -62,9 +62,9 @@ describe('ProviderRegistry', () => {
     expect(ProviderRegistry.supportsCodingPlan('unknown')).toBe(false);
   });
 
-  test('idsByRegion china returns 12 providers', () => {
+  test('idsByRegion china returns 10 providers', () => {
     const china = ProviderRegistry.idsByRegion('china');
-    expect(china.length).toBe(12);
+    expect(china.length).toBe(10);
     expect(china).toContain(ProviderName.DeepSeek);
     expect(china).toContain(ProviderName.Qianfan);
     expect(china).toContain(ProviderName.Ollama);
@@ -88,9 +88,9 @@ describe('ProviderRegistry', () => {
     expect(en[2]).toBe(ProviderName.Gemini);
   });
 
-  test('idsForEnLocale puts lm-studio at end', () => {
+  test('idsForEnLocale puts ollama at end', () => {
     const en = ProviderRegistry.idsForEnLocale();
-    expect(en[en.length - 1]).toBe(ProviderName.LmStudio);
+    expect(en[en.length - 1]).toBe(ProviderName.Ollama);
     expect(en).not.toContain(ProviderName.Custom);
   });
 

@@ -651,12 +651,6 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
 
-  [ProviderName.Youdaozhiyun]: {
-    providerId: OpenClawProviderId.Youdaozhiyun,
-    resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
-    normalizeBaseUrl: stripChatCompletionsSuffix,
-  },
-
   [ProviderName.StepFun]: {
     providerId: OpenClawProviderId.StepFun,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
@@ -678,12 +672,6 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
   [ProviderName.Ollama]: {
     providerId: OpenClawProviderId.Ollama,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
-    normalizeBaseUrl: stripChatCompletionsSuffix,
-  },
-
-  [ProviderName.LmStudio]: {
-    providerId: OpenClawProviderId.LmStudio,
-    resolveApi: ({ apiType, baseURL }) => mapApiTypeToOpenClawApi(apiType, undefined, baseURL),
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
 
