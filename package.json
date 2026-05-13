@@ -31,12 +31,6 @@
         "version": "2.4.3"
       },
       {
-        "id": "openclaw-nim-channel",
-        "npm": "git+https://github.com/netease-im/openclaw-nim-channel.git#1.1.1",
-        "version": "1.1.1",
-        "optional": true
-      },
-      {
         "id": "clawemail-email",
         "npm": "@clawemail/email",
         "version": "0.9.12"

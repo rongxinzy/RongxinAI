@@ -190,6 +190,7 @@ const MANAGED_OWNER_ALLOW_FROM = [
 const MANAGED_TOOL_DENY = ['web_search'] as const;
 const EMAIL_PLUGIN_ID = 'email';
 const NIM_CHANNEL_PLUGIN_ID = 'nimsuite-openclaw-nim-channel';
+const REMOVED_NIM_CHANNEL_PLUGIN_IDS = ['openclaw-nim-channel', NIM_CHANNEL_PLUGIN_ID] as const;
 
 const MANAGED_SKILL_ENTRY_OVERRIDES: Record<string, { enabled: boolean }> = {
   // QQ plugin ships a legacy reminder skill that steers the model toward a
@@ -868,6 +869,10 @@ const pluginMatches = (
   ...ids: string[]
 ): boolean => ids.includes(plugin.packageId) || ids.includes(plugin.pluginId);
 
+const hasPreinstalledNimChannelPlugin = (): boolean => (
+  readPreinstalledPlugins().some((plugin) => pluginMatches(plugin, ...REMOVED_NIM_CHANNEL_PLUGIN_IDS, 'nim'))
+);
+
 const isBundledPluginAvailable = (pluginId: string): boolean => {
   return hasBundledOpenClawExtension(pluginId);
 };
@@ -1172,6 +1177,7 @@ export class OpenClawConfigSync {
     const hasPreinstalledPlugin = (...ids: string[]) => (
       preinstalledPlugins.some((plugin) => pluginMatches(plugin, ...ids))
     );
+    const hasNimChannelPlugin = hasPreinstalledNimChannelPlugin();
     const hasMcpBridgePlugin = isBundledPluginAvailable('mcp-bridge');
     const hasAskUserPlugin = isBundledPluginAvailable('ask-user-question');
     const qwenPortalAuthPluginId = resolveOpenClawExtensionPluginId('qwen-portal-auth');
@@ -1330,15 +1336,14 @@ export class OpenClawConfigSync {
       },
       ...((() => {
         // Remove legacy package/directory ids from plugin entries.  OpenClaw
-        // validates entries by the manifest `id`, so aliases like
-        // `clawemail-email` and `openclaw-nim-channel` produce noisy
-        // "plugin not found" warnings even when the package exists.
+        // validates entries by the manifest `id`, so package aliases like
+        // `clawemail-email` produce noisy "plugin not found" warnings.
         const packageAliasPluginIds = preinstalledPlugins
           .filter((plugin) => plugin.packageId !== plugin.pluginId)
           .map((plugin) => plugin.packageId);
         const knownStalePluginIds = [
           'dingtalk',
-          'openclaw-nim-channel',
+          ...REMOVED_NIM_CHANNEL_PLUGIN_IDS,
           'clawemail-email',
           'qwen-portal-auth',
           'openclaw-qqbot',
@@ -1372,8 +1377,6 @@ export class OpenClawConfigSync {
                   return feishuInstances.some(i => i.enabled && i.appId);
                 if (pluginMatches(plugin, 'openclaw-qqbot')) return qqInstances.some(i => i.enabled && i.appId);
                 if (pluginMatches(plugin, 'wecom-openclaw-plugin')) return wecomInstances.some(i => i.enabled && i.botId);
-                if (pluginMatches(plugin, 'openclaw-nim-channel', NIM_CHANNEL_PLUGIN_ID, 'nim'))
-                  return nimInstances.some(i => i.enabled && ((i.nimToken && i.nimToken.trim()) || (i.appKey && i.account && i.token)));
                 if (pluginMatches(plugin, 'openclaw-weixin')) return true; // Always keep enabled for QR login discovery
                 if (pluginMatches(plugin, 'clawemail-email', EMAIL_PLUGIN_ID)) return !!emailConfig?.instances.some(i => i.enabled && i.email);
                 return true; // other plugins stay enabled
@@ -1801,10 +1804,14 @@ export class OpenClawConfigSync {
         };
       }
     }
-    // Sync NIM OpenClaw channel config (via openclaw-nim plugin) — multi-instance via accounts
-    const configuredNimInstances = nimInstances.filter((inst) =>
-      Boolean((inst.nimToken && inst.nimToken.trim()) || (inst.appKey && inst.account && inst.token))
-    );
+    // Sync NIM OpenClaw channel config only when a compatible plugin is present.
+    // RongxinAI no longer preinstalls the NIM channel plugin, but this guard
+    // preserves compatibility if a deployment explicitly declares it again.
+    const configuredNimInstances = hasNimChannelPlugin
+      ? nimInstances.filter((inst) =>
+        Boolean((inst.nimToken && inst.nimToken.trim()) || (inst.appKey && inst.account && inst.token))
+      )
+      : [];
     if (configuredNimInstances.length > 0) {
       const accounts: Record<string, Record<string, unknown>> = {};
       configuredNimInstances.forEach((inst, idx) => {
@@ -2101,13 +2108,6 @@ export class OpenClawConfigSync {
           env[`LOBSTER_EMAIL_${envSuffix}_APIKEY`] = inst.apiKey;
         }
       }
-    }
-
-    // NIM
-    const nimInstances = this.getNimInstances().filter((inst) => inst.enabled && inst.token);
-    for (let idx = 0; idx < nimInstances.length; idx++) {
-      const key = idx === 0 ? 'LOBSTER_NIM_TOKEN' : `LOBSTER_NIM_TOKEN_${idx}`;
-      env[key] = nimInstances[idx].token;
     }
 
     const D = gwDiagTs;
@@ -2510,13 +2510,14 @@ export class OpenClawConfigSync {
     const agents = this.getAgents?.() ?? [];
 
     const bindings: Array<Record<string, unknown>> = [];
+    const hasNimChannelPlugin = hasPreinstalledNimChannelPlugin();
 
     // Handle per-instance bindings for multi-instance platforms
     const multiInstanceChannels: Record<string, { channel: string; getInstances: () => Array<{ instanceId: string; enabled: boolean; appKey?: string; account?: string; nimToken?: string }> }> = {
       dingtalk: { channel: DINGTALK_OPENCLAW_CHANNEL, getInstances: () => this.getDingTalkInstances() },
       feishu: { channel: 'feishu', getInstances: () => this.getFeishuInstances() },
       qq: { channel: 'qqbot', getInstances: () => this.getQQInstances() },
-      nim: { channel: 'nim', getInstances: () => this.getNimInstances() },
+      ...(hasNimChannelPlugin ? { nim: { channel: 'nim', getInstances: () => this.getNimInstances() } } : {}),
       wecom: { channel: 'wecom', getInstances: () => this.getWecomInstances() },
       telegram: { channel: 'telegram', getInstances: () => this.getTelegramInstances() },
       discord: { channel: 'discord', getInstances: () => this.getDiscordInstances() },
