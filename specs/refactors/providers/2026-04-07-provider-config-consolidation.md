@@ -116,10 +116,10 @@ const PROVIDER_DEFINITIONS = [
     // ...
   },
   {
-    id: ProviderName.Youdaozhiyun,
-    label: 'Youdao',
-    website: 'https://ai.youdao.com',
-    apiKeyUrl: 'https://ai.youdao.com/console',
+    id: ProviderName.InternalProvider,
+    label: 'Internal Provider',
+    website: 'https://example.internal',
+    apiKeyUrl: 'https://example.internal/console',
     // ...
   },
   {
@@ -285,7 +285,7 @@ import React from 'react';
 import { ProviderName } from '@shared/providers';
 import {
   OpenAIIcon, DeepSeekIcon, GeminiIcon, AnthropicIcon,
-  MoonshotIcon, ZhipuIcon, MiniMaxIcon, YouDaoZhiYunIcon,
+  MoonshotIcon, ZhipuIcon, MiniMaxIcon, InternalProviderIcon,
   QwenIcon, XiaomiIcon, StepfunIcon, VolcengineIcon,
   OpenRouterIcon, OllamaIcon, GitHubCopilotIcon, CustomProviderIcon,
 } from '../components/icons/providers';
@@ -305,7 +305,7 @@ const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
   [ProviderName.Moonshot]:      <MoonshotIcon />,
   [ProviderName.Zhipu]:         <ZhipuIcon />,
   [ProviderName.Minimax]:       <MiniMaxIcon />,
-  [ProviderName.Youdaozhiyun]:  <YouDaoZhiYunIcon />,
+  [ProviderName.InternalProvider]:  <InternalProviderIcon />,
   [ProviderName.Qwen]:          <QwenIcon />,
   [ProviderName.Xiaomi]:        <XiaomiIcon />,
   [ProviderName.StepFun]:       <StepfunIcon />,

@@ -5,7 +5,7 @@
 用户正常使用 LobsterAI Cowork 时，未主动修改配置，但 OpenClaw gateway 在后台突然收到 `SIGTERM` 并重启。日志中同时出现了插件配置 warning：
 
 ```text
-[Auth:getModels] Fetching: https://lobsterai-server.youdao.com/api/models/available
+[Auth:getModels] Fetching: https://example.internal/api/models/available
 [Auth:getModels] Response status: 200
 [GW-RESTART-DIAG] syncOpenClawConfig START reason=server-models-updated
 [GW-RESTART-DIAG] needsHardRestart=true

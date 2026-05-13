@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Build and Development Commands
 
@@ -17,8 +17,8 @@ npm run build
 # Lint with ESLint
 npm run lint
 
-# Run memory extractor tests (Node.js built-in test runner)
-npm run test:memory
+# Run unit tests (Vitest)
+npm test
 
 # Compile Electron main process only
 npm run compile:electron
@@ -38,15 +38,19 @@ npm run openclaw:runtime:host   # current platform
 
 ## Architecture Overview
 
-LobsterAI is an Electron + React desktop application with two primary modes:
-1. **Cowork Mode** - AI-assisted coding sessions powered by OpenClaw as the primary agent engine
-2. **Artifacts System** - Rich preview of code outputs (HTML, SVG, React, Mermaid)
+RongxinAI is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
+1. **Cowork Mode** - AI-assisted task sessions powered by OpenClaw as the primary agent runtime
+2. **Ollama Local Inference** - local model service management, model launch options, and local model integration with OpenClaw
+3. **Skills and MCP** - built-in skills, remote skill marketplace, and MCP server configuration
+4. **Artifacts System** - rich preview of code outputs (HTML, SVG, React, Mermaid)
 
 Uses strict process isolation with IPC communication.
 
+Public-facing product documentation should use the RongxinAI name. Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
+
 ### Authentication Flow
 
-1. **登录：** 打开系统浏览器 → Portal 登录页 → URS 登录成功 → deep link `lobsterai://auth/callback?code=<authCode>`
+1. **登录：** 打开系统浏览器 → Portal 登录页 → 登录成功 → deep link callback with `code=<authCode>`
 2. **换取令牌：** `POST /api/auth/exchange` 消费一次性 authCode → 返回 `accessToken`(2h) + `refreshToken`(30d)
 3. **持久化：** SQLite kv store `auth_tokens` 存储双 token，应用重启后自动恢复登录态
 4. **请求认证：** `fetchWithAuth()` 在每个 API 请求附加 `Authorization: Bearer <accessToken>`
@@ -57,7 +61,7 @@ Uses strict process isolation with IPC communication.
 
 **关键文件：**
 - Token 存储与请求：`src/renderer/services/api.ts`（`fetchWithAuth()`、token 管理）
-- 登录流程：`src/main/main.ts`（deep link 处理 `lobsterai://` 协议）
+- 登录流程：`src/main/main.ts`（deep link callback 处理；legacy protocol names may still be present）
 - 持久化：`src/main/sqliteStore.ts`（kv 表存储 `auth_tokens`）
 
 ### Process Model
@@ -66,8 +70,10 @@ Uses strict process isolation with IPC communication.
 - Window lifecycle management
 - SQLite storage via `better-sqlite3` (`src/main/sqliteStore.ts`)
 - Agent engine routing (`src/main/libs/agentEngine/coworkEngineRouter.ts`) - dispatches to `openclawRuntimeAdapter.ts` (OpenClaw)
-- IM gateways (`src/main/im/`) - WeChat, WeCom, DingTalk, Feishu, QQ, Telegram, Discord, NetEase IM, NetEase Bee, POPO
+- Ollama lifecycle and local inference management (`src/main/libs/ollamaManager.ts`, `src/shared/ollama/`)
 - Skill management (`src/main/skillManager.ts`)
+- MCP server configuration and marketplace integration
+- IM/email gateways (`src/main/im/`) - public-facing channels are WeChat, WeCom, DingTalk, Feishu/Lark, QQ, Email, plus optional NIM/POPO-compatible enterprise channels. Legacy/global connector code may exist; do not re-expose it in UI or docs unless explicitly requested.
 - IPC handlers for store, cowork, and API operations (40+ channels)
 - Security: context isolation enabled, node integration disabled, sandbox enabled
 
@@ -87,13 +93,14 @@ src/main/
 ├── sqliteStore.ts       # SQLite database (kv + cowork tables)
 ├── coworkStore.ts       # Cowork session/message CRUD operations
 ├── skillManager.ts      # Skill loading and management
-├── im/                  # IM gateway integrations (WeChat/WeCom/DingTalk/Feishu/QQ/Telegram/Discord/POPO)
+├── im/                  # IM/email gateway integrations
 └── libs/
     ├── agentEngine/
     │   ├── coworkEngineRouter.ts    # Routes to OpenClaw runtime
     │   └── openclawRuntimeAdapter.ts # OpenClaw gateway adapter
     ├── openclawEngineManager.ts # OpenClaw runtime lifecycle (install/start/status)
     ├── openclawConfigSync.ts    # Syncs cowork config → OpenClaw config files
+    ├── ollamaManager.ts         # Ollama service lifecycle and configuration
 
 src/renderer/
 ├── types/cowork.ts      # Cowork type definitions
@@ -110,6 +117,9 @@ src/renderer/
 │   │   ├── CoworkSessionList.tsx   # Session sidebar
 │   │   ├── CoworkSessionDetail.tsx # Message display
 │   │   └── CoworkPermissionModal.tsx # Tool permission UI
+│   ├── localInference/  # Ollama local inference UI
+│   ├── skills/          # Skill management and marketplace UI
+│   ├── mcp/             # MCP server configuration UI
 │   └── artifacts/       # Artifact renderers
 
 SKILLs/                  # Custom skill definitions for cowork sessions
@@ -126,6 +136,7 @@ SKILLs/                  # Custom skill definitions for cowork sessions
 2. **Cowork Session**: User sends prompt → `coworkService.startSession()` → IPC to main → `CoworkEngineRouter` → OpenClaw gateway (primary) → streaming events back to renderer via IPC → Redux updates
 3. **Tool Permissions**: Agent requests tool use → `CoworkEngineRouter` emits `permissionRequest` → UI shows `CoworkPermissionModal` → user approves/denies → result sent back to engine
 4. **Persistence**: Cowork sessions stored in SQLite (`cowork_sessions`, `cowork_messages` tables)
+5. **Local Inference**: Renderer invokes Ollama IPC → main process manages `ollama serve`, model pull/list/run state, and service/model launch parameters
 
 ### Cowork System
 
@@ -161,13 +172,14 @@ The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-
 
 ### Key Patterns
 
-- **Streaming responses**: `apiService.chat()` uses SSE with `onProgress` callback for real-time message updates
+- **Streaming responses**: provider chat APIs can use SSE with `onProgress` callback for real-time message updates
 - **Cowork streaming**: Uses IPC event listeners (`onStreamMessage`, `onStreamMessageUpdate`, etc.) for bidirectional communication
 - **Markdown rendering**: `react-markdown` with `remark-gfm`, `remark-math`, `rehype-katex` for GitHub markdown and LaTeX
 - **Theme system**: Class-based Tailwind dark mode, applies `dark` class to `<html>` element
 - **i18n**: Simple key-value translation in `services/i18n.ts`, supports Chinese (default) and English. Language auto-detected from system locale on first run.
 - **Path alias**: `@` maps to `src/renderer/` in Vite config for imports.
 - **Skills**: Custom skill definitions in `SKILLs/` directory, configured via `skills.config.json`
+- **Ollama parameters**: service-level options are environment variables for `ollama serve`; model-level options are request options passed when starting/running a model.
 
 ### Artifacts System
 
@@ -201,7 +213,7 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - Cowork config stored in `cowork_config` table (workingDirectory, systemPrompt, executionMode, **agentEngine**)
 - Cowork sessions and messages stored in `cowork_sessions` and `cowork_messages` tables
 - Scheduled task metadata stored in `scheduled_task_meta` table (origin and binding info); task definitions are managed by OpenClaw
-- Database file: `lobsterai.sqlite` in user data directory
+- Database file: currently uses the configured app SQLite filename in the user data directory. Legacy installations may still use `lobsterai.sqlite`; do not change storage names without a migration plan.
 - OpenClaw pinned version declared in `package.json` under `"openclaw": { "version": "...", "repo": "..." }`; update the version field and re-run to upgrade
 
 ### TypeScript Configuration
@@ -249,7 +261,7 @@ export type SessionTarget = typeof SessionTarget[keyof typeof SessionTarget];
 
 ### What NOT to constantize
 
-- Platform-specific identifiers passed through from external sources (e.g., `'telegram'`, `'feishu'` as IM platform names from user config).
+- Platform-specific identifiers passed through from external sources (e.g., `'feishu'`, `'weixin'`, `'email'` as IM/email platform names from user config).
 - One-off strings used in a single location with no comparison logic (e.g., error messages, log tags).
 - CSS class names, HTML attributes, and other UI-layer strings managed by Tailwind/React.
 

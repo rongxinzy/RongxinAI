@@ -1,11 +1,11 @@
-# LobsterAI — 全场景个人助理 Agent
+# RongxinAI
 
 <p align="center">
-  <img src="public/logo.png" alt="LobsterAI" width="120">
+  <img src="public/logo.png" alt="RongxinAI" width="120">
 </p>
 
 <p align="center">
-  <strong>7×24 小时帮你干活的全场景个人助理，由网易有道开发</strong>
+  <strong>基于 OpenClaw 与 Ollama 的本地 AI Agent 工作台</strong>
 </p>
 
 <p align="center">
@@ -23,510 +23,182 @@
 
 ---
 
-**LobsterAI** 是由[网易有道](https://www.youdao.com/)开发的全场景个人助理 Agent。它 7×24 小时待命，能够帮你完成日常办公中的各类事务 —— 数据分析、制作 PPT、生成视频、撰写文档、搜索信息、收发邮件、定时任务，以及更多。
+RongxinAI 是一个本地优先的桌面 AI Agent 工作台。它将 **OpenClaw Agent runtime**、**Ollama 本地模型推理**、技能系统、MCP 扩展、定时任务和 IM/邮件触达整合到同一个应用中，面向办公自动化、数据分析、文档生成、信息检索和个人助理场景。
 
-LobsterAI 的核心是 **Cowork 模式**，它能在本地或沙箱环境中执行工具、操作文件、运行命令，一切都在你的监督下自主完成。此外，LobsterAI 支持通过微信、企业微信、钉钉、飞书、Telegram、Discord 等 IM 平台远程触发，让你在手机上也能随时指挥 Agent 工作。
+项目目标不是做一个单纯聊天客户端，而是提供一个可以在本机执行任务、管理工具权限、调度长期任务、接入本地模型并可通过移动端触发的 Agent 工作环境。
 
-## 核心特性
+## 核心能力
 
-- **全场景办公助理** — 数据分析、PPT 制作、视频生成、文档撰写、Web 搜索、邮件收发，覆盖日常办公全流程
-- **本地 + 沙箱执行** — 任务执行支持本地直接运行或 OpenClaw 沙箱环境
-- **内置技能** — 包括 Office 文档生成、Web 搜索、Playwright 自动化、Remotion 视频生成等
-- **Windows 内置 Python 运行时** — Windows 安装包内置可直接使用的 Python 解释器运行时；Python 技能依赖可按需安装
-- **定时任务** — 支持对话式发起或 GUI 界面添加定时任务，如每日新闻收集、邮箱整理、周期性报告生成等
-- **持久记忆** — 自动从对话中提取用户偏好与个人信息，跨会话记住你的习惯，越用越懂你
-- **IM 远程操控** — 通过微信、企业微信、钉钉、飞书、QQ、Telegram、Discord 等在手机端随时触发 Agent
-- **权限门控** — 所有敏感工具调用需用户明确批准后执行
-- **跨平台** — macOS（Intel + Apple Silicon）、Windows、Linux 桌面端，配合 IM 实现移动端覆盖
-- **数据本地化** — SQLite 本地存储，聊天记录和配置不离开你的设备
+- **OpenClaw Agent 工作流**：通过 Cowork 会话执行文件操作、命令运行、网页访问、文档处理等任务。
+- **Ollama 本地推理**：管理本地模型、拉取模型、配置模型启动参数，并把本地模型接入 OpenClaw。
+- **技能系统**：内置文档、表格、PPT、PDF、Web 搜索、网页自动化、视频生成、投研、邮件等技能。
+- **MCP 扩展**：支持配置 MCP Server，把外部工具和数据源接入 Agent。
+- **定时任务**：支持自然语言或 GUI 创建周期任务，例如每日简报、邮箱整理、定期报告。
+- **IM/邮件触达**：支持微信、企业微信、钉钉、飞书、QQ、邮箱，可选接入 NIM/POPO 兼容企业通道。
+- **权限门控**：涉及文件、终端、网络等敏感工具调用时，需要用户审批。
+- **本地数据存储**：会话、配置、记忆和任务元数据保存在本地 SQLite 中。
+- **跨平台桌面端**：支持 macOS、Windows、Linux；Windows 包可内置 Python runtime。
 
 ## 工作原理
 
 <p align="center">
-  <img src="docs/res/architecture_v2_zh.png" alt="Architecture" width="500">
+  <img src="docs/res/rongxinai_architecture_zh.svg" alt="RongxinAI 架构" width="760">
 </p>
+
+RongxinAI 使用 Electron 严格进程隔离架构。Renderer 负责 React UI，Preload 通过 `contextBridge` 暴露受控 IPC，Main Process 负责本地存储、OpenClaw runtime 生命周期、Ollama 服务管理、技能/MCP/IM 调度。
 
 ## 快速开始
 
 ### 环境要求
 
-- **Node.js** >= 24 < 25
-- **npm**
+- Node.js `>=24 <25`
+- npm
 
-### 安装与开发
+### 本地开发
 
 ```bash
-# 克隆仓库
-git clone https://github.com/netease-youdao/LobsterAI.git
-cd LobsterAI
-
-# 安装依赖
+git clone <repository-url> RongxinAI
+cd RongxinAI
 npm install
-
-# 启动开发环境（Vite 开发服务器 + Electron 热重载）
 npm run electron:dev
 ```
 
 开发服务器默认运行在 `http://localhost:5175`。
 
-
-LobsterAI 使用 [OpenClaw](https://github.com/openclaw/openclaw) 作为 Agent 引擎。
-所依赖的 OpenClaw 版本在 `package.json` 的 `openclaw.version` 字段中声明。
+### 使用 OpenClaw runtime 开发
 
 ```bash
-# 首次运行：自动克隆并构建 OpenClaw（可能需要几分钟）
-npm run electron:dev:openclaw
-
-# 后续运行：如果锁定版本未变，自动跳过构建
 npm run electron:dev:openclaw
 ```
 
-默认 OpenClaw 源码会被克隆/管理在 `../openclaw`（相对于本仓库）。可通过环境变量覆盖：
+该命令会按 `package.json` 中的 `openclaw.version` 拉取或切换 OpenClaw 源码，构建并启动内置 runtime。默认源码路径为 `../openclaw`，可通过环境变量覆盖：
 
 ```bash
 OPENCLAW_SRC=/path/to/openclaw npm run electron:dev:openclaw
 ```
 
-强制重新构建（即使版本未变）：
+常用 OpenClaw 构建变量：
+
+| 变量 | 说明 |
+|------|------|
+| `OPENCLAW_SRC` | 指定 OpenClaw 源码目录 |
+| `OPENCLAW_FORCE_BUILD=1` | 强制重新构建 runtime |
+| `OPENCLAW_SKIP_ENSURE=1` | 跳过自动切换 OpenClaw 版本，便于本地调试 |
+
+## 构建与打包
 
 ```bash
-OPENCLAW_FORCE_BUILD=1 npm run electron:dev:openclaw
-```
-
-跳过自动版本切换（如需本地开发 OpenClaw 时）：
-
-```bash
-OPENCLAW_SKIP_ENSURE=1 npm run electron:dev:openclaw
-```
-
-### 生产构建
-
-```bash
-# 编译 TypeScript + Vite 打包
+# 类型检查 + Vite 构建
 npm run build
 
-# ESLint 代码检查
+# ESLint 检查
 npm run lint
+
+# 构建当前平台 OpenClaw runtime
+npm run openclaw:runtime:host
 ```
 
-## 打包分发
-
-使用 [electron-builder](https://www.electron.build/) 生成各平台安装包，输出到 `release/` 目录。
+平台打包：
 
 ```bash
-# macOS (.dmg)
 npm run dist:mac
-
-# macOS - 仅 Intel
-npm run dist:mac:x64
-
-# macOS - 仅 Apple Silicon
-npm run dist:mac:arm64
-
-# macOS - Universal (双架构)
-npm run dist:mac:universal
-
-# Windows (.exe NSIS 安装包)
 npm run dist:win
-
-# Linux (.AppImage)
 npm run dist:linux
 ```
 
-桌面端打包（macOS / Windows / Linux）都会把预构建的 OpenClaw runtime 内置到 `Resources/cfmind`。
-锁定的 OpenClaw 版本（`package.json` → `openclaw.version`）在打包时会自动拉取并构建，无需手动操作。
-构建结果带缓存：如果本地已存在对应版本的 runtime，构建步骤会自动跳过。
+桌面端安装包会把预构建 OpenClaw runtime 放入应用资源目录。Windows 打包流程还会准备便携 Python runtime，用于运行部分 Python 技能；第三方 Python 包按技能需要在运行时安装。
 
-也可以手动构建 OpenClaw runtime：
+## 主要模块
 
-```bash
-# 按当前主机平台自动选择 target（mac/win/linux + 架构）
-npm run openclaw:runtime:host
+### Cowork
 
-# 显式指定目标平台
-npm run openclaw:runtime:mac-arm64
-npm run openclaw:runtime:mac-x64
-npm run openclaw:runtime:win-x64
-npm run openclaw:runtime:linux-x64
-```
+Cowork 是 RongxinAI 的核心会话系统。用户发起任务后，Renderer 通过 IPC 请求 Main Process，Main Process 将任务交给 OpenClaw runtime。执行过程中的消息、工具调用、权限请求和完成状态会以流式事件返回 UI。
 
-如需覆盖 OpenClaw 源码路径：
+支持的关键事件：
 
-```bash
-OPENCLAW_SRC=/path/to/openclaw npm run dist:win
-```
-
-Windows 打包会内置便携 Python 运行时到 `resources/python-win`（安装包资源目录为 `python-win`），终端用户无需手动安装 Python。
-该运行时以解释器为主，不预装 LobsterAI 技能所需的 Python 三方包；相关依赖可在运行时按需安装。
-默认情况下，如果未提供预构建压缩包，打包脚本会直接从 python.org 下载官方 embeddable Python 运行时。
-离线或无法联网的构建场景，请显式提供预构建运行时压缩包。
-
-企业离线/私有源打包可通过以下环境变量配置：
-- `LOBSTERAI_PORTABLE_PYTHON_ARCHIVE`：本地预构建运行时压缩包路径（离线 CI/CD 推荐）
-- `LOBSTERAI_PORTABLE_PYTHON_URL`：预构建运行时压缩包下载地址
-- `LOBSTERAI_WINDOWS_EMBED_PYTHON_VERSION` / `LOBSTERAI_WINDOWS_EMBED_PYTHON_URL` / `LOBSTERAI_WINDOWS_GET_PIP_URL`：Windows 主机构建时自动拉取源的可选覆盖项
-
-## 架构概览
-
-LobsterAI 采用 Electron 严格进程隔离架构，所有跨进程通信通过 IPC 完成。
-
-### 进程模型
-
-**Main Process**（`src/main/main.ts`）：
-- 窗口生命周期管理
-- SQLite 数据持久化
-- OpenClaw Agent 引擎（主引擎）+ CoworkEngineRouter 调度层
-- IM 网关 — 微信、企业微信、钉钉、飞书、QQ、Telegram、Discord、POPO 远程接入
-- 40+ IPC 通道处理
-- 安全：context isolation 启用，node integration 禁用，sandbox 启用
-
-**Preload Script**（`src/main/preload.ts`）：
-- 通过 `contextBridge` 暴露 `window.electron` API
-- 包含 `cowork` 命名空间用于会话管理和流式事件
-
-**Renderer Process**（`src/renderer/`）：
-- React 18 + Redux Toolkit + Tailwind CSS
-- 所有 UI 和业务逻辑
-- 仅通过 IPC 与主进程通信
-
-### 目录结构
-
-```
-src/
-├── main/                           # Electron 主进程
-│   ├── main.ts                     # 入口，IPC 处理
-│   ├── preload.ts                  # 安全桥接
-│   ├── sqliteStore.ts              # SQLite 存储
-│   ├── coworkStore.ts              # 会话/消息 CRUD
-│   ├── skillManager.ts             # 技能管理
-│   ├── im/                         # IM 网关（钉钉/飞书/Telegram/Discord）
-│   └── libs/
-│       ├── agentEngine/
-│       │   ├── coworkEngineRouter.ts    # 调度层（将会话路由到当前激活的引擎）
-│       │   ├── openclawRuntimeAdapter.ts # 主引擎 OpenClaw 网关适配器
-│       │   └── claudeRuntimeAdapter.ts  # 旧内置适配器（已废弃）
-│       ├── coworkRunner.ts          # 旧内置执行器（已废弃）
-│       ├── openclawEngineManager.ts # OpenClaw 运行时生命周期管理
-│       ├── openclawConfigSync.ts    # 同步 cowork 配置到 OpenClaw 配置文件
-│       └── coworkMemoryExtractor.ts # 记忆提取
-│
-├── renderer/                        # React 前端
-│   ├── App.tsx                     # 根组件
-│   ├── types/                      # TypeScript 类型定义
-│   ├── store/slices/               # Redux 状态切片
-│   ├── services/                   # 业务逻辑层（API/IPC/i18n）
-│   └── components/
-│       ├── cowork/                 # Cowork UI 组件
-│       ├── artifacts/              # Artifact 渲染器
-│       ├── skills/                 # 技能管理 UI
-│       ├── im/                     # IM 集成 UI
-│       └── Settings.tsx            # 设置面板
-│
-SKILLs/                              # 技能定义目录
-├── skills.config.json              # 技能启停与排序配置
-├── web-search/                     # Web 搜索
-├── docx/                           # Word 文档生成
-├── xlsx/                           # Excel 表格
-├── pptx/                           # PowerPoint 演示
-├── pdf/                            # PDF 处理
-├── remotion/                       # 视频生成
-├── playwright/                     # Web 自动化
-└── ...                             # 更多技能
-```
-
-## Cowork 系统
-
-Cowork 是 LobsterAI 的核心功能 —— 以 OpenClaw 为主引擎的 AI 工作会话系统。它面向办公场景设计，能够自主完成数据分析、文档生成、信息检索等复杂任务。
-
-### 执行模式
-
-| 模式 | 说明 |
+| 事件 | 说明 |
 |------|------|
-| `auto` | 自动根据上下文选择执行方式 |
-| `local` | 本地直接执行，全速运行 |
+| `message` | 新消息进入会话 |
+| `messageUpdate` | 流式内容增量更新 |
+| `permissionRequest` | 工具调用需要审批 |
+| `complete` | 会话执行完成 |
+| `error` | 会话执行失败 |
 
-### 流式事件
+### Ollama 本地推理
 
-Cowork 通过 IPC 事件实现实时双向通信：
+本地推理页面用于管理 Ollama 服务、本地模型、模型市场和模型启动参数。模型级参数会作为 Ollama request options 传入，例如上下文长度、GPU offload 层数、线程数、批处理大小、主 GPU、内存映射和驻留时间。服务级参数会作为 `ollama serve` 的环境变量写入，仅在启动或重启 Ollama 服务时生效。
 
-- `message` — 新消息加入会话
-- `messageUpdate` — 流式内容增量更新
-- `permissionRequest` — 工具执行需要用户审批
-- `complete` — 会话执行完毕
-- `error` — 执行出错
+### 技能与 MCP
 
-### 权限控制
+`SKILLs/` 目录包含内置技能定义，`SKILLs/skills.config.json` 控制默认启停和排序。技能市场用于发现和安装远端技能；MCP 配置用于接入外部工具服务，例如 GitHub、浏览器、文件系统、数据库或企业内部服务。
 
-所有涉及文件系统、终端命令、网络请求的工具调用都需要用户在 `CoworkPermissionModal` 中明确批准。支持单次批准和会话级批准。
+常见内置技能包括：
 
-
-## 技能系统
-
-LobsterAI 内置 29 种技能，覆盖办公、创作、投研、自动化等多种场景，通过 `SKILLs/skills.config.json` 配置启停和排序：
-
-| 技能 | 功能 | 典型场景 |
-|------|------|---------|
-| web-search | Web 搜索 | 信息检索、资料收集 |
-| docx | Word 文档生成 | 报告撰写、方案输出 |
-| xlsx | Excel 表格生成 | 数据分析、报表制作 |
-| pptx | PowerPoint 制作 | 演示文稿、汇报材料 |
-| pdf | PDF 处理 | 文档解析、格式转换 |
-| remotion | 视频生成（Remotion） | 宣传视频、数据可视化动画 |
-| seedance | AI 视频生成（Seedance） | 文生视频、图生视频 |
-| seedream | AI 图片生成（Seedream） | 文生图、图片编辑与融合 |
-| playwright | Web 自动化 | 网页操作、自动化测试 |
-| canvas-design | Canvas 绘图设计 | 海报、图表设计 |
-| frontend-design | 前端 UI 设计 | 原型制作、页面设计 |
-| develop-web-game | Web 游戏开发 | 小游戏快速原型 |
-| stock-analyzer | 股票深度分析 | A 股深度研究、估值与财报分析 |
-| stock-announcements | 股票公告获取 | 上市公司公告检索、信息披露查阅 |
-| stock-explorer | 股票信息探索 | 股票基本信息查询、行情概览 |
-| content-planner | 内容规划 | 选题策划、内容日历制作 |
-| article-writer | 文章撰写 | 多风格长文创作、自媒体内容生成 |
-| daily-trending | 每日热榜 | 热点资讯聚合、趋势追踪 |
-| films-search | 影视资源搜索 | 电影/剧集网盘资源检索下载 |
-| music-search | 音乐资源搜索 | 歌曲/专辑网盘资源检索下载 |
-| technology-news-search | 科技资讯搜索 | 编程、AI、IT 行业动态（默认禁用） |
-| weather | 天气查询 | 天气信息获取 |
-| local-tools | 本地系统工具 | 文件管理、系统操作 |
-| imap-smtp-email | 邮件收发 | 邮件处理、自动回复 |
-| create-plan | 计划编排 | 项目规划、任务分解 |
-| skill-vetter | 技能安全审查 | 安装第三方技能前的安全检验 |
-| skill-creator | 自定义技能创建 | 扩展新能力 |
-
-支持通过 `skill-creator` 创建自定义技能并热加载。
-
-## 定时任务
-
-LobsterAI 支持创建定时任务，让 Agent 按计划自动执行重复性工作。
-
-### 创建方式
-
-- **对话式创建** — 直接用自然语言告诉 Agent（如「每天早上 9 点帮我收集科技新闻」），Agent 会自动创建对应的定时任务
-- **GUI 界面创建** — 在定时任务管理面板中手动添加，可视化配置执行时间和任务内容
-
-### 典型场景
-
-| 场景 | 示例 |
+| 技能 | 用途 |
 |------|------|
-| 新闻收集 | 每天早上自动收集行业资讯并生成摘要 |
-| 邮箱整理 | 定时检查收件箱，分类整理并汇总重要邮件 |
-| 数据报告 | 每周自动生成业务数据分析报告 |
-| 信息监控 | 定期检查指定网站内容变化并通知 |
-| 工作提醒 | 按计划生成待办事项清单或会议纪要 |
+| `web-search` | 搜索与资料收集 |
+| `docx` / `xlsx` / `pptx` / `pdf` | Office 与文档处理 |
+| `playwright` | 浏览器自动化 |
+| `remotion` | 视频生成 |
+| `imap-smtp-email` | 邮件收发 |
+| `stock-*` | 投研与公告检索 |
+| `skill-creator` | 创建自定义技能 |
 
-定时任务基于 Cron 表达式调度，支持分钟、小时、日、周、月等多种周期粒度。任务执行时会自动启动 Cowork 会话，结果可通过桌面端查看或经 IM 推送到手机。
+### 定时任务
 
-## IM 集成 — 手机端远程操控
+定时任务支持自然语言创建和 GUI 配置。任务触发后会启动 Cowork 会话执行，并将结果保留在桌面端；如配置了通知渠道，也可以推送到对应 IM/邮件通道。
 
-LobsterAI 支持将 Agent 桥接到多种 IM 平台。在手机上通过 IM 发送消息即可远程触发桌面端的 Agent 执行任务，随时随地指挥你的个人助理。
+### IM 与邮件
 
-| 平台 | 协议 | 说明 |
-|------|------|------|
-| 微信 | OpenClaw 网关 | 微信账号接入，支持私聊与群聊 |
-| 企业微信 | OpenClaw 网关 | 企业微信应用机器人，支持私聊与群聊 |
-| 钉钉 | DingTalk Stream | 企业机器人双向通信，支持多实例 |
-| 飞书 | Lark SDK | 飞书/Lark 应用机器人，支持多实例 |
-| QQ | OpenClaw 网关 | QQ 机器人接入（官方 Bot API），支持多实例 |
-| Telegram | grammY | Bot API 接入，支持 Webhook 与轮询 |
-| Discord | discord.js | Discord Bot 接入，支持服务器与私聊 |
-| 云信 IM | node-nim V2 SDK | [网易云信 IM P2P 私聊](https://doc.yunxin.163.com/messaging2/getting-started) |
-| 网易小蜜蜂 | node-nim V2 SDK | [网易小蜜蜂个人数字助理](https://wp.m.163.com/163/html/bee/lobsterai_guide/index.html) |
-| 网易 POPO | OpenClaw 网关 | 网易 POPO 企业 IM，支持 WebSocket 与 Webhook 两种接入方式 |
+当前对外文档只描述产品需要开放和维护的接入方式：
 
-在设置面板中配置对应平台的 Token/密钥即可启用。配置完成后，你可以在手机 IM 中直接对 Agent 下达指令（如「帮我分析这份数据」「做一份本周工作汇报 PPT」），Agent 会在桌面端自动执行并返回结果。
-
-## 持久记忆
-
-LobsterAI 的记忆系统基于 OpenClaw，以文件形式持久化存储在工作目录中，让 Agent 跨会话记住你的信息和偏好。
-
-### 记忆文件结构
-
-| 文件 | 用途 |
+| 通道 | 说明 |
 |------|------|
-| `MEMORY.md` | 持久化事实、偏好与决策，每次会话启动时自动加载 |
-| `memory/YYYY-MM-DD.md` | 每日临时笔记，保留近期上下文 |
-| `USER.md` | 用户档案（姓名、职业、习惯等长期信息） |
-| `SOUL.md` | Agent 个性与行为准则 |
+| 微信 | 个人微信账号接入，支持私聊与群聊触发 |
+| 企业微信 | 企业微信机器人/应用接入 |
+| 钉钉 | 企业机器人接入 |
+| 飞书 | 飞书/Lark 应用机器人接入 |
+| QQ | QQ 机器人接入 |
+| 邮箱 | 通过邮件收发触发 Agent |
+| NIM/POPO 兼容通道 | 可选企业 IM 通道，按部署需要启用 |
 
-### 记忆的写入方式
+## 数据与安全
 
-- **显式指令** — 对话中说「记住 xxx」「以后回复用英文」等，Agent 会在回复前先调用 `write` 工具将信息写入 `MEMORY.md`，确认写入成功后再回复「记住了」
-- **Agent 自动记录** — Agent 在执行任务过程中可主动将重要发现、配置、环境信息等写入记忆文件，无需用户显式要求
-- **GUI 手动管理** — 在设置面板的记忆管理界面中直接添加、编辑、删除 `MEMORY.md` 中的条目；支持关键词搜索
-
-### 工作机制
-
-每次会话启动时，OpenClaw 会按顺序读取 `SOUL.md`、`USER.md`、今日及昨日的 `memory/YYYY-MM-DD.md`，以及 `MEMORY.md`，将这些内容作为上下文注入，使 Agent 无需用户重复说明就能延续上次的偏好和认知。
-
-记忆写入通过文件工具完成，不依赖任何后台提取或推断，内容完全由用户或 Agent 明确控制。
-
-## 数据存储
-
-所有数据存储在本地 SQLite 数据库（`lobsterai.sqlite`，位于用户数据目录）。
-
-| 表 | 用途 |
-|----|------|
-| `kv` | 应用配置键值对 |
-| `cowork_config` | Cowork 设置（工作目录、系统提示词、执行模式） |
-| `cowork_sessions` | 会话元数据 |
-| `cowork_messages` | 消息历史 |
-| `user_memories` | 用户记忆条目 |
-| `user_memory_sources` | 记忆来源追踪 |
-| `agents` | 自定义 Agent 配置 |
-| `mcp_servers` | MCP 服务器配置 |
-| `im_config` | IM 网关配置（各平台 Token/密钥） |
-| `im_session_mappings` | IM 会话与 Cowork 会话的映射关系 |
-| `scheduled_task_meta` | 定时任务元数据（来源与绑定信息） |
-
-## 安全模型
-
-LobsterAI 在多个层面实施安全控制：
-
-- **进程隔离** — context isolation 启用，node integration 禁用
-- **权限门控** — 敏感工具调用需用户明确审批
-- **沙箱执行** — 可选 OpenClaw 沙箱隔离执行环境
-- **工作区边界** — 文件操作限制在指定工作目录内
-- **IPC 验证** — 所有跨进程调用经过类型检查
+- 应用配置、会话、消息、Agent、MCP、IM 配置和定时任务元数据存储在本地 SQLite。
+- Electron 启用 `contextIsolation`，关闭 Renderer 的 Node 集成。
+- Renderer 与 Main 之间只通过显式 IPC 接口通信。
+- 高风险工具调用需要用户确认。
+- Artifact 预览使用 iframe/DOMPurify/Mermaid strict mode 等隔离与清洗策略。
 
 ## 技术栈
 
 | 层 | 技术 |
 |----|------|
-| 框架 | Electron 40 |
+| 桌面框架 | Electron 40 |
 | 前端 | React 18 + TypeScript |
 | 构建 | Vite 5 |
-| 样式 | Tailwind CSS 3 |
-| 状态 | Redux Toolkit |
-| AI 引擎 | OpenClaw（主引擎） |
+| 样式 | Tailwind CSS |
+| 状态管理 | Redux Toolkit |
+| Agent runtime | OpenClaw |
+| 本地模型 | Ollama |
 | 存储 | better-sqlite3 |
-| Markdown | react-markdown + remark-gfm + rehype-katex |
-| 图表 | Mermaid |
-| 安全 | DOMPurify |
-| IM | @larksuiteoapi/node-sdk · nim-web-sdk-ng · @wecom/wecom-aibot-sdk · OpenClaw 网关（钉钉 / Telegram / Discord / QQ 等） |
+| 文档渲染 | react-markdown / Mermaid / KaTeX |
 
-## 配置
+## OpenClaw 版本
 
-### 应用配置
-
-应用级配置存储在 SQLite `kv` 表中，通过设置面板修改。
-
-### Cowork 配置
-
-Cowork 会话配置包含：
-
-- **工作目录** — Agent 操作的根目录
-- **系统提示词** — 自定义 Agent 行为
-- **执行模式** — `auto` / `local`
-
-### 国际化
-
-支持中文（默认）和英文两种语言，通过设置面板切换。
-
-## OpenClaw 版本管理
-
-LobsterAI 将 OpenClaw 依赖锁定到指定的 release 版本，在 `package.json` 中声明：
+OpenClaw 版本固定在 `package.json`：
 
 ```json
 {
   "openclaw": {
-    "version": "v2026.3.2",
+    "version": "v2026.4.14",
     "repo": "https://github.com/openclaw/openclaw.git"
   }
 }
 ```
 
-### 工作原理
+升级时修改 `openclaw.version`，然后重新执行 `npm run electron:dev:openclaw` 或对应平台的 runtime 构建命令。
 
-| 步骤 | 行为 | 时机 |
-|------|------|------|
-| **版本确认** | 克隆或切换 `../openclaw` 到锁定的 tag | 每次 runtime 构建前 |
-| **构建缓存检查** | 比对锁定版本与 `runtime-build-info.json` | 每次 runtime 构建前 |
-| **完整构建** | `pnpm install` → `build` → `ui:build` → 打包为 asar | 仅版本变更时 |
+## License
 
-### 更新 OpenClaw 版本
-
-1. 修改 `package.json` 中 `openclaw.version` 为目标 release tag
-2. 执行 `npm run electron:dev:openclaw` 或 `npm run dist:win` — 新版本会自动拉取并构建
-3. 提交 `package.json` 的变更
-
-### 环境变量
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `OPENCLAW_SRC` | OpenClaw 源码目录路径 | `../openclaw` |
-| `OPENCLAW_FORCE_BUILD` | 设为 `1` 强制重新构建（即使版本匹配） | — |
-| `OPENCLAW_SKIP_ENSURE` | 设为 `1` 跳过自动版本切换 | — |
-
-## 测试
-
-单元测试使用 [Vitest](https://vitest.dev/)，测试文件与被测源文件**同目录存放**。
-
-```bash
-# 运行全部测试
-npm test
-
-# 只运行指定模块的测试（按文件名过滤）
-npm test -- logger
-npm test -- cowork
-```
-
-新增测试文件放在对应源文件旁边，使用 `.test.ts` 扩展名：
-
-```
-src/main/
-├── foo.ts
-└── foo.test.ts
-```
-
-示例（`src/main/logger.test.ts`）：
-
-```ts
-import { test, expect } from 'vitest';
-
-test('log file pattern matches daily name', () => {
-  expect(/^main-\d{4}-\d{2}-\d{2}\.log$/.test('main-2026-03-20.log')).toBe(true);
-});
-```
-
-避免在测试中引入 Electron 专属 API（如 `electron-log`），改为将相关逻辑内联到测试文件中。
-
-## 开发规范
-
-- TypeScript 严格模式，函数式组件 + Hooks
-- 2 空格缩进，单引号，分号
-- 组件 `PascalCase`，函数/变量 `camelCase`，Redux 切片 `*Slice.ts`
-- Tailwind CSS 优先，避免自定义 CSS
-- 提交信息遵循 `type: short imperative summary` 格式（如 `feat: add artifact toolbar`）
-
-## 微信社群
-
-扫码加入微信交流群，获取帮助、反馈问题、了解最新动态：
-
-<p align="center">
-  <img src="https://shared.ydstatic.com/market/souti/fihserChatWeb/online/1.3.5/dist/assets/wechat_group-ButC0ZCl.jpg" alt="微信社群二维码" width="200">
-</p>
-
-## 贡献
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/your-feature`)
-3. 提交改动 (`git commit -m 'feat: add something'`)
-4. 推送到远程 (`git push origin feature/your-feature`)
-5. 发起 Pull Request
-
-PR 描述中请包含：变更说明、关联 issue、UI 变更附截图，以及涉及 Electron 特定行为的说明。
-
-## 许可证
-
-[MIT License](LICENSE)
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=netease-youdao/LobsterAI&type=date&legend=top-left)](https://www.star-history.com/#netease-youdao/LobsterAI&type=date&legend=top-left)
-
-
----
-
-由[网易有道](https://www.youdao.com/)开发维护。
+MIT

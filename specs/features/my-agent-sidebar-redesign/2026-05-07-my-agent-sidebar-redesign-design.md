@@ -20,7 +20,7 @@
 
 ```text
 我的 Agent
-  有道龙虾
+  默认 Agent
     分析 Q1 销售数据
     生成产品发布会 PPT v3
     竞品 SWOT 分析
