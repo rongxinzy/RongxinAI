@@ -177,12 +177,10 @@ export function getOllamaServiceConfig(store: SqliteStore): OllamaServiceConfig 
 function sanitizeOllamaServiceConfig(config: OllamaServiceConfig | undefined): OllamaServiceConfig {
   const next: OllamaServiceConfig = {};
   const cudaVisibleDevices = normalizeCsvIntegerList(config?.cudaVisibleDevices);
-  const numGpu = normalizeIntegerString(config?.numGpu, { allowMinusOne: true });
   const maxLoadedModels = normalizeIntegerString(config?.maxLoadedModels);
   const numParallel = normalizeIntegerString(config?.numParallel);
 
   if (cudaVisibleDevices) next.cudaVisibleDevices = cudaVisibleDevices;
-  if (numGpu) next.numGpu = numGpu;
   if (maxLoadedModels) next.maxLoadedModels = maxLoadedModels;
   if (numParallel) next.numParallel = numParallel;
   if (typeof config?.schedSpread === 'boolean') next.schedSpread = config.schedSpread;

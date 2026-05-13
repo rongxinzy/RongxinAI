@@ -41,7 +41,6 @@ export type OllamaInstallProgress = {
 
 export type OllamaServiceConfig = {
   cudaVisibleDevices?: string;
-  numGpu?: string;
   maxLoadedModels?: string;
   numParallel?: string;
   schedSpread?: boolean;
@@ -82,9 +81,7 @@ export type OllamaModelLaunchInput = {
     num_batch?: number;
     num_gpu?: number;
     main_gpu?: number;
-    low_vram?: boolean;
     use_mmap?: boolean;
-    use_mlock?: boolean;
     num_thread?: number;
   };
 };
