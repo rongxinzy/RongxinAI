@@ -4379,13 +4379,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   };
 
   return (
-    <Modal onClose={onClose} overlayClassName="fixed inset-0 z-50 modal-backdrop flex items-center justify-center">
+    <Modal onClose={onClose} overlayClassName="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3">
       <div
-        className="relative flex w-[900px] h-[80vh] rounded-2xl border-border border shadow-modal overflow-hidden modal-content"
+        className="relative flex h-[min(80vh,calc(100vh-24px))] w-full max-w-[900px] min-w-0 rounded-2xl border-border border shadow-modal overflow-hidden modal-content"
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
-        <div className="w-[220px] shrink-0 flex flex-col bg-surface-raised border-r border-border rounded-l-2xl overflow-y-auto">
+        <div className="w-[180px] sm:w-[220px] shrink-0 flex flex-col bg-surface-raised border-r border-border rounded-l-2xl overflow-y-auto">
           <div className="px-5 pt-5 pb-3">
             <h2 className="text-lg font-semibold text-foreground">{i18nService.t('settings')}</h2>
           </div>
@@ -4401,7 +4401,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 }`}
               >
                 {tab.icon}
-                <span>{tab.label}</span>
+                <span className="min-w-0 truncate">{tab.label}</span>
               </button>
             ))}
           </nav>
@@ -4410,7 +4410,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         {/* Right content */}
         <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden bg-background rounded-r-2xl">
           {/* Content header */}
-          <div className="flex justify-between items-center px-6 pt-5 pb-3 shrink-0">
+          <div className="flex justify-between items-center gap-3 px-4 sm:px-6 pt-5 pb-3 shrink-0">
             <h3 className="text-lg font-semibold text-foreground">{activeTabLabel}</h3>
             <button
               onClick={onClose}
@@ -4421,7 +4421,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           </div>
 
           {noticeMessage && (
-            <div className="px-6">
+            <div className="px-4 sm:px-6">
               <ErrorMessage
                 message={noticeMessage}
                 onClose={() => setNoticeMessage(null)}
@@ -4430,7 +4430,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           )}
 
           {error && (
-            <div className="px-6">
+            <div className="px-4 sm:px-6">
               <ErrorMessage
                 message={error}
                 onClose={() => setError(null)}
@@ -4442,14 +4442,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             {/* Tab content */}
             <div
               ref={contentRef}
-              className="px-6 py-4 flex-1 overflow-y-auto"
+              className="px-4 sm:px-6 py-4 flex-1 overflow-y-auto"
               style={{ scrollbarGutter: 'stable' }}
             >
               {renderTabContent()}
             </div>
 
             {/* Footer buttons */}
-            <div className="flex justify-end space-x-4 p-4 border-border border-t bg-background shrink-0">
+            <div className="flex flex-wrap justify-end gap-3 p-4 border-border border-t bg-background shrink-0">
               <button
                 type="button"
                 onClick={onClose}

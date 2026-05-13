@@ -931,6 +931,24 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           </div>
         ) : (
           <>
+            <div className="mb-3 flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-medium text-foreground">
+                  {i18nService.t('skillMarketplaceFeaturedTitle')}
+                </div>
+                <p className="mt-1 text-xs text-secondary">
+                  {i18nService.t('skillMarketplaceFeaturedDescription')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void window.electron.shell.openExternal('https://clawhub.ai/skills')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                <LinkIcon className="h-3.5 w-3.5" />
+                {i18nService.t('skillMarketplaceOpenClawHub')}
+              </button>
+            </div>
             {filteredMarketplaceSkills.length === 0 ? (
               <div className="text-center py-12 text-sm text-secondary">
                 {i18nService.t('skillMarketplaceEmpty')}
@@ -1029,6 +1047,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                           </span>
                         );
                       })()}
+                    </>
+                  )}
+                  {skill.stats?.stars != null && skill.stats.stars > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="px-1.5 py-0.5 rounded bg-surface-raised font-medium">
+                        ★ {skill.stats.stars}
+                      </span>
                     </>
                   )}
                 </div>

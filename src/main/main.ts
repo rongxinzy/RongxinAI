@@ -2672,42 +2672,38 @@ if (!gotTheLock) {
     const apiUrl = url || clawhubBase;
     console.log(`[SkillMarketplace] fetching from: ${apiUrl}`);
     try {
-      const MAX_PAGES = 3;
-      const PAGE_LIMIT = 100;
-      let cursor: string | undefined;
-      let allItems: Array<Record<string, unknown>> = [];
-      let pageCount = 0;
-      const overallTimeout = Date.now() + 10000;
-
-      while (pageCount < MAX_PAGES && Date.now() < overallTimeout) {
-        pageCount++;
-        const pageUrl = cursor
-          ? `${apiUrl}?limit=${PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`
-          : `${apiUrl}?limit=${PAGE_LIMIT}`;
-        try {
-          const pageResponse = await fetch(pageUrl, { signal: AbortSignal.timeout(8000) });
-          if (!pageResponse.ok) break;
-          const pageData = await pageResponse.json() as {
-            items?: Array<Record<string, unknown>>;
-            nextCursor?: string;
-          };
-          const pageItems = pageData.items ?? [];
-          if (pageItems.length === 0) break;
-          allItems = allItems.concat(pageItems);
-          cursor = pageData.nextCursor;
-          if (!cursor) break;
-        } catch {
-          break;
-        }
+      const FEATURED_LIMIT = 40;
+      const separator = apiUrl.includes('?') ? '&' : '?';
+      const pageUrl = `${apiUrl}${separator}limit=${FEATURED_LIMIT}&sort=stars`;
+      const pageResponse = await fetch(pageUrl, { signal: AbortSignal.timeout(8000) });
+      if (!pageResponse.ok) {
+        throw new Error(`ClawHub returned HTTP ${pageResponse.status}`);
       }
+      const pageData = await pageResponse.json() as {
+        items?: Array<Record<string, unknown>>;
+      };
+      const allItems = (pageData.items ?? []).sort((left, right) => {
+        const leftStats = left.stats as Record<string, number> | undefined;
+        const rightStats = right.stats as Record<string, number> | undefined;
+        const leftScore =
+          (leftStats?.stars ?? 0) * 1000 +
+          (leftStats?.installsAllTime ?? 0) * 10 +
+          (leftStats?.downloads ?? 0);
+        const rightScore =
+          (rightStats?.stars ?? 0) * 1000 +
+          (rightStats?.installsAllTime ?? 0) * 10 +
+          (rightStats?.downloads ?? 0);
+        return rightScore - leftScore;
+      });
 
-      console.log(`[SkillMarketplace] fetched ${allItems.length} skills (${pageCount} pages)`);
+      console.log(`[SkillMarketplace] fetched ${allItems.length} featured skills`);
 
       const marketplace = allItems.map((item) => ({
         id: item.slug || item.id,
         name: item.displayName || item.name,
         description: item.summary || item.description || '',
         tags: item.tags ? Object.keys(item.tags as Record<string, unknown>) : [],
+        stats: item.stats,
         url: `https://clawhub.ai/skills/${item.slug || item.id}`,
         version: ((item.tags as Record<string, string> | undefined)?.latest) || '1.0.0',
         source: {
