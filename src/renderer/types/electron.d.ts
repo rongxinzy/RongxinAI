@@ -671,27 +671,6 @@ interface IElectronAPI {
       accountId?: string,
     ) => Promise<{ success: boolean; connected: boolean; message: string; accountId?: string }>;
 
-    // POPO QR login
-    popoQrLoginStart: () => Promise<{
-      success: boolean;
-      qrUrl?: string;
-      taskToken?: string;
-      timeoutMs?: number;
-      message?: string;
-    }>;
-    popoQrLoginPoll: (taskToken: string) => Promise<{
-      success: boolean;
-      appKey?: string;
-      appSecret?: string;
-      aesKey?: string;
-      message: string;
-    }>;
-
-    // POPO Multi-Instance
-    addPopoInstance: (name: string) => Promise<{ success: boolean; instance?: import('./im').PopoInstanceConfig; error?: string }>;
-    deletePopoInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
-    setPopoInstanceConfig: (instanceId: string, config: Record<string, unknown>, options?: { syncGateway?: boolean }) => Promise<{ success: boolean; error?: string }>;
-
     listPairingRequests: (platform: string) => Promise<{
       success: boolean;
       requests: Array<{
@@ -1110,9 +1089,7 @@ interface IMGatewayConfig {
   qq: QQMultiInstanceConfig;
   discord: DiscordMultiInstanceConfig;
   nim: NimMultiInstanceConfig;
-  'netease-bee': NeteaseBeeChanConfig;
   wecom: WecomMultiInstanceConfig;
-  popo: PopoMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
   email: EmailMultiInstanceConfig;
   settings: IMSettings;
@@ -1321,12 +1298,6 @@ interface NimMultiInstanceConfig {
   instances: NimInstanceConfig[];
 }
 
-interface NeteaseBeeChanConfig {
-  enabled: boolean;
-  clientId: string;
-  secret: string;
-  debug?: boolean;
-}
 
 interface QQConfig {
   enabled: boolean;
@@ -1390,42 +1361,10 @@ interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
 }
 
-interface PopoOpenClawConfig {
-  enabled: boolean;
-  connectionMode: 'websocket' | 'webhook';
-  appKey: string;
-  appSecret: string;
-  token: string;
-  aesKey: string;
-  webhookBaseUrl: string;
-  webhookPath: string;
-  webhookPort: number;
-  dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled';
-  allowFrom: string[];
-  groupPolicy: 'open' | 'allowlist' | 'disabled';
-  groupAllowFrom: string[];
-  textChunkLimit: number;
-  richTextChunkLimit: number;
-  debug: boolean;
-}
 
-interface PopoInstanceConfig extends PopoOpenClawConfig {
-  instanceId: string;
-  instanceName: string;
-}
 
-interface PopoInstanceStatus extends PopoGatewayStatus {
-  instanceId: string;
-  instanceName: string;
-}
 
-interface PopoMultiInstanceConfig {
-  instances: PopoInstanceConfig[];
-}
 
-interface PopoMultiInstanceStatus {
-  instances: PopoInstanceStatus[];
-}
 
 interface WeixinOpenClawConfig {
   enabled: boolean;
@@ -1449,9 +1388,7 @@ interface IMGatewayStatus {
   telegram: TelegramMultiInstanceStatus;
   discord: DiscordMultiInstanceStatus;
   nim: NimMultiInstanceStatus;
-  'netease-bee': NeteaseBeeChanGatewayStatus;
   wecom: WecomMultiInstanceStatus;
-  popo: PopoMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
   email: EmailMultiInstanceStatus;
 }
@@ -1561,14 +1498,6 @@ interface NimGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-interface NeteaseBeeChanGatewayStatus {
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  botAccount: string | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
 
 interface QQGatewayStatus {
   connected: boolean;
@@ -1587,13 +1516,6 @@ interface WecomGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-interface PopoGatewayStatus {
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
 
 interface WeixinGatewayStatus {
   connected: boolean;

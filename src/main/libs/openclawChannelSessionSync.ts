@@ -196,7 +196,7 @@ export function extractAccountIdFromKey(sessionKey: string): string | null {
   return null;
 }
 
-const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'email', 'nim', 'wecom', 'telegram', 'discord', 'popo']);
+const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'email', 'nim', 'wecom', 'telegram', 'discord']);
 
 /**
  * Resolve the agent binding for a platform, supporting per-instance bindings.
@@ -257,13 +257,11 @@ function getChannelTitlePrefix(platform: string): string {
     'wecom-openclaw-plugin': t('channelPrefixWecom'),
     nim: t('channelPrefixNim'),
     weixin: t('channelPrefixWeixin'),
-    'netease-bee': t('channelPrefixNeteaseBee'),
   };
   const staticMap: Record<string, string> = {
     telegram: 'TG',
     discord: 'Discord',
     qq: 'QQ',
-    popo: 'POPO',
     email: t('channelPrefixEmail'),
   };
   const label = i18nMap[platform] ?? staticMap[platform] ?? platform;
@@ -445,7 +443,7 @@ export class OpenClawChannelSessionSync {
 
     // 5. Create new Cowork session
     const titlePrefix = getChannelTitlePrefix(parsed.platform);
-    // For conversationIds that look like email addresses (e.g. POPO),
+    // For conversationIds that look like email addresses,
     // use the local part before '@' as the display name.
     const displayId = parsed.conversationId.includes('@')
       ? parsed.conversationId.split('@')[0]

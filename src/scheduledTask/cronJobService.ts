@@ -267,7 +267,6 @@ function toGatewayDelivery(delivery?: ScheduledTaskDelivery): GatewayDelivery | 
   }
 
   // Translate logical UI channel names to OpenClaw channel names.
-  // e.g. 'popo' (UI/config key) → 'moltbot-popo' (OpenClaw plugin name).
   const openclawChannel = delivery.channel
     ? (() => {
         const platform = PlatformRegistry.platformOfChannel(delivery.channel);

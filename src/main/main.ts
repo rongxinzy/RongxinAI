@@ -1119,13 +1119,6 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
           return [];
         }
       },
-      getPopoInstances: () => {
-        try {
-          return getIMGatewayManager().getIMStore().getPopoInstances();
-          } catch {
-          return [];
-        }
-      },
       getEmailOpenClawConfig: () => {
         try {
           return getIMGatewayManager().getIMStore().getEmailConfig();
@@ -1138,13 +1131,6 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
           return getIMGatewayManager().getIMStore().getNimInstances();
         } catch {
           return [];
-        }
-      },
-      getNeteaseBeeChanConfig: () => {
-        try {
-          return getIMGatewayManager().getConfig()['netease-bee'];
-        } catch {
-          return null;
         }
       },
       getWeixinConfig: () => {
@@ -4065,7 +4051,7 @@ if (!gotTheLock) {
       // Only trigger sync when explicitly requested via syncGateway flag (e.g. from
       // the global Save button), to avoid frequent gateway restarts on every field blur.
       const hasOpenClawChange = config.telegram || config.discord || config.dingtalk
-        || config.feishu || config.qq || config.wecom || config.popo || config.weixin;
+        || config.feishu || config.qq || config.wecom || config.weixin;
       if (options?.syncGateway && hasOpenClawChange && getOpenClawEngineManager().getStatus().phase === 'running') {
         scheduleImConfigSync();
       }
@@ -4157,74 +4143,6 @@ if (!gotTheLock) {
       return { success: true, ...result };
     } catch (error) {
       return { success: false, connected: false, message: error instanceof Error ? error.message : 'Weixin QR login failed' };
-    }
-  });
-
-  // POPO QR login
-  ipcMain.handle('im:popo:qr-login-start', async () => {
-    try {
-      const result = getIMGatewayManager().popoQrLoginStart();
-      return { success: true, ...result };
-    } catch (error) {
-      return { success: false, message: error instanceof Error ? error.message : 'Failed to start POPO QR login' };
-    }
-  });
-
-  ipcMain.handle('im:popo:qr-login-poll', async (_event, taskToken: string) => {
-    try {
-      const result = await getIMGatewayManager().popoQrLoginPoll(taskToken);
-      return result;
-    } catch (error) {
-      return { success: false, message: error instanceof Error ? error.message : 'POPO QR login poll failed' };
-    }
-  });
-
-  ipcMain.handle('im:popo:instance:add', async (_event, name: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_POPO_CONFIG: defaults } = await import('./im/types');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'POPO Bot',
-      };
-      getIMGatewayManager().getIMStore().setPopoInstanceConfig(instanceId, instance);
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add POPO instance',
-      };
-    }
-  });
-
-  ipcMain.handle('im:popo:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deletePopoInstance(instanceId);
-      if (getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete POPO instance',
-      };
-    }
-  });
-
-  ipcMain.handle('im:popo:instance:config:set', async (_event, instanceId: string, config: Record<string, unknown>, options?: { syncGateway?: boolean }) => {
-    try {
-      getIMGatewayManager().getIMStore().setPopoInstanceConfig(instanceId, config);
-      if (options?.syncGateway && getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to set POPO instance config',
-      };
     }
   });
 

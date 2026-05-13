@@ -30,7 +30,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     channelPrefixWecom: '企微',
     channelPrefixNim: '云信',
     channelPrefixWeixin: '微信',
-    channelPrefixNeteaseBee: '小蜜蜂',
     channelPrefixEmail: '邮件',
     // NIM chat type labels
     nimQChat: '圈组',
@@ -197,16 +196,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imNimP2pOnly: '云信 IM 当前仅支持 P2P（私聊）消息。',
     imNimP2pOnlySuggestion: '请通过私聊方式向机器人账号发送消息触发对话。',
 
-    // Xiaomifeng
-    imNeteaseBeeConfigReady: '小蜜蜂配置已就绪（Client ID: {clientId}）。',
-
-    // POPO
-    imPopoFillWebhookCredentials: '请补全 appKey、appSecret、token 和 aesKey 后重新测试连通性。',
-    imPopoFillWsCredentials: '请补全 appKey、appSecret 和 aesKey 后重新测试连通性。',
-    imPopoConfigReady: 'POPO 配置已就绪。',
-    imPopoOpenClawHint: 'POPO 通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
-    imPopoConfigReadyOpenClaw: 'POPO 配置已就绪，通过 OpenClaw 运行。',
-
     // Email Channel
     emailSettings: '邮件设置',
     emailInstance: '邮箱账号',
@@ -288,7 +277,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     channelPrefixWecom: 'WeCom',
     channelPrefixNim: 'NIM',
     channelPrefixWeixin: 'WeChat',
-    channelPrefixNeteaseBee: 'Xiaomifeng',
     channelPrefixEmail: 'Email',
     // NIM chat type labels
     nimQChat: 'QChat',
@@ -491,19 +479,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imNimP2pOnly: 'NIM currently only supports P2P (direct) messages.',
     imNimP2pOnlySuggestion:
       'Please send a direct message to the bot account to start a conversation.',
-
-    // Netease Bee
-    imNeteaseBeeConfigReady: 'Netease Bee configuration is ready (Client ID: {clientId}).',
-
-    // POPO
-    imPopoFillWebhookCredentials:
-      'Please provide the appKey, appSecret, token, and aesKey and test connectivity again.',
-    imPopoFillWsCredentials:
-      'Please provide the appKey, appSecret, and aesKey and test connectivity again.',
-    imPopoConfigReady: 'POPO configuration is ready.',
-    imPopoOpenClawHint:
-      'POPO runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
-    imPopoConfigReadyOpenClaw: 'POPO configuration is ready, running via OpenClaw.',
 
     // Email Channel
     emailSettings: 'Email Settings',

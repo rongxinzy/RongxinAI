@@ -318,24 +318,6 @@ export interface NimMultiInstanceStatus {
 /** @deprecated Use NimOpenClawConfig instead. */
 export type NimConfig = NimOpenClawConfig;
 
-// ==================== NeteaseBee (小蜜蜂) Types ====================
-
-export interface NeteaseBeeChanConfig {
-  enabled: boolean;
-  clientId: string; // NIM 登录账号
-  secret: string; // NIM 登录 token
-  debug?: boolean;
-}
-
-export interface NeteaseBeeChanGatewayStatus {
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  botAccount: string | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
 // ==================== QQ Types ====================
 
 export interface QQOpenClawConfig {
@@ -431,55 +413,6 @@ export interface WecomMultiInstanceConfig {
 
 export interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
-}
-
-// ==================== POPO Types ====================
-
-export interface PopoOpenClawConfig {
-  enabled: boolean;
-  connectionMode: 'websocket' | 'webhook';
-  appKey: string;
-  appSecret: string;
-  token: string;
-  aesKey: string;
-  webhookBaseUrl: string;
-  webhookPath: string;
-  webhookPort: number;
-  dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled';
-  allowFrom: string[];
-  groupPolicy: 'open' | 'allowlist' | 'disabled';
-  groupAllowFrom: string[];
-  textChunkLimit: number;
-  richTextChunkLimit: number;
-  debug: boolean;
-}
-
-export interface PopoGatewayStatus {
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
-export const MAX_POPO_INSTANCES = 5;
-
-export interface PopoInstanceConfig extends PopoOpenClawConfig {
-  instanceId: string;
-  instanceName: string;
-}
-
-export interface PopoInstanceStatus extends PopoGatewayStatus {
-  instanceId: string;
-  instanceName: string;
-}
-
-export interface PopoMultiInstanceConfig {
-  instances: PopoInstanceConfig[];
-}
-
-export interface PopoMultiInstanceStatus {
-  instances: PopoInstanceStatus[];
 }
 
 // ==================== Weixin (微信) Types ====================
@@ -584,9 +517,7 @@ export interface IMGatewayConfig {
   qq: QQMultiInstanceConfig;
   discord: DiscordMultiInstanceConfig;
   nim: NimMultiInstanceConfig;
-  'netease-bee': NeteaseBeeChanConfig;
   wecom: WecomMultiInstanceConfig;
-  popo: PopoMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
   email: EmailMultiInstanceConfig;
   settings: IMSettings;
@@ -606,9 +537,7 @@ export interface IMGatewayStatus {
   telegram: TelegramMultiInstanceStatus;
   discord: DiscordMultiInstanceStatus;
   nim: NimMultiInstanceStatus;
-  'netease-bee': NeteaseBeeChanGatewayStatus;
   wecom: WecomMultiInstanceStatus;
-  popo: PopoMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
   email: EmailMultiInstanceStatus;
 }
@@ -802,14 +731,6 @@ export const DEFAULT_NIM_MULTI_INSTANCE_CONFIG: NimMultiInstanceConfig = {
 /** @deprecated Use DEFAULT_NIM_OPENCLAW_CONFIG instead. */
 export const DEFAULT_NIM_CONFIG = DEFAULT_NIM_OPENCLAW_CONFIG;
 
-// ==================== NetEase Bee Types ====================
-
-export const DEFAULT_NETEASE_BEE_CONFIG: NeteaseBeeChanConfig = {
-  enabled: false,
-  clientId: '',
-  secret: '',
-};
-
 export const DEFAULT_TELEGRAM_OPENCLAW_CONFIG: TelegramOpenClawConfig = {
   enabled: false,
   botToken: '',
@@ -869,27 +790,6 @@ export const DEFAULT_WECOM_CONFIG: WecomOpenClawConfig = {
 
 export const DEFAULT_WECOM_MULTI_INSTANCE_CONFIG: WecomMultiInstanceConfig = { instances: [] };
 
-export const DEFAULT_POPO_CONFIG: PopoOpenClawConfig = {
-  enabled: false,
-  connectionMode: 'websocket',
-  appKey: '',
-  appSecret: '',
-  token: '',
-  aesKey: '',
-  webhookBaseUrl: '',
-  webhookPath: '/popo/callback',
-  webhookPort: 3100,
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'open',
-  groupAllowFrom: [],
-  textChunkLimit: 3000,
-  richTextChunkLimit: 5000,
-  debug: true,
-};
-
-export const DEFAULT_POPO_MULTI_INSTANCE_CONFIG: PopoMultiInstanceConfig = { instances: [] };
-
 export const DEFAULT_WEIXIN_CONFIG: WeixinOpenClawConfig = {
   enabled: false,
   accountId: '',
@@ -912,9 +812,7 @@ export const DEFAULT_IM_CONFIG: IMGatewayConfig = {
   qq: DEFAULT_QQ_MULTI_INSTANCE_CONFIG,
   discord: DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG,
   nim: DEFAULT_NIM_MULTI_INSTANCE_CONFIG,
-  'netease-bee': DEFAULT_NETEASE_BEE_CONFIG,
   wecom: DEFAULT_WECOM_MULTI_INSTANCE_CONFIG,
-  popo: DEFAULT_POPO_MULTI_INSTANCE_CONFIG,
   weixin: DEFAULT_WEIXIN_CONFIG,
   email: DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG,
   settings: DEFAULT_IM_SETTINGS,
@@ -960,15 +858,6 @@ export const DEFAULT_NIM_MULTI_INSTANCE_STATUS: NimMultiInstanceStatus = {
   instances: [],
 };
 
-export const DEFAULT_NETEASE_BEE_STATUS: NeteaseBeeChanGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  lastError: null,
-  botAccount: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
 export const DEFAULT_QQ_STATUS: QQGatewayStatus = {
   connected: false,
   startedAt: null,
@@ -986,16 +875,6 @@ export const DEFAULT_WECOM_STATUS: WecomGatewayStatus = {
   lastOutboundAt: null,
 };
 
-export const DEFAULT_POPO_STATUS: PopoGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  lastError: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_POPO_MULTI_INSTANCE_STATUS: PopoMultiInstanceStatus = { instances: [] };
-
 export const DEFAULT_WEIXIN_STATUS: WeixinGatewayStatus = {
   connected: false,
   startedAt: null,
@@ -1011,9 +890,7 @@ export const DEFAULT_IM_STATUS: IMGatewayStatus = {
   qq: { instances: [] },
   discord: { instances: [] },
   nim: DEFAULT_NIM_MULTI_INSTANCE_STATUS,
-  'netease-bee': DEFAULT_NETEASE_BEE_STATUS,
   wecom: { instances: [] },
-  popo: DEFAULT_POPO_MULTI_INSTANCE_STATUS,
   weixin: DEFAULT_WEIXIN_STATUS,
   email: { instances: [] },
 };

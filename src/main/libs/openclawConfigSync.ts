@@ -13,7 +13,7 @@ import {
 } from '../../shared/providers';
 import type { Agent, CoworkConfig, CoworkExecutionMode } from '../coworkStore';
 import type { DiscordInstanceConfig, IMSettings, TelegramInstanceConfig } from '../im/types';
-import type { DingTalkInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, NeteaseBeeChanConfig, NimInstanceConfig, PopoInstanceConfig, QQInstanceConfig, WecomInstanceConfig, WeixinOpenClawConfig } from '../im/types';
+import type { DingTalkInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, NimInstanceConfig, QQInstanceConfig, WecomInstanceConfig, WeixinOpenClawConfig } from '../im/types';
 import { OpenClawSessionKeepAlive } from '../openclawSessionPolicy/constants';
 import { buildOpenClawSessionConfig } from '../openclawSessionPolicy/store';
 import {
@@ -930,10 +930,8 @@ type OpenClawConfigSyncDeps = {
   getFeishuInstances?: () => FeishuInstanceConfig[];
   getQQInstances?: () => QQInstanceConfig[];
   getWecomInstances?: () => WecomInstanceConfig[];
-  getPopoInstances: () => PopoInstanceConfig[];
   getEmailOpenClawConfig?: () => EmailMultiInstanceConfig;
   getNimInstances?: () => NimInstanceConfig[];
-  getNeteaseBeeChanConfig: () => NeteaseBeeChanConfig | null;
   getWeixinConfig: () => WeixinOpenClawConfig | null;
   getIMSettings?: () => IMSettings | null;
   getMcpBridgeConfig?: () => McpBridgeConfig | null;
@@ -953,10 +951,8 @@ export class OpenClawConfigSync {
   private readonly getFeishuInstances: () => FeishuInstanceConfig[];
   private readonly getQQInstances: () => QQInstanceConfig[];
   private readonly getWecomInstances: () => WecomInstanceConfig[];
-  private readonly getPopoInstances: () => PopoInstanceConfig[];
   private readonly getEmailOpenClawConfig?: () => EmailMultiInstanceConfig;
   private readonly getNimInstances: () => NimInstanceConfig[];
-  private readonly getNeteaseBeeChanConfig: () => NeteaseBeeChanConfig | null;
   private readonly getWeixinConfig: () => WeixinOpenClawConfig | null;
   private readonly getIMSettings?: () => IMSettings | null;
   private readonly getMcpBridgeConfig?: () => McpBridgeConfig | null;
@@ -977,10 +973,8 @@ export class OpenClawConfigSync {
     this.getFeishuInstances = deps.getFeishuInstances ?? (() => []);
     this.getQQInstances = deps.getQQInstances ?? (() => []);
     this.getWecomInstances = deps.getWecomInstances ?? (() => []);
-    this.getPopoInstances = deps.getPopoInstances;
     this.getEmailOpenClawConfig = deps.getEmailOpenClawConfig;
     this.getNimInstances = deps.getNimInstances ?? (() => []);
-    this.getNeteaseBeeChanConfig = deps.getNeteaseBeeChanConfig;
     this.getWeixinConfig = deps.getWeixinConfig;
     this.getIMSettings = deps.getIMSettings;
     this.getMcpBridgeConfig = deps.getMcpBridgeConfig;
@@ -1220,13 +1214,9 @@ export class OpenClawConfigSync {
 
     const wecomInstances = this.getWecomInstances();
 
-    const popoInstances = this.getPopoInstances();
-
     const emailConfig = this.getEmailOpenClawConfig?.();
 
     const nimInstances = this.getNimInstances();
-
-    const neteaseBeeChanConfig = this.getNeteaseBeeChanConfig();
 
     const weixinConfig = this.getWeixinConfig();
 
@@ -1382,10 +1372,8 @@ export class OpenClawConfigSync {
                   return feishuInstances.some(i => i.enabled && i.appId);
                 if (pluginMatches(plugin, 'openclaw-qqbot')) return qqInstances.some(i => i.enabled && i.appId);
                 if (pluginMatches(plugin, 'wecom-openclaw-plugin')) return wecomInstances.some(i => i.enabled && i.botId);
-                if (pluginMatches(plugin, 'moltbot-popo')) return popoInstances.some(i => i.enabled && i.appKey);
                 if (pluginMatches(plugin, 'openclaw-nim-channel', NIM_CHANNEL_PLUGIN_ID, 'nim'))
                   return nimInstances.some(i => i.enabled && ((i.nimToken && i.nimToken.trim()) || (i.appKey && i.account && i.token)));
-                if (pluginMatches(plugin, 'openclaw-netease-bee')) return !!(neteaseBeeChanConfig?.enabled && neteaseBeeChanConfig.clientId && neteaseBeeChanConfig.secret);
                 if (pluginMatches(plugin, 'openclaw-weixin')) return true; // Always keep enabled for QR login discovery
                 if (pluginMatches(plugin, 'clawemail-email', EMAIL_PLUGIN_ID)) return !!emailConfig?.instances.some(i => i.enabled && i.email);
                 return true; // other plugins stay enabled
@@ -1744,64 +1732,6 @@ export class OpenClawConfigSync {
       };
     }
 
-    // Sync POPO OpenClaw channel config (via moltbot-popo plugin) — multi-instance via accounts
-    const enabledPopoInstances = popoInstances.filter(i => i.enabled && i.appKey);
-    if (enabledPopoInstances.length > 0) {
-      const popoAccounts: Record<string, unknown> = {};
-      for (let idx = 0; idx < enabledPopoInstances.length; idx++) {
-        const inst = enabledPopoInstances[idx];
-        // Migration: old configs lack connectionMode. If token is set, the user
-        // was using webhook mode; otherwise default to the new websocket mode.
-        const effectiveConnectionMode =
-          inst.connectionMode || (inst.token ? 'webhook' : 'websocket');
-        const isWebSocket = effectiveConnectionMode === 'websocket';
-        const secretVar = idx === 0 ? 'LOBSTER_POPO_APP_SECRET' : `LOBSTER_POPO_APP_SECRET_${idx}`;
-        const account: Record<string, unknown> = {
-          enabled: true,
-          name: inst.instanceName,
-          connectionMode: effectiveConnectionMode,
-          appKey: inst.appKey,
-          appSecret: `\${${secretVar}}`,
-          aesKey: inst.aesKey,
-          dmPolicy: inst.dmPolicy || 'open',
-          allowFrom: (() => {
-            const ids = inst.allowFrom?.length ? [...inst.allowFrom] : [];
-            if (inst.dmPolicy === 'open' && !ids.includes('*')) ids.push('*');
-            return ids;
-          })(),
-          groupPolicy: inst.groupPolicy || 'open',
-          groupAllowFrom: (() => {
-            const ids = inst.groupAllowFrom?.length ? [...inst.groupAllowFrom] : [];
-            if (inst.groupPolicy === 'open' && !ids.includes('*')) ids.push('*');
-            return ids;
-          })(),
-        };
-        // Webhook-only fields
-        if (!isWebSocket) {
-          const tokenVar = idx === 0 ? 'LOBSTER_POPO_TOKEN' : `LOBSTER_POPO_TOKEN_${idx}`;
-          account.token = `\${${tokenVar}}`;
-          account.webhookPort = inst.webhookPort || 3100;
-          if (inst.webhookBaseUrl) {
-            account.webhookBaseUrl = inst.webhookBaseUrl;
-          }
-          if (inst.webhookPath && inst.webhookPath !== '/popo/callback') {
-            account.webhookPath = inst.webhookPath;
-          }
-        }
-        if (inst.textChunkLimit && inst.textChunkLimit !== 3000) {
-          account.textChunkLimit = inst.textChunkLimit;
-        }
-        if (inst.richTextChunkLimit && inst.richTextChunkLimit !== 5000) {
-          account.richTextChunkLimit = inst.richTextChunkLimit;
-        }
-        popoAccounts[inst.instanceId.slice(0, 8)] = account;
-      }
-      managedConfig.channels = {
-        ...((managedConfig.channels as Record<string, unknown>) || {}),
-        'moltbot-popo': { enabled: true, accounts: popoAccounts },
-      };
-    }
-
     // Sync Email OpenClaw channel config (multi-instance)
     if (emailConfig?.instances && emailConfig.instances.length > 0) {
       const enabledInstances = emailConfig.instances.filter(i => i.enabled && i.email);
@@ -1896,22 +1826,6 @@ export class OpenClawConfigSync {
         accounts[accountKey] = nimInstance;
       });
       managedConfig.channels = { ...(managedConfig.channels as Record<string, unknown> || {}), nim: { accounts } };
-    }
-
-    // Sync NeteaseBee OpenClaw channel config (via openclaw-netease-bee plugin)
-    if (
-      neteaseBeeChanConfig?.enabled &&
-      neteaseBeeChanConfig.clientId &&
-      neteaseBeeChanConfig.secret
-    ) {
-      managedConfig.channels = {
-        ...((managedConfig.channels as Record<string, unknown>) || {}),
-        'netease-bee': {
-          enabled: true,
-          clientId: neteaseBeeChanConfig.clientId,
-          secret: neteaseBeeChanConfig.secret,
-        },
-      };
     }
 
     // Sync Weixin OpenClaw channel config (via openclaw-weixin plugin)
@@ -2168,29 +2082,6 @@ export class OpenClawConfigSync {
         env.LOBSTER_WECOM_SECRET = enabledWecom[idx].secret;
       } else {
         env[`LOBSTER_WECOM_SECRET_${idx}`] = enabledWecom[idx].secret;
-      }
-    }
-
-    // POPO — per-instance secrets (must match sync() indexing: enabled instances only)
-    const enabledPopo = this.getPopoInstances().filter(i => i.enabled && i.appSecret);
-    for (let idx = 0; idx < enabledPopo.length; idx++) {
-      if (idx === 0) {
-        env.LOBSTER_POPO_APP_SECRET = enabledPopo[idx].appSecret;
-        if (enabledPopo[idx].token) {
-          env.LOBSTER_POPO_TOKEN = enabledPopo[idx].token;
-        } else {
-          // Provide non-empty fallback so stale openclaw.json files that still
-          // contain ${LOBSTER_POPO_TOKEN} from a previous webhook config
-          // don't crash the gateway with MissingEnvVarError.
-          env.LOBSTER_POPO_TOKEN = 'unconfigured';
-        }
-      } else {
-        env[`LOBSTER_POPO_APP_SECRET_${idx}`] = enabledPopo[idx].appSecret;
-        if (enabledPopo[idx].token) {
-          env[`LOBSTER_POPO_TOKEN_${idx}`] = enabledPopo[idx].token;
-        } else {
-          env[`LOBSTER_POPO_TOKEN_${idx}`] = 'unconfigured';
-        }
       }
     }
 
@@ -2629,7 +2520,6 @@ export class OpenClawConfigSync {
       wecom: { channel: 'wecom', getInstances: () => this.getWecomInstances() },
       telegram: { channel: 'telegram', getInstances: () => this.getTelegramInstances() },
       discord: { channel: 'discord', getInstances: () => this.getDiscordInstances() },
-      popo: { channel: 'moltbot-popo', getInstances: () => this.getPopoInstances() },
     };
 
     for (const [platform, { channel, getInstances }] of Object.entries(multiInstanceChannels)) {
@@ -2668,7 +2558,6 @@ export class OpenClawConfigSync {
       channel: string;
       platform: string;
     }> = [
-      { getter: () => this.getNeteaseBeeChanConfig(), channel: 'netease-bee', platform: 'netease-bee' },
       { getter: () => this.getWeixinConfig(), channel: 'openclaw-weixin', platform: 'weixin' },
     ];
 
