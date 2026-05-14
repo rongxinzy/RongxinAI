@@ -11,8 +11,8 @@
 
 import { describe, expect, test } from 'vitest';
 
-import { ALL_IM_PLATFORMS, buildProbeResult, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
 import type { IMConnectivityTestResult, Platform } from '../types';
+import { ALL_IM_PLATFORMS, buildProbeResult, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
 
 // ── Payload helpers (mirrors cron SystemEvent shape) ──
 
