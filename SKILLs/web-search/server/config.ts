@@ -11,6 +11,8 @@ export interface BrowserConfig {
   userDataDir?: string;
   /** Whether to run browser headless */
   headless: boolean;
+  /** Retry once with visible browser when headless search appears blocked */
+  fallbackToHeadful: boolean;
   /** Additional Chrome flags */
   chromeFlags?: string[];
 }
@@ -47,7 +49,8 @@ export interface Config {
 export const defaultConfig: Config = {
   browser: {
     cdpPort: 9222,
-    headless: false, // Always visible for transparency
+    headless: true,
+    fallbackToHeadful: true,
     chromeFlags: [
       '--no-first-run',
       '--no-default-browser-check',

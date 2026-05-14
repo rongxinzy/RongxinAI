@@ -172,11 +172,18 @@ function isDeliveryOnlyError(opts: {
   error?: string;
   deliveryError?: string;
   deliveryStatus?: string;
+  summary?: string;
 }): boolean {
   if (opts.status !== GatewayStatus.Error) return false;
   if (!opts.error) return false;
-  // The error is delivery-only when its text matches the deliveryError exactly.
-  return !!opts.deliveryError && opts.error === opts.deliveryError;
+  if (!opts.deliveryError || opts.error !== opts.deliveryError) return false;
+
+  // OpenClaw also mirrors execution errors into deliveryError when nothing was
+  // delivered. Only suppress the error when the run still produced a distinct
+  // agent summary, which indicates the agent turn completed and only delivery
+  // failed.
+  const summary = opts.summary?.trim();
+  return !!summary && summary !== opts.error.trim();
 }
 
 export function mapGatewaySchedule(schedule: GatewaySchedule): Schedule {
@@ -391,6 +398,7 @@ export function mapGatewayRun(entry: GatewayRunLogEntry): ScheduledTaskRun {
       error: entry.error,
       deliveryError: entry.deliveryError,
       deliveryStatus: entry.deliveryStatus,
+      summary: entry.summary,
     })
   ) {
     status = TaskStatus.Success;

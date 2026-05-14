@@ -224,6 +224,16 @@ export class BridgeServer {
     }
   }
 
+  private async relaunchHeadfulBrowser(): Promise<string> {
+    await this.resetBrowserState();
+    const headfulConfig: Config['browser'] = {
+      ...this.config.browser,
+      headless: false
+    };
+    this.browserInstance = await launchBrowser(headfulConfig);
+    return this.playwrightManager.connectToCDP(this.browserInstance.cdpPort);
+  }
+
   private async ensureBrowserReady(): Promise<{ instance: BrowserInstance; reused: boolean }> {
     if (this.browserInstance) {
       const processAlive = this.isBrowserProcessAlive(this.browserInstance);
@@ -393,7 +403,25 @@ export class BridgeServer {
       }
 
       const preferredEngine = this.normalizeEnginePreference(engine);
-      const results = await this.searchWithFallback(connectionId, query, maxResults, preferredEngine);
+      let results: SearchResponse;
+      try {
+        results = await this.searchWithFallback(connectionId, query, maxResults, preferredEngine);
+      } catch (error) {
+        const isHeadless = this.browserInstance?.headless === true;
+        if (!isHeadless || !this.config.browser.fallbackToHeadful) {
+          throw error;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[Search] Headless search failed, retrying with visible browser: ${message}`);
+        const fallbackConnectionId = await this.relaunchHeadfulBrowser();
+        results = await this.searchWithFallback(
+          fallbackConnectionId,
+          query,
+          maxResults,
+          preferredEngine
+        );
+      }
 
       res.json({
         success: true,
@@ -439,11 +467,18 @@ export class BridgeServer {
     for (const engine of engineOrder) {
       try {
         console.log(`[Search] Trying engine: ${engine}`);
+        let response: SearchResponse;
         if (engine === 'google') {
-          return await this.googleSearch.search(connectionId, query, { maxResults });
+          response = await this.googleSearch.search(connectionId, query, { maxResults });
+        } else {
+          response = await this.bingSearch.search(connectionId, query, { maxResults });
         }
 
-        return await this.bingSearch.search(connectionId, query, { maxResults });
+        if (response.results.length === 0) {
+          throw new Error(`${engine} returned no results`);
+        }
+
+        return response;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         errors.push(`${engine}: ${message}`);
