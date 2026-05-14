@@ -60,11 +60,12 @@ type InferenceMessage = {
 
 type LaunchFormState = {
   numCtx: string;
-  numGpu: string;
+  accelerationMode: string;
+  customGpuLayers: string;
   numThread: string;
   numBatch: string;
   useMmap: string;
-  gpuDevices: string;
+  gpuPreset: string;
   customGpuDevices: string;
 };
 
@@ -76,11 +77,12 @@ type SuggestedLaunchOptions = {
   summary: string;
 };
 
-type GpuDeviceSelection = 'service-default' | 'auto' | 'gpu0' | 'gpu1' | 'gpu0-gpu1' | 'custom';
+type LaunchGpuPreset = 'service-default' | 'single-auto' | 'gpu0' | 'gpu1' | 'dual-gpu' | 'custom';
+type LaunchAccelerationMode = 'auto' | 'cpu' | 'custom';
 
 type LaunchRequest = {
   input: OllamaModelLaunchInput;
-  gpuDevices: string;
+  gpuPreset: string;
   customGpuDevices: string;
 };
 
@@ -350,20 +352,21 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handlePreload = (request: LaunchRequest, openDebugger: boolean) => {
     void runAction(async () => {
-      const nextGpuConfig = resolveLaunchGpuDevices(request.gpuDevices, request.customGpuDevices);
-      const currentGpuConfig = serviceConfig.cudaVisibleDevices ?? '';
-      if (nextGpuConfig !== undefined && nextGpuConfig !== currentGpuConfig) {
-        const nextServiceConfig = await saveOllamaServiceConfig({
-          ...serviceConfig,
-          cudaVisibleDevices: nextGpuConfig,
-        });
-        setServiceConfig(nextServiceConfig);
+      const servicePatch = resolveLaunchServiceConfig(request.gpuPreset, request.customGpuDevices);
+      if (servicePatch && hasServiceConfigPatchChanged(serviceConfig, servicePatch)) {
+        if (status?.status === 'running' && !status.managedByApp) {
+          throw new Error(i18nService.t('localInferenceServiceConfigExternalNotApplied'));
+        }
+        const nextConfig = { ...serviceConfig, ...servicePatch };
+        const savedConfig = await saveOllamaServiceConfig(nextConfig);
+        setServiceConfig(savedConfig);
         const restartedStatus = await window.electron.ollama.restart();
         setStatus(restartedStatus);
         if (restartedStatus.status !== 'running') {
           throw new Error(restartedStatus.error || i18nService.t('localInferenceLaunchRestartFailed'));
         }
       }
+
       const result = await window.electron.ollama.preloadModel(request.input);
       setRunningModels(result.runningModels);
       setSelectedModel(request.input.model);
@@ -754,6 +757,7 @@ function ServiceHeader({
       <OllamaServiceConfigPanel
         loading={loading}
         running={running}
+        managedByApp={managedByApp}
         config={serviceConfig}
         onSave={onSaveServiceConfig}
       />
@@ -764,11 +768,13 @@ function ServiceHeader({
 function OllamaServiceConfigPanel({
   loading,
   running,
+  managedByApp,
   config,
   onSave,
 }: {
   loading: boolean;
   running: boolean;
+  managedByApp: boolean;
   config: OllamaServiceConfig;
   onSave: (config: OllamaServiceConfig) => void;
 }) {
@@ -805,6 +811,11 @@ function OllamaServiceConfigPanel({
       {expanded && (
         <div className="mt-3 rounded-md border border-border bg-background/60 p-3">
           <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigDescription')}</p>
+          {running && !managedByApp && (
+            <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              {i18nService.t('localInferenceServiceConfigExternalWarning')}
+            </p>
+          )}
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <ServiceConfigInput
               label="CUDA_VISIBLE_DEVICES"
@@ -843,7 +854,9 @@ function OllamaServiceConfigPanel({
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-secondary">
-              {running
+              {running && !managedByApp
+                ? i18nService.t('localInferenceServiceConfigExternalHint')
+                : running
                 ? i18nService.t('localInferenceServiceConfigRestartHint')
                 : i18nService.t('localInferenceServiceConfigStartHint')}
             </p>
@@ -1093,11 +1106,12 @@ function LaunchModelDialog({
 }) {
   const [form, setForm] = useState<LaunchFormState>({
     numCtx: '4096',
-    numGpu: '',
+    accelerationMode: 'auto',
+    customGpuLayers: '',
     numThread: '',
     numBatch: '',
     useMmap: '',
-    gpuDevices: 'service-default',
+    gpuPreset: 'service-default',
     customGpuDevices: '',
   });
   const [optimizationSummary, setOptimizationSummary] = useState('');
@@ -1108,7 +1122,7 @@ function LaunchModelDialog({
   const buildInput = (): OllamaModelLaunchInput => {
     const options: NonNullable<OllamaModelLaunchInput['options']> = {};
     const parsedNumCtx = parseOptionalInteger(form.numCtx);
-    const parsedNumGpu = parseOptionalInteger(form.numGpu);
+    const parsedNumGpu = resolveAccelerationNumGpu(form.accelerationMode, form.customGpuLayers);
     const parsedNumThread = parseOptionalInteger(form.numThread);
     const parsedNumBatch = parseOptionalInteger(form.numBatch);
     const parsedUseMmap = parseOptionalBoolean(form.useMmap);
@@ -1140,7 +1154,8 @@ function LaunchModelDialog({
     setForm((current) => ({
       ...current,
       numCtx: String(next.numCtx),
-      numGpu: next.numGpu === undefined ? '' : String(next.numGpu),
+      accelerationMode: next.numGpu === undefined ? 'auto' : 'custom',
+      customGpuLayers: next.numGpu === undefined ? '' : String(next.numGpu),
       numThread: String(next.numThread),
       numBatch: String(next.numBatch),
     }));
@@ -1148,11 +1163,11 @@ function LaunchModelDialog({
   };
   const buildLaunchRequest = (): LaunchRequest => ({
     input: buildInput(),
-    gpuDevices: form.gpuDevices,
+    gpuPreset: form.gpuPreset,
     customGpuDevices: form.customGpuDevices,
   });
-  const gpuDevicesChanged = resolveLaunchGpuDevices(form.gpuDevices, form.customGpuDevices) !== undefined
-    && resolveLaunchGpuDevices(form.gpuDevices, form.customGpuDevices) !== (serviceConfig.cudaVisibleDevices ?? '');
+  const servicePatch = resolveLaunchServiceConfig(form.gpuPreset, form.customGpuDevices);
+  const gpuPresetChangesService = servicePatch !== null && hasServiceConfigPatchChanged(serviceConfig, servicePatch);
 
   return (
     <div
@@ -1161,8 +1176,8 @@ function LaunchModelDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-5 py-4">
           <div className="min-w-0">
             <h3 className="text-xl font-semibold text-foreground">{i18nService.t('localInferenceLaunchTitle')}</h3>
             <p className="mt-1 truncate font-mono text-xs text-secondary">{model.name}</p>
@@ -1178,12 +1193,19 @@ function LaunchModelDialog({
         </div>
 
         <div className="space-y-4 overflow-y-auto px-5 py-4">
-          <section className="rounded-lg bg-surface-raised px-4 py-3">
-            <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchLifecycleTitle')}</h4>
-            <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchLifecycleDescription')}</p>
+          <section className="rounded-xl border border-border bg-surface px-4 py-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchLifecycleTitle')}</h4>
+                <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchLifecycleDescription')}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-surface-raised px-2.5 py-1 text-xs text-secondary">
+                {i18nService.t('localInferenceLaunchKeepAliveForever')}
+              </span>
+            </div>
           </section>
 
-          <section className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <section className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchAutoTitle')}</h4>
               <p className="mt-1 text-sm text-secondary">
@@ -1202,51 +1224,81 @@ function LaunchModelDialog({
             </button>
           </section>
 
-          <section className="rounded-lg bg-surface-raised px-4 py-3">
-            <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchKeepAlive')}</h4>
-            <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchKeepAliveForever')}</p>
-          </section>
-
-          <section className="space-y-3 rounded-lg border border-border px-4 py-3">
+          <section className="space-y-3 rounded-xl border border-border bg-surface/40 px-4 py-3">
             <div>
-              <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchGpuDevices')}</h4>
-              <p className="mt-1 text-sm text-secondary">
-                {i18nService.t('localInferenceLaunchGpuDevicesHint')}
-              </p>
+              <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchGpuPresetTitle')}</h4>
+              <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchGpuPresetDescription')}</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
-              <LaunchSelectOptions
-                label={i18nService.t('localInferenceLaunchGpuDevices')}
-                value={form.gpuDevices}
+            <div className="grid gap-3 md:grid-cols-2">
+              <LaunchChoiceGrid
+                value={form.gpuPreset}
                 options={[
-                  { value: 'service-default', label: i18nService.t('localInferenceLaunchGpuServiceDefault') },
-                  { value: 'auto', label: i18nService.t('localInferenceLaunchGpuAuto') },
-                  { value: 'gpu0', label: i18nService.t('localInferenceLaunchGpu0') },
-                  { value: 'gpu1', label: i18nService.t('localInferenceLaunchGpu1') },
-                  { value: 'gpu0-gpu1', label: i18nService.t('localInferenceLaunchGpu01') },
-                  { value: 'custom', label: i18nService.t('localInferenceLaunchGpuCustom') },
+                  {
+                    value: 'service-default',
+                    label: i18nService.t('localInferenceLaunchGpuServiceDefault'),
+                    description: i18nService.t('localInferenceLaunchGpuServiceDefaultHint'),
+                  },
+                  {
+                    value: 'single-auto',
+                    label: i18nService.t('localInferenceLaunchGpuSingleAuto'),
+                    description: i18nService.t('localInferenceLaunchGpuSingleAutoHint'),
+                  },
+                  {
+                    value: 'gpu0',
+                    label: i18nService.t('localInferenceLaunchGpu0'),
+                    description: i18nService.t('localInferenceLaunchGpu0Hint'),
+                  },
+                  {
+                    value: 'gpu1',
+                    label: i18nService.t('localInferenceLaunchGpu1'),
+                    description: i18nService.t('localInferenceLaunchGpu1Hint'),
+                  },
+                  {
+                    value: 'dual-gpu',
+                    label: i18nService.t('localInferenceLaunchGpuDual'),
+                    description: i18nService.t('localInferenceLaunchGpuDualHint'),
+                  },
+                  {
+                    value: 'custom',
+                    label: i18nService.t('localInferenceLaunchGpuCustom'),
+                    description: i18nService.t('localInferenceLaunchGpuCustomHint'),
+                  },
                 ]}
-                hint={formatLaunchGpuSummary(form.gpuDevices, form.customGpuDevices, serviceConfig.cudaVisibleDevices)}
-                onChange={(value) => updateForm('gpuDevices', value)}
+                onChange={(value) => updateForm('gpuPreset', value)}
               />
-              {form.gpuDevices === 'custom' && (
-                <LaunchTextInput
-                  label={i18nService.t('localInferenceLaunchGpuCustomValue')}
-                  value={form.customGpuDevices}
-                  placeholder="0,1"
-                  hint={i18nService.t('localInferenceLaunchGpuCustomHint')}
-                  onChange={(value) => updateForm('customGpuDevices', value)}
-                />
-              )}
+              <div className="rounded-lg border border-border bg-background/70 p-3">
+                <p className="text-xs font-medium text-secondary">{i18nService.t('localInferenceLaunchGpuCurrent')}</p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {formatCurrentGpuServiceConfig(serviceConfig)}
+                </p>
+                <p className="mt-3 text-xs font-medium text-secondary">{i18nService.t('localInferenceLaunchGpuWillUse')}</p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {formatLaunchGpuPresetSummary(form.gpuPreset, form.customGpuDevices)}
+                </p>
+              </div>
             </div>
-            {gpuDevicesChanged && (
-              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            {form.gpuPreset === 'custom' && (
+              <LaunchTextInput
+                label={i18nService.t('localInferenceLaunchGpuCustomValue')}
+                value={form.customGpuDevices}
+                placeholder="0,1"
+                hint={i18nService.t('localInferenceLaunchGpuCustomValueHint')}
+                onChange={(value) => updateForm('customGpuDevices', value)}
+              />
+            )}
+            {gpuPresetChangesService && (
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                 {i18nService.t('localInferenceLaunchGpuRestartNotice')}
               </p>
             )}
           </section>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <section className="space-y-3 rounded-xl border border-border px-4 py-3">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchBasicTitle')}</h4>
+              <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchBasicDescription')}</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
             <LaunchInput
               label={i18nService.t('localInferenceLaunchNumCtx')}
               value={form.numCtx}
@@ -1255,30 +1307,44 @@ function LaunchModelDialog({
               hint={i18nService.t('localInferenceLaunchNumCtxHint')}
               onChange={(value) => updateForm('numCtx', value)}
             />
-            <LaunchInput
-              label={i18nService.t('localInferenceLaunchNumGpu')}
-              value={form.numGpu}
-              min={0}
-              placeholder={i18nService.t('localInferenceLaunchDefault')}
-              hint={i18nService.t('localInferenceLaunchNumGpuHint')}
-              onChange={(value) => updateForm('numGpu', value)}
+            <LaunchChoiceSelect
+              label={i18nService.t('localInferenceLaunchAcceleration')}
+              value={form.accelerationMode}
+              options={[
+                { value: 'auto', label: i18nService.t('localInferenceLaunchAccelerationAuto') },
+                { value: 'cpu', label: i18nService.t('localInferenceLaunchAccelerationCpu') },
+                { value: 'custom', label: i18nService.t('localInferenceLaunchAccelerationCustom') },
+              ]}
+              hint={i18nService.t('localInferenceLaunchAccelerationHint')}
+              onChange={(value) => updateForm('accelerationMode', value)}
             />
-            <LaunchInput
-              label={i18nService.t('localInferenceLaunchNumThread')}
-              value={form.numThread}
-              min={1}
-              placeholder={i18nService.t('localInferenceLaunchDefault')}
-              hint={i18nService.t('localInferenceLaunchNumThreadHint')}
-              onChange={(value) => updateForm('numThread', value)}
-            />
-          </div>
+            {form.accelerationMode === 'custom' && (
+              <LaunchInput
+                label={i18nService.t('localInferenceLaunchNumGpu')}
+                value={form.customGpuLayers}
+                min={0}
+                placeholder={i18nService.t('localInferenceLaunchDefault')}
+                hint={i18nService.t('localInferenceLaunchNumGpuHint')}
+                onChange={(value) => updateForm('customGpuLayers', value)}
+              />
+            )}
+            </div>
+          </section>
 
-          <section className="space-y-3 rounded-lg border border-border px-4 py-3">
+          <section className="space-y-3 rounded-xl border border-border px-4 py-3">
             <div>
               <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchAdvancedTitle')}</h4>
               <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchAdvancedDescription')}</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
+              <LaunchInput
+                label={i18nService.t('localInferenceLaunchNumThread')}
+                value={form.numThread}
+                min={1}
+                placeholder={i18nService.t('localInferenceLaunchDefault')}
+                hint={i18nService.t('localInferenceLaunchNumThreadHint')}
+                onChange={(value) => updateForm('numThread', value)}
+              />
               <LaunchInput
                 label={i18nService.t('localInferenceLaunchNumBatch')}
                 value={form.numBatch}
@@ -1377,17 +1443,50 @@ function LaunchTextInput({
   );
 }
 
-function LaunchSelectOptions({
+function LaunchChoiceGrid({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: Array<{ value: string; label: string; description: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {options.map((option) => {
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+              selected
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border bg-background/70 text-foreground hover:border-primary/50 hover:bg-surface-raised'
+            }`}
+          >
+            <span className="block text-sm font-semibold">{option.label}</span>
+            <span className="mt-1 block text-xs leading-5 text-secondary">{option.description}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LaunchChoiceSelect({
   label,
   value,
-  hint,
   options,
+  hint,
   onChange,
 }: {
   label: string;
   value: string;
-  hint: string;
   options: Array<{ value: string; label: string }>;
+  hint: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -1707,34 +1806,72 @@ function parseOptionalBoolean(value: string): boolean | undefined {
   return undefined;
 }
 
-function resolveLaunchGpuDevices(selection: string, customValue: string): string | undefined {
-  switch (selection as GpuDeviceSelection) {
-    case 'service-default':
-      return undefined;
-    case 'auto':
-      return '';
-    case 'gpu0':
-      return '0';
-    case 'gpu1':
-      return '1';
-    case 'gpu0-gpu1':
-      return '0,1';
+function resolveAccelerationNumGpu(mode: string, customGpuLayers: string): number | undefined {
+  switch (mode as LaunchAccelerationMode) {
+    case 'cpu':
+      return 0;
     case 'custom':
-      return customValue.split(',').map((part) => part.trim()).filter(Boolean).join(',');
+      return parseOptionalInteger(customGpuLayers);
+    case 'auto':
     default:
       return undefined;
   }
 }
 
-function formatLaunchGpuSummary(selection: string, customValue: string, currentValue?: string): string {
-  const nextValue = resolveLaunchGpuDevices(selection, customValue);
-  if (nextValue === undefined) {
-    return currentValue
-      ? i18nService.t('localInferenceLaunchGpuCurrent').replace('{devices}', currentValue)
-      : i18nService.t('localInferenceLaunchGpuCurrentAuto');
+function resolveLaunchServiceConfig(preset: string, customGpuDevices: string): Partial<OllamaServiceConfig> | null {
+  switch (preset as LaunchGpuPreset) {
+    case 'service-default':
+      return null;
+    case 'single-auto':
+      return { cudaVisibleDevices: '', schedSpread: false };
+    case 'gpu0':
+      return { cudaVisibleDevices: '0', schedSpread: false };
+    case 'gpu1':
+      return { cudaVisibleDevices: '1', schedSpread: false };
+    case 'dual-gpu':
+      return { cudaVisibleDevices: '0,1', schedSpread: true };
+    case 'custom': {
+      const normalized = normalizeGpuDeviceList(customGpuDevices);
+      return normalized ? { cudaVisibleDevices: normalized } : null;
+    }
+    default:
+      return null;
   }
-  if (!nextValue) return i18nService.t('localInferenceLaunchGpuWillUseAuto');
-  return i18nService.t('localInferenceLaunchGpuWillUse').replace('{devices}', nextValue);
+}
+
+function hasServiceConfigPatchChanged(current: OllamaServiceConfig, patch: Partial<OllamaServiceConfig>): boolean {
+  if ('cudaVisibleDevices' in patch && patch.cudaVisibleDevices !== (current.cudaVisibleDevices ?? '')) return true;
+  if ('schedSpread' in patch && patch.schedSpread !== current.schedSpread) return true;
+  return false;
+}
+
+function normalizeGpuDeviceList(value: string): string {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => /^\d+$/.test(part))
+    .join(',');
+}
+
+function formatCurrentGpuServiceConfig(config: OllamaServiceConfig): string {
+  const devices = config.cudaVisibleDevices?.trim();
+  const spread = config.schedSpread === true
+    ? i18nService.t('localInferenceLaunchGpuSpreadOn')
+    : config.schedSpread === false
+      ? i18nService.t('localInferenceLaunchGpuSpreadOff')
+      : i18nService.t('localInferenceLaunchDefault');
+  return devices
+    ? `${devices} · ${spread}`
+    : `${i18nService.t('localInferenceLaunchGpuAutoVisible')} · ${spread}`;
+}
+
+function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string): string {
+  const patch = resolveLaunchServiceConfig(preset, customGpuDevices);
+  if (!patch) return i18nService.t('localInferenceLaunchGpuKeepService');
+  const devices = patch.cudaVisibleDevices?.trim() || i18nService.t('localInferenceLaunchGpuAutoVisible');
+  if (patch.schedSpread === true) return `${devices} · ${i18nService.t('localInferenceLaunchGpuSpreadOn')}`;
+  if (patch.schedSpread === false) return `${devices} · ${i18nService.t('localInferenceLaunchGpuSpreadOff')}`;
+  return devices;
 }
 
 function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFormState {
