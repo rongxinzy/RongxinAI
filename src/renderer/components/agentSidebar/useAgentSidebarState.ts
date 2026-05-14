@@ -306,6 +306,20 @@ export const useAgentSidebarState = () => {
         }
       });
 
+      // Remove task previews for sessions that were deleted from the Redux
+      // store (e.g. via batch delete).  The Redux sessions array is the
+      // source of truth; anything in taskPreviews that isn't in sessions
+      // should be pruned.
+      const sessionIdSet = new Set(sessions.map((s) => s.id));
+      for (const agentId of Object.keys(next)) {
+        if (!loadedAgentIdsRef.current.has(agentId)) continue;
+        const filtered = next[agentId].filter((task) => sessionIdSet.has(task.id));
+        if (filtered.length !== next[agentId].length) {
+          next[agentId] = filtered;
+          changed = true;
+        }
+      }
+
       return changed ? next : previous;
     });
   }, [sessions]);

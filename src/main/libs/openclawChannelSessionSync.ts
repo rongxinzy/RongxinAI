@@ -273,6 +273,12 @@ export interface ChannelSessionSyncDeps {
   getDefaultCwd: (agentId?: string) => string;
   /** Optional synchronous lookup: jobId → human-readable name (for cron session titles). */
   resolveJobName?: (jobId: string) => string | null;
+  /**
+   * Called when a channel session's agent binding changes, so the caller can
+   * patch the Gateway session to use the new agent's model for the NEXT turn.
+   * (The current turn already started with the old model — this fixes future messages.)
+   */
+  onBindingChanged?: (sessionKey: string, platform: Platform, newAgentId: string) => void;
 }
 
 export class OpenClawChannelSessionSync {
@@ -280,6 +286,7 @@ export class OpenClawChannelSessionSync {
   private readonly imStore: IMStore;
   private readonly getDefaultCwd: (agentId?: string) => string;
   private readonly resolveJobName: ((jobId: string) => string | null) | null;
+  private readonly onBindingChanged: ((sessionKey: string, platform: Platform, newAgentId: string) => void) | null;
 
   /** In-memory cache: openclawSessionKey → local sessionId. */
   private readonly syncedSessionKeys = new Map<string, string>();
@@ -299,18 +306,23 @@ export class OpenClawChannelSessionSync {
     this.imStore = deps.imStore;
     this.getDefaultCwd = deps.getDefaultCwd;
     this.resolveJobName = deps.resolveJobName ?? null;
+    this.onBindingChanged = deps.onBindingChanged ?? null;
   }
 
   /**
-   * Check if a gateway session key belongs to the agent currently bound to its platform.
-   * When users switch agent bindings, the gateway retains old sessions under the previous
-   * agentId. This method filters them out so only the current agent's sessions are processed.
+   * Check if a gateway session key belongs to a platform that has a current
+   * agent binding.  The Gateway may resume old sessions (via sync buf) after
+   * a restart, so the key's agentId can be stale even post-restart.
+   *
+   * resolveOrCreateSession() handles the transition (create new session for
+   * the current agent, isolate history).  We only filter out sessions whose
+   * platform has NO binding at all.
    */
   isCurrentBindingKey(sessionKey: string): boolean {
     const parsed = parseChannelSessionKey(sessionKey);
-    if (!parsed) return true; // Not a channel key — let other logic handle it
+    if (!parsed) return true;
     const keyAgentId = extractAgentIdFromKey(sessionKey);
-    if (!keyAgentId) return true; // Legacy key without agentId — allow
+    if (!keyAgentId) return true;
     const imSettings = this.imStore.getIMSettings();
     const accountId = extractAccountIdFromKey(sessionKey);
     const currentAgentId = resolveAgentBinding(
@@ -318,7 +330,12 @@ export class OpenClawChannelSessionSync {
       parsed.platform,
       accountId,
     );
-    return keyAgentId === currentAgentId;
+    // Platform has NO non-main binding — session is truly orphaned, skip it.
+    if (!currentAgentId || currentAgentId === 'main') {
+      return keyAgentId === (currentAgentId || 'main');
+    }
+    // Platform HAS a binding — let resolveOrCreateSession() handle routing.
+    return true;
   }
 
   /**
@@ -367,11 +384,22 @@ export class OpenClawChannelSessionSync {
 
     // 4. Check persistent mapping in im_session_mappings
     const existingMapping = this.imStore.getSessionMapping(parsed.conversationId, parsed.platform);
+    const imSettings = this.imStore.getIMSettings();
+    const accountId = extractAccountIdFromKey(sessionKey);
+    const currentAgentId = resolveAgentBinding(
+      imSettings.platformAgentBindings,
+      parsed.platform,
+      accountId,
+    );
     console.log(
       '[ChannelSessionSync] existing mapping:',
       existingMapping
         ? `coworkSessionId=${existingMapping.coworkSessionId} agentId=${existingMapping.agentId}`
         : 'none',
+      '| current binding:',
+      currentAgentId,
+      '| platformAgentBindings:',
+      JSON.stringify(imSettings.platformAgentBindings),
     );
     if (existingMapping) {
       // Verify the Cowork session still exists
@@ -380,21 +408,18 @@ export class OpenClawChannelSessionSync {
         // Check if the agent binding has changed since this mapping was created.
         // When platformAgentBindings changes, the mapping's agentId becomes stale.
         // Create a new session for the new agent and update the mapping.
-        const imSettings = this.imStore.getIMSettings();
-        const accountId = extractAccountIdFromKey(sessionKey);
-        const currentAgentId = resolveAgentBinding(
-          imSettings.platformAgentBindings,
-          parsed.platform,
-          accountId,
-        );
+        // (imSettings, accountId, currentAgentId already resolved above)
         if (existingMapping.agentId !== currentAgentId) {
           console.log(
             '[ChannelSessionSync] agent binding changed:',
             existingMapping.agentId,
             '→',
             currentAgentId,
-            '— creating new session',
+            '— creating new session and removing old',
           );
+          // Delete the old Cowork session so it doesn't linger in the
+          // previous agent's sidebar list after the binding change.
+          this.coworkStore.deleteSession(existingMapping.coworkSessionId);
           const titlePrefix = getChannelTitlePrefix(parsed.platform);
           const displayId = parsed.conversationId.includes('@')
             ? parsed.conversationId.split('@')[0]
@@ -411,6 +436,10 @@ export class OpenClawChannelSessionSync {
             currentAgentId,
           );
           console.log('[ChannelSessionSync] created new session for agent change:', newSession.id);
+          // Notify the caller so it can patch the Gateway session's model.
+          // The current turn already started with the old model — this fixes
+          // the NEXT inbound message so it uses the new agent's model.
+          this.onBindingChanged?.(sessionKey, parsed.platform, currentAgentId);
           this.imStore.updateSessionMappingTarget(
             parsed.conversationId,
             parsed.platform,
@@ -450,8 +479,7 @@ export class OpenClawChannelSessionSync {
     const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
     const title = `${titlePrefix} ${shortId}`;
     // Look up the per-platform agent binding so the session is filed under the correct agent.
-    const imSettings = this.imStore.getIMSettings();
-    const accountId = extractAccountIdFromKey(sessionKey);
+    // (imSettings, accountId already resolved above; re-resolve agentId for the new-session path)
     const agentId = resolveAgentBinding(imSettings.platformAgentBindings, parsed.platform, accountId);
     const cwd = this.getDefaultCwd(agentId);
     console.log(
