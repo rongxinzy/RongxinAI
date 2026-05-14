@@ -367,11 +367,22 @@ export class OpenClawChannelSessionSync {
 
     // 4. Check persistent mapping in im_session_mappings
     const existingMapping = this.imStore.getSessionMapping(parsed.conversationId, parsed.platform);
+    const imSettings = this.imStore.getIMSettings();
+    const accountId = extractAccountIdFromKey(sessionKey);
+    const currentAgentId = resolveAgentBinding(
+      imSettings.platformAgentBindings,
+      parsed.platform,
+      accountId,
+    );
     console.log(
       '[ChannelSessionSync] existing mapping:',
       existingMapping
         ? `coworkSessionId=${existingMapping.coworkSessionId} agentId=${existingMapping.agentId}`
         : 'none',
+      '| current binding:',
+      currentAgentId,
+      '| platformAgentBindings:',
+      JSON.stringify(imSettings.platformAgentBindings),
     );
     if (existingMapping) {
       // Verify the Cowork session still exists
@@ -380,13 +391,7 @@ export class OpenClawChannelSessionSync {
         // Check if the agent binding has changed since this mapping was created.
         // When platformAgentBindings changes, the mapping's agentId becomes stale.
         // Create a new session for the new agent and update the mapping.
-        const imSettings = this.imStore.getIMSettings();
-        const accountId = extractAccountIdFromKey(sessionKey);
-        const currentAgentId = resolveAgentBinding(
-          imSettings.platformAgentBindings,
-          parsed.platform,
-          accountId,
-        );
+        // (imSettings, accountId, currentAgentId already resolved above)
         if (existingMapping.agentId !== currentAgentId) {
           console.log(
             '[ChannelSessionSync] agent binding changed:',
@@ -453,8 +458,7 @@ export class OpenClawChannelSessionSync {
     const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
     const title = `${titlePrefix} ${shortId}`;
     // Look up the per-platform agent binding so the session is filed under the correct agent.
-    const imSettings = this.imStore.getIMSettings();
-    const accountId = extractAccountIdFromKey(sessionKey);
+    // (imSettings, accountId already resolved above; re-resolve agentId for the new-session path)
     const agentId = resolveAgentBinding(imSettings.platformAgentBindings, parsed.platform, accountId);
     const cwd = this.getDefaultCwd(agentId);
     console.log(
