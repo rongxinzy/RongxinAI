@@ -195,9 +195,9 @@ describe('Pattern B: 飞书 — after server-side stripFeishuSystemHeader', () =
   });
 });
 
-// ─── System: timestamp lines ────────────────────────────────
+// ─── System: / System (untrusted): timestamp lines ──────────
 
-describe('System: timestamp lines', () => {
+describe('System: / System (untrusted): timestamp lines', () => {
   test('generic channel system header stripped from text message', () => {
     const input = [
       'System: [2026-04-28 11:53:11 GMT+8] From user889589',
@@ -221,6 +221,32 @@ describe('System: timestamp lines', () => {
     expect(result).toBe('hello');
   });
 
+  test('scheduled-task System (untrusted) exec line stripped', () => {
+    const input = [
+      'System (untrusted): [2026-05-14 15:03:38 GMT+8] Exec completed (nova-mis, code 0) :: Cambricon Technologies Corporation Limited',
+      '',
+      '股票查询结果：寒武纪当前价格 1,270.20 CNY，跌幅 -3.54%',
+    ].join('\n');
+
+    const result = parseUserMessageForDisplay(input);
+    expect(result).toBe('股票查询结果：寒武纪当前价格 1,270.20 CNY，跌幅 -3.54%');
+    expect(result).not.toContain('System (untrusted)');
+    expect(result).not.toContain('Exec completed');
+  });
+
+  test('System (untrusted) stripped, user content preserved below table', () => {
+    const input = [
+      'System (untrusted): [2026-05-14 15:03:38 GMT+8] Exec completed (nova-mis, code 0) :: Cambricon Technologies Corporation Limited ┌──────┬─────────────────┐ │ 指标 │ 值 │ ├──────┼─────────────────┤ │ 代码 │ 688256.SS │ │ 价格 │ 1,270.20 CNY │ │ 涨跌 │ -46.68 (-3.54%) │ └────┘',
+      '',
+      '根据最新数据，寒武纪股价有所下跌。',
+    ].join('\n');
+
+    const result = parseUserMessageForDisplay(input);
+    expect(result).toBe('根据最新数据，寒武纪股价有所下跌。');
+    expect(result).not.toContain('System (untrusted)');
+    expect(result).not.toContain('688256');
+  });
+
   test('does NOT strip user text that looks vaguely like System:', () => {
     const msg = 'System: this is not a timestamp line';
     expect(parseUserMessageForDisplay(msg)).toBe(msg);
@@ -228,6 +254,11 @@ describe('System: timestamp lines', () => {
 
   test('does NOT strip System: without valid timestamp', () => {
     const msg = 'System: [invalid] something';
+    expect(parseUserMessageForDisplay(msg)).toBe(msg);
+  });
+
+  test('does NOT strip System(untrusted) without colon, just bare text', () => {
+    const msg = 'System(untrusted) is a concept in security';
     expect(parseUserMessageForDisplay(msg)).toBe(msg);
   });
 });

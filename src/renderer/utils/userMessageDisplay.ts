@@ -31,8 +31,9 @@ const MEDIA_TAG_RE = /^\s*media:\w+\s*$/gm;
 // --------------- Shared patterns ---------------
 
 // System: [timestamp ...] metadata lines — injected by various openclaw plugins
-// (feishu, dingtalk, popo, etc.) Matches timestamps like [2026-04-28 11:53:25 GMT+8]
-const SYSTEM_TIMESTAMP_LINE_RE = /^System:\s*\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[^\]]*\].*$/gm;
+// (feishu, dingtalk, popo, etc.) Matches timestamps like [2026-04-28 11:53:25 GMT+8].
+// Also matches System (untrusted): for scheduled-task exec outputs from the gateway.
+const SYSTEM_TIMESTAMP_LINE_RE = /^System(?:\s*\(untrusted\))?:\s*\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[^\]]*\].*$/gm;
 
 // Bare path in the openclaw inbound media directory — highly specific, safe to match
 const OPENCLAW_INBOUND_IMAGE_RE = /^((?:[A-Za-z]:\\|\/)[^\n]*[/\\]openclaw[/\\]state[/\\]media[/\\]inbound[/\\][^\n]+\.(?:jpg|jpeg|png|gif|bmp|webp))\s*$/gm;
