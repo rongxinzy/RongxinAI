@@ -263,7 +263,7 @@ export async function getGitHubUser(accessToken: string): Promise<string> {
     headers: {
       'Authorization': `token ${accessToken}`,
       'Accept': 'application/json',
-      'User-Agent': 'LobsterAI',
+      'User-Agent': 'RongxinAI',
     },
   });
   return data.login || 'unknown';

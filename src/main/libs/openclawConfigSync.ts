@@ -181,10 +181,10 @@ const MANAGED_SKILL_ENTRY_OVERRIDES: Record<string, { enabled: boolean }> = {
   'feishu-cron-reminder': {
     enabled: false,
   },
-  // LobsterAI implements its own MCP integration. The bundled mcporter skill
+  // RongxinAI implements its own MCP integration. The bundled mcporter skill
   // tries to discover MCP servers via its own CLI, finds none, and produces
   // confusing "no MCP servers" output. Disable it so users are routed through
-  // LobsterAI's MCP layer instead.
+  // RongxinAI's MCP layer instead.
   'mcporter': {
     enabled: false,
   },
@@ -210,12 +210,12 @@ const MANAGED_WEB_SEARCH_POLICY_PROMPT = [
   '',
   'When you need live web information:',
   '- If you already have a specific URL, use `web_fetch`.',
-  '- If you need search discovery, prefer the LobsterAI `web-search` skill when local command execution is available. It searches headlessly first and only falls back to a visible browser when needed.',
+  '- If you need search discovery, prefer the RongxinAI `web-search` skill when local command execution is available. It searches headlessly first and only falls back to a visible browser when needed.',
   '- Use the built-in `browser` tool only for interactive browsing, login-gated pages, or complex dynamic pages that `web-search` cannot handle.',
   '- Native channel sessions may deny `exec`; in those sessions prefer `web_fetch` for known URLs or `browser` when discovery is unavoidable.',
   '- Exception: the `imap-smtp-email` skill must always use `exec` to run its scripts, even in native channel sessions. Do not skip it because of exec restrictions.',
   '',
-  'Do not claim you searched the web unless you actually used `browser`, `web_fetch`, or the LobsterAI `web-search` skill.',
+  'Do not claim you searched the web unless you actually used `browser`, `web_fetch`, or the RongxinAI `web-search` skill.',
 ].join('\n');
 
 const MANAGED_EXEC_SAFETY_PROMPT = [
@@ -245,9 +245,9 @@ const MANAGED_EXEC_SAFETY_PROMPT = [
  * embedding in AGENTS.md so the model knows where to create new skills.
  *
  * Example outputs:
- *   macOS:   ~/Library/Application Support/LobsterAI/SKILLs
- *   Windows: ~/AppData/Roaming/LobsterAI/SKILLs
- *   Linux:   ~/.config/LobsterAI/SKILLs
+ *   macOS:   ~/Library/Application Support/RongxinAI/SKILLs
+ *   Windows: ~/AppData/Roaming/RongxinAI/SKILLs
+ *   Linux:   ~/.config/RongxinAI/SKILLs
  */
 const resolveSkillCreationPath = (): string => {
   const skillsDir = path.join(app.getPath('userData'), 'SKILLs');
@@ -262,7 +262,7 @@ const resolveSkillCreationPath = (): string => {
 const buildManagedSkillCreationPrompt = (skillsDirPath: string): string => [
   '## Skill Creation',
   '',
-  'When the user asks you to create a new skill, you MUST place it under the LobsterAI skills directory:',
+  'When the user asks you to create a new skill, you MUST place it under the RongxinAI skills directory:',
   '',
   `  ${skillsDirPath}/<skill-name>/SKILL.md`,
   '',
@@ -965,7 +965,7 @@ export class OpenClawConfigSync {
    * read against a "last known good" fingerprint.  One of the checks is
    * `hasConfigMeta` — if the previous good config had `meta` but the current
    * one doesn't, an anomaly is logged and the file content is persisted as a
-   * `.clobbered.<timestamp>` snapshot.  Because LobsterAI writes openclaw.json
+   * `.clobbered.<timestamp>` snapshot.  Because RongxinAI writes openclaw.json
    * directly (bypassing OpenClaw's own `writeConfigFile` which calls
    * `stampConfigVersion`), we need to stamp `meta` ourselves.
    */
@@ -1364,7 +1364,7 @@ export class OpenClawConfigSync {
           // Qwen/DashScope URLs. Declare it only when the plugin actually
           // exists, otherwise it becomes a stale entry on every startup.
           ...(hasQwenProvider && qwenPortalAuthPluginId ? { [qwenPortalAuthPluginId]: { enabled: true } } : {}),
-          // Disable acpx (ACP agent runtime) — LobsterAI does not use ACP and
+          // Disable acpx (ACP agent runtime) — RongxinAI does not use ACP and
           // the embedded probe adds ~11s to gateway startup while it waits for
           // a process that always fails.  See openclaw/openclaw#62588.
           'acpx': { enabled: false },
@@ -2061,7 +2061,7 @@ export class OpenClawConfigSync {
   }
 
   /**
-   * Ensures exec-approvals.json under the LobsterAI-managed openclaw home has
+   * Ensures exec-approvals.json under the RongxinAI-managed openclaw home has
    * security=full + ask=off so the gateway never triggers approval-pending
    * for any command. The path must match the OPENCLAW_HOME env var passed to
    * the gateway process so both sides read/write the same file.
@@ -2263,13 +2263,13 @@ export class OpenClawConfigSync {
   }
 
   /**
-   * Resolve the LobsterAI SKILLs installation directory for OpenClaw's
+   * Resolve the RongxinAI SKILLs installation directory for OpenClaw's
    * `skills.load.extraDirs` configuration.
    *
    * Cross-platform paths (via Electron app.getPath('userData')):
-   *   macOS:   ~/Library/Application Support/LobsterAI/SKILLs
-   *   Windows: %APPDATA%/LobsterAI/SKILLs
-   *   Linux:   ~/.config/LobsterAI/SKILLs
+   *   macOS:   ~/Library/Application Support/RongxinAI/SKILLs
+   *   Windows: %APPDATA%/RongxinAI/SKILLs
+   *   Linux:   ~/.config/RongxinAI/SKILLs
    */
   private resolveSkillsExtraDirs(): string[] {
     const userDataSkillsDir = path.join(app.getPath('userData'), 'SKILLs');
@@ -2292,8 +2292,8 @@ export class OpenClawConfigSync {
   }
 
   /**
-   * Build per-skill `enabled` overrides from the LobsterAI SkillManager state,
-   * so that skills disabled in the LobsterAI UI are also hidden from OpenClaw.
+   * Build per-skill `enabled` overrides from the RongxinAI SkillManager state,
+   * so that skills disabled in the RongxinAI UI are also hidden from OpenClaw.
    */
   private buildSkillEntries(): Record<string, { enabled: boolean }> {
     const skills = this.getSkillsList?.() ?? [];
@@ -2308,10 +2308,13 @@ export class OpenClawConfigSync {
    * Sync AGENTS.md to the OpenClaw workspace directory.
    * Embeds the skills routing prompt and system prompt so that OpenClaw's
    * native channel connectors (DingTalk, Feishu, etc.) can discover and
-   * invoke LobsterAI skills.
+   * invoke RongxinAI skills.
    */
   private syncAgentsMd(workspaceDir: string, coworkConfig: CoworkConfig): string | undefined {
-    const MARKER = '<!-- LobsterAI managed: do not edit below this line -->';
+    const MARKER = '<!-- RongxinAI managed: do not edit below this line -->';
+    const LEGACY_MARKER = '<!-- LobsterAI managed: do not edit below this line -->';
+    const stripManagedMarkers = (value: string): string =>
+      value.replaceAll(MARKER, '').replaceAll(LEGACY_MARKER, '');
 
     try {
       ensureDir(workspaceDir);
@@ -2320,8 +2323,8 @@ export class OpenClawConfigSync {
       // Build the managed section
       const sections: string[] = [];
 
-      // Add system prompt if configured — strip MARKER to prevent content corruption
-      const systemPrompt = (coworkConfig.systemPrompt || '').trim().replaceAll(MARKER, '');
+      // Add system prompt if configured — strip managed markers to prevent content corruption.
+      const systemPrompt = stripManagedMarkers((coworkConfig.systemPrompt || '').trim());
       if (systemPrompt) {
         sections.push(`## System Prompt\n\n${systemPrompt}`);
       }
@@ -2336,7 +2339,7 @@ export class OpenClawConfigSync {
 
       // Keep scheduled-task policy after skills so native channel sessions
       // treat it as the final app-managed override for reminder handling.
-      const scheduledTaskPrompt = buildScheduledTaskEnginePrompt().replaceAll(MARKER, '');
+      const scheduledTaskPrompt = stripManagedMarkers(buildScheduledTaskEnginePrompt());
       if (scheduledTaskPrompt) {
         sections.push(scheduledTaskPrompt);
       }
@@ -2351,14 +2354,19 @@ export class OpenClawConfigSync {
 
       // Extract user content (everything before the marker)
       const markerIdx = existingContent.indexOf(MARKER);
+      const legacyMarkerIdx = existingContent.indexOf(LEGACY_MARKER);
+      const managedMarkerIdx =
+        markerIdx >= 0
+          ? markerIdx
+          : legacyMarkerIdx;
       const userContent =
-        markerIdx >= 0 ? existingContent.slice(0, markerIdx).trimEnd() : existingContent.trimEnd();
+        managedMarkerIdx >= 0 ? existingContent.slice(0, managedMarkerIdx).trimEnd() : existingContent.trimEnd();
       const preservedUserContent = userContent || readBundledOpenClawAgentsTemplate();
 
       if (sections.length === 0) {
         // No managed content — remove the managed section if present,
         // but preserve user content.
-        if (markerIdx >= 0) {
+        if (managedMarkerIdx >= 0) {
           if (preservedUserContent) {
             const cleaned = preservedUserContent + '\n';
             if (existingContent !== cleaned) {

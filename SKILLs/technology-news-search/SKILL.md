@@ -290,7 +290,7 @@ Articles appearing on multiple sources rank higher, indicating broader industry 
 - Verify sources are enabled in [references/sources.json](references/sources.json)
 
 **Script errors:**
-- Ensure Node.js is available or LobsterAI Electron is running
+- Ensure Node.js is available or RongxinAI Electron is running
 - Check network connectivity
 - Review stderr output for specific error messages
 - Some sources may be temporarily unavailable
