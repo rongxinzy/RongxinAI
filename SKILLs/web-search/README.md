@@ -4,12 +4,12 @@ Real-time web search capability for LobsterAI using Playwright-controlled browse
 
 ## Overview
 
-The Web Search Skill enables LobsterAI to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance, making all operations transparent and observable.
+The Web Search Skill enables LobsterAI to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance. It runs headless first to avoid interrupting the desktop, then retries once with a visible browser when headless search appears blocked.
 
 ## Features
 
 - ✅ **Real-time Search** - Access current web information via Google with Bing fallback
-- ✅ **Transparent Operations** - Visible browser window shows all actions
+- ✅ **Low-Disruption Search** - Headless by default, visible-browser fallback when needed
 - ✅ **Playwright-Powered** - Robust browser automation using playwright-core
 - ✅ **Simple CLI** - Easy-to-use command-line interface for Claude
 - ✅ **HTTP API** - RESTful Bridge Server for advanced integrations
@@ -110,7 +110,8 @@ Default configuration in `server/config.ts`:
 {
   browser: {
     cdpPort: 9222,
-    headless: false,  // Always visible
+    headless: true,
+    fallbackToHeadful: true,
     chromeFlags: [/* ... */]
   },
   server: {

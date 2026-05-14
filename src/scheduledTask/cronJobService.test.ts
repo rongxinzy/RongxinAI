@@ -1,6 +1,7 @@
-import { test, expect, describe } from 'vitest';
-import { mapGatewayJob, mapGatewayRun, mapGatewayTaskState } from './cronJobService';
+import { describe, expect, test } from 'vitest';
+
 import { DeliveryMode, GatewayStatus, TaskStatus } from './constants';
+import { mapGatewayJob, mapGatewayRun, mapGatewayTaskState } from './cronJobService';
 
 describe('mapGatewayRun', () => {
   const baseEntry = {
@@ -45,6 +46,19 @@ describe('mapGatewayRun', () => {
     });
     expect(run.status).toBe(TaskStatus.Success);
     expect(run.error).toBeNull();
+  });
+
+  test('keeps execution error when deliveryError mirrors the run error', () => {
+    const run = mapGatewayRun({
+      ...baseEntry,
+      status: GatewayStatus.Error,
+      error: 'LLM request failed: network connection error.',
+      deliveryStatus: 'not-delivered',
+      deliveryError: 'LLM request failed: network connection error.',
+      summary: 'LLM request failed: network connection error.',
+    });
+    expect(run.status).toBe(TaskStatus.Error);
+    expect(run.error).toBe('LLM request failed: network connection error.');
   });
 
   test('does not suppress error when error differs from deliveryError', () => {
@@ -133,7 +147,7 @@ describe('mapGatewayTaskState', () => {
     expect(state.lastStatus).toBe(TaskStatus.Running);
   });
 
-  test('suppresses delivery-only error when delivery mode is none', () => {
+  test('keeps ambiguous delivery error in task state', () => {
     const state = mapGatewayTaskState(
       {
         lastRunStatus: GatewayStatus.Error,
@@ -143,8 +157,8 @@ describe('mapGatewayTaskState', () => {
       },
       DeliveryMode.None,
     );
-    expect(state.lastStatus).toBe(TaskStatus.Success);
-    expect(state.lastError).toBeNull();
+    expect(state.lastStatus).toBe(TaskStatus.Error);
+    expect(state.lastError).toBe('⚠️ ✉️ Message failed');
   });
 
   test('does not suppress delivery error when delivery mode is announce', () => {

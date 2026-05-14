@@ -12,6 +12,7 @@ export interface BrowserInstance {
   process: ChildProcess;
   pid: number;
   cdpPort: number;
+  headless: boolean;
   startTime: number;
 }
 
@@ -242,6 +243,7 @@ export async function launchBrowser(config: BrowserConfig): Promise<BrowserInsta
     process: browserProcess,
     pid: browserProcess.pid,
     cdpPort,
+    headless: runtimeHeadless,
     startTime: Date.now()
   };
 }

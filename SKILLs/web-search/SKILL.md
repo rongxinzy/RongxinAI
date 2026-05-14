@@ -43,7 +43,7 @@ Use the web-search skill when you need:
 2. **Bridge Server** - Express HTTP API (auto-started by Electron)
 3. **Playwright Manager** - Browser connection and session management
 4. **Search Engine Layer** - Google primary, Bing fallback
-5. **Chrome Browser** - Visible browser window (all operations transparent)
+5. **Chrome Browser** - Headless by default; automatically retries once with a visible browser when headless search appears blocked
 
 ## Basic Usage
 
@@ -363,7 +363,7 @@ The search output is Markdown. Extract:
 - **Localhost only** - Bridge Server binds to 127.0.0.1 (no external access)
 - **No network exposure** - Not accessible from other machines
 - **Isolated browser** - Uses separate Chrome profile, won't affect user's main browser
-- **Visible operations** - All browser actions shown in visible window (transparent)
+- **Low-disruption search** - Uses headless browser first, then falls back to a visible browser only when needed
 - **No credentials** - Skill never handles passwords or sensitive data
 
 ### Privacy Considerations
