@@ -1447,6 +1447,21 @@ const getCoworkEngineRouter = () => {
             imStore,
             getDefaultCwd: (agentId?: string) => resolveAgentDefaultWorkingDirectory(agentId) || os.homedir(),
             resolveJobName: (jobId) => getCronJobService().getJobNameSync(jobId),
+            onBindingChanged: (sessionKey, _platform, newAgentId) => {
+              // Patch the Gateway session to use the new agent's model for
+              // future inbound messages.  The current turn already started
+              // with the old agent's configuration.
+              const agent = getCoworkStore().getAgent(newAgentId);
+              const model = agent?.model || '';
+              if (model && openClawRuntimeAdapter) {
+                const client = openClawRuntimeAdapter.getGatewayClient();
+                if (client) {
+                  void client.request('sessions.patch', { key: sessionKey, model }).catch((err) => {
+                    console.warn('[ChannelSessionSync] failed to patch Gateway session model after binding change:', err);
+                  });
+                }
+              }
+            },
           });
           openClawRuntimeAdapter.setChannelSessionSync(channelSessionSync);
         }

@@ -273,6 +273,12 @@ export interface ChannelSessionSyncDeps {
   getDefaultCwd: (agentId?: string) => string;
   /** Optional synchronous lookup: jobId → human-readable name (for cron session titles). */
   resolveJobName?: (jobId: string) => string | null;
+  /**
+   * Called when a channel session's agent binding changes, so the caller can
+   * patch the Gateway session to use the new agent's model for the NEXT turn.
+   * (The current turn already started with the old model — this fixes future messages.)
+   */
+  onBindingChanged?: (sessionKey: string, platform: Platform, newAgentId: string) => void;
 }
 
 export class OpenClawChannelSessionSync {
@@ -280,6 +286,7 @@ export class OpenClawChannelSessionSync {
   private readonly imStore: IMStore;
   private readonly getDefaultCwd: (agentId?: string) => string;
   private readonly resolveJobName: ((jobId: string) => string | null) | null;
+  private readonly onBindingChanged: ((sessionKey: string, platform: Platform, newAgentId: string) => void) | null;
 
   /** In-memory cache: openclawSessionKey → local sessionId. */
   private readonly syncedSessionKeys = new Map<string, string>();
@@ -299,6 +306,7 @@ export class OpenClawChannelSessionSync {
     this.imStore = deps.imStore;
     this.getDefaultCwd = deps.getDefaultCwd;
     this.resolveJobName = deps.resolveJobName ?? null;
+    this.onBindingChanged = deps.onBindingChanged ?? null;
   }
 
   /**
@@ -428,6 +436,10 @@ export class OpenClawChannelSessionSync {
             currentAgentId,
           );
           console.log('[ChannelSessionSync] created new session for agent change:', newSession.id);
+          // Notify the caller so it can patch the Gateway session's model.
+          // The current turn already started with the old model — this fixes
+          // the NEXT inbound message so it uses the new agent's model.
+          this.onBindingChanged?.(sessionKey, parsed.platform, currentAgentId);
           this.imStore.updateSessionMappingTarget(
             parsed.conversationId,
             parsed.platform,
