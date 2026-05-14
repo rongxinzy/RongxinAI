@@ -93,6 +93,11 @@ type OllamaServiceConfigFormState = {
   schedSpread: string;
 };
 
+type SaveServiceConfigResult = {
+  success: boolean;
+  error?: string;
+};
+
 const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
   temperature: 0.7,
   top_p: 0.9,
@@ -142,6 +147,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [cancelling, setCancelling] = useState(false);
   const activeRequestIdRef = useRef<string | null>(null);
   const messagesRef = useRef<InferenceMessage[]>([]);
+  const conversationVersionRef = useRef(0);
   const isRunning = status?.status === 'running';
   const normalizedPullName = pullName.trim();
   const activePullProgress = activePullName ? pullProgress[activePullName] : undefined;
@@ -153,6 +159,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceTask, setMarketplaceTask] = useState<string>('all');
   const [marketplaceSize, setMarketplaceSize] = useState<string>('all');
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
+  const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
   const installedModelNames = useMemo(() => new Set(localModels.map((m) => m.name)), [localModels]);
@@ -264,15 +271,48 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     };
   }, [refreshLocalModels, refreshRunningModels, refreshStatus, runAction]);
 
-  const handleSaveServiceConfig = (config: OllamaServiceConfig) => {
-    void runAction(async () => {
+  const handleSaveServiceConfig = async (config: OllamaServiceConfig): Promise<SaveServiceConfigResult> => {
+    setLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
       const saved = await saveOllamaServiceConfig(config);
       setServiceConfig(saved);
       setNotice(status?.status === 'running'
         ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
         : i18nService.t('localInferenceServiceConfigSaved'));
-    });
+      return { success: true };
+    } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : String(saveError);
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const resetInferenceConversation = useCallback(() => {
+    const requestId = activeRequestIdRef.current;
+    conversationVersionRef.current += 1;
+    if (requestId) {
+      void window.electron.ollama.cancelChatStream(requestId).catch(() => undefined);
+    }
+    activeRequestIdRef.current = null;
+    messagesRef.current = [];
+    setMessages([]);
+    setStreamingText('');
+    setStreamingThinking('');
+    setPrompt('');
+    setSending(false);
+    setCancelling(false);
+  }, []);
+
+  const handleSelectInferenceModel = useCallback((modelName: string) => {
+    if (modelName !== selectedModel) {
+      resetInferenceConversation();
+    }
+    setSelectedModel(modelName);
+  }, [resetInferenceConversation, selectedModel]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -369,6 +409,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
       const result = await window.electron.ollama.preloadModel(request.input);
       setRunningModels(result.runningModels);
+      resetInferenceConversation();
       setSelectedModel(request.input.model);
       setLaunchTarget(null);
       if (openDebugger) {
@@ -419,11 +460,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setCancelling(false);
     setError(null);
     const requestId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const conversationVersion = conversationVersionRef.current;
     activeRequestIdRef.current = requestId;
+    const isCurrentRequest = () => activeRequestIdRef.current === requestId
+      && conversationVersionRef.current === conversationVersion;
 
     let streamState = createOllamaStreamState();
     const unsubscribe = window.electron.ollama.onChatStreamChunk(({ requestId: eventRequestId, chunk }) => {
-      if (eventRequestId !== requestId) return;
+      if (eventRequestId !== requestId || conversationVersionRef.current !== conversationVersion) return;
       streamState = reduceOllamaStreamChunk(streamState, chunk);
       setStreamingThinking(streamState.thinking);
       setStreamingText(streamState.content);
@@ -445,6 +489,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         options: normalizeOptions(options),
       };
       await window.electron.ollama.chatStream(requestId, payload);
+      if (!isCurrentRequest()) return;
       const assistantMessage: InferenceMessage = {
         role: 'assistant',
         content: streamState.content,
@@ -455,6 +500,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       messagesRef.current = [...nextHistory, assistantMessage];
       await refreshRunningModels().catch(() => undefined);
     } catch (sendError) {
+      if (!isCurrentRequest()) return;
       if (sendError instanceof Error && sendError.message.includes('Generation cancelled')) {
         setNotice(i18nService.t('localInferenceGenerationCancelled'));
         if (streamState.content || streamState.thinking) {
@@ -474,11 +520,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       }
     } finally {
       unsubscribe();
-      activeRequestIdRef.current = null;
-      setSending(false);
-      setCancelling(false);
-      setStreamingText('');
-      setStreamingThinking('');
+      if (isCurrentRequest()) {
+        activeRequestIdRef.current = null;
+        setSending(false);
+        setCancelling(false);
+        setStreamingText('');
+        setStreamingThinking('');
+      }
     }
   };
 
@@ -522,17 +570,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         <WindowTitleBar inline />
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-gutter:stable]">
-        <div className="mx-auto max-w-6xl px-4 py-5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
+        <div className={`mx-auto max-w-6xl px-4 py-5 ${activeTab === 'inference' ? 'flex h-full min-h-0 flex-col gap-4' : 'space-y-4'}`}>
           <ServiceHeader
             status={status}
             loading={loading}
             localModels={localModels}
             runningModels={runningModels}
-            serviceConfig={serviceConfig}
             onPrepare={handlePrepare}
             onStop={handleStop}
-            onSaveServiceConfig={handleSaveServiceConfig}
+            onOpenServiceConfig={() => setServiceConfigDialogOpen(true)}
             onRefresh={() => void runAction(async () => {
               const nextStatus = await refreshStatus();
               if (nextStatus.status === 'running') {
@@ -587,7 +634,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onDelete={handleDelete}
               onSetOpenClawModel={handleSetOpenClawModel}
               onOpenInference={(modelName) => {
-                setSelectedModel(modelName);
+                handleSelectInferenceModel(modelName);
                 setActiveTab('inference');
               }}
             />
@@ -617,34 +664,36 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onInstall={handleMarketplaceInstall}
               onCancelPull={handleCancelPull}
               onOpenInference={(modelName) => {
-                setSelectedModel(modelName);
+                handleSelectInferenceModel(modelName);
                 setActiveTab('inference');
               }}
             />
           ) : (
-            <InferencePanel
-              isRunning={isRunning}
-              loading={loading}
-              selectedModel={selectedModel}
-              selectedRunningModel={selectedRunningModel}
-              runnableModels={runnableModels}
-              systemPrompt={systemPrompt}
-              prompt={prompt}
-              options={options}
-              messages={messages}
-              streamingText={streamingText}
-              streamingThinking={streamingThinking}
-              sending={sending}
-              cancelling={cancelling}
-              onModelChange={setSelectedModel}
-              onSystemPromptChange={setSystemPrompt}
-              onPromptChange={setPrompt}
-              onOptionsChange={setOptions}
-              onSavePreset={handleSavePreset}
-              onSend={() => void sendPrompt()}
-              onStop={() => void stopGeneration()}
-              onOpenModels={() => setActiveTab('models')}
-            />
+            <div className="min-h-[520px] flex-1">
+              <InferencePanel
+                isRunning={isRunning}
+                loading={loading}
+                selectedModel={selectedModel}
+                selectedRunningModel={selectedRunningModel}
+                runnableModels={runnableModels}
+                systemPrompt={systemPrompt}
+                prompt={prompt}
+                options={options}
+                messages={messages}
+                streamingText={streamingText}
+                streamingThinking={streamingThinking}
+                sending={sending}
+                cancelling={cancelling}
+                onModelChange={handleSelectInferenceModel}
+                onSystemPromptChange={setSystemPrompt}
+                onPromptChange={setPrompt}
+                onOptionsChange={setOptions}
+                onSavePreset={handleSavePreset}
+                onSend={() => void sendPrompt()}
+                onStop={() => void stopGeneration()}
+                onOpenModels={() => setActiveTab('models')}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -657,6 +706,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onLaunch={handlePreload}
         />
       )}
+      {serviceConfigDialogOpen && (
+        <OllamaServiceConfigDialog
+          loading={loading}
+          running={isRunning}
+          managedByApp={Boolean(status?.managedByApp)}
+          config={serviceConfig}
+          onClose={() => setServiceConfigDialogOpen(false)}
+          onSave={handleSaveServiceConfig}
+        />
+      )}
     </div>
   );
 };
@@ -666,20 +725,18 @@ function ServiceHeader({
   loading,
   localModels,
   runningModels,
-  serviceConfig,
   onPrepare,
   onStop,
-  onSaveServiceConfig,
+  onOpenServiceConfig,
   onRefresh,
 }: {
   status: OllamaStatusSnapshot | null;
   loading: boolean;
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
-  serviceConfig: OllamaServiceConfig;
   onPrepare: () => void;
   onStop: () => void;
-  onSaveServiceConfig: (config: OllamaServiceConfig) => void;
+  onOpenServiceConfig: () => void;
   onRefresh: () => void;
 }) {
   const running = status?.status === 'running';
@@ -730,6 +787,15 @@ function ServiceHeader({
             <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             {i18nService.t('refresh')}
           </button>
+          <button
+            type="button"
+            onClick={onOpenServiceConfig}
+            disabled={loading}
+            className={smallOutlineButtonClass}
+          >
+            <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+            {i18nService.t('localInferenceServiceConfigTitle')}
+          </button>
           {!running && canPrepare && (
             <button
               type="button"
@@ -754,32 +820,27 @@ function ServiceHeader({
           ) : null}
         </div>
       </div>
-      <OllamaServiceConfigPanel
-        loading={loading}
-        running={running}
-        managedByApp={managedByApp}
-        config={serviceConfig}
-        onSave={onSaveServiceConfig}
-      />
     </section>
   );
 }
 
-function OllamaServiceConfigPanel({
+function OllamaServiceConfigDialog({
   loading,
   running,
   managedByApp,
   config,
+  onClose,
   onSave,
 }: {
   loading: boolean;
   running: boolean;
   managedByApp: boolean;
   config: OllamaServiceConfig;
-  onSave: (config: OllamaServiceConfig) => void;
+  onClose: () => void;
+  onSave: (config: OllamaServiceConfig) => Promise<SaveServiceConfigResult>;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState<OllamaServiceConfigFormState>(() => serviceConfigToForm(config));
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(serviceConfigToForm(config));
@@ -789,88 +850,121 @@ function OllamaServiceConfigPanel({
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const save = () => {
-    onSave({
+  const save = async () => {
+    setSaveError(null);
+    const result = await onSave({
       cudaVisibleDevices: form.cudaVisibleDevices,
       maxLoadedModels: form.maxLoadedModels,
       numParallel: form.numParallel,
       ...(form.schedSpread ? { schedSpread: form.schedSpread === 'true' } : {}),
     });
+    if (result.success) {
+      onClose();
+    } else {
+      setSaveError(result.error || i18nService.t('localInferenceServiceConfigRestartAppRequired'));
+    }
   };
 
   return (
-    <div className="mt-3 border-t border-border pt-3">
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-secondary transition-colors hover:text-foreground"
-      >
-        <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
-        {i18nService.t('localInferenceServiceConfigTitle')}
-      </button>
-      {expanded && (
-        <div className="mt-3 rounded-md border border-border bg-background/60 p-3">
-          <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigDescription')}</p>
-          {running && !managedByApp && (
-            <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-              {i18nService.t('localInferenceServiceConfigExternalWarning')}
-            </p>
-          )}
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <ServiceConfigInput
-              label="CUDA_VISIBLE_DEVICES"
-              value={form.cudaVisibleDevices}
-              placeholder="0,1"
-              hint={i18nService.t('localInferenceServiceConfigCudaHint')}
-              onChange={(value) => updateForm('cudaVisibleDevices', value)}
-            />
-            <ServiceConfigInput
-              label="OLLAMA_MAX_LOADED_MODELS"
-              value={form.maxLoadedModels}
-              placeholder={i18nService.t('localInferenceLaunchDefault')}
-              hint={i18nService.t('localInferenceServiceConfigMaxLoadedHint')}
-              onChange={(value) => updateForm('maxLoadedModels', value)}
-            />
-            <ServiceConfigInput
-              label="OLLAMA_NUM_PARALLEL"
-              value={form.numParallel}
-              placeholder={i18nService.t('localInferenceLaunchDefault')}
-              hint={i18nService.t('localInferenceServiceConfigNumParallelHint')}
-              onChange={(value) => updateForm('numParallel', value)}
-            />
-            <label className="space-y-1.5 md:col-span-2">
-              <span className="font-mono text-xs font-semibold text-foreground">OLLAMA_SCHED_SPREAD</span>
-              <select
-                value={form.schedSpread}
-                onChange={(event) => updateForm('schedSpread', event.target.value)}
-                className="h-8 w-full rounded-md border border-border bg-surface px-2 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-              >
-                <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
-                <option value="true">{i18nService.t('localInferenceLaunchBooleanEnabled')}</option>
-                <option value="false">{i18nService.t('localInferenceLaunchBooleanDisabled')}</option>
-              </select>
-              <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigSchedSpreadHint')}</p>
-            </label>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="text-xl font-semibold text-foreground">{i18nService.t('localInferenceServiceConfigTitle')}</h3>
+            <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceServiceConfigDescription')}</p>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-secondary">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            aria-label={i18nService.t('close')}
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-5 py-4">
+          <section className="rounded-xl border border-border bg-surface/40 px-4 py-4">
+            {running && !managedByApp && (
+              <p className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                {i18nService.t('localInferenceServiceConfigExternalWarning')}
+              </p>
+            )}
+            {saveError && (
+              <p className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                {saveError}
+              </p>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <ServiceConfigInput
+                label="CUDA_VISIBLE_DEVICES"
+                value={form.cudaVisibleDevices}
+                placeholder="0,1"
+                hint={i18nService.t('localInferenceServiceConfigCudaHint')}
+                onChange={(value) => updateForm('cudaVisibleDevices', value)}
+              />
+              <ServiceConfigInput
+                label="OLLAMA_MAX_LOADED_MODELS"
+                value={form.maxLoadedModels}
+                placeholder={i18nService.t('localInferenceLaunchDefault')}
+                hint={i18nService.t('localInferenceServiceConfigMaxLoadedHint')}
+                onChange={(value) => updateForm('maxLoadedModels', value)}
+              />
+              <ServiceConfigInput
+                label="OLLAMA_NUM_PARALLEL"
+                value={form.numParallel}
+                placeholder={i18nService.t('localInferenceLaunchDefault')}
+                hint={i18nService.t('localInferenceServiceConfigNumParallelHint')}
+                onChange={(value) => updateForm('numParallel', value)}
+              />
+              <label className="space-y-2 md:col-span-2">
+                <span className="font-mono text-sm font-semibold text-foreground">OLLAMA_SCHED_SPREAD</span>
+                <select
+                  value={form.schedSpread}
+                  onChange={(event) => updateForm('schedSpread', event.target.value)}
+                  className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+                >
+                  <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
+                  <option value="true">{i18nService.t('localInferenceLaunchBooleanEnabled')}</option>
+                  <option value="false">{i18nService.t('localInferenceLaunchBooleanDisabled')}</option>
+                </select>
+                <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigSchedSpreadHint')}</p>
+              </label>
+            </div>
+            <p className="mt-4 text-xs text-secondary">
               {running && !managedByApp
                 ? i18nService.t('localInferenceServiceConfigExternalHint')
                 : running
                 ? i18nService.t('localInferenceServiceConfigRestartHint')
                 : i18nService.t('localInferenceServiceConfigStartHint')}
             </p>
-            <button
-              type="button"
-              onClick={save}
-              disabled={loading}
-              className="inline-flex h-7 items-center rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-            >
-              {i18nService.t('save')}
-            </button>
-          </div>
+          </section>
         </div>
-      )}
+
+        <div className="flex flex-col gap-2 border-t border-border px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-4 text-sm text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
+          >
+            {i18nService.t('cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+          >
+            {i18nService.t('save')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -889,13 +983,13 @@ function ServiceConfigInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-1.5">
-      <span className="font-mono text-xs font-semibold text-foreground">{label}</span>
+    <label className="space-y-2">
+      <span className="font-mono text-sm font-semibold text-foreground">{label}</span>
       <input
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="h-8 w-full rounded-md border border-border bg-surface px-2 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60"
       />
       <p className="text-xs text-secondary">{hint}</p>
     </label>
@@ -1578,6 +1672,27 @@ function InferencePanel({
   onStop: () => void;
   onOpenModels: () => void;
 }) {
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const composingRef = useRef(false);
+
+  useEffect(() => {
+    const element = chatScrollRef.current;
+    if (!element) return;
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTop = element.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, streamingText, streamingThinking, sending]);
+
+  useEffect(() => {
+    if (sending || cancelling || !selectedModel) return;
+    const frame = window.requestAnimationFrame(() => {
+      promptRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [cancelling, selectedModel, sending]);
+
   if (!isRunning || runnableModels.length === 0) {
     return (
       <EmptyState
@@ -1592,8 +1707,8 @@ function InferencePanel({
   }
 
   return (
-    <div className="grid min-h-[620px] gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="rounded-lg border border-border bg-surface p-3">
+    <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="min-h-0 overflow-y-auto rounded-lg border border-border bg-surface p-3">
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-secondary">{i18nService.t('localInferenceModel')}</label>
@@ -1644,7 +1759,7 @@ function InferencePanel({
       </aside>
 
       <main className="flex min-h-0 flex-col rounded-lg border border-border bg-surface">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+        <div className="shrink-0 flex items-center justify-between border-b border-border px-3 py-2.5">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-foreground">{selectedModel}</h2>
             <p className="text-xs text-secondary">
@@ -1655,7 +1770,7 @@ function InferencePanel({
             <Badge>{selectedRunningModel.context_length}</Badge>
           )}
         </div>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div ref={chatScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           {messages.length === 0 && !sending && (
             <div className="flex min-h-[360px] items-center justify-center text-sm text-secondary">
               {i18nService.t('localInferenceEmptyChat')}
@@ -1675,13 +1790,26 @@ function InferencePanel({
             />
           )}
         </div>
-        <div className="border-t border-border p-3">
+        <div className="shrink-0 border-t border-border p-3">
           <div className="flex gap-2">
             <textarea
+              ref={promptRef}
               value={prompt}
               onChange={(event) => onPromptChange(event.target.value)}
+              onCompositionStart={() => {
+                composingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                composingRef.current = false;
+              }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey && !sending) {
+                if (
+                  event.key === 'Enter'
+                  && !event.shiftKey
+                  && !sending
+                  && !composingRef.current
+                  && !event.nativeEvent.isComposing
+                ) {
                   event.preventDefault();
                   onSend();
                 }

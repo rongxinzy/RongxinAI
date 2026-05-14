@@ -31,7 +31,7 @@ This directory contains utilities and notes for SQLite backup and recovery perfo
    Confirm the target database path. The default desktop user-data path is usually:
 
    ```bash
-   ~/Library/Application\ Support/LobsterAI/lobsterai.sqlite
+   ~/Library/Application\ Support/RongxinAI/app.sqlite
    ```
 
 3. 建议先退出应用，避免写入测试数据时与正在运行的进程竞争数据库锁。  
@@ -46,7 +46,7 @@ First, generate enough data for backup performance testing.
 
 ```bash
 npm run test:sqlite-backup:seed -- \
-  --db '/Users/jj.deng/Library/Application Support/LobsterAI/lobsterai.sqlite' \
+  --db '/Users/jj.deng/Library/Application Support/RongxinAI/app.sqlite' \
   --sessions 10 \
   --messages-per-session 2000 \
   --payload-kb 8
@@ -56,7 +56,7 @@ npm run test:sqlite-backup:seed -- \
 
 ```bash
 npm run test:sqlite-backup:seed -- \
-  --db '/Users/jj.deng/Library/Application Support/LobsterAI/lobsterai.sqlite' \
+  --db '/Users/jj.deng/Library/Application Support/RongxinAI/app.sqlite' \
   --sessions 50 \
   --messages-per-session 10000 \
   --payload-kb 16
@@ -113,7 +113,7 @@ After the app starts, inspect the main-process logs.
 Focus on these log lines:
 
 - `[SqliteBackup] Forced startup backup is enabled ...`
-- `[SqliteBackup] Starting periodic backup to lobsterai-latest.sqlite`
+- `[SqliteBackup] Starting periodic backup to app-latest.sqlite`
 - `[SqliteBackup] Backup progress: transferred X/Y pages, Z remaining`
 - `[SqliteBackup] Completed periodic backup with 1 retained snapshot(s)`
 
@@ -131,15 +131,17 @@ Without the force env var, startup will first check:
 After backup completes, verify that the backup file exists:
 
 ```bash
-ls -lh ~/Library/Application\ Support/LobsterAI/backups/sqlite/snapshots/
+ls -lh ~/Library/Application\ Support/RongxinAI/backups/sqlite/snapshots/
 ```
 
 当前单文件备份名为：  
 The current single backup file is:
 
 ```text
-lobsterai-latest.sqlite
+app-latest.sqlite
 ```
+
+The backup filename is a legacy compatibility name. Do not rename it without a storage migration.
 
 ## 6. Recovery Test
 
@@ -165,7 +167,7 @@ Make sure a valid backup exists first, then intentionally corrupt the main datab
 Example:
 
 ```bash
-printf 'not-a-sqlite-db' > ~/Library/Application\ Support/LobsterAI/lobsterai.sqlite
+printf 'not-a-sqlite-db' > ~/Library/Application\ Support/RongxinAI/app.sqlite
 ```
 
 然后启动应用。  

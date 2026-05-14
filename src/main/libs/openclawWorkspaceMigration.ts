@@ -19,7 +19,8 @@ import {
 const TAG = '[OpenClaw Migration]';
 const MIGRATION_KEY = 'migration.mainAgentWorkspace.v3.completed';
 
-const AGENTS_MARKER = '<!-- LobsterAI managed: do not edit below this line -->';
+const AGENTS_MARKER = '<!-- RongxinAI managed: do not edit below this line -->';
+const LEGACY_AGENTS_MARKER = '<!-- LobsterAI managed: do not edit below this line -->';
 const BOOTSTRAP_FILES = ['IDENTITY.md', 'USER.md', 'SOUL.md', 'TOOLS.md', 'BOOTSTRAP.md'];
 
 type CopyResult = {
@@ -140,7 +141,9 @@ function mergeDirIfNeeded(src: string, dest: string): CopyResult {
 
 function extractAgentsUserContent(content: string): string {
   const markerIndex = content.indexOf(AGENTS_MARKER);
-  const userContent = markerIndex >= 0 ? content.slice(0, markerIndex) : content;
+  const legacyMarkerIndex = content.indexOf(LEGACY_AGENTS_MARKER);
+  const managedMarkerIndex = markerIndex >= 0 ? markerIndex : legacyMarkerIndex;
+  const userContent = managedMarkerIndex >= 0 ? content.slice(0, managedMarkerIndex) : content;
   return userContent.trim();
 }
 
@@ -164,12 +167,14 @@ function mergeAgentsMdUserContent(src: string, dest: string): CopyResult {
     }
 
     const markerIndex = destContent.indexOf(AGENTS_MARKER);
+    const legacyMarkerIndex = destContent.indexOf(LEGACY_AGENTS_MARKER);
+    const managedMarkerIndex = markerIndex >= 0 ? markerIndex : legacyMarkerIndex;
     let nextContent: string;
     if (!destContent.trim()) {
       nextContent = `${srcUserContent}\n`;
-    } else if (markerIndex >= 0) {
-      const destUserContent = destContent.slice(0, markerIndex).trim();
-      const managedContent = destContent.slice(markerIndex).trimStart();
+    } else if (managedMarkerIndex >= 0) {
+      const destUserContent = destContent.slice(0, managedMarkerIndex).trim();
+      const managedContent = destContent.slice(managedMarkerIndex).trimStart();
       nextContent = destUserContent
         ? `${destUserContent}\n\n${srcUserContent}\n\n${managedContent}`
         : `${srcUserContent}\n\n${managedContent}`;

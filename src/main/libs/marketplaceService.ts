@@ -48,7 +48,7 @@ export class MarketplaceService {
     try {
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'LobsterAI/marketplace',
+          'User-Agent': 'RongxinAI/marketplace',
         },
         signal: controller.signal,
       });

@@ -14,7 +14,7 @@ import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/co
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
 import { AgentManager } from './agentManager';
-import { APP_NAME } from './appConstants';
+import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkStore } from './coworkStore';
 import { setLanguage, t } from './i18n';
@@ -376,7 +376,7 @@ const buildLogExportFileName = (): string => {
   const now = new Date();
   const datePart = `${now.getFullYear()}${padTwoDigits(now.getMonth() + 1)}${padTwoDigits(now.getDate())}`;
   const timePart = `${padTwoDigits(now.getHours())}${padTwoDigits(now.getMinutes())}${padTwoDigits(now.getSeconds())}`;
-  return `lobsterai-logs-${datePart}-${timePart}.zip`;
+  return `rongxinai-logs-${datePart}-${timePart}.zip`;
 };
 
 const OPENCLAW_DAILY_LOG_RETENTION_DAYS = 7;
@@ -560,11 +560,16 @@ const savePngWithDialog = async (
 const configureUserDataPath = (): void => {
   const appDataPath = app.getPath('appData');
   const preferredUserDataPath = path.join(appDataPath, APP_NAME);
+  const legacyUserDataPath = path.join(appDataPath, LEGACY_APP_NAME);
   const currentUserDataPath = app.getPath('userData');
+  const targetUserDataPath =
+    fs.existsSync(legacyUserDataPath) && !fs.existsSync(preferredUserDataPath)
+      ? legacyUserDataPath
+      : preferredUserDataPath;
 
-  if (currentUserDataPath !== preferredUserDataPath) {
-    app.setPath('userData', preferredUserDataPath);
-    console.log(`[Main] userData path updated: ${currentUserDataPath} -> ${preferredUserDataPath}`);
+  if (currentUserDataPath !== targetUserDataPath) {
+    app.setPath('userData', targetUserDataPath);
+    console.log(`[Main] userData path updated: ${currentUserDataPath} -> ${targetUserDataPath}`);
   }
 };
 
@@ -1846,6 +1851,15 @@ function mergeCoworkSystemPrompt(
   systemPrompt?: string,
 ): string | undefined {
   const sections = [
+    [
+      'You are RongxinAI, an AI assistant for the user\'s desktop workspace.',
+      'RongxinAI is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+      'Treat RongxinAI as an exact product name. Do not translate, localize, or transliterate it as 容芯AI, RongxiAI, or any other variant.',
+      'When the user asks who you are, answer that you are RongxinAI. In Chinese, say "我是 RongxinAI。"',
+      'Do not describe LobsterAI as a brand, product, project, codename, or capability system. If asked about LobsterAI, say only that it is a legacy internal compatibility identifier in some technical paths and that the current product identity is RongxinAI.',
+      'Do not use any other product name, model name, runtime name, or preset role as your identity.',
+      'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
+    ].join('\n'),
     buildScheduledTaskEnginePrompt(),
     systemPrompt?.trim() || '',
   ].filter(Boolean);
@@ -2205,7 +2219,7 @@ if (!gotTheLock) {
           ...manager.getRecentGatewayLogEntries(),
           ...getRecentOpenClawDailyLogEntries(manager.getOpenClawDailyLogDir()),
           ...(process.platform === 'win32'
-            ? [{ archiveName: 'install-timing.log', filePath: path.join(app.getPath('appData'), 'LobsterAI', 'install-timing.log') }]
+            ? [{ archiveName: 'install-timing.log', filePath: path.join(app.getPath('appData'), LEGACY_APP_NAME, 'install-timing.log') }]
             : []),
         ],
       });

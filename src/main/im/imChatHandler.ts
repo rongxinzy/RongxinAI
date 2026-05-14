@@ -4,11 +4,12 @@
  */
 
 import axios from 'axios';
+
+import { buildIMMediaInstruction } from './imMediaInstruction';
 import {
   IMMessage,
   IMSettings,
 } from './types';
-import { buildIMMediaInstruction } from './imMediaInstruction';
 
 // LLM Configuration interface (mirrors app_config structure)
 interface LLMConfig {
@@ -17,6 +18,15 @@ interface LLMConfig {
   model?: string;
   provider?: string;
 }
+
+const RONGXINAI_IDENTITY_PROMPT = [
+  'You are RongxinAI, an AI assistant for the user\'s desktop workspace.',
+  'RongxinAI is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+  'Treat RongxinAI as an exact product name. Do not translate, localize, or transliterate it as 荣信AI, 容芯AI, RongxiAI, or any other variant.',
+  'When the user asks who you are, answer that you are RongxinAI. In Chinese, say "我是 RongxinAI。"',
+  'Do not describe LobsterAI as a brand, product, project, codename, or capability system. If asked about LobsterAI, say only that it is a legacy internal compatibility identifier in some technical paths and that the current product identity is RongxinAI.',
+  'Do not use any other product name, model name, runtime name, or preset role as your identity.',
+].join('\n');
 
 export interface IMChatHandlerOptions {
   getLLMConfig: () => Promise<LLMConfig | null>;
@@ -41,7 +51,9 @@ export class IMChatHandler {
     }
 
     // Build system prompt with optional skills
-    let systemPrompt = this.options.imSettings.systemPrompt || '';
+    let systemPrompt = [RONGXINAI_IDENTITY_PROMPT, this.options.imSettings.systemPrompt || '']
+      .filter(Boolean)
+      .join('\n\n');
 
     if (this.options.imSettings.skillsEnabled && this.options.getSkillsPrompt) {
       const skillsPrompt = await this.options.getSkillsPrompt();
@@ -287,7 +299,9 @@ export class IMChatHandler {
     }
 
     // Build system prompt
-    let systemPrompt = this.options.imSettings.systemPrompt || '';
+    let systemPrompt = [RONGXINAI_IDENTITY_PROMPT, this.options.imSettings.systemPrompt || '']
+      .filter(Boolean)
+      .join('\n\n');
 
     if (this.options.imSettings.skillsEnabled && this.options.getSkillsPrompt) {
       const skillsPrompt = await this.options.getSkillsPrompt();
