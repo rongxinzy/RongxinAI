@@ -776,7 +776,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentNamePlaceholder: 'Agent 名称',
     agentAvatarPickerTitle: '选择头像',
     agentAvatarPickerDone: '完成',
-    agentAvatarSvgLobster: '荣芯',
+    agentAvatarSvgLobster: '容芯',
     agentAvatarSvgCode: '代码',
     agentAvatarSvgRepair: '修理',
     agentAvatarSvgBriefcase: '公文包',
