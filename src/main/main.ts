@@ -1311,7 +1311,12 @@ const syncOpenClawConfig = async (
     };
   }
 
-  if (hasActiveGatewayWorkloads()) {
+  // Binding changes are explicit user actions (reassigning a channel to a
+  // different agent).  The old Gateway session keeps the channel producing
+  // messages under the old agent's model, so active workloads never drain
+  // and the restart would be deferred indefinitely.  Force immediate restart
+  // so new messages route to the correct agent.
+  if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged) {
     console.log(`${D()} ──── RESTART DEFERRED (active workloads). reason=${options.reason}`);
     scheduleDeferredGatewayRestart(options.reason);
     return {
