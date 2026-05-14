@@ -493,6 +493,23 @@ export class AppUpdateCoordinator {
   }
 
   private restoreStoredReadyState(): void {
+    // When the update system is disabled, clear any stale persisted state
+    // left over from earlier versions.  Otherwise a stored ready-file
+    // record (version + installer path) keeps showing "有新版本" on every
+    // startup even though fetchUpdateInfo() is hardcoded to return null.
+    if (this.isUpdateDisabled()) {
+      console.log('[AppUpdate] update system is disabled, clearing any persisted ready state');
+      for (const source of [AppUpdateSource.Manual, AppUpdateSource.Auto] as AppUpdateSource[]) {
+        const stale = this.getStoredReadyFile(source);
+        if (stale) {
+          this.clearStoredReadyFile(source);
+          void this.cleanupReadyFile(stale.filePath);
+        }
+        void this.pruneCachedInstallerFiles(source);
+      }
+      return;
+    }
+
     const sources: AppUpdateSource[] = [AppUpdateSource.Manual, AppUpdateSource.Auto];
     let restored = false;
 
