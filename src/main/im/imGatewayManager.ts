@@ -265,8 +265,7 @@ export class IMGatewayManager extends EventEmitter {
     return this.imStore;
   }
 
-  setConfig(config: Partial<IMGatewayConfig>, options?: { syncGateway?: boolean }): void {
-    const previousConfig = this.imStore.getConfig();
+  setConfig(config: Partial<IMGatewayConfig>, _options?: { syncGateway?: boolean }): void {
     this.imStore.setConfig(config);
 
     // Update chat handler if settings changed
