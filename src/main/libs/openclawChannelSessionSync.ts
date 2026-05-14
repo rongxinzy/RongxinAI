@@ -302,15 +302,19 @@ export class OpenClawChannelSessionSync {
   }
 
   /**
-   * Check if a gateway session key belongs to the agent currently bound to its platform.
-   * When users switch agent bindings, the gateway retains old sessions under the previous
-   * agentId. This method filters them out so only the current agent's sessions are processed.
+   * Check if a gateway session key belongs to a platform that has a current
+   * agent binding.  The Gateway may resume old sessions (via sync buf) after
+   * a restart, so the key's agentId can be stale even post-restart.
+   *
+   * resolveOrCreateSession() handles the transition (create new session for
+   * the current agent, isolate history).  We only filter out sessions whose
+   * platform has NO binding at all.
    */
   isCurrentBindingKey(sessionKey: string): boolean {
     const parsed = parseChannelSessionKey(sessionKey);
-    if (!parsed) return true; // Not a channel key — let other logic handle it
+    if (!parsed) return true;
     const keyAgentId = extractAgentIdFromKey(sessionKey);
-    if (!keyAgentId) return true; // Legacy key without agentId — allow
+    if (!keyAgentId) return true;
     const imSettings = this.imStore.getIMSettings();
     const accountId = extractAccountIdFromKey(sessionKey);
     const currentAgentId = resolveAgentBinding(
@@ -318,7 +322,12 @@ export class OpenClawChannelSessionSync {
       parsed.platform,
       accountId,
     );
-    return keyAgentId === currentAgentId;
+    // Platform has NO non-main binding — session is truly orphaned, skip it.
+    if (!currentAgentId || currentAgentId === 'main') {
+      return keyAgentId === (currentAgentId || 'main');
+    }
+    // Platform HAS a binding — let resolveOrCreateSession() handle routing.
+    return true;
   }
 
   /**
