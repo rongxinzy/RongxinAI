@@ -393,8 +393,11 @@ export class OpenClawChannelSessionSync {
             existingMapping.agentId,
             '→',
             currentAgentId,
-            '— creating new session',
+            '— creating new session and removing old',
           );
+          // Delete the old Cowork session so it doesn't linger in the
+          // previous agent's sidebar list after the binding change.
+          this.coworkStore.deleteSession(existingMapping.coworkSessionId);
           const titlePrefix = getChannelTitlePrefix(parsed.platform);
           const displayId = parsed.conversationId.includes('@')
             ? parsed.conversationId.split('@')[0]
