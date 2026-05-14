@@ -1215,6 +1215,9 @@ export class OpenClawConfigSync {
         // "config change requires gateway restart (gateway.auth.token)".
         auth: { mode: 'token', token: '${OPENCLAW_GATEWAY_TOKEN}' },
         tailscale: { mode: 'off' },
+        channelHealthCheckMinutes: 5,
+        channelStaleEventThresholdMinutes: 30,
+        channelMaxRestartsPerHour: 10,
         ...(hasAnyChannel
           ? {
               http: {
