@@ -63,8 +63,9 @@ type LaunchFormState = {
   numGpu: string;
   numThread: string;
   numBatch: string;
-  mainGpu: string;
   useMmap: string;
+  gpuDevices: string;
+  customGpuDevices: string;
 };
 
 type SuggestedLaunchOptions = {
@@ -72,8 +73,15 @@ type SuggestedLaunchOptions = {
   numBatch: number;
   numGpu?: number;
   numThread: number;
-  mainGpu?: number;
   summary: string;
+};
+
+type GpuDeviceSelection = 'service-default' | 'auto' | 'gpu0' | 'gpu1' | 'gpu0-gpu1' | 'custom';
+
+type LaunchRequest = {
+  input: OllamaModelLaunchInput;
+  gpuDevices: string;
+  customGpuDevices: string;
 };
 
 type OllamaServiceConfigFormState = {
@@ -340,11 +348,25 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     });
   };
 
-  const handlePreload = (input: OllamaModelLaunchInput, openDebugger: boolean) => {
+  const handlePreload = (request: LaunchRequest, openDebugger: boolean) => {
     void runAction(async () => {
-      const result = await window.electron.ollama.preloadModel(input);
+      const nextGpuConfig = resolveLaunchGpuDevices(request.gpuDevices, request.customGpuDevices);
+      const currentGpuConfig = serviceConfig.cudaVisibleDevices ?? '';
+      if (nextGpuConfig !== undefined && nextGpuConfig !== currentGpuConfig) {
+        const nextServiceConfig = await saveOllamaServiceConfig({
+          ...serviceConfig,
+          cudaVisibleDevices: nextGpuConfig,
+        });
+        setServiceConfig(nextServiceConfig);
+        const restartedStatus = await window.electron.ollama.restart();
+        setStatus(restartedStatus);
+        if (restartedStatus.status !== 'running') {
+          throw new Error(restartedStatus.error || i18nService.t('localInferenceLaunchRestartFailed'));
+        }
+      }
+      const result = await window.electron.ollama.preloadModel(request.input);
       setRunningModels(result.runningModels);
-      setSelectedModel(input.model);
+      setSelectedModel(request.input.model);
       setLaunchTarget(null);
       if (openDebugger) {
         setActiveTab('inference');
@@ -627,6 +649,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         <LaunchModelDialog
           model={launchTarget}
           loading={loading}
+          serviceConfig={serviceConfig}
           onClose={() => setLaunchTarget(null)}
           onLaunch={handlePreload}
         />
@@ -1058,21 +1081,24 @@ function ModelCard({
 function LaunchModelDialog({
   model,
   loading,
+  serviceConfig,
   onClose,
   onLaunch,
 }: {
   model: OllamaModel;
   loading: boolean;
+  serviceConfig: OllamaServiceConfig;
   onClose: () => void;
-  onLaunch: (input: OllamaModelLaunchInput, openDebugger: boolean) => void;
+  onLaunch: (request: LaunchRequest, openDebugger: boolean) => void;
 }) {
   const [form, setForm] = useState<LaunchFormState>({
     numCtx: '4096',
     numGpu: '',
     numThread: '',
     numBatch: '',
-    mainGpu: '',
     useMmap: '',
+    gpuDevices: 'service-default',
+    customGpuDevices: '',
   });
   const [optimizationSummary, setOptimizationSummary] = useState('');
   const [detectingHardware, setDetectingHardware] = useState(false);
@@ -1085,13 +1111,11 @@ function LaunchModelDialog({
     const parsedNumGpu = parseOptionalInteger(form.numGpu);
     const parsedNumThread = parseOptionalInteger(form.numThread);
     const parsedNumBatch = parseOptionalInteger(form.numBatch);
-    const parsedMainGpu = parseOptionalInteger(form.mainGpu);
     const parsedUseMmap = parseOptionalBoolean(form.useMmap);
 
     if (parsedNumCtx !== undefined) options.num_ctx = parsedNumCtx;
     if (parsedNumBatch !== undefined) options.num_batch = parsedNumBatch;
     if (parsedNumGpu !== undefined) options.num_gpu = parsedNumGpu;
-    if (parsedMainGpu !== undefined) options.main_gpu = parsedMainGpu;
     if (parsedUseMmap !== undefined) options.use_mmap = parsedUseMmap;
     if (parsedNumThread !== undefined) options.num_thread = parsedNumThread;
 
@@ -1119,10 +1143,16 @@ function LaunchModelDialog({
       numGpu: next.numGpu === undefined ? '' : String(next.numGpu),
       numThread: String(next.numThread),
       numBatch: String(next.numBatch),
-      mainGpu: next.mainGpu === undefined ? '' : String(next.mainGpu),
     }));
     setOptimizationSummary(next.summary);
   };
+  const buildLaunchRequest = (): LaunchRequest => ({
+    input: buildInput(),
+    gpuDevices: form.gpuDevices,
+    customGpuDevices: form.customGpuDevices,
+  });
+  const gpuDevicesChanged = resolveLaunchGpuDevices(form.gpuDevices, form.customGpuDevices) !== undefined
+    && resolveLaunchGpuDevices(form.gpuDevices, form.customGpuDevices) !== (serviceConfig.cudaVisibleDevices ?? '');
 
   return (
     <div
@@ -1177,6 +1207,45 @@ function LaunchModelDialog({
             <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceLaunchKeepAliveForever')}</p>
           </section>
 
+          <section className="space-y-3 rounded-lg border border-border px-4 py-3">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceLaunchGpuDevices')}</h4>
+              <p className="mt-1 text-sm text-secondary">
+                {i18nService.t('localInferenceLaunchGpuDevicesHint')}
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+              <LaunchSelectOptions
+                label={i18nService.t('localInferenceLaunchGpuDevices')}
+                value={form.gpuDevices}
+                options={[
+                  { value: 'service-default', label: i18nService.t('localInferenceLaunchGpuServiceDefault') },
+                  { value: 'auto', label: i18nService.t('localInferenceLaunchGpuAuto') },
+                  { value: 'gpu0', label: i18nService.t('localInferenceLaunchGpu0') },
+                  { value: 'gpu1', label: i18nService.t('localInferenceLaunchGpu1') },
+                  { value: 'gpu0-gpu1', label: i18nService.t('localInferenceLaunchGpu01') },
+                  { value: 'custom', label: i18nService.t('localInferenceLaunchGpuCustom') },
+                ]}
+                hint={formatLaunchGpuSummary(form.gpuDevices, form.customGpuDevices, serviceConfig.cudaVisibleDevices)}
+                onChange={(value) => updateForm('gpuDevices', value)}
+              />
+              {form.gpuDevices === 'custom' && (
+                <LaunchTextInput
+                  label={i18nService.t('localInferenceLaunchGpuCustomValue')}
+                  value={form.customGpuDevices}
+                  placeholder="0,1"
+                  hint={i18nService.t('localInferenceLaunchGpuCustomHint')}
+                  onChange={(value) => updateForm('customGpuDevices', value)}
+                />
+              )}
+            </div>
+            {gpuDevicesChanged && (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                {i18nService.t('localInferenceLaunchGpuRestartNotice')}
+              </p>
+            )}
+          </section>
+
           <div className="grid gap-4 md:grid-cols-3">
             <LaunchInput
               label={i18nService.t('localInferenceLaunchNumCtx')}
@@ -1219,14 +1288,6 @@ function LaunchModelDialog({
                 hint={i18nService.t('localInferenceLaunchNumBatchHint')}
                 onChange={(value) => updateForm('numBatch', value)}
               />
-              <LaunchInput
-                label={i18nService.t('localInferenceLaunchMainGpu')}
-                value={form.mainGpu}
-                min={0}
-                placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceLaunchMainGpuHint')}
-                onChange={(value) => updateForm('mainGpu', value)}
-              />
               <LaunchSelect
                 label={i18nService.t('localInferenceLaunchUseMmap')}
                 value={form.useMmap}
@@ -1241,11 +1302,11 @@ function LaunchModelDialog({
           <button type="button" onClick={onClose} disabled={loading} className="inline-flex h-9 items-center justify-center rounded-lg border border-border px-4 text-sm text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60">
             {i18nService.t('cancel')}
           </button>
-          <button type="button" onClick={() => onLaunch(buildInput(), false)} disabled={loading} className={smallOutlineButtonClass.replace('h-7', 'h-9').replace('text-xs', 'text-sm') + ' justify-center px-4'}>
+          <button type="button" onClick={() => onLaunch(buildLaunchRequest(), false)} disabled={loading} className={smallOutlineButtonClass.replace('h-7', 'h-9').replace('text-xs', 'text-sm') + ' justify-center px-4'}>
             <PlayIcon className="h-4 w-4" />
             {i18nService.t('localInferenceLaunchLoadOnly')}
           </button>
-          <button type="button" onClick={() => onLaunch(buildInput(), true)} disabled={loading} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60">
+          <button type="button" onClick={() => onLaunch(buildLaunchRequest(), true)} disabled={loading} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60">
             <BeakerIcon className="h-4 w-4" />
             {i18nService.t('localInferenceLaunchLoadAndDebug')}
           </button>
@@ -1284,6 +1345,63 @@ function LaunchInput({
         onChange={(event) => onChange(event.target.value)}
         className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60"
       />
+      <p className="text-xs text-secondary">{hint}</p>
+    </label>
+  );
+}
+
+function LaunchTextInput({
+  label,
+  value,
+  hint,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-2">
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60"
+      />
+      <p className="text-xs text-secondary">{hint}</p>
+    </label>
+  );
+}
+
+function LaunchSelectOptions({
+  label,
+  value,
+  hint,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-2">
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
       <p className="text-xs text-secondary">{hint}</p>
     </label>
   );
@@ -1589,6 +1707,36 @@ function parseOptionalBoolean(value: string): boolean | undefined {
   return undefined;
 }
 
+function resolveLaunchGpuDevices(selection: string, customValue: string): string | undefined {
+  switch (selection as GpuDeviceSelection) {
+    case 'service-default':
+      return undefined;
+    case 'auto':
+      return '';
+    case 'gpu0':
+      return '0';
+    case 'gpu1':
+      return '1';
+    case 'gpu0-gpu1':
+      return '0,1';
+    case 'custom':
+      return customValue.split(',').map((part) => part.trim()).filter(Boolean).join(',');
+    default:
+      return undefined;
+  }
+}
+
+function formatLaunchGpuSummary(selection: string, customValue: string, currentValue?: string): string {
+  const nextValue = resolveLaunchGpuDevices(selection, customValue);
+  if (nextValue === undefined) {
+    return currentValue
+      ? i18nService.t('localInferenceLaunchGpuCurrent').replace('{devices}', currentValue)
+      : i18nService.t('localInferenceLaunchGpuCurrentAuto');
+  }
+  if (!nextValue) return i18nService.t('localInferenceLaunchGpuWillUseAuto');
+  return i18nService.t('localInferenceLaunchGpuWillUse').replace('{devices}', nextValue);
+}
+
 function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFormState {
   return {
     cudaVisibleDevices: config.cudaVisibleDevices ?? '',
@@ -1661,7 +1809,6 @@ function suggestLaunchOptions(
     numBatch,
     numGpu,
     numThread,
-    mainGpu: undefined,
     summary,
   };
 }

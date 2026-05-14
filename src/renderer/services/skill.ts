@@ -1,11 +1,27 @@
 import { LocalizedText, LocalSkillInfo, MarketplaceSkill, MarketTag, Skill } from '../types/skill';
 import { i18nService } from './i18n';
 
+const HIDDEN_MARKETPLACE_SKILL_IDS = new Set(['youdaonote', 'youdao-note', 'youdao_note']);
+
 export function resolveLocalizedText(text: string | LocalizedText): string {
   if (!text) return '';
   if (typeof text === 'string') return text;
   const lang = i18nService.getLanguage();
   return text[lang] || text.en || '';
+}
+
+function normalizeSkillIdentity(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isHiddenMarketplaceSkill(skill: MarketplaceSkill): boolean {
+  const ids = [
+    normalizeSkillIdentity(skill.id),
+    normalizeSkillIdentity(skill.name),
+    normalizeSkillIdentity(skill.url),
+    normalizeSkillIdentity(skill.source?.url),
+  ];
+  return ids.some((id) => HIDDEN_MARKETPLACE_SKILL_IDS.has(id) || id.includes('youdaonote'));
 }
 
 export function compareVersions(a: string, b: string): number {
@@ -258,7 +274,9 @@ class SkillService {
         this.localSkillDescriptions.set(ls.name, ls.description);
         this.localSkillDescriptions.set(ls.id, ls.description);
       }
-      const skills: MarketplaceSkill[] = Array.isArray(value?.marketplace) ? value.marketplace : [];
+      const skills: MarketplaceSkill[] = Array.isArray(value?.marketplace)
+        ? value.marketplace.filter((skill: MarketplaceSkill) => !isHiddenMarketplaceSkill(skill))
+        : [];
       const tags: MarketTag[] = Array.isArray(value?.marketTags) ? value.marketTags : [];
       // Also store marketplace skill descriptions for i18n lookup (keyed by id)
       this.marketplaceSkillDescriptions.clear();
