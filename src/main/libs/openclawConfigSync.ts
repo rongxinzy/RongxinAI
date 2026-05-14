@@ -166,6 +166,7 @@ const MANAGED_OWNER_ALLOW_FROM = [
 const MANAGED_TOOL_DENY = ['web_search'] as const;
 const EMAIL_PLUGIN_ID = 'email';
 const REMOVED_NIM_CHANNEL_PLUGIN_IDS = ['openclaw-nim-channel', 'nimsuite-openclaw-nim-channel'] as const;
+const REMOVED_POPO_NETEASEBEE_PLUGIN_IDS = ['moltbot-popo', 'openclaw-netease-bee'] as const;
 
 const MANAGED_SKILL_ENTRY_OVERRIDES: Record<string, { enabled: boolean }> = {
   // QQ plugin ships a legacy reminder skill that steers the model toward a
@@ -1312,6 +1313,7 @@ export class OpenClawConfigSync {
         const knownStalePluginIds = [
           'dingtalk',
           ...REMOVED_NIM_CHANNEL_PLUGIN_IDS,
+          ...REMOVED_POPO_NETEASEBEE_PLUGIN_IDS,
           'clawemail-email',
           'qwen-portal-auth',
           'openclaw-qqbot',
