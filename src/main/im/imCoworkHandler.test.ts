@@ -133,7 +133,7 @@ class FakeIMStore {
 
 function createMessage(overrides: Record<string, unknown> = {}) {
   return {
-    platform: 'nim',
+    platform: 'dingtalk',
     messageId: 'im-msg-1',
     conversationId: 'conv-1',
     senderId: 'user-1',
@@ -260,7 +260,7 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
 
   expect(relayedReplies).toEqual([
     {
-      platform: 'nim',
+      platform: 'dingtalk',
       conversationId: 'conv-1',
       text: '⏰ 该喝水啦！起身喝一杯水吧。',
     },

@@ -138,16 +138,11 @@ function conversationOptionMatchesValue(
   optionConversationId: string,
   selectedValue: string,
 ): boolean {
+  void channel;
   const optionId = optionConversationId.trim();
   const value = selectedValue.trim();
   if (!optionId || !value) return false;
   if (optionId === value) return true;
-
-  const platform = PlatformRegistry.platformOfChannel(channel);
-  if (platform === 'nim') {
-    if (optionId.endsWith(`:${value}`)) return true;
-    if (optionId.endsWith(`|${value}`)) return true;
-  }
 
   return false;
 }

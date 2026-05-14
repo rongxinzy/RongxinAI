@@ -1,13 +1,11 @@
 /**
  * IM Gateway Manager
- * Unified manager for DingTalk, Feishu, NIM gateways
- * and Telegram, Discord, QQ, WeCom, Weixin, NIM via OpenClaw
+ * Unified manager for IM gateways backed by OpenClaw.
  */
 
 import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
 
-import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
 import type { CoworkRuntime } from '../libs/agentEngine/types';
@@ -27,7 +25,6 @@ import type {
 } from './imScheduledTaskHandler';
 import { createIMScheduledTaskRequestDetector } from './imScheduledTaskHandler';
 import { IMStore } from './imStore';
-import { NimGateway } from './nimGateway';
 import {
   IMConnectivityCheck,
   IMConnectivityTestResult,
@@ -85,7 +82,6 @@ export interface IMGatewayManagerOptions {
 }
 
 export class IMGatewayManager extends EventEmitter {
-  private nimGateway: NimGateway;
   private imStore: IMStore;
   private chatHandler: IMChatHandler | null = null;
   private coworkHandler: IMCoworkHandler | null = null;
@@ -118,7 +114,6 @@ export class IMGatewayManager extends EventEmitter {
     super();
 
     this.imStore = new IMStore(db);
-    this.nimGateway = new NimGateway();
 
     // Store Cowork dependencies if provided
     if (options?.coworkRuntime && options?.coworkStore) {
@@ -143,8 +138,6 @@ export class IMGatewayManager extends EventEmitter {
   private setupGatewayEventForwarding(): void {
     // DingTalk runs via OpenClaw; no direct gateway events to forward
 
-    // NIM runs via OpenClaw; no direct gateway events to forward
-
     // QQ runs via OpenClaw; no direct gateway events to forward
 
     // WeCom runs via OpenClaw; no direct gateway events to forward
@@ -161,8 +154,6 @@ export class IMGatewayManager extends EventEmitter {
     console.log('[IMGatewayManager] Reconnecting all disconnected gateways...');
 
     // DingTalk runs via OpenClaw; no direct reconnect needed
-
-    // NIM runs via OpenClaw; no direct reconnect needed
 
     // QQ runs via OpenClaw; no direct reconnection needed
 
@@ -183,63 +174,6 @@ export class IMGatewayManager extends EventEmitter {
     this.getLLMConfig = options.getLLMConfig;
     this.getSkillsPrompt = options.getSkillsPrompt ?? null;
 
-    // Set up message handlers for gateways
-    this.setupMessageHandlers();
-  }
-
-  /**
-   * Set up message handlers for both gateways
-   */
-  private setupMessageHandlers(): void {
-    const messageHandler = async (
-      message: IMMessage,
-      replyFn: (text: string) => Promise<void>
-    ): Promise<void> => {
-      // Persist notification target whenever we receive a message
-      this.persistNotificationTarget(message.platform);
-
-      try {
-        let response: string;
-
-        // Always use Cowork mode if handler is available
-        if (this.coworkHandler) {
-          if (this.ensureCoworkReady) {
-            await this.ensureCoworkReady();
-          }
-          console.log('[IMGatewayManager] Using Cowork mode for message processing');
-          response = await this.coworkHandler.processMessage(message);
-        } else {
-          // Fallback to regular chat handler
-          if (!this.chatHandler) {
-            this.updateChatHandler();
-          }
-
-          if (!this.chatHandler) {
-            throw new Error('Chat handler not available');
-          }
-
-          response = await this.chatHandler.processMessage(message);
-        }
-
-        await replyFn(response);
-      } catch (error: any) {
-        console.error(`[IMGatewayManager] Error processing message: ${error.message}`);
-        // Don't send "Replaced by a newer IM request" error to user, just log it
-        if (error.message === 'Replaced by a newer IM request') {
-          return;
-        }
-        // Send error message to user
-        try {
-          const errorKey = classifyErrorKey(error.message);
-          const friendlyMessage = errorKey ? t(errorKey) : error.message;
-          await replyFn(`${t('imErrorPrefix')}: ${friendlyMessage}`);
-        } catch (replyError) {
-          console.error(`[IMGatewayManager] Failed to send error reply: ${replyError}`);
-        }
-      }
-    };
-
-    this.nimGateway.setMessageCallback(messageHandler);
   }
 
   /**
@@ -248,12 +182,8 @@ export class IMGatewayManager extends EventEmitter {
   private persistNotificationTarget(platform: Platform): void {
     try {
       let target: any = null;
-      if (platform === 'nim') {
-        target = this.nimGateway.getNotificationTarget();
-      }
       // WeCom runs via OpenClaw; notification target not managed locally
       // Weixin runs via OpenClaw; notification target not managed locally
-      // POPO runs via OpenClaw; notification target not managed locally
       if (target != null) {
         this.imStore.setNotificationTarget(platform, target);
       }
@@ -270,12 +200,8 @@ export class IMGatewayManager extends EventEmitter {
       const target = this.imStore.getNotificationTarget(platform);
       if (target == null) return;
 
-      if (platform === 'nim') {
-        this.nimGateway.setNotificationTarget(target);
-      }
       // WeCom runs via OpenClaw; notification target not managed locally
       // Weixin runs via OpenClaw; notification target not managed locally
-      // POPO runs via OpenClaw; notification target not managed locally
       console.log(`[IMGatewayManager] Restored notification target for ${platform}`);
     } catch (err: any) {
       console.warn(`[IMGatewayManager] Failed to restore notification target for ${platform}:`, err.message);
@@ -339,17 +265,13 @@ export class IMGatewayManager extends EventEmitter {
     return this.imStore;
   }
 
-  setConfig(config: Partial<IMGatewayConfig>, options?: { syncGateway?: boolean }): void {
-    const previousConfig = this.imStore.getConfig();
+  setConfig(config: Partial<IMGatewayConfig>, _options?: { syncGateway?: boolean }): void {
     this.imStore.setConfig(config);
 
     // Update chat handler if settings changed
     if (config.settings) {
       this.updateChatHandler();
     }
-
-
-    // NIM now runs via OpenClaw; config sync is handled by IPC handler
 
     // DingTalk now runs via OpenClaw; config sync is handled by IPC handler
 
@@ -438,18 +360,6 @@ export class IMGatewayManager extends EventEmitter {
         })),
       },
       discord: discordStatus,
-      nim: {
-        instances: (config.nim?.instances || []).map(inst => ({
-          instanceId: inst.instanceId,
-          instanceName: inst.instanceName,
-          connected: Boolean(inst.enabled && ((inst.nimToken && inst.nimToken.trim()) || (inst.appKey && inst.account && inst.token))),
-          startedAt: null as number | null,
-          lastError: null as string | null,
-          botAccount: inst.account || null,
-          lastInboundAt: null as number | null,
-          lastOutboundAt: null as number | null,
-        })),
-      },
       wecom: {
         instances: (config.wecom?.instances || []).map(inst => ({
           instanceId: inst.instanceId,
@@ -507,10 +417,6 @@ export class IMGatewayManager extends EventEmitter {
     // DingTalk always uses OpenClaw mode
     if (platform === 'dingtalk') {
       return this.testDingTalkOpenClawConnectivity(configOverride);
-    }
-
-    if (platform === 'nim') {
-      return this.testNimOpenClawConnectivity(configOverride);
     }
 
     // WeCom always uses OpenClaw mode
@@ -725,12 +631,6 @@ export class IMGatewayManager extends EventEmitter {
       await this.syncOpenClawConfig?.('im-gateway-start:discord');
       await this.ensureOpenClawGatewayConnected?.();
       return;
-    } else if (platform === 'nim') {
-      // NIM runs via OpenClaw gateway (openclaw-nim plugin)
-      console.log('[IMGatewayManager] NIM in OpenClaw mode, syncing config instead of starting direct gateway');
-      await this.syncOpenClawConfig?.('im-gateway-start:nim');
-      await this.ensureOpenClawGatewayConnected?.();
-      return;
     } else if (platform === 'qq') {
       // QQ runs via OpenClaw gateway (qqbot plugin)
       console.log('[IMGatewayManager] QQ in OpenClaw mode, syncing config instead of starting direct gateway');
@@ -776,11 +676,6 @@ export class IMGatewayManager extends EventEmitter {
       console.log('[IMGatewayManager] Discord in OpenClaw mode, syncing disabled config');
       await this.syncOpenClawConfig?.('im-gateway-stop:discord');
       return;
-    } else if (platform === 'nim') {
-      // NIM runs via OpenClaw gateway
-      console.log('[IMGatewayManager] NIM in OpenClaw mode, syncing disabled config');
-      await this.syncOpenClawConfig?.('im-gateway-stop:nim');
-      return;
     } else if (platform === 'qq') {
       // QQ runs via OpenClaw gateway
       console.log('[IMGatewayManager] QQ in OpenClaw mode, syncing disabled config');
@@ -802,7 +697,7 @@ export class IMGatewayManager extends EventEmitter {
   /**
    * Start all enabled gateways.
    *
-   * OpenClaw platforms (dingtalk/feishu/telegram/discord/qq/wecom/weixin/nim) are batched
+   * OpenClaw platforms (dingtalk/feishu/telegram/discord/qq/wecom/weixin) are batched
    * so that `syncOpenClawConfig` + `ensureOpenClawGatewayConnected` are called
    * only **once** regardless of how many OpenClaw platforms are enabled.
    * This avoids N serial gateway restarts which cause message loss, Telegram
@@ -844,10 +739,6 @@ export class IMGatewayManager extends EventEmitter {
     }
     if (config.weixin?.enabled) {
       openClawPlatformsToStart.push('weixin');
-    }
-    const nimInstances = config.nim?.instances || [];
-    if (nimInstances.some(i => i.enabled && ((i.nimToken && i.nimToken.trim()) || (i.appKey && i.account && i.token)))) {
-      openClawPlatformsToStart.push('nim');
     }
     if (openClawPlatformsToStart.length > 0) {
       console.log(`[IMGatewayManager] Starting OpenClaw platforms in batch: ${openClawPlatformsToStart.join(', ')}`);
@@ -893,12 +784,6 @@ export class IMGatewayManager extends EventEmitter {
       const discordInstances = config.discord?.instances || [];
       return discordInstances.some(i => i.enabled && i.botToken);
     }
-    if (platform === 'nim') {
-      // NIM runs via OpenClaw; consider it connected when enabled and configured
-      const config = this.getConfig();
-      const nimInstances = config.nim?.instances || [];
-      return nimInstances.some(i => i.enabled && ((i.nimToken && i.nimToken.trim()) || (i.appKey && i.account && i.token)));
-    }
     if (platform === 'qq') {
       // QQ runs via OpenClaw; consider it connected when any instance is enabled and configured
       const config = this.getConfig();
@@ -925,10 +810,7 @@ export class IMGatewayManager extends EventEmitter {
     }
 
     try {
-      if (platform === 'nim') {
-        // NIM runs via OpenClaw; notifications not yet supported via plugin
-        console.log('[IMGatewayManager] NIM notification via OpenClaw not yet supported');
-      } else if (platform === 'qq') {
+      if (platform === 'qq') {
         // QQ runs via OpenClaw; notifications are handled by the qqbot plugin
         console.log('[IMGatewayManager] QQ notification via OpenClaw not yet supported');
       } else if (platform === 'wecom') {
@@ -952,10 +834,7 @@ export class IMGatewayManager extends EventEmitter {
     }
 
     try {
-      if (platform === 'nim') {
-        // NIM runs via OpenClaw; notifications not yet supported via plugin
-        console.log('[IMGatewayManager] NIM notification with media via OpenClaw not yet supported');
-      } else if (platform === 'qq') {
+      if (platform === 'qq') {
         // QQ runs via OpenClaw; notifications are handled by the qqbot plugin
         console.log('[IMGatewayManager] QQ notification with media via OpenClaw not yet supported');
       } else if (platform === 'wecom') {
@@ -1500,64 +1379,6 @@ export class IMGatewayManager extends EventEmitter {
     }
   }
 
-  private async testNimOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
-  ): Promise<IMConnectivityTestResult> {
-    const checks: IMConnectivityCheck[] = [];
-    const testedAt = Date.now();
-    const platform: Platform = 'nim';
-
-    const mergedConfig = this.buildMergedConfig(configOverride);
-    const nimConfig = (mergedConfig.nim?.instances || []).find((inst) =>
-      Boolean((inst.nimToken && inst.nimToken.trim()) || inst.enabled || inst.appKey || inst.account || inst.token)
-    );
-
-    if (!nimConfig || (!nimConfig.nimToken && (!nimConfig.appKey || !nimConfig.account || !nimConfig.token))) {
-      const missing: string[] = [];
-      if (!nimConfig?.nimToken) {
-        if (!nimConfig?.appKey) missing.push('appKey');
-        if (!nimConfig?.account) missing.push('account');
-        if (!nimConfig?.token) missing.push('token');
-      }
-      checks.push({
-        code: 'missing_credentials',
-        level: 'fail',
-        message: t('imMissingCredentials', { fields: missing.join(', ') }),
-        suggestion: t('imNimFillCredentials'),
-      });
-      return { platform, testedAt, verdict: 'fail', checks };
-    }
-
-    checks.push({
-      code: 'auth_check',
-      level: 'pass',
-      message: t('imNimConfigReady', { account: nimConfig.account }),
-    });
-
-    checks.push({
-      code: 'gateway_running',
-      level: 'info',
-      message: t('imNimOpenClawHint'),
-    });
-
-    checks.push({
-      code: 'nim_p2p_only_hint',
-      level: 'info',
-      message: t('imNimP2pOnly'),
-      suggestion: t('imNimP2pOnlySuggestion'),
-    });
-
-    checks.push(...await this.probeOpenClawChannel('nim'));
-
-    const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
-      ? 'fail'
-      : checks.some(c => c.level === 'warn')
-        ? 'warn'
-        : 'pass';
-
-    return { platform, testedAt, verdict, checks };
-  }
-
   private async testQQOpenClawConnectivity(
     configOverride?: Partial<IMGatewayConfig>
   ): Promise<IMConnectivityTestResult> {
@@ -1656,7 +1477,6 @@ export class IMGatewayManager extends EventEmitter {
       qq: configOverride.qq || current.qq,
       telegram: configOverride.telegram || current.telegram,
       discord: configOverride.discord || current.discord,
-      nim: { ...current.nim, ...(configOverride.nim || {}) },
       wecom: configOverride.wecom || current.wecom,
       weixin: { ...current.weixin, ...(configOverride.weixin || {}) },
       settings: { ...current.settings, ...(configOverride.settings || {}) },
@@ -1687,18 +1507,6 @@ export class IMGatewayManager extends EventEmitter {
       const tgInst = telegramInstances.find(i => i.enabled);
       if (!tgInst) return ['botToken'];
       return tgInst.botToken ? [] : ['botToken'];
-    }
-    if (platform === 'nim') {
-      const nimInstances = config.nim?.instances || [];
-      const nimInst = nimInstances.find(i => i.enabled);
-      if (!nimInst) return ['appKey', 'account', 'token'];
-      const fields: string[] = [];
-      if (!nimInst.nimToken) {
-        if (!nimInst.appKey) fields.push('appKey');
-        if (!nimInst.account) fields.push('account');
-        if (!nimInst.token) fields.push('token');
-      }
-      return fields;
     }
     if (platform === 'qq') {
       const qqInstances = config.qq?.instances || [];
@@ -1765,14 +1573,6 @@ export class IMGatewayManager extends EventEmitter {
       }
       const botName = response.data?.app_name ?? response.data?.bot?.app_name ?? 'unknown';
       return t('imFeishuAuthPassedWithBot', { botName });
-    }
-
-    if (platform === 'nim') {
-      const nimInst = (config.nim?.instances || []).find(i => i.enabled && ((i.nimToken && i.nimToken.trim()) || (i.appKey && i.account && i.token)));
-      if (!nimInst) {
-        throw new Error(t('imConfigIncomplete'));
-      }
-      return t('imNimConfigReady', { account: nimInst.account });
     }
 
     if (platform === 'wecom') {
@@ -2260,7 +2060,6 @@ export class IMGatewayManager extends EventEmitter {
     }
     if (platform === 'dingtalk') return status.dingtalk.instances?.[0]?.startedAt ?? null;
     if (platform === 'telegram') return status.telegram.instances?.[0]?.startedAt ?? null;
-    if (platform === 'nim') return status.nim.instances?.[0]?.startedAt ?? null;
     if (platform === 'qq') return status.qq.instances?.[0]?.startedAt ?? null;
     if (platform === 'wecom') return status.wecom.instances?.[0]?.startedAt ?? null;
     if (platform === 'weixin') return status.weixin.startedAt;
@@ -2271,7 +2070,6 @@ export class IMGatewayManager extends EventEmitter {
     if (platform === 'dingtalk') return status.dingtalk.instances?.[0]?.lastInboundAt ?? null;
     if (platform === 'feishu') return status.feishu.instances?.[0]?.lastInboundAt ?? null;
     if (platform === 'telegram') return status.telegram.instances?.[0]?.lastInboundAt ?? null;
-    if (platform === 'nim') return status.nim.instances?.[0]?.lastInboundAt ?? null;
     if (platform === 'qq') return status.qq.instances?.[0]?.lastInboundAt ?? null;
     if (platform === 'wecom') return status.wecom.instances?.[0]?.lastInboundAt ?? null;
     if (platform === 'weixin') return status.weixin.lastInboundAt;
@@ -2282,7 +2080,6 @@ export class IMGatewayManager extends EventEmitter {
     if (platform === 'dingtalk') return status.dingtalk.instances?.[0]?.lastOutboundAt ?? null;
     if (platform === 'feishu') return status.feishu.instances?.[0]?.lastOutboundAt ?? null;
     if (platform === 'telegram') return status.telegram.instances?.[0]?.lastOutboundAt ?? null;
-    if (platform === 'nim') return status.nim.instances?.[0]?.lastOutboundAt ?? null;
     if (platform === 'qq') return status.qq.instances?.[0]?.lastOutboundAt ?? null;
     if (platform === 'wecom') return status.wecom.instances?.[0]?.lastOutboundAt ?? null;
     if (platform === 'weixin') return status.weixin.lastOutboundAt;
@@ -2293,7 +2090,6 @@ export class IMGatewayManager extends EventEmitter {
     if (platform === 'dingtalk') return status.dingtalk.instances?.[0]?.lastError ?? null;
     if (platform === 'feishu') return status.feishu.instances?.[0]?.error ?? null;
     if (platform === 'telegram') return status.telegram.instances?.[0]?.lastError ?? null;
-    if (platform === 'nim') return status.nim.instances?.[0]?.lastError ?? null;
     if (platform === 'qq') return status.qq.instances?.[0]?.lastError ?? null;
     if (platform === 'wecom') return status.wecom.instances?.[0]?.lastError ?? null;
     if (platform === 'weixin') return status.weixin.lastError;

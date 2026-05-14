@@ -8,11 +8,11 @@
  * arrive here already partially stripped (e.g. Feishu messages may be just a bare path).
  */
 
-// --------------- Pattern A: NIM/DingTalk ---------------
+// --------------- Pattern A: Legacy media placeholders ---------------
 
-// Placeholder line — e.g. "[图片] https://nos.netease.com/..."
+// Placeholder line — e.g. "[图片] https://example.com/..."
 // Capture the URL (group 2) so we can preserve it as plain text instead of stripping it.
-const NIM_PLACEHOLDER_RE = /^\[(图片|语音消息|视频|文件|多媒体消息)\](?:\s+(https?:\/\/\S+))?\s*$/m;
+const MEDIA_PLACEHOLDER_RE = /^\[(图片|语音消息|视频|文件|多媒体消息)\](?:\s+(https?:\/\/\S+))?\s*$/m;
 
 // [附件信息] block — header line followed by "- ..." lines
 const ATTACHMENT_INFO_BLOCK_RE = /\n?\[附件信息\]\n(?:- .+(?:\n|$))+/;
@@ -31,7 +31,7 @@ const MEDIA_TAG_RE = /^\s*media:\w+\s*$/gm;
 // --------------- Shared patterns ---------------
 
 // System: [timestamp ...] metadata lines — injected by various openclaw plugins
-// (feishu, nim, popo, etc.) Matches timestamps like [2026-04-28 11:53:25 GMT+8]
+// (feishu, dingtalk, popo, etc.) Matches timestamps like [2026-04-28 11:53:25 GMT+8]
 const SYSTEM_TIMESTAMP_LINE_RE = /^System:\s*\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[^\]]*\].*$/gm;
 
 // Bare path in the openclaw inbound media directory — highly specific, safe to match
@@ -56,13 +56,13 @@ export function parseUserMessageForDisplay(content: string): string {
 
   const imagePaths: string[] = [];
 
-  // --- Pattern A: NIM/DingTalk ---
+  // --- Pattern A: Legacy media placeholders ---
 
   if (result.includes('[图片]') || result.includes('[语音消息]') || result.includes('[视频]')
     || result.includes('[文件]') || result.includes('[多媒体消息]') || result.includes('[附件信息]')) {
 
     // Strip [图片] etc. but preserve the URL as plain text
-    result = result.replace(NIM_PLACEHOLDER_RE, (_match, _type, url) => url || '');
+    result = result.replace(MEDIA_PLACEHOLDER_RE, (_match, _type, url) => url || '');
     result = result.replace(ATTACHMENT_INFO_BLOCK_RE, '');
   }
 
@@ -89,7 +89,7 @@ export function parseUserMessageForDisplay(content: string): string {
   }
 
   // --- Always: strip System: [timestamp] metadata lines ---
-  // These are injected by openclaw plugins (feishu, nim, popo, etc.)
+  // These are injected by openclaw plugins (feishu, dingtalk, popo, etc.)
   // and are never user-typed content. The timestamp format is specific enough
   // to avoid false positives.
   result = result.replace(SYSTEM_TIMESTAMP_LINE_RE, '');

@@ -6,7 +6,6 @@ import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
-import { NimQrLoginIpc } from './ipcHandlers/nimQrLogin';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 
@@ -506,14 +505,6 @@ contextBridge.exposeInMainWorld('electron', {
       config: any,
       options?: { syncGateway?: boolean },
     ) => ipcRenderer.invoke('im:dingtalk:instance:config:set', instanceId, config, options),
-
-    // NIM Multi-Instance
-    addNimInstance: (name: string) => ipcRenderer.invoke('im:nim:instance:add', name),
-    deleteNimInstance: (instanceId: string) => ipcRenderer.invoke('im:nim:instance:delete', instanceId),
-    setNimInstanceConfig: (instanceId: string, config: any, options?: { syncGateway?: boolean }) =>
-      ipcRenderer.invoke('im:nim:instance:config:set', instanceId, config, options),
-    nimQrLoginStart: () => ipcRenderer.invoke(NimQrLoginIpc.Start),
-    nimQrLoginPoll: (uuid: string) => ipcRenderer.invoke(NimQrLoginIpc.Poll, uuid),
 
     // QQ Multi-Instance
     addQQInstance: (name: string) => ipcRenderer.invoke('im:qq:instance:add', name),

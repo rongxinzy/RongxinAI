@@ -73,7 +73,7 @@ Public-facing product documentation should use the RongxinAI name. Some legacy i
 - Ollama lifecycle and local inference management (`src/main/libs/ollamaManager.ts`, `src/shared/ollama/`)
 - Skill management (`src/main/skillManager.ts`)
 - MCP server configuration and marketplace integration
-- IM/email gateways (`src/main/im/`) - public-facing channels are WeChat, WeCom, DingTalk, Feishu/Lark, QQ, Email, plus optional NIM/POPO-compatible enterprise channels. Legacy/global connector code may exist; do not re-expose it in UI or docs unless explicitly requested.
+- IM/email gateways (`src/main/im/`) - public-facing channels are WeChat, WeCom, DingTalk, Feishu/Lark, QQ, and Email. Legacy/global connector code may exist; do not re-expose it in UI or docs unless explicitly requested.
 - IPC handlers for store, cowork, and API operations (40+ channels)
 - Security: context isolation enabled, node integration disabled, sandbox enabled
 

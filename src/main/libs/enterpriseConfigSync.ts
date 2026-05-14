@@ -671,17 +671,6 @@ function syncIMChannels(configPath: string, imStore: IMStore): void {
           imStore.setWecomConfig(cfg);
         }
       },
-      'nim': (cfg) => {
-        if (cfg && typeof cfg.accounts === 'object' && !Array.isArray(cfg.accounts)) {
-          imStore.setNimMultiInstanceConfig({ instances: Object.values(cfg.accounts) });
-          return;
-        }
-        if (cfg && Array.isArray(cfg.instances)) {
-          imStore.setNimMultiInstanceConfig(cfg);
-          return;
-        }
-        imStore.setNimConfig(cfg);
-      },
       'openclaw-weixin': (cfg) => imStore.setWeixinConfig(cfg),
     };
 

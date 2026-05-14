@@ -12,24 +12,7 @@ export function initScheduledTaskHelpers(d: ScheduledTaskHelperDeps): void {
   deps = d;
 }
 
-const MULTI_INSTANCE_CONFIG_KEYS = new Set(['dingtalk', 'feishu', 'nim', 'qq', 'wecom', 'telegram', 'discord']);
-
-function deriveNimRuntimeAccountId(value: unknown): string | null {
-  if (!value || typeof value !== 'object') return null;
-  const inst = value as { nimToken?: string; appKey?: string; account?: string };
-  const nimToken = inst.nimToken?.trim();
-  if (nimToken) {
-    const delimiter = nimToken.includes('|') ? '|' : '-';
-    const parts = nimToken.split(delimiter).map((part) => part.trim());
-    if (parts.length === 3 && parts[0] && parts[1]) {
-      return `${parts[0]}:${parts[1]}`;
-    }
-  }
-  if (inst.appKey?.trim() && inst.account?.trim()) {
-    return `${inst.appKey.trim()}:${inst.account.trim()}`;
-  }
-  return null;
-}
+const MULTI_INSTANCE_CONFIG_KEYS = new Set(['dingtalk', 'feishu', 'qq', 'wecom', 'telegram', 'discord']);
 
 function isConfigKeyEnabled(key: string, value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -76,10 +59,7 @@ export function listScheduledTaskChannels(): Array<{
         .filter((inst) => inst && typeof inst === 'object' && (inst as { enabled?: boolean }).enabled)
         .map((inst) => {
           const i = inst as { instanceId?: string; instanceName?: string };
-          const nimAccountId = key === 'nim'
-            ? ((i.instanceId ?? '').slice(0, 8) || deriveNimRuntimeAccountId(inst))
-            : null;
-          const accountId = nimAccountId ?? (i.instanceId ?? '').slice(0, 8);
+          const accountId = (i.instanceId ?? '').slice(0, 8);
           return {
             accountId,
             instanceName: i.instanceName || (accountId ?? (i.instanceId ?? '').slice(0, 8)),

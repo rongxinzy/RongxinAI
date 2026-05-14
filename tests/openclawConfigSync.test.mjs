@@ -138,7 +138,6 @@ const createSync = (tmpDir, appConfig, options = {}) => {
     getQQInstances: () => options.qqInstances ?? [],
     getWecomConfig: () => null,
     getPopoConfig: () => options.popoConfig ?? null,
-    getNimConfig: () => options.nimConfig ?? null,
     getSkillsPrompt: () => null,
   });
 };

@@ -89,9 +89,9 @@ describe('enterpriseConfigSync', () => {
       telegram: 'telegramOpenClaw', discord: 'discordOpenClaw',
       feishu: 'feishuOpenClaw', dingtalk: 'dingtalkOpenClaw', 'dingtalk-connector': 'dingtalkOpenClaw',
       qqbot: 'qq', wecom: 'wecomOpenClaw',
-      nim: 'nim', 'openclaw-weixin': 'weixin',
+      'openclaw-weixin': 'weixin',
     };
-    expect(Object.keys(map)).toHaveLength(9);
+    expect(Object.keys(map)).toHaveLength(8);
     expect(map['telegram']).toBe('telegramOpenClaw');
     expect(map['dingtalk']).toBe('dingtalkOpenClaw');
     expect(map['dingtalk-connector']).toBe('dingtalkOpenClaw');
@@ -145,7 +145,6 @@ describe('enterpriseConfigSync', () => {
         setWecomInstanceConfig: () => undefined,
         setWecomConfig: () => undefined,
         setPopoConfig: () => undefined,
-        setNimConfig: () => undefined,
         setWeixinConfig: () => undefined,
         setNeteaseBeeChanConfig: () => undefined,
       } as any,
@@ -221,7 +220,6 @@ describe('enterpriseConfigSync', () => {
       setQQInstanceConfig: () => undefined,
       setQQConfig: () => undefined,
       setPopoConfig: () => undefined,
-      setNimConfig: () => undefined,
       setWeixinConfig: () => undefined,
       setNeteaseBeeChanConfig: () => undefined,
     };
@@ -411,7 +409,6 @@ describe('enterpriseConfigSync', () => {
       setWecomInstanceConfig: () => undefined,
       setWecomConfig: () => undefined,
       setPopoConfig: () => undefined,
-      setNimConfig: () => undefined,
       setWeixinConfig: () => undefined,
       setNeteaseBeeChanConfig: () => undefined,
     };
@@ -526,7 +523,6 @@ describe('enterpriseConfigSync', () => {
       setWecomInstanceConfig: () => undefined,
       setWecomConfig: () => undefined,
       setPopoConfig: () => undefined,
-      setNimConfig: () => undefined,
       setWeixinConfig: () => undefined,
       setNeteaseBeeChanConfig: () => undefined,
     };

@@ -44,20 +44,20 @@ describe('passthrough (no transformation)', () => {
   });
 });
 
-// ─── Pattern A: NIM/DingTalk ────────────────────────────────
+// ─── Pattern A: Legacy media placeholders ────────────────────────────────
 
-describe('Pattern A: NIM/DingTalk', () => {
+describe('Pattern A: Legacy media placeholders', () => {
   test('[图片] with URL and [附件信息] → strip metadata, preserve URL as text', () => {
     const imgPath = fileImg(WIN_INBOUND, 'abc123.jpg');
     const input = [
-      '[图片] https://nos.netease.com/xxx.jpg',
+      '[图片] https://example.com/xxx.jpg',
       '',
       '[附件信息]',
       `- 类型: image, 路径: ${imgPath}, MIME: image/jpeg, 尺寸: 1920x1080`,
     ].join('\n');
 
     const result = parseUserMessageForDisplay(input);
-    expect(result).toBe('https://nos.netease.com/xxx.jpg');
+    expect(result).toBe('https://example.com/xxx.jpg');
     expect(result).not.toContain('[图片]');
     expect(result).not.toContain('[附件信息]');
   });
@@ -77,7 +77,7 @@ describe('Pattern A: NIM/DingTalk', () => {
   test('user text + [图片] → preserve user text and URL', () => {
     const input = [
       '看看这张图',
-      '[图片] https://nos.netease.com/xxx.jpg',
+      '[图片] https://example.com/xxx.jpg',
       '',
       '[附件信息]',
       `- 类型: image, 路径: ${fileImg(WIN_INBOUND, 'abc123.jpg')}, MIME: image/jpeg`,
@@ -85,7 +85,7 @@ describe('Pattern A: NIM/DingTalk', () => {
 
     const result = parseUserMessageForDisplay(input);
     expect(result).toContain('看看这张图');
-    expect(result).toContain('https://nos.netease.com/xxx.jpg');
+    expect(result).toContain('https://example.com/xxx.jpg');
     expect(result).not.toContain('[图片]');
   });
 
@@ -103,9 +103,9 @@ describe('Pattern A: NIM/DingTalk', () => {
   });
 
   test('[文件] with URL → preserve URL', () => {
-    const input = '[文件] https://nos.netease.com/file.pdf';
+    const input = '[文件] https://example.com/file.pdf';
     const result = parseUserMessageForDisplay(input);
-    expect(result).toBe('https://nos.netease.com/file.pdf');
+    expect(result).toBe('https://example.com/file.pdf');
   });
 
   test('[文件] without URL → strip', () => {
@@ -198,7 +198,7 @@ describe('Pattern B: 飞书 — after server-side stripFeishuSystemHeader', () =
 // ─── System: timestamp lines ────────────────────────────────
 
 describe('System: timestamp lines', () => {
-  test('NIM system header stripped from text message', () => {
+  test('generic channel system header stripped from text message', () => {
     const input = [
       'System: [2026-04-28 11:53:11 GMT+8] From user889589',
       '',
@@ -212,7 +212,7 @@ describe('System: timestamp lines', () => {
   test('multiple system lines stripped', () => {
     const input = [
       'System: [2026-04-28 11:53:11 GMT+8] From user889589',
-      'System: [2026-04-28 11:53:12 GMT+8] NIM[abc123] DM',
+      'System: [2026-04-28 11:53:12 GMT+8] CHAT[abc123] DM',
       '',
       'hello',
     ].join('\n');
@@ -273,7 +273,7 @@ describe('false positive safety', () => {
 
   test('user typing [图片] in a sentence is NOT stripped (not on its own line)', () => {
     const msg = '他发了一个[图片]标记在消息里';
-    // [图片] is not on its own line, NIM_PLACEHOLDER_RE requires ^...$
+    // [图片] is not on its own line, MEDIA_PLACEHOLDER_RE requires ^...$
     expect(parseUserMessageForDisplay(msg)).toBe(msg);
   });
 });
@@ -294,16 +294,16 @@ describe('\\r\\n handling', () => {
     expect(result).toBe(toFileUrl(imgPath));
   });
 
-  test('NIM format with \\r\\n line endings', () => {
+  test('legacy placeholder format with \\r\\n line endings', () => {
     const input = [
-      '[图片] https://nos.netease.com/xxx.jpg',
+      '[图片] https://example.com/xxx.jpg',
       '',
       '[附件信息]',
       `- 类型: image, 路径: ${fileImg(WIN_INBOUND, 'abc123.jpg')}, MIME: image/jpeg`,
     ].join('\r\n');
 
     const result = parseUserMessageForDisplay(input);
-    expect(result).toBe('https://nos.netease.com/xxx.jpg');
+    expect(result).toBe('https://example.com/xxx.jpg');
   });
 });
 

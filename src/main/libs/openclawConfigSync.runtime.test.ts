@@ -55,7 +55,6 @@ vi.mock('./openclawLocalExtensions', () => ({
   resolveOpenClawExtensionPluginId: (id: string) => {
     const manifestIds: Record<string, string> = {
       'clawemail-email': 'email',
-      'openclaw-nim-channel': 'nimsuite-openclaw-nim-channel',
     };
     if (id === 'qwen-portal-auth') return null;
     return manifestIds[id] ?? id;
@@ -138,7 +137,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -222,7 +220,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -293,7 +290,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -414,7 +410,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -499,7 +494,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -562,7 +556,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getSkillsList: () => [],
@@ -666,7 +659,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -684,7 +676,7 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(config.plugins.entries).not.toHaveProperty('openclaw-qqbot');
   });
 
-  test('writes plugin entries using manifest ids and removes stale package ids', async () => {
+  test('writes plugin entries using manifest ids and removes removed NIM channel entries', async () => {
     const { OpenClawConfigSync } = await import('./openclawConfigSync');
 
     fs.writeFileSync(configPath, JSON.stringify({
@@ -692,6 +684,7 @@ describe('OpenClawConfigSync runtime config output', () => {
         entries: {
           'clawemail-email': { enabled: true },
           'openclaw-nim-channel': { enabled: true },
+          'nimsuite-openclaw-nim-channel': { enabled: true },
         },
       },
     }, null, 2));
@@ -735,14 +728,6 @@ describe('OpenClawConfigSync runtime config output', () => {
           agentId: 'main',
         }],
       }),
-      getNimInstances: () => [{
-        instanceId: 'nim-work',
-        instanceName: 'NIM Work',
-        enabled: true,
-        appKey: 'nim-app-key',
-        account: 'nim-account',
-        token: 'nim-token',
-      }],
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -756,8 +741,9 @@ describe('OpenClawConfigSync runtime config output', () => {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     expect(config.plugins.entries).not.toHaveProperty('clawemail-email');
     expect(config.plugins.entries).not.toHaveProperty('openclaw-nim-channel');
+    expect(config.plugins.entries).not.toHaveProperty('nimsuite-openclaw-nim-channel');
     expect(config.plugins.entries.email).toEqual({ enabled: true });
-    expect(config.plugins.entries['nimsuite-openclaw-nim-channel']).toEqual({ enabled: true });
+    expect(config.channels ?? {}).not.toHaveProperty('nim');
   });
 
   test('writes weixin channel config using dmPolicy and allowFrom instead of unsupported accountId', async () => {
@@ -791,7 +777,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getNimConfig: () => null,
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => ({
         enabled: true,

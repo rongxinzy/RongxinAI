@@ -25,10 +25,8 @@ import {
   readAllowFromStore,
   rejectPairingRequest,
 } from './im/imPairingStore';
-import { pollNimQrLogin, startNimQrLogin } from './im/nimQrLoginService';
-import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, NimInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
+import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
-import { registerNimQrLoginHandlers } from './ipcHandlers/nimQrLogin';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import {
   getCronJobService,
@@ -1124,13 +1122,6 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
           return getIMGatewayManager().getIMStore().getEmailConfig();
         } catch {
           return { instances: [] };
-        }
-      },
-      getNimInstances: () => {
-        try {
-          return getIMGatewayManager().getIMStore().getNimInstances();
-        } catch {
-          return [];
         }
       },
       getWeixinConfig: () => {
@@ -3933,11 +3924,6 @@ if (!gotTheLock) {
     getOpenClawRuntimeAdapter: () => openClawRuntimeAdapter,
   });
 
-  registerNimQrLoginHandlers({
-    startNimQrLogin,
-    pollNimQrLogin,
-  });
-
   // ==================== Permissions IPC Handlers ====================
 
   ipcMain.handle('permissions:checkCalendar', async () => {
@@ -4342,56 +4328,6 @@ if (!gotTheLock) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to set DingTalk instance config',
-      };
-    }
-  });
-
-  // NIM Multi-Instance handlers
-  ipcMain.handle('im:nim:instance:add', async (_event, name: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_NIM_OPENCLAW_CONFIG: defaults } = await import('./im/types');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'NIM Bot',
-      };
-      getIMGatewayManager().getIMStore().setNimInstanceConfig(instanceId, instance);
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add NIM instance',
-      };
-    }
-  });
-
-  ipcMain.handle('im:nim:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteNimInstance(instanceId);
-      if (getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete NIM instance',
-      };
-    }
-  });
-
-  ipcMain.handle('im:nim:instance:config:set', async (_event, instanceId: string, config: Partial<NimInstanceConfig>, options?: { syncGateway?: boolean }) => {
-    try {
-      getIMGatewayManager().getIMStore().setNimInstanceConfig(instanceId, config);
-      if (options?.syncGateway && getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to set NIM instance config',
       };
     }
   });
