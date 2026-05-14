@@ -1330,9 +1330,12 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         }
         console.log('[ChannelSync] discovered', channelCount, 'channel sessions, notified', notified, 'windows');
       }
-      // Sync full history for newly discovered sessions
+      // Sync full history for newly discovered sessions in background.
+      // Fire-and-forget so the poll cycle doesn't block on sequential
+      // chat.history RPC calls (each up to 10s timeout) while the Gateway
+      // is still starting channels and sidecars during postAttachRuntime.
       for (const { sessionId, sessionKey } of newSessionsToSync) {
-        await this.syncFullChannelHistory(sessionId, sessionKey);
+        void this.syncFullChannelHistory(sessionId, sessionKey);
       }
 
       // Incremental sync for already-known sessions: check if the gateway has messages
@@ -1354,11 +1357,9 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           syncedThisCycle.add(sessionId);
           // Skip sessions with an active turn (they handle their own sync)
           if (this.activeTurns.has(sessionId)) continue;
-          try {
-            await this.incrementalChannelSync(sessionId, key);
-          } catch (err) {
+          void this.incrementalChannelSync(sessionId, key).catch((err) => {
             console.warn('[ChannelSync] incremental sync failed for', key, err);
-          }
+          });
         }
       }
     } catch (error) {
