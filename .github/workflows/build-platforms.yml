@@ -1,5 +1,8 @@
 name: Build Platforms
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
