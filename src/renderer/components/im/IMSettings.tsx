@@ -131,6 +131,32 @@ const IMSettings: React.FC = () => {
     return () => { isMountedRef.current = false; };
   }, []);
 
+  // Auto-run connectivity tests for all enabled platforms on mount
+  useEffect(() => {
+    const enabledPlatforms = PlatformRegistry.listIM()
+      .map(p => p.id as Platform)
+      .filter(platform => isPlatformEnabled(platform));
+    if (enabledPlatforms.length === 0) return;
+
+    let cancelled = false;
+    const runTests = async () => {
+      for (const platform of enabledPlatforms) {
+        if (cancelled) return;
+        try {
+          const result = await runConnectivityTest(platform, config);
+          if (!cancelled && result) {
+            setConnectivityResults(prev => ({ ...prev, [platform]: result }));
+          }
+        } catch {
+          // Ignore individual probe failures during auto-test.
+        }
+      }
+    };
+    runTests();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Cleanup feishu QR timers on unmount
   useEffect(() => {
     return () => {
