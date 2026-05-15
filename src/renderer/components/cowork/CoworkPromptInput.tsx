@@ -18,7 +18,7 @@ import {
   setDraftPrompt,
   updateCurrentSessionModelOverride,
 } from '../../store/slices/coworkSlice';
-import type { Model } from '../../store/slices/modelSlice';
+import { isSameModelIdentity, type Model } from '../../store/slices/modelSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
@@ -213,6 +213,9 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     fallbackModel: currentAgentSelectedModel,
     engine: coworkAgentEngine,
   });
+  const agentSelectedModelIsAvailable = agentSelectedModel
+    ? availableModels.some(model => isSameModelIdentity(model, agentSelectedModel))
+    : false;
 
   const isLarge = size === 'large';
   const minHeight = isLarge ? 60 : 24;
@@ -902,7 +905,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                       disabled={isPatchingModel || isPersistingAgentModel}
                       value={agentModelIsInvalid && currentSession?.modelOverride
                         ? { id: '__invalid__', name: currentSession.modelOverride.split('/').pop() || currentSession.modelOverride } as Model
-                        : agentSelectedModel}
+                        : (agentSelectedModelIsAvailable ? agentSelectedModel : null)}
                       onChange={async (nextModel) => {
                         if (isPatchingModel || isPersistingAgentModel) return;
                         if (!nextModel) return;

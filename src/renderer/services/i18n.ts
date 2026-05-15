@@ -584,6 +584,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkSystemPromptPlaceholder: '为 RongxinAI 设置自定义指令...',
     coworkSystemPromptHint: '可选的系统提示词，用于自定义 RongxinAI 的行为',
     coworkModelSettingsRequired: '请先在模型设置中配置可用模型与 API Key。',
+    coworkOllamaModelNotRunning: '本地模型 {name} 当前未运行。请先在本地推理中配置启动该模型，再用于 RongxinAI。',
     coworkModelSettingsTitle: '模型设置',
     coworkModelSettingsHint: 'RongxinAI 使用模型设置中的当前模型与提供商配置。',
     coworkModelSettingsAction: '前往模型设置',
@@ -2429,6 +2430,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkSystemPromptPlaceholder: 'Set custom instructions for RongxinAI...',
     coworkSystemPromptHint: "Optional system prompt to customize RongxinAI's behavior",
     coworkModelSettingsRequired: 'Please configure models and API keys in Model Settings first.',
+    coworkOllamaModelNotRunning: 'Local model {name} is not running. Start it from Local Inference before using it with RongxinAI.',
     coworkModelSettingsTitle: 'Model Settings',
     coworkModelSettingsHint:
       'RongxinAI uses the current model and provider configuration from Model Settings.',

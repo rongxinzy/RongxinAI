@@ -237,7 +237,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         onClick={toggleOpen}
         className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl hover:bg-surface-raised text-foreground transition-colors max-w-[280px] disabled:opacity-70 disabled:cursor-wait ${isOpen ? 'bg-surface-raised' : ''}`}
       >
-        <span className="font-medium text-sm truncate">{selectedModel?.name ?? defaultLabel ?? ''}</span>
+        <span className="font-medium text-sm truncate">{selectedModel?.name ?? defaultLabel ?? i18nService.t('selectModel')}</span>
         <ChevronDownIcon className="h-4 w-4 shrink-0 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
       </button>
 

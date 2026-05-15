@@ -3,7 +3,7 @@ import { ArrowTopRightOnSquareIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChip
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { OllamaStatusSnapshot } from '../../shared/ollama';
+import type { OllamaRunningModel, OllamaStatusSnapshot } from '../../shared/ollama';
 import { OpenClawProviderId, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { type AppConfig, defaultConfig, getCustomProviderDefaultName, getProviderDisplayName, getVisibleProviders, isCustomProvider } from '../config';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
@@ -99,6 +99,25 @@ type ProviderConnectionTestResult = {
 type ProviderStatusBadge = {
   labelKey: string;
   className: string;
+};
+
+const toOllamaRunningModelNameSet = (models: OllamaRunningModel[]): Set<string> => {
+  const names = new Set<string>();
+  models.forEach((model) => {
+    if (model.name) names.add(model.name);
+    if (model.model) names.add(model.model);
+  });
+  return names;
+};
+
+const getVisibleProviderModels = (
+  provider: ProviderType,
+  models: Model[] | undefined,
+  ollamaRunningNames: ReadonlySet<string>,
+): Model[] => {
+  const allModels = models ?? [];
+  if (provider !== ProviderName.Ollama) return allModels;
+  return allModels.filter(model => ollamaRunningNames.has(model.id));
 };
 
 const resolveModelSupportsImageForProvider = (
@@ -630,6 +649,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
   // Add state for providers configuration
   const [providers, setProviders] = useState<ProvidersConfig>(() => getDefaultProviders());
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusSnapshot | null>(null);
+  const [ollamaRunningModelNames, setOllamaRunningModelNames] = useState<Set<string>>(() => new Set());
 
 
   // authType defaults to undefined on first open, which should behave as OAuth mode
@@ -679,6 +699,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
   const refreshOllamaStatus = useCallback(async () => {
     const status = await window.electron.ollama.status();
     setOllamaStatus(status);
+    if (status.status === 'running') {
+      const runningModels = await window.electron.ollama.listRunningModels();
+      setOllamaRunningModelNames(toOllamaRunningModelNameSet(runningModels));
+    } else {
+      setOllamaRunningModelNames(new Set());
+    }
     return status;
   }, []);
 
@@ -687,6 +713,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
     void refreshOllamaStatus().catch(() => undefined);
     const unsubscribe = window.electron.ollama.onStatusChanged((status) => {
       setOllamaStatus(status);
+      if (status.status === 'running') {
+        void window.electron.ollama.listRunningModels()
+          .then((runningModels) => setOllamaRunningModelNames(toOllamaRunningModelNameSet(runningModels)))
+          .catch(() => setOllamaRunningModelNames(new Set()));
+      } else {
+        setOllamaRunningModelNames(new Set());
+      }
     });
     return unsubscribe;
   }, [activeTab, refreshOllamaStatus]);
@@ -4244,7 +4277,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
                 {/* Models List */}
                 <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                  {(providers[activeProvider].models ?? []).map(model => (
+                  {getVisibleProviderModels(activeProvider, providers[activeProvider].models, ollamaRunningModelNames).map(model => (
                     <div
                       key={model.id}
                       className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
@@ -4282,7 +4315,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
                     </div>
                   ))}
 
-                  {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
+                  {getVisibleProviderModels(activeProvider, providers[activeProvider].models, ollamaRunningModelNames).length === 0 && (
                     <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
                       <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
                       <button

@@ -257,6 +257,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, [messages]);
 
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent('ollama:running-models-changed'));
+  }, [runningModels]);
+
+  useEffect(() => {
     const unsubscribers = [
       window.electron.ollama.onStatusChanged(setStatus),
       window.electron.ollama.onPullProgress(({ name, chunk }) => {
@@ -436,6 +440,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       await window.electron.ollama.deleteModel(modelName);
       await refreshLocalModels();
       await refreshRunningModels();
+      if (selectedModel === modelName) {
+        resetInferenceConversation();
+        setSelectedModel('');
+      }
     });
   };
 

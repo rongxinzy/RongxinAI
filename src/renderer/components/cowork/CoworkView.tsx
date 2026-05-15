@@ -3,6 +3,7 @@ import React, { useEffect, useRef,useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
+import { ProviderName } from '../../../shared/providers';
 import { agentService } from '../../services/agent';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -14,10 +15,12 @@ import {
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
 import { addMessage, clearCurrentSession, setCurrentSession, setStreaming, updateSessionStatus } from '../../store/slices/coworkSlice';
+import { isSameModelIdentity } from '../../store/slices/modelSlice';
 import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { getOllamaModelNameFromRef, isOllamaModelRunning } from '../../utils/runtimeModelList';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import ModelSelector from '../ModelSelector';
@@ -66,10 +69,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const quickActions = useSelector((state: RootState) => state.quickAction.actions);
   const selectedActionId = useSelector((state: RootState) => state.quickAction.selectedActionId);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
+  const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgent = agents.find((agent) => agent.id === currentAgentId);
   const currentAgentWorkingDirectory = currentAgent?.workingDirectory?.trim() || config.workingDirectory || '';
   const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
+  const currentAgentUsableModel = currentAgentSelectedModel
+    ? (availableModels.find(model => isSameModelIdentity(model, currentAgentSelectedModel)) ?? null)
+    : null;
   const {
     isPersistingAgentModel,
     persistAgentModelSelection,
@@ -114,6 +121,20 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const isOpenClawReadyForSession = (status: OpenClawEngineStatus | null): boolean => {
     if (!status) return false;
     return status.phase === 'running' || status.phase === 'ready';
+  };
+
+  const ensureSelectedModelCanRun = async (modelRef: string): Promise<boolean> => {
+    const ollamaModelName = getOllamaModelNameFromRef(modelRef);
+    if (!ollamaModelName) return true;
+
+    const running = await isOllamaModelRunning(ollamaModelName);
+    if (running) return true;
+
+    window.dispatchEvent(new CustomEvent('ollama:running-models-changed'));
+    window.dispatchEvent(new CustomEvent('app:showToast', {
+      detail: i18nService.t('coworkOllamaModelNotRunning').replace('{name}', ollamaModelName),
+    }));
+    return false;
   };
 
   const handleRestartGateway = async () => {
@@ -221,6 +242,19 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         console.error('Failed to check cowork API config:', error);
       }
 
+      const selectedModelForSession = currentAgentUsableModel;
+      if (!selectedModelForSession) {
+        window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkModelSettingsRequired') }));
+        isStartingRef.current = false;
+        return false;
+      }
+
+      const sessionModelOverride = toOpenClawModelRef(selectedModelForSession);
+      if (selectedModelForSession.providerKey === ProviderName.Ollama && !(await ensureSelectedModelCanRun(sessionModelOverride))) {
+        isStartingRef.current = false;
+        return false;
+      }
+
       // Create a temporary session with user message to show immediately
       const tempSessionId = `temp-${Date.now()}`;
       const fallbackTitle = buildSessionTitleFromInput(
@@ -242,7 +276,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         updatedAt: now,
         cwd: currentAgentWorkingDirectory,
         systemPrompt: '',
-        modelOverride: currentAgentSelectedModel ? toOpenClawModelRef(currentAgentSelectedModel) : '',
+        modelOverride: sessionModelOverride,
         executionMode: config.executionMode || 'local',
         activeSkillIds: sessionSkillIds,
         agentId: currentAgentId,
@@ -283,8 +317,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         .join('\n\n') || undefined;
 
       // Start the actual session immediately with fallback title
-      const sessionModelOverride = currentAgentSelectedModel ? toOpenClawModelRef(currentAgentSelectedModel) : '';
-      console.log('[CoworkView] creating session:', { modelId: currentAgentSelectedModel?.id, providerKey: currentAgentSelectedModel?.providerKey, isServerModel: currentAgentSelectedModel?.isServerModel, sessionModelOverride, agentModel: currentAgent?.model });
+      console.log('[CoworkView] creating session:', { modelId: selectedModelForSession.id, providerKey: selectedModelForSession.providerKey, isServerModel: selectedModelForSession.isServerModel, sessionModelOverride, agentModel: currentAgent?.model });
       const { session: startedSession, error: startError } = await coworkService.startSession({
         prompt,
         title: fallbackTitle,
@@ -346,6 +379,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
       // Capture active skill IDs before clearing
       const sessionSkillIds = [...activeSkillIds];
+
+      const sessionModelRef = currentSession.modelOverride
+        || (currentAgentUsableModel ? toOpenClawModelRef(currentAgentUsableModel) : '');
+      if (!(await ensureSelectedModelCanRun(sessionModelRef))) return;
 
       // Clear active skills after capturing so they don't persist to next message
       if (sessionSkillIds.length > 0) {
@@ -488,7 +525,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         )}
         <ModelSelector
           disabled={isPersistingAgentModel}
-          value={currentAgentSelectedModel}
+          value={currentAgentUsableModel}
           onChange={async (nextModel) => {
             if (!nextModel) return;
             await persistAgentModelSelection(nextModel);
