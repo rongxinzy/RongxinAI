@@ -681,6 +681,7 @@ const handleConfirmUpdate = useCallback(async () => {
           {showSettings && (
             <Settings
               onClose={handleCloseSettings}
+              onShowLocalInference={handleShowLocalInference}
               initialTab={settingsOptions.initialTab}
               notice={settingsOptions.notice}
               enterpriseConfig={enterpriseConfig}
@@ -763,6 +764,7 @@ const handleConfirmUpdate = useCallback(async () => {
       {showSettings && (
         <Settings
           onClose={handleCloseSettings}
+          onShowLocalInference={handleShowLocalInference}
           initialTab={settingsOptions.initialTab}
           notice={settingsOptions.notice}
           enterpriseConfig={enterpriseConfig}

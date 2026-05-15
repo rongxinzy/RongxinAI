@@ -66,6 +66,7 @@ export type SettingsOpenOptions = {
 
 interface SettingsProps extends SettingsOpenOptions {
   onClose: () => void;
+  onShowLocalInference?: () => void;
   enterpriseConfig?: {
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
@@ -93,6 +94,11 @@ type ProviderConnectionTestResult = {
   success: boolean;
   message: string;
   provider: ProviderType;
+};
+
+type ProviderStatusBadge = {
+  labelKey: string;
+  className: string;
 };
 
 const resolveModelSupportsImageForProvider = (
@@ -175,6 +181,59 @@ const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfi
   }
 
   return config.apiKey.trim().length > 0;
+};
+const getOllamaProviderStatusBadge = (
+  providerConfig: ProviderConfig,
+  status: OllamaStatusSnapshot | null,
+): ProviderStatusBadge => {
+  if (!providerConfig.enabled) {
+    return {
+      labelKey: 'providerStatusOff',
+      className: 'bg-red-500/20 text-red-600 dark:text-red-400',
+    };
+  }
+
+  if (status?.status === 'running') {
+    return {
+      labelKey: status.managedByApp ? 'ollamaProviderServiceConnected' : 'ollamaProviderServiceExternal',
+      className: status.managedByApp
+        ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+        : 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
+    };
+  }
+
+  if (status?.status === 'starting') {
+    return {
+      labelKey: 'ollamaProviderServiceStarting',
+      className: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+    };
+  }
+
+  return {
+    labelKey: 'ollamaProviderServiceStopped',
+    className: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
+  };
+};
+
+const getProviderStatusBadge = (
+  provider: ProviderType,
+  providerConfig: ProviderConfig,
+  ollamaStatus: OllamaStatusSnapshot | null,
+): ProviderStatusBadge => {
+  if (provider === ProviderName.Ollama) {
+    return getOllamaProviderStatusBadge(providerConfig, ollamaStatus);
+  }
+
+  const enabled = providerConfig.enabled && hasProviderAuthConfigured(provider, providerConfig);
+  return enabled
+    ? {
+      labelKey: 'providerStatusOn',
+      className: 'bg-green-500/20 text-green-600 dark:text-green-400',
+    }
+    : {
+      labelKey: 'providerStatusOff',
+      className: 'bg-red-500/20 text-red-600 dark:text-red-400',
+    };
 };
 const normalizeBaseUrl = (baseUrl: string): string => baseUrl.trim().replace(/\/+$/, '').toLowerCase();
 const normalizeApiFormat = (value: unknown): 'anthropic' | 'openai' => (
@@ -511,7 +570,7 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
   );
 };
 
-const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, noticeI18nKey, noticeExtra, enterpriseConfig }) => {
+const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, initialTab, notice, noticeI18nKey, noticeExtra, enterpriseConfig }) => {
   const dispatch = useDispatch();
   // 状态
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
@@ -620,40 +679,20 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     setShowApiKey(false);
   }, [activeProvider]);
 
-  void ollamaStatus;
-
-  const syncOllamaProviderEnabled = useCallback((status: OllamaStatusSnapshot) => {
-    const enabled = status.status === 'running';
-    setProviders(prev => {
-      if (prev[ProviderName.Ollama].enabled === enabled) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [ProviderName.Ollama]: {
-          ...prev[ProviderName.Ollama],
-          enabled,
-        },
-      };
-    });
-  }, []);
-
   const refreshOllamaStatus = useCallback(async () => {
     const status = await window.electron.ollama.status();
     setOllamaStatus(status);
-    syncOllamaProviderEnabled(status);
     return status;
-  }, [syncOllamaProviderEnabled]);
+  }, []);
 
   useEffect(() => {
     if (activeTab !== 'model') return;
     void refreshOllamaStatus().catch(() => undefined);
     const unsubscribe = window.electron.ollama.onStatusChanged((status) => {
       setOllamaStatus(status);
-      syncOllamaProviderEnabled(status);
     });
     return unsubscribe;
-  }, [activeTab, refreshOllamaStatus, syncOllamaProviderEnabled]);
+  }, [activeTab, refreshOllamaStatus]);
 
   const handleExportLogs = useCallback(async () => {
     if (isExportingLogs) {
@@ -3066,7 +3105,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 const providerKey = provider as ProviderType;
                 const isCustom = isCustomProvider(provider);
                 const hasValidAuth = hasProviderAuthConfigured(providerKey, config);
-                const effectiveEnabled = config.enabled && hasValidAuth;
+                const effectiveEnabled = providerKey === ProviderName.Ollama
+                  ? config.enabled
+                  : config.enabled && hasValidAuth;
                 const canToggleProvider = effectiveEnabled || hasValidAuth;
                 const displayLabel = isCustom
                   ? ((config as ProviderConfig).displayName || getCustomProviderDefaultName(provider))
@@ -3103,6 +3144,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       </div>
                     </div>
                     <div className="flex items-center ml-2 gap-1">
+                      {providerKey === ProviderName.Ollama && config.enabled && (
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            ollamaStatus?.status === 'running'
+                              ? 'bg-green-400'
+                              : ollamaStatus?.status === 'starting'
+                                ? 'bg-blue-400'
+                                : 'bg-amber-400'
+                          }`}
+                          title={i18nService.t(
+                            ollamaStatus?.status === 'running'
+                              ? 'ollamaProviderServiceConnected'
+                              : ollamaStatus?.status === 'starting'
+                                ? 'ollamaProviderServiceStarting'
+                                : 'ollamaProviderServiceStopped',
+                          )}
+                        />
+                      )}
                       {isCustom && (
                         <button
                           type="button"
@@ -3157,6 +3216,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
             {/* Provider Settings - Right Side */}
             <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
+              {(() => {
+                const statusBadge = getProviderStatusBadge(activeProvider, providers[activeProvider], ollamaStatus);
+                return (
               <div className="flex items-center justify-between pb-2 border-b border-border">
                 <div className="flex items-center gap-1.5">
                   <h3 className="text-base font-medium text-foreground">
@@ -3177,18 +3239,37 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     </button>
                   )}
                 </div>
-                <div
-                  className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
-                    providers[activeProvider].enabled && hasProviderAuthConfigured(activeProvider, providers[activeProvider])
-                      ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                      : 'bg-red-500/20 text-red-600 dark:text-red-400'
-                  }`}
-                >
-                  {providers[activeProvider].enabled && hasProviderAuthConfigured(activeProvider, providers[activeProvider])
-                    ? i18nService.t('providerStatusOn')
-                    : i18nService.t('providerStatusOff')}
+                <div className={`px-2 py-0.5 rounded-lg text-xs font-medium ${statusBadge.className}`}>
+                  {i18nService.t(statusBadge.labelKey)}
                 </div>
               </div>
+                );
+              })()}
+
+              {activeProvider === ProviderName.Ollama && (
+                <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground">
+                        {i18nService.t('ollamaProviderConfigOnlyTitle')}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-5 text-secondary">
+                        {i18nService.t('ollamaProviderConfigOnlyDescription')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onShowLocalInference?.();
+                      }}
+                      className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-raised"
+                    >
+                      {i18nService.t('ollamaProviderOpenLocalInference')}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
