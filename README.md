@@ -57,7 +57,7 @@ RongxinAI uses Electron with strict process isolation. The Renderer hosts the Re
 ### Local Development
 
 ```bash
-git clone <repository-url> RongxinAI
+git clone https://github.com/rongxinzy/RongxinAI.git RongxinAI
 cd RongxinAI
 npm install
 npm run electron:dev
