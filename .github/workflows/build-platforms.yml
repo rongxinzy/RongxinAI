@@ -42,16 +42,10 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       
       - run: npm install
-      
-      # 设置 OpenClaw runtime (如果需要)
-      - name: Setup OpenClaw Runtime
-        run: |
-          if [ -d "vendor/openclaw-runtime/current" ]; then
-            echo "✓ OpenClaw runtime found"
-          else
-            echo "⚠ OpenClaw runtime not found, build may fail"
-          fi
-      
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
       - name: Build macOS
         run: npm run dist:mac
         env:
@@ -85,7 +79,10 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       
       - run: npm install
-      
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
       # Windows 需要 Python 运行时
       - name: Setup Python Runtime
         run: npm run setup:python-runtime
@@ -126,7 +123,10 @@ jobs:
           sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
       
       - run: npm install
-      
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
       - name: Build Linux
         run: npm run dist:linux
         env:
