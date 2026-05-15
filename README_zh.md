@@ -57,7 +57,7 @@ RongxinAI 使用 Electron 严格进程隔离架构。Renderer 负责 React UI，
 ### 本地开发
 
 ```bash
-git clone <repository-url> RongxinAI
+git clone https://github.com/rongxinzy/RongxinAI.git RongxinAI
 cd RongxinAI
 npm install
 npm run electron:dev
@@ -200,4 +200,4 @@ OpenClaw 版本固定在 `package.json`：
 
 ## License
 
-MIT
+[MIT License](LICENSE)

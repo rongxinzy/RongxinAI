@@ -200,4 +200,4 @@ To upgrade, change `openclaw.version`, then run `npm run electron:dev:openclaw` 
 
 ## License
 
-MIT
+[MIT License](LICENSE)
