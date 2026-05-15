@@ -20,7 +20,11 @@ export function registerOllamaIpcHandlers(
   manager: OllamaManager,
   options: {
     getStore: () => SqliteStore;
-    syncOpenClawConfig: (options: { reason: string; restartGatewayIfRunning?: boolean }) => Promise<{ success: boolean; error?: string }>;
+    syncOpenClawConfig: (options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean }) => Promise<{ success: boolean; error?: string }>;
+    getAgentManager?: () => {
+      getDefaultAgent: () => { id: string } | null;
+      updateAgent: (agentId: string, updates: { model?: string }) => unknown;
+    };
   },
 ): void {
   const broadcast = (channel: string, payload: unknown): void => {
@@ -161,12 +165,34 @@ export function registerOllamaIpcHandlers(
   ipcMain.handle(OllamaIpcChannel.SetOpenClawModel, async (_event, modelName: string) => {
     const current = options.getStore().get<OllamaOpenClawAppConfig>('app_config') ?? {};
     const next = buildOllamaOpenClawAppConfig(current, modelName);
+    const normalizedModelName = modelName.trim();
+    const openClawModelRef = `ollama/${normalizedModelName}`;
     options.getStore().set('app_config', next);
+
+    const defaultAgent = (() => {
+      try {
+        const agentManager = options.getAgentManager?.();
+        const agent = agentManager?.getDefaultAgent?.();
+        if (!agent) return null;
+        return agentManager.updateAgent(agent.id, { model: openClawModelRef });
+      } catch (error) {
+        console.warn('[Ollama] failed to update the default OpenClaw agent model:', error);
+        return null;
+      }
+    })();
+
     const syncResult = await options.syncOpenClawConfig({
       reason: 'ollama-local-model-selected',
       restartGatewayIfRunning: true,
+      forceGatewayRestartIfRunning: true,
     });
-    return { success: syncResult.success, error: syncResult.error };
+    return {
+      success: syncResult.success,
+      error: syncResult.error,
+      config: next,
+      modelRef: openClawModelRef,
+      defaultAgent,
+    };
   });
 }
 

@@ -405,7 +405,8 @@ type OpenClawProviderApi =
   | 'openai-completions'
   | 'openai-responses'
   | 'openai-codex-responses'
-  | 'google-generative-ai';
+  | 'google-generative-ai'
+  | 'ollama';
 
 type OpenClawProviderSelection = {
   providerId: string;
@@ -472,6 +473,14 @@ const stripChatCompletionsSuffix = (rawBaseUrl: string): string => {
   const normalized = rawBaseUrl.trim().replace(/\/+$/, '');
   if (normalized.endsWith('/chat/completions')) {
     return normalized.slice(0, -'/chat/completions'.length).replace(/\/+$/, '');
+  }
+  return normalized;
+};
+
+const normalizeOllamaNativeBaseUrl = (rawBaseUrl: string): string => {
+  const normalized = stripChatCompletionsSuffix(rawBaseUrl);
+  if (/\/v\d+$/.test(normalized)) {
+    return normalized.replace(/\/v\d+$/, '');
   }
   return normalized;
 };
@@ -649,8 +658,8 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
 
   [ProviderName.Ollama]: {
     providerId: OpenClawProviderId.Ollama,
-    resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
-    normalizeBaseUrl: stripChatCompletionsSuffix,
+    resolveApi: () => OpenClawApiConst.Ollama as OpenClawProviderApi,
+    normalizeBaseUrl: normalizeOllamaNativeBaseUrl,
   },
 
   [ProviderName.Copilot]: {

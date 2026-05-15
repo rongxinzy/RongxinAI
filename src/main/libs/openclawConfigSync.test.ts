@@ -95,7 +95,12 @@ describe('env var stability on model switch', () => {
 // the registry mapping correctness.
 // ═══════════════════════════════════════════════════════
 
-type OpenClawProviderApi = 'anthropic-messages' | 'openai-completions' | 'openai-responses' | 'google-generative-ai';
+type OpenClawProviderApi =
+  | 'anthropic-messages'
+  | 'openai-completions'
+  | 'openai-responses'
+  | 'google-generative-ai'
+  | 'ollama';
 
 const mapApiTypeToOpenClawApi = (
   apiType: 'anthropic' | 'openai' | undefined,
@@ -196,7 +201,7 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
   },
   [ProviderName.Ollama]: {
     providerId: OpenClawProviderId.Ollama,
-    resolveApi: () => OpenClawApi.OpenAICompletions as OpenClawProviderApi,
+    resolveApi: () => OpenClawApi.Ollama as OpenClawProviderApi,
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
 };
@@ -269,10 +274,10 @@ describe('resolveDescriptor', () => {
     expect(d.resolveApi({ apiType: 'anthropic', baseURL: '' })).toBe(OpenClawApi.AnthropicMessages);
   });
 
-  test('ollama always uses openai-completions', () => {
+  test('ollama uses native OpenClaw Ollama api', () => {
     const d = resolveDescriptor(ProviderName.Ollama, false);
     expect(d.providerId).toBe(OpenClawProviderId.Ollama);
-    expect(d.resolveApi({ apiType: undefined, baseURL: '' })).toBe(OpenClawApi.OpenAICompletions);
+    expect(d.resolveApi({ apiType: undefined, baseURL: '' })).toBe(OpenClawApi.Ollama);
   });
 
   test('unknown provider falls back to lobster providerId', () => {

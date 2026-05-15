@@ -14,6 +14,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDispatch } from 'react-redux';
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
@@ -33,7 +34,11 @@ import {
   createOllamaStreamState,
   reduceOllamaStreamChunk,
 } from '../../../shared/ollama';
+import { OpenClawProviderId, ProviderName } from '../../../shared/providers';
+import { agentService } from '../../services/agent';
+import { configService } from '../../services/config';
 import { i18nService } from '../../services/i18n';
+import { setDefaultSelectedModel, setSelectedModel as setAgentSelectedModel } from '../../store/slices/modelSlice';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import MarkdownContent from '../MarkdownContent';
@@ -125,6 +130,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
+  const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(null);
@@ -437,6 +443,22 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       const result = await window.electron.ollama.setOpenClawModel(modelName);
       if (!result.success) throw new Error(result.error || i18nService.t('localInferenceSetOpenClawFailed'));
+      const model = {
+        id: modelName,
+        name: modelName,
+        provider: 'Ollama',
+        providerKey: ProviderName.Ollama,
+        openClawProviderId: OpenClawProviderId.Ollama,
+        supportsImage: false,
+      };
+      if (result.config) {
+        await configService.updateConfig(result.config);
+      }
+      dispatch(setDefaultSelectedModel(model));
+      if (result.defaultAgent?.id) {
+        dispatch(setAgentSelectedModel({ agentId: result.defaultAgent.id, model }));
+      }
+      await agentService.loadAgents();
       setNotice(i18nService.t('localInferenceSetOpenClawDone').replace('{name}', modelName));
     });
   };
@@ -1172,7 +1194,13 @@ function ModelCard({
           <ServerStackIcon className="h-3.5 w-3.5" />
           {i18nService.t('localInferenceInfer')}
         </button>
-        <button type="button" onClick={onSetOpenClawModel} className={smallOutlineButtonClass}>
+        <button
+          type="button"
+          onClick={onSetOpenClawModel}
+          disabled={!isRunning || loading}
+          title={!isRunning ? i18nService.t('localInferenceUseOpenClawDisabledHint') : undefined}
+          className={smallOutlineButtonClass}
+        >
           <CheckCircleIcon className="h-3.5 w-3.5" />
           {i18nService.t('localInferenceUseOpenClaw')}
         </button>

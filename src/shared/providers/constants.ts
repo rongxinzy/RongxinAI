@@ -75,6 +75,7 @@ export const OpenClawApi = {
   OpenAIResponses: 'openai-responses',
   OpenAICodexResponses: 'openai-codex-responses',
   GoogleGenerativeAI: 'google-generative-ai',
+  Ollama: 'ollama',
 } as const;
 export type OpenClawApi = typeof OpenClawApi[keyof typeof OpenClawApi];
 
