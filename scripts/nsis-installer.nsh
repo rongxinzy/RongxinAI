@@ -19,16 +19,16 @@
 !macroend
 
 !macro customInit
-  CreateDirectory "$APPDATA\LobsterAI"
-  FileOpen $9 "$APPDATA\LobsterAI\install-timing.log" w
+  CreateDirectory "$APPDATA\RongxinAI"
+  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" w
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=custom-init-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
   FileClose $9
 
   ; ── Kill every process that might hold file handles in the install dir ──
   ;
-  ; 1. LobsterAI.exe — the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
-  ; 2. node.exe whose binary lives inside the LobsterAI install tree
+  ; 1. RongxinAI.exe — the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
+  ; 2. node.exe whose binary lives inside the RongxinAI install tree
   ;    (Web Search bridge server, MCP servers spawned with detached:true)
   ;
   ; Stop-Process -Force is equivalent to taskkill /F — the processes have no
@@ -36,22 +36,22 @@
   ; "ghost handles" in the Windows kernel. We poll until no matching process
   ; remains before proceeding.
 
-  DetailPrint "[Installer] Stopping running LobsterAI processes"
+  DetailPrint "[Installer] Stopping running RongxinAI processes"
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    Stop-Process -Name LobsterAI -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*LobsterAI*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
+    Stop-Process -Name RongxinAI -Force -ErrorAction SilentlyContinue;\
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
       $$procs = @();\
-      $$procs += Get-Process -Name LobsterAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*LobsterAI*\" };\
+      $$procs += Get-Process -Name RongxinAI -ErrorAction SilentlyContinue;\
+      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" };\
       if ($$procs.Count -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=process-stop-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
@@ -64,7 +64,7 @@
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$dirs = @(\
       (Join-Path $$env:USERPROFILE \".openclaw\openclaw-weixin\accounts\"),\
-      (Join-Path $$env:APPDATA \"LobsterAI\openclaw\state\openclaw-weixin\accounts\")\
+      (Join-Path $$env:APPDATA \"RongxinAI\openclaw\state\openclaw-weixin\accounts\")\
     );\
     foreach ($$d in $$dirs) {\
       if (Test-Path $$d) {\
@@ -75,7 +75,7 @@
   Pop $0
 
   ; ── Backup user-created skills to AppData before extraction overwrites them ──
-  ; Copy non-bundled skills to %APPDATA%\LobsterAI\skills-backup\ so they are
+  ; Copy non-bundled skills to %APPDATA%\RongxinAI\skills-backup\ so they are
   ; preserved when NSIS extracts the new version over the existing install.
   ; The backup is restored in customInstall after extraction completes.
   ;
@@ -85,7 +85,7 @@
   DetailPrint "[Installer] Backing up user-created skills"
   System::Call 'kernel32::GetTickCount()i .r7'
   ClearErrors
-  FileOpen $R0 "$APPDATA\LobsterAI\skill-migrate.log" w
+  FileOpen $R0 "$APPDATA\RongxinAI\skill-migrate.log" w
   IfErrors BackupLogOpenFailed
     !insertmacro GetTimestamp $8
     FileWrite $R0 "$8 phase=backup-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
@@ -96,7 +96,7 @@
 
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$src    = \"$INSTDIR\resources\SKILLs\";\
-    $$backup = \"$APPDATA\LobsterAI\skills-backup\";\
+    $$backup = \"$APPDATA\RongxinAI\skills-backup\";\
     $$config = \"$$src\skills.config.json\";\
     if (Test-Path $$backup) { Remove-Item -Path $$backup -Recurse -Force -ErrorAction SilentlyContinue };\
     if (Test-Path $$src) {\
@@ -124,7 +124,7 @@
     FileWrite $R0 "$8 phase=backup-output text=$1$\r$\n"
     FileClose $R0
   BackupSkipCloseLog:
-  FileOpen $9 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=skill-backup-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
@@ -158,7 +158,7 @@
   SkipOldDirRemoval:
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=old-install-cleanup-complete elapsed_ms=$5 renamed_path=$3 cleanup_mode=async$\r$\n"
   FileClose $9
@@ -167,10 +167,10 @@
 !macro customInstall
   ; ─── Install Timing Log ───
   ; Write timestamps to help diagnose slow installation phases.
-  ; Log file: %APPDATA%\LobsterAI\install-timing.log
+  ; Log file: %APPDATA%\RongxinAI\install-timing.log
 
-  CreateDirectory "$APPDATA\LobsterAI"
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  CreateDirectory "$APPDATA\RongxinAI"
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=nsis-extract-complete$\r$\n"
   FileClose $2
@@ -189,7 +189,7 @@
   CreateDirectory "$INSTDIR\resources\SKILLs"
   DetailPrint "[Installer] Preparing resource directories"
   DetailPrint "[Installer] Adding Windows Defender exclusions before extraction"
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
   FileClose $2
@@ -198,7 +198,7 @@
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=defender-exclusion-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
@@ -207,20 +207,20 @@
 
   DetailPrint "[Installer] Launching bundled extractor"
   DetailPrint "[Installer] Extracting bundled resources"
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-start tar=$INSTDIR\resources\win-resources.tar dest=$INSTDIR\resources$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
 
-  nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$INSTDIR\resources\unpack-cfmind.cjs" "$INSTDIR\resources\win-resources.tar" "$INSTDIR\resources" "$APPDATA\LobsterAI\install-timing.log"'
+  nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$INSTDIR\resources\unpack-cfmind.cjs" "$INSTDIR\resources\win-resources.tar" "$INSTDIR\resources" "$APPDATA\RongxinAI\install-timing.log"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
 
   ; Diagnostic: log raw exit code with brackets to reveal trailing whitespace
   StrLen $4 $0
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-raw-exit exit_raw=[$0] exit_len=$4$\r$\n"
   FileClose $2
@@ -232,22 +232,22 @@
   IntCmp $0 0 TarExtractOK TarExtractNonZero TarExtractNonZero
 
   TarExtractProcessFailed:
-    FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=process-start-failed$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start extractor process (exit=$0). This may be caused by antivirus software. See %APPDATA%\LobsterAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start extractor process (exit=$0). This may be caused by antivirus software. See %APPDATA%\RongxinAI\install-timing.log for details."
     Goto TarExtractOK
 
   TarExtractNonZero:
-    FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=nonzero-exit$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed (exit code $0). See %APPDATA%\LobsterAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed (exit code $0). See %APPDATA%\RongxinAI\install-timing.log for details."
   TarExtractOK:
 
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
@@ -257,16 +257,16 @@
   ; ── Restore user-created skills from AppData backup ──
   ; The backup was created in customInit before extraction began. Restore any
   ; skills not already present in the new install, then clean up the backup.
-  IfFileExists "$APPDATA\LobsterAI\skills-backup\*.*" 0 SkipSkillRestore
+  IfFileExists "$APPDATA\RongxinAI\skills-backup\*.*" 0 SkipSkillRestore
     DetailPrint "[Installer] Restoring user-created skills"
-    FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=skill-restore-start$\r$\n"
     FileClose $2
     System::Call 'kernel32::GetTickCount()i .r7'
 
     nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-      $$backup    = \"$APPDATA\LobsterAI\skills-backup\";\
+      $$backup    = \"$APPDATA\RongxinAI\skills-backup\";\
       $$newSkills = \"$INSTDIR\resources\SKILLs\";\
       Get-ChildItem -Path $$backup -Directory | ForEach-Object {\
         $$target = Join-Path $$newSkills $$_.Name;\
@@ -279,7 +279,7 @@
     Pop $1
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $5 $6 - $7
-    FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=skill-restore-complete exit=$0 elapsed_ms=$5$\r$\n"
     FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
@@ -292,7 +292,7 @@
   DetailPrint "[Installer] Cleaning up temporary installer files"
   Delete "$INSTDIR\resources\unpack-cfmind.cjs"
 
-  FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=install-complete$\r$\n"
   FileClose $2
@@ -303,16 +303,16 @@
   ; Kill all running app instances (main app + OpenClaw gateway + detached
   ; node.exe services) before the uninstaller's built-in process check.
   ; Without this, the uninstaller detects the OpenClaw gateway process
-  ; (also named LobsterAI.exe) and shows an "app cannot be closed" dialog
+  ; (also named RongxinAI.exe) and shows an "app cannot be closed" dialog
   ; where even "Retry" never succeeds — because the gateway has no UI window
   ; for the user to close.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    Stop-Process -Name LobsterAI -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*LobsterAI*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
+    Stop-Process -Name RongxinAI -Force -ErrorAction SilentlyContinue;\
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
       $$procs = @();\
-      $$procs += Get-Process -Name LobsterAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*LobsterAI*\" };\
+      $$procs += Get-Process -Name RongxinAI -ErrorAction SilentlyContinue;\
+      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" };\
       if ($$procs.Count -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'

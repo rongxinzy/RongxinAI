@@ -10,7 +10,7 @@
  * Usage (via ELECTRON_RUN_AS_NODE=1):
  *   set ELECTRON_RUN_AS_NODE=1
  *   set NODE_COMPILE_CACHE=<cache-dir>
- *   LobsterAI.exe <path-to>/warmup-compile-cache.cjs [--cache-dir <dir>]
+ *   RongxinAI.exe <path-to>/warmup-compile-cache.cjs [--cache-dir <dir>]
  *
  * Or directly with Node.js (for testing):
  *   NODE_COMPILE_CACHE=<cache-dir> node warmup-compile-cache.cjs

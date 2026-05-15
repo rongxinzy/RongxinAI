@@ -609,9 +609,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   // About tab
   const [appVersion, setAppVersion] = useState('');
   const [isExportingLogs, setIsExportingLogs] = useState(false);
-  const [testMode, setTestMode] = useState(false);
-  const [logoClickCount, setLogoClickCount] = useState(0);
-  const [testModeUnlocked, setTestModeUnlocked] = useState(false);
   useEffect(() => {
     window.electron.appInfo.getVersion().then(setAppVersion);
   }, []);
@@ -775,9 +772,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       setLanguage(config.language);
       setUseSystemProxy(config.useSystemProxy ?? false);
       setSqliteAutoBackupEnabled(config.sqliteAutoBackupEnabled === true);
-      const savedTestMode = config.app?.testMode ?? false;
-      setTestMode(savedTestMode);
-      if (savedTestMode) setTestModeUnlocked(true);
 
       // Load auto-launch setting
       window.electron.autoLaunch.get().then(({ enabled }) => {
@@ -1739,7 +1733,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         shortcuts,
         app: {
           ...configService.getConfig().app,
-          testMode,
         },
       });
 
@@ -4308,14 +4301,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             <img
               src="logo.png"
               alt="RongxinAI"
-              className="w-16 h-16 mb-3 cursor-pointer select-none"
-              onClick={() => {
-                const next = logoClickCount + 1;
-                setLogoClickCount(next);
-                if (next >= 10 && !testModeUnlocked) {
-                  setTestModeUnlocked(true);
-                }
-              }}
+              className="w-16 h-16 mb-3 select-none"
             />
             <h3 className="text-lg font-semibold text-foreground">RongxinAI</h3>
             <span className="text-xs text-secondary mt-1">v{appVersion}</span>
@@ -4331,26 +4317,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   </span>
                 </div>
               </div>
-              {testModeUnlocked && (
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-foreground">{i18nService.t('testMode')}</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={testMode}
-                    onClick={() => setTestMode((prev) => !prev)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                      testMode ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        testMode ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Footer */}

@@ -24,7 +24,7 @@ function splitEnvPaths(value?: string): string[] {
 }
 
 function readEnterpriseConfig(): Partial<OllamaInstallConfig> {
-  const configPath = path.join(os.homedir(), '.lobsterai', 'install.config.json');
+  const configPath = path.join(os.homedir(), '.rongxinai', 'install.config.json');
   if (!fs.existsSync(configPath)) return {};
   try {
     return JSON.parse(fs.readFileSync(configPath, 'utf8')) as Partial<OllamaInstallConfig>;
@@ -42,15 +42,15 @@ export function getOllamaInstallConfig(): OllamaInstallConfig {
   const defaults: OllamaInstallConfig = {
     presetInstaller: {
       win32: [
-        'C:\\ProgramData\\LobsterAI\\installers',
+        'C:\\ProgramData\\RongxinAI\\installers',
         downloadsDir,
       ],
       darwin: [
-        '/Library/Application Support/LobsterAI/installers',
+        '/Library/Application Support/RongxinAI/installers',
         downloadsDir,
       ],
       linux: [
-        '/opt/lobsterai/installers',
+        '/opt/rongxinai/installers',
         downloadsDir,
       ],
     },
