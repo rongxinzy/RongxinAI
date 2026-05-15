@@ -397,10 +397,7 @@ const PROVIDER_DEFINITIONS = [
     },
     region: 'china',
     enPriority: 0,
-    defaultModels: [
-      { id: 'qwen3-coder-next', name: 'Qwen3-Coder-Next', supportsImage: false },
-      { id: 'glm-4.7-flash', name: 'GLM 4.7 Flash', supportsImage: false },
-    ],
+    defaultModels: [],
   },
   // ── Global ──
   {
