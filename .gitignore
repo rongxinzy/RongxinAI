@@ -8,6 +8,7 @@ dist
 dist-electron
 .DS_Store
 .env 
+.npmrc
 .claude/
 __pycache__/
 .codebuddy/
