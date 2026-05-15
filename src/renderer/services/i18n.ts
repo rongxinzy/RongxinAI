@@ -1719,17 +1719,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksDataAnomalyWarning:
       '定时任务「{name}」存在异常数据，已自动修正显示，建议重新编辑该任务',
 
-    // 隐私协议弹窗
-    privacyDialogTitle: 'RongxinAI 服务协议',
-    privacyDialogDesc: '在使用 RongxinAI 之前，请您仔细阅读{link}内容，并进行确认。',
-    privacyDialogLinkText: 'RongxinAI 服务协议',
-    privacyDialogAccept: '我已阅读并同意',
-    privacyDialogReject: '拒绝',
-    welcomeTitle: '欢迎使用 RongxinAI',
-    welcomeSubtitle: '超多AI功能等你探索～',
-    welcomePromo: '新用户限时送百万Token',
-    welcomeLogin: '登录',
-    welcomeCustomModel: '自定义模型',
     githubCopilotAuth: 'GitHub 账号认证',
     githubCopilotSignIn: '使用 GitHub 登录',
     githubCopilotSignOut: '退出登录',
@@ -3627,18 +3616,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksDataAnomalyWarning:
       'Scheduled task "{name}" has abnormal data. Display has been auto-corrected. Consider re-editing this task',
 
-    // Privacy dialog
-    privacyDialogTitle: 'RongxinAI Terms of Service',
-    privacyDialogDesc:
-      'Before using RongxinAI, please carefully read the {link} and confirm.',
-    privacyDialogLinkText: 'RongxinAI Terms of Service',
-    privacyDialogAccept: 'I have read and agree',
-    privacyDialogReject: 'Decline',
-    welcomeTitle: 'Welcome to RongxinAI',
-    welcomeSubtitle: 'Explore a world of AI features~',
-    welcomePromo: 'New users get 1M free tokens',
-    welcomeLogin: 'Login',
-    welcomeCustomModel: 'Custom Model',
     githubCopilotAuth: 'GitHub Account Authentication',
     githubCopilotSignIn: 'Sign in with GitHub',
     githubCopilotSignOut: 'Sign Out',
