@@ -115,6 +115,7 @@ export const IpcChannel = {
   ResolveSession: 'scheduledTask:resolveSession',
   ListChannels: 'scheduledTask:listChannels',
   ListChannelConversations: 'scheduledTask:listChannelConversations',
+  Preflight: 'scheduledTask:preflight',
   StatusUpdate: 'scheduledTask:statusUpdate',
   RunUpdate: 'scheduledTask:runUpdate',
   Refresh: 'scheduledTask:refresh',

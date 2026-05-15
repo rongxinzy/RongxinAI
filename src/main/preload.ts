@@ -572,6 +572,7 @@ contextBridge.exposeInMainWorld('electron', {
     // Execution
     runManually: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.RunManually, id),
     stop: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.Stop, id),
+    preflight: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.Preflight, id),
 
     // Run history
     listRuns: (taskId: string, limit?: number, offset?: number, filter?: any) =>

@@ -1,5 +1,5 @@
 import { PlayIcon } from '@heroicons/react/24/outline';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { ScheduledTask } from '../../../scheduledTask/types';
@@ -28,9 +28,19 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
   const dispatch = useDispatch();
   const runs = useSelector((state: RootState) => state.scheduledTask.runs[task.id] ?? []);
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
+  const [preflight, setPreflight] = useState<{
+    hasChannel: boolean;
+    channel?: string;
+    lastDeliveryErrors?: string[] | null;
+    consecutiveErrors?: number;
+  } | null>(null);
 
   useEffect(() => {
     void scheduledTaskService.loadRuns(task.id);
+  }, [task.id]);
+
+  useEffect(() => {
+    void scheduledTaskService.preflight(task.id).then(setPreflight);
   }, [task.id]);
 
   const statusLabel = i18nService.t(getStatusLabelKey(task.state.lastStatus));
@@ -123,6 +133,17 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
           )}
         </div>
       </div>
+
+      {preflight?.hasChannel && preflight.lastDeliveryErrors && preflight.lastDeliveryErrors.length > 0 && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+              Channel delivery issue detected
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-red-500/80">{preflight.lastDeliveryErrors[0]}</p>
+        </div>
+      )}
 
       <div className={sectionClass}>
         <h3 className={sectionTitleClass}>{i18nService.t('scheduledTasksStatus')}</h3>

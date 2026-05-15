@@ -202,6 +202,23 @@ class ScheduledTaskService {
     }
   }
 
+  async preflight(id: string): Promise<{
+    hasChannel: boolean;
+    channel?: string;
+    lastDeliveryErrors?: string[] | null;
+    consecutiveErrors?: number;
+  } | null> {
+    const api = window.electron?.scheduledTasks;
+    if (!api) return null;
+
+    try {
+      const result = await api.preflight(id);
+      return result.success ? (result.preflight ?? null) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async stopTask(id: string): Promise<void> {
     const api = window.electron?.scheduledTasks;
     if (!api) return;
