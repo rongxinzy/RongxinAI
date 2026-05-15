@@ -55,6 +55,7 @@ jobs:
       - name: Build macOS
         run: npm run dist:mac
         env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
           # 签名环境变量 (如果有证书)
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -94,6 +95,7 @@ jobs:
       - name: Build Windows
         run: npm run dist:win
         env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
       
@@ -127,6 +129,8 @@ jobs:
       
       - name: Build Linux
         run: npm run dist:linux
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
       
       - uses: actions/upload-artifact@v4
         with:
