@@ -725,6 +725,15 @@ export class CronJobService {
           if (previousHash !== undefined) {
             const task = mapGatewayJob(job);
             this.emitStatusUpdate(task.id, task.state);
+
+            // Log repeated cron failures to main process log for diagnostics.
+            const errors = task.state.consecutiveErrors;
+            if (errors >= 3 && task.state.lastStatus === TaskStatus.Error) {
+              console.warn(
+                `[CronJobService] Task "${task.name}" (${task.id}) has ${errors} consecutive errors. ` +
+                `Last error: ${task.state.lastError || '(none)'}`,
+              );
+            }
           }
         }
 
