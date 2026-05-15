@@ -346,16 +346,16 @@ export class AppUpdateCoordinator {
   }
 
   private isCachedInstallerForSource(filename: string, source: AppUpdateSource | null): boolean {
-    if (!filename.startsWith('lobsterai-update-')) {
+    if (!filename.startsWith('rongxinai-update-')) {
       return false;
     }
     if (source == null) {
       return true;
     }
-    if (filename.startsWith(`lobsterai-update-${source}-`)) {
+    if (filename.startsWith(`rongxinai-update-${source}-`)) {
       return true;
     }
-    return /^lobsterai-update-\d+/.test(filename);
+    return /^rongxinai-update-\d+/.test(filename);
   }
 
   private async pruneCachedInstallerFiles(

@@ -359,7 +359,7 @@ const resolveInlineAttachmentDir = (cwd?: string): string => {
       return path.join(resolved, '.cowork-temp', 'attachments', 'manual');
     }
   }
-  return path.join(app.getPath('temp'), 'lobsterai', 'attachments');
+  return path.join(app.getPath('temp'), 'rongxinai', 'attachments');
 };
 
 const ensurePngFileName = (value: string): string => {
@@ -2062,13 +2062,13 @@ if (!gotTheLock) {
   app.quit();
 } else {
   // Register custom protocol for OAuth callback
-  app.setAsDefaultProtocolClient('lobsterai');
+  app.setAsDefaultProtocolClient('rongxinai');
 
   // Buffer for deep link auth code received before renderer is ready
   let pendingAuthCode: string | null = null;
 
   /**
-   * Parse a lobsterai:// deep link and send (or buffer) the auth code.
+   * Parse a rongxinai:// deep link and send (or buffer) the auth code.
    */
   const handleDeepLink = (url: string) => {
     try {
@@ -2119,7 +2119,7 @@ if (!gotTheLock) {
     console.debug('[Main] second-instance event', { commandLine, workingDirectory });
 
     // Check for deep link in command line args (Windows/Linux)
-    const deepLink = commandLine.find(arg => arg.startsWith('lobsterai://'));
+    const deepLink = commandLine.find(arg => arg.startsWith('rongxinai://'));
     if (deepLink) {
       handleDeepLink(deepLink);
     }
@@ -5039,7 +5039,7 @@ if (!gotTheLock) {
         const { execFile } = await import('child_process');
         const { promisify } = await import('util');
         const execFileAsync = promisify(execFile);
-        const tmpDir = path.join(app.getPath('temp'), 'lobsterai-thumbnails');
+        const tmpDir = path.join(app.getPath('temp'), 'rongxinai-thumbnails');
         await fs.promises.mkdir(tmpDir, { recursive: true });
         const baseName = path.basename(resolvedPath);
         const outputFile = path.join(tmpDir, `${baseName}.png`);

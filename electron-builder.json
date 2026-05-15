@@ -55,7 +55,7 @@
   "protocols": [
     {
       "name": "RongxinAI",
-      "schemes": ["lobsterai"]
+      "schemes": ["rongxinai"]
     }
   ],
   "mac": {
