@@ -135,6 +135,7 @@ const IPC_MAX_KEYS = 80;
 const IPC_MAX_ITEMS = 40;
 const MAX_INLINE_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const ENGINE_NOT_READY_CODE = 'ENGINE_NOT_READY';
+const HIDDEN_SKILL_MARKETPLACE_IDS = new Set(['youdaonote', 'youdao-note', 'youdao_note']);
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
 } as const;
@@ -166,6 +167,16 @@ function sanitizeOptionalPatchValue(
     throw new Error('Session patch value is too long.');
   }
   return trimmed;
+}
+
+function isHiddenSkillMarketplaceItem(item: Record<string, unknown>): boolean {
+  const values = [
+    item.slug,
+    item.id,
+    item.name,
+    item.displayName,
+  ].map((value) => String(value ?? '').trim().toLowerCase());
+  return values.some((value) => HIDDEN_SKILL_MARKETPLACE_IDS.has(value) || value.includes('youdaonote'));
 }
 
 function sanitizeOpenClawSessionPatch(input: unknown): OpenClawSessionPatch {
