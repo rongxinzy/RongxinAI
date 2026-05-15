@@ -5,7 +5,7 @@
     "name": "RongxinAI"
   },
   "license": "MIT",
-  "version": "2026.5.9",
+  "version": "2026.5.15",
   "openclaw": {
     "version": "v2026.4.14",
     "repo": "https://github.com/openclaw/openclaw.git",
