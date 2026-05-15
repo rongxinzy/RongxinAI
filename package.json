@@ -2,7 +2,8 @@
   "name": "rongxinai",
   "private": true,
   "author": {
-    "name": "RongxinAI"
+    "name": "RongxinAI",
+    "email": "dev@rongxinai.com"
   },
   "license": "MIT",
   "version": "2026.5.15",
