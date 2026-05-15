@@ -1232,10 +1232,10 @@ const scheduleDeferredGatewayRestart = (reason: string) => {
 };
 
 const syncOpenClawConfig = async (
-  options: { reason: string; restartGatewayIfRunning?: boolean } = { reason: 'unknown' },
+  options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean } = { reason: 'unknown' },
 ): Promise<{ success: boolean; changed: boolean; mcpBridgeConfigChanged?: boolean; status?: OpenClawEngineStatus; error?: string }> => {
   const D = gwDiagTs;
-  console.log(`${D()} ──── syncOpenClawConfig START reason=${options.reason} restartIfRunning=${!!options.restartGatewayIfRunning}`);
+  console.log(`${D()} ──── syncOpenClawConfig START reason=${options.reason} restartIfRunning=${!!options.restartGatewayIfRunning} forceRestart=${!!options.forceGatewayRestartIfRunning}`);
 
   const syncResult = getOpenClawConfigSync().sync(options.reason);
   console.log(`${D()} sync() ok=${syncResult.ok} changed=${syncResult.changed} bindingsChanged=${!!syncResult.bindingsChanged}`);
@@ -1316,12 +1316,10 @@ const syncOpenClawConfig = async (
     };
   }
 
-  // Binding changes are explicit user actions (reassigning a channel to a
-  // different agent).  The old Gateway session keeps the channel producing
-  // messages under the old agent's model, so active workloads never drain
-  // and the restart would be deferred indefinitely.  Force immediate restart
-  // so new messages route to the correct agent.
-  if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged) {
+  // Binding changes and explicit force-restart requests are user actions where
+  // keeping the old gateway alive would keep routing messages with stale config.
+  // Force immediate restart so the next request sees the selected model/agent.
+  if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged && !options.forceGatewayRestartIfRunning) {
     console.log(`${D()} ──── RESTART DEFERRED (active workloads). reason=${options.reason}`);
     scheduleDeferredGatewayRestart(options.reason);
     return {
@@ -5811,6 +5809,7 @@ if (!gotTheLock) {
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
       syncOpenClawConfig,
+      getAgentManager,
     });
     registerMarketplaceIpcHandlers();
     // Inject auth getters for lobsterai-server provider routing
