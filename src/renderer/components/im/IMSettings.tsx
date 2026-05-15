@@ -133,7 +133,7 @@ const IMSettings: React.FC = () => {
 
   // Auto-run connectivity tests for all enabled platforms on mount
   useEffect(() => {
-    const imPlatforms: Platform[] = ['weixin', 'dingtalk', 'qq', 'feishu', 'email', 'wecom', 'telegram', 'discord', 'nim'];
+    const imPlatforms: Platform[] = ['weixin', 'dingtalk', 'qq', 'feishu', 'email', 'wecom', 'telegram', 'discord'];
     const enabledPlatforms = imPlatforms.filter(platform => isPlatformEnabled(platform));
     if (enabledPlatforms.length === 0) return;
 
