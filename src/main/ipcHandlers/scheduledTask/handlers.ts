@@ -289,6 +289,40 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
     }
   });
 
+  ipcMain.handle(ScheduledTaskIpc.Preflight, async (_event, taskId: string) => {
+    try {
+      const task = await getCronJobService().getJob(taskId);
+      if (!task) return { success: false, error: 'Task not found' };
+
+      // Only relevant for tasks with IM channel delivery.
+      const channel = task.delivery?.channel;
+      if (!channel || task.delivery?.mode === 'none') {
+        return { success: true, preflight: { hasChannel: false } };
+      }
+
+      // Check recent runs for delivery failures indicating channel issues.
+      const recentRuns = await getCronJobService().listRuns(taskId, 5, 0, { status: 'error' });
+      const deliveryErrors = recentRuns
+        .filter(r => r.error?.includes('channel') || r.error?.includes('delivery'))
+        .map(r => r.error!);
+
+      return {
+        success: true,
+        preflight: {
+          hasChannel: true,
+          channel,
+          lastDeliveryErrors: deliveryErrors.length > 0 ? deliveryErrors.slice(0, 3) : null,
+          consecutiveErrors: task.state.consecutiveErrors,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Preflight failed',
+      };
+    }
+  });
+
   ipcMain.handle(
     ScheduledTaskIpc.ListChannelConversations,
     async (_event, channel: string, accountId?: string, filterAccountId?: string) => {

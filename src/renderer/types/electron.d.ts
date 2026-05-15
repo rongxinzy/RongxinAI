@@ -801,6 +801,16 @@ interface IElectronAPI {
     }>;
     runManually: (id: string) => Promise<{ success: boolean; error?: string }>;
     stop: (id: string) => Promise<{ success: boolean; error?: string }>;
+    preflight: (id: string) => Promise<{
+      success: boolean;
+      error?: string;
+      preflight?: {
+        hasChannel: boolean;
+        channel?: string;
+        lastDeliveryErrors?: string[] | null;
+        consecutiveErrors?: number;
+      };
+    }>;
     listRuns: (
       taskId: string,
       limit?: number,
