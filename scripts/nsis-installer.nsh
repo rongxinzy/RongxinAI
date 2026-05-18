@@ -13,12 +13,17 @@
   ; This does NOT change the default install path — just ensures UAC elevation.
   RequestExecutionLevel admin
 
-  ; Keep only the progress bar visible. The details box stays hidden and
-  ; NSIS/electron-builder retains the default status text behavior.
-  ShowInstDetails nevershow
+  ; Show the details box so users can see per-phase timing information.
+  ShowInstDetails show
 !macroend
 
 !macro customInit
+  ; ── Capture total install start tick (persisted to file for cross-macro access) ──
+  System::Call 'kernel32::GetTickCount()i .r9'
+  FileOpen $8 "$APPDATA\RongxinAI\install-start-tick.txt" w
+  FileWrite $8 "$r9"
+  FileClose $8
+
   CreateDirectory "$APPDATA\RongxinAI"
   FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" w
   !insertmacro GetTimestamp $8
@@ -55,12 +60,14 @@
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=process-stop-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
+  DetailPrint "[Installer] Stopped running processes — $5 ms"
 
   ; ── Clean stale openclaw-weixin session data ──
   ; On reinstall, old bot tokens cause the ilink server to reject new QR logins
   ; because it still considers the old session active. Remove stale accounts
   ; from both possible state directories so the fresh install starts clean.
   DetailPrint "[Installer] Clearing stale Weixin session data"
+  System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$dirs = @(\
       (Join-Path $$env:USERPROFILE \".openclaw\openclaw-weixin\accounts\"),\
@@ -73,6 +80,13 @@
       }\
     }"'
   Pop $0
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $5 $6 - $7
+  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
+  !insertmacro GetTimestamp $8
+  FileWrite $9 "$8 phase=weixin-cleanup-complete exit=$0 elapsed_ms=$5$\r$\n"
+  FileClose $9
+  DetailPrint "[Installer] Cleared stale Weixin session data — $5 ms"
 
   ; ── Backup user-created skills to AppData before extraction overwrites them ──
   ; Copy non-bundled skills to %APPDATA%\RongxinAI\skills-backup\ so they are
@@ -128,6 +142,7 @@
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=skill-backup-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
+  DetailPrint "[Installer] Backed up user-created skills — $5 ms"
 
   ; ── Remove old installation directory ──
   ; Rename $INSTDIR so the old uninstaller exe disappears from its registered
@@ -162,6 +177,7 @@
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=old-install-cleanup-complete elapsed_ms=$5 renamed_path=$3 cleanup_mode=async$\r$\n"
   FileClose $9
+  DetailPrint "[Installer] Removed previous installation directory — $5 ms"
 !macroend
 
 !macro customInstall
@@ -205,6 +221,7 @@
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=defender-exclusion-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
+  DetailPrint "[Installer] Windows Defender exclusions added — $5 ms"
 
   ; ── Native tar extraction ──
   DetailPrint "[Installer] Extracting bundled resources (native tar)"
@@ -252,7 +269,7 @@
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
-  DetailPrint "[Installer] Bundled resources extraction complete"
+  DetailPrint "[Installer] Bundled resources extracted — $5 ms"
   Delete "$INSTDIR\resources\win-resources.tar"
 
   ; ── Restore user-created skills from AppData backup ──
@@ -285,11 +302,35 @@
     FileWrite $2 "$8 phase=skill-restore-complete exit=$0 elapsed_ms=$5$\r$\n"
     FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
     FileClose $2
+    DetailPrint "[Installer] User-created skills restored — $5 ms"
   SkipSkillRestore:
+
+  ; ── Total install time ──
+  FileOpen $2 "$APPDATA\RongxinAI\install-start-tick.txt" r
+  IfErrors TotalTimeSkip
+  FileRead $2 $R1
+  FileClose $2
+  System::Call 'kernel32::GetTickCount()i .r7'
+  IntOp $R2 $R7 - $R1
+  StrCpy $R3 ""
+  IntCmp $R2 1000 TotalLessThan1s TotalLessThan1s TotalInSeconds
+  TotalLessThan1s:
+    StrCpy $R3 "$R2 ms"
+    Goto TotalTimeDone
+  TotalInSeconds:
+    ; Show as whole seconds with 1 decimal (tenths)
+    IntOp $R4 $R2 / 100   ; tenths of seconds
+    IntOp $R5 $R4 % 10    ; decimal digit
+    IntOp $R4 $R4 / 10    ; whole seconds
+    StrCpy $R3 "$R4.$R5 s"
+  TotalTimeDone:
+  Delete "$APPDATA\RongxinAI\install-start-tick.txt"
+  DetailPrint "[Installer] Total installation time: $R3"
+  TotalTimeSkip:
 
   FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=install-complete$\r$\n"
+  FileWrite $2 "$8 phase=install-complete total_ms=$R2$\r$\n"
   FileClose $2
   DetailPrint "[Installer] Installation complete"
 !macroend
