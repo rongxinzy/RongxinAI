@@ -106,6 +106,8 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
       - run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
       - uses: actions/upload-artifact@v4
         with:
           name: renderer-dist
