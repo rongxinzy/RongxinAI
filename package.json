@@ -93,6 +93,7 @@
     "openclaw:runtime:win-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs win-arm64 && node scripts/sync-openclaw-runtime-current.cjs win-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
     "openclaw:runtime:linux-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs linux-x64 && node scripts/sync-openclaw-runtime-current.cjs linux-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
     "openclaw:runtime:linux-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs linux-arm64 && node scripts/sync-openclaw-runtime-current.cjs linux-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
+    "upload:artifact": "node scripts/upload-artifact.cjs",
     "regenerate:icon": "bash scripts/regenerate-mac-icon.sh",
     "fix:mac-icon": "bash scripts/fix-mac-icon-display.sh"
   },
