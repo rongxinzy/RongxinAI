@@ -12,6 +12,7 @@
  *   FROG_PW      - JFrog password or API key (required)
  *   FROG_REPO    - Target repository (default: generic-local)
  *   ALL_PROXY    - Optional proxy (e.g. socks5h://localhost:1055)
+ *   HTTP_PROXY   - Optional HTTP proxy
  */
 
 const fs = require('fs');
@@ -51,8 +52,15 @@ function uploadArtifact(localPath, remotePath, options = {}) {
     '-u', `${frogName}:${frogPw}`,
     '-T', resolvedLocal,
     '-H', 'X-Checksum-Deploy:false',
-    url,
   ];
+
+  // Explicitly pass proxy if set, to ensure curl uses it
+  const proxy = process.env.ALL_PROXY || process.env.HTTP_PROXY || process.env.http_proxy || '';
+  if (proxy) {
+    curlArgs.push('--proxy', proxy);
+  }
+
+  curlArgs.push(url);
 
   const cmd = `curl ${curlArgs.map((a) => `"${a}"`).join(' ')}`;
   execSync(cmd, { stdio: 'inherit', env: process.env });

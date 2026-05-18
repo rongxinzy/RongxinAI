@@ -38,34 +38,66 @@ jobs:
         run: |
           sudo cp certs/headscale.crt /usr/local/share/ca-certificates/headscale.crt
           sudo update-ca-certificates
+          # Verify certificate is in the bundle (Go programs read this file)
+          grep -c "headscale" /etc/ssl/certs/ca-certificates.crt || true
 
       - name: Start Tailscale VPN
         env:
           VPN_KEY: ${{ secrets.VPN_KEY }}
         run: |
+          # Go programs (including tailscale) need these env vars to find custom CA certs
+          export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+          export SSL_CERT_DIR=/etc/ssl/certs
+
           echo "Starting tailscaled in userspace networking mode..."
           sudo tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1056 &
+          TAILSCALED_PID=$!
+          echo "tailscaled PID: $TAILSCALED_PID"
           sleep 3
+
           echo "Connecting to headscale..."
           sudo -E tailscale up \
             --login-server=https://headscale.wystarry.com:9443/ \
             --accept-routes \
             --auth-key "$VPN_KEY" \
-            --hostname="github-actions-${{ github.run_id }}"
-          sleep 2
-          echo "Tailscale status:"
-          sudo tailscale status
+            --hostname="github-actions-${{ github.run_id }}" \
+            --timeout=60s \
+            --reset
+
+          UP_EXIT=$?
+          echo "tailscale up exited with code: $UP_EXIT"
+
+          echo "Waiting for BackendState=Running..."
+          for i in $(seq 1 15); do
+            STATE=$(sudo tailscale status --json 2>/dev/null | grep -o '"BackendState" *: *"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || true)
+            echo "Attempt $i/15: BackendState=$STATE"
+            if [ "$STATE" = "Running" ]; then
+              echo "Tailscale is Running!"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "=== Tailscale Status ==="
+          sudo tailscale status || true
+
+          echo "=== Tailscale IPs ==="
+          sudo tailscale ip -4 || true
 
       - name: Verify VPN Connectivity
-        env:
-          ALL_PROXY: socks5h://localhost:1055
         run: |
-          echo "Checking connectivity to JFrog via VPN..."
-          # Try to reach JFrog Artifactory API through the SOCKS5 proxy
-          curl -sS --connect-timeout 15 --proxy socks5h://localhost:1055 \
+          PROXY="socks5h://localhost:1055"
+          echo "Testing SOCKS5 proxy ($PROXY) connectivity..."
+
+          # Test 1: Can we reach the proxy itself?
+          curl -sS --connect-timeout 5 --proxy "$PROXY" http://100.100.100.100 2>&1 | head -5 || true
+
+          # Test 2: Try to reach JFrog through the proxy
+          echo "Testing JFrog reachability via VPN proxy..."
+          curl -sS --connect-timeout 15 --proxy "$PROXY" \
             -u "${{ secrets.FROG_NAME }}:${{ secrets.FROG_PW }}" \
             http://172.18.5.249:8081/artifactory/api/repositories || {
-              echo "Warning: Could not reach JFrog API immediately (this is OK if ACLs restrict the API endpoint)"
+              echo "Warning: JFrog API check returned non-zero (may be OK if repo endpoint differs)"
             }
 
       - name: Setup Node.js
