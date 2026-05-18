@@ -18,22 +18,22 @@ import { useDispatch } from 'react-redux';
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
+  LlamaCppChatChunk as OllamaChatChunk,
+  LlamaCppChatPayload as OllamaChatPayload,
+  LlamaCppModel as OllamaModel,
+  LlamaCppModelLaunchInput as OllamaModelLaunchInput,
+  LlamaCppRunningModel as OllamaRunningModel,
+  LlamaCppServiceConfig as OllamaServiceConfig,
+  LlamaCppStatusSnapshot as OllamaStatusSnapshot,
+} from '../../../shared/llamacpp';
+import {
+  createLlamaCppStreamState as createOllamaStreamState,
+  reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
+} from '../../../shared/llamacpp';
+import type {
   MarketplaceModel,
   MarketplaceSearchParams,
 } from '../../../shared/marketplace';
-import type {
-  OllamaChatChunk,
-  OllamaChatPayload,
-  OllamaModel,
-  OllamaModelLaunchInput,
-  OllamaRunningModel,
-  OllamaServiceConfig,
-  OllamaStatusSnapshot,
-} from '../../../shared/ollama';
-import {
-  createOllamaStreamState,
-  reduceOllamaStreamChunk,
-} from '../../../shared/ollama';
 import { OpenClawProviderId, ProviderName } from '../../../shared/providers';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
@@ -92,10 +92,10 @@ type LaunchRequest = {
 };
 
 type OllamaServiceConfigFormState = {
-  cudaVisibleDevices: string;
-  maxLoadedModels: string;
-  numParallel: string;
-  schedSpread: string;
+  device: string;
+  modelsMax: string;
+  parallel: string;
+  splitMode: string;
 };
 
 type SaveServiceConfigResult = {
@@ -200,7 +200,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setError(null);
     setNotice(null);
     try {
-      await window.electron.ollama.pullModel(name);
+      await window.electron.llamacpp.pullModel(name);
       await refreshLocalModels();
       setNotice(i18nService.t('marketplacePullDone').replace('{name}', name));
     } catch (installError) {
@@ -222,19 +222,19 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 
   const refreshStatus = useCallback(async () => {
-    const nextStatus = await window.electron.ollama.status();
+    const nextStatus = await window.electron.llamacpp.status();
     setStatus(nextStatus);
     return nextStatus;
   }, []);
 
   const refreshLocalModels = useCallback(async () => {
-    const models = await window.electron.ollama.listLocalModels();
+    const models = await window.electron.llamacpp.listLocalModels();
     setLocalModels(models);
     return models;
   }, []);
 
   const refreshRunningModels = useCallback(async () => {
-    const models = await window.electron.ollama.listRunningModels();
+    const models = await window.electron.llamacpp.listRunningModels();
     setRunningModels(models);
     return models;
   }, []);
@@ -258,8 +258,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   useEffect(() => {
     const unsubscribers = [
-      window.electron.ollama.onStatusChanged(setStatus),
-      window.electron.ollama.onPullProgress(({ name, chunk }) => {
+      window.electron.llamacpp.onStatusChanged(setStatus),
+      window.electron.llamacpp.onPullProgress(({ name, chunk }) => {
         setPullProgress((current) => ({ ...current, [name]: chunk }));
       }),
     ];
@@ -301,7 +301,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const requestId = activeRequestIdRef.current;
     conversationVersionRef.current += 1;
     if (requestId) {
-      void window.electron.ollama.cancelChatStream(requestId).catch(() => undefined);
+      void window.electron.llamacpp.cancelChatStream(requestId).catch(() => undefined);
     }
     activeRequestIdRef.current = null;
     messagesRef.current = [];
@@ -349,10 +349,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handlePrepare = () => {
     void runAction(async () => {
       if (status?.status === 'not-installed') {
-        await window.electron.ollama.install();
+        await window.electron.llamacpp.install();
         setNotice(i18nService.t('localInferenceInstallOpened'));
       } else if (status?.status === 'installed' || status?.status === 'stopped') {
-        await window.electron.ollama.start();
+        await window.electron.llamacpp.start();
       } else {
         await refreshStatus();
       }
@@ -365,7 +365,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleStop = () => {
     void runAction(async () => {
-      await window.electron.ollama.stop();
+      await window.electron.llamacpp.stop();
       const nextStatus = await refreshStatus();
       if (nextStatus.status === 'running') {
         await refreshRunningModels();
@@ -383,7 +383,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       [normalizedPullName]: { status: 'starting' },
     }));
     void runAction(async () => {
-      await window.electron.ollama.pullModel(normalizedPullName);
+      await window.electron.llamacpp.pullModel(normalizedPullName);
       await refreshLocalModels();
       setNotice(i18nService.t('localInferencePullDone').replace('{name}', normalizedPullName));
     });
@@ -391,7 +391,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleCancelPull = () => {
     if (!activePullName) return;
-    void window.electron.ollama.cancelPull(activePullName).catch((cancelError) => {
+    void window.electron.llamacpp.cancelPull(activePullName).catch((cancelError) => {
       setError(cancelError instanceof Error ? cancelError.message : String(cancelError));
     });
   };
@@ -406,14 +406,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         const nextConfig = { ...serviceConfig, ...servicePatch };
         const savedConfig = await saveOllamaServiceConfig(nextConfig);
         setServiceConfig(savedConfig);
-        const restartedStatus = await window.electron.ollama.restart();
+        const restartedStatus = await window.electron.llamacpp.restart();
         setStatus(restartedStatus);
         if (restartedStatus.status !== 'running') {
           throw new Error(restartedStatus.error || i18nService.t('localInferenceLaunchRestartFailed'));
         }
       }
 
-      const result = await window.electron.ollama.preloadModel(request.input);
+      const result = await window.electron.llamacpp.loadModel(request.input);
       setRunningModels(result.runningModels);
       resetInferenceConversation();
       setSelectedModel(request.input.model);
@@ -426,14 +426,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleUnload = (modelName: string) => {
     void runAction(async () => {
-      const result = await window.electron.ollama.unloadModel(modelName);
+      const result = await window.electron.llamacpp.unloadModel(modelName);
       setRunningModels(result.runningModels);
     });
   };
 
   const handleDelete = (modelName: string) => {
     void runAction(async () => {
-      await window.electron.ollama.deleteModel(modelName);
+      await window.electron.llamacpp.deleteModel(modelName);
       await refreshLocalModels();
       await refreshRunningModels();
     });
@@ -441,14 +441,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleSetOpenClawModel = (modelName: string) => {
     void runAction(async () => {
-      const result = await window.electron.ollama.setOpenClawModel(modelName);
+      const result = await window.electron.llamacpp.setOpenClawModel(modelName);
       if (!result.success) throw new Error(result.error || i18nService.t('localInferenceSetOpenClawFailed'));
       const model = {
         id: modelName,
         name: modelName,
-        provider: 'Ollama',
-        providerKey: ProviderName.Ollama,
-        openClawProviderId: OpenClawProviderId.Ollama,
+        provider: 'Llama.cpp',
+        providerKey: ProviderName.LlamaCpp,
+        openClawProviderId: OpenClawProviderId.LlamaCpp,
         supportsImage: false,
       };
       if (result.config) {
@@ -464,7 +464,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   };
 
   const handleSavePreset = () => {
-    localStorage.setItem('lobsterai:ollama-inference-options', JSON.stringify(options));
+    localStorage.setItem('lobsterai:llamacpp-inference-options', JSON.stringify(options));
     setNotice(i18nService.t('localInferencePresetSaved'));
   };
 
@@ -488,7 +488,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       && conversationVersionRef.current === conversationVersion;
 
     let streamState = createOllamaStreamState();
-    const unsubscribe = window.electron.ollama.onChatStreamChunk(({ requestId: eventRequestId, chunk }) => {
+    const unsubscribe = window.electron.llamacpp.onChatStreamChunk(({ requestId: eventRequestId, chunk }) => {
       if (eventRequestId !== requestId || conversationVersionRef.current !== conversationVersion) return;
       streamState = reduceOllamaStreamChunk(streamState, chunk);
       setStreamingThinking(streamState.thinking);
@@ -510,7 +510,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         ],
         options: normalizeOptions(options),
       };
-      await window.electron.ollama.chatStream(requestId, payload);
+      await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
       const assistantMessage: InferenceMessage = {
         role: 'assistant',
@@ -557,7 +557,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     if (!requestId) return;
     setCancelling(true);
     try {
-      await window.electron.ollama.cancelChatStream(requestId);
+      await window.electron.llamacpp.cancelChatStream(requestId);
     } catch (cancelError) {
       setError(cancelError instanceof Error ? cancelError.message : String(cancelError));
       setCancelling(false);
@@ -875,10 +875,10 @@ function OllamaServiceConfigDialog({
   const save = async () => {
     setSaveError(null);
     const result = await onSave({
-      cudaVisibleDevices: form.cudaVisibleDevices,
-      maxLoadedModels: form.maxLoadedModels,
-      numParallel: form.numParallel,
-      ...(form.schedSpread ? { schedSpread: form.schedSpread === 'true' } : {}),
+      device: form.device,
+      modelsMax: form.modelsMax,
+      parallel: form.parallel,
+      ...(form.splitMode ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> } : {}),
     });
     if (result.success) {
       onClose();
@@ -924,38 +924,40 @@ function OllamaServiceConfigDialog({
             )}
             <div className="grid gap-4 md:grid-cols-2">
               <ServiceConfigInput
-                label="CUDA_VISIBLE_DEVICES"
-                value={form.cudaVisibleDevices}
+                label="LLAMACPP_DEVICE"
+                value={form.device}
                 placeholder="0,1"
-                hint={i18nService.t('localInferenceServiceConfigCudaHint')}
-                onChange={(value) => updateForm('cudaVisibleDevices', value)}
+                hint={i18nService.t('localInferenceServiceConfigDeviceHint')}
+                onChange={(value) => updateForm('device', value)}
               />
               <ServiceConfigInput
-                label="OLLAMA_MAX_LOADED_MODELS"
-                value={form.maxLoadedModels}
+                label="LLAMACPP_MODELS_MAX"
+                value={form.modelsMax}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceServiceConfigMaxLoadedHint')}
-                onChange={(value) => updateForm('maxLoadedModels', value)}
+                hint={i18nService.t('localInferenceServiceConfigModelsMaxHint')}
+                onChange={(value) => updateForm('modelsMax', value)}
               />
               <ServiceConfigInput
-                label="OLLAMA_NUM_PARALLEL"
-                value={form.numParallel}
+                label="LLAMACPP_PARALLEL"
+                value={form.parallel}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceServiceConfigNumParallelHint')}
-                onChange={(value) => updateForm('numParallel', value)}
+                hint={i18nService.t('localInferenceServiceConfigParallelHint')}
+                onChange={(value) => updateForm('parallel', value)}
               />
               <label className="space-y-2 md:col-span-2">
-                <span className="font-mono text-sm font-semibold text-foreground">OLLAMA_SCHED_SPREAD</span>
+                <span className="font-mono text-sm font-semibold text-foreground">LLAMACPP_SPLIT_MODE</span>
                 <select
-                  value={form.schedSpread}
-                  onChange={(event) => updateForm('schedSpread', event.target.value)}
+                  value={form.splitMode}
+                  onChange={(event) => updateForm('splitMode', event.target.value)}
                   className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
                 >
                   <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
-                  <option value="true">{i18nService.t('localInferenceLaunchBooleanEnabled')}</option>
-                  <option value="false">{i18nService.t('localInferenceLaunchBooleanDisabled')}</option>
+                  <option value="none">{i18nService.t('localInferenceServiceConfigSplitNone')}</option>
+                  <option value="layer">{i18nService.t('localInferenceServiceConfigSplitLayer')}</option>
+                  <option value="row">{i18nService.t('localInferenceServiceConfigSplitRow')}</option>
+                  <option value="tensor">{i18nService.t('localInferenceServiceConfigSplitTensor')}</option>
                 </select>
-                <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigSchedSpreadHint')}</p>
+                <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigSplitModeHint')}</p>
               </label>
             </div>
             <p className="mt-4 text-xs text-secondary">
@@ -1249,15 +1251,15 @@ function LaunchModelDialog({
     const parsedNumBatch = parseOptionalInteger(form.numBatch);
     const parsedUseMmap = parseOptionalBoolean(form.useMmap);
 
-    if (parsedNumCtx !== undefined) options.num_ctx = parsedNumCtx;
-    if (parsedNumBatch !== undefined) options.num_batch = parsedNumBatch;
-    if (parsedNumGpu !== undefined) options.num_gpu = parsedNumGpu;
-    if (parsedUseMmap !== undefined) options.use_mmap = parsedUseMmap;
-    if (parsedNumThread !== undefined) options.num_thread = parsedNumThread;
+    if (parsedNumCtx !== undefined) options.ctxSize = parsedNumCtx;
+    if (parsedNumBatch !== undefined) options.batchSize = parsedNumBatch;
+    if (parsedNumGpu !== undefined) options.gpuLayers = parsedNumGpu;
+    if (parsedUseMmap !== undefined) options.mmap = parsedUseMmap;
+    if (parsedNumThread !== undefined) options.threads = parsedNumThread;
 
     return {
       model: model.name,
-      keep_alive: -1,
+      ...(model.path ? { modelPath: model.path } : {}),
       ...(Object.keys(options).length > 0 ? { options } : {}),
     };
   };
@@ -1761,7 +1763,7 @@ function InferencePanel({
           <RangeControl label="temperature" min={0} max={2} step={0.1} value={options.temperature} onChange={(value) => onOptionsChange({ ...options, temperature: value })} />
           <RangeControl label="top_p" min={0} max={1} step={0.05} value={options.top_p} onChange={(value) => onOptionsChange({ ...options, top_p: value })} />
           <RangeControl label="top_k" min={1} max={100} step={1} value={options.top_k} onChange={(value) => onOptionsChange({ ...options, top_k: value })} />
-          <RangeControl label="num_predict" min={-1} max={32768} step={1} value={options.num_predict} onChange={(value) => onOptionsChange({ ...options, num_predict: value })} />
+          <RangeControl label={i18nService.t('localInferenceMaxTokens')} min={-1} max={32768} step={1} value={options.num_predict} onChange={(value) => onOptionsChange({ ...options, num_predict: value })} />
           <RangeControl label="repeat_penalty" min={0} max={2} step={0.05} value={options.repeat_penalty} onChange={(value) => onOptionsChange({ ...options, repeat_penalty: value })} />
           <div>
             <label className="mb-1 block text-xs font-medium text-secondary">seed</label>
@@ -1883,7 +1885,7 @@ function ChatBubble({ message, streaming = false }: { message: InferenceMessage;
           <MarkdownContent content={message.content} />
         )}
         {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/50 align-text-bottom" />}
-        {message.metrics && (
+        {hasMetricsSummary(message.metrics) && (
           <p className="mt-2 border-t border-border pt-2 text-xs text-secondary">
             {formatMetricsSummary(message.metrics)}
           </p>
@@ -1979,16 +1981,16 @@ function resolveLaunchServiceConfig(preset: string, customGpuDevices: string): P
     case 'service-default':
       return null;
     case 'single-auto':
-      return { cudaVisibleDevices: '', schedSpread: false };
+      return { device: '', splitMode: 'none' };
     case 'gpu0':
-      return { cudaVisibleDevices: '0', schedSpread: false };
+      return { device: '0', splitMode: 'none' };
     case 'gpu1':
-      return { cudaVisibleDevices: '1', schedSpread: false };
+      return { device: '1', splitMode: 'none' };
     case 'dual-gpu':
-      return { cudaVisibleDevices: '0,1', schedSpread: true };
+      return { device: '0,1', splitMode: 'layer' };
     case 'custom': {
       const normalized = normalizeGpuDeviceList(customGpuDevices);
-      return normalized ? { cudaVisibleDevices: normalized } : null;
+      return normalized ? { device: normalized, splitMode: 'none' } : null;
     }
     default:
       return null;
@@ -1996,8 +1998,10 @@ function resolveLaunchServiceConfig(preset: string, customGpuDevices: string): P
 }
 
 function hasServiceConfigPatchChanged(current: OllamaServiceConfig, patch: Partial<OllamaServiceConfig>): boolean {
-  if ('cudaVisibleDevices' in patch && patch.cudaVisibleDevices !== (current.cudaVisibleDevices ?? '')) return true;
-  if ('schedSpread' in patch && patch.schedSpread !== current.schedSpread) return true;
+  if ('device' in patch && patch.device !== (current.device ?? '')) return true;
+  if ('modelsMax' in patch && patch.modelsMax !== (current.modelsMax ?? '')) return true;
+  if ('parallel' in patch && patch.parallel !== (current.parallel ?? '')) return true;
+  if ('splitMode' in patch && patch.splitMode !== current.splitMode) return true;
   return false;
 }
 
@@ -2010,38 +2014,32 @@ function normalizeGpuDeviceList(value: string): string {
 }
 
 function formatCurrentGpuServiceConfig(config: OllamaServiceConfig): string {
-  const devices = config.cudaVisibleDevices?.trim();
-  const spread = config.schedSpread === true
-    ? i18nService.t('localInferenceLaunchGpuSpreadOn')
-    : config.schedSpread === false
-      ? i18nService.t('localInferenceLaunchGpuSpreadOff')
-      : i18nService.t('localInferenceLaunchDefault');
-  return devices
-    ? `${devices} · ${spread}`
-    : `${i18nService.t('localInferenceLaunchGpuAutoVisible')} · ${spread}`;
+  const device = config.device?.trim();
+  const splitMode = config.splitMode?.trim() || i18nService.t('localInferenceLaunchDefault');
+  return device
+    ? `${device} · ${splitMode}`
+    : `${i18nService.t('localInferenceLaunchGpuAutoVisible')} · ${splitMode}`;
 }
 
 function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string): string {
   const patch = resolveLaunchServiceConfig(preset, customGpuDevices);
   if (!patch) return i18nService.t('localInferenceLaunchGpuKeepService');
-  const devices = patch.cudaVisibleDevices?.trim() || i18nService.t('localInferenceLaunchGpuAutoVisible');
-  if (patch.schedSpread === true) return `${devices} · ${i18nService.t('localInferenceLaunchGpuSpreadOn')}`;
-  if (patch.schedSpread === false) return `${devices} · ${i18nService.t('localInferenceLaunchGpuSpreadOff')}`;
-  return devices;
+  const devices = patch.device?.trim() || i18nService.t('localInferenceLaunchGpuAutoVisible');
+  return `${devices} · ${patch.splitMode ?? i18nService.t('localInferenceLaunchDefault')}`;
 }
 
 function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFormState {
   return {
-    cudaVisibleDevices: config.cudaVisibleDevices ?? '',
-    maxLoadedModels: config.maxLoadedModels ?? '',
-    numParallel: config.numParallel ?? '',
-    schedSpread: config.schedSpread === undefined ? '' : String(config.schedSpread),
+    device: config.device ?? '',
+    modelsMax: config.modelsMax ?? '',
+    parallel: config.parallel ?? '',
+    splitMode: config.splitMode ?? '',
   };
 }
 
 async function loadOllamaServiceConfig(): Promise<OllamaServiceConfig> {
   try {
-    return await window.electron.ollama.getServiceConfig();
+    return await window.electron.llamacpp.getServiceConfig();
   } catch (error) {
     if (isMissingIpcHandlerError(error)) return {};
     throw error;
@@ -2050,7 +2048,7 @@ async function loadOllamaServiceConfig(): Promise<OllamaServiceConfig> {
 
 async function saveOllamaServiceConfig(config: OllamaServiceConfig): Promise<OllamaServiceConfig> {
   try {
-    return await window.electron.ollama.setServiceConfig(config);
+    return await window.electron.llamacpp.setServiceConfig(config);
   } catch (error) {
     if (isMissingIpcHandlerError(error)) {
       throw new Error(i18nService.t('localInferenceServiceConfigRestartAppRequired'));
@@ -2061,7 +2059,7 @@ async function saveOllamaServiceConfig(config: OllamaServiceConfig): Promise<Oll
 
 function isMissingIpcHandlerError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes('No handler registered') && message.includes('ollama:service-config');
+  return message.includes('No handler registered') && message.includes('llamacpp:service-config');
 }
 
 function suggestLaunchOptions(
@@ -2138,7 +2136,7 @@ function resolveModelParameterCount(model: OllamaModel): number {
 
 function loadInferenceOptions(): InferenceOptions {
   try {
-    const raw = localStorage.getItem('lobsterai:ollama-inference-options');
+    const raw = localStorage.getItem('lobsterai:llamacpp-inference-options');
     if (!raw) return DEFAULT_INFERENCE_OPTIONS;
     return { ...DEFAULT_INFERENCE_OPTIONS, ...JSON.parse(raw) };
   } catch {
@@ -2155,7 +2153,7 @@ function normalizeOptions(options: InferenceOptions): Record<string, unknown> {
     temperature: options.temperature,
     top_p: options.top_p,
     top_k: options.top_k,
-    num_predict: options.num_predict,
+    max_tokens: options.num_predict,
     repeat_penalty: options.repeat_penalty,
     ...(options.seed >= 0 ? { seed: options.seed } : {}),
     ...(stop.length > 0 ? { stop } : {}),
@@ -2164,12 +2162,12 @@ function normalizeOptions(options: InferenceOptions): Record<string, unknown> {
 
 function isPullInProgress(progress?: Record<string, unknown>): boolean {
   if (!progress) return false;
-  const status = typeof progress.status === 'string' ? progress.status : '';
-  return !['success', 'done', 'cancelled', 'error', 'failed'].includes(status);
+  const status = readProgressStatus(progress);
+  return !['success', 'done', 'cancelled', 'error', 'failed', 'needs-manual'].includes(status);
 }
 
 function formatPullProgress(progress: Record<string, unknown>): string {
-  const status = typeof progress.status === 'string' ? progress.status : '';
+  const status = readProgressStatus(progress);
   const error = typeof progress.error === 'string' ? progress.error : '';
   const completed = typeof progress.completed === 'number' ? progress.completed : undefined;
   const total = typeof progress.total === 'number' ? progress.total : undefined;
@@ -2178,6 +2176,12 @@ function formatPullProgress(progress: Record<string, unknown>): string {
     return `${status} · ${formatBytes(completed)} / ${formatBytes(total)}`;
   }
   return status || i18nService.t('loading');
+}
+
+function readProgressStatus(progress: Record<string, unknown>): string {
+  if (typeof progress.status === 'string') return progress.status;
+  if (typeof progress.phase === 'string') return progress.phase;
+  return '';
 }
 
 function formatBytes(value: number): string {
@@ -2194,13 +2198,30 @@ function formatDate(value: string): string {
 }
 
 function formatMetricsSummary(metrics: OllamaChatChunk): string {
-  const tokens = metrics.eval_count ?? 0;
-  const durationNs = metrics.eval_duration ?? 0;
-  const seconds = durationNs / 1_000_000_000;
-  const speed = seconds > 0 ? (tokens / seconds).toFixed(1) : '-';
+  const tokens = readMetricNumber(metrics.usage, 'completion_tokens')
+    ?? readMetricNumber(metrics.timings, 'predicted_n')
+    ?? metrics.eval_count;
+  const speedValue = readMetricNumber(metrics.timings, 'predicted_per_second')
+    ?? metrics.predicted_per_second;
+  const speed = speedValue !== undefined ? speedValue.toFixed(1) : '-';
   return i18nService.t('localInferenceMetrics')
-    .replace('{tokens}', String(tokens))
+    .replace('{tokens}', tokens === undefined ? '-' : String(tokens))
     .replace('{speed}', speed);
+}
+
+function hasMetricsSummary(metrics: OllamaChatChunk | null | undefined): metrics is OllamaChatChunk {
+  if (!metrics) return false;
+  return readMetricNumber(metrics.usage, 'completion_tokens') !== undefined
+    || readMetricNumber(metrics.timings, 'predicted_n') !== undefined
+    || readMetricNumber(metrics.timings, 'predicted_per_second') !== undefined
+    || metrics.eval_count !== undefined
+    || metrics.predicted_per_second !== undefined;
+}
+
+function readMetricNumber(source: unknown, key: string): number | undefined {
+  if (!source || typeof source !== 'object') return undefined;
+  const value = (source as Record<string, unknown>)[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function MarketplacePanel({

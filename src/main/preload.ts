@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
+import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
@@ -107,6 +108,62 @@ contextBridge.exposeInMainWorld('electron', {
       const handler = (_event: any, payload: any) => callback(payload);
       ipcRenderer.on(OllamaIpcChannel.ChatStreamChunk, handler);
       return () => ipcRenderer.removeListener(OllamaIpcChannel.ChatStreamChunk, handler);
+    },
+  },
+  llamacpp: {
+    status: () => ipcRenderer.invoke(LlamaCppIpcChannel.Status),
+    install: () => ipcRenderer.invoke(LlamaCppIpcChannel.Install),
+    start: () => ipcRenderer.invoke(LlamaCppIpcChannel.Start),
+    stop: () => ipcRenderer.invoke(LlamaCppIpcChannel.Stop),
+    restart: () => ipcRenderer.invoke(LlamaCppIpcChannel.Restart),
+    getServiceConfig: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetServiceConfig),
+    setServiceConfig: (config: any) => ipcRenderer.invoke(LlamaCppIpcChannel.SetServiceConfig, config),
+    modelsDir: () => ipcRenderer.invoke(LlamaCppIpcChannel.ModelsDir),
+    listLocalModels: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListLocalModels),
+    listRunningModels: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListRunningModels),
+    deleteModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.DeleteModel, name),
+    showModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.ShowModel, name),
+    loadModel: (input: any) => ipcRenderer.invoke(LlamaCppIpcChannel.LoadModel, input),
+    unloadModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.UnloadModel, name),
+    installModel: (input: any) => ipcRenderer.invoke(LlamaCppIpcChannel.InstallModel, input),
+    cancelInstall: (modelId: string) => ipcRenderer.invoke(LlamaCppIpcChannel.CancelInstall, modelId),
+    pullModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.InstallModel, { modelId: name, displayName: name }),
+    cancelPull: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.CancelInstall, name),
+    chat: (payload: any) => ipcRenderer.invoke(LlamaCppIpcChannel.Chat, payload),
+    chatStream: (requestId: string, payload: any) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.ChatStream, requestId, payload),
+    cancelChatStream: (requestId: string) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.CancelChatStream, requestId),
+    setOpenClawModel: (modelName: string) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.SetOpenClawModel, modelName),
+    onStatusChanged: (callback: (snapshot: any) => void) => {
+      const handler = (_event: any, snapshot: any) => callback(snapshot);
+      ipcRenderer.on(LlamaCppIpcChannel.StatusChanged, handler);
+      return () => ipcRenderer.removeListener(LlamaCppIpcChannel.StatusChanged, handler);
+    },
+    onInstallProgress: (callback: (progress: any) => void) => {
+      const handler = (_event: any, progress: any) => callback(progress);
+      ipcRenderer.on(LlamaCppIpcChannel.InstallProgress, handler);
+      return () => ipcRenderer.removeListener(LlamaCppIpcChannel.InstallProgress, handler);
+    },
+    onPullProgress: (callback: (payload: any) => void) => {
+      const handler = (_event: any, progress: any) => {
+        const name = String(progress?.modelId || progress?.modelName || '');
+        callback({
+          name,
+          chunk: {
+            ...progress,
+            status: progress?.phase,
+          },
+        });
+      };
+      ipcRenderer.on(LlamaCppIpcChannel.InstallProgress, handler);
+      return () => ipcRenderer.removeListener(LlamaCppIpcChannel.InstallProgress, handler);
+    },
+    onChatStreamChunk: (callback: (payload: any) => void) => {
+      const handler = (_event: any, payload: any) => callback(payload);
+      ipcRenderer.on(LlamaCppIpcChannel.ChatStreamChunk, handler);
+      return () => ipcRenderer.removeListener(LlamaCppIpcChannel.ChatStreamChunk, handler);
     },
   },
   marketplace: {

@@ -26,6 +26,7 @@ import {
   rejectPairingRequest,
 } from './im/imPairingStore';
 import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
+import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import {
@@ -54,6 +55,7 @@ import { registerProxyTokenRefresher, startCoworkOpenAICompatProxy, stopCoworkOp
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
 import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
+import { LlamaCppManager } from './libs/llamacppManager';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { McpServerManager } from './libs/mcpServerManager';
@@ -814,6 +816,7 @@ let imGatewayManager: IMGatewayManager | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
 let openClawEngineManager: OpenClawEngineManager | null = null;
+let llamaCppManager: LlamaCppManager | null = null;
 let ollamaManager: OllamaManager | null = null;
 let openClawConfigSync: OpenClawConfigSync | null = null;
 let openClawBootstrapPromise: Promise<OpenClawEngineStatus> | null = null;
@@ -867,6 +870,13 @@ const getOpenClawEngineManager = (): OpenClawEngineManager => {
     openClawEngineManager = new OpenClawEngineManager();
   }
   return openClawEngineManager;
+};
+
+const getLlamaCppManager = (): LlamaCppManager => {
+  if (!llamaCppManager) {
+    llamaCppManager = new LlamaCppManager(() => getLlamaCppServiceConfig(getStore()));
+  }
+  return llamaCppManager;
 };
 
 const getOllamaManager = (): OllamaManager => {
@@ -5705,6 +5715,12 @@ if (!gotTheLock) {
       });
     }
 
+    if (llamaCppManager) {
+      await llamaCppManager.shutdownForQuit().catch((error) => {
+        console.error('[LlamaCpp] Failed to stop service on quit:', error);
+      });
+    }
+
     // Stop the cron job polling
     try {
       getCronJobService().stopPolling();
@@ -5825,6 +5841,11 @@ if (!gotTheLock) {
     }
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
+    registerLlamaCppIpcHandlers(getLlamaCppManager(), {
+      getStore,
+      syncOpenClawConfig,
+      getAgentManager,
+    });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
       syncOpenClawConfig,
