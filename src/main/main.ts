@@ -5851,7 +5851,9 @@ if (!gotTheLock) {
       syncOpenClawConfig,
       getAgentManager,
     });
-    registerMarketplaceIpcHandlers();
+    registerMarketplaceIpcHandlers({
+      getModelsDir: () => getLlamaCppManager().getModelsDir(),
+    });
     // Inject auth getters for lobsterai-server provider routing
     // The getter proactively triggers a background token refresh when the
     // accessToken is within 5 minutes of expiry, so that the SDK always

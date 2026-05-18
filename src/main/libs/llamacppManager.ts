@@ -336,6 +336,7 @@ export class LlamaCppManager extends EventEmitter {
   ): Promise<LlamaCppModel> {
     const modelId = input.modelId.trim();
     if (!modelId) throw new Error('Model ID is required');
+    onProgress?.({ phase: 'starting', modelId, modelName: input.displayName ?? modelId });
     const resolved = await resolveModelScopeInstallRequest(input);
     const filePath = resolved.filePath;
 
@@ -889,39 +890,48 @@ async function downloadFile(
   signal?: AbortSignal,
 ): Promise<void> {
   const tempPath = `${targetPath}.download`;
-  const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
-  const response = await fetch(url, {
-    signal,
-    ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`Model download failed: HTTP ${response.status}`);
-  }
-  const resumed = resumeFrom > 0 && response.status === 206;
-  const totalHeader = response.headers.get('content-length');
-  const contentRangeTotal = parseContentRangeTotal(response.headers.get('content-range'));
-  const total = contentRangeTotal ?? (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
-  const file = fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' });
-  const reader = response.body.getReader();
-  let completed = resumed ? resumeFrom : 0;
   let completedSuccessfully = false;
   try {
-    if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
-    while (true) {
-      if (signal?.aborted) throw new Error('Install cancelled');
-      const { value, done } = await reader.read();
-      if (done) break;
-      completed += value.byteLength;
-      if (!file.write(Buffer.from(value))) {
-        await new Promise<void>((resolve) => file.once('drain', resolve));
-      }
-      onProgress(completed, Number.isFinite(total) ? total : undefined);
+    const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
+    const response = await fetch(url, {
+      signal,
+      ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`Model download failed: HTTP ${response.status}`);
     }
-    completedSuccessfully = true;
-  } finally {
-    await new Promise<void>((resolve) => file.end(resolve));
+    const resumed = resumeFrom > 0 && response.status === 206;
+    const totalHeader = response.headers.get('content-length');
+    const contentRangeTotal = parseContentRangeTotal(response.headers.get('content-range'));
+    const total = contentRangeTotal ?? (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
+    const file = fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' });
+    const reader = response.body.getReader();
+    let completed = resumed ? resumeFrom : 0;
+    try {
+      if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
+      while (true) {
+        if (signal?.aborted) throw new Error('Install cancelled');
+        const { value, done } = await reader.read();
+        if (done) break;
+        completed += value.byteLength;
+        if (!file.write(Buffer.from(value))) {
+          await new Promise<void>((resolve) => file.once('drain', resolve));
+        }
+        onProgress(completed, Number.isFinite(total) ? total : undefined);
+      }
+      completedSuccessfully = true;
+    } finally {
+      await new Promise<void>((resolve) => file.end(resolve));
+    }
+    if (completedSuccessfully) {
+      fs.renameSync(tempPath, targetPath);
+    }
+  } catch (error) {
+    if (fs.existsSync(tempPath)) {
+      fs.rmSync(tempPath, { force: true });
+    }
+    throw error;
   }
-  if (completedSuccessfully) fs.renameSync(tempPath, targetPath);
 }
 
 function sanitizePathSegment(value: string): string {

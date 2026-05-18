@@ -33,7 +33,7 @@ test('MarketplaceService marks installed models from the configured llama.cpp mo
 
   const service = new MarketplaceService(() => modelsDir);
   const result = service.searchLocal({ query: 'Qwen2.5 7B Instruct', limit: 10 });
-  const model = result.find((item) => item.id === 'Qwen/Qwen2.5-7B-Instruct-GGUF');
+  const model = result.find((item) => item.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF');
 
   expect(model?.installed).toBe(true);
   expect(model?.installedPath).toBe(installedPath);
@@ -67,10 +67,10 @@ test('MarketplaceService merges online and curated results without duplicates', 
   const module = await import('./marketplaceService');
   const mergeMarketplaceModels = (module as unknown as {
     __test__mergeMarketplaceModels?: (
-      primary: Array<{ id: string; repoId?: string; name: string }>,
-      fallback: Array<{ id: string; repoId?: string; name: string }>,
+      primary: Array<{ id: string; repoId: string; name: string; description: string; tags: string[]; sizes: string[]; recommendedTag: string; capability: 'chat'; installed: false; source: 'modelscope-gguf' }>,
+      fallback: Array<{ id: string; repoId: string; name: string; description: string; tags: string[]; sizes: string[]; recommendedTag: string; capability: 'chat'; installed: false; source: 'modelscope-gguf' }>,
       limit: number,
-    ) => Array<{ id: string; repoId?: string; name: string }>;
+    ) => Array<{ id: string; repoId: string; name: string }>;
   }).__test__mergeMarketplaceModels;
 
   expect(typeof mergeMarketplaceModels).toBe('function');
@@ -78,15 +78,24 @@ test('MarketplaceService merges online and curated results without duplicates', 
 
   const result = mergeMarketplaceModels(
     [
-      { id: 'a/one', repoId: 'a/one', name: 'one' },
-      { id: 'b/two', repoId: 'b/two', name: 'two' },
+      { id: 'a/one', repoId: 'a/one', name: 'one', description: 'one', tags: ['chat'], sizes: ['7B'], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, source: 'modelscope-gguf' },
+      { id: 'b/two', repoId: 'b/two', name: 'two', description: 'two', tags: ['chat'], sizes: ['7B'], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, source: 'modelscope-gguf' },
     ],
     [
-      { id: 'b/two', repoId: 'b/two', name: 'two' },
-      { id: 'c/three', repoId: 'c/three', name: 'three' },
+      { id: 'b/two', repoId: 'b/two', name: 'two', description: 'two', tags: ['chat'], sizes: ['7B'], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, source: 'modelscope-gguf' },
+      { id: 'c/three', repoId: 'c/three', name: 'three', description: 'three', tags: ['chat'], sizes: ['7B'], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, source: 'modelscope-gguf' },
     ],
     10,
   );
 
   expect(result.map((item) => item.id)).toEqual(['a/one', 'b/two', 'c/three']);
+});
+
+test('MarketplaceService sorts featured models first for empty queries and applies filters', () => {
+  const service = new MarketplaceService(() => createTempDir());
+  const result = service.searchLocal({ task: 'reasoning', size: 'desktop', limit: 20 });
+
+  expect(result.length).toBeGreaterThan(0);
+  expect(result.every((item) => item.tags.includes('reasoning') || item.capability === 'reasoning')).toBe(true);
+  expect(result[0]?.isFeatured).toBe(true);
 });

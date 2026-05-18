@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 test('marketplace page sizing defaults stay within supported range', async () => {
   const module = await import('./LocalInferenceView');
   const estimateMarketplacePageSize = (module as unknown as {
-    __test__estimateMarketplacePageSize?: () => number;
+    __test__estimateMarketplacePageSize?: (width?: number, height?: number) => number;
   }).__test__estimateMarketplacePageSize;
 
   expect(typeof estimateMarketplacePageSize).toBe('function');
@@ -12,6 +12,11 @@ test('marketplace page sizing defaults stay within supported range', async () =>
   const pageSize = estimateMarketplacePageSize();
   expect(pageSize).toBeGreaterThanOrEqual(6);
   expect(pageSize).toBeLessThanOrEqual(24);
+
+  expect(estimateMarketplacePageSize(640, 720)).toBeGreaterThanOrEqual(6);
+  expect(estimateMarketplacePageSize(640, 720)).toBeLessThanOrEqual(pageSize);
+  expect(estimateMarketplacePageSize(1600, 1200)).toBeLessThanOrEqual(24);
+  expect(estimateMarketplacePageSize(1600, 1200)).toBeGreaterThanOrEqual(pageSize);
 });
 
 test('llama.cpp service config field metadata uses UI parameter keys without CLI prefixes', async () => {

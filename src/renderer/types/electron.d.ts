@@ -414,7 +414,7 @@ interface IElectronAPI {
     showModel: (name: string) => Promise<unknown>;
     loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
     unloadModel: (name: string) => Promise<LlamaCppModelLaunchResult>;
-    installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean }>;
+    installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
     pullModel: (name: string) => Promise<{ success: boolean }>;
     cancelPull: (name: string) => Promise<LlamaCppCancelInstallResult>;

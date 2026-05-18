@@ -42,9 +42,11 @@ export type LlamaCppRuntimeInstallResult = {
 };
 
 export type LlamaCppInstallProgressPhase =
+  | 'starting'
   | 'detecting'
   | 'downloading'
   | 'downloading-progress'
+  | 'cancelling'
   | 'installing'
   | 'done'
   | 'failed'

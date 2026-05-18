@@ -1,9 +1,13 @@
-import type {
-  MarketplaceModel,
-  MarketplaceSearchParams,
-  MarketplaceSearchResult,
+import fs from 'fs';
+import path from 'path';
+
+import {
+  MarketplaceCapability,
+  type MarketplaceModel,
+  type MarketplaceSearchParams,
+  type MarketplaceSearchResult,
 } from '../../shared/marketplace';
-import curatedModels from '../resources/ollama-curated-models.json';
+import curatedModels from '../resources/modelscope-gguf-curated-models.json';
 
 type CuratedModelEntry = {
   name: string;
@@ -11,195 +15,533 @@ type CuratedModelEntry = {
   tags: string[];
   sizes: string[];
   recommendedTag: string;
+  filePath?: string;
   downloads?: number;
   detailUrl?: string;
   parameterCount?: number;
 };
 
+type MarketplaceIndexRecord = {
+  repoId: string;
+  downloads?: number;
+  detailUrl?: string;
+  description?: string;
+  filePath?: string;
+  tags?: string[];
+  sizes?: string[];
+  parameterCount?: number;
+};
+
+type InstalledModelRecord = {
+  repoId: string;
+  installedPath: string;
+};
+
+const MARKETPLACE_SOURCE = 'modelscope-gguf' as const;
+const DEFAULT_LIMIT = 120;
+const LOCAL_LIMIT = 100;
+const MARKETPLACE_TIMEOUT_MS = 8000;
+const MODEL_SCOPE_LIBRARY_URL = 'https://www.modelscope.cn/models?other=gguf';
+const MODEL_SCOPE_SEARCH_API_URL = 'https://www.modelscope.cn/api/v1/models';
+
 export class MarketplaceService {
+  constructor(private readonly getModelsDir: () => string = () => '') {}
+
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
-    const limit = params.limit && params.limit > 0 ? params.limit : 120;
-    const localModels = this.searchLocal(params);
+    const limit = resolveLimit(params.limit, DEFAULT_LIMIT);
+    const curated = this.searchLocal({ ...params, limit });
     try {
-      const onlineModels = await this.searchOnline(params);
-      const merged = sortMarketplaceModels(filterMarketplaceModels(onlineModels, params), params);
-      return { models: merged.slice(0, limit) };
+      const online = await this.searchOnline(params);
+      const merged = mergeMarketplaceModels(online, curated, limit);
+      return {
+        models: sortMarketplaceModels(
+          annotateInstalledModels(merged, scanInstalledModels(this.getModelsDir())),
+          params,
+        ).slice(0, limit),
+      };
     } catch {
-      return { models: localModels.slice(0, limit) };
+      return { models: curated };
     }
   }
 
   searchLocal(params: MarketplaceSearchParams = {}): MarketplaceModel[] {
-    const limit = params.limit && params.limit > 0 ? params.limit : 120;
+    const installed = scanInstalledModels(this.getModelsDir());
+    const localModels = (curatedModels as CuratedModelEntry[]).map((entry) =>
+      toMarketplaceModel(entry, { isFeatured: true }),
+    );
     return sortMarketplaceModels(
-      filterMarketplaceModels(
-        (curatedModels as CuratedModelEntry[]).map(toMarketplaceModel),
-        params,
-      ),
+      annotateInstalledModels(filterMarketplaceModels(localModels, params), installed),
       params,
-    ).slice(0, limit);
+    ).slice(0, resolveLimit(params.limit, LOCAL_LIMIT));
   }
 
   private async searchOnline(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
-    const query = params.query?.trim() ?? '';
-    const url = buildSearchUrl(query);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'RongxinAI/marketplace',
-        },
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new Error(`Ollama search failed: HTTP ${response.status}`);
-      }
-      const html = await response.text();
-      const parsed = parseOllamaSearchHtml(html, query);
-      return parsed;
-    } finally {
-      clearTimeout(timeout);
+    const installed = scanInstalledModels(this.getModelsDir());
+    const searchResults = await this.fetchModelScopeSearchApi(params).catch(
+      (): MarketplaceModel[] | null => null,
+    );
+    if (searchResults && searchResults.length > 0) {
+      return annotateInstalledModels(filterMarketplaceModels(searchResults, params), installed);
     }
+
+    const libraryResults = await this.fetchModelScopeLibrary(params);
+    return annotateInstalledModels(filterMarketplaceModels(libraryResults, params), installed);
+  }
+
+  private async fetchModelScopeSearchApi(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
+    const query = params.query?.trim() ?? '';
+    const url = buildModelScopeSearchApiUrl(query);
+    const payload = await fetchJsonWithTimeout(url);
+    const records = extractMarketplaceIndexRecords(payload);
+    const models = records.map((record) => toMarketplaceModelFromRecord(record));
+    if (models.length === 0) {
+      throw new Error('ModelScope search returned no GGUF repositories');
+    }
+    return mergeMarketplaceModels(models, this.searchLocal({ ...params, featuredOnly: true, limit: DEFAULT_LIMIT }), DEFAULT_LIMIT);
+  }
+
+  private async fetchModelScopeLibrary(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
+    const html = await fetchTextWithTimeout(buildModelScopeLibraryUrl(params.query?.trim() ?? ''));
+    const repoIds = parseModelScopeGgufLibraryHtml(html);
+    if (repoIds.length === 0) {
+      throw new Error('ModelScope GGUF library page structure changed');
+    }
+    return repoIds.map((repoId) => toMarketplaceModelFromRecord({ repoId }));
   }
 }
 
-function toMarketplaceModel(entry: CuratedModelEntry): MarketplaceModel {
-  const tags = unique([...entry.tags, ...classifyTaskTags(entry.name, entry.description, entry.tags)]);
+function toMarketplaceModel(
+  entry: CuratedModelEntry,
+  options: { isFeatured: boolean },
+): MarketplaceModel {
+  const repoId = entry.name.trim();
+  const tags = unique([...entry.tags, ...classifyTaskTags(repoId, entry.description, entry.tags)]);
   return {
-    source: 'ollama-library',
-    id: entry.name,
-    name: entry.name,
+    source: MARKETPLACE_SOURCE,
+    id: repoId,
+    repoId,
+    name: repoId,
     description: entry.description,
     tags,
     sizes: entry.sizes,
     recommendedTag: entry.recommendedTag,
+    capability: resolvePrimaryCapability(tags),
+    filePath: entry.filePath,
     downloads: entry.downloads,
-    installName: entry.name,
-    detailUrl: entry.detailUrl,
+    detailUrl: entry.detailUrl ?? `https://www.modelscope.cn/models/${repoId}`,
     parameterCount: entry.parameterCount,
+    installed: false,
+    isFeatured: options.isFeatured,
   };
 }
 
-function buildSearchUrl(query: string): string {
-  const params = new URLSearchParams();
-  if (query) params.set('q', query);
-  const suffix = params.toString();
-  return `https://ollama.com/search${suffix ? `?${suffix}` : ''}`;
-}
-
-function parseOllamaSearchHtml(html: string, _query: string): MarketplaceModel[] {
-  const models: MarketplaceModel[] = [];
-  const liRegex = /<li\b[^>]*\bx-test-model\b[\s\S]*?<\/li>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = liRegex.exec(html)) !== null) {
-    const block = match[0];
-    const model = parseModelBlock(block);
-    if (model) {
-      models.push(model);
-    }
-  }
-  if (models.length === 0 && !/No models found\./i.test(html)) {
-    if (!/<li\b[^>]*\bx-test-model\b/i.test(html)) {
-      throw new Error('Ollama marketplace page structure changed');
-    }
-  }
-  return models;
-}
-
-function parseModelBlock(block: string): MarketplaceModel | null {
-  const hrefMatch = block.match(/<a\b[^>]*href="([^"]+)"/i);
-  const nameMatch = block.match(/<span\b[^>]*\bx-test-search-response-title\b[^>]*>([\s\S]*?)<\/span>/i)
-    ?? block.match(/<div\b[^>]*title="([^"]+)"/i);
-  if (!hrefMatch || !nameMatch) return null;
-
-  const rawName = decodeHtml(stripTags(nameMatch[1])).trim();
-  if (!rawName) return null;
-
-  const description = parseDescription(block);
-  const tags = parseRepeatedText(block, /<span\b[^>]*\bx-test-capability\b[^>]*>([\s\S]*?)<\/span>/gi)
-    .map((t) => t.toLowerCase());
-  const sizes = parseRepeatedText(block, /<span\b[^>]*\bx-test-size\b[^>]*>([\s\S]*?)<\/span>/gi)
-    .map(formatSizeText);
-  const downloads = parsePullCount(
-    matchFirst(block, /<span\b[^>]*\bx-test-pull-count\b[^>]*>([\s\S]*?)<\/span>/i),
-  );
-
-  const installName = toInstallName(hrefMatch[1], rawName);
-  const allTags = unique([...tags, ...classifyTaskTags(rawName, description, tags)]);
-
+function toMarketplaceModelFromRecord(record: MarketplaceIndexRecord): MarketplaceModel {
+  const repoId = record.repoId.trim();
+  const sizes = record.sizes?.length ? record.sizes : inferSizesFromRepoId(repoId);
+  const tags = unique([
+    ...(record.tags ?? []),
+    ...classifyTaskTags(repoId, record.description ?? '', record.tags ?? []),
+  ]);
   return {
-    source: 'ollama-library',
-    id: installName,
-    name: installName,
-    description: description || 'Ollama Library model.',
-    tags: allTags,
-    sizes: sizes.length > 0 ? sizes : inferSizesFromName(rawName),
-    recommendedTag: sizes[0] ?? 'Ollama',
-    downloads,
-    installName,
-    detailUrl: `https://ollama.com${hrefMatch[1].startsWith('/') ? hrefMatch[1] : `/${hrefMatch[1]}`}`,
-    parameterCount: resolveParameterCount(sizes),
+    source: MARKETPLACE_SOURCE,
+    id: repoId,
+    repoId,
+    name: repoId,
+    description: record.description?.trim() || `${repoId} GGUF repository on ModelScope.`,
+    tags,
+    sizes,
+    recommendedTag: resolveRecommendedTag(record.filePath),
+    capability: resolvePrimaryCapability(tags),
+    filePath: record.filePath,
+    downloads: record.downloads,
+    detailUrl: record.detailUrl ?? `https://www.modelscope.cn/models/${repoId}`,
+    parameterCount: record.parameterCount ?? resolveParameterCount(sizes),
+    installed: false,
+    isFeatured: false,
   };
 }
 
-function parseDescription(block: string): string {
-  const desc = matchFirst(
-    block,
-    /<p\b[^>]*class="[^"]*\btext-neutral-800\b[^"]*"[^>]*>([\s\S]*?)<\/p>/i,
-  );
-  return desc ? decodeHtml(stripTags(desc)).replace(/\s+/g, ' ').trim() : '';
+function buildModelScopeSearchApiUrl(query: string): string {
+  const params = new URLSearchParams({
+    PageNumber: '1',
+    PageSize: '200',
+    SortBy: 'Downloads',
+    Task: 'text-generation',
+  });
+  if (query) params.set('Search', query);
+  return `${MODEL_SCOPE_SEARCH_API_URL}?${params.toString()}`;
 }
 
-function toInstallName(href: string, fallback: string): string {
-  const normalized = href.replace(/^https?:\/\/ollama\.com/i, '').replace(/^\/+/, '');
-  if (normalized.startsWith('library/')) {
-    return normalized.slice('library/'.length).split(/[?#]/)[0] || fallback;
+function buildModelScopeLibraryUrl(query: string): string {
+  const params = new URLSearchParams();
+  params.set('other', 'gguf');
+  if (query) params.set('search', query);
+  return `https://www.modelscope.cn/models?${params.toString()}`;
+}
+
+async function fetchJsonWithTimeout(url: string): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MARKETPLACE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-marketplace' },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`ModelScope marketplace API failed: HTTP ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
   }
-  return normalized.split(/[?#]/)[0] || fallback;
 }
 
-function parsePullCount(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const text = decodeHtml(stripTags(value)).replace(/\s+/g, ' ').trim().toLowerCase();
-  const match = text.match(/(\d+(?:\.\d+)?)\s*([kmb])?\s*(?:downloads?|pulls?)/i)
-    ?? text.match(/(?:downloads?|pulls?)\s*(\d+(?:\.\d+)?)\s*([kmb])?/i)
-    ?? text.match(/(\d+(?:\.\d+)?)\s*([kmb])/i);
-  if (!match) return undefined;
-  const num = Number(match[1]);
-  if (!Number.isFinite(num)) return undefined;
-  const multiplier = match[2] === 'b'
-    ? 1_000_000_000
-    : match[2] === 'm'
-      ? 1_000_000
-      : match[2] === 'k'
-        ? 1_000
-        : 1;
-  return Math.round(num * multiplier);
+async function fetchTextWithTimeout(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MARKETPLACE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-marketplace' },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`ModelScope marketplace page failed: HTTP ${response.status}`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
-function formatSizeText(value: string): string {
-  return value.trim();
+function extractMarketplaceIndexRecords(payload: unknown): MarketplaceIndexRecord[] {
+  const records = extractRecords(payload);
+  const models = records
+    .map((record) => {
+      const owner = readRecordString(record.Path)
+        || readRecordString(record.owner)
+        || readRecordString(record.Owner);
+      const repo = readRecordString(record.Name)
+        || readRecordString(record.name)
+        || readRecordString(record.ModelName)
+        || readRecordString(record.model_name);
+      const repoId = readRecordString(record.repoId)
+        || readRecordString(record.RepoId)
+        || (owner && repo ? `${owner}/${repo}` : undefined);
+      if (!repoId || !/^[^/\s]+\/[^/\s]+$/.test(repoId) || !repoId.toLowerCase().includes('gguf')) return null;
+      return {
+        repoId,
+        downloads: readRecordNumber(record.Downloads) ?? readRecordNumber(record.downloads) ?? readRecordNumber(record.Likes),
+        detailUrl: readRecordString(record.Url) || readRecordString(record.url),
+        description: readRecordString(record.Description) || readRecordString(record.description),
+        filePath: readRecordString(record.FilePath) || readRecordString(record.filePath),
+        tags: normalizeTagList(record.Tags) ?? normalizeTagList(record.tags),
+        sizes: normalizeSizeList(record.sizes) ?? normalizeSizeList(record.Tags),
+        parameterCount: readRecordNumber(record.parameterCount) ?? readRecordNumber(record.ParameterCount),
+      } satisfies MarketplaceIndexRecord;
+    })
+    .filter((record): record is NonNullable<typeof record> => record !== null);
+  return dedupeIndexRecords(models);
 }
 
-function parseRepeatedText(html: string, pattern: RegExp): string[] {
-  return Array.from(html.matchAll(pattern), (m) =>
-    decodeHtml(stripTags(m[1])).trim(),
-  ).filter(Boolean);
+function dedupeIndexRecords(records: MarketplaceIndexRecord[]): MarketplaceIndexRecord[] {
+  const merged = new Map<string, MarketplaceIndexRecord>();
+  for (const record of records) {
+    const existing = merged.get(record.repoId);
+    merged.set(record.repoId, {
+      repoId: record.repoId,
+      downloads: record.downloads ?? existing?.downloads,
+      detailUrl: record.detailUrl ?? existing?.detailUrl,
+      description: record.description ?? existing?.description,
+      filePath: record.filePath ?? existing?.filePath,
+      tags: unique([...(existing?.tags ?? []), ...(record.tags ?? [])]),
+      sizes: unique([...(existing?.sizes ?? []), ...(record.sizes ?? [])]),
+      parameterCount: record.parameterCount ?? existing?.parameterCount,
+    });
+  }
+  return Array.from(merged.values());
 }
 
-function matchFirst(value: string, pattern: RegExp): string | undefined {
-  return value.match(pattern)?.[1];
+function parseModelScopeGgufLibraryHtml(html: string): string[] {
+  const repoIds = new Set<string>();
+  const pattern = /href="\/models\/([^"/?#]+\/[^"/?#]+)"/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html)) !== null) {
+    const repoId = decodeHtml(match[1]).trim();
+    if (repoId.toLowerCase().includes('gguf')) {
+      repoIds.add(repoId);
+    }
+  }
+  return Array.from(repoIds);
 }
 
-function stripTags(value: string): string {
-  return value.replace(/<[^>]*>/g, '');
+function mergeMarketplaceModels(
+  primary: MarketplaceModel[],
+  fallback: MarketplaceModel[],
+  limit: number,
+): MarketplaceModel[] {
+  const merged = new Map<string, MarketplaceModel>();
+  for (const model of [...primary, ...fallback]) {
+    const key = model.repoId || model.id;
+    const existing = merged.get(key);
+    merged.set(key, mergeMarketplaceModel(existing, model));
+  }
+  return Array.from(merged.values()).slice(0, resolveLimit(limit, DEFAULT_LIMIT));
+}
+
+function mergeMarketplaceModel(existing: MarketplaceModel | undefined, next: MarketplaceModel): MarketplaceModel {
+  if (!existing) return next;
+  return {
+    ...existing,
+    ...next,
+    tags: unique([...(existing.tags ?? []), ...(next.tags ?? [])]),
+    sizes: unique([...(existing.sizes ?? []), ...(next.sizes ?? [])]),
+    recommendedTag: next.recommendedTag || existing.recommendedTag,
+    downloads: next.downloads ?? existing.downloads,
+    detailUrl: next.detailUrl ?? existing.detailUrl,
+    parameterCount: next.parameterCount ?? existing.parameterCount,
+    filePath: next.filePath ?? existing.filePath,
+    installed: next.installed || existing.installed,
+    installedPath: next.installedPath ?? existing.installedPath,
+    isFeatured: next.isFeatured || existing.isFeatured,
+    capability: preferCapability(next.capability, existing.capability),
+    description: next.description !== `${next.repoId} GGUF repository on ModelScope.`
+      ? next.description
+      : existing.description,
+  };
+}
+
+function annotateInstalledModels(
+  models: MarketplaceModel[],
+  installed: Map<string, InstalledModelRecord>,
+): MarketplaceModel[] {
+  return models.map((model) => {
+    const match = installed.get(model.repoId);
+    return {
+      ...model,
+      installed: Boolean(match),
+      installedPath: match?.installedPath,
+    };
+  });
+}
+
+function scanInstalledModels(modelsDir: string): Map<string, InstalledModelRecord> {
+  const normalizedRoot = modelsDir.trim();
+  if (!normalizedRoot || !fs.existsSync(normalizedRoot)) return new Map();
+  const modelscopeRoot = path.join(normalizedRoot, 'modelscope');
+  if (!fs.existsSync(modelscopeRoot)) return new Map();
+
+  const installed = new Map<string, InstalledModelRecord>();
+  for (const filePath of walkFiles(modelscopeRoot)) {
+    if (!filePath.toLowerCase().endsWith('.gguf')) continue;
+    if (/[/\\]mmproj/i.test(filePath)) continue;
+    const relative = path.relative(modelscopeRoot, filePath);
+    const segments = relative.split(path.sep);
+    if (segments.length < 3) continue;
+    const [owner, repo] = segments;
+    const repoId = `${owner}/${repo}`;
+    if (!installed.has(repoId)) {
+      installed.set(repoId, { repoId, installedPath: filePath });
+    }
+  }
+  return installed;
+}
+
+function walkFiles(dir: string): string[] {
+  const files: string[] = [];
+  for (const entry of safeReadDir(dir)) {
+    const candidate = path.join(dir, entry);
+    if (safeIsDirectory(candidate)) {
+      files.push(...walkFiles(candidate));
+    } else {
+      files.push(candidate);
+    }
+  }
+  return files;
+}
+
+function safeReadDir(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+}
+
+function safeIsDirectory(target: string): boolean {
+  try {
+    return fs.statSync(target).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function classifyTaskTags(name: string, description: string, tags: string[]): string[] {
+  const source = `${name} ${description} ${tags.join(' ')}`.toLowerCase();
+  const inferred = new Set<string>();
+
+  if (/\b(chat|instruct|assistant|conversation|dialogue)\b/.test(source)) inferred.add(MarketplaceCapability.Chat);
+  if (/\b(reasoning|thinking|reasoner|math|stem|qwq|r1)\b/.test(source)) inferred.add(MarketplaceCapability.Reasoning);
+  if (/\b(code|coder|coding|programming|developer|swe|devstral)\b/.test(source)) inferred.add(MarketplaceCapability.Code);
+  if (/\b(embed|embedding|retrieval|rerank|reranker)\b/.test(source)) inferred.add(MarketplaceCapability.Embedding);
+  if (/\b(vision|visual|vl|multimodal|ocr|image)\b/.test(source)) inferred.add(MarketplaceCapability.Vision);
+
+  if (inferred.size === 0 || (!inferred.has(MarketplaceCapability.Embedding) && !inferred.has(MarketplaceCapability.Vision))) {
+    inferred.add(MarketplaceCapability.Chat);
+  }
+  return [...inferred];
+}
+
+function inferSizesFromRepoId(repoId: string): string[] {
+  const match = repoId.match(/(\d+(?:\.\d+)?)\s*[bB]/);
+  return match ? [`${match[1]}B`] : [];
+}
+
+function resolveParameterCount(sizes: string[]): number | undefined {
+  for (const size of sizes) {
+    const match = size.trim().match(/^(\d+(?:\.\d+)?)\s*B$/i);
+    if (!match) continue;
+    const count = Number(match[1]);
+    if (Number.isFinite(count)) return count * 1_000_000_000;
+  }
+  return undefined;
+}
+
+function resolvePrimaryCapability(tags: string[]): MarketplaceModel['capability'] {
+  const normalized = tags.map((tag) => tag.toLowerCase());
+  if (normalized.includes(MarketplaceCapability.Reasoning)) return MarketplaceCapability.Reasoning;
+  if (normalized.includes(MarketplaceCapability.Code)) return MarketplaceCapability.Code;
+  if (normalized.includes(MarketplaceCapability.Embedding)) return MarketplaceCapability.Embedding;
+  if (normalized.includes(MarketplaceCapability.Vision)) return MarketplaceCapability.Vision;
+  return MarketplaceCapability.Chat;
+}
+
+function preferCapability(
+  next: MarketplaceModel['capability'],
+  existing: MarketplaceModel['capability'],
+): MarketplaceModel['capability'] {
+  const priority: Record<MarketplaceModel['capability'], number> = {
+    reasoning: 5,
+    code: 4,
+    vision: 3,
+    embedding: 2,
+    chat: 1,
+  };
+  return priority[next] >= priority[existing] ? next : existing;
+}
+
+function resolveRecommendedTag(filePath?: string): string {
+  if (!filePath) return 'GGUF';
+  const fileName = path.basename(filePath, '.gguf');
+  return fileName.match(/\b(Q[2-8](?:_[A-Z0-9]+){0,3}|F16|F32|BF16|IQ[1-4]_[A-Z0-9_]+)\b/i)?.[1]?.toUpperCase() ?? 'GGUF';
+}
+
+function filterMarketplaceModels(models: MarketplaceModel[], params: MarketplaceSearchParams): MarketplaceModel[] {
+  const requiredTags = new Set([
+    ...(params.tags ?? []),
+    ...tagsForTask(params.task),
+  ].map((tag) => tag.toLowerCase()));
+
+  return models
+    .filter((model) => !params.source || params.source === 'all' || params.source === model.source)
+    .filter((model) => !params.featuredOnly || Boolean(model.isFeatured))
+    .filter((model) => matchesQuery(model, params.query))
+    .filter((model) => matchesTags(model, requiredTags))
+    .filter((model) => matchesSizeFilter(model, params.size));
+}
+
+function sortMarketplaceModels(models: MarketplaceModel[], params: MarketplaceSearchParams): MarketplaceModel[] {
+  const emptyQuery = !params.query?.trim();
+  return [...models].sort((a, b) => {
+    if (emptyQuery && a.isFeatured !== b.isFeatured) {
+      return a.isFeatured ? -1 : 1;
+    }
+    if (a.installed !== b.installed) {
+      return a.installed ? -1 : 1;
+    }
+    const capabilityDiff = capabilityScore(b.capability) - capabilityScore(a.capability);
+    if (capabilityDiff !== 0 && params.task === 'reasoning') {
+      return capabilityDiff;
+    }
+    const downloadsDiff = (b.downloads ?? 0) - (a.downloads ?? 0);
+    if (downloadsDiff !== 0) return downloadsDiff;
+    const paramsDiff = (b.parameterCount ?? 0) - (a.parameterCount ?? 0);
+    if (paramsDiff !== 0 && emptyQuery) return paramsDiff;
+    return a.repoId.localeCompare(b.repoId);
+  });
+}
+
+function capabilityScore(capability: MarketplaceModel['capability']): number {
+  switch (capability) {
+    case MarketplaceCapability.Reasoning: return 5;
+    case MarketplaceCapability.Code: return 4;
+    case MarketplaceCapability.Vision: return 3;
+    case MarketplaceCapability.Embedding: return 2;
+    case MarketplaceCapability.Chat:
+    default:
+      return 1;
+  }
+}
+
+function matchesQuery(model: MarketplaceModel, query?: string): boolean {
+  if (!query?.trim()) return true;
+  const q = query.toLowerCase();
+  return [
+    model.repoId,
+    model.description,
+    model.tags.join(' '),
+    model.sizes.join(' '),
+    model.recommendedTag,
+    model.capability,
+  ].some((value) => value.toLowerCase().includes(q));
+}
+
+function matchesTags(model: MarketplaceModel, required: Set<string>): boolean {
+  if (required.size === 0) return true;
+  const tags = new Set(model.tags.map((tag) => tag.toLowerCase()));
+  tags.add(model.capability);
+  return Array.from(required).every((tag) => tags.has(tag));
+}
+
+function tagsForTask(task?: MarketplaceSearchParams['task']): string[] {
+  switch (task) {
+    case 'chat': return [MarketplaceCapability.Chat];
+    case 'reasoning': return [MarketplaceCapability.Reasoning];
+    case 'embedding': return [MarketplaceCapability.Embedding];
+    case 'code': return [MarketplaceCapability.Code];
+    case 'vision': return [MarketplaceCapability.Vision];
+    default: return [];
+  }
+}
+
+function matchesSizeFilter(model: MarketplaceModel, size?: MarketplaceSearchParams['size']): boolean {
+  if (!size || size === 'all') return true;
+  const count = resolveParamCount(model);
+  if (count === null) return true;
+  const billions = count / 1_000_000_000;
+  switch (size) {
+    case 'small': return billions < 4;
+    case 'desktop': return billions >= 4 && billions <= 8;
+    case 'workstation': return billions > 8 && billions <= 32;
+    case 'large': return billions > 32;
+    default: return true;
+  }
+}
+
+function resolveParamCount(model: MarketplaceModel): number | null {
+  if (typeof model.parameterCount === 'number' && Number.isFinite(model.parameterCount)) {
+    return model.parameterCount;
+  }
+  return resolveParameterCount(model.sizes) ?? null;
+}
+
+function unique<T>(items: T[]): T[] {
+  return [...new Set(items.filter(Boolean as unknown as (item: T) => boolean))];
 }
 
 function decodeHtml(value: string): string {
   const named: Record<string, string> = {
     amp: '&',
-    apos: "'",
+    apos: '\'',
     gt: '>',
     lt: '<',
     nbsp: ' ',
@@ -219,129 +561,65 @@ function decodeHtml(value: string): string {
   });
 }
 
-function unique<T>(items: T[]): T[] {
-  return [...new Set(items)];
+function resolveLimit(limit: number | undefined, fallback: number): number {
+  return limit && limit > 0 ? limit : fallback;
 }
 
-function classifyTaskTags(
-  name: string,
-  description: string,
-  tags: string[],
-): string[] {
-  const source = `${name} ${description} ${tags.join(' ')}`.toLowerCase();
-  const inferred = new Set<string>();
-
-  if (/\b(chat|instruct|assistant|conversation|dialogue)\b/.test(source)) inferred.add('chat');
-  if (/\b(reasoning|thinking|reasoner|math|stem)\b/.test(source)) inferred.add('reasoning');
-  if (/\b(code|coder|coding|programming|developer|swe|devstral)\b/.test(source)) inferred.add('code');
-  if (/\b(embed|embedding|retrieval|rerank|reranker)\b/.test(source)) inferred.add('embedding');
-  if (/\b(vision|visual|vl|multimodal|ocr|image)\b/.test(source)) inferred.add('vision');
-
-  // Most Ollama Library generative models can be used for chat even when the
-  // search page omits an explicit chat capability.
-  if (!inferred.has('embedding')) inferred.add('chat');
-
-  return [...inferred];
-}
-
-function inferSizesFromName(name: string): string[] {
-  const match = name.match(/(\d+\.?\d*)[bB]/);
-  if (match) {
-    return [`${match[1]}B`];
-  }
-  return [];
-}
-
-function resolveParameterCount(sizes: string[]): number | undefined {
-  for (const size of sizes) {
-    const m = size.trim().match(/^(\d+(?:\.\d+)?)\s*B$/);
-    if (m) {
-      const num = Number(m[1]);
-      if (Number.isFinite(num)) return num * 1_000_000_000;
+function extractRecords(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) return payload.filter(isRecord);
+  if (!isRecord(payload)) return [];
+  const records: Record<string, unknown>[] = [];
+  const stack: unknown[] = [payload];
+  while (stack.length > 0) {
+    const item = stack.pop();
+    if (Array.isArray(item)) {
+      if (item.every(isRecord)) records.push(...item);
+      item.forEach((child) => stack.push(child));
+      continue;
     }
+    if (!isRecord(item)) continue;
+    Object.values(item).forEach((child) => {
+      if (Array.isArray(child) || isRecord(child)) stack.push(child);
+    });
+  }
+  return records;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readRecordString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readRecordNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[,\s]/g, '');
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
 }
 
-function filterMarketplaceModels(
-  models: MarketplaceModel[],
-  params: MarketplaceSearchParams,
-): MarketplaceModel[] {
-  const requiredTags = new Set([
-    ...(params.tags ?? []),
-    ...tagsForTask(params.task),
-  ].map((t) => t.toLowerCase()));
-
-  return models
-    .filter((m) => !params.source || params.source === 'all' || params.source === m.source)
-    .filter((m) => matchesQuery(m, params.query))
-    .filter((m) => matchesTags(m, requiredTags))
-    .filter((m) => matchesSizeFilter(m, params.size));
+function normalizeTagList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const tags = value
+    .map((item) => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+    .filter(Boolean);
+  return tags.length > 0 ? tags : undefined;
 }
 
-function sortMarketplaceModels(
-  models: MarketplaceModel[],
-  _params: MarketplaceSearchParams,
-): MarketplaceModel[] {
-  return [...models].sort((a, b) => {
-    const downloadsDiff = (b.downloads ?? 0) - (a.downloads ?? 0);
-    if (downloadsDiff !== 0) return downloadsDiff;
-    return a.name.localeCompare(b.name);
-  });
-}
-
-function matchesQuery(model: MarketplaceModel, query?: string): boolean {
-  if (!query?.trim()) return true;
-  const q = query.toLowerCase();
-  const name = model.name.toLowerCase();
-  const desc = model.description.toLowerCase();
-  const tags = model.tags.join(' ').toLowerCase();
-  return name.includes(q) || desc.includes(q) || tags.includes(q);
-}
-
-function matchesTags(model: MarketplaceModel, required: Set<string>): boolean {
-  if (required.size === 0) return true;
-  const modelTags = new Set(model.tags.map((t) => t.toLowerCase()));
-  return Array.from(required).every((t) => modelTags.has(t));
-}
-
-function tagsForTask(task?: MarketplaceSearchParams['task']): string[] {
-  switch (task) {
-    case 'chat': return ['chat'];
-    case 'reasoning': return ['reasoning'];
-    case 'embedding': return ['embedding'];
-    case 'code': return ['code'];
-    case 'vision': return ['vision'];
-    default: return [];
+function normalizeSizeList(value: unknown): string[] | undefined {
+  if (Array.isArray(value)) {
+    const sizes = value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter((item) => /^\d+(?:\.\d+)?B$/i.test(item));
+    return sizes.length > 0 ? sizes : undefined;
   }
+  return undefined;
 }
 
-function matchesSizeFilter(model: MarketplaceModel, size?: MarketplaceSearchParams['size']): boolean {
-  if (!size || size === 'all') return true;
-  const count = resolveParamCount(model);
-  if (count === null) return true;
-  const billions = count / 1_000_000_000;
-  switch (size) {
-    case 'small': return billions < 4;
-    case 'desktop': return billions >= 4 && billions <= 8;
-    case 'workstation': return billions > 8 && billions <= 14;
-    case 'large': return billions > 14;
-    default: return true;
-  }
-}
-
-function resolveParamCount(model: MarketplaceModel): number | null {
-  if (typeof model.parameterCount === 'number' && Number.isFinite(model.parameterCount)) {
-    return model.parameterCount;
-  }
-  for (const size of model.sizes) {
-    const m = size.trim().match(/^(\d+(?:\.\d+)?)\s*([bB])$/);
-    if (m) {
-      const amount = Number(m[1]);
-      if (Number.isFinite(amount)) {
-        return m[2].toLowerCase() === 'b' ? amount * 1_000_000_000 : amount * 1_000_000;
-      }
-    }
-  }
-  return null;
-}
+export const __test__parseModelScopeGgufLibraryHtml = parseModelScopeGgufLibraryHtml;
+export const __test__mergeMarketplaceModels = mergeMarketplaceModels;

@@ -28,8 +28,15 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     modelsDir: '/tmp/models',
     modelsMax: '2',
     modelsAutoload: true,
+    ctxSize: '8192',
+    gpuLayers: 'all',
+    threads: '8',
+    batchSize: '256',
+    ubatchSize: '64',
     device: '0,1',
     splitMode: 'layer',
     tensorSplit: '3,2',
+    reasoning: 'on',
+    chatTemplate: 'chatml',
   });
 });
