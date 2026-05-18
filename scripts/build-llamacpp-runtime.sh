@@ -50,11 +50,31 @@ if [[ -z "${CMAKE_BIN_RESOLVED}" ]]; then
   exit 127
 fi
 
-"${CMAKE_BIN_RESOLVED}" -S "${SRC_DIR}" -B "${BUILD_DIR}" \
+CMAKE_ARGS=(
+  -S "${SRC_DIR}"
+  -B "${BUILD_DIR}"
   -DCMAKE_BUILD_TYPE=Release \
   -DLLAMA_BUILD_TESTS=OFF \
   -DLLAMA_BUILD_EXAMPLES=OFF \
   -DLLAMA_BUILD_SERVER=ON
+)
+
+case "${TARGET_ID}" in
+  mac-arm64)
+    CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=arm64 -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON)
+    ;;
+  mac-x64)
+    CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON)
+    ;;
+  linux-*)
+    CMAKE_ARGS+=(-DGGML_METAL=OFF)
+    ;;
+  win-*)
+    CMAKE_ARGS+=(-DGGML_METAL=OFF)
+    ;;
+esac
+
+"${CMAKE_BIN_RESOLVED}" "${CMAKE_ARGS[@]}"
 
 "${CMAKE_BIN_RESOLVED}" --build "${BUILD_DIR}" --config Release --target llama-server --parallel
 

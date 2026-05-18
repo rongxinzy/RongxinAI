@@ -256,6 +256,21 @@ export function sanitizeLlamaCppServiceConfig(config: LlamaCppServiceConfig | un
   const modelsDir = config?.modelsDir?.trim();
   const modelsMax = normalizeIntegerString(config?.modelsMax);
   const modelsAutoload = config?.modelsAutoload as unknown;
+  const timeout = normalizeIntegerString(config?.timeout);
+  const threadsHttp = normalizeSignedIntegerString(config?.threadsHttp);
+  const cacheReuse = normalizeIntegerString(config?.cacheReuse);
+  const cacheRam = normalizeSignedIntegerString(config?.cacheRam);
+  const ctxCheckpoints = normalizeIntegerString(config?.ctxCheckpoints);
+  const checkpointEveryNt = normalizeSignedIntegerString(config?.checkpointEveryNt);
+  const ctxSize = normalizeIntegerString(config?.ctxSize);
+  const parallel = normalizeSignedIntegerString(config?.parallel);
+  const batchSize = normalizeIntegerString(config?.batchSize);
+  const ubatchSize = normalizeIntegerString(config?.ubatchSize);
+  const gpuLayers = normalizeGpuLayersString(config?.gpuLayers);
+  const threads = normalizeSignedIntegerString(config?.threads);
+  const threadsBatch = normalizeSignedIntegerString(config?.threadsBatch);
+  const mainGpu = normalizeIntegerString(config?.mainGpu);
+  const reasoningBudget = normalizeSignedIntegerString(config?.reasoningBudget);
 
   if (host) next.host = host;
   if (port) next.port = port;
@@ -264,9 +279,36 @@ export function sanitizeLlamaCppServiceConfig(config: LlamaCppServiceConfig | un
   if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
   if (modelsAutoload === 'true') next.modelsAutoload = true;
   if (modelsAutoload === 'false') next.modelsAutoload = false;
+  if (timeout) next.timeout = timeout;
+  if (threadsHttp) next.threadsHttp = threadsHttp;
+  if (typeof config?.cachePrompt === 'boolean') next.cachePrompt = config.cachePrompt;
+  if (cacheReuse) next.cacheReuse = cacheReuse;
+  if (cacheRam) next.cacheRam = cacheRam;
+  if (ctxCheckpoints) next.ctxCheckpoints = ctxCheckpoints;
+  if (checkpointEveryNt) next.checkpointEveryNt = checkpointEveryNt;
+  if (ctxSize) next.ctxSize = ctxSize;
+  if (parallel) next.parallel = parallel;
+  if (batchSize) next.batchSize = batchSize;
+  if (ubatchSize) next.ubatchSize = ubatchSize;
+  if (gpuLayers) next.gpuLayers = gpuLayers;
+  if (threads) next.threads = threads;
+  if (threadsBatch) next.threadsBatch = threadsBatch;
   if (config?.device?.trim()) next.device = config.device.trim();
+  if (mainGpu) next.mainGpu = mainGpu;
   if (isSplitMode(config?.splitMode)) next.splitMode = config.splitMode;
   if (config?.tensorSplit?.trim()) next.tensorSplit = config.tensorSplit.trim();
+  if (isOnOffAuto(config?.flashAttn)) next.flashAttn = config.flashAttn;
+  if (isOnOffAuto(config?.jinja)) next.jinja = config.jinja;
+  if (isOnOffAuto(config?.reasoning)) next.reasoning = config.reasoning;
+  if (isReasoningFormat(config?.reasoningFormat)) next.reasoningFormat = config.reasoningFormat;
+  if (reasoningBudget) next.reasoningBudget = reasoningBudget;
+  if (config?.reasoningBudgetMessage?.trim()) next.reasoningBudgetMessage = config.reasoningBudgetMessage.trim();
+  if (config?.chatTemplate?.trim()) next.chatTemplate = config.chatTemplate.trim();
+  if (config?.chatTemplateFile?.trim()) next.chatTemplateFile = config.chatTemplateFile.trim();
+  if (typeof config?.skipChatParsing === 'boolean') next.skipChatParsing = config.skipChatParsing;
+  if (typeof config?.prefillAssistant === 'boolean') next.prefillAssistant = config.prefillAssistant;
+  if (typeof config?.noMmap === 'boolean') next.noMmap = config.noMmap;
+  if (typeof config?.mlock === 'boolean') next.mlock = config.mlock;
   return next;
 }
 
@@ -277,8 +319,31 @@ function normalizeIntegerString(value: string | undefined): string | undefined {
   return trimmed;
 }
 
+function normalizeSignedIntegerString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (!/^-?\d+$/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+function normalizeGpuLayersString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed === 'auto' || trimmed === 'all') return trimmed;
+  if (!/^-?\d+$/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
 function isSplitMode(value: unknown): value is NonNullable<LlamaCppServiceConfig['splitMode']> {
   return value === 'none' || value === 'layer' || value === 'row' || value === 'tensor';
+}
+
+function isOnOffAuto(value: unknown): value is 'on' | 'off' | 'auto' {
+  return value === 'on' || value === 'off' || value === 'auto';
+}
+
+function isReasoningFormat(value: unknown): value is NonNullable<LlamaCppServiceConfig['reasoningFormat']> {
+  return value === 'none' || value === 'deepseek' || value === 'deepseek-legacy' || value === 'auto';
 }
 
 function isAbortError(error: unknown): boolean {

@@ -69,20 +69,36 @@ export type LlamaCppServiceConfig = {
   modelsDir?: string;
   modelsMax?: string;
   modelsAutoload?: boolean;
+  timeout?: string;
+  threadsHttp?: string;
+  cachePrompt?: boolean;
+  cacheReuse?: string;
+  cacheRam?: string;
+  ctxCheckpoints?: string;
+  checkpointEveryNt?: string;
   ctxSize?: string;
   parallel?: string;
   batchSize?: string;
   ubatchSize?: string;
   gpuLayers?: string;
   threads?: string;
+  threadsBatch?: string;
   device?: string;
   mainGpu?: string;
   splitMode?: 'none' | 'layer' | 'row' | 'tensor';
   tensorSplit?: string;
   flashAttn?: 'on' | 'off' | 'auto';
+  jinja?: 'on' | 'off' | 'auto';
   reasoning?: 'on' | 'off' | 'auto';
   reasoningFormat?: 'none' | 'deepseek' | 'deepseek-legacy' | 'auto';
+  reasoningBudget?: string;
+  reasoningBudgetMessage?: string;
   chatTemplate?: string;
+  chatTemplateFile?: string;
+  skipChatParsing?: boolean;
+  prefillAssistant?: boolean;
+  noMmap?: boolean;
+  mlock?: boolean;
 };
 
 export type LlamaCppDeleteModelResult = {

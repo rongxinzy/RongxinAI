@@ -514,9 +514,45 @@ export function buildLlamaServerArgs(config: LlamaCppServiceConfig, modelsDir: s
   if (typeof config.modelsAutoload === 'boolean') {
     args.push(config.modelsAutoload ? '--models-autoload' : '--no-models-autoload');
   }
+  appendArg(args, '--timeout', config.timeout);
+  appendArg(args, '--threads-http', config.threadsHttp);
+  appendArg(args, '--cache-reuse', config.cacheReuse);
+  appendArg(args, '--cache-ram', config.cacheRam);
+  appendArg(args, '--ctx-checkpoints', config.ctxCheckpoints);
+  appendArg(args, '--checkpoint-every-n-tokens', config.checkpointEveryNt);
+  if (typeof config.cachePrompt === 'boolean') {
+    args.push(config.cachePrompt ? '--cache-prompt' : '--no-cache-prompt');
+  }
+  appendArg(args, '--ctx-size', config.ctxSize);
+  appendArg(args, '--parallel', config.parallel);
+  appendArg(args, '--batch-size', config.batchSize);
+  appendArg(args, '--ubatch-size', config.ubatchSize);
+  appendArg(args, '--gpu-layers', config.gpuLayers);
+  appendArg(args, '--threads', config.threads);
+  appendArg(args, '--threads-batch', config.threadsBatch);
   appendArg(args, '--device', config.device);
+  appendArg(args, '--main-gpu', config.mainGpu);
   appendArg(args, '--split-mode', config.splitMode);
   appendArg(args, '--tensor-split', config.tensorSplit);
+  appendArg(args, '--flash-attn', config.flashAttn);
+  if (config.jinja === 'on') args.push('--jinja');
+  if (config.jinja === 'off') args.push('--no-jinja');
+  appendArg(args, '--reasoning', config.reasoning);
+  if (config.reasoningFormat && config.reasoningFormat !== 'auto') {
+    appendArg(args, '--reasoning-format', config.reasoningFormat);
+  }
+  appendArg(args, '--reasoning-budget', config.reasoningBudget);
+  appendArg(args, '--reasoning-budget-message', config.reasoningBudgetMessage);
+  appendArg(args, '--chat-template', config.chatTemplate);
+  appendArg(args, '--chat-template-file', config.chatTemplateFile);
+  if (typeof config.skipChatParsing === 'boolean') {
+    args.push(config.skipChatParsing ? '--skip-chat-parsing' : '--no-skip-chat-parsing');
+  }
+  if (typeof config.prefillAssistant === 'boolean') {
+    args.push(config.prefillAssistant ? '--prefill-assistant' : '--no-prefill-assistant');
+  }
+  if (config.noMmap) args.push('--no-mmap');
+  if (config.mlock) args.push('--mlock');
   return args;
 }
 

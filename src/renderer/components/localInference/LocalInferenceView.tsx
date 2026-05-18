@@ -96,6 +96,21 @@ type OllamaServiceConfigFormState = {
   modelsMax: string;
   parallel: string;
   splitMode: string;
+  ctxSize: string;
+  gpuLayers: string;
+  batchSize: string;
+  ubatchSize: string;
+  threads: string;
+  timeout: string;
+  threadsHttp: string;
+  cachePrompt: string;
+  cacheReuse: string;
+  cacheRam: string;
+  flashAttn: string;
+  jinja: string;
+  reasoning: string;
+  reasoningFormat: string;
+  reasoningBudget: string;
 };
 
 type SaveServiceConfigResult = {
@@ -878,6 +893,21 @@ function OllamaServiceConfigDialog({
       device: form.device,
       modelsMax: form.modelsMax,
       parallel: form.parallel,
+      ctxSize: form.ctxSize,
+      gpuLayers: form.gpuLayers,
+      batchSize: form.batchSize,
+      ubatchSize: form.ubatchSize,
+      threads: form.threads,
+      timeout: form.timeout,
+      threadsHttp: form.threadsHttp,
+      cacheReuse: form.cacheReuse,
+      cacheRam: form.cacheRam,
+      ...(form.cachePrompt ? { cachePrompt: form.cachePrompt === 'true' } : {}),
+      ...(form.flashAttn ? { flashAttn: form.flashAttn as NonNullable<OllamaServiceConfig['flashAttn']> } : {}),
+      ...(form.jinja ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> } : {}),
+      ...(form.reasoning ? { reasoning: form.reasoning as NonNullable<OllamaServiceConfig['reasoning']> } : {}),
+      ...(form.reasoningFormat ? { reasoningFormat: form.reasoningFormat as NonNullable<OllamaServiceConfig['reasoningFormat']> } : {}),
+      reasoningBudget: form.reasoningBudget,
       ...(form.splitMode ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> } : {}),
     });
     if (result.success) {
@@ -924,28 +954,91 @@ function OllamaServiceConfigDialog({
             )}
             <div className="grid gap-4 md:grid-cols-2">
               <ServiceConfigInput
-                label="LLAMACPP_DEVICE"
+                label="--ctx-size"
+                value={form.ctxSize}
+                placeholder="16384"
+                hint={i18nService.t('localInferenceServiceConfigCtxSizeHint')}
+                onChange={(value) => updateForm('ctxSize', value)}
+              />
+              <ServiceConfigInput
+                label="--parallel"
+                value={form.parallel}
+                placeholder="1"
+                hint={i18nService.t('localInferenceServiceConfigParallelHint')}
+                onChange={(value) => updateForm('parallel', value)}
+              />
+              <ServiceConfigInput
+                label="--gpu-layers"
+                value={form.gpuLayers}
+                placeholder="auto"
+                hint={i18nService.t('localInferenceServiceConfigGpuLayersHint')}
+                onChange={(value) => updateForm('gpuLayers', value)}
+              />
+              <ServiceConfigInput
+                label="--device"
                 value={form.device}
                 placeholder="0,1"
                 hint={i18nService.t('localInferenceServiceConfigDeviceHint')}
                 onChange={(value) => updateForm('device', value)}
               />
               <ServiceConfigInput
-                label="LLAMACPP_MODELS_MAX"
+                label="--models-max"
                 value={form.modelsMax}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
                 hint={i18nService.t('localInferenceServiceConfigModelsMaxHint')}
                 onChange={(value) => updateForm('modelsMax', value)}
               />
               <ServiceConfigInput
-                label="LLAMACPP_PARALLEL"
-                value={form.parallel}
+                label="--batch-size"
+                value={form.batchSize}
+                placeholder="2048"
+                hint={i18nService.t('localInferenceServiceConfigBatchSizeHint')}
+                onChange={(value) => updateForm('batchSize', value)}
+              />
+              <ServiceConfigInput
+                label="--ubatch-size"
+                value={form.ubatchSize}
+                placeholder="512"
+                hint={i18nService.t('localInferenceServiceConfigUbatchSizeHint')}
+                onChange={(value) => updateForm('ubatchSize', value)}
+              />
+              <ServiceConfigInput
+                label="--threads"
+                value={form.threads}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceServiceConfigParallelHint')}
-                onChange={(value) => updateForm('parallel', value)}
+                hint={i18nService.t('localInferenceServiceConfigThreadsHint')}
+                onChange={(value) => updateForm('threads', value)}
+              />
+              <ServiceConfigInput
+                label="--timeout"
+                value={form.timeout}
+                placeholder="600"
+                hint={i18nService.t('localInferenceServiceConfigTimeoutHint')}
+                onChange={(value) => updateForm('timeout', value)}
+              />
+              <ServiceConfigInput
+                label="--threads-http"
+                value={form.threadsHttp}
+                placeholder={i18nService.t('localInferenceLaunchDefault')}
+                hint={i18nService.t('localInferenceServiceConfigThreadsHttpHint')}
+                onChange={(value) => updateForm('threadsHttp', value)}
+              />
+              <ServiceConfigInput
+                label="--cache-reuse"
+                value={form.cacheReuse}
+                placeholder="256"
+                hint={i18nService.t('localInferenceServiceConfigCacheReuseHint')}
+                onChange={(value) => updateForm('cacheReuse', value)}
+              />
+              <ServiceConfigInput
+                label="--cache-ram"
+                value={form.cacheRam}
+                placeholder="8192"
+                hint={i18nService.t('localInferenceServiceConfigCacheRamHint')}
+                onChange={(value) => updateForm('cacheRam', value)}
               />
               <label className="space-y-2 md:col-span-2">
-                <span className="font-mono text-sm font-semibold text-foreground">LLAMACPP_SPLIT_MODE</span>
+                <span className="font-mono text-sm font-semibold text-foreground">--split-mode</span>
                 <select
                   value={form.splitMode}
                   onChange={(event) => updateForm('splitMode', event.target.value)}
@@ -959,6 +1052,56 @@ function OllamaServiceConfigDialog({
                 </select>
                 <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigSplitModeHint')}</p>
               </label>
+              <ServiceConfigSelect
+                label="--cache-prompt"
+                value={form.cachePrompt}
+                hint={i18nService.t('localInferenceServiceConfigCachePromptHint')}
+                onChange={(value) => updateForm('cachePrompt', value)}
+                options={[
+                  { value: 'true', label: i18nService.t('localInferenceLaunchBooleanEnabled') },
+                  { value: 'false', label: i18nService.t('localInferenceLaunchBooleanDisabled') },
+                ]}
+              />
+              <ServiceConfigSelect
+                label="--flash-attn"
+                value={form.flashAttn}
+                hint={i18nService.t('localInferenceServiceConfigFlashAttnHint')}
+                onChange={(value) => updateForm('flashAttn', value)}
+                options={onOffAutoOptions()}
+              />
+              <ServiceConfigSelect
+                label="--jinja"
+                value={form.jinja}
+                hint={i18nService.t('localInferenceServiceConfigJinjaHint')}
+                onChange={(value) => updateForm('jinja', value)}
+                options={onOffAutoOptions()}
+              />
+              <ServiceConfigSelect
+                label="--reasoning"
+                value={form.reasoning}
+                hint={i18nService.t('localInferenceServiceConfigReasoningHint')}
+                onChange={(value) => updateForm('reasoning', value)}
+                options={onOffAutoOptions()}
+              />
+              <ServiceConfigSelect
+                label="--reasoning-format"
+                value={form.reasoningFormat}
+                hint={i18nService.t('localInferenceServiceConfigReasoningFormatHint')}
+                onChange={(value) => updateForm('reasoningFormat', value)}
+                options={[
+                  { value: 'none', label: 'none' },
+                  { value: 'deepseek', label: 'deepseek' },
+                  { value: 'deepseek-legacy', label: 'deepseek-legacy' },
+                  { value: 'auto', label: 'auto' },
+                ]}
+              />
+              <ServiceConfigInput
+                label="--reasoning-budget"
+                value={form.reasoningBudget}
+                placeholder="-1"
+                hint={i18nService.t('localInferenceServiceConfigReasoningBudgetHint')}
+                onChange={(value) => updateForm('reasoningBudget', value)}
+              />
             </div>
             <p className="mt-4 text-xs text-secondary">
               {running && !managedByApp
@@ -1018,6 +1161,45 @@ function ServiceConfigInput({
       <p className="text-xs text-secondary">{hint}</p>
     </label>
   );
+}
+
+function ServiceConfigSelect({
+  label,
+  value,
+  hint,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-2">
+      <span className="font-mono text-sm font-semibold text-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+      >
+        <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <p className="text-xs text-secondary">{hint}</p>
+    </label>
+  );
+}
+
+function onOffAutoOptions(): Array<{ value: string; label: string }> {
+  return [
+    { value: 'auto', label: 'auto' },
+    { value: 'on', label: 'on' },
+    { value: 'off', label: 'off' },
+  ];
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -2034,6 +2216,21 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
     modelsMax: config.modelsMax ?? '',
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
+    ctxSize: config.ctxSize ?? '',
+    gpuLayers: config.gpuLayers ?? '',
+    batchSize: config.batchSize ?? '',
+    ubatchSize: config.ubatchSize ?? '',
+    threads: config.threads ?? '',
+    timeout: config.timeout ?? '',
+    threadsHttp: config.threadsHttp ?? '',
+    cachePrompt: config.cachePrompt === undefined ? '' : String(config.cachePrompt),
+    cacheReuse: config.cacheReuse ?? '',
+    cacheRam: config.cacheRam ?? '',
+    flashAttn: config.flashAttn ?? '',
+    jinja: config.jinja ?? '',
+    reasoning: config.reasoning ?? '',
+    reasoningFormat: config.reasoningFormat ?? '',
+    reasoningBudget: config.reasoningBudget ?? '',
   };
 }
 
