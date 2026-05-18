@@ -235,15 +235,8 @@ function packMultipleSources(sources, outputTar) {
         maxBuffer: 10 * 1024 * 1024,
       });
 
-      // Count entries back from the result
-      const listResult = execSync(`tar -tf "${outputTar}"`, {
-        stdio: 'pipe',
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      totalFiles = listResult.toString('utf-8').trim().split('\n').filter(Boolean).length;
-
       const tarElapsed = ((Date.now() - tTar) / 1000).toFixed(1);
-      console.log(`[pack-openclaw-tar] tar.exe completed in ${tarElapsed}s, ${totalFiles} entries, ${excludeCount} exclude rules`);
+      console.log(`[pack-openclaw-tar] tar.exe completed in ${tarElapsed}s, ${excludeCount} exclude rules`);
     } finally {
       // Clean up junctions and staging dir
       for (const prefix of includedPrefixes) {
@@ -323,11 +316,11 @@ function main() {
 
     console.log(`[pack-openclaw-tar] Packing combined Windows tar: ${outputTar}`);
     const t0 = Date.now();
-    const { totalFiles } = packMultipleSources(sources, outputTar);
+    packMultipleSources(sources, outputTar);
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     const sizeMB = (fs.statSync(outputTar).size / (1024 * 1024)).toFixed(1);
     console.log(
-      `[pack-openclaw-tar] Done in ${elapsed}s: ${totalFiles} files, ${sizeMB} MB`
+      `[pack-openclaw-tar] Done in ${elapsed}s: ${sizeMB} MB`
     );
     return;
   }
