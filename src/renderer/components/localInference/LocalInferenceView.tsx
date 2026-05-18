@@ -758,6 +758,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
           {activeTab === 'models' ? (
             <ModelsPanel
+              isRunning={isRunning}
               loading={loading}
               localModels={localModels}
               runningModels={runningModels}
