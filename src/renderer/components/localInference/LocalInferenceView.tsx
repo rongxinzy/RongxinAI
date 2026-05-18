@@ -43,18 +43,16 @@ import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import MarkdownContent from '../MarkdownContent';
 import WindowTitleBar from '../window/WindowTitleBar';
+import {
+  getRecommendedInferenceOptions,
+  type InferenceOptions,
+  isThinkingModel,
+  loadInferenceOptions,
+  normalizeOptions,
+  shouldApplyModelPreset,
+} from './inferenceOptions';
 
 type LocalInferenceTab = 'inference' | 'models' | 'marketplace';
-
-type InferenceOptions = {
-  temperature: number;
-  top_p: number;
-  top_k: number;
-  num_predict: number;
-  repeat_penalty: number;
-  seed: number;
-  stop: string;
-};
 
 type InferenceMessage = {
   role: 'user' | 'assistant';
@@ -92,25 +90,57 @@ type LaunchRequest = {
 };
 
 type OllamaServiceConfigFormState = {
+  host: string;
+  port: string;
   device: string;
   modelsMax: string;
+  modelsAutoload: string;
   parallel: string;
   splitMode: string;
+  tensorSplit: string;
   ctxSize: string;
   gpuLayers: string;
   batchSize: string;
   ubatchSize: string;
   threads: string;
+  threadsBatch: string;
   timeout: string;
   threadsHttp: string;
   cachePrompt: string;
   cacheReuse: string;
   cacheRam: string;
   flashAttn: string;
+  mainGpu: string;
+  mmap: string;
+  mlock: string;
   jinja: string;
   reasoning: string;
   reasoningFormat: string;
   reasoningBudget: string;
+};
+
+type ServiceConfigGroup = 'basic' | 'performance' | 'cache' | 'reasoning' | 'advanced';
+type ServiceConfigField = {
+  key: keyof OllamaServiceConfigFormState;
+  labelKey: string;
+  paramName: string;
+  group: ServiceConfigGroup;
+  type: 'input' | 'select';
+  placeholder?: string;
+  placeholderKey?: string;
+  hintKey: string;
+  restartRequired: boolean;
+};
+
+type InferenceOptionField = {
+  key: keyof InferenceOptions;
+  labelKey: string;
+  paramName: string;
+  type: 'range' | 'number' | 'text' | 'select';
+  min?: number;
+  max?: number;
+  step?: number;
+  hintKey: string;
 };
 
 type SaveServiceConfigResult = {
@@ -118,19 +148,60 @@ type SaveServiceConfigResult = {
   error?: string;
 };
 
-const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
-  temperature: 0.7,
-  top_p: 0.9,
-  top_k: 40,
-  num_predict: 1024,
-  repeat_penalty: 1.1,
-  seed: -1,
-  stop: '',
-};
 const MARKETPLACE_INITIAL_VISIBLE_COUNT = 24;
 const MARKETPLACE_VISIBLE_INCREMENT = 24;
 const smallOutlineButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
+const SERVICE_CONFIG_GROUPS: Array<{ id: ServiceConfigGroup; titleKey: string }> = [
+  { id: 'basic', titleKey: 'localInferenceServiceConfigGroupBasic' },
+  { id: 'performance', titleKey: 'localInferenceServiceConfigGroupPerformance' },
+  { id: 'cache', titleKey: 'localInferenceServiceConfigGroupCache' },
+  { id: 'reasoning', titleKey: 'localInferenceServiceConfigGroupReasoning' },
+  { id: 'advanced', titleKey: 'localInferenceServiceConfigGroupAdvanced' },
+];
+const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
+  { key: 'ctxSize', labelKey: 'localInferenceServiceConfigCtxSizeLabel', paramName: 'ctx-size', group: 'basic', type: 'input', placeholder: '16384', hintKey: 'localInferenceServiceConfigCtxSizeHint', restartRequired: true },
+  { key: 'parallel', labelKey: 'localInferenceServiceConfigParallelLabel', paramName: 'parallel', group: 'basic', type: 'input', placeholder: '1', hintKey: 'localInferenceServiceConfigParallelHint', restartRequired: true },
+  { key: 'gpuLayers', labelKey: 'localInferenceServiceConfigGpuLayersLabel', paramName: 'gpu-layers', group: 'basic', type: 'input', placeholder: 'auto', hintKey: 'localInferenceServiceConfigGpuLayersHint', restartRequired: true },
+  { key: 'device', labelKey: 'localInferenceServiceConfigDeviceLabel', paramName: 'device', group: 'basic', type: 'input', placeholder: '0,1', hintKey: 'localInferenceServiceConfigDeviceHint', restartRequired: true },
+  { key: 'modelsMax', labelKey: 'localInferenceServiceConfigModelsMaxLabel', paramName: 'models-max', group: 'basic', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigModelsMaxHint', restartRequired: true },
+  { key: 'host', labelKey: 'localInferenceServiceConfigHostLabel', paramName: 'host', group: 'basic', type: 'input', placeholder: '127.0.0.1', hintKey: 'localInferenceServiceConfigHostHint', restartRequired: true },
+  { key: 'port', labelKey: 'localInferenceServiceConfigPortLabel', paramName: 'port', group: 'basic', type: 'input', placeholder: '8080', hintKey: 'localInferenceServiceConfigPortHint', restartRequired: true },
+  { key: 'batchSize', labelKey: 'localInferenceServiceConfigBatchSizeLabel', paramName: 'batch-size', group: 'performance', type: 'input', placeholder: '2048', hintKey: 'localInferenceServiceConfigBatchSizeHint', restartRequired: true },
+  { key: 'ubatchSize', labelKey: 'localInferenceServiceConfigUbatchSizeLabel', paramName: 'ubatch-size', group: 'performance', type: 'input', placeholder: '512', hintKey: 'localInferenceServiceConfigUbatchSizeHint', restartRequired: true },
+  { key: 'threads', labelKey: 'localInferenceServiceConfigThreadsLabel', paramName: 'threads', group: 'performance', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsHint', restartRequired: true },
+  { key: 'threadsBatch', labelKey: 'localInferenceServiceConfigThreadsBatchLabel', paramName: 'threads-batch', group: 'performance', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsBatchHint', restartRequired: true },
+  { key: 'threadsHttp', labelKey: 'localInferenceServiceConfigThreadsHttpLabel', paramName: 'threads-http', group: 'performance', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsHttpHint', restartRequired: true },
+  { key: 'timeout', labelKey: 'localInferenceServiceConfigTimeoutLabel', paramName: 'timeout', group: 'performance', type: 'input', placeholder: '600', hintKey: 'localInferenceServiceConfigTimeoutHint', restartRequired: true },
+  { key: 'cachePrompt', labelKey: 'localInferenceServiceConfigCachePromptLabel', paramName: 'cache-prompt', group: 'cache', type: 'select', hintKey: 'localInferenceServiceConfigCachePromptHint', restartRequired: true },
+  { key: 'cacheReuse', labelKey: 'localInferenceServiceConfigCacheReuseLabel', paramName: 'cache-reuse', group: 'cache', type: 'input', placeholder: '256', hintKey: 'localInferenceServiceConfigCacheReuseHint', restartRequired: true },
+  { key: 'cacheRam', labelKey: 'localInferenceServiceConfigCacheRamLabel', paramName: 'cache-ram', group: 'cache', type: 'input', placeholder: '8192', hintKey: 'localInferenceServiceConfigCacheRamHint', restartRequired: true },
+  { key: 'modelsAutoload', labelKey: 'localInferenceServiceConfigModelsAutoloadLabel', paramName: 'models-autoload', group: 'cache', type: 'select', hintKey: 'localInferenceServiceConfigModelsAutoloadHint', restartRequired: true },
+  { key: 'jinja', labelKey: 'localInferenceServiceConfigJinjaLabel', paramName: 'jinja', group: 'reasoning', type: 'select', hintKey: 'localInferenceServiceConfigJinjaHint', restartRequired: true },
+  { key: 'reasoning', labelKey: 'localInferenceServiceConfigReasoningLabel', paramName: 'reasoning', group: 'reasoning', type: 'select', hintKey: 'localInferenceServiceConfigReasoningHint', restartRequired: true },
+  { key: 'reasoningFormat', labelKey: 'localInferenceServiceConfigReasoningFormatLabel', paramName: 'reasoning-format', group: 'reasoning', type: 'select', hintKey: 'localInferenceServiceConfigReasoningFormatHint', restartRequired: true },
+  { key: 'reasoningBudget', labelKey: 'localInferenceServiceConfigReasoningBudgetLabel', paramName: 'reasoning-budget', group: 'reasoning', type: 'input', placeholder: '-1', hintKey: 'localInferenceServiceConfigReasoningBudgetHint', restartRequired: true },
+  { key: 'splitMode', labelKey: 'localInferenceServiceConfigSplitModeLabel', paramName: 'split-mode', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigSplitModeHint', restartRequired: true },
+  { key: 'tensorSplit', labelKey: 'localInferenceServiceConfigTensorSplitLabel', paramName: 'tensor-split', group: 'advanced', type: 'input', placeholder: '3,2', hintKey: 'localInferenceServiceConfigTensorSplitHint', restartRequired: true },
+  { key: 'mainGpu', labelKey: 'localInferenceServiceConfigMainGpuLabel', paramName: 'main-gpu', group: 'advanced', type: 'input', placeholder: '0', hintKey: 'localInferenceServiceConfigMainGpuHint', restartRequired: true },
+  { key: 'flashAttn', labelKey: 'localInferenceServiceConfigFlashAttnLabel', paramName: 'flash-attn', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigFlashAttnHint', restartRequired: true },
+  { key: 'mmap', labelKey: 'localInferenceServiceConfigMmapLabel', paramName: 'mmap', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigMmapHint', restartRequired: true },
+  { key: 'mlock', labelKey: 'localInferenceServiceConfigMlockLabel', paramName: 'mlock', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigMlockHint', restartRequired: true },
+];
+const INFERENCE_OPTION_FIELDS: InferenceOptionField[] = [
+  { key: 'temperature', labelKey: 'localInferenceOptionTemperatureLabel', paramName: 'temperature', type: 'range', min: 0, max: 2, step: 0.1, hintKey: 'localInferenceOptionTemperatureHint' },
+  { key: 'top_p', labelKey: 'localInferenceOptionTopPLabel', paramName: 'top_p', type: 'range', min: 0, max: 1, step: 0.05, hintKey: 'localInferenceOptionTopPHint' },
+  { key: 'top_k', labelKey: 'localInferenceOptionTopKLabel', paramName: 'top_k', type: 'range', min: 0, max: 100, step: 1, hintKey: 'localInferenceOptionTopKHint' },
+  { key: 'min_p', labelKey: 'localInferenceOptionMinPLabel', paramName: 'min_p', type: 'range', min: 0, max: 1, step: 0.01, hintKey: 'localInferenceOptionMinPHint' },
+  { key: 'num_predict', labelKey: 'localInferenceOptionMaxTokensLabel', paramName: 'max_tokens', type: 'range', min: -1, max: 32768, step: 1, hintKey: 'localInferenceOptionMaxTokensHint' },
+  { key: 'repeat_penalty', labelKey: 'localInferenceOptionRepeatPenaltyLabel', paramName: 'repeat_penalty', type: 'range', min: 0, max: 2, step: 0.05, hintKey: 'localInferenceOptionRepeatPenaltyHint' },
+  { key: 'presence_penalty', labelKey: 'localInferenceOptionPresencePenaltyLabel', paramName: 'presence_penalty', type: 'range', min: -2, max: 2, step: 0.1, hintKey: 'localInferenceOptionPresencePenaltyHint' },
+  { key: 'reasoning_format', labelKey: 'localInferenceOptionReasoningFormatLabel', paramName: 'reasoning_format', type: 'select', hintKey: 'localInferenceOptionReasoningFormatHint' },
+  { key: 'thinking_forced_open', labelKey: 'localInferenceOptionThinkingForcedOpenLabel', paramName: 'thinking_forced_open', type: 'select', hintKey: 'localInferenceOptionThinkingForcedOpenHint' },
+  { key: 'cache_prompt', labelKey: 'localInferenceOptionCachePromptLabel', paramName: 'cache_prompt', type: 'select', hintKey: 'localInferenceOptionCachePromptHint' },
+  { key: 'seed', labelKey: 'localInferenceOptionSeedLabel', paramName: 'seed', type: 'number', hintKey: 'localInferenceOptionSeedHint' },
+  { key: 'stop', labelKey: 'localInferenceOptionStopLabel', paramName: 'stop', type: 'text', hintKey: 'localInferenceOptionStopHint' },
+];
 
 interface LocalInferenceViewProps {
   isSidebarCollapsed?: boolean;
@@ -332,6 +403,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     if (modelName !== selectedModel) {
       resetInferenceConversation();
     }
+    setOptions((current) => shouldApplyModelPreset(current)
+      ? getRecommendedInferenceOptions(modelName)
+      : current);
     setSelectedModel(modelName);
   }, [resetInferenceConversation, selectedModel]);
 
@@ -793,13 +867,9 @@ function ServiceHeader({
             <h2 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceService')}</h2>
             <StatusBadge status={status?.status ?? 'unknown'} />
             {status?.version && <span className="font-mono text-xs text-secondary">v{status.version}</span>}
-            {running && (
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                managedByApp
-                  ? 'bg-blue-500/15 text-blue-500'
-                  : 'bg-amber-500/15 text-amber-500'
-              }`}>
-                {i18nService.t(managedByApp ? 'localInferenceServiceManagedByApp' : 'localInferenceServiceExternal')}
+            {running && !managedByApp && (
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                {i18nService.t('localInferenceServiceExternal')}
               </span>
             )}
           </div>
@@ -890,20 +960,28 @@ function OllamaServiceConfigDialog({
   const save = async () => {
     setSaveError(null);
     const result = await onSave({
+      host: form.host,
+      port: form.port,
       device: form.device,
       modelsMax: form.modelsMax,
+      ...(form.modelsAutoload ? { modelsAutoload: form.modelsAutoload === 'true' } : {}),
       parallel: form.parallel,
       ctxSize: form.ctxSize,
       gpuLayers: form.gpuLayers,
       batchSize: form.batchSize,
       ubatchSize: form.ubatchSize,
       threads: form.threads,
+      threadsBatch: form.threadsBatch,
       timeout: form.timeout,
       threadsHttp: form.threadsHttp,
       cacheReuse: form.cacheReuse,
       cacheRam: form.cacheRam,
       ...(form.cachePrompt ? { cachePrompt: form.cachePrompt === 'true' } : {}),
       ...(form.flashAttn ? { flashAttn: form.flashAttn as NonNullable<OllamaServiceConfig['flashAttn']> } : {}),
+      mainGpu: form.mainGpu,
+      tensorSplit: form.tensorSplit,
+      ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
+      ...(form.mlock ? { mlock: form.mlock === 'true' } : {}),
       ...(form.jinja ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> } : {}),
       ...(form.reasoning ? { reasoning: form.reasoning as NonNullable<OllamaServiceConfig['reasoning']> } : {}),
       ...(form.reasoningFormat ? { reasoningFormat: form.reasoningFormat as NonNullable<OllamaServiceConfig['reasoningFormat']> } : {}),
@@ -952,156 +1030,46 @@ function OllamaServiceConfigDialog({
                 {saveError}
               </p>
             )}
-            <div className="grid gap-4 md:grid-cols-2">
-              <ServiceConfigInput
-                label="--ctx-size"
-                value={form.ctxSize}
-                placeholder="16384"
-                hint={i18nService.t('localInferenceServiceConfigCtxSizeHint')}
-                onChange={(value) => updateForm('ctxSize', value)}
-              />
-              <ServiceConfigInput
-                label="--parallel"
-                value={form.parallel}
-                placeholder="1"
-                hint={i18nService.t('localInferenceServiceConfigParallelHint')}
-                onChange={(value) => updateForm('parallel', value)}
-              />
-              <ServiceConfigInput
-                label="--gpu-layers"
-                value={form.gpuLayers}
-                placeholder="auto"
-                hint={i18nService.t('localInferenceServiceConfigGpuLayersHint')}
-                onChange={(value) => updateForm('gpuLayers', value)}
-              />
-              <ServiceConfigInput
-                label="--device"
-                value={form.device}
-                placeholder="0,1"
-                hint={i18nService.t('localInferenceServiceConfigDeviceHint')}
-                onChange={(value) => updateForm('device', value)}
-              />
-              <ServiceConfigInput
-                label="--models-max"
-                value={form.modelsMax}
-                placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceServiceConfigModelsMaxHint')}
-                onChange={(value) => updateForm('modelsMax', value)}
-              />
-              <ServiceConfigInput
-                label="--batch-size"
-                value={form.batchSize}
-                placeholder="2048"
-                hint={i18nService.t('localInferenceServiceConfigBatchSizeHint')}
-                onChange={(value) => updateForm('batchSize', value)}
-              />
-              <ServiceConfigInput
-                label="--ubatch-size"
-                value={form.ubatchSize}
-                placeholder="512"
-                hint={i18nService.t('localInferenceServiceConfigUbatchSizeHint')}
-                onChange={(value) => updateForm('ubatchSize', value)}
-              />
-              <ServiceConfigInput
-                label="--threads"
-                value={form.threads}
-                placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceServiceConfigThreadsHint')}
-                onChange={(value) => updateForm('threads', value)}
-              />
-              <ServiceConfigInput
-                label="--timeout"
-                value={form.timeout}
-                placeholder="600"
-                hint={i18nService.t('localInferenceServiceConfigTimeoutHint')}
-                onChange={(value) => updateForm('timeout', value)}
-              />
-              <ServiceConfigInput
-                label="--threads-http"
-                value={form.threadsHttp}
-                placeholder={i18nService.t('localInferenceLaunchDefault')}
-                hint={i18nService.t('localInferenceServiceConfigThreadsHttpHint')}
-                onChange={(value) => updateForm('threadsHttp', value)}
-              />
-              <ServiceConfigInput
-                label="--cache-reuse"
-                value={form.cacheReuse}
-                placeholder="256"
-                hint={i18nService.t('localInferenceServiceConfigCacheReuseHint')}
-                onChange={(value) => updateForm('cacheReuse', value)}
-              />
-              <ServiceConfigInput
-                label="--cache-ram"
-                value={form.cacheRam}
-                placeholder="8192"
-                hint={i18nService.t('localInferenceServiceConfigCacheRamHint')}
-                onChange={(value) => updateForm('cacheRam', value)}
-              />
-              <label className="space-y-2 md:col-span-2">
-                <span className="font-mono text-sm font-semibold text-foreground">--split-mode</span>
-                <select
-                  value={form.splitMode}
-                  onChange={(event) => updateForm('splitMode', event.target.value)}
-                  className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-                >
-                  <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
-                  <option value="none">{i18nService.t('localInferenceServiceConfigSplitNone')}</option>
-                  <option value="layer">{i18nService.t('localInferenceServiceConfigSplitLayer')}</option>
-                  <option value="row">{i18nService.t('localInferenceServiceConfigSplitRow')}</option>
-                  <option value="tensor">{i18nService.t('localInferenceServiceConfigSplitTensor')}</option>
-                </select>
-                <p className="text-xs text-secondary">{i18nService.t('localInferenceServiceConfigSplitModeHint')}</p>
-              </label>
-              <ServiceConfigSelect
-                label="--cache-prompt"
-                value={form.cachePrompt}
-                hint={i18nService.t('localInferenceServiceConfigCachePromptHint')}
-                onChange={(value) => updateForm('cachePrompt', value)}
-                options={[
-                  { value: 'true', label: i18nService.t('localInferenceLaunchBooleanEnabled') },
-                  { value: 'false', label: i18nService.t('localInferenceLaunchBooleanDisabled') },
-                ]}
-              />
-              <ServiceConfigSelect
-                label="--flash-attn"
-                value={form.flashAttn}
-                hint={i18nService.t('localInferenceServiceConfigFlashAttnHint')}
-                onChange={(value) => updateForm('flashAttn', value)}
-                options={onOffAutoOptions()}
-              />
-              <ServiceConfigSelect
-                label="--jinja"
-                value={form.jinja}
-                hint={i18nService.t('localInferenceServiceConfigJinjaHint')}
-                onChange={(value) => updateForm('jinja', value)}
-                options={onOffAutoOptions()}
-              />
-              <ServiceConfigSelect
-                label="--reasoning"
-                value={form.reasoning}
-                hint={i18nService.t('localInferenceServiceConfigReasoningHint')}
-                onChange={(value) => updateForm('reasoning', value)}
-                options={onOffAutoOptions()}
-              />
-              <ServiceConfigSelect
-                label="--reasoning-format"
-                value={form.reasoningFormat}
-                hint={i18nService.t('localInferenceServiceConfigReasoningFormatHint')}
-                onChange={(value) => updateForm('reasoningFormat', value)}
-                options={[
-                  { value: 'none', label: 'none' },
-                  { value: 'deepseek', label: 'deepseek' },
-                  { value: 'deepseek-legacy', label: 'deepseek-legacy' },
-                  { value: 'auto', label: 'auto' },
-                ]}
-              />
-              <ServiceConfigInput
-                label="--reasoning-budget"
-                value={form.reasoningBudget}
-                placeholder="-1"
-                hint={i18nService.t('localInferenceServiceConfigReasoningBudgetHint')}
-                onChange={(value) => updateForm('reasoningBudget', value)}
-              />
+            <div className="space-y-5">
+              {SERVICE_CONFIG_GROUPS.map((group) => {
+                const fields = SERVICE_CONFIG_FIELDS.filter((field) => field.group === group.id);
+                return (
+                  <div key={group.id} className="space-y-3">
+                    <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-2">
+                      <h4 className="text-sm font-semibold text-foreground">{i18nService.t(group.titleKey)}</h4>
+                      <span className="text-[11px] text-secondary">{i18nService.t('localInferenceServiceConfigRestartRequired')}</span>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {fields.map((field) => {
+                        const placeholder = field.placeholderKey ? i18nService.t(field.placeholderKey) : field.placeholder ?? '';
+                        const label = i18nService.t(field.labelKey);
+                        const hint = i18nService.t(field.hintKey);
+                        return field.type === 'select' ? (
+                          <ServiceConfigSelect
+                            key={field.key}
+                            label={label}
+                            paramName={field.paramName}
+                            value={form[field.key]}
+                            hint={hint}
+                            onChange={(value) => updateForm(field.key, value)}
+                            options={getServiceConfigSelectOptions(field.key)}
+                          />
+                        ) : (
+                          <ServiceConfigInput
+                            key={field.key}
+                            label={label}
+                            paramName={field.paramName}
+                            value={form[field.key]}
+                            placeholder={placeholder}
+                            hint={hint}
+                            onChange={(value) => updateForm(field.key, value)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <p className="mt-4 text-xs text-secondary">
               {running && !managedByApp
@@ -1138,12 +1106,14 @@ function OllamaServiceConfigDialog({
 
 function ServiceConfigInput({
   label,
+  paramName,
   value,
   placeholder,
   hint,
   onChange,
 }: {
   label: string;
+  paramName: string;
   value: string;
   placeholder: string;
   hint: string;
@@ -1151,7 +1121,10 @@ function ServiceConfigInput({
 }) {
   return (
     <label className="space-y-2">
-      <span className="font-mono text-sm font-semibold text-foreground">{label}</span>
+      <span className="flex items-baseline gap-2">
+        <span className="text-sm font-semibold text-foreground">{label}</span>
+        <code className="text-[11px] text-secondary">{paramName}</code>
+      </span>
       <input
         value={value}
         placeholder={placeholder}
@@ -1165,12 +1138,14 @@ function ServiceConfigInput({
 
 function ServiceConfigSelect({
   label,
+  paramName,
   value,
   hint,
   options,
   onChange,
 }: {
   label: string;
+  paramName: string;
   value: string;
   hint: string;
   options: Array<{ value: string; label: string }>;
@@ -1178,7 +1153,10 @@ function ServiceConfigSelect({
 }) {
   return (
     <label className="space-y-2">
-      <span className="font-mono text-sm font-semibold text-foreground">{label}</span>
+      <span className="flex items-baseline gap-2">
+        <span className="text-sm font-semibold text-foreground">{label}</span>
+        <code className="text-[11px] text-secondary">{paramName}</code>
+      </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1192,6 +1170,43 @@ function ServiceConfigSelect({
       <p className="text-xs text-secondary">{hint}</p>
     </label>
   );
+}
+
+function getServiceConfigSelectOptions(key: keyof OllamaServiceConfigFormState): Array<{ value: string; label: string }> {
+  switch (key) {
+    case 'splitMode':
+      return [
+        { value: 'none', label: i18nService.t('localInferenceServiceConfigSplitNone') },
+        { value: 'layer', label: i18nService.t('localInferenceServiceConfigSplitLayer') },
+        { value: 'row', label: i18nService.t('localInferenceServiceConfigSplitRow') },
+        { value: 'tensor', label: i18nService.t('localInferenceServiceConfigSplitTensor') },
+      ];
+    case 'cachePrompt':
+    case 'modelsAutoload':
+    case 'mmap':
+    case 'mlock':
+      return booleanSelectOptions();
+    case 'flashAttn':
+    case 'jinja':
+    case 'reasoning':
+      return onOffAutoOptions();
+    case 'reasoningFormat':
+      return [
+        { value: 'none', label: 'none' },
+        { value: 'deepseek', label: 'deepseek' },
+        { value: 'deepseek-legacy', label: 'deepseek-legacy' },
+        { value: 'auto', label: 'auto' },
+      ];
+    default:
+      return [];
+  }
+}
+
+function booleanSelectOptions(): Array<{ value: string; label: string }> {
+  return [
+    { value: 'true', label: i18nService.t('localInferenceLaunchBooleanEnabled') },
+    { value: 'false', label: i18nService.t('localInferenceLaunchBooleanDisabled') },
+  ];
 }
 
 function onOffAutoOptions(): Array<{ value: string; label: string }> {
@@ -1887,6 +1902,10 @@ function InferencePanel({
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
+  const likelyThinkingModel = isThinkingModel(selectedModel);
+  const updateOption = (key: keyof InferenceOptions, value: InferenceOptions[keyof InferenceOptions]) => {
+    onOptionsChange({ ...options, [key]: value });
+  };
 
   useEffect(() => {
     const element = chatScrollRef.current;
@@ -1942,28 +1961,23 @@ function InferencePanel({
               className="min-h-20 w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 text-sm text-foreground outline-none focus:border-primary/60"
             />
           </div>
-          <RangeControl label="temperature" min={0} max={2} step={0.1} value={options.temperature} onChange={(value) => onOptionsChange({ ...options, temperature: value })} />
-          <RangeControl label="top_p" min={0} max={1} step={0.05} value={options.top_p} onChange={(value) => onOptionsChange({ ...options, top_p: value })} />
-          <RangeControl label="top_k" min={1} max={100} step={1} value={options.top_k} onChange={(value) => onOptionsChange({ ...options, top_k: value })} />
-          <RangeControl label={i18nService.t('localInferenceMaxTokens')} min={-1} max={32768} step={1} value={options.num_predict} onChange={(value) => onOptionsChange({ ...options, num_predict: value })} />
-          <RangeControl label="repeat_penalty" min={0} max={2} step={0.05} value={options.repeat_penalty} onChange={(value) => onOptionsChange({ ...options, repeat_penalty: value })} />
-          <div>
-            <label className="mb-1 block text-xs font-medium text-secondary">seed</label>
-            <input
-              type="number"
-              value={options.seed}
-              onChange={(event) => onOptionsChange({ ...options, seed: Number(event.target.value) })}
-              className="h-8 w-full rounded-md border border-border bg-background px-2.5 font-mono text-sm text-foreground outline-none focus:border-primary/60"
-            />
+          <div className="rounded-md border border-border/70 bg-background/40 px-2.5 py-2 text-xs text-secondary">
+            <div className="flex items-center justify-between gap-2">
+              <span>{i18nService.t('localInferenceOptionRequestParamsTitle')}</span>
+              <Badge tone={likelyThinkingModel ? 'success' : 'neutral'}>
+                {i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModel' : 'localInferenceNonThinkingModel')}
+              </Badge>
+            </div>
+            <p className="mt-1">{i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModelHint' : 'localInferenceNonThinkingModelHint')}</p>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-secondary">stop</label>
-            <input
-              value={options.stop}
-              onChange={(event) => onOptionsChange({ ...options, stop: event.target.value })}
-              className="h-8 w-full rounded-md border border-border bg-background px-2.5 font-mono text-sm text-foreground outline-none focus:border-primary/60"
+          {INFERENCE_OPTION_FIELDS.map((field) => (
+            <InferenceOptionControl
+              key={field.key}
+              field={field}
+              value={options[field.key]}
+              onChange={(value) => updateOption(field.key, value)}
             />
-          </div>
+          ))}
           <button type="button" onClick={onSavePreset} className="h-8 w-full rounded-md bg-primary text-sm font-medium text-white transition-colors hover:bg-primary-hover">
             {i18nService.t('localInferenceSavePreset')}
           </button>
@@ -2077,25 +2091,85 @@ function ChatBubble({ message, streaming = false }: { message: InferenceMessage;
   );
 }
 
+function InferenceOptionControl({
+  field,
+  value,
+  onChange,
+}: {
+  field: InferenceOptionField;
+  value: InferenceOptions[keyof InferenceOptions];
+  onChange: (value: InferenceOptions[keyof InferenceOptions]) => void;
+}) {
+  const label = i18nService.t(field.labelKey);
+  const hint = i18nService.t(field.hintKey);
+  if (field.type === 'range') {
+    return (
+      <RangeControl
+        label={label}
+        paramName={field.paramName}
+        min={field.min ?? 0}
+        max={field.max ?? 1}
+        step={field.step ?? 1}
+        value={typeof value === 'number' ? value : 0}
+        hint={hint}
+        onChange={onChange}
+      />
+    );
+  }
+  if (field.type === 'select') {
+    return (
+      <label className="space-y-1.5">
+        <OptionLabel label={label} paramName={field.paramName} />
+        <select
+          value={String(value)}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary/60"
+        >
+          {getInferenceOptionSelectOptions(field.key).map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <p className="text-[11px] leading-4 text-secondary">{hint}</p>
+      </label>
+    );
+  }
+  return (
+    <label className="space-y-1.5">
+      <OptionLabel label={label} paramName={field.paramName} />
+      <input
+        type={field.type === 'number' ? 'number' : 'text'}
+        value={String(value)}
+        onChange={(event) => onChange(field.type === 'number' ? Number(event.target.value) : event.target.value)}
+        className="h-8 w-full rounded-md border border-border bg-background px-2.5 font-mono text-sm text-foreground outline-none focus:border-primary/60"
+      />
+      <p className="text-[11px] leading-4 text-secondary">{hint}</p>
+    </label>
+  );
+}
+
 function RangeControl({
   label,
+  paramName,
   min,
   max,
   step,
   value,
+  hint,
   onChange,
 }: {
   label: string;
+  paramName: string;
   min: number;
   max: number;
   step: number;
   value: number;
+  hint: string;
   onChange: (value: number) => void;
 }) {
   return (
-    <div>
+    <div className="space-y-1.5">
       <div className="mb-1 flex items-center justify-between">
-        <label className="font-mono text-xs font-medium text-secondary">{label}</label>
+        <OptionLabel label={label} paramName={paramName} />
         <span className="font-mono text-xs text-secondary">{value}</span>
       </div>
       <input
@@ -2107,8 +2181,39 @@ function RangeControl({
         onChange={(event) => onChange(Number(event.target.value))}
         className="w-full accent-primary"
       />
+      <p className="text-[11px] leading-4 text-secondary">{hint}</p>
     </div>
   );
+}
+
+function OptionLabel({ label, paramName }: { label: string; paramName: string }) {
+  return (
+    <span className="flex min-w-0 items-baseline gap-2">
+      <span className="text-xs font-medium text-secondary">{label}</span>
+      <code className="truncate text-[11px] text-secondary/80">{paramName}</code>
+    </span>
+  );
+}
+
+function getInferenceOptionSelectOptions(key: keyof InferenceOptions): Array<{ value: string; label: string }> {
+  switch (key) {
+    case 'reasoning_format':
+      return [
+        { value: 'auto', label: 'auto' },
+        { value: 'none', label: 'none' },
+        { value: 'deepseek', label: 'deepseek' },
+        { value: 'deepseek-legacy', label: 'deepseek-legacy' },
+      ];
+    case 'thinking_forced_open':
+    case 'cache_prompt':
+      return [
+        { value: 'auto', label: i18nService.t('localInferenceOptionAuto') },
+        { value: 'enabled', label: i18nService.t('localInferenceLaunchBooleanEnabled') },
+        { value: 'disabled', label: i18nService.t('localInferenceLaunchBooleanDisabled') },
+      ];
+    default:
+      return [];
+  }
 }
 
 function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'success' }) {
@@ -2212,21 +2317,29 @@ function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string):
 
 function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFormState {
   return {
+    host: config.host ?? '',
+    port: config.port ?? '',
     device: config.device ?? '',
     modelsMax: config.modelsMax ?? '',
+    modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
+    tensorSplit: config.tensorSplit ?? '',
     ctxSize: config.ctxSize ?? '',
     gpuLayers: config.gpuLayers ?? '',
     batchSize: config.batchSize ?? '',
     ubatchSize: config.ubatchSize ?? '',
     threads: config.threads ?? '',
+    threadsBatch: config.threadsBatch ?? '',
     timeout: config.timeout ?? '',
     threadsHttp: config.threadsHttp ?? '',
     cachePrompt: config.cachePrompt === undefined ? '' : String(config.cachePrompt),
     cacheReuse: config.cacheReuse ?? '',
     cacheRam: config.cacheRam ?? '',
     flashAttn: config.flashAttn ?? '',
+    mainGpu: config.mainGpu ?? '',
+    mmap: config.noMmap === undefined ? '' : String(!config.noMmap),
+    mlock: config.mlock === undefined ? '' : String(config.mlock),
     jinja: config.jinja ?? '',
     reasoning: config.reasoning ?? '',
     reasoningFormat: config.reasoningFormat ?? '',
@@ -2329,32 +2442,6 @@ function resolveModelParameterCount(model: OllamaModel): number {
   return match[2].toLowerCase() === 'b'
     ? amount * 1_000_000_000
     : amount * 1_000_000;
-}
-
-function loadInferenceOptions(): InferenceOptions {
-  try {
-    const raw = localStorage.getItem('lobsterai:llamacpp-inference-options');
-    if (!raw) return DEFAULT_INFERENCE_OPTIONS;
-    return { ...DEFAULT_INFERENCE_OPTIONS, ...JSON.parse(raw) };
-  } catch {
-    return DEFAULT_INFERENCE_OPTIONS;
-  }
-}
-
-function normalizeOptions(options: InferenceOptions): Record<string, unknown> {
-  const stop = options.stop
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return {
-    temperature: options.temperature,
-    top_p: options.top_p,
-    top_k: options.top_k,
-    max_tokens: options.num_predict,
-    repeat_penalty: options.repeat_penalty,
-    ...(options.seed >= 0 ? { seed: options.seed } : {}),
-    ...(stop.length > 0 ? { stop } : {}),
-  };
 }
 
 function isPullInProgress(progress?: Record<string, unknown>): boolean {
@@ -2782,5 +2869,9 @@ function SparklesIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export const __test__getServiceConfigFields = () => SERVICE_CONFIG_FIELDS.map((field) => ({ ...field }));
+export const __test__getInferenceOptionFields = () => INFERENCE_OPTION_FIELDS.map((field) => ({ ...field }));
+export const __test__estimateMarketplacePageSize = () => MARKETPLACE_INITIAL_VISIBLE_COUNT;
 
 export default LocalInferenceView;

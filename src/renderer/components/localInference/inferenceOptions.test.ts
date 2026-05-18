@@ -15,20 +15,24 @@ test('normalizes inference options for llama.cpp requests', () => {
     stop: '###, END',
     min_p: 0.1,
     presence_penalty: 0.4,
-    thinking_budget_tokens: 512,
+    reasoning_format: 'deepseek',
+    thinking_forced_open: 'enabled',
+    cache_prompt: 'disabled',
   });
 
   expect(normalized).toEqual(expect.objectContaining({
     temperature: DEFAULT_INFERENCE_OPTIONS.temperature,
     top_p: DEFAULT_INFERENCE_OPTIONS.top_p,
     top_k: DEFAULT_INFERENCE_OPTIONS.top_k,
-    num_predict: DEFAULT_INFERENCE_OPTIONS.num_predict,
+    max_tokens: DEFAULT_INFERENCE_OPTIONS.num_predict,
     repeat_penalty: DEFAULT_INFERENCE_OPTIONS.repeat_penalty,
     min_p: 0.1,
     presence_penalty: 0.4,
+    reasoning_format: 'deepseek',
+    thinking_forced_open: true,
+    cache_prompt: false,
     seed: 42,
     stop: ['###', 'END'],
-    thinking_budget_tokens: 512,
   }));
 });
 
@@ -42,7 +46,8 @@ test('returns a Qwen preset with a shorter thinking budget', () => {
     repeat_penalty: 1.05,
     min_p: 0.05,
     presence_penalty: 0.6,
-    thinking_budget_tokens: 1024,
+    reasoning_format: 'auto',
+    thinking_forced_open: 'auto',
   }));
 });
 
