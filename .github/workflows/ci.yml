@@ -18,6 +18,7 @@ env:
 
 jobs:
   # ========== Stage 1: 变更检测 ==========
+  # Stay on GitHub-hosted — needs GitHub API token to list PR files.
   changed-files:
     runs-on: ubuntu-latest
     outputs:
@@ -53,8 +54,10 @@ jobs:
               - '**/*.md'
 
   # ========== Stage 2: 代码质量 (快速) ==========
+  # Self-hosted runner — no storage quota for caches, no memory limit for ESLint.
   lint:
-    runs-on: ubuntu-latest
+    needs: changed-files
+    runs-on: CICD
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,10 +93,12 @@ jobs:
           fi
 
   # ========== Stage 3: Renderer 构建 ==========
+  # Self-hosted runner — no OOM, no artifact storage quota.
+  # Artifact upload removed: no downstream job consumes renderer-dist.
   build-renderer:
     needs: [changed-files, lint]
     if: ${{ needs.changed-files.outputs.renderer == 'true' || github.event_name == 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: CICD
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -106,19 +111,12 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
       - run: npm run build
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: renderer-dist
-          path: dist/
-          retention-days: 1
 
   # ========== Stage 4: Main 进程构建 ==========
   build-main:
     needs: [changed-files, lint]
     if: ${{ needs.changed-files.outputs.main == 'true' || github.event_name == 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: CICD
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -131,17 +129,12 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
       - run: npm run compile:electron
-      - uses: actions/upload-artifact@v4
-        with:
-          name: main-dist
-          path: dist-electron/
-          retention-days: 1
 
   # ========== Stage 5: Skill 构建 ==========
   build-skills:
     needs: changed-files
     if: ${{ needs.changed-files.outputs.skills == 'true' || github.event_name == 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: CICD
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -155,10 +148,10 @@ jobs:
       - run: npm install
       - run: npm run build:skills
 
-  # ========== Stage 6: 测试 (Node.js 内置) ==========
+  # ========== Stage 6: 测试 ==========
   test:
     needs: [build-main]
-    runs-on: ubuntu-latest
+    runs-on: CICD
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
