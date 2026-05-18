@@ -13,8 +13,9 @@
   ; This does NOT change the default install path — just ensures UAC elevation.
   RequestExecutionLevel admin
 
-  ; Show the details box so users can see per-phase timing information.
-  ShowInstDetails show
+  ; Keep details hidden (electron-builder template overrides ShowInstDetails
+  ; at compile time).  Timing is displayed via a summary MessageBox at the end.
+  ShowInstDetails nevershow
 !macroend
 
 !macro customInit
@@ -25,6 +26,10 @@
   FileClose $8
 
   CreateDirectory "$APPDATA\RongxinAI"
+  ; Clear timing summary file for this install session
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" w
+  FileClose $R9
+
   FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" w
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=custom-init-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
@@ -61,6 +66,9 @@
   FileWrite $9 "$8 phase=process-stop-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
   DetailPrint "[Installer] Stopped running processes — $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Stop RongxinAI processes: $5 ms$\r$\n"
+  FileClose $R9
 
   ; ── Clean stale openclaw-weixin session data ──
   ; On reinstall, old bot tokens cause the ilink server to reject new QR logins
@@ -87,6 +95,9 @@
   FileWrite $9 "$8 phase=weixin-cleanup-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
   DetailPrint "[Installer] Cleared stale Weixin session data — $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Clear stale Weixin sessions: $5 ms$\r$\n"
+  FileClose $R9
 
   ; ── Backup user-created skills to AppData before extraction overwrites them ──
   ; Copy non-bundled skills to %APPDATA%\RongxinAI\skills-backup\ so they are
@@ -143,6 +154,9 @@
   FileWrite $9 "$8 phase=skill-backup-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
   DetailPrint "[Installer] Backed up user-created skills — $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Backup user skills: $5 ms$\r$\n"
+  FileClose $R9
 
   ; ── Remove old installation directory ──
   ; Rename $INSTDIR so the old uninstaller exe disappears from its registered
@@ -178,6 +192,9 @@
   FileWrite $9 "$8 phase=old-install-cleanup-complete elapsed_ms=$5 renamed_path=$3 cleanup_mode=async$\r$\n"
   FileClose $9
   DetailPrint "[Installer] Removed previous installation directory — $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Remove previous installation: $5 ms$\r$\n"
+  FileClose $R9
 !macroend
 
 !macro customInstall
@@ -222,6 +239,9 @@
   FileWrite $2 "$8 phase=defender-exclusion-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
   DetailPrint "[Installer] Windows Defender exclusions added — $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Defender exclusions: $5 ms$\r$\n"
+  FileClose $R9
 
   ; ── Native tar extraction ──
   DetailPrint "[Installer] Extracting bundled resources (native tar)"
@@ -270,6 +290,9 @@
   FileWrite $2 "$8 phase=tar-extract-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
   DetailPrint "[Installer] Bundled resources extracted — $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Extract bundled resources: $5 ms$\r$\n"
+  FileClose $R9
   Delete "$INSTDIR\resources\win-resources.tar"
 
   ; ── Restore user-created skills from AppData backup ──
@@ -303,9 +326,12 @@
     FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
     FileClose $2
     DetailPrint "[Installer] User-created skills restored — $5 ms"
+    FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+    FileWrite $R9 "  Restore user skills: $5 ms$\r$\n"
+    FileClose $R9
   SkipSkillRestore:
 
-  ; ── Total install time ──
+  ; ── Total install time & summary MessageBox ──
   FileOpen $2 "$APPDATA\RongxinAI\install-start-tick.txt" r
   IfErrors TotalTimeSkip
   FileRead $2 $R1
@@ -318,14 +344,24 @@
     StrCpy $R3 "$R2 ms"
     Goto TotalTimeDone
   TotalInSeconds:
-    ; Show as whole seconds with 1 decimal (tenths)
-    IntOp $R4 $R2 / 100   ; tenths of seconds
-    IntOp $R5 $R4 % 10    ; decimal digit
-    IntOp $R4 $R4 / 10    ; whole seconds
+    IntOp $R4 $R2 / 100
+    IntOp $R5 $R4 % 10
+    IntOp $R4 $R4 / 10
     StrCpy $R3 "$R4.$R5 s"
   TotalTimeDone:
   Delete "$APPDATA\RongxinAI\install-start-tick.txt"
-  DetailPrint "[Installer] Total installation time: $R3"
+
+  ; Build and display summary via PowerShell/WScript popup
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" r
+  IfErrors TotalTimeSkipPopup
+  FileRead $R9 $R8
+  FileClose $R9
+  ; Escape backslashes / single quotes for PowerShell
+  Push "$R3"
+  Push "$R8"
+  Call ShowTimingSummary
+  TotalTimeSkipPopup:
+  Delete "$APPDATA\RongxinAI\install-timing-summary.txt"
   TotalTimeSkip:
 
   FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
@@ -334,6 +370,29 @@
   FileClose $2
   DetailPrint "[Installer] Installation complete"
 !macroend
+
+; ── ShowTimingSummary: display timing summary via WScript.Shell.Popup ──
+; Input: stack top = detail lines, next = total time string
+; Writes message and PowerShell script to temp files, then executes the script.
+Function ShowTimingSummary
+  Pop $R4  ; total time string
+  Pop $R5  ; detail lines
+  ; Write message text to temp file (NSIS expands $R4/$R5 here)
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-msg.txt" w
+  FileWrite $R9 "Installation completed in $R4$\r$\n$\r$\nPhases:$\r$\n$R5"
+  FileClose $R9
+  ; Write PowerShell script to temp file ($\ = escape for FileWrite inside "...")
+  FileOpen $R9 "$APPDATA\RongxinAI\show-summary.ps1" w
+  FileWrite $R9 '$$msg = Get-Content "$$env:APPDATA\RongxinAI\install-timing-msg.txt" -Raw$\r$\n'
+  FileWrite $R9 '(New-Object -ComObject WScript.Shell).Popup($$msg, 0, "RongxinAI Setup", 0)$\r$\n'
+  FileClose $R9
+  ; Execute PowerShell script (use double-quoted NSIS string for APPDATA expansion)
+  nsExec::ExecToStack "powershell -NoProfile -NonInteractive -File $\"$APPDATA\RongxinAI\show-summary.ps1$\""
+  Pop $0
+  ; Cleanup
+  Delete "$APPDATA\RongxinAI\install-timing-msg.txt"
+  Delete "$APPDATA\RongxinAI\show-summary.ps1"
+FunctionEnd
 
 !macro customUnInit
   ; Kill all running app instances (main app + OpenClaw gateway + detached
