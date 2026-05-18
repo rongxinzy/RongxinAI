@@ -16,6 +16,7 @@ describe('providerApiKeyEnvVar', () => {
     expect(providerApiKeyEnvVar(ProviderName.Moonshot)).toBe('LOBSTER_APIKEY_MOONSHOT');
     expect(providerApiKeyEnvVar(ProviderName.Anthropic)).toBe('LOBSTER_APIKEY_ANTHROPIC');
     expect(providerApiKeyEnvVar(ProviderName.OpenAI)).toBe('LOBSTER_APIKEY_OPENAI');
+    expect(providerApiKeyEnvVar(ProviderName.LlamaCpp)).toBe('LOBSTER_APIKEY_LLAMACPP');
     expect(providerApiKeyEnvVar(ProviderName.Ollama)).toBe('LOBSTER_APIKEY_OLLAMA');
   });
 
@@ -204,6 +205,11 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     resolveApi: () => OpenClawApi.Ollama as OpenClawProviderApi,
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
+  [ProviderName.LlamaCpp]: {
+    providerId: OpenClawProviderId.LlamaCpp,
+    resolveApi: ({ apiType }) => mapApiTypeToOpenClawApi(apiType),
+    normalizeBaseUrl: stripChatCompletionsSuffix,
+  },
 };
 
 const DEFAULT_DESCRIPTOR: ProviderDescriptor = {
@@ -280,6 +286,12 @@ describe('resolveDescriptor', () => {
     expect(d.resolveApi({ apiType: undefined, baseURL: '' })).toBe(OpenClawApi.Ollama);
   });
 
+  test('llamacpp maps to llamacpp providerId', () => {
+    const d = resolveDescriptor(ProviderName.LlamaCpp, false);
+    expect(d.providerId).toBe(OpenClawProviderId.LlamaCpp);
+    expect(d.resolveApi({ apiType: 'openai', baseURL: '' })).toBe(OpenClawApi.OpenAICompletions);
+  });
+
   test('unknown provider falls back to lobster providerId', () => {
     const d = resolveDescriptor('some-unknown', false);
     expect(d.providerId).toBe('some-unknown');
@@ -320,6 +332,7 @@ describe('provider registry coverage', () => {
     ProviderName.StepFun,
     ProviderName.Xiaomi,
     ProviderName.OpenRouter,
+    ProviderName.LlamaCpp,
     ProviderName.Ollama,
   ] as const;
 
