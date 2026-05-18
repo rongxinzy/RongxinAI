@@ -32,40 +32,62 @@ jobs:
 
       - name: Install Tailscale
         run: |
+          # Ubuntu runners may have tailscale pre-installed; ensure latest
           curl -fsSL https://tailscale.com/install.sh | sh
 
       - name: Import Headscale Certificate
         run: |
           sudo cp certs/headscale.crt /usr/local/share/ca-certificates/headscale.crt
           sudo update-ca-certificates
-          # Verify certificate is in the bundle (Go programs read this file)
           grep -c "headscale" /etc/ssl/certs/ca-certificates.crt || true
 
       - name: Start Tailscale VPN
         env:
           VPN_KEY: ${{ secrets.VPN_KEY }}
         run: |
-          # Go programs (including tailscale) need these env vars to find custom CA certs
+          # Go programs need explicit env vars to find custom CA certs
           export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
           export SSL_CERT_DIR=/etc/ssl/certs
 
+          # Cleanup any stale tailscaled (GH runners often have one pre-installed)
+          echo "Stopping existing tailscaled..."
+          sudo systemctl stop tailscaled 2>/dev/null || true
+          sudo systemctl disable tailscaled 2>/dev/null || true
+          sudo pkill -9 tailscaled 2>/dev/null || true
+          sleep 2
+          sudo rm -f /var/run/tailscale/tailscaled.sock
+          sudo rm -rf /var/lib/tailscale/*
+
           echo "Starting tailscaled in userspace networking mode..."
-          sudo tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1056 &
+          sudo nohup tailscaled \
+            --tun=userspace-networking \
+            --socks5-server=localhost:1055 \
+            --outbound-http-proxy-listen=localhost:1056 \
+            --no-logs-no-support \
+            > /tmp/tailscaled.log 2>&1 &
           TAILSCALED_PID=$!
           echo "tailscaled PID: $TAILSCALED_PID"
-          sleep 3
 
-          echo "Connecting to headscale..."
+          # Wait for socket to appear
+          for i in $(seq 1 15); do
+            if [ -S /var/run/tailscale/tailscaled.sock ]; then
+              echo "Socket ready at attempt $i"
+              break
+            fi
+            echo "Waiting for tailscaled socket... ($i/15)"
+            sleep 1
+          done
+
+          echo "=== tailscaled initial logs ==="
+          cat /tmp/tailscaled.log || true
+
+          echo "Running tailscale up..."
           sudo -E tailscale up \
             --login-server=https://headscale.wystarry.com:9443/ \
             --accept-routes \
             --auth-key "$VPN_KEY" \
             --hostname="github-actions-${{ github.run_id }}" \
-            --timeout=60s \
-            --reset
-
-          UP_EXIT=$?
-          echo "tailscale up exited with code: $UP_EXIT"
+            --timeout=60s
 
           echo "Waiting for BackendState=Running..."
           for i in $(seq 1 15); do
@@ -80,7 +102,6 @@ jobs:
 
           echo "=== Tailscale Status ==="
           sudo tailscale status || true
-
           echo "=== Tailscale IPs ==="
           sudo tailscale ip -4 || true
 
@@ -89,16 +110,19 @@ jobs:
           PROXY="socks5h://localhost:1055"
           echo "Testing SOCKS5 proxy ($PROXY) connectivity..."
 
-          # Test 1: Can we reach the proxy itself?
+          # Test proxy itself
           curl -sS --connect-timeout 5 --proxy "$PROXY" http://100.100.100.100 2>&1 | head -5 || true
 
-          # Test 2: Try to reach JFrog through the proxy
-          echo "Testing JFrog reachability via VPN proxy..."
+          # Test JFrog reachability through proxy
+          echo "Testing JFrog via VPN proxy..."
           curl -sS --connect-timeout 15 --proxy "$PROXY" \
             -u "${{ secrets.FROG_NAME }}:${{ secrets.FROG_PW }}" \
             http://172.18.5.249:8081/artifactory/api/repositories || {
-              echo "Warning: JFrog API check returned non-zero (may be OK if repo endpoint differs)"
+              echo "Warning: JFrog API check returned non-zero"
             }
+
+          echo "=== tailscaled logs ==="
+          cat /tmp/tailscaled.log || true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
