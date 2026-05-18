@@ -179,7 +179,10 @@
   ; ─── Extract combined resource archive (win-resources.tar) ───
   ; All large resource directories (cfmind/, SKILLs/, python-win/) are packed
   ; into a single tar file. NSIS 7z extracts one large file almost instantly;
-  ; we then unpack the tar here using Electron's Node runtime.
+  ; we then unpack the tar here using Windows native tar.exe (C implementation).
+  ; tar.exe is built into Windows 10 1803+ — Electron 40 requires Windows 10+,
+  ; so it is always available. Native C tar is ~3-5x faster than JS tar and
+  ; eliminates the 2-5s Electron cold-start overhead.
 
   ; ─── Windows Defender Exclusion (optional, best-effort) ───
   ; Add exclusions before tar extraction so Defender does not slow down the
@@ -203,17 +206,15 @@
   FileWrite $2 "$8 phase=defender-exclusion-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
 
-  System::Call 'Kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "1")i'
-
-  DetailPrint "[Installer] Launching bundled extractor"
-  DetailPrint "[Installer] Extracting bundled resources"
+  ; ── Native tar extraction ──
+  DetailPrint "[Installer] Extracting bundled resources (native tar)"
   FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-start tar=$INSTDIR\resources\win-resources.tar dest=$INSTDIR\resources$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
 
-  nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$INSTDIR\resources\unpack-cfmind.cjs" "$INSTDIR\resources\win-resources.tar" "$INSTDIR\resources" "$APPDATA\RongxinAI\install-timing.log"'
+  nsExec::ExecToLog 'tar -xf "$INSTDIR\resources\win-resources.tar" -C "$INSTDIR\resources"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
@@ -236,7 +237,7 @@
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=process-start-failed$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start extractor process (exit=$0). This may be caused by antivirus software. See %APPDATA%\RongxinAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start tar.exe (exit=$0). This may be caused by antivirus software or a heavily stripped Windows installation. See %APPDATA%\RongxinAI\install-timing.log for details."
     Goto TarExtractOK
 
   TarExtractNonZero:
@@ -285,12 +286,6 @@
     FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
     FileClose $2
   SkipSkillRestore:
-
-  System::Call 'Kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "")i'
-
-  ; Clean up the unpack script — no longer needed after installation
-  DetailPrint "[Installer] Cleaning up temporary installer files"
-  Delete "$INSTDIR\resources\unpack-cfmind.cjs"
 
   FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
