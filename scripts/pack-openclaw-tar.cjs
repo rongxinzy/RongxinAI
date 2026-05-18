@@ -148,7 +148,6 @@ function packSingleSource(sourceDir, outputTar, prefix) {
  */
 function packMultipleSources(sources, outputTar) {
   let totalFiles = 0;
-  let totalSkipped = 0;
 
   // Pack first source (creates the tar)
   let first = true;
@@ -159,23 +158,9 @@ function packMultipleSources(sources, outputTar) {
     }
 
     console.log(`[pack-openclaw-tar]   Adding ${prefix} ← ${dir}`);
+    const t0 = Date.now();
 
-    const entries = [];
-    function countFiles(d) {
-      for (const item of fs.readdirSync(d, { withFileTypes: true })) {
-        if (item.isSymbolicLink()) continue;
-        const fullPath = path.join(d, item.name);
-        if (item.isDirectory()) {
-          if (!EXCLUDED_DIRS.has(item.name.toLowerCase())) countFiles(fullPath);
-        } else if (item.isFile()) {
-          if (!shouldExclude(item.name)) entries.push(item.name);
-          else totalSkipped++;
-        }
-      }
-    }
-    countFiles(dir);
-    totalFiles += entries.length;
-
+    let sourceFiles = 0;
     const opts = {
       file: outputTar,
       cwd: dir,
@@ -183,26 +168,29 @@ function packMultipleSources(sources, outputTar) {
       sync: true,
       follow: true,
       filter: (filePath) => !shouldExclude(filePath),
+      // Count entries during tar creation (zero-cost: no extra I/O)
+      onentry: () => { sourceFiles++; },
     };
 
     if (first) {
-      // Create new tar
       tar.create(
         opts,
         fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
       );
       first = false;
     } else {
-      // Append to existing tar (replace creates new, we need to use a different approach)
-      // npm tar doesn't support append directly, so we use replace with gzip:false
       tar.replace(
         opts,
         fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
       );
     }
+
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log(`[pack-openclaw-tar]   ${prefix}: ${sourceFiles} entries in ${elapsed}s`);
+    totalFiles += sourceFiles;
   }
 
-  return { totalFiles, skipped: totalSkipped };
+  return { totalFiles };
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -226,11 +214,11 @@ function main() {
 
     console.log(`[pack-openclaw-tar] Packing combined Windows tar: ${outputTar}`);
     const t0 = Date.now();
-    const { totalFiles, skipped } = packMultipleSources(sources, outputTar);
+    const { totalFiles } = packMultipleSources(sources, outputTar);
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     const sizeMB = (fs.statSync(outputTar).size / (1024 * 1024)).toFixed(1);
     console.log(
-      `[pack-openclaw-tar] Done in ${elapsed}s: ${totalFiles} files, ${skipped} skipped, ${sizeMB} MB`
+      `[pack-openclaw-tar] Done in ${elapsed}s: ${totalFiles} files, ${sizeMB} MB`
     );
     return;
   }

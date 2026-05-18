@@ -545,12 +545,12 @@ async function beforePack(context) {
     // Remove old tar if exists
     if (existsSync(outputTar)) rmSync(outputTar);
 
-    const { totalFiles, skipped } = packMultipleSources(sources, outputTar);
+    const { totalFiles } = packMultipleSources(sources, outputTar);
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
     console.log(
       `[electron-builder-hooks] Combined tar packed in ${elapsed}s: `
-      + `${totalFiles} files, ${skipped} skipped, ${sizeMB} MB`
+      + `${totalFiles} files, ${sizeMB} MB`
     );
   }
 
