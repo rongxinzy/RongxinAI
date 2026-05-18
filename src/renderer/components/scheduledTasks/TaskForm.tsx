@@ -12,7 +12,7 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import type { Model } from '../../store/slices/modelSlice';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
 import ModelSelector from '../ModelSelector';
 import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 
@@ -72,6 +72,7 @@ interface FormState {
   cronMode: 'builder' | 'raw';
   cronBuilder: CronBuilder;
   notifyAccountId: string | undefined;
+  agentId: string;
   modelId: string;
 }
 
@@ -102,6 +103,7 @@ const DEFAULT_FORM_STATE: FormState = {
   cronMode: 'builder',
   cronBuilder: { ...DEFAULT_CRON_BUILDER },
   notifyAccountId: undefined,
+  agentId: '',
   modelId: '',
 };
 
@@ -177,6 +179,7 @@ function createFormState(task?: ScheduledTask): FormState {
     cronMode: 'builder',
     cronBuilder: parsedBuilder,
     notifyAccountId: task.delivery.accountId,
+    agentId: task.agentId || '',
     modelId: task.payload.kind === 'agentTurn' ? (task.payload.model ?? '') : '',
   };
 }
@@ -249,6 +252,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
   const [form, setForm] = useState<FormState>(() => createFormState(task));
   const initialFormRef = useRef<string>(JSON.stringify(createFormState(task)));
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
+  const agents = useSelector((state: RootState) => state.agent.agents);
+
   const [channelOptions, setChannelOptions] = useState<ScheduledTaskChannelOption[]>(() => {
     const base: ScheduledTaskChannelOption[] = [];
     const savedChannel = task?.delivery.channel;
@@ -356,6 +361,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
     if (!form.name.trim()) {
       nextErrors.name = i18nService.t('scheduledTasksFormValidationNameRequired');
     }
+    if (!form.agentId) {
+      nextErrors.agentId = i18nService.t('scheduledTasksFormValidationAgentRequired');
+    }
     if (!form.payloadText.trim()) {
       nextErrors.payloadText = i18nService.t('scheduledTasksFormValidationPromptRequired');
     }
@@ -418,6 +426,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
         schedule,
         sessionTarget: 'isolated',
         wakeMode: 'now',
+        agentId: form.agentId,
         payload: {
           kind: 'agentTurn',
           message: form.payloadText.trim(),
@@ -466,6 +475,15 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
   const handleModelChange = (model: Model | null) => {
     updateForm({ modelId: model ? toOpenClawModelRef(model) : '' });
   };
+
+  // Resolve the selected agent's configured model for display
+  const selectedAgent = agents.find(a => a.id === form.agentId) ?? null;
+  const agentModelLabel = selectedAgent
+    ? (resolveOpenClawModelRef(selectedAgent.model, availableModels)?.name ?? selectedAgent.model)
+    : '';
+  const modelDefaultLabel = form.agentId
+    ? `${i18nService.t('scheduledTasksFormModelFollowAgent')}: ${agentModelLabel}`
+    : i18nService.t('scheduledTasksFormModelSelectAgentFirst');
 
   const timeValue = `${String(form.hour).padStart(2, '0')}:${String(form.minute).padStart(2, '0')}`;
   const handleTimeChange = (value: string) => {
@@ -1235,6 +1253,30 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           {errors.name && <p className={errorClass}>{errors.name}</p>}
         </div>
 
+        {/* Agent binding */}
+        <div>
+          <label className={labelClass}>
+            {i18nService.t('scheduledTasksFormAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+          </label>
+          <select
+            value={form.agentId}
+            onChange={e => {
+              updateForm({ agentId: e.target.value, modelId: '' });
+            }}
+            className={inputClass}
+          >
+            <option value="" disabled>
+              {i18nService.t('scheduledTasksFormAgentPlaceholder')}
+            </option>
+            {agents.map(agent => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
+          {errors.agentId && <p className={errorClass}>{errors.agentId}</p>}
+        </div>
+
         {/* Schedule */}
         <div>
           {renderScheduleRow()}
@@ -1266,7 +1308,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                 dropdownDirection="up"
                 value={selectedModelValue}
                 onChange={handleModelChange}
-                defaultLabel={i18nService.t('scheduledTasksFormModelDefault')}
+                defaultLabel={modelDefaultLabel}
               />
             </div>
           </div>
