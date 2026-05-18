@@ -57,7 +57,7 @@ jobs:
   # Self-hosted runner — no storage quota for caches, no memory limit for ESLint.
   lint:
     needs: changed-files
-    runs-on: CICD
+    runs-on: cicd
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,7 +98,7 @@ jobs:
   build-renderer:
     needs: [changed-files, lint]
     if: ${{ needs.changed-files.outputs.renderer == 'true' || github.event_name == 'push' }}
-    runs-on: CICD
+    runs-on: cicd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -116,7 +116,7 @@ jobs:
   build-main:
     needs: [changed-files, lint]
     if: ${{ needs.changed-files.outputs.main == 'true' || github.event_name == 'push' }}
-    runs-on: CICD
+    runs-on: cicd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -134,7 +134,7 @@ jobs:
   build-skills:
     needs: changed-files
     if: ${{ needs.changed-files.outputs.skills == 'true' || github.event_name == 'push' }}
-    runs-on: CICD
+    runs-on: cicd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -151,7 +151,7 @@ jobs:
   # ========== Stage 6: 测试 ==========
   test:
     needs: [build-main]
-    runs-on: CICD
+    runs-on: cicd
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
