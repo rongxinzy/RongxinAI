@@ -306,23 +306,24 @@ export const useAgentSidebarState = () => {
         }
       });
 
-      // Remove task previews for sessions that were deleted from the Redux
-      // store (e.g. via batch delete).  The Redux sessions array is the
-      // source of truth; anything in taskPreviews that isn't in sessions
-      // should be pruned.
+      // Remove task previews for sessions that were deleted from the
+      // backend (e.g. via batch delete).  Only prune the *current* agent:
+      // Redux sessions are scoped to the active agent after a switch, so
+      // pruning all agents would wipe cached previews of inactive agents
+      // and briefly show "no tasks" until the user switches back.
       const sessionIdSet = new Set(sessions.map((s) => s.id));
-      for (const agentId of Object.keys(next)) {
-        if (!loadedAgentIdsRef.current.has(agentId)) continue;
-        const filtered = next[agentId].filter((task) => sessionIdSet.has(task.id));
-        if (filtered.length !== next[agentId].length) {
-          next[agentId] = filtered;
+      const currentTasks = next[currentAgentId];
+      if (currentTasks && loadedAgentIdsRef.current.has(currentAgentId)) {
+        const filtered = currentTasks.filter((task) => sessionIdSet.has(task.id));
+        if (filtered.length !== currentTasks.length) {
+          next[currentAgentId] = filtered;
           changed = true;
         }
       }
 
       return changed ? next : previous;
     });
-  }, [sessions]);
+  }, [sessions, currentAgentId]);
 
   const toggleAgentExpanded = useCallback((agentId: string) => {
     setExpandedTaskListAgentIds((previous) => collapseAgentSidebarTaskList(previous, agentId));

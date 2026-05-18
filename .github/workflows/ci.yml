@@ -54,6 +54,7 @@ jobs:
 
   # ========== Stage 2: 代码质量 (快速) ==========
   lint:
+    needs: changed-files
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -106,11 +107,8 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
       - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: renderer-dist
-          path: dist/
-          retention-days: 1
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
 
   # ========== Stage 4: Main 进程构建 ==========
   build-main:
@@ -129,11 +127,6 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
       - run: npm run compile:electron
-      - uses: actions/upload-artifact@v4
-        with:
-          name: main-dist
-          path: dist-electron/
-          retention-days: 1
 
   # ========== Stage 5: Skill 构建 ==========
   build-skills:
@@ -153,7 +146,7 @@ jobs:
       - run: npm install
       - run: npm run build:skills
 
-  # ========== Stage 6: 测试 (Node.js 内置) ==========
+  # ========== Stage 6: 测试 ==========
   test:
     needs: [build-main]
     runs-on: ubuntu-latest
