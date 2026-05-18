@@ -153,10 +153,6 @@
       {
         "from": "build-tar/win-resources.tar",
         "to": "win-resources.tar"
-      },
-      {
-        "from": "scripts/unpack-cfmind.cjs",
-        "to": "unpack-cfmind.cjs"
       }
     ]
   },
