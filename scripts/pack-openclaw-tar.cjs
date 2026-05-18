@@ -12,16 +12,22 @@
  *   - SKILLs directory (SKILLs -> SKILLs/)
  *   - Python runtime (resources/python-win -> python-win/)
  *
+ * On Windows, uses the built-in tar.exe (C implementation, ~10-20x faster
+ * than the JS npm tar module on NTFS).  On other platforms, falls back to
+ * npm tar.
+ *
  * Usage:
  *   Single dir:      node scripts/pack-openclaw-tar.cjs [sourceDir] [outputTar]
  *   Windows combined: node scripts/pack-openclaw-tar.cjs --win-combined
- *
- * Uses npm `tar` package for reliable handling of long paths, Unicode, etc.
  */
 
 const fs = require('fs');
 const path = require('path');
-const tar = require('tar');
+const os = require('os');
+const { execSync } = require('child_process');
+
+// Lazy-loaded — only required when falling back to JS tar (non-Windows)
+let tar;
 
 // ── File/dir exclusion rules (same as electron-builder.json filters) ─────────
 
@@ -83,17 +89,52 @@ function shouldExclude(entryPath) {
   return false;
 }
 
+// ── Generate tar --exclude-from file (bsdtar glob patterns) ─────────
+
+function writeExcludeFile(excludeFile) {
+  const patterns = [];
+  // Excluded directories (anywhere in tree)
+  const dirs = ['test', 'tests', '__tests__', '__mocks__', '.github',
+                'example', 'examples', 'coverage', '.venv', '.bin'];
+  for (const d of dirs) {
+    patterns.push(`*/${d}`);
+  }
+
+  // Excluded files (by extension)
+  const exts = ['.map', '.d.ts', '.d.cts', '.d.mts'];
+  for (const ext of exts) {
+    patterns.push(`*${ext}`);
+  }
+
+  // Excluded file name patterns
+  const names = [
+    '.env', '.env.*',
+    '.eslintrc*', '.prettierrc*', '.editorconfig',
+    '.npmignore', '.gitignore', '.gitattributes',
+    'README*', 'readme*', 'CHANGELOG*', 'HISTORY*',
+    'LICENSE*', 'LICENCE*', 'AUTHORS*', 'CONTRIBUTORS*',
+    'tsconfig*.json', 'jest.config*', 'vitest.config*',
+    '*.test.*', '*.spec.*',
+  ];
+  for (const n of names) {
+    patterns.push(n);
+  }
+
+  fs.writeFileSync(excludeFile, patterns.join('\n'), 'utf-8');
+  return patterns.length;
+}
+
 // ── Pack functions ───────────────────────────────────────────────────────────
 
 /**
- * Pack a single source directory into a tar file.
+ * Pack a single source directory into a tar file (JS fallback for non-Windows).
  * The directory contents are stored under `prefix/` in the tar.
  */
 function packSingleSource(sourceDir, outputTar, prefix) {
+  if (!tar) tar = require('tar');
   const entries = [];
   let skipped = 0;
 
-  // Collect entries, applying exclusion filter
   function walk(dir, relPrefix) {
     const items = fs.readdirSync(dir, { withFileTypes: true });
     items.sort((a, b) => a.name.localeCompare(b.name));
@@ -121,18 +162,15 @@ function packSingleSource(sourceDir, outputTar, prefix) {
 
   walk(sourceDir, '');
 
-  // Use npm tar to create the archive
   tar.create(
     {
       file: outputTar,
       cwd: sourceDir,
       prefix: prefix || '',
       sync: true,
-      // Follow symlinks instead of storing them (avoids Windows issues)
       follow: true,
       filter: (filePath) => !shouldExclude(filePath),
     },
-    // Pack all top-level entries (tar will recurse)
     fs.readdirSync(sourceDir).filter((name) => {
       if (EXCLUDED_DIRS.has(name.toLowerCase())) return false;
       return true;
@@ -145,49 +183,120 @@ function packSingleSource(sourceDir, outputTar, prefix) {
 /**
  * Pack multiple source directories into a single tar file.
  * Each source gets its own prefix (root directory name) in the tar.
+ *
+ * On Windows, uses native tar.exe via directory junctions — ~10-20x faster
+ * than JS npm tar on NTFS because it avoids thousands of per-file stat/read
+ * calls through the JS event loop.
  */
 function packMultipleSources(sources, outputTar) {
+  const isWindows = process.platform === 'win32';
   let totalFiles = 0;
 
-  // Pack first source (creates the tar)
-  let first = true;
-  for (const { dir, prefix } of sources) {
-    if (!fs.existsSync(dir)) {
-      console.log(`[pack-openclaw-tar]   Skipping ${prefix}: ${dir} not found`);
-      continue;
+  if (isWindows) {
+    // ── Native tar.exe (Windows) ──
+    // Strategy: create a temp staging directory with junctions pointing to
+    // each source, then a single tar -cf pass with --exclude-from rules.
+    const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-tar-'));
+    const excludeFile = path.join(stagingDir, 'exclude.txt');
+    const excludeCount = writeExcludeFile(excludeFile);
+
+    const includedPrefixes = [];
+    try {
+      for (const { dir, prefix } of sources) {
+        if (!fs.existsSync(dir)) {
+          console.log(`[pack-openclaw-tar]   Skipping ${prefix}: ${dir} not found`);
+          continue;
+        }
+
+        console.log(`[pack-openclaw-tar]   Adding ${prefix} ← ${dir}`);
+        const t0 = Date.now();
+
+        const junctionPath = path.join(stagingDir, prefix);
+        // 'junction' type works without admin on Windows (unlike 'dir' symlinks)
+        fs.symlinkSync(dir, junctionPath, 'junction');
+
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        console.log(`[pack-openclaw-tar]   ${prefix}: junction created in ${elapsed}s`);
+        includedPrefixes.push(prefix);
+      }
+
+      console.log(`[pack-openclaw-tar] Creating tar with tar.exe (${includedPrefixes.join(', ')})...`);
+      const tTar = Date.now();
+
+      const tarArgs = [
+        '-cf', outputTar,
+        `--exclude-from=${excludeFile}`,
+        '-C', stagingDir,
+        ...includedPrefixes,
+      ];
+
+      execSync(`tar ${tarArgs.map(a => `"${a}"`).join(' ')}`, {
+        stdio: 'pipe',
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      // Count entries back from the result
+      const listResult = execSync(`tar -tf "${outputTar}"`, {
+        stdio: 'pipe',
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      totalFiles = listResult.toString('utf-8').trim().split('\n').filter(Boolean).length;
+
+      const tarElapsed = ((Date.now() - tTar) / 1000).toFixed(1);
+      console.log(`[pack-openclaw-tar] tar.exe completed in ${tarElapsed}s, ${totalFiles} entries, ${excludeCount} exclude rules`);
+    } finally {
+      // Clean up junctions and staging dir
+      for (const prefix of includedPrefixes) {
+        try { fs.unlinkSync(path.join(stagingDir, prefix)); } catch {}
+      }
+      try { fs.unlinkSync(excludeFile); } catch {}
+      try { fs.rmdirSync(stagingDir); } catch {}
     }
+  } else {
+    // ── JS fallback (non-Windows) ──
+    if (!tar) tar = require('tar');
 
-    console.log(`[pack-openclaw-tar]   Adding ${prefix} ← ${dir}`);
-    const t0 = Date.now();
+    let first = true;
+    for (const { dir, prefix } of sources) {
+      if (!fs.existsSync(dir)) {
+        console.log(`[pack-openclaw-tar]   Skipping ${prefix}: ${dir} not found`);
+        continue;
+      }
 
-    let sourceFiles = 0;
-    const opts = {
-      file: outputTar,
-      cwd: dir,
-      prefix,
-      sync: true,
-      follow: true,
-      filter: (filePath) => !shouldExclude(filePath),
-      // Count entries during tar creation (zero-cost: no extra I/O)
-      onentry: () => { sourceFiles++; },
-    };
+      console.log(`[pack-openclaw-tar]   Adding ${prefix} ← ${dir}`);
+      const t0 = Date.now();
 
-    if (first) {
-      tar.create(
-        opts,
-        fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
-      );
-      first = false;
-    } else {
-      tar.replace(
-        opts,
-        fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
-      );
+      let sourceFiles = 0;
+      const opts = {
+        file: outputTar,
+        cwd: dir,
+        prefix,
+        sync: true,
+        follow: true,
+        filter: (filePath) => {
+          const included = !shouldExclude(filePath);
+          if (included) sourceFiles++;
+          return included;
+        },
+      };
+
+      if (first) {
+        tar.create(
+          opts,
+          fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
+        );
+        first = false;
+      } else {
+        tar.replace(
+          opts,
+          fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
+        );
+      }
+
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      console.log(`[pack-openclaw-tar]   ${prefix}: ${sourceFiles} entries in ${elapsed}s`);
+      totalFiles += sourceFiles;
     }
-
-    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-    console.log(`[pack-openclaw-tar]   ${prefix}: ${sourceFiles} entries in ${elapsed}s`);
-    totalFiles += sourceFiles;
   }
 
   return { totalFiles };
