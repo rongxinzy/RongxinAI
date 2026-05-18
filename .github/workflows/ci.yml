@@ -18,7 +18,6 @@ env:
 
 jobs:
   # ========== Stage 1: 变更检测 ==========
-  # Stay on GitHub-hosted — needs GitHub API token to list PR files.
   changed-files:
     runs-on: ubuntu-latest
     outputs:
@@ -54,10 +53,9 @@ jobs:
               - '**/*.md'
 
   # ========== Stage 2: 代码质量 (快速) ==========
-  # Self-hosted runner — no storage quota for caches, no memory limit for ESLint.
   lint:
     needs: changed-files
-    runs-on: cicd
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,12 +91,10 @@ jobs:
           fi
 
   # ========== Stage 3: Renderer 构建 ==========
-  # Self-hosted runner — no OOM, no artifact storage quota.
-  # Artifact upload removed: no downstream job consumes renderer-dist.
   build-renderer:
     needs: [changed-files, lint]
     if: ${{ needs.changed-files.outputs.renderer == 'true' || github.event_name == 'push' }}
-    runs-on: cicd
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -111,12 +107,14 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
       - run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
 
   # ========== Stage 4: Main 进程构建 ==========
   build-main:
     needs: [changed-files, lint]
     if: ${{ needs.changed-files.outputs.main == 'true' || github.event_name == 'push' }}
-    runs-on: cicd
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -134,7 +132,7 @@ jobs:
   build-skills:
     needs: changed-files
     if: ${{ needs.changed-files.outputs.skills == 'true' || github.event_name == 'push' }}
-    runs-on: cicd
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -151,7 +149,7 @@ jobs:
   # ========== Stage 6: 测试 ==========
   test:
     needs: [build-main]
-    runs-on: cicd
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
