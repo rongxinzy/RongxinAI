@@ -1291,8 +1291,13 @@ const syncOpenClawConfig = async (
   // regardless of the restartGatewayIfRunning flag.  The OpenClaw gateway
   // pins its config snapshot at startup, so a hot-reload alone won't pick
   // up a new callbackUrl — the gateway must be fully restarted.
+  //
+  // bindingsChanged is intentionally NOT included here.  The gateway's
+  // chokidar-based hybrid reload engine (config-reload.ts) hot-reloads
+  // channel plugins on channels.* config changes — a full process restart
+  // is unnecessary and causes a visible "starting gateway" overlay flicker.
   const mcpBridgeForceRestart = !!syncResult.mcpBridgeConfigChanged;
-  const needsHardRestart = secretEnvVarsChanged || syncResult.bindingsChanged || mcpBridgeForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
+  const needsHardRestart = secretEnvVarsChanged || mcpBridgeForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
 
   console.log(`${D()} needsHardRestart=${needsHardRestart} (envChanged=${secretEnvVarsChanged} bindingsChanged=${!!syncResult.bindingsChanged} mcpBridgeChanged=${mcpBridgeForceRestart} configChanged=${syncResult.changed} restartFlag=${!!options.restartGatewayIfRunning})`);
 
@@ -1316,10 +1321,9 @@ const syncOpenClawConfig = async (
     };
   }
 
-  // Binding changes and explicit force-restart requests are user actions where
-  // keeping the old gateway alive would keep routing messages with stale config.
-  // Force immediate restart so the next request sees the selected model/agent.
-  if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged && !options.forceGatewayRestartIfRunning) {
+  // Defer restart when there are active workloads, unless the caller
+  // explicitly requested an immediate force restart.
+  if (hasActiveGatewayWorkloads() && !options.forceGatewayRestartIfRunning) {
     console.log(`${D()} ──── RESTART DEFERRED (active workloads). reason=${options.reason}`);
     scheduleDeferredGatewayRestart(options.reason);
     return {
