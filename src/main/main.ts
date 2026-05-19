@@ -1292,12 +1292,13 @@ const syncOpenClawConfig = async (
   // pins its config snapshot at startup, so a hot-reload alone won't pick
   // up a new callbackUrl — the gateway must be fully restarted.
   //
-  // bindingsChanged is intentionally NOT included here.  The gateway's
-  // chokidar-based hybrid reload engine (config-reload.ts) hot-reloads
-  // channel plugins on channels.* config changes — a full process restart
-  // is unnecessary and causes a visible "starting gateway" overlay flicker.
+  // bindingsChanged also requires a hard restart.  The top-level "bindings"
+  // key in openclaw.json does not match any hot-reload prefix in the
+  // gateway's BASE_RELOAD_RULES and falls through to the tail rule
+  // (restartGateway=true).  On Windows, the gateway cannot restart itself
+  // in-process (no SIGUSR1), so a full kill+spawn is the only reliable path.
   const mcpBridgeForceRestart = !!syncResult.mcpBridgeConfigChanged;
-  const needsHardRestart = secretEnvVarsChanged || mcpBridgeForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
+  const needsHardRestart = secretEnvVarsChanged || syncResult.bindingsChanged || mcpBridgeForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
 
   console.log(`${D()} needsHardRestart=${needsHardRestart} (envChanged=${secretEnvVarsChanged} bindingsChanged=${!!syncResult.bindingsChanged} mcpBridgeChanged=${mcpBridgeForceRestart} configChanged=${syncResult.changed} restartFlag=${!!options.restartGatewayIfRunning})`);
 
@@ -1334,9 +1335,10 @@ const syncOpenClawConfig = async (
     };
   }
 
-  // Defer restart when there are active workloads, unless the caller
-  // explicitly requested an immediate force restart.
-  if (hasActiveGatewayWorkloads() && !options.forceGatewayRestartIfRunning) {
+  // Binding changes are user actions (switching agent/model for a channel).
+  // Deferring the restart would keep routing messages with stale config, so
+  // force immediate restart regardless of active workloads.
+  if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged && !options.forceGatewayRestartIfRunning) {
     console.log(`${D()} ──── RESTART DEFERRED (active workloads). reason=${options.reason}`);
     scheduleDeferredGatewayRestart(options.reason);
     return {

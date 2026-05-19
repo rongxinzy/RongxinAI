@@ -16,7 +16,7 @@ needsHardRestart = secretEnvVarsChanged
 
 | 场景 | reason | 热重载方式 |
 |------|--------|----------|
-| **频道绑定变更** | `im-config-change` | 写文件 → config.apply RPC → Gateway hot → restartChannel（按粒度） |
+| **频道绑定变更** | `im-config-change` | ❌ 必须重启。`bindings` 是 openclaw.json 顶层 key，不匹配 Gateway BASE_RELOAD_RULES 中任何 hot 前缀，落入 tail 规则 → restartGateway |
 | **Agent 创建/更新/删除** | `agent-created`, `agent-updated`, `agent-deleted` | 写文件 → config.apply RPC → Gateway hot → agents 运行时缓存失效 |
 | **Agent preset 添加** | `agent-preset-added` | 同上 |
 | **模型列表更新** | `server-models-updated` | 写文件 → config.apply RPC → Gateway hot → models 缓存失效 |
@@ -34,6 +34,7 @@ needsHardRestart = secretEnvVarsChanged
 
 | 场景 | reason | 为什么不能热重载 |
 |------|--------|----------------|
+| **频道绑定变更** | `im-config-change` | `bindingsChanged` 触发。`bindings` 是 openclaw.json 顶层 key，不匹配 BASE_RELOAD_RULES 中任何 hot 前缀（gateway/hooks/agents/cron/browser），落入 tail 规则 → 必须重启 |
 | **Provider API Key 变更** | `app-config-change`（密钥变更） | `secretEnvVarsChanged` 触发。env vars 在 `spawn()` 时固化到子进程，`${VAR}` 占位符由进程当前 env 解析。不 kill+spawn 则 Gateway 永远拿不到新密钥 |
 | **MCP Bridge 配置变更** | `mcp-server-changed` | `mcpBridgeForceRestart` 触发。Gateway 在启动时固定 MCP Bridge callbackUrl，热重载无法更新回调地址 |
 | **`restartGatewayIfRunning: true` 调用方** | — | 代码中**不存在**此调用方。所有 20+ 个调用方都传 `false` 或不传（默认 `false`） |
@@ -50,8 +51,8 @@ needsHardRestart = secretEnvVarsChanged
 
 ```
 总调用场景:         ~23 个
-无需重启:           ~21 个  (91%)
-必须重启:           2 个    (secretEnvVarsChanged, mcpBridgeForceRestart)
+无需重启:           ~20 个  (87%)
+必须重启:           3 个    (bindingsChanged, secretEnvVarsChanged, mcpBridgeForceRestart)
 已废弃:             0 个    (restartGatewayIfRunning: true 无调用方)
 ```
 
@@ -78,7 +79,7 @@ needsHardRestart = secretEnvVarsChanged
   || (syncResult.changed && options.restartGatewayIfRunning)
 ```
 
-- 切换频道绑定 → **热重载**（config.apply RPC + chokidar，无中断）
+- 切换频道绑定 → **hard restart**（bindings 不匹配任何 hot 前缀，Gateway 自身也无法重启，必须 kill+spawn）
 - 变更 Agent 配置 → 热重载（config.apply RPC 即时推送）
 - 模型/技能变更 → 热重载（同上）
 - API Key 变更 → **hard restart**（物理限制，无法绕过）
@@ -91,4 +92,4 @@ needsHardRestart = secretEnvVarsChanged
 | `secretEnvVarsChanged` | 用户主动修改 API Key / Provider 密钥 | 极低频（设置一次后几乎不变） |
 | `mcpBridgeForceRestart` | 首次配置 MCP Bridge 或修改其 callbackUrl/tools | 极低频（初始配置后几乎不变） |
 
-高频场景（切换频道 agent、切换模型、更新技能）全部热重载免重启。
+高频场景：切换模型、更新技能 → 热重载免重启。切换频道 agent → 必须重启（Gateway 架构限制）。
