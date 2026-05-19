@@ -456,7 +456,7 @@ export class OpenClawChannelSessionSync {
           // old session (under the previous agent) and shows the new one.
           for (const win of BrowserWindow.getAllWindows()) {
             if (!win.isDestroyed()) {
-              win.webContents.send('cowork:sessions:changed');
+              win.webContents.send('cowork:sessions:changed', { sessionId: newSession.id });
             }
           }
           return newSession.id;

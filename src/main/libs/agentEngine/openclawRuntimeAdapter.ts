@@ -3206,7 +3206,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     this.store.deleteMessage(sessionId, messageId);
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send('cowork:sessions:changed');
+        win.webContents.send('cowork:sessions:changed', { sessionId });
       }
     }
   }
@@ -4260,7 +4260,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       // Notify renderer to refresh
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) {
-          win.webContents.send('cowork:sessions:changed');
+          win.webContents.send('cowork:sessions:changed', { sessionId });
         }
       }
     } catch (error) {

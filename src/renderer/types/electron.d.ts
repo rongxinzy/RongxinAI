@@ -597,7 +597,7 @@ interface IElectronAPI {
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => () => void;
     onStreamError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
-    onSessionsChanged: (callback: () => void) => () => void;
+    onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => () => void;
   };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;

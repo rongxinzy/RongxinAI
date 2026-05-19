@@ -398,8 +398,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('cowork:stream:error', handler);
       return () => ipcRenderer.removeListener('cowork:stream:error', handler);
     },
-    onSessionsChanged: (callback: () => void) => {
-      const handler = () => callback();
+    onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => {
+      const handler = (_event: any, data?: { sessionId?: string }) => callback(data ?? {});
       ipcRenderer.on('cowork:sessions:changed', handler);
       return () => ipcRenderer.removeListener('cowork:sessions:changed', handler);
     },

@@ -436,7 +436,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     if (!currentSession || currentSession.status !== 'running') return;
 
     const runningSessionId = currentSession.id;
+    let lastFocusTime = 0;
+    const FOCUS_DEBOUNCE_MS = 2000;
+
     const handleWindowFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusTime < FOCUS_DEBOUNCE_MS) return;
+      lastFocusTime = now;
       void coworkService.loadSession(runningSessionId);
     };
 

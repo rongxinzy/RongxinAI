@@ -129,6 +129,27 @@ const coworkSlice = createSlice({
     setCurrentSession(state, action: PayloadAction<CoworkSession | null>) {
       if (action.payload) {
         const session = action.payload;
+
+        // Guard: skip store mutation if session data is identical to current.
+        // Prevents unnecessary React re-renders when loadSession is called
+        // but the backend returns unchanged data.
+        if (state.currentSession && state.currentSession.id === session.id) {
+          const prev = state.currentSession;
+          const prevMsgs = prev.messages;
+          const newMsgs = session.messages;
+          if (prevMsgs.length === newMsgs.length) {
+            const firstMatch = prevMsgs.length === 0 || prevMsgs[0]?.id === newMsgs[0]?.id;
+            const lastMatch = prevMsgs.length === 0 || prevMsgs[prevMsgs.length - 1]?.id === newMsgs[newMsgs.length - 1]?.id;
+            if (firstMatch && lastMatch &&
+                prev.status === session.status &&
+                prev.title === session.title &&
+                prev.messagesOffset === (session.messagesOffset ?? 0) &&
+                prev.totalMessages === (session.totalMessages ?? session.messages.length)) {
+              return;
+            }
+          }
+        }
+
         // Ensure pagination fields are always present (guard against stale IPC data).
         state.currentSession = {
           ...session,
@@ -142,7 +163,7 @@ const coworkSlice = createSlice({
         state.currentSessionId = action.payload.id;
         if (!action.payload.id.startsWith('temp-')) {
           const summary = toSessionSummary(action.payload);
-          const sessionIndex = state.sessions.findIndex((session) => session.id === summary.id);
+          const sessionIndex = state.sessions.findIndex((s) => s.id === summary.id);
           if (sessionIndex !== -1) {
             state.sessions[sessionIndex] = {
               ...state.sessions[sessionIndex],
