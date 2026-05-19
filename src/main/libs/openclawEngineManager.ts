@@ -183,6 +183,12 @@ export class OpenClawEngineManager extends EventEmitter {
   private startupPhaseLogged: Set<string> = new Set();
   private startupStderrBuffer = '';
 
+  // ── Cache warmup (pre-fork V8 compile-cache seeding) ──
+  private warmupProcess: ChildProcess | null = null;
+  private get warmingLockPath(): string {
+    return path.join(this.stateDir, '.cache-warming');
+  }
+
   constructor() {
     super();
 
@@ -289,6 +295,159 @@ export class OpenClawEngineManager extends EventEmitter {
     if (this.gatewayLogPrunedDateKey === dateKey) return;
     pruneGatewayLogs(this.logsDir, now);
     this.gatewayLogPrunedDateKey = dateKey;
+  }
+
+  // ── Compile-cache helpers ─────────────────────────────────────────────
+
+  private getCompileCacheDir(): string {
+    return path.join(this.stateDir, '.compile-cache');
+  }
+
+  private isCompileCachePopulated(): boolean {
+    const cacheDir = this.getCompileCacheDir();
+    try {
+      if (!fs.existsSync(cacheDir)) return false;
+      const entries = fs.readdirSync(cacheDir);
+      return entries.some((entry) => {
+        const full = path.join(cacheDir, entry);
+        try { return fs.statSync(full).isFile(); } catch { return false; }
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Wait for an in-progress cache warmup (guarded by .cache-warming lock).
+   * Returns immediately if no warmup is running.
+   */
+  private async waitForWarmupIfInProgress(): Promise<void> {
+    if (!fs.existsSync(this.warmingLockPath)) return;
+
+    console.log('[OpenClaw] cache warmup already in progress, waiting...');
+    const t0 = Date.now();
+    const maxWaitMs = 120_000;
+
+    while (fs.existsSync(this.warmingLockPath)) {
+      if (Date.now() - t0 > maxWaitMs) {
+        console.warn('[OpenClaw] waited for cache warmup lock >2min, proceeding without it');
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    console.log(`[OpenClaw] cache warmup lock released after ${Date.now() - t0}ms`);
+  }
+
+  private cleanupWarmingLock(): void {
+    try {
+      if (fs.existsSync(this.warmingLockPath)) fs.unlinkSync(this.warmingLockPath);
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Run a compile-cache warmup before forking the gateway process.
+   *
+   * Generates a minimal launcher script that imports gateway-bundle.mjs under
+   * the same V8 compile-cache directory the real gateway will use.  The
+   * warmup-compile-cache.cjs helper is not in production builds, so we write
+   * an inlined equivalent into the state directory.
+   */
+  private async runCompileCacheWarmup(): Promise<void> {
+    // Double-check: avoid duplicate warmup via lock.
+    if (fs.existsSync(this.warmingLockPath)) return this.waitForWarmupIfInProgress();
+
+    fs.writeFileSync(this.warmingLockPath, String(process.pid), 'utf8');
+    console.log('[OpenClaw] Starting compile-cache warmup...');
+
+    const runtime = this.resolveRuntimeMetadata();
+    const bundlePath = path.join(runtime.root!, 'gateway-bundle.mjs');
+    if (!fs.existsSync(bundlePath)) {
+      console.warn('[OpenClaw] No gateway-bundle.mjs found, skipping warmup');
+      this.cleanupWarmingLock();
+      return;
+    }
+
+    const compileCacheDir = this.getCompileCacheDir();
+    ensureDir(compileCacheDir);
+
+    // Write an inlined warmup launcher to the state dir.
+    const launcherPath = path.join(this.stateDir, '.warmup-launcher.cjs');
+    const launcherSrc = [
+      `const { pathToFileURL } = require('node:url');`,
+      `const path = require('node:path');`,
+      `const fs = require('node:fs');`,
+      `const t0 = Date.now();`,
+      `const elapsed = () => Date.now() - t0 + 'ms';`,
+      `try { const { enableCompileCache } = require('node:module');`,
+      `  enableCompileCache(process.env.NODE_COMPILE_CACHE); } catch (_) {}`,
+      `const bundlePath = path.join(${JSON.stringify(path.dirname(bundlePath))}, 'gateway-bundle.mjs');`,
+      `process.stderr.write('[warmup] loading ' + bundlePath + '...\\n');`,
+      `import(pathToFileURL(bundlePath).href).then(() => {`,
+      `  try { require('node:module').flushCompileCache(); } catch (_) {}`,
+      `  process.stderr.write('[warmup] done (' + elapsed() + ')\\n');`,
+      `  process.exit(0);`,
+      `}).catch((err) => {`,
+      `  try { require('node:module').flushCompileCache(); } catch (_) {}`,
+      `  process.stderr.write('[warmup] finished with error (cache still written): ' + err.message + ' (' + elapsed() + ')\\n');`,
+      `  process.exit(0);`,
+      `});`,
+    ].join('\n');
+
+    // Write only if different to avoid unnecessary disk writes.
+    const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : '';
+    if (existing !== launcherSrc) {
+      fs.writeFileSync(launcherPath, launcherSrc, 'utf8');
+    }
+
+    return new Promise<void>((resolve) => {
+      const child = spawn(process.execPath, [launcherPath], {
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
+          NODE_COMPILE_CACHE: compileCacheDir,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+
+      this.warmupProcess = child;
+
+      child.stderr?.on('data', (chunk: Buffer) => {
+        const text = chunk.toString().trim();
+        if (text) console.log(`[OpenClaw warmup] ${text}`);
+      });
+
+      const done = (exitCode: number | null) => {
+        const elapsed = Date.now();
+        this.warmupProcess = null;
+        console.log(`[OpenClaw] cache warmup finished (exitCode=${exitCode})`);
+        this.cleanupWarmingLock();
+        // Remove the temp launcher on success.
+        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch {}
+        resolve();
+      };
+
+      child.once('exit', done);
+      child.once('error', (err) => {
+        console.warn(`[OpenClaw] cache warmup error: ${err.message}`);
+        this.warmupProcess = null;
+        this.cleanupWarmingLock();
+        resolve();
+      });
+
+      // Hard timeout: never block startup for more than 120s on warmup.
+      setTimeout(() => {
+        if (this.warmupProcess === child) {
+          console.warn('[OpenClaw] cache warmup timed out after 120s, killing');
+          try { child.kill(); } catch {}
+          this.warmupProcess = null;
+          this.cleanupWarmingLock();
+          resolve();
+        }
+      }, 120_000);
+    });
   }
 
   /**
@@ -472,6 +631,24 @@ export class OpenClawEngineManager extends EventEmitter {
     this.ensureConfigFile();
     console.log(`[OpenClaw] startGateway: pre-fork setup done (${elapsed()})`);
 
+    // ── Pre-fork cache warmup (Windows-only) ──
+    // On Windows, cold V8 compilation of the 27 MB gateway-bundle.mjs can
+    // take 25-35 s.  Pre-seed the compile cache so the real gateway process
+    // starts in ~5 s instead.
+    if (process.platform === 'win32' && !this.isCompileCachePopulated()) {
+      await this.waitForWarmupIfInProgress();
+      if (!this.isCompileCachePopulated()) {
+        this.setStatus({
+          phase: 'compiling',
+          version: runtime.version,
+          progressPercent: 5,
+          message: 'Pre-compiling gateway bundle for faster startup...',
+          canRetry: false,
+        });
+        await this.runCompileCacheWarmup();
+      }
+    }
+
     this.setStatus({
       phase: 'starting',
       version: runtime.version,
@@ -647,6 +824,13 @@ export class OpenClawEngineManager extends EventEmitter {
     if (this.gatewayRestartTimer) {
       clearTimeout(this.gatewayRestartTimer);
       this.gatewayRestartTimer = null;
+    }
+
+    // Kill in-progress cache warmup (if any).
+    if (this.warmupProcess) {
+      try { this.warmupProcess.kill(); } catch { /* ignore */ }
+      this.warmupProcess = null;
+      this.cleanupWarmingLock();
     }
 
     if (this.gatewayProcess) {
