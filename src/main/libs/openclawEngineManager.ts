@@ -1646,7 +1646,7 @@ export class OpenClawEngineManager extends EventEmitter {
         });
 
         if (pollCount % 5 === 0) {
-          console.log(`[OpenClaw] waitForGatewayReady: poll #${pollCount}, elapsed=${elapsedMs}ms, progress=${progress}%`);
+          console.log(`[OpenClaw] waitForGatewayReady: poll #${pollCount}, elapsed=${elapsedMs}ms, progress=${progressPct}%`);
         }
 
         setTimeout(() => {
