@@ -5,6 +5,7 @@
  * to local Cowork sessions so that conversations are visible in the RongxinAI UI.
  */
 
+import { BrowserWindow } from 'electron';
 import { PlatformRegistry } from '../../shared/platform';
 import type { CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
@@ -451,6 +452,13 @@ export class OpenClawChannelSessionSync {
           // Mark so pollChannelSessions skips full history sync for this session —
           // old gateway messages should not be pulled into the new session.
           this.agentChangedSessionIds.add(newSession.id);
+          // Notify all renderer windows immediately so the sidebar removes the
+          // old session (under the previous agent) and shows the new one.
+          for (const win of BrowserWindow.getAllWindows()) {
+            if (!win.isDestroyed()) {
+              win.webContents.send('cowork:sessions:changed');
+            }
+          }
           return newSession.id;
         }
         console.log(
