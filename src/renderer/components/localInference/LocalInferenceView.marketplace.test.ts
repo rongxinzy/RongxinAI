@@ -65,15 +65,12 @@ test('llama.cpp inference option metadata uses OpenAI-compatible request paramet
   const advancedKeys = fields.filter((field) => field.group === 'advanced').map((field) => field.key);
 
   expect(paramNames).toContain('max_tokens');
-  expect(paramNames).toContain('reasoning_format');
-  expect(paramNames).toContain('chat_template_kwargs.enable_thinking');
-  expect(paramNames).toContain('thinking_budget_tokens');
-  expect(paramNames).not.toContain('thinking_forced_open');
+  expect(paramNames).toContain('app.system_hint.direct_answer_only');
   expect(paramNames).not.toContain('num_predict');
   expect(paramNames.every((paramName) => !paramName.startsWith('--'))).toBe(true);
   expect(basicKeys).toEqual([
     'num_predict',
-    'thinking_forced_open',
+    'direct_answer_mode',
     'temperature',
     'top_p',
   ]);
@@ -82,8 +79,6 @@ test('llama.cpp inference option metadata uses OpenAI-compatible request paramet
     'min_p',
     'repeat_penalty',
     'presence_penalty',
-    'reasoning_format',
-    'thinking_budget_tokens',
     'cache_prompt',
     'seed',
     'stop',
@@ -97,7 +92,6 @@ test('streaming assistant display shows waiting dots until content or thinking a
     __test__buildStreamingAssistantMessage?: (input: {
       content: string;
       thinking: string;
-      thinkingDisabled: boolean;
     }) => { content: string; thinking?: string; waiting?: boolean; hiddenThinking?: boolean };
   }).__test__buildStreamingAssistantMessage;
 
@@ -107,7 +101,6 @@ test('streaming assistant display shows waiting dots until content or thinking a
   expect(buildStreamingAssistantMessage({
     content: '',
     thinking: '',
-    thinkingDisabled: false,
   })).toEqual(expect.objectContaining({
     content: '',
     waiting: true,
@@ -116,7 +109,6 @@ test('streaming assistant display shows waiting dots until content or thinking a
   expect(buildStreamingAssistantMessage({
     content: '',
     thinking: 'checking',
-    thinkingDisabled: false,
   })).toEqual(expect.objectContaining({
     content: '',
     thinking: 'checking',
@@ -126,36 +118,11 @@ test('streaming assistant display shows waiting dots until content or thinking a
   expect(buildStreamingAssistantMessage({
     content: 'answer',
     thinking: 'checking',
-    thinkingDisabled: false,
   })).toEqual(expect.objectContaining({
     content: 'answer',
     thinking: 'checking',
     waiting: false,
   }));
-});
-
-test('streaming assistant display hides thinking when thinking is disabled', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildStreamingAssistantMessage = (module as unknown as {
-    __test__buildStreamingAssistantMessage?: (input: {
-      content: string;
-      thinking: string;
-      thinkingDisabled: boolean;
-    }) => { content: string; thinking?: string; waiting?: boolean; hiddenThinking?: boolean };
-  }).__test__buildStreamingAssistantMessage;
-
-  expect(typeof buildStreamingAssistantMessage).toBe('function');
-  if (!buildStreamingAssistantMessage) return;
-
-  const message = buildStreamingAssistantMessage({
-    content: '',
-    thinking: 'hidden',
-    thinkingDisabled: true,
-  });
-
-  expect(message.thinking).toBeUndefined();
-  expect(message.hiddenThinking).toBe(true);
-  expect(message.waiting).toBe(true);
 });
 
 test('new prompt scroll target points at the next assistant response start', async () => {
@@ -183,12 +150,12 @@ test('new prompt scroll target points at the next assistant response start', asy
     containerScrollTop: 320,
     containerTop: 100,
     targetTop: 240,
-  })).toBe(440);
+  })).toBe(460);
   expect(getAssistantScrollTop({
     containerScrollTop: 5,
     containerTop: 100,
     targetTop: 110,
-  })).toBe(0);
+  })).toBe(15);
 });
 
 test('jump-to-bottom visibility logic only triggers when content remains below viewport', async () => {
@@ -240,14 +207,13 @@ test('jump-to-bottom visibility logic only triggers when content remains below v
   })).toBe(false);
 });
 
-test('final assistant message hides thinking when thinking is disabled', async () => {
+test('final assistant message keeps visible content and preserves thinking details', async () => {
   const module = await import('./LocalInferenceView');
   const buildAssistantMessage = (module as unknown as {
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
       metrics: unknown;
-      thinkingDisabled: boolean;
     }) => { content: string; thinking?: string; hiddenThinking?: boolean };
   }).__test__buildAssistantMessage;
 
@@ -258,22 +224,20 @@ test('final assistant message hides thinking when thinking is disabled', async (
     content: 'answer',
     thinking: 'hidden chain',
     metrics: null,
-    thinkingDisabled: true,
   });
 
   expect(message.content).toBe('answer');
-  expect(message.thinking).toBeUndefined();
-  expect(message.hiddenThinking).toBe(true);
+  expect(message.thinking).toBe('hidden chain');
+  expect(message.hiddenThinking).toBeUndefined();
 });
 
-test('final assistant message explains hidden thinking when no visible answer exists', async () => {
+test('final assistant message falls back to a generic notice when no visible answer exists', async () => {
   const module = await import('./LocalInferenceView');
   const buildAssistantMessage = (module as unknown as {
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
       metrics: unknown;
-      thinkingDisabled: boolean;
     }) => { content: string; thinking?: string; hiddenThinking?: boolean };
   }).__test__buildAssistantMessage;
 
@@ -284,13 +248,12 @@ test('final assistant message explains hidden thinking when no visible answer ex
     content: '',
     thinking: 'hidden chain',
     metrics: null,
-    thinkingDisabled: true,
   });
 
   expect(message.content).toBeTruthy();
   expect(message.content).not.toContain('hidden chain');
-  expect(message.thinking).toBeUndefined();
-  expect(message.hiddenThinking).toBe(true);
+  expect(message.thinking).toBe('hidden chain');
+  expect(message.hiddenThinking).toBeUndefined();
 });
 
 test('metrics summary uses usage token counts first', async () => {
@@ -361,9 +324,6 @@ test('request preview exposes the important llama.cpp body fields', async () => 
     systemPrompt: 'reply with over',
     options: {
       max_tokens: 256,
-      reasoning_format: 'none',
-      chat_template_kwargs: { enable_thinking: false },
-      thinking_budget_tokens: 0,
       temperature: 0.7,
     },
   });
@@ -372,9 +332,6 @@ test('request preview exposes the important llama.cpp body fields', async () => 
     model: 'DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
     messages: [{ role: 'system', content: 'reply with over' }],
     max_tokens: 256,
-    reasoning_format: 'none',
-    chat_template_kwargs: { enable_thinking: false },
-    thinking_budget_tokens: 0,
   });
 });
 
@@ -386,14 +343,76 @@ test('composer height maps to safe chat padding and jump button offset', async (
   const getJumpToBottomOffset = (module as unknown as {
     __test__getJumpToBottomOffset?: (composerHeight: number) => number;
   }).__test__getJumpToBottomOffset;
+  const getLatestTurnContentHeight = (module as unknown as {
+    __test__getLatestTurnContentHeight?: (scrollHeight: number, latestTurnTop: number) => number;
+  }).__test__getLatestTurnContentHeight;
+  const getLatestTurnTailSpacer = (module as unknown as {
+    __test__getLatestTurnTailSpacer?: (viewportHeight: number, bottomPadding: number) => number;
+  }).__test__getLatestTurnTailSpacer;
+  const getEffectiveChatScrollHeight = (module as unknown as {
+    __test__getEffectiveChatScrollHeight?: (scrollHeight: number, tailSpacer: number) => number;
+  }).__test__getEffectiveChatScrollHeight;
+  const findLatestUserMessageIndex = (module as unknown as {
+    __test__findLatestUserMessageIndex?: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) => number;
+  }).__test__findLatestUserMessageIndex;
 
   expect(typeof getChatBottomPadding).toBe('function');
   expect(typeof getJumpToBottomOffset).toBe('function');
+  expect(typeof getLatestTurnContentHeight).toBe('function');
+  expect(typeof getLatestTurnTailSpacer).toBe('function');
+  expect(typeof getEffectiveChatScrollHeight).toBe('function');
+  expect(typeof findLatestUserMessageIndex).toBe('function');
   if (!getChatBottomPadding) return;
   if (!getJumpToBottomOffset) return;
+  if (!getLatestTurnContentHeight) return;
+  if (!getLatestTurnTailSpacer) return;
+  if (!getEffectiveChatScrollHeight) return;
+  if (!findLatestUserMessageIndex) return;
 
   expect(getChatBottomPadding(48)).toBe(120);
   expect(getChatBottomPadding(136)).toBe(156);
   expect(getJumpToBottomOffset(48)).toBe(92);
   expect(getJumpToBottomOffset(136)).toBe(152);
+  expect(getLatestTurnContentHeight(1200, 716)).toBe(484);
+  expect(getLatestTurnContentHeight(1200, 180)).toBe(1020);
+  expect(getLatestTurnTailSpacer(640, 156)).toBe(484);
+  expect(getLatestTurnTailSpacer(640, 720)).toBe(0);
+  expect(getLatestTurnTailSpacer(120, 156)).toBe(0);
+  expect(getEffectiveChatScrollHeight(1200, 484)).toBe(716);
+  expect(getEffectiveChatScrollHeight(300, 484)).toBe(0);
+  expect(findLatestUserMessageIndex([
+    { role: 'user', content: 'first' },
+    { role: 'assistant', content: 'reply' },
+    { role: 'user', content: 'latest' },
+    { role: 'assistant', content: 'final' },
+  ])).toBe(2);
+  expect(findLatestUserMessageIndex([{ role: 'assistant', content: 'reply' }])).toBe(-1);
+});
+
+test('local inference transient notices auto-dismiss within five seconds', async () => {
+  const module = await import('./LocalInferenceView');
+  const isInstallTerminalPhase = (module as unknown as {
+    __test__isInstallTerminalPhase?: (phase: string) => boolean;
+  }).__test__isInstallTerminalPhase;
+  const getLocalInferenceToastAutoDismissMs = (module as unknown as {
+    __test__getLocalInferenceToastAutoDismissMs?: () => number;
+  }).__test__getLocalInferenceToastAutoDismissMs;
+  const getLocalInferenceProgressDismissMs = (module as unknown as {
+    __test__getLocalInferenceProgressDismissMs?: () => number;
+  }).__test__getLocalInferenceProgressDismissMs;
+
+  expect(typeof isInstallTerminalPhase).toBe('function');
+  expect(typeof getLocalInferenceToastAutoDismissMs).toBe('function');
+  expect(typeof getLocalInferenceProgressDismissMs).toBe('function');
+  if (!isInstallTerminalPhase) return;
+  if (!getLocalInferenceToastAutoDismissMs) return;
+  if (!getLocalInferenceProgressDismissMs) return;
+
+  expect(getLocalInferenceToastAutoDismissMs()).toBeLessThanOrEqual(5000);
+  expect(getLocalInferenceProgressDismissMs()).toBeLessThanOrEqual(5000);
+  expect(isInstallTerminalPhase('done')).toBe(true);
+  expect(isInstallTerminalPhase('failed')).toBe(true);
+  expect(isInstallTerminalPhase('cancelled')).toBe(true);
+  expect(isInstallTerminalPhase('needs-manual')).toBe(true);
+  expect(isInstallTerminalPhase('downloading-progress')).toBe(false);
 });

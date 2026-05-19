@@ -4,6 +4,7 @@ import {
   DEFAULT_INFERENCE_OPTIONS,
   getRecommendedInferenceOptions,
   isDefaultInferenceOptions,
+  loadInferenceOptions,
   normalizeOptions,
   shouldApplyModelPreset,
 } from './inferenceOptions';
@@ -15,9 +16,7 @@ test('normalizes inference options for llama.cpp requests', () => {
     stop: '###, END',
     min_p: 0.1,
     presence_penalty: 0.4,
-    reasoning_format: 'deepseek',
-    thinking_forced_open: 'enabled',
-    thinking_budget_tokens: 256,
+    direct_answer_mode: 'enabled',
     cache_prompt: 'disabled',
   });
 
@@ -29,32 +28,50 @@ test('normalizes inference options for llama.cpp requests', () => {
     repeat_penalty: DEFAULT_INFERENCE_OPTIONS.repeat_penalty,
     min_p: 0.1,
     presence_penalty: 0.4,
-    reasoning_format: 'deepseek',
-    chat_template_kwargs: {
-      enable_thinking: true,
-    },
-    thinking_budget_tokens: 256,
     cache_prompt: false,
     seed: 42,
     stop: ['###', 'END'],
   }));
   expect(normalized).not.toHaveProperty('thinking_forced_open');
+  expect(normalized).not.toHaveProperty('reasoning_format');
+  expect(normalized).not.toHaveProperty('chat_template_kwargs');
+  expect(normalized).not.toHaveProperty('thinking_budget_tokens');
 });
 
-test('disabling thinking sends llama.cpp template flag and zero thinking budget', () => {
-  const normalized = normalizeOptions({
-    ...DEFAULT_INFERENCE_OPTIONS,
-    thinking_forced_open: 'disabled',
-    thinking_budget_tokens: 512,
+test('loading inference options clears deprecated thinking-specific settings', () => {
+  const storage = new Map<string, string>();
+  const originalLocalStorage = globalThis.localStorage;
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+      clear: () => storage.clear(),
+      key: (index: number) => Array.from(storage.keys())[index] ?? null,
+      get length() {
+        return storage.size;
+      },
+    },
   });
 
-  expect(normalized).toEqual(expect.objectContaining({
+  storage.set('lobsterai:llamacpp-inference-options', JSON.stringify({
     reasoning_format: 'none',
-    chat_template_kwargs: {
-      enable_thinking: false,
-    },
+    thinking_forced_open: 'disabled',
     thinking_budget_tokens: 0,
+    direct_answer_mode: 'enabled',
   }));
+
+  const loaded = loadInferenceOptions();
+  expect(loaded.reasoning_format).toBe('auto');
+  expect(loaded.thinking_forced_open).toBe('auto');
+  expect(loaded.thinking_budget_tokens).toBe(-1);
+  expect(loaded.direct_answer_mode).toBe('enabled');
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: originalLocalStorage,
+  });
 });
 
 test('returns a Qwen preset with a shorter thinking budget', () => {

@@ -272,3 +272,47 @@ test('deleteModel removes empty parent directories after deleting a GGUF file', 
   expect(fs.existsSync(ggufPath)).toBe(false);
   expect(fs.existsSync(repoDir)).toBe(false);
 });
+
+test('installModel cleans already-downloaded files when a later stage is cancelled', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-cancel-'));
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  manager.refreshModelsAfterInstall = async () => undefined as any;
+
+  let fetchCount = 0;
+  const originalFetch = global.fetch;
+  try {
+    global.fetch = async (_input: string | URL | Request, init?: RequestInit) => {
+      fetchCount += 1;
+      if (fetchCount === 1) {
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { 'content-length': '3' },
+        });
+      }
+      const controllerSignal = init?.signal;
+      await new Promise((_, reject) => {
+        controllerSignal?.addEventListener('abort', () => reject(new Error('Install cancelled')), { once: true });
+      });
+      throw new Error('Install cancelled');
+    };
+
+    const controller = new AbortController();
+    const installPromise = manager.installModel({
+      modelId: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+      filePath: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
+      mmprojFilePath: 'mmproj-F16.gguf',
+      displayName: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+    }, undefined, { signal: controller.signal });
+
+    controller.abort(new Error('Install cancelled'));
+
+    await expect(installPromise).rejects.toThrow();
+
+    const repoDir = path.join(modelsDir, 'modelscope', 'unsloth', 'DeepSeek-R1-Distill-Qwen-1.5B-GGUF');
+    expect(fs.existsSync(path.join(repoDir, 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf'))).toBe(false);
+    expect(fs.existsSync(path.join(repoDir, 'mmproj-F16.gguf'))).toBe(false);
+    expect(fs.existsSync(repoDir)).toBe(false);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

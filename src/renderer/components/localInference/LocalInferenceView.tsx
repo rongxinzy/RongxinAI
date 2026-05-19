@@ -52,7 +52,6 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import {
   getRecommendedInferenceOptions,
   type InferenceOptions,
-  isThinkingModel,
   loadInferenceOptions,
   normalizeOptions,
   shouldApplyModelPreset,
@@ -150,6 +149,7 @@ type InferenceOptionField = {
   max?: number;
   step?: number;
   hintKey: string;
+  showParamName?: boolean;
 };
 type InferenceOptionGroup = 'basic' | 'advanced';
 
@@ -176,7 +176,6 @@ type BuildAssistantMessageInput = {
   content: string;
   thinking: string;
   metrics: OllamaChatChunk | null;
-  thinkingDisabled: boolean;
 };
 type RequestPreviewInput = {
   model: string;
@@ -190,12 +189,23 @@ const MARKETPLACE_CARD_MIN_HEIGHT = 236;
 const MARKETPLACE_FILTER_PANEL_HEIGHT = 160;
 const CHAT_NEAR_BOTTOM_THRESHOLD = 96;
 const CHAT_HIDDEN_BELOW_THRESHOLD = 8;
-const ASSISTANT_SCROLL_TOP_OFFSET = 20;
+const ASSISTANT_SCROLL_TOP_OFFSET = 0;
 const CHAT_COMPOSER_MIN_PADDING = 120;
 const CHAT_COMPOSER_PADDING_GAP = 20;
 const CHAT_JUMP_TO_BOTTOM_MIN_OFFSET = 92;
 const CHAT_JUMP_TO_BOTTOM_GAP = 16;
-const LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS = 3600;
+const LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS = 5_000;
+const LOCAL_INFERENCE_PROGRESS_DISMISS_MS = 5_000;
+const DIRECT_ANSWER_SYSTEM_HINT = [
+  'Answer as quickly and directly as possible.',
+  'Skip unnecessary drafts, long internal monologues, and unrelated exploration.',
+  'If you produce thinking, keep it very short and focused before giving the final answer.',
+  'Please think briefly, do not ramble, and keep any visible thinking within about 50 Chinese characters or one short sentence when possible.',
+  'Focus on the necessary conditions first, then give the conclusion without drifting to unrelated topics.',
+  '请尽快直接给出结论，跳过不必要的草稿和长篇思考。',
+  '如果必须输出思考，请用非常简短的话表达，尽量控制在 50 个汉字以内或一句短句内。',
+  '请先抓住必要条件，再直接给出结论，不要发散到无关内容。',
+].join(' ');
 const smallOutlineButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
@@ -217,15 +227,13 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
 ];
 const INFERENCE_OPTION_FIELDS: InferenceOptionField[] = [
   { key: 'num_predict', labelKey: 'localInferenceOptionMaxTokensLabel', paramName: 'max_tokens', group: 'basic', type: 'range', min: -1, max: 32768, step: 1, hintKey: 'localInferenceOptionMaxTokensHint' },
-  { key: 'thinking_forced_open', labelKey: 'localInferenceOptionThinkingForcedOpenLabel', paramName: 'chat_template_kwargs.enable_thinking', group: 'basic', type: 'select', hintKey: 'localInferenceOptionThinkingForcedOpenHint' },
+  { key: 'direct_answer_mode', labelKey: 'localInferenceOptionDirectAnswerModeLabel', paramName: 'app.system_hint.direct_answer_only', group: 'basic', type: 'select', hintKey: 'localInferenceOptionDirectAnswerModeHint', showParamName: false },
   { key: 'temperature', labelKey: 'localInferenceOptionTemperatureLabel', paramName: 'temperature', group: 'basic', type: 'range', min: 0, max: 2, step: 0.1, hintKey: 'localInferenceOptionTemperatureHint' },
   { key: 'top_p', labelKey: 'localInferenceOptionTopPLabel', paramName: 'top_p', group: 'basic', type: 'range', min: 0, max: 1, step: 0.05, hintKey: 'localInferenceOptionTopPHint' },
   { key: 'top_k', labelKey: 'localInferenceOptionTopKLabel', paramName: 'top_k', group: 'advanced', type: 'range', min: 0, max: 100, step: 1, hintKey: 'localInferenceOptionTopKHint' },
   { key: 'min_p', labelKey: 'localInferenceOptionMinPLabel', paramName: 'min_p', group: 'advanced', type: 'range', min: 0, max: 1, step: 0.01, hintKey: 'localInferenceOptionMinPHint' },
   { key: 'repeat_penalty', labelKey: 'localInferenceOptionRepeatPenaltyLabel', paramName: 'repeat_penalty', group: 'advanced', type: 'range', min: 0, max: 2, step: 0.05, hintKey: 'localInferenceOptionRepeatPenaltyHint' },
   { key: 'presence_penalty', labelKey: 'localInferenceOptionPresencePenaltyLabel', paramName: 'presence_penalty', group: 'advanced', type: 'range', min: -2, max: 2, step: 0.1, hintKey: 'localInferenceOptionPresencePenaltyHint' },
-  { key: 'reasoning_format', labelKey: 'localInferenceOptionReasoningFormatLabel', paramName: 'reasoning_format', group: 'advanced', type: 'select', hintKey: 'localInferenceOptionReasoningFormatHint' },
-  { key: 'thinking_budget_tokens', labelKey: 'localInferenceOptionThinkingBudgetTokensLabel', paramName: 'thinking_budget_tokens', group: 'advanced', type: 'range', min: -1, max: 32768, step: 1, hintKey: 'localInferenceOptionThinkingBudgetTokensHint' },
   { key: 'cache_prompt', labelKey: 'localInferenceOptionCachePromptLabel', paramName: 'cache_prompt', group: 'advanced', type: 'select', hintKey: 'localInferenceOptionCachePromptHint' },
   { key: 'seed', labelKey: 'localInferenceOptionSeedLabel', paramName: 'seed', group: 'advanced', type: 'number', hintKey: 'localInferenceOptionSeedHint' },
   { key: 'stop', labelKey: 'localInferenceOptionStopLabel', paramName: 'stop', group: 'advanced', type: 'text', hintKey: 'localInferenceOptionStopHint' },
@@ -283,6 +291,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
   const toastTimerRef = useRef<number | null>(null);
+  const installProgressDismissTimersRef = useRef<Record<string, number>>({});
   const servicePopoverRef = useRef<HTMLDivElement>(null);
   const installedModelPathMap = useMemo(() => new Map(
     localModels
@@ -301,7 +310,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const showToast = useCallback((
     message: string,
     kind: LocalInferenceToastKind = LocalInferenceToastKind.Info,
-    autoDismiss = kind !== LocalInferenceToastKind.Error,
+    autoDismiss = true,
   ) => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
@@ -314,6 +323,25 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       autoDismiss,
     });
   }, []);
+
+  const clearInstallProgressDismissTimer = useCallback((name: string) => {
+    const timer = installProgressDismissTimersRef.current[name];
+    if (!timer) return;
+    window.clearTimeout(timer);
+    delete installProgressDismissTimersRef.current[name];
+  }, []);
+
+  const scheduleInstallProgressDismiss = useCallback((name: string, phase: LlamaCppInstallProgress['phase']) => {
+    clearInstallProgressDismissTimer(name);
+    installProgressDismissTimersRef.current[name] = window.setTimeout(() => {
+      setPullProgress((current) => {
+        if (current[name]?.phase !== phase) return current;
+        const { [name]: _completedProgress, ...nextProgress } = current;
+        return nextProgress;
+      });
+      delete installProgressDismissTimersRef.current[name];
+    }, LOCAL_INFERENCE_PROGRESS_DISMISS_MS);
+  }, [clearInstallProgressDismissTimer]);
 
   const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
     const id = ++marketplaceSearchRef.current;
@@ -368,6 +396,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleMarketplaceInstall = useCallback(async (model: MarketplaceModel) => {
     const name = model.repoId;
+    clearInstallProgressDismissTimer(name);
     setActivePullName(name);
     setPullProgress((current) => ({
       ...current,
@@ -387,10 +416,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       showToast(
         installError instanceof Error ? installError.message : String(installError),
         LocalInferenceToastKind.Error,
-        false,
       );
     }
-  }, [dismissToast, refreshLocalModels, showToast]);
+  }, [clearInstallProgressDismissTimer, dismissToast, refreshLocalModels, showToast]);
 
   const runAction = useCallback(async (action: () => Promise<void>) => {
     setLoading(true);
@@ -401,7 +429,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       showToast(
         actionError instanceof Error ? actionError.message : String(actionError),
         LocalInferenceToastKind.Error,
-        false,
       );
     } finally {
       setLoading(false);
@@ -431,6 +458,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
       }
+      Object.values(installProgressDismissTimersRef.current).forEach((timer) => {
+        window.clearTimeout(timer);
+      });
+      installProgressDismissTimersRef.current = {};
     };
   }, []);
 
@@ -459,7 +490,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       window.electron.llamacpp.onStatusChanged(setStatus),
       window.electron.llamacpp.onPullProgress(({ name, chunk }) => {
         const progress = normalizeInstallProgress(name, chunk);
+        if (!isInstallTerminalPhase(progress.phase)) {
+          clearInstallProgressDismissTimer(name);
+        }
         setPullProgress((current) => ({ ...current, [name]: progress }));
+        if (isInstallTerminalPhase(progress.phase)) {
+          scheduleInstallProgressDismiss(name, progress.phase);
+        }
         if (isInstallTerminalPhase(progress.phase)) {
           void refreshLocalModels().catch(() => undefined);
           void searchMarketplace({
@@ -483,7 +520,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [refreshLocalModels, refreshRunningModels, refreshStatus, runAction]);
+  }, [clearInstallProgressDismissTimer, refreshLocalModels, refreshRunningModels, refreshStatus, runAction, scheduleInstallProgressDismiss]);
 
   const handleSaveServiceConfig = useCallback(async (config: OllamaServiceConfig): Promise<SaveServiceConfigResult> => {
     setLoading(true);
@@ -611,7 +648,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       showToast(
         cancelError instanceof Error ? cancelError.message : String(cancelError),
         LocalInferenceToastKind.Error,
-        false,
       );
     });
   };
@@ -706,13 +742,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     activeRequestIdRef.current = requestId;
     const isCurrentRequest = () => activeRequestIdRef.current === requestId
       && conversationVersionRef.current === conversationVersion;
-    const thinkingDisabled = options.thinking_forced_open === 'disabled';
+    const effectiveSystemPrompt = buildEffectiveSystemPrompt(systemPrompt, options.direct_answer_mode === 'enabled');
 
     let streamState = createOllamaStreamState();
     const unsubscribe = window.electron.llamacpp.onChatStreamChunk(({ requestId: eventRequestId, chunk }) => {
       if (eventRequestId !== requestId || conversationVersionRef.current !== conversationVersion) return;
       streamState = reduceOllamaStreamChunk(streamState, chunk);
-      setStreamingThinking(thinkingDisabled ? '' : streamState.thinking);
+      setStreamingThinking(streamState.thinking);
       setStreamingText(streamState.content);
     });
 
@@ -721,11 +757,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         model: selectedModel,
         stream: true,
         messages: [
-          ...(systemPrompt.trim() ? [{ role: 'system' as const, content: systemPrompt.trim() }] : []),
+          ...(effectiveSystemPrompt ? [{ role: 'system' as const, content: effectiveSystemPrompt }] : []),
           ...baseHistory.map((message) => ({
             role: message.role,
             content: message.content,
-            ...(message.role === 'assistant' && message.thinking ? { thinking: message.thinking } : {}),
           })),
           { role: 'user', content: userMessage },
         ],
@@ -737,7 +772,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         content: streamState.content,
         thinking: streamState.thinking,
         metrics: streamState.finalChunk,
-        thinkingDisabled,
       });
       setMessages([...nextHistory, assistantMessage]);
       messagesRef.current = [...nextHistory, assistantMessage];
@@ -751,7 +785,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             content: streamState.content,
             thinking: streamState.thinking,
             metrics: streamState.finalChunk,
-            thinkingDisabled,
           });
           setMessages([...nextHistory, assistantMessage]);
           messagesRef.current = [...nextHistory, assistantMessage];
@@ -762,7 +795,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         showToast(
           sendError instanceof Error ? sendError.message : String(sendError),
           LocalInferenceToastKind.Error,
-          false,
         );
       }
     } finally {
@@ -787,7 +819,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       showToast(
         cancelError instanceof Error ? cancelError.message : String(cancelError),
         LocalInferenceToastKind.Error,
-        false,
       );
       setCancelling(false);
     }
@@ -1007,9 +1038,9 @@ function ServicePopover({
       <button
         type="button"
         onClick={onToggle}
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-foreground transition-colors hover:bg-surface-raised"
+        className="inline-flex h-10 items-center gap-2.5 rounded-xl border border-border bg-surface px-3.5 text-sm text-foreground transition-colors hover:bg-surface-raised sm:min-w-[15rem]"
       >
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-surface-raised text-secondary">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-surface-raised text-secondary">
           <CpuChipIcon className="h-4 w-4" />
         </span>
         <span className="hidden text-left sm:block">
@@ -1024,7 +1055,6 @@ function ServicePopover({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceService')}</h2>
-                {status?.version && <span className="font-mono text-[11px] text-secondary">v{status.version}</span>}
                 {running && !managedByApp && (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
                     {i18nService.t('localInferenceServiceExternal')}
@@ -2137,9 +2167,10 @@ function InferencePanel({
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
-  const assistantStartRef = useRef<HTMLDivElement>(null);
-  const assistantScrollTargetIndexRef = useRef<number | null>(null);
-  const pendingAssistantStartAlignRef = useRef(false);
+  const latestTurnStartRef = useRef<HTMLDivElement>(null);
+  const latestTurnScrollTargetIndexRef = useRef<number | null>(null);
+  const pendingLatestTurnAlignRef = useRef(false);
+  const lockLatestTurnAnchorRef = useRef(false);
   const userDetachedFromBottomRef = useRef(false);
   const autoFollowStreamRef = useRef(true);
   const programmaticScrollRef = useRef<{ mode: 'align' | 'bottom'; until: number } | null>(null);
@@ -2147,21 +2178,18 @@ function InferencePanel({
   const [configCollapsed, setConfigCollapsed] = useState(false);
   const [configPage, setConfigPage] = useState<InferenceOptionGroup>('basic');
   const [composerHeight, setComposerHeight] = useState(CHAT_COMPOSER_MIN_PADDING);
+  const [chatViewportHeight, setChatViewportHeight] = useState(0);
+  const [latestTurnTailSpacer, setLatestTurnTailSpacer] = useState(0);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
-  const likelyThinkingModel = isThinkingModel(selectedModel);
-  const thinkingDisabled = options.thinking_forced_open === 'disabled';
   const requestPreview = useMemo(() => buildRequestPreview({
     model: selectedModel,
-    systemPrompt,
+    systemPrompt: buildEffectiveSystemPrompt(systemPrompt, options.direct_answer_mode === 'enabled'),
     options: normalizeOptions(options),
   }), [options, selectedModel, systemPrompt]);
   const updateOption = (key: keyof InferenceOptions, value: InferenceOptions[keyof InferenceOptions]) => {
     onOptionsChange({
       ...options,
       [key]: value,
-      ...(key === 'thinking_forced_open' && value === 'disabled'
-        ? { reasoning_format: 'none', thinking_budget_tokens: 0 }
-      : {}),
     });
   };
   const visibleOptionFields = INFERENCE_OPTION_FIELDS.filter((field) => field.group === configPage);
@@ -2177,15 +2205,16 @@ function InferencePanel({
   const syncScrollIndicators = useCallback(() => {
     const element = chatScrollRef.current;
     if (!element) return;
+    const effectiveScrollHeight = getEffectiveChatScrollHeight(element.scrollHeight, latestTurnTailSpacer);
     const nearBottom = isScrollNearBottom({
       scrollTop: element.scrollTop,
       clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
+      scrollHeight: effectiveScrollHeight,
     });
     const hiddenBelow = hasHiddenContentBelow({
       scrollTop: element.scrollTop,
       clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
+      scrollHeight: effectiveScrollHeight,
     });
     const activeProgrammaticScroll = programmaticScrollRef.current
       && window.performance.now() <= programmaticScrollRef.current.until
@@ -2194,7 +2223,7 @@ function InferencePanel({
     if (!activeProgrammaticScroll) {
       programmaticScrollRef.current = null;
       userDetachedFromBottomRef.current = !nearBottom;
-      autoFollowStreamRef.current = nearBottom;
+      autoFollowStreamRef.current = lockLatestTurnAnchorRef.current ? false : nearBottom;
     } else if (activeProgrammaticScroll.mode === 'bottom') {
       userDetachedFromBottomRef.current = false;
       autoFollowStreamRef.current = true;
@@ -2202,10 +2231,11 @@ function InferencePanel({
       autoFollowStreamRef.current = false;
     }
     setShowJumpToBottom(hiddenBelow);
-  }, []);
+  }, [latestTurnTailSpacer]);
   const submitPrompt = () => {
-    assistantScrollTargetIndexRef.current = getNewAssistantScrollTargetIndex(messages.length);
-    pendingAssistantStartAlignRef.current = true;
+    latestTurnScrollTargetIndexRef.current = getNewAssistantScrollTargetIndex(messages.length);
+    pendingLatestTurnAlignRef.current = true;
+    lockLatestTurnAnchorRef.current = true;
     userDetachedFromBottomRef.current = false;
     autoFollowStreamRef.current = false;
     onSend();
@@ -2214,14 +2244,18 @@ function InferencePanel({
     const element = chatScrollRef.current;
     if (!element) return;
     markProgrammaticScroll('bottom', behavior);
-    pendingAssistantStartAlignRef.current = false;
+    pendingLatestTurnAlignRef.current = false;
+    lockLatestTurnAnchorRef.current = false;
     userDetachedFromBottomRef.current = false;
     autoFollowStreamRef.current = true;
-    element.scrollTo({ top: element.scrollHeight, behavior });
-  }, [markProgrammaticScroll]);
-  const scrollAssistantStartIntoView = useCallback((behavior: ScrollBehavior = 'auto') => {
+    element.scrollTo({
+      top: Math.max(0, getEffectiveChatScrollHeight(element.scrollHeight, latestTurnTailSpacer) - element.clientHeight),
+      behavior,
+    });
+  }, [latestTurnTailSpacer, markProgrammaticScroll]);
+  const scrollLatestTurnStartIntoView = useCallback((behavior: ScrollBehavior = 'auto') => {
     const container = chatScrollRef.current;
-    const element = assistantStartRef.current;
+    const element = latestTurnStartRef.current;
     if (!container || !element) return;
     const top = getAssistantScrollTop({
       containerScrollTop: container.scrollTop,
@@ -2237,24 +2271,63 @@ function InferencePanel({
     if (nextHeight <= 0) return;
     setComposerHeight((current) => (current === nextHeight ? current : nextHeight));
   }, []);
+  const measureChatViewportHeight = useCallback(() => {
+    const nextHeight = chatScrollRef.current?.clientHeight ?? 0;
+    if (nextHeight <= 0) return;
+    setChatViewportHeight((current) => (current === nextHeight ? current : nextHeight));
+  }, []);
+  const measureLatestTurnTailSpacer = useCallback(() => {
+    const container = chatScrollRef.current;
+    const latestTurnStart = latestTurnStartRef.current;
+    if (!container || !latestTurnStart || messages.length === 0) {
+      setLatestTurnTailSpacer((current) => (current === 0 ? current : 0));
+      return;
+    }
+    const effectiveScrollHeight = getEffectiveChatScrollHeight(container.scrollHeight, latestTurnTailSpacer);
+    const targetScrollTop = getAssistantScrollTop({
+      containerScrollTop: container.scrollTop,
+      containerTop: container.getBoundingClientRect().top,
+      targetTop: latestTurnStart.getBoundingClientRect().top,
+    });
+    const contentHeightFromLatestTurn = getLatestTurnContentHeight(effectiveScrollHeight, targetScrollTop);
+    const nextSpacer = getLatestTurnTailSpacer(chatViewportHeight, contentHeightFromLatestTurn);
+    setLatestTurnTailSpacer((current) => (current === nextSpacer ? current : nextSpacer));
+  }, [chatViewportHeight, latestTurnTailSpacer, messages.length]);
 
   useEffect(() => {
     if (!sending) return;
-    if (!pendingAssistantStartAlignRef.current) return;
-    if (assistantScrollTargetIndexRef.current !== messages.length) return;
+    if (!pendingLatestTurnAlignRef.current) return;
+    if (latestTurnScrollTargetIndexRef.current !== messages.length) return;
     const frame = window.requestAnimationFrame(() => {
-      scrollAssistantStartIntoView('auto');
-      pendingAssistantStartAlignRef.current = false;
+      scrollLatestTurnStartIntoView('auto');
+      pendingLatestTurnAlignRef.current = false;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages.length, scrollAssistantStartIntoView, sending]);
+  }, [messages.length, scrollLatestTurnStartIntoView, sending]);
 
   useEffect(() => {
     syncScrollIndicators();
   }, [messages.length, sending, streamingText, streamingThinking, syncScrollIndicators]);
 
   useEffect(() => {
-    if (!sending || pendingAssistantStartAlignRef.current || !autoFollowStreamRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      measureLatestTurnTailSpacer();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [measureLatestTurnTailSpacer, messages.length, sending, streamingText, streamingThinking]);
+
+  useEffect(() => {
+    if (!sending) return;
+    if (pendingLatestTurnAlignRef.current) return;
+    if (!lockLatestTurnAnchorRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrollLatestTurnStartIntoView('auto');
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [scrollLatestTurnStartIntoView, sending, streamingText, streamingThinking]);
+
+  useEffect(() => {
+    if (!sending || pendingLatestTurnAlignRef.current || !autoFollowStreamRef.current) return;
     const frame = window.requestAnimationFrame(() => {
       scrollToBottom('auto');
     });
@@ -2263,8 +2336,18 @@ function InferencePanel({
 
   useEffect(() => {
     if (sending) return;
-    pendingAssistantStartAlignRef.current = false;
-    assistantScrollTargetIndexRef.current = null;
+    if (!lockLatestTurnAnchorRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrollLatestTurnStartIntoView('auto');
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [scrollLatestTurnStartIntoView, sending]);
+
+  useEffect(() => {
+    if (sending) return;
+    pendingLatestTurnAlignRef.current = false;
+    latestTurnScrollTargetIndexRef.current = null;
+    lockLatestTurnAnchorRef.current = false;
     programmaticScrollRef.current = null;
   }, [sending]);
 
@@ -2284,6 +2367,23 @@ function InferencePanel({
       window.removeEventListener('resize', measureComposerHeight);
     };
   }, [measureComposerHeight]);
+
+  useEffect(() => {
+    measureChatViewportHeight();
+    const chatElement = chatScrollRef.current;
+    if (!chatElement) return;
+    const resizeObserver = typeof window.ResizeObserver !== 'undefined'
+      ? new window.ResizeObserver(() => {
+        measureChatViewportHeight();
+      })
+      : null;
+    resizeObserver?.observe(chatElement);
+    window.addEventListener('resize', measureChatViewportHeight);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measureChatViewportHeight);
+    };
+  }, [measureChatViewportHeight]);
 
   useEffect(() => {
     if (sending || cancelling || !selectedModel) return;
@@ -2321,9 +2421,6 @@ function InferencePanel({
             >
               <ChevronRightIcon className="h-4 w-4" />
             </button>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-subtle bg-surface-raised text-secondary">
-              <AdjustmentsHorizontalIcon className="h-4 w-4" />
-            </div>
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
@@ -2379,24 +2476,12 @@ function InferencePanel({
                   </button>
                 ))}
               </div>
-              {configPage === 'basic' && (
-                <div className="rounded-xl border border-border-subtle bg-surface-raised/40 px-3 py-2.5 text-xs text-secondary">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>{i18nService.t('localInferenceOptionRequestParamsTitle')}</span>
-                    <Badge tone={likelyThinkingModel ? 'success' : 'neutral'}>
-                      {i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModel' : 'localInferenceNonThinkingModel')}
-                    </Badge>
-                  </div>
-                  <p className="mt-1">{i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModelHint' : 'localInferenceNonThinkingModelHint')}</p>
-                </div>
-              )}
               <div className="space-y-3">
                 {visibleOptionFields.map((field) => (
                   <InferenceOptionControl
                     key={field.key}
                     field={field}
                     value={options[field.key]}
-                    disabled={thinkingDisabled && field.key === 'thinking_budget_tokens'}
                     onChange={(value) => updateOption(field.key, value)}
                   />
                 ))}
@@ -2427,9 +2512,6 @@ function InferencePanel({
             </div>
             <div className="min-w-0">
               <h2 className="truncate text-sm font-medium text-foreground">{selectedModel}</h2>
-              <p className="text-xs text-secondary">
-                {selectedRunningModel ? i18nService.t('localInferenceLoaded') : i18nService.t('localInferenceNoLoadedModels')}
-              </p>
             </div>
           </div>
           {selectedRunningModel?.context_length && (
@@ -2438,7 +2520,7 @@ function InferencePanel({
         </div>
         <div
           ref={chatScrollRef}
-          className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-4 [scrollbar-gutter:stable_both-edges]"
+          className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-0 [scrollbar-gutter:stable_both-edges]"
           onScroll={syncScrollIndicators}
           style={{
             paddingBottom: `${chatBottomPadding}px`,
@@ -2458,20 +2540,34 @@ function InferencePanel({
             </div>
           )}
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-            {messages.map((message, index) => (
-              <ChatBubble key={index} message={message} />
-            ))}
+            {messages.map((message, index) => {
+              const isLatestTurnStart = message.role === 'user'
+                && (sending
+                  ? index === messages.length - 1
+                  : index === findLatestUserMessageIndex(messages));
+              return (
+                <div key={index} ref={isLatestTurnStart ? latestTurnStartRef : undefined}>
+                  <ChatBubble message={message} />
+                </div>
+              );
+            })}
             {sending && (
-              <div ref={assistantStartRef}>
+              <div>
                 <ChatBubble
                   message={buildStreamingAssistantMessage({
                     content: streamingText,
                     thinking: streamingThinking,
-                    thinkingDisabled,
                   })}
                   streaming
                 />
               </div>
+            )}
+            {latestTurnTailSpacer > 0 && (
+              <div
+                aria-hidden="true"
+                className="shrink-0"
+                style={{ height: latestTurnTailSpacer }}
+              />
             )}
           </div>
         </div>
@@ -2520,11 +2616,7 @@ function InferencePanel({
               placeholder={i18nService.t('localInferencePromptPlaceholder')}
             />
             <div className="flex items-center justify-between gap-2 px-1 pb-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <Badge tone={thinkingDisabled ? 'neutral' : 'success'}>
-                  {i18nService.t('localInferenceOptionThinkingForcedOpenLabel')}
-                </Badge>
-              </div>
+              <div className="min-w-0" />
               <button
                 type="button"
                 onClick={sending ? onStop : submitPrompt}
@@ -2545,17 +2637,32 @@ function InferencePanel({
 
 function ChatBubble({ message, streaming = false }: { message: InferenceMessage; streaming?: boolean }) {
   const isUser = message.role === 'user';
+  const hasThinking = Boolean(message.thinking?.trim());
+  const hasVisibleContent = Boolean(message.content.trim());
+  const thinkingSummary = streaming && !hasVisibleContent
+    ? i18nService.t('localInferenceThinkingInProgress')
+    : i18nService.t('localInferenceThinking');
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[86%] text-sm leading-7 ${
+      <div className={`text-sm leading-7 ${
         isUser
-          ? 'rounded-2xl bg-surface-raised px-4 py-2.5 text-foreground border border-border-subtle'
-          : 'text-foreground'
+          ? 'w-fit max-w-[86%] rounded-2xl border border-border-subtle bg-surface-raised px-4 py-2.5 text-foreground'
+          : 'w-full text-foreground'
       }`}>
-        {message.thinking && (
-          <details className="mb-3 rounded-xl border border-border-subtle bg-surface-raised/55 px-3 py-2 text-xs text-secondary" open={streaming && !message.content.trim()}>
-            <summary className="cursor-pointer select-none text-foreground">{i18nService.t(streaming ? 'localInferenceThinkingInProgress' : 'localInferenceThinking')}</summary>
-            <p className="mt-2 whitespace-pre-wrap opacity-80">{message.thinking}</p>
+        {!isUser && hasThinking && (
+          <details
+            className="mb-3 rounded-2xl border border-border-subtle bg-surface-raised/55 px-3 py-2 text-sm text-foreground/90"
+            open={streaming && !hasVisibleContent}
+          >
+            <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+              {thinkingSummary}
+            </summary>
+            <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-secondary">
+              {message.thinking}
+              {streaming && !hasVisibleContent && (
+                <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
+              )}
+            </div>
           </details>
         )}
         {message.waiting && <WaitingDots />}
@@ -2564,7 +2671,7 @@ function ChatBubble({ message, streaming = false }: { message: InferenceMessage;
         ) : (
           message.content.trim() ? <MarkdownContent content={message.content} /> : null
         )}
-        {streaming && !message.waiting && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />}
+        {streaming && !message.waiting && hasVisibleContent && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />}
         {hasMetricsSummary(message.metrics) && (
           <p className="mt-2 text-xs text-secondary">
             {formatMetricsSummary(message.metrics)}
@@ -2602,6 +2709,7 @@ function InferenceOptionControl({
 }) {
   const label = i18nService.t(field.labelKey);
   const hint = i18nService.t(field.hintKey);
+  const showParamName = field.showParamName !== false;
   if (field.type === 'range') {
     return (
       <RangeControl
@@ -2618,9 +2726,39 @@ function InferenceOptionControl({
     );
   }
   if (field.type === 'select') {
+    const selectOptions = getInferenceOptionSelectOptions(field.key);
+    if (field.key === 'direct_answer_mode') {
+      return (
+        <div className="space-y-1.5">
+          <OptionLabel label={label} paramName={showParamName ? field.paramName : undefined} />
+          <div className="grid grid-cols-2 rounded-xl border border-border bg-surface-input p-1">
+            {selectOptions.map((option) => {
+              const selected = String(value) === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onChange(option.value)}
+                  disabled={disabled}
+                  aria-pressed={selected}
+                  className={`h-9 rounded-lg px-3 text-sm transition-colors ${
+                    selected
+                      ? 'bg-surface text-foreground shadow-sm'
+                      : 'text-secondary hover:text-foreground'
+                  } disabled:opacity-50`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] leading-4 text-secondary">{hint}</p>
+        </div>
+      );
+    }
     return (
       <label className="space-y-1.5">
-        <OptionLabel label={label} paramName={field.paramName} />
+        <OptionLabel label={label} paramName={showParamName ? field.paramName : undefined} />
         <select
           value={String(value)}
           onChange={(event) => onChange(event.target.value)}
@@ -2692,25 +2830,22 @@ function RangeControl({
   );
 }
 
-function OptionLabel({ label, paramName }: { label: string; paramName: string }) {
+function OptionLabel({ label, paramName }: { label: string; paramName?: string }) {
   return (
     <span className="flex min-w-0 items-baseline gap-2">
       <span className="text-xs font-medium text-secondary">{label}</span>
-      <code className="truncate text-[11px] text-secondary/80">{paramName}</code>
+      {paramName && <code className="truncate text-[11px] text-secondary/80">{paramName}</code>}
     </span>
   );
 }
 
 function getInferenceOptionSelectOptions(key: keyof InferenceOptions): Array<{ value: string; label: string }> {
   switch (key) {
-    case 'reasoning_format':
+    case 'direct_answer_mode':
       return [
-        { value: 'auto', label: 'auto' },
-        { value: 'none', label: 'none' },
-        { value: 'deepseek', label: 'deepseek' },
-        { value: 'deepseek-legacy', label: 'deepseek-legacy' },
+        { value: 'disabled', label: i18nService.t('localInferenceDirectAnswerModeStandard') },
+        { value: 'enabled', label: i18nService.t('localInferenceDirectAnswerModeReducedThinking') },
       ];
-    case 'thinking_forced_open':
     case 'cache_prompt':
       return [
         { value: 'auto', label: i18nService.t('localInferenceOptionAuto') },
@@ -2990,6 +3125,14 @@ function isInstallTerminalPhase(phase: LlamaCppInstallProgress['phase']): boolea
   return ['done', 'failed', 'cancelled', 'needs-manual'].includes(phase);
 }
 
+function getLocalInferenceToastAutoDismissMs(): number {
+  return LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS;
+}
+
+function getLocalInferenceProgressDismissMs(): number {
+  return LOCAL_INFERENCE_PROGRESS_DISMISS_MS;
+}
+
 function humanizeInstallPhase(phase: string): string {
   switch (phase) {
     case 'starting': return i18nService.t('marketplaceInstallStarting');
@@ -3137,22 +3280,33 @@ function getJumpToBottomOffset(composerHeight: number): number {
   return Math.max(CHAT_JUMP_TO_BOTTOM_MIN_OFFSET, composerHeight + CHAT_JUMP_TO_BOTTOM_GAP);
 }
 
+function getLatestTurnContentHeight(scrollHeight: number, latestTurnTop: number): number {
+  return Math.max(0, scrollHeight - latestTurnTop);
+}
+
+function getLatestTurnTailSpacer(viewportHeight: number, latestTurnContentHeight: number): number {
+  if (viewportHeight <= 0) return 0;
+  return Math.max(0, viewportHeight - latestTurnContentHeight);
+}
+
+function getEffectiveChatScrollHeight(scrollHeight: number, tailSpacer: number): number {
+  return Math.max(0, scrollHeight - tailSpacer);
+}
+
 function buildAssistantMessage({
   content,
   thinking,
   metrics,
-  thinkingDisabled,
 }: BuildAssistantMessageInput): InferenceMessage {
   const visibleContent = content.trim()
     ? content
-    : thinkingDisabled && thinking.trim()
-      ? i18nService.t('localInferenceHiddenThinkingOnly')
+    : thinking.trim()
+      ? i18nService.t('localInferenceNoVisibleReply')
       : content;
   return {
     role: 'assistant',
     content: visibleContent,
-    ...(thinkingDisabled ? {} : thinking ? { thinking } : {}),
-    ...(thinkingDisabled && thinking ? { hiddenThinking: true } : {}),
+    ...(thinking.trim() ? { thinking } : {}),
     metrics,
   };
 }
@@ -3160,25 +3314,35 @@ function buildAssistantMessage({
 function buildStreamingAssistantMessage({
   content,
   thinking,
-  thinkingDisabled,
 }: {
   content: string;
   thinking: string;
-  thinkingDisabled: boolean;
 }): InferenceMessage {
   const hasContent = Boolean(content.trim());
   const hasThinking = Boolean(thinking.trim());
   return {
     role: 'assistant',
     content,
-    ...(thinkingDisabled ? {} : hasThinking ? { thinking } : {}),
-    ...(thinkingDisabled && hasThinking ? { hiddenThinking: true } : {}),
-    waiting: !hasContent && (!hasThinking || thinkingDisabled),
+    ...(hasThinking ? { thinking } : {}),
+    waiting: !hasContent && !hasThinking,
   };
 }
 
 function getNewAssistantScrollTargetIndex(historyLength: number): number {
   return historyLength + 1;
+}
+
+function findLatestUserMessageIndex(messages: InferenceMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'user') return index;
+  }
+  return -1;
+}
+
+function buildEffectiveSystemPrompt(systemPrompt: string, directAnswerModeEnabled: boolean): string {
+  const trimmed = systemPrompt.trim();
+  if (!directAnswerModeEnabled) return trimmed;
+  return [trimmed, DIRECT_ANSWER_SYSTEM_HINT].filter(Boolean).join('\n\n');
 }
 
 function buildRequestPreview({ model, systemPrompt, options }: RequestPreviewInput): Record<string, unknown> {
@@ -3188,7 +3352,7 @@ function buildRequestPreview({ model, systemPrompt, options }: RequestPreviewInp
       ? [{ role: 'system', content: systemPrompt.trim() }]
       : [],
   };
-  for (const key of ['max_tokens', 'reasoning_format', 'chat_template_kwargs', 'thinking_budget_tokens'] as const) {
+  for (const key of ['max_tokens'] as const) {
     if (Object.prototype.hasOwnProperty.call(options, key)) {
       preview[key] = options[key];
     }
@@ -3713,5 +3877,12 @@ export const __test__hasHiddenContentBelow = (input: Parameters<typeof hasHidden
 export const __test__getAssistantScrollTop = (input: Parameters<typeof getAssistantScrollTop>[0]) => getAssistantScrollTop(input);
 export const __test__getChatBottomPadding = (composerHeight: number) => getChatBottomPadding(composerHeight);
 export const __test__getJumpToBottomOffset = (composerHeight: number) => getJumpToBottomOffset(composerHeight);
+export const __test__getLatestTurnContentHeight = (scrollHeight: number, latestTurnTop: number) => getLatestTurnContentHeight(scrollHeight, latestTurnTop);
+export const __test__getLatestTurnTailSpacer = (viewportHeight: number, bottomPadding: number) => getLatestTurnTailSpacer(viewportHeight, bottomPadding);
+export const __test__getEffectiveChatScrollHeight = (scrollHeight: number, tailSpacer: number) => getEffectiveChatScrollHeight(scrollHeight, tailSpacer);
+export const __test__findLatestUserMessageIndex = (messages: InferenceMessage[]) => findLatestUserMessageIndex(messages);
+export const __test__isInstallTerminalPhase = (phase: LlamaCppInstallProgress['phase']) => isInstallTerminalPhase(phase);
+export const __test__getLocalInferenceToastAutoDismissMs = () => getLocalInferenceToastAutoDismissMs();
+export const __test__getLocalInferenceProgressDismissMs = () => getLocalInferenceProgressDismissMs();
 
 export default LocalInferenceView;

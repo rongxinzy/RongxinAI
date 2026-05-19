@@ -8,6 +8,7 @@ export type InferenceOptions = {
   stop: string;
   min_p: number;
   presence_penalty: number;
+  direct_answer_mode: 'disabled' | 'enabled';
   reasoning_format: 'auto' | 'none' | 'deepseek' | 'deepseek-legacy';
   thinking_forced_open: 'auto' | 'enabled' | 'disabled';
   thinking_budget_tokens: number;
@@ -24,6 +25,7 @@ export const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
   stop: '',
   min_p: 0.05,
   presence_penalty: 0,
+  direct_answer_mode: 'disabled',
   reasoning_format: 'auto',
   thinking_forced_open: 'auto',
   thinking_budget_tokens: -1,
@@ -40,17 +42,27 @@ const QWEN35_08B_INFERENCE_OPTIONS: InferenceOptions = {
   stop: '',
   min_p: 0.05,
   presence_penalty: 0.6,
+  direct_answer_mode: 'disabled',
   reasoning_format: 'auto',
   thinking_forced_open: 'auto',
   thinking_budget_tokens: -1,
   cache_prompt: 'auto',
 };
 
+function clearDeprecatedThinkingOptions(options: InferenceOptions): InferenceOptions {
+  return {
+    ...options,
+    reasoning_format: 'auto',
+    thinking_forced_open: 'auto',
+    thinking_budget_tokens: -1,
+  };
+}
+
 export function loadInferenceOptions(): InferenceOptions {
   try {
     const raw = localStorage.getItem('lobsterai:llamacpp-inference-options');
     if (!raw) return DEFAULT_INFERENCE_OPTIONS;
-    return { ...DEFAULT_INFERENCE_OPTIONS, ...JSON.parse(raw) };
+    return clearDeprecatedThinkingOptions({ ...DEFAULT_INFERENCE_OPTIONS, ...JSON.parse(raw) });
   } catch {
     return DEFAULT_INFERENCE_OPTIONS;
   }
@@ -69,17 +81,6 @@ export function normalizeOptions(options: InferenceOptions): Record<string, unkn
     repeat_penalty: options.repeat_penalty,
     min_p: options.min_p,
     presence_penalty: options.presence_penalty,
-    ...(options.reasoning_format !== 'auto' ? { reasoning_format: options.reasoning_format } : {}),
-    ...(options.thinking_forced_open === 'disabled' ? { reasoning_format: 'none' } : {}),
-    ...(options.thinking_forced_open !== 'auto'
-      ? { chat_template_kwargs: { enable_thinking: options.thinking_forced_open === 'enabled' } }
-      : {}),
-    ...(options.thinking_forced_open === 'disabled'
-      ? { thinking_budget_tokens: 0 }
-      : {}),
-    ...(options.thinking_forced_open !== 'disabled' && options.thinking_budget_tokens >= 0
-      ? { thinking_budget_tokens: options.thinking_budget_tokens }
-      : {}),
     ...(options.cache_prompt === 'enabled' ? { cache_prompt: true } : {}),
     ...(options.cache_prompt === 'disabled' ? { cache_prompt: false } : {}),
     ...(options.seed >= 0 ? { seed: options.seed } : {}),
@@ -97,6 +98,7 @@ export function areInferenceOptionsEqual(left: InferenceOptions, right: Inferenc
     && left.stop === right.stop
     && left.min_p === right.min_p
     && left.presence_penalty === right.presence_penalty
+    && left.direct_answer_mode === right.direct_answer_mode
     && left.reasoning_format === right.reasoning_format
     && left.thinking_forced_open === right.thinking_forced_open
     && left.thinking_budget_tokens === right.thinking_budget_tokens

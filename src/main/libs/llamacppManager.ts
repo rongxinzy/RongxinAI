@@ -344,6 +344,7 @@ export class LlamaCppManager extends EventEmitter {
     const safeModelDir = path.join(this.getModelsDir(), 'modelscope', ...modelId.split('/').map(sanitizePathSegment));
     fs.mkdirSync(safeModelDir, { recursive: true });
     const targetPath = resolveModelScopeTargetPath(safeModelDir, filePath);
+    const installedThisAttempt = new Set<string>();
     if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
       onProgress?.({ phase: 'done', modelId, modelName: input.displayName ?? modelId, percent: 100, targetPath });
       await this.refreshModelsAfterInstall();
@@ -360,24 +361,8 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     onProgress?.({ phase: 'downloading', modelId, modelName: input.displayName ?? modelId, targetPath });
-    await downloadFile(url, targetPath, (completed, total) => {
-      onProgress?.({
-        phase: 'downloading-progress',
-        modelId,
-        modelName: input.displayName ?? modelId,
-        completed,
-        total,
-        percent: total ? Math.round((completed / total) * 100) : undefined,
-        targetPath,
-      });
-    }, options.signal);
-
-    if (input.mmprojFilePath?.trim()) {
-      const mmprojFilePath = input.mmprojFilePath.trim();
-      const mmprojUrl = buildModelScopeFileUrl(modelId, mmprojFilePath, input.revision);
-      const mmprojTargetPath = resolveModelScopeTargetPath(safeModelDir, mmprojFilePath);
-      onProgress?.({ phase: 'downloading', modelId, modelName: input.displayName ?? modelId, targetPath: mmprojTargetPath });
-      await downloadFile(mmprojUrl, mmprojTargetPath, (completed, total) => {
+    try {
+      await downloadFile(url, targetPath, (completed, total) => {
         onProgress?.({
           phase: 'downloading-progress',
           modelId,
@@ -385,9 +370,33 @@ export class LlamaCppManager extends EventEmitter {
           completed,
           total,
           percent: total ? Math.round((completed / total) * 100) : undefined,
-          targetPath: mmprojTargetPath,
+          targetPath,
         });
       }, options.signal);
+      installedThisAttempt.add(targetPath);
+
+      if (input.mmprojFilePath?.trim()) {
+        const mmprojFilePath = input.mmprojFilePath.trim();
+        const mmprojUrl = buildModelScopeFileUrl(modelId, mmprojFilePath, input.revision);
+        const mmprojTargetPath = resolveModelScopeTargetPath(safeModelDir, mmprojFilePath);
+        onProgress?.({ phase: 'downloading', modelId, modelName: input.displayName ?? modelId, targetPath: mmprojTargetPath });
+        await downloadFile(mmprojUrl, mmprojTargetPath, (completed, total) => {
+          onProgress?.({
+            phase: 'downloading-progress',
+            modelId,
+            modelName: input.displayName ?? modelId,
+            completed,
+            total,
+            percent: total ? Math.round((completed / total) * 100) : undefined,
+            targetPath: mmprojTargetPath,
+          });
+        }, options.signal);
+        installedThisAttempt.add(mmprojTargetPath);
+      }
+    } catch (error) {
+      cleanupInstallArtifacts(installedThisAttempt, this.getModelsDir());
+      removeEmptyParentDirs(safeModelDir, this.getModelsDir());
+      throw error;
     }
 
     onProgress?.({ phase: 'done', modelId, modelName: input.displayName ?? modelId, percent: 100, targetPath });
@@ -860,6 +869,18 @@ function removeEmptyParentDirs(startDir: string, stopDir: string): void {
     if (!safeIsDirectoryEmpty(currentDir)) return;
     fs.rmdirSync(currentDir);
     currentDir = path.dirname(currentDir);
+  }
+}
+
+function cleanupInstallArtifacts(paths: Iterable<string>, rootDir: string): void {
+  const resolvedRootDir = path.resolve(rootDir);
+  for (const candidate of paths) {
+    const target = path.resolve(candidate);
+    if (!target.startsWith(resolvedRootDir + path.sep) && target !== resolvedRootDir) continue;
+    if (fs.existsSync(target)) {
+      fs.rmSync(target, { force: true, recursive: true });
+    }
+    removeEmptyParentDirs(path.dirname(target), resolvedRootDir);
   }
 }
 
