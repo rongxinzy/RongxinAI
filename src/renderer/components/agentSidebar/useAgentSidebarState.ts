@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { coworkService } from '../../services/cowork';
@@ -128,7 +128,12 @@ export const useAgentSidebarState = () => {
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const sessions = useSelector(selectCoworkSessions);
-  const unreadSessionIds = useSelector(selectUnreadSessionIds);
+  const unreadSessionIdsRaw = useSelector(selectUnreadSessionIds);
+  // Defer tree recalculation caused by unread badge changes so the
+  // conversation view renders uninterrupted — background cron-task
+  // completions updating unreadSessionIds would otherwise trigger a
+  // full sidebar tree rebuild that flickers the adjacent chat area.
+  const unreadSessionIds = useDeferredValue(unreadSessionIdsRaw);
 
   const [expandedAgentIds, setExpandedAgentIds] = useState<string[]>([]);
   const [expandedTaskListAgentIds, setExpandedTaskListAgentIds] = useState<string[]>([]);
