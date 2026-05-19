@@ -5,7 +5,12 @@ import {
   ArrowTopRightOnSquareIcon,
   BeakerIcon,
   CheckCircleIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CpuChipIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
   PaperAirplaneIcon,
   PlayIcon,
   ServerStackIcon,
@@ -59,6 +64,8 @@ type InferenceMessage = {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
+  hiddenThinking?: boolean;
+  waiting?: boolean;
   metrics?: OllamaChatChunk | null;
 };
 
@@ -137,24 +144,58 @@ type InferenceOptionField = {
   key: keyof InferenceOptions;
   labelKey: string;
   paramName: string;
+  group: InferenceOptionGroup;
   type: 'range' | 'number' | 'text' | 'select';
   min?: number;
   max?: number;
   step?: number;
   hintKey: string;
 };
+type InferenceOptionGroup = 'basic' | 'advanced';
 
 type SaveServiceConfigResult = {
   success: boolean;
   error?: string;
 };
 
+const LocalInferenceToastKind = {
+  Success: 'success',
+  Error: 'error',
+  Info: 'info',
+} as const;
+type LocalInferenceToastKind = typeof LocalInferenceToastKind[keyof typeof LocalInferenceToastKind];
+type LocalInferenceToast = {
+  id: string;
+  kind: LocalInferenceToastKind;
+  message: string;
+  autoDismiss: boolean;
+};
+
 type InstallProgressState = Record<string, LlamaCppInstallProgress>;
+type BuildAssistantMessageInput = {
+  content: string;
+  thinking: string;
+  metrics: OllamaChatChunk | null;
+  thinkingDisabled: boolean;
+};
+type RequestPreviewInput = {
+  model: string;
+  systemPrompt: string;
+  options: Record<string, unknown>;
+};
 
 const MARKETPLACE_MIN_PAGE_SIZE = 6;
 const MARKETPLACE_MAX_PAGE_SIZE = 24;
 const MARKETPLACE_CARD_MIN_HEIGHT = 236;
 const MARKETPLACE_FILTER_PANEL_HEIGHT = 160;
+const CHAT_NEAR_BOTTOM_THRESHOLD = 96;
+const CHAT_HIDDEN_BELOW_THRESHOLD = 8;
+const ASSISTANT_SCROLL_TOP_OFFSET = 20;
+const CHAT_COMPOSER_MIN_PADDING = 120;
+const CHAT_COMPOSER_PADDING_GAP = 20;
+const CHAT_JUMP_TO_BOTTOM_MIN_OFFSET = 92;
+const CHAT_JUMP_TO_BOTTOM_GAP = 16;
+const LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS = 3600;
 const smallOutlineButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
@@ -167,9 +208,6 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   { key: 'cacheReuse', labelKey: 'localInferenceServiceConfigCacheReuseLabel', paramName: 'cache-reuse', group: 'advanced', type: 'input', placeholder: '256', hintKey: 'localInferenceServiceConfigCacheReuseHint', restartRequired: true },
   { key: 'cacheRam', labelKey: 'localInferenceServiceConfigCacheRamLabel', paramName: 'cache-ram', group: 'advanced', type: 'input', placeholder: '8192', hintKey: 'localInferenceServiceConfigCacheRamHint', restartRequired: true },
   { key: 'jinja', labelKey: 'localInferenceServiceConfigJinjaLabel', paramName: 'jinja', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigJinjaHint', restartRequired: true },
-  { key: 'reasoning', labelKey: 'localInferenceServiceConfigReasoningLabel', paramName: 'reasoning', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigReasoningHint', restartRequired: true },
-  { key: 'reasoningFormat', labelKey: 'localInferenceServiceConfigReasoningFormatLabel', paramName: 'reasoning-format', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigReasoningFormatHint', restartRequired: true },
-  { key: 'reasoningBudget', labelKey: 'localInferenceServiceConfigReasoningBudgetLabel', paramName: 'reasoning-budget', group: 'advanced', type: 'input', placeholder: '-1', hintKey: 'localInferenceServiceConfigReasoningBudgetHint', restartRequired: true },
   { key: 'device', labelKey: 'localInferenceServiceConfigDeviceLabel', paramName: 'device', group: 'advanced', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigDeviceHint', restartRequired: true },
   { key: 'splitMode', labelKey: 'localInferenceServiceConfigSplitModeLabel', paramName: 'split-mode', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigSplitModeHint', restartRequired: true },
   { key: 'tensorSplit', labelKey: 'localInferenceServiceConfigTensorSplitLabel', paramName: 'tensor-split', group: 'advanced', type: 'input', placeholder: '3,2', hintKey: 'localInferenceServiceConfigTensorSplitHint', restartRequired: true },
@@ -178,18 +216,19 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   { key: 'mlock', labelKey: 'localInferenceServiceConfigMlockLabel', paramName: 'mlock', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigMlockHint', restartRequired: true },
 ];
 const INFERENCE_OPTION_FIELDS: InferenceOptionField[] = [
-  { key: 'temperature', labelKey: 'localInferenceOptionTemperatureLabel', paramName: 'temperature', type: 'range', min: 0, max: 2, step: 0.1, hintKey: 'localInferenceOptionTemperatureHint' },
-  { key: 'top_p', labelKey: 'localInferenceOptionTopPLabel', paramName: 'top_p', type: 'range', min: 0, max: 1, step: 0.05, hintKey: 'localInferenceOptionTopPHint' },
-  { key: 'top_k', labelKey: 'localInferenceOptionTopKLabel', paramName: 'top_k', type: 'range', min: 0, max: 100, step: 1, hintKey: 'localInferenceOptionTopKHint' },
-  { key: 'min_p', labelKey: 'localInferenceOptionMinPLabel', paramName: 'min_p', type: 'range', min: 0, max: 1, step: 0.01, hintKey: 'localInferenceOptionMinPHint' },
-  { key: 'num_predict', labelKey: 'localInferenceOptionMaxTokensLabel', paramName: 'max_tokens', type: 'range', min: -1, max: 32768, step: 1, hintKey: 'localInferenceOptionMaxTokensHint' },
-  { key: 'repeat_penalty', labelKey: 'localInferenceOptionRepeatPenaltyLabel', paramName: 'repeat_penalty', type: 'range', min: 0, max: 2, step: 0.05, hintKey: 'localInferenceOptionRepeatPenaltyHint' },
-  { key: 'presence_penalty', labelKey: 'localInferenceOptionPresencePenaltyLabel', paramName: 'presence_penalty', type: 'range', min: -2, max: 2, step: 0.1, hintKey: 'localInferenceOptionPresencePenaltyHint' },
-  { key: 'reasoning_format', labelKey: 'localInferenceOptionReasoningFormatLabel', paramName: 'reasoning_format', type: 'select', hintKey: 'localInferenceOptionReasoningFormatHint' },
-  { key: 'thinking_forced_open', labelKey: 'localInferenceOptionThinkingForcedOpenLabel', paramName: 'thinking_forced_open', type: 'select', hintKey: 'localInferenceOptionThinkingForcedOpenHint' },
-  { key: 'cache_prompt', labelKey: 'localInferenceOptionCachePromptLabel', paramName: 'cache_prompt', type: 'select', hintKey: 'localInferenceOptionCachePromptHint' },
-  { key: 'seed', labelKey: 'localInferenceOptionSeedLabel', paramName: 'seed', type: 'number', hintKey: 'localInferenceOptionSeedHint' },
-  { key: 'stop', labelKey: 'localInferenceOptionStopLabel', paramName: 'stop', type: 'text', hintKey: 'localInferenceOptionStopHint' },
+  { key: 'num_predict', labelKey: 'localInferenceOptionMaxTokensLabel', paramName: 'max_tokens', group: 'basic', type: 'range', min: -1, max: 32768, step: 1, hintKey: 'localInferenceOptionMaxTokensHint' },
+  { key: 'thinking_forced_open', labelKey: 'localInferenceOptionThinkingForcedOpenLabel', paramName: 'chat_template_kwargs.enable_thinking', group: 'basic', type: 'select', hintKey: 'localInferenceOptionThinkingForcedOpenHint' },
+  { key: 'temperature', labelKey: 'localInferenceOptionTemperatureLabel', paramName: 'temperature', group: 'basic', type: 'range', min: 0, max: 2, step: 0.1, hintKey: 'localInferenceOptionTemperatureHint' },
+  { key: 'top_p', labelKey: 'localInferenceOptionTopPLabel', paramName: 'top_p', group: 'basic', type: 'range', min: 0, max: 1, step: 0.05, hintKey: 'localInferenceOptionTopPHint' },
+  { key: 'top_k', labelKey: 'localInferenceOptionTopKLabel', paramName: 'top_k', group: 'advanced', type: 'range', min: 0, max: 100, step: 1, hintKey: 'localInferenceOptionTopKHint' },
+  { key: 'min_p', labelKey: 'localInferenceOptionMinPLabel', paramName: 'min_p', group: 'advanced', type: 'range', min: 0, max: 1, step: 0.01, hintKey: 'localInferenceOptionMinPHint' },
+  { key: 'repeat_penalty', labelKey: 'localInferenceOptionRepeatPenaltyLabel', paramName: 'repeat_penalty', group: 'advanced', type: 'range', min: 0, max: 2, step: 0.05, hintKey: 'localInferenceOptionRepeatPenaltyHint' },
+  { key: 'presence_penalty', labelKey: 'localInferenceOptionPresencePenaltyLabel', paramName: 'presence_penalty', group: 'advanced', type: 'range', min: -2, max: 2, step: 0.1, hintKey: 'localInferenceOptionPresencePenaltyHint' },
+  { key: 'reasoning_format', labelKey: 'localInferenceOptionReasoningFormatLabel', paramName: 'reasoning_format', group: 'advanced', type: 'select', hintKey: 'localInferenceOptionReasoningFormatHint' },
+  { key: 'thinking_budget_tokens', labelKey: 'localInferenceOptionThinkingBudgetTokensLabel', paramName: 'thinking_budget_tokens', group: 'advanced', type: 'range', min: -1, max: 32768, step: 1, hintKey: 'localInferenceOptionThinkingBudgetTokensHint' },
+  { key: 'cache_prompt', labelKey: 'localInferenceOptionCachePromptLabel', paramName: 'cache_prompt', group: 'advanced', type: 'select', hintKey: 'localInferenceOptionCachePromptHint' },
+  { key: 'seed', labelKey: 'localInferenceOptionSeedLabel', paramName: 'seed', group: 'advanced', type: 'number', hintKey: 'localInferenceOptionSeedHint' },
+  { key: 'stop', labelKey: 'localInferenceOptionStopLabel', paramName: 'stop', group: 'advanced', type: 'text', hintKey: 'localInferenceOptionStopHint' },
 ];
 
 interface LocalInferenceViewProps {
@@ -212,8 +251,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [pullName, setPullName] = useState('');
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
@@ -240,14 +278,42 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceTask, setMarketplaceTask] = useState<string>('all');
   const [marketplaceSize, setMarketplaceSize] = useState<string>('all');
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
+  const [servicePopoverOpen, setServicePopoverOpen] = useState(false);
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
+  const toastTimerRef = useRef<number | null>(null);
+  const servicePopoverRef = useRef<HTMLDivElement>(null);
   const installedModelPathMap = useMemo(() => new Map(
     localModels
       .filter((model): model is OllamaModel & { path: string } => Boolean(model.path))
       .map((model) => [model.path, model.name]),
   ), [localModels]);
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToast(null);
+  }, []);
+
+  const showToast = useCallback((
+    message: string,
+    kind: LocalInferenceToastKind = LocalInferenceToastKind.Info,
+    autoDismiss = kind !== LocalInferenceToastKind.Error,
+  ) => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToast({
+      id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      kind,
+      message,
+      autoDismiss,
+    });
+  }, []);
 
   const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
     const id = ++marketplaceSearchRef.current;
@@ -268,29 +334,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       }
     }
   }, []);
-
-  const handleMarketplaceInstall = async (model: MarketplaceModel) => {
-    const name = model.repoId;
-    setActivePullName(name);
-    setPullProgress((current) => ({
-      ...current,
-      [name]: { phase: 'starting', modelId: model.repoId, modelName: model.repoId },
-    }));
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await window.electron.llamacpp.installModel({
-        modelId: model.repoId,
-        filePath: model.filePath,
-        displayName: model.repoId,
-      });
-      if (!result.success) return;
-      await refreshLocalModels();
-      setNotice(i18nService.t('marketplacePullDone').replace('{name}', name));
-    } catch (installError) {
-      setError(installError instanceof Error ? installError.message : String(installError));
-    }
-  };
 
   const runningModelNames = useMemo(
     () => new Set(runningModels.map((model) => model.name || model.model).filter(Boolean)),
@@ -323,22 +366,93 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return models;
   }, []);
 
+  const handleMarketplaceInstall = useCallback(async (model: MarketplaceModel) => {
+    const name = model.repoId;
+    setActivePullName(name);
+    setPullProgress((current) => ({
+      ...current,
+      [name]: { phase: 'starting', modelId: model.repoId, modelName: model.repoId },
+    }));
+    dismissToast();
+    try {
+      const result = await window.electron.llamacpp.installModel({
+        modelId: model.repoId,
+        filePath: model.filePath,
+        displayName: model.repoId,
+      });
+      if (!result.success) return;
+      await refreshLocalModels();
+      showToast(i18nService.t('marketplacePullDone').replace('{name}', name), LocalInferenceToastKind.Success);
+    } catch (installError) {
+      showToast(
+        installError instanceof Error ? installError.message : String(installError),
+        LocalInferenceToastKind.Error,
+        false,
+      );
+    }
+  }, [dismissToast, refreshLocalModels, showToast]);
+
   const runAction = useCallback(async (action: () => Promise<void>) => {
     setLoading(true);
-    setError(null);
-    setNotice(null);
+    dismissToast();
     try {
       await action();
     } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : String(actionError));
+      showToast(
+        actionError instanceof Error ? actionError.message : String(actionError),
+        LocalInferenceToastKind.Error,
+        false,
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dismissToast, showToast]);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    if (!toast?.autoDismiss) return;
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast((current) => current?.id === toast.id ? null : current);
+      toastTimerRef.current = null;
+    }, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS);
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, [toast]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!servicePopoverOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!servicePopoverRef.current?.contains(event.target as Node)) {
+        setServicePopoverOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setServicePopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [servicePopoverOpen]);
 
   useEffect(() => {
     const unsubscribers = [
@@ -371,25 +485,26 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     };
   }, [refreshLocalModels, refreshRunningModels, refreshStatus, runAction]);
 
-  const handleSaveServiceConfig = async (config: OllamaServiceConfig): Promise<SaveServiceConfigResult> => {
+  const handleSaveServiceConfig = useCallback(async (config: OllamaServiceConfig): Promise<SaveServiceConfigResult> => {
     setLoading(true);
-    setError(null);
-    setNotice(null);
+    dismissToast();
     try {
       const saved = await saveOllamaServiceConfig(config);
       setServiceConfig(saved);
-      setNotice(status?.status === 'running'
-        ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
-        : i18nService.t('localInferenceServiceConfigSaved'));
+      showToast(
+        status?.status === 'running'
+          ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
+          : i18nService.t('localInferenceServiceConfigSaved'),
+        LocalInferenceToastKind.Success,
+      );
       return { success: true };
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : String(saveError);
-      setError(message);
       return { success: false, error: message };
     } finally {
       setLoading(false);
     }
-  };
+  }, [dismissToast, showToast, status?.status]);
 
   const resetInferenceConversation = useCallback(() => {
     const requestId = activeRequestIdRef.current;
@@ -447,7 +562,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       if (status?.status === 'not-installed') {
         await window.electron.llamacpp.install();
-        setNotice(i18nService.t('localInferenceInstallOpened'));
+        showToast(i18nService.t('localInferenceInstallOpened'));
       } else if (status?.status === 'installed' || status?.status === 'stopped') {
         await window.electron.llamacpp.start();
       } else {
@@ -486,14 +601,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       });
       if (!result.success) return;
       await refreshLocalModels();
-      setNotice(i18nService.t('localInferencePullDone').replace('{name}', normalizedPullName));
+      showToast(i18nService.t('localInferencePullDone').replace('{name}', normalizedPullName), LocalInferenceToastKind.Success);
     });
   };
 
   const handleCancelPull = () => {
     if (!activePullName) return;
     void window.electron.llamacpp.cancelPull(activePullName).catch((cancelError) => {
-      setError(cancelError instanceof Error ? cancelError.message : String(cancelError));
+      showToast(
+        cancelError instanceof Error ? cancelError.message : String(cancelError),
+        LocalInferenceToastKind.Error,
+        false,
+      );
     });
   };
 
@@ -560,13 +679,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         dispatch(setAgentSelectedModel({ agentId: result.defaultAgent.id, model }));
       }
       await agentService.loadAgents();
-      setNotice(i18nService.t('localInferenceSetOpenClawDone').replace('{name}', modelName));
+      showToast(i18nService.t('localInferenceSetOpenClawDone').replace('{name}', modelName), LocalInferenceToastKind.Success);
     });
   };
 
   const handleSavePreset = () => {
     localStorage.setItem('lobsterai:llamacpp-inference-options', JSON.stringify(options));
-    setNotice(i18nService.t('localInferencePresetSaved'));
+    showToast(i18nService.t('localInferencePresetSaved'), LocalInferenceToastKind.Success);
   };
 
   const sendPrompt = async () => {
@@ -581,18 +700,19 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setStreamingThinking('');
     setSending(true);
     setCancelling(false);
-    setError(null);
+    dismissToast();
     const requestId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const conversationVersion = conversationVersionRef.current;
     activeRequestIdRef.current = requestId;
     const isCurrentRequest = () => activeRequestIdRef.current === requestId
       && conversationVersionRef.current === conversationVersion;
+    const thinkingDisabled = options.thinking_forced_open === 'disabled';
 
     let streamState = createOllamaStreamState();
     const unsubscribe = window.electron.llamacpp.onChatStreamChunk(({ requestId: eventRequestId, chunk }) => {
       if (eventRequestId !== requestId || conversationVersionRef.current !== conversationVersion) return;
       streamState = reduceOllamaStreamChunk(streamState, chunk);
-      setStreamingThinking(streamState.thinking);
+      setStreamingThinking(thinkingDisabled ? '' : streamState.thinking);
       setStreamingText(streamState.content);
     });
 
@@ -613,33 +733,37 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       };
       await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
-      const assistantMessage: InferenceMessage = {
-        role: 'assistant',
+      const assistantMessage = buildAssistantMessage({
         content: streamState.content,
-        thinking: streamState.thinking || undefined,
+        thinking: streamState.thinking,
         metrics: streamState.finalChunk,
-      };
+        thinkingDisabled,
+      });
       setMessages([...nextHistory, assistantMessage]);
       messagesRef.current = [...nextHistory, assistantMessage];
       await refreshRunningModels().catch(() => undefined);
     } catch (sendError) {
       if (!isCurrentRequest()) return;
       if (sendError instanceof Error && sendError.message.includes('Generation cancelled')) {
-        setNotice(i18nService.t('localInferenceGenerationCancelled'));
+        showToast(i18nService.t('localInferenceGenerationCancelled'));
         if (streamState.content || streamState.thinking) {
-          const assistantMessage: InferenceMessage = {
-            role: 'assistant',
+          const assistantMessage = buildAssistantMessage({
             content: streamState.content,
-            thinking: streamState.thinking || undefined,
+            thinking: streamState.thinking,
             metrics: streamState.finalChunk,
-          };
+            thinkingDisabled,
+          });
           setMessages([...nextHistory, assistantMessage]);
           messagesRef.current = [...nextHistory, assistantMessage];
         }
       } else {
         setMessages(baseHistory);
         messagesRef.current = baseHistory;
-        setError(sendError instanceof Error ? sendError.message : String(sendError));
+        showToast(
+          sendError instanceof Error ? sendError.message : String(sendError),
+          LocalInferenceToastKind.Error,
+          false,
+        );
       }
     } finally {
       unsubscribe();
@@ -660,13 +784,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     try {
       await window.electron.llamacpp.cancelChatStream(requestId);
     } catch (cancelError) {
-      setError(cancelError instanceof Error ? cancelError.message : String(cancelError));
+      showToast(
+        cancelError instanceof Error ? cancelError.message : String(cancelError),
+        LocalInferenceToastKind.Error,
+        false,
+      );
       setCancelling(false);
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-background h-full">
+    <div className="relative flex h-full flex-1 flex-col bg-background">
       <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
         <div className="flex items-center space-x-3 h-8">
           {isSidebarCollapsed && (
@@ -692,51 +820,53 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
         <WindowTitleBar inline />
       </div>
+      {toast && (
+        <div className="pointer-events-none absolute right-4 top-16 z-30 flex w-[min(24rem,calc(100%-2rem))] justify-end">
+          <LocalInferenceToastView toast={toast} onClose={dismissToast} />
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
         <div className={`mx-auto max-w-6xl px-4 py-5 ${activeTab === 'inference' ? 'flex h-full min-h-0 flex-col gap-4' : 'space-y-4'}`}>
-          <ServiceHeader
-            status={status}
-            loading={loading}
-            localModels={localModels}
-            runningModels={runningModels}
-            onPrepare={handlePrepare}
-            onStop={handleStop}
-            onOpenServiceConfig={() => setServiceConfigDialogOpen(true)}
-            onRefresh={() => void runAction(async () => {
-              const nextStatus = await refreshStatus();
-              if (nextStatus.status === 'running') {
-                await refreshLocalModels();
-                await refreshRunningModels();
-              }
-            })}
-          />
-
-          {(notice || error) && (
-            <div className={`rounded-md border px-3 py-2 text-sm ${
-              error
-                ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300'
-                : 'border-border bg-surface text-secondary'
-            }`}>
-              {error || notice}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="inline-flex rounded-lg bg-surface-raised p-1">
+              {(['inference', 'models', 'marketplace'] as LocalInferenceTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`h-7 rounded-md px-3 text-sm transition-colors ${
+                    activeTab === tab
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-secondary hover:text-foreground'
+                  }`}
+                >
+                  {i18nService.t(tab === 'inference' ? 'localInferenceTabInference' : tab === 'models' ? 'localInferenceTabModels' : 'localInferenceTabMarketplace')}
+                </button>
+              ))}
             </div>
-          )}
-
-          <div className="inline-flex rounded-lg bg-surface-raised p-1">
-            {(['inference', 'models', 'marketplace'] as LocalInferenceTab[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`h-7 rounded-md px-3 text-sm transition-colors ${
-                  activeTab === tab
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-secondary hover:text-foreground'
-                }`}
-              >
-                {i18nService.t(tab === 'inference' ? 'localInferenceTabInference' : tab === 'models' ? 'localInferenceTabModels' : 'localInferenceTabMarketplace')}
-              </button>
-            ))}
+            <ServicePopover
+              containerRef={servicePopoverRef}
+              open={servicePopoverOpen}
+              status={status}
+              loading={loading}
+              localModels={localModels}
+              runningModels={runningModels}
+              onToggle={() => setServicePopoverOpen((current) => !current)}
+              onPrepare={handlePrepare}
+              onStop={handleStop}
+              onOpenServiceConfig={() => {
+                setServicePopoverOpen(false);
+                setServiceConfigDialogOpen(true);
+              }}
+              onRefresh={() => void runAction(async () => {
+                const nextStatus = await refreshStatus();
+                if (nextStatus.status === 'running') {
+                  await refreshLocalModels();
+                  await refreshRunningModels();
+                }
+              })}
+            />
           </div>
 
           {activeTab === 'models' ? (
@@ -786,10 +916,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               })}
               onInstall={handleMarketplaceInstall}
               onCancelPull={handleCancelPull}
-              onOpenInference={(modelName) => {
-                handleSelectInferenceModel(modelName);
-                setActiveTab('inference');
-              }}
             />
           ) : (
             <div className="min-h-[520px] flex-1">
@@ -843,20 +969,26 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 };
 
-function ServiceHeader({
+function ServicePopover({
+  containerRef,
+  open,
   status,
   loading,
   localModels,
   runningModels,
+  onToggle,
   onPrepare,
   onStop,
   onOpenServiceConfig,
   onRefresh,
 }: {
+  containerRef: React.RefObject<HTMLDivElement>;
+  open: boolean;
   status: OllamaStatusSnapshot | null;
   loading: boolean;
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
+  onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
   onOpenServiceConfig: () => void;
@@ -871,75 +1003,105 @@ function ServiceHeader({
     ? i18nService.t('localInferenceInstall')
     : i18nService.t('localInferenceStart');
   return (
-    <section className="rounded-lg border border-border bg-surface px-3 py-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <CpuChipIcon className="h-4 w-4 text-secondary" />
-            <h2 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceService')}</h2>
+    <div ref={containerRef} className="relative shrink-0 self-end sm:self-auto">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-foreground transition-colors hover:bg-surface-raised"
+      >
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-surface-raised text-secondary">
+          <CpuChipIcon className="h-4 w-4" />
+        </span>
+        <span className="hidden text-left sm:block">
+          <span className="block text-[11px] text-secondary">{i18nService.t('localInferenceService')}</span>
+          <span className="block text-xs text-foreground">{i18nService.t(`localInferenceStatus_${status?.status ?? 'unknown'}`) || status?.status || 'unknown'}</span>
+        </span>
+        <StatusBadge status={status?.status ?? 'unknown'} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-background/95 p-3 shadow-2xl backdrop-blur">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceService')}</h2>
+                {status?.version && <span className="font-mono text-[11px] text-secondary">v{status.version}</span>}
+                {running && !managedByApp && (
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                    {i18nService.t('localInferenceServiceExternal')}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-secondary">
+                {i18nService.t('localInferenceServiceHint')
+                  .replace('{local}', String(localModels.length))
+                  .replace('{running}', String(runningModels.length))}
+              </p>
+            </div>
             <StatusBadge status={status?.status ?? 'unknown'} />
-            {status?.version && <span className="font-mono text-xs text-secondary">v{status.version}</span>}
-            {running && !managedByApp && (
-              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
-                {i18nService.t('localInferenceServiceExternal')}
-              </span>
-            )}
           </div>
-          <p className="mt-1 text-xs text-secondary">
-            {i18nService.t('localInferenceServiceHint')
-              .replace('{local}', String(localModels.length))
-              .replace('{running}', String(runningModels.length))}
-          </p>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
+              <p className="text-[11px] text-secondary">{i18nService.t('localInferenceTabModels')}</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">{localModels.length}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
+              <p className="text-[11px] text-secondary">{i18nService.t('localInferenceLoaded')}</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">{runningModels.length}</p>
+            </div>
+          </div>
+
           {running && !managedByApp && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
               {i18nService.t('localInferenceExternalServiceHint')}
             </p>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={loading}
-            className={smallOutlineButtonClass}
-          >
-            <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            {i18nService.t('refresh')}
-          </button>
-          <button
-            type="button"
-            onClick={onOpenServiceConfig}
-            disabled={loading}
-            className={smallOutlineButtonClass}
-          >
-            <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
-            {i18nService.t('localInferenceServiceConfigTitle')}
-          </button>
-          {!running && canPrepare && (
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={onPrepare}
-              disabled={loading}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-            >
-              <PlayIcon className="h-3.5 w-3.5" />
-              {actionLabel}
-            </button>
-          )}
-          {running && managedByApp ? (
-            <button
-              type="button"
-              onClick={onStop}
+              onClick={onRefresh}
               disabled={loading}
               className={smallOutlineButtonClass}
             >
-              <StopIcon className="h-3.5 w-3.5" />
-              {i18nService.t('localInferenceStop')}
+              <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              {i18nService.t('refresh')}
             </button>
-          ) : null}
+            <button
+              type="button"
+              onClick={onOpenServiceConfig}
+              disabled={loading}
+              className={smallOutlineButtonClass}
+            >
+              <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+              {i18nService.t('localInferenceServiceConfigTitle')}
+            </button>
+            {!running && canPrepare && (
+              <button
+                type="button"
+                onClick={onPrepare}
+                disabled={loading}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+              >
+                <PlayIcon className="h-3.5 w-3.5" />
+                {actionLabel}
+              </button>
+            )}
+            {running && managedByApp ? (
+              <button
+                type="button"
+                onClick={onStop}
+                disabled={loading}
+                className={smallOutlineButtonClass}
+              >
+                <StopIcon className="h-3.5 w-3.5" />
+                {i18nService.t('localInferenceStop')}
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+    </div>
   );
 }
 
@@ -1041,10 +1203,10 @@ function OllamaServiceConfigDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-5 py-4">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
           <div className="min-w-0">
-            <h3 className="text-xl font-semibold text-foreground">{i18nService.t('localInferenceServiceConfigTitle')}</h3>
+            <h3 className="text-lg font-semibold text-foreground">{i18nService.t('localInferenceServiceConfigTitle')}</h3>
             <p className="mt-1 text-sm text-secondary">{i18nService.t('localInferenceServiceConfigDescription')}</p>
           </div>
           <button
@@ -1057,8 +1219,8 @@ function OllamaServiceConfigDialog({
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4">
-          <section className="rounded-xl border border-border bg-surface/40 px-4 py-4">
+        <div className="overflow-y-auto px-4 py-3">
+          <section className="rounded-xl border border-border bg-surface/40 px-3 py-3">
             {running && !managedByApp && (
               <p className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                 {i18nService.t('localInferenceServiceConfigExternalWarning')}
@@ -1075,7 +1237,7 @@ function OllamaServiceConfigDialog({
                   <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceServiceConfigGroupBasic')}</h4>
                   <span className="text-[11px] text-secondary">{i18nService.t('localInferenceServiceConfigRestartRequired')}</span>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2">
                   {SERVICE_CONFIG_FIELDS.filter((field) => field.group === 'basic').map(renderField)}
                 </div>
               </div>
@@ -1095,7 +1257,7 @@ function OllamaServiceConfigDialog({
                   </span>
                 </button>
                 {advancedOpen && (
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-3 md:grid-cols-2">
                     {SERVICE_CONFIG_FIELDS.filter((field) => field.group === 'advanced').map(renderField)}
                   </div>
                 )}
@@ -1111,7 +1273,7 @@ function OllamaServiceConfigDialog({
           </section>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-border px-5 py-4 sm:flex-row sm:justify-end">
+        <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
@@ -1129,6 +1291,56 @@ function OllamaServiceConfigDialog({
             {i18nService.t('save')}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LocalInferenceToastView({
+  toast,
+  onClose,
+}: {
+  toast: LocalInferenceToast;
+  onClose: () => void;
+}) {
+  const tone = toast.kind === LocalInferenceToastKind.Error
+    ? {
+      Icon: ExclamationTriangleIcon,
+      borderClass: 'border-red-500/30',
+      iconClass: 'bg-red-500/15 text-red-500',
+      messageClass: 'text-red-700 dark:text-red-200',
+    }
+    : toast.kind === LocalInferenceToastKind.Success
+      ? {
+        Icon: CheckCircleIcon,
+        borderClass: 'border-emerald-500/30',
+        iconClass: 'bg-emerald-500/15 text-emerald-500',
+        messageClass: 'text-foreground',
+      }
+      : {
+        Icon: InformationCircleIcon,
+        borderClass: 'border-primary/30',
+        iconClass: 'bg-primary/15 text-primary',
+        messageClass: 'text-foreground',
+      };
+
+  return (
+    <div className={`pointer-events-auto w-full max-w-sm rounded-xl border bg-background/95 px-4 py-3 shadow-2xl backdrop-blur ${tone.borderClass}`}>
+      <div className="flex items-start gap-3">
+        <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tone.iconClass}`}>
+          <tone.Icon className="h-4 w-4" />
+        </span>
+        <div className={`min-w-0 flex-1 text-sm leading-6 ${tone.messageClass}`}>
+          {toast.message}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+          aria-label={i18nService.t('close')}
+        >
+          <XMarkIcon className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
@@ -1924,20 +2136,154 @@ function InferencePanel({
 }) {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const assistantStartRef = useRef<HTMLDivElement>(null);
+  const assistantScrollTargetIndexRef = useRef<number | null>(null);
+  const pendingAssistantStartAlignRef = useRef(false);
+  const userDetachedFromBottomRef = useRef(false);
+  const autoFollowStreamRef = useRef(true);
+  const programmaticScrollRef = useRef<{ mode: 'align' | 'bottom'; until: number } | null>(null);
   const composingRef = useRef(false);
+  const [configCollapsed, setConfigCollapsed] = useState(false);
+  const [configPage, setConfigPage] = useState<InferenceOptionGroup>('basic');
+  const [composerHeight, setComposerHeight] = useState(CHAT_COMPOSER_MIN_PADDING);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const likelyThinkingModel = isThinkingModel(selectedModel);
+  const thinkingDisabled = options.thinking_forced_open === 'disabled';
+  const requestPreview = useMemo(() => buildRequestPreview({
+    model: selectedModel,
+    systemPrompt,
+    options: normalizeOptions(options),
+  }), [options, selectedModel, systemPrompt]);
   const updateOption = (key: keyof InferenceOptions, value: InferenceOptions[keyof InferenceOptions]) => {
-    onOptionsChange({ ...options, [key]: value });
+    onOptionsChange({
+      ...options,
+      [key]: value,
+      ...(key === 'thinking_forced_open' && value === 'disabled'
+        ? { reasoning_format: 'none', thinking_budget_tokens: 0 }
+      : {}),
+    });
   };
-
-  useEffect(() => {
+  const visibleOptionFields = INFERENCE_OPTION_FIELDS.filter((field) => field.group === configPage);
+  const chatBottomPadding = getChatBottomPadding(composerHeight);
+  const jumpToBottomOffset = getJumpToBottomOffset(composerHeight);
+  const markProgrammaticScroll = useCallback((mode: 'align' | 'bottom', behavior: ScrollBehavior) => {
+    const duration = behavior === 'smooth' ? 400 : 120;
+    programmaticScrollRef.current = {
+      mode,
+      until: window.performance.now() + duration,
+    };
+  }, []);
+  const syncScrollIndicators = useCallback(() => {
     const element = chatScrollRef.current;
     if (!element) return;
+    const nearBottom = isScrollNearBottom({
+      scrollTop: element.scrollTop,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    });
+    const hiddenBelow = hasHiddenContentBelow({
+      scrollTop: element.scrollTop,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    });
+    const activeProgrammaticScroll = programmaticScrollRef.current
+      && window.performance.now() <= programmaticScrollRef.current.until
+      ? programmaticScrollRef.current
+      : null;
+    if (!activeProgrammaticScroll) {
+      programmaticScrollRef.current = null;
+      userDetachedFromBottomRef.current = !nearBottom;
+      autoFollowStreamRef.current = nearBottom;
+    } else if (activeProgrammaticScroll.mode === 'bottom') {
+      userDetachedFromBottomRef.current = false;
+      autoFollowStreamRef.current = true;
+    } else {
+      autoFollowStreamRef.current = false;
+    }
+    setShowJumpToBottom(hiddenBelow);
+  }, []);
+  const submitPrompt = () => {
+    assistantScrollTargetIndexRef.current = getNewAssistantScrollTargetIndex(messages.length);
+    pendingAssistantStartAlignRef.current = true;
+    userDetachedFromBottomRef.current = false;
+    autoFollowStreamRef.current = false;
+    onSend();
+  };
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const element = chatScrollRef.current;
+    if (!element) return;
+    markProgrammaticScroll('bottom', behavior);
+    pendingAssistantStartAlignRef.current = false;
+    userDetachedFromBottomRef.current = false;
+    autoFollowStreamRef.current = true;
+    element.scrollTo({ top: element.scrollHeight, behavior });
+  }, [markProgrammaticScroll]);
+  const scrollAssistantStartIntoView = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const container = chatScrollRef.current;
+    const element = assistantStartRef.current;
+    if (!container || !element) return;
+    const top = getAssistantScrollTop({
+      containerScrollTop: container.scrollTop,
+      containerTop: container.getBoundingClientRect().top,
+      targetTop: element.getBoundingClientRect().top,
+    });
+    markProgrammaticScroll('align', behavior);
+    autoFollowStreamRef.current = false;
+    container.scrollTo({ top, behavior });
+  }, [markProgrammaticScroll]);
+  const measureComposerHeight = useCallback(() => {
+    const nextHeight = composerRef.current?.offsetHeight ?? 0;
+    if (nextHeight <= 0) return;
+    setComposerHeight((current) => (current === nextHeight ? current : nextHeight));
+  }, []);
+
+  useEffect(() => {
+    if (!sending) return;
+    if (!pendingAssistantStartAlignRef.current) return;
+    if (assistantScrollTargetIndexRef.current !== messages.length) return;
     const frame = window.requestAnimationFrame(() => {
-      element.scrollTop = element.scrollHeight;
+      scrollAssistantStartIntoView('auto');
+      pendingAssistantStartAlignRef.current = false;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, streamingText, streamingThinking, sending]);
+  }, [messages.length, scrollAssistantStartIntoView, sending]);
+
+  useEffect(() => {
+    syncScrollIndicators();
+  }, [messages.length, sending, streamingText, streamingThinking, syncScrollIndicators]);
+
+  useEffect(() => {
+    if (!sending || pendingAssistantStartAlignRef.current || !autoFollowStreamRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrollToBottom('auto');
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, scrollToBottom, sending, streamingText, streamingThinking]);
+
+  useEffect(() => {
+    if (sending) return;
+    pendingAssistantStartAlignRef.current = false;
+    assistantScrollTargetIndexRef.current = null;
+    programmaticScrollRef.current = null;
+  }, [sending]);
+
+  useEffect(() => {
+    measureComposerHeight();
+    const composerElement = composerRef.current;
+    if (!composerElement) return;
+    const resizeObserver = typeof window.ResizeObserver !== 'undefined'
+      ? new window.ResizeObserver(() => {
+        measureComposerHeight();
+      })
+      : null;
+    resizeObserver?.observe(composerElement);
+    window.addEventListener('resize', measureComposerHeight);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measureComposerHeight);
+    };
+  }, [measureComposerHeight]);
 
   useEffect(() => {
     if (sending || cancelling || !selectedModel) return;
@@ -1961,86 +2307,192 @@ function InferencePanel({
   }
 
   return (
-    <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="min-h-0 overflow-y-auto rounded-lg border border-border bg-surface p-3">
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-secondary">{i18nService.t('localInferenceModel')}</label>
-            <select
-              value={selectedModel}
-              onChange={(event) => onModelChange(event.target.value)}
-              className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary/60"
+    <div className="h-full min-h-0 rounded-[24px] border border-border bg-surface shadow-card overflow-hidden">
+      <div className={`grid h-full min-h-0 ${configCollapsed ? 'lg:grid-cols-[56px_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'}`}>
+      <aside className={`min-h-0 overflow-hidden bg-surface ${configCollapsed ? 'border-r border-border-subtle' : 'border-r border-border-subtle'}`}>
+        {configCollapsed ? (
+          <div className="flex h-full flex-col items-center gap-3 py-4">
+            <button
+              type="button"
+              onClick={() => setConfigCollapsed(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              aria-label={i18nService.t('localInferenceConfigExpand')}
+              title={i18nService.t('localInferenceConfigExpand')}
             >
-              {runnableModels.map((model) => (
-                <option key={model.name} value={model.name}>{model.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-secondary">{i18nService.t('localInferenceSystemPrompt')}</label>
-            <textarea
-              value={systemPrompt}
-              onChange={(event) => onSystemPromptChange(event.target.value)}
-              className="min-h-20 w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 text-sm text-foreground outline-none focus:border-primary/60"
-            />
-          </div>
-          <div className="rounded-md border border-border/70 bg-background/40 px-2.5 py-2 text-xs text-secondary">
-            <div className="flex items-center justify-between gap-2">
-              <span>{i18nService.t('localInferenceOptionRequestParamsTitle')}</span>
-              <Badge tone={likelyThinkingModel ? 'success' : 'neutral'}>
-                {i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModel' : 'localInferenceNonThinkingModel')}
-              </Badge>
+              <ChevronRightIcon className="h-4 w-4" />
+            </button>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-subtle bg-surface-raised text-secondary">
+              <AdjustmentsHorizontalIcon className="h-4 w-4" />
             </div>
-            <p className="mt-1">{i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModelHint' : 'localInferenceNonThinkingModelHint')}</p>
           </div>
-          {INFERENCE_OPTION_FIELDS.map((field) => (
-            <InferenceOptionControl
-              key={field.key}
-              field={field}
-              value={options[field.key]}
-              onChange={(value) => updateOption(field.key, value)}
-            />
-          ))}
-          <button type="button" onClick={onSavePreset} className="h-8 w-full rounded-md bg-primary text-sm font-medium text-white transition-colors hover:bg-primary-hover">
-            {i18nService.t('localInferenceSavePreset')}
-          </button>
-        </div>
+        ) : (
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-4">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceConfigTitle')}</h2>
+                <p className="mt-0.5 text-[11px] text-secondary">{selectedModel}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfigCollapsed(true)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                aria-label={i18nService.t('localInferenceConfigCollapse')}
+                title={i18nService.t('localInferenceConfigCollapse')}
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-secondary">{i18nService.t('localInferenceModel')}</label>
+                <select
+                  value={selectedModel}
+                  onChange={(event) => onModelChange(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+                >
+                  {runnableModels.map((model) => (
+                    <option key={model.name} value={model.name}>{model.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-secondary">{i18nService.t('localInferenceSystemPrompt')}</label>
+                <textarea
+                  value={systemPrompt}
+                  onChange={(event) => onSystemPromptChange(event.target.value)}
+                  className="min-h-24 w-full resize-y rounded-xl border border-border bg-surface-input px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+                />
+              </div>
+              <div className="grid grid-cols-2 rounded-xl border border-border-subtle bg-surface-raised/60 p-1">
+                {(['basic', 'advanced'] as InferenceOptionGroup[]).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setConfigPage(page)}
+                    className={`h-8 rounded-lg px-2 text-xs transition-colors ${
+                      configPage === page
+                        ? 'bg-surface text-foreground shadow-sm'
+                        : 'text-secondary hover:text-foreground'
+                    }`}
+                  >
+                    {i18nService.t(page === 'basic' ? 'localInferenceConfigBasic' : 'localInferenceConfigAdvanced')}
+                  </button>
+                ))}
+              </div>
+              {configPage === 'basic' && (
+                <div className="rounded-xl border border-border-subtle bg-surface-raised/40 px-3 py-2.5 text-xs text-secondary">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{i18nService.t('localInferenceOptionRequestParamsTitle')}</span>
+                    <Badge tone={likelyThinkingModel ? 'success' : 'neutral'}>
+                      {i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModel' : 'localInferenceNonThinkingModel')}
+                    </Badge>
+                  </div>
+                  <p className="mt-1">{i18nService.t(likelyThinkingModel ? 'localInferenceThinkingModelHint' : 'localInferenceNonThinkingModelHint')}</p>
+                </div>
+              )}
+              <div className="space-y-3">
+                {visibleOptionFields.map((field) => (
+                  <InferenceOptionControl
+                    key={field.key}
+                    field={field}
+                    value={options[field.key]}
+                    disabled={thinkingDisabled && field.key === 'thinking_budget_tokens'}
+                    onChange={(value) => updateOption(field.key, value)}
+                  />
+                ))}
+              </div>
+              {configPage === 'advanced' && (
+                <details className="rounded-xl border border-border-subtle bg-surface-raised/40 px-3 py-2.5 text-xs text-secondary">
+                  <summary className="cursor-pointer select-none text-foreground">{i18nService.t('localInferenceRequestPreview')}</summary>
+                  <pre className="mt-2 max-h-52 overflow-auto rounded-lg border border-border-subtle bg-background px-2.5 py-2 font-mono text-[11px] leading-4 text-foreground">
+                    {JSON.stringify(requestPreview, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+            <div className="shrink-0 border-t border-border-subtle p-4">
+              <button type="button" onClick={onSavePreset} className="h-9 w-full rounded-xl bg-primary text-sm font-medium text-white transition-colors hover:bg-primary-hover">
+                {i18nService.t('localInferenceSavePreset')}
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
 
-      <main className="flex min-h-0 flex-col rounded-lg border border-border bg-surface">
-        <div className="shrink-0 flex items-center justify-between border-b border-border px-3 py-2.5">
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-foreground">{selectedModel}</h2>
-            <p className="text-xs text-secondary">
-              {selectedRunningModel ? i18nService.t('localInferenceLoaded') : i18nService.t('localInferenceNoLoadedModels')}
-            </p>
+      <main className="relative flex min-h-0 flex-col overflow-hidden bg-background">
+        <div className="shrink-0 flex items-center justify-between border-b border-border-subtle px-5 py-4">
+          <div className="min-w-0 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-surface-raised text-secondary">
+              <CpuChipIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-medium text-foreground">{selectedModel}</h2>
+              <p className="text-xs text-secondary">
+                {selectedRunningModel ? i18nService.t('localInferenceLoaded') : i18nService.t('localInferenceNoLoadedModels')}
+              </p>
+            </div>
           </div>
           {selectedRunningModel?.context_length && (
             <Badge>{selectedRunningModel.context_length}</Badge>
           )}
         </div>
-        <div ref={chatScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div
+          ref={chatScrollRef}
+          className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-4 [scrollbar-gutter:stable_both-edges]"
+          onScroll={syncScrollIndicators}
+          style={{
+            paddingBottom: `${chatBottomPadding}px`,
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'var(--lobster-scroll-thumb) transparent',
+          }}
+        >
           {messages.length === 0 && !sending && (
-            <div className="flex min-h-[360px] items-center justify-center text-sm text-secondary">
-              {i18nService.t('localInferenceEmptyChat')}
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border-subtle bg-surface-raised text-secondary">
+                <CpuChipIcon className="h-8 w-8" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">{i18nService.t('localInferenceEmptyChat')}</p>
+                <p className="text-xs text-secondary">{selectedModel}</p>
+              </div>
             </div>
           )}
-          {messages.map((message, index) => (
-            <ChatBubble key={index} message={message} />
-          ))}
-          {sending && (streamingText || streamingThinking) && (
-            <ChatBubble
-              message={{
-                role: 'assistant',
-                content: streamingText || i18nService.t('localInferenceAwaitingResponse'),
-                thinking: streamingThinking || undefined,
-              }}
-              streaming
-            />
-          )}
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+            {messages.map((message, index) => (
+              <ChatBubble key={index} message={message} />
+            ))}
+            {sending && (
+              <div ref={assistantStartRef}>
+                <ChatBubble
+                  message={buildStreamingAssistantMessage({
+                    content: streamingText,
+                    thinking: streamingThinking,
+                    thinkingDisabled,
+                  })}
+                  streaming
+                />
+              </div>
+            )}
+          </div>
         </div>
-        <div className="shrink-0 border-t border-border p-3">
-          <div className="flex gap-2">
+        {showJumpToBottom && (
+          <div
+            className="pointer-events-none absolute inset-x-0 flex justify-center px-4"
+            style={{ bottom: `${jumpToBottomOffset}px` }}
+          >
+            <button
+              type="button"
+              onClick={() => scrollToBottom()}
+              className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-subtle bg-surface-overlay/95 text-secondary shadow-popover backdrop-blur transition-colors hover:bg-surface-raised hover:text-foreground"
+              aria-label={i18nService.t('localInferenceJumpToBottom')}
+              title={i18nService.t('localInferenceJumpToBottom')}
+            >
+              <ChevronRightIcon className="h-4 w-4 rotate-90" />
+            </button>
+          </div>
+        )}
+        <div ref={composerRef} className="absolute inset-x-0 bottom-0 px-4 pb-4">
+          <div className="mx-auto max-w-[44rem] rounded-[20px] border border-border bg-surface-overlay p-1.5 shadow-card backdrop-blur">
             <textarea
               ref={promptRef}
               value={prompt}
@@ -2060,25 +2512,33 @@ function InferencePanel({
                   && !event.nativeEvent.isComposing
                 ) {
                   event.preventDefault();
-                  onSend();
+                  submitPrompt();
                 }
               }}
               disabled={sending}
-              className="min-h-16 flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
+              className="min-h-14 w-full resize-none rounded-2xl border-0 bg-transparent px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-secondary"
               placeholder={i18nService.t('localInferencePromptPlaceholder')}
             />
-            <button
-              type="button"
-              onClick={sending ? onStop : onSend}
-              disabled={!selectedModel || cancelling || (!prompt.trim() && !sending)}
-              className="inline-flex h-16 w-16 items-center justify-center rounded-md bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-              aria-label={sending ? i18nService.t('localInferenceStopGeneration') : i18nService.t('localInferenceSend')}
-            >
-              {sending ? <StopIcon className="h-5 w-5" /> : <PaperAirplaneIcon className="h-5 w-5" />}
-            </button>
+            <div className="flex items-center justify-between gap-2 px-1 pb-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <Badge tone={thinkingDisabled ? 'neutral' : 'success'}>
+                  {i18nService.t('localInferenceOptionThinkingForcedOpenLabel')}
+                </Badge>
+              </div>
+              <button
+                type="button"
+                onClick={sending ? onStop : submitPrompt}
+                disabled={!selectedModel || cancelling || (!prompt.trim() && !sending)}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-40"
+                aria-label={sending ? i18nService.t('localInferenceStopGeneration') : i18nService.t('localInferenceSend')}
+              >
+                {sending ? <StopIcon className="h-4 w-4" /> : <PaperAirplaneIcon className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
         </div>
       </main>
+      </div>
     </div>
   );
 }
@@ -2087,25 +2547,26 @@ function ChatBubble({ message, streaming = false }: { message: InferenceMessage;
   const isUser = message.role === 'user';
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[86%] rounded-lg border px-3 py-2.5 text-sm leading-7 ${
+      <div className={`max-w-[86%] text-sm leading-7 ${
         isUser
-          ? 'border-primary/20 bg-primary/10 text-foreground'
-          : 'border-border bg-background text-foreground'
+          ? 'rounded-2xl bg-surface-raised px-4 py-2.5 text-foreground border border-border-subtle'
+          : 'text-foreground'
       }`}>
         {message.thinking && (
-          <details className="mb-2 text-xs text-secondary">
-            <summary className="cursor-pointer select-none">{i18nService.t('localInferenceThinking')}</summary>
-            <p className="mt-1 whitespace-pre-wrap opacity-80">{message.thinking}</p>
+          <details className="mb-3 rounded-xl border border-border-subtle bg-surface-raised/55 px-3 py-2 text-xs text-secondary" open={streaming && !message.content.trim()}>
+            <summary className="cursor-pointer select-none text-foreground">{i18nService.t(streaming ? 'localInferenceThinkingInProgress' : 'localInferenceThinking')}</summary>
+            <p className="mt-2 whitespace-pre-wrap opacity-80">{message.thinking}</p>
           </details>
         )}
+        {message.waiting && <WaitingDots />}
         {isUser ? (
           <div className="whitespace-pre-wrap break-words">{message.content}</div>
         ) : (
-          <MarkdownContent content={message.content} />
+          message.content.trim() ? <MarkdownContent content={message.content} /> : null
         )}
-        {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/50 align-text-bottom" />}
+        {streaming && !message.waiting && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />}
         {hasMetricsSummary(message.metrics) && (
-          <p className="mt-2 border-t border-border pt-2 text-xs text-secondary">
+          <p className="mt-2 text-xs text-secondary">
             {formatMetricsSummary(message.metrics)}
           </p>
         )}
@@ -2114,13 +2575,29 @@ function ChatBubble({ message, streaming = false }: { message: InferenceMessage;
   );
 }
 
+function WaitingDots() {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface-raised px-3 py-2" aria-label={i18nService.t('localInferenceAwaitingResponse')}>
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          className="h-1.5 w-1.5 animate-pulse rounded-full bg-secondary"
+          style={{ animationDelay: `${index * 120}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function InferenceOptionControl({
   field,
   value,
+  disabled = false,
   onChange,
 }: {
   field: InferenceOptionField;
   value: InferenceOptions[keyof InferenceOptions];
+  disabled?: boolean;
   onChange: (value: InferenceOptions[keyof InferenceOptions]) => void;
 }) {
   const label = i18nService.t(field.labelKey);
@@ -2135,6 +2612,7 @@ function InferenceOptionControl({
         step={field.step ?? 1}
         value={typeof value === 'number' ? value : 0}
         hint={hint}
+        disabled={disabled}
         onChange={onChange}
       />
     );
@@ -2146,7 +2624,8 @@ function InferenceOptionControl({
         <select
           value={String(value)}
           onChange={(event) => onChange(event.target.value)}
-          className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary/60"
+          disabled={disabled}
+          className="h-9 w-full rounded-xl border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:opacity-50"
         >
           {getInferenceOptionSelectOptions(field.key).map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -2163,7 +2642,8 @@ function InferenceOptionControl({
         type={field.type === 'number' ? 'number' : 'text'}
         value={String(value)}
         onChange={(event) => onChange(field.type === 'number' ? Number(event.target.value) : event.target.value)}
-        className="h-8 w-full rounded-md border border-border bg-background px-2.5 font-mono text-sm text-foreground outline-none focus:border-primary/60"
+        disabled={disabled}
+        className="h-9 w-full rounded-xl border border-border bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:opacity-50"
       />
       <p className="text-[11px] leading-4 text-secondary">{hint}</p>
     </label>
@@ -2178,6 +2658,7 @@ function RangeControl({
   step,
   value,
   hint,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -2187,6 +2668,7 @@ function RangeControl({
   step: number;
   value: number;
   hint: string;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   return (
@@ -2202,7 +2684,8 @@ function RangeControl({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-primary"
+        disabled={disabled}
+        className="w-full accent-primary disabled:opacity-50"
       />
       <p className="text-[11px] leading-4 text-secondary">{hint}</p>
     </div>
@@ -2566,22 +3049,34 @@ function formatDate(value: string): string {
 }
 
 function formatMetricsSummary(metrics: OllamaChatChunk): string {
-  const tokens = readMetricNumber(metrics.usage, 'completion_tokens')
+  const promptTokens = readMetricNumber(metrics.usage, 'prompt_tokens')
+    ?? readMetricNumber(metrics.timings, 'prompt_n')
+    ?? metrics.prompt_eval_count;
+  const completionTokens = readMetricNumber(metrics.usage, 'completion_tokens')
     ?? readMetricNumber(metrics.timings, 'predicted_n')
     ?? metrics.eval_count;
+  const totalTokens = readMetricNumber(metrics.usage, 'total_tokens')
+    ?? (promptTokens !== undefined && completionTokens !== undefined
+      ? promptTokens + completionTokens
+      : undefined);
   const speedValue = readMetricNumber(metrics.timings, 'predicted_per_second')
     ?? metrics.predicted_per_second;
   const speed = speedValue !== undefined ? speedValue.toFixed(1) : '-';
   return i18nService.t('localInferenceMetrics')
-    .replace('{tokens}', tokens === undefined ? '-' : String(tokens))
+    .replace('{prompt}', promptTokens === undefined ? '-' : String(promptTokens))
+    .replace('{completion}', completionTokens === undefined ? '-' : String(completionTokens))
+    .replace('{total}', totalTokens === undefined ? '-' : String(totalTokens))
     .replace('{speed}', speed);
 }
 
 function hasMetricsSummary(metrics: OllamaChatChunk | null | undefined): metrics is OllamaChatChunk {
   if (!metrics) return false;
   return readMetricNumber(metrics.usage, 'completion_tokens') !== undefined
+    || readMetricNumber(metrics.usage, 'prompt_tokens') !== undefined
+    || readMetricNumber(metrics.usage, 'total_tokens') !== undefined
     || readMetricNumber(metrics.timings, 'predicted_n') !== undefined
     || readMetricNumber(metrics.timings, 'predicted_per_second') !== undefined
+    || metrics.prompt_eval_count !== undefined
     || metrics.eval_count !== undefined
     || metrics.predicted_per_second !== undefined;
 }
@@ -2590,6 +3085,115 @@ function readMetricNumber(source: unknown, key: string): number | undefined {
   if (!source || typeof source !== 'object') return undefined;
   const value = (source as Record<string, unknown>)[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isScrollNearBottom({
+  scrollTop,
+  clientHeight,
+  scrollHeight,
+  threshold = CHAT_NEAR_BOTTOM_THRESHOLD,
+}: {
+  scrollTop: number;
+  clientHeight: number;
+  scrollHeight: number;
+  threshold?: number;
+}): boolean {
+  return scrollHeight - (scrollTop + clientHeight) <= threshold;
+}
+
+function hasHiddenContentBelow({
+  scrollTop,
+  clientHeight,
+  scrollHeight,
+  threshold = CHAT_HIDDEN_BELOW_THRESHOLD,
+}: {
+  scrollTop: number;
+  clientHeight: number;
+  scrollHeight: number;
+  threshold?: number;
+}): boolean {
+  return scrollTop + clientHeight < scrollHeight - threshold;
+}
+
+function getAssistantScrollTop({
+  containerScrollTop,
+  containerTop,
+  targetTop,
+  offset = ASSISTANT_SCROLL_TOP_OFFSET,
+}: {
+  containerScrollTop: number;
+  containerTop: number;
+  targetTop: number;
+  offset?: number;
+}): number {
+  return Math.max(0, containerScrollTop + (targetTop - containerTop) - offset);
+}
+
+function getChatBottomPadding(composerHeight: number): number {
+  return Math.max(CHAT_COMPOSER_MIN_PADDING, composerHeight + CHAT_COMPOSER_PADDING_GAP);
+}
+
+function getJumpToBottomOffset(composerHeight: number): number {
+  return Math.max(CHAT_JUMP_TO_BOTTOM_MIN_OFFSET, composerHeight + CHAT_JUMP_TO_BOTTOM_GAP);
+}
+
+function buildAssistantMessage({
+  content,
+  thinking,
+  metrics,
+  thinkingDisabled,
+}: BuildAssistantMessageInput): InferenceMessage {
+  const visibleContent = content.trim()
+    ? content
+    : thinkingDisabled && thinking.trim()
+      ? i18nService.t('localInferenceHiddenThinkingOnly')
+      : content;
+  return {
+    role: 'assistant',
+    content: visibleContent,
+    ...(thinkingDisabled ? {} : thinking ? { thinking } : {}),
+    ...(thinkingDisabled && thinking ? { hiddenThinking: true } : {}),
+    metrics,
+  };
+}
+
+function buildStreamingAssistantMessage({
+  content,
+  thinking,
+  thinkingDisabled,
+}: {
+  content: string;
+  thinking: string;
+  thinkingDisabled: boolean;
+}): InferenceMessage {
+  const hasContent = Boolean(content.trim());
+  const hasThinking = Boolean(thinking.trim());
+  return {
+    role: 'assistant',
+    content,
+    ...(thinkingDisabled ? {} : hasThinking ? { thinking } : {}),
+    ...(thinkingDisabled && hasThinking ? { hiddenThinking: true } : {}),
+    waiting: !hasContent && (!hasThinking || thinkingDisabled),
+  };
+}
+
+function getNewAssistantScrollTargetIndex(historyLength: number): number {
+  return historyLength + 1;
+}
+
+function buildRequestPreview({ model, systemPrompt, options }: RequestPreviewInput): Record<string, unknown> {
+  const preview: Record<string, unknown> = {
+    model,
+    messages: systemPrompt.trim()
+      ? [{ role: 'system', content: systemPrompt.trim() }]
+      : [],
+  };
+  for (const key of ['max_tokens', 'reasoning_format', 'chat_template_kwargs', 'thinking_budget_tokens'] as const) {
+    if (Object.prototype.hasOwnProperty.call(options, key)) {
+      preview[key] = options[key];
+    }
+  }
+  return preview;
 }
 
 function MarketplacePanel({
@@ -2611,7 +3215,6 @@ function MarketplacePanel({
   onSearch,
   onInstall,
   onCancelPull,
-  onOpenInference,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -2631,7 +3234,6 @@ function MarketplacePanel({
   onSearch: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
   onCancelPull: () => void;
-  onOpenInference: (name: string) => void;
 }) {
   const [installingModel, setInstallingModel] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -2680,13 +3282,44 @@ function MarketplacePanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">{i18nService.t('marketplaceTitle')}</h2>
-          <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{i18nService.t('marketplaceTitle')}</h2>
+            <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((value) => !value)}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors ${
+                filtersOpen || hasActiveFilters
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-secondary hover:bg-surface-raised hover:text-foreground'
+              }`}
+            >
+              {i18nService.t('marketplaceFilterButton')}
+              <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {task !== 'all' && (
+              <FilterKeywordChip label={`${i18nService.t('marketplaceTaskFilterLabel')}: ${taskFilterLabel(task)}`} onRemove={() => onTaskChange('all')} />
+            )}
+            {size !== 'all' && (
+              <FilterKeywordChip label={`${i18nService.t('marketplaceSizeFilterLabel')}: ${sizeFilterLabel(size)}`} onRemove={() => onSizeChange('all')} />
+            )}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => { onQueryChange(''); onTaskChange('all'); onSizeChange('all'); setFiltersOpen(false); }}
+                className="inline-flex h-8 items-center rounded-full border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
+              >
+                {i18nService.t('marketplaceFilterReset')}
+              </button>
+            )}
+          </div>
         </div>
         <form
-          className="w-full md:max-w-xl"
+          className="w-full lg:max-w-xl"
           onSubmit={(e) => { e.preventDefault(); onSearch(); }}
         >
           <div className="rounded-lg border border-border bg-surface p-3">
@@ -2712,63 +3345,47 @@ function MarketplacePanel({
         </form>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((value) => !value)}
-          className={`inline-flex h-8 items-center rounded-full border px-3 text-xs transition-colors ${
-            filtersOpen || hasActiveFilters
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border text-secondary hover:bg-surface-raised hover:text-foreground'
-          }`}
-        >
-          {i18nService.t('marketplaceFilterButton')}
-        </button>
-        {task !== 'all' && (
-          <FilterKeywordChip label={`${i18nService.t('marketplaceTaskFilterLabel')}: ${taskFilterLabel(task)}`} onRemove={() => onTaskChange('all')} />
-        )}
-        {size !== 'all' && (
-          <FilterKeywordChip label={`${i18nService.t('marketplaceSizeFilterLabel')}: ${sizeFilterLabel(size)}`} onRemove={() => onSizeChange('all')} />
-        )}
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={() => { onQueryChange(''); onTaskChange('all'); onSizeChange('all'); setFiltersOpen(false); }}
-            className="inline-flex h-8 items-center rounded-full border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
-          >
-            {i18nService.t('marketplaceFilterReset')}
-          </button>
-        )}
-      </div>
-
       {filtersOpen && (
         <div className="rounded-lg border border-border bg-surface p-3">
-          <div className="space-y-4">
-            <FilterChipGroup
-              label={i18nService.t('marketplaceTaskFilterLabel')}
-              value={task}
-              onChange={onTaskChange}
-              options={[
-                { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
-                { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
-                { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
-                { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
-                { value: 'embedding', label: i18nService.t('marketplaceFilterTaskEmbedding') },
-                { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
-              ]}
-            />
-            <FilterChipGroup
-              label={i18nService.t('marketplaceSizeFilterLabel')}
-              value={size}
-              onChange={onSizeChange}
-              options={[
-                { value: 'all', label: i18nService.t('marketplaceFilterSizeAll') },
-                { value: 'small', label: i18nService.t('marketplaceFilterSizeSmall') },
-                { value: 'desktop', label: i18nService.t('marketplaceFilterSizeDesktop') },
-                { value: 'workstation', label: i18nService.t('marketplaceFilterSizeWorkstation') },
-                { value: 'large', label: i18nService.t('marketplaceFilterSizeLarge') },
-              ]}
-            />
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="grid flex-1 gap-3 md:grid-cols-2">
+              <CompactFilterSelect
+                label={i18nService.t('marketplaceTaskFilterLabel')}
+                value={task}
+                onChange={onTaskChange}
+                options={[
+                  { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
+                  { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
+                  { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
+                  { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
+                  { value: 'embedding', label: i18nService.t('marketplaceFilterTaskEmbedding') },
+                  { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
+                ]}
+              />
+              <CompactFilterSelect
+                label={i18nService.t('marketplaceSizeFilterLabel')}
+                value={size}
+                onChange={onSizeChange}
+                options={[
+                  { value: 'all', label: i18nService.t('marketplaceFilterSizeAll') },
+                  { value: 'small', label: i18nService.t('marketplaceFilterSizeSmall') },
+                  { value: 'desktop', label: i18nService.t('marketplaceFilterSizeDesktop') },
+                  { value: 'workstation', label: i18nService.t('marketplaceFilterSizeWorkstation') },
+                  { value: 'large', label: i18nService.t('marketplaceFilterSizeLarge') },
+                ]}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onQueryChange('');
+                onTaskChange('all');
+                onSizeChange('all');
+              }}
+              className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised md:min-w-20"
+            >
+              {i18nService.t('marketplaceFilterReset')}
+            </button>
           </div>
         </div>
       )}
@@ -2840,7 +3457,6 @@ function MarketplacePanel({
           {visibleModels.map((model) => {
             const progress = installProgress[model.repoId];
             const installedModelName = model.installedPath ? installedModelPathMap.get(model.installedPath) : undefined;
-            const installName = installedModelName ?? model.repoId.split('/')[1];
             const installed = model.installed || Boolean(installedModelName);
             const installing = installingModel === model.id || isPullInProgress(progress);
             return (
@@ -2908,17 +3524,7 @@ function MarketplacePanel({
                         {i18nService.t('marketplaceOpenModelScope')}
                       </button>
                     )}
-                    {installed ? (
-                      <button
-                        type="button"
-                        onClick={() => onOpenInference(installName)}
-                        disabled={!installedModelName}
-                        className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:opacity-60"
-                      >
-                        <PlayIcon className="h-3.5 w-3.5" />
-                        {installedModelName ? i18nService.t('marketplaceInfer') : i18nService.t('marketplaceOpenModel')}
-                      </button>
-                    ) : installing ? (
+                    {installed ? null : installing ? (
                       <button
                         type="button"
                         onClick={onCancelPull}
@@ -3026,7 +3632,7 @@ function FilterKeywordChip({
   );
 }
 
-function FilterChipGroup({
+function CompactFilterSelect({
   label,
   value,
   onChange,
@@ -3038,25 +3644,18 @@ function FilterChipGroup({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <div className="space-y-2">
+    <label className="block space-y-1.5">
       <span className="text-[11px] font-medium text-secondary">{label}</span>
-      <div className="flex flex-wrap gap-2">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+      >
         {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={`inline-flex h-8 items-center rounded-full border px-3 text-xs transition-colors ${
-              value === option.value
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border text-secondary hover:bg-surface-raised hover:text-foreground'
-            }`}
-          >
-            {option.label}
-          </button>
+          <option key={option.value} value={option.value}>{option.label}</option>
         ))}
-      </div>
-    </div>
+      </select>
+    </label>
   );
 }
 
@@ -3104,5 +3703,15 @@ function SparklesIcon({ className }: { className?: string }) {
 export const __test__getServiceConfigFields = () => SERVICE_CONFIG_FIELDS.map((field) => ({ ...field }));
 export const __test__getInferenceOptionFields = () => INFERENCE_OPTION_FIELDS.map((field) => ({ ...field }));
 export const __test__estimateMarketplacePageSize = (width?: number, height?: number) => estimateMarketplacePageSize(width, height);
+export const __test__buildAssistantMessage = (input: BuildAssistantMessageInput) => buildAssistantMessage(input);
+export const __test__buildStreamingAssistantMessage = (input: Parameters<typeof buildStreamingAssistantMessage>[0]) => buildStreamingAssistantMessage(input);
+export const __test__getNewAssistantScrollTargetIndex = (historyLength: number) => getNewAssistantScrollTargetIndex(historyLength);
+export const __test__formatMetricsSummary = (metrics: OllamaChatChunk) => formatMetricsSummary(metrics);
+export const __test__buildRequestPreview = (input: RequestPreviewInput) => buildRequestPreview(input);
+export const __test__isScrollNearBottom = (input: Parameters<typeof isScrollNearBottom>[0]) => isScrollNearBottom(input);
+export const __test__hasHiddenContentBelow = (input: Parameters<typeof hasHiddenContentBelow>[0]) => hasHiddenContentBelow(input);
+export const __test__getAssistantScrollTop = (input: Parameters<typeof getAssistantScrollTop>[0]) => getAssistantScrollTop(input);
+export const __test__getChatBottomPadding = (composerHeight: number) => getChatBottomPadding(composerHeight);
+export const __test__getJumpToBottomOffset = (composerHeight: number) => getJumpToBottomOffset(composerHeight);
 
 export default LocalInferenceView;
