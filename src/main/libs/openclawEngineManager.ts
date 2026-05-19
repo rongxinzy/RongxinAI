@@ -34,7 +34,11 @@ type GatewayProcess = UtilityProcess | ChildProcess;
 const DEFAULT_OPENCLAW_VERSION = '2026.2.23';
 const DEFAULT_GATEWAY_PORT = 18789;
 const GATEWAY_PORT_SCAN_LIMIT = 80;
-const GATEWAY_BOOT_TIMEOUT_MS = 300 * 1000;
+// Boot timeout adapts to cache state: a warm cache means the gateway starts
+// quickly (~5-15s), while a cold cache requires V8 compilation (~25-35s) and
+// plugin loading on top.
+const GATEWAY_BOOT_TIMEOUT_MS_COLD = 600 * 1000; // 10 min — cold start may need V8 compilation
+const GATEWAY_BOOT_TIMEOUT_MS_WARM = 120 * 1000; // 2 min — warm start typically completes in <30s
 const GATEWAY_MAX_RESTART_ATTEMPTS = 5;
 const GATEWAY_RESTART_DELAYS = [3_000, 5_000, 10_000, 20_000, 30_000];
 
@@ -909,7 +913,13 @@ export class OpenClawEngineManager extends EventEmitter {
       console.log(`[OpenClaw] gateway process spawned (${elapsed()}), pid=${child.pid}`);
     });
 
-    const ready = await this.waitForGatewayReady(port, GATEWAY_BOOT_TIMEOUT_MS);
+    // Use a tighter timeout when the compile cache is warm (5-15s typical)
+    // and a generous one for cold starts (V8 compilation may take 25-35s).
+    const bootTimeoutMs = this.isCompileCachePopulated()
+      ? GATEWAY_BOOT_TIMEOUT_MS_WARM
+      : GATEWAY_BOOT_TIMEOUT_MS_COLD;
+    console.log(`[OpenClaw] boot timeout: ${bootTimeoutMs}ms (cache=${this.isCompileCachePopulated() ? 'warm' : 'cold'})`);
+    const ready = await this.waitForGatewayReady(port, bootTimeoutMs);
     console.log(`[OpenClaw] startGateway: waitForGatewayReady returned (${elapsed()}), ready=${ready}`);
     if (!ready) {
       this.setStatus({
