@@ -17,6 +17,7 @@ import {
 } from './gatewayLogRotation';
 import { getCodexHomeDir } from './openaiCodexAuth';
 import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
+import { t } from '../i18n';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 
 const gwDiagTs = (): string => {
@@ -762,7 +763,7 @@ export class OpenClawEngineManager extends EventEmitter {
             phase: 'compiling',
             version: runtime.version,
             progressPercent: 5,
-            message: 'Pre-compiling gateway bundle for faster startup...',
+            message: t('gatewayStartupPrecompiling'),
             canRetry: false,
           });
           await this.runCompileCacheWarmup();
@@ -775,7 +776,7 @@ export class OpenClawEngineManager extends EventEmitter {
       phase: 'starting',
       version: runtime.version,
       progressPercent: 10,
-      message: 'Starting OpenClaw gateway...',
+      message: t('gatewayStartupStarting'),
       canRetry: false,
     });
 
@@ -1627,15 +1628,15 @@ export class OpenClawEngineManager extends EventEmitter {
         if (this.startupPhase === 'compiling') {
           // V8 compilation phase: stretch 12 → 50 across the timeout window.
           progressPct = Math.min(50, 12 + Math.round((elapsedMs / timeoutMs) * 38));
-          phaseLabel = `Compiling gateway bundle... (${Math.round(elapsedMs / 1000)}s)`;
+          phaseLabel = `${t('gatewayStartupCompiling')} (${Math.round(elapsedMs / 1000)}s)`;
         } else if (this.startupPhase === 'modules-loading') {
           // Module loading: stretch 50 → 90.
           progressPct = Math.min(90, 50 + Math.round((elapsedMs / timeoutMs) * 40));
-          phaseLabel = `Loading gateway modules... (${Math.round(elapsedMs / 1000)}s)`;
+          phaseLabel = `${t('gatewayStartupLoadingModules')} (${Math.round(elapsedMs / 1000)}s)`;
         } else {
           // Pre-fork or health-waiting: 10 → 90 as before.
           progressPct = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
-          phaseLabel = `Starting OpenClaw gateway... (${Math.round(elapsedMs / 1000)}s)`;
+          phaseLabel = `${t('gatewayStartupStarting')} (${Math.round(elapsedMs / 1000)}s)`;
         }
         this.setStatus({
           phase: this.startupPhase === 'compiling' ? 'compiling' : 'starting',
@@ -1755,7 +1756,7 @@ export class OpenClawEngineManager extends EventEmitter {
           phase: 'compiling',
           version: this.status.version,
           progressPercent: 12,
-          message: 'Compiling gateway bundle...',
+          message: t('gatewayStartupCompiling'),
           canRetry: false,
         });
       }
@@ -1767,7 +1768,7 @@ export class OpenClawEngineManager extends EventEmitter {
           phase: 'starting',
           version: this.status.version,
           progressPercent: 50,
-          message: 'Loading gateway modules...',
+          message: t('gatewayStartupLoadingModules'),
           canRetry: false,
         });
       }
