@@ -179,21 +179,36 @@ const coworkSlice = createSlice({
 
     updateSessionStatus(state, action: PayloadAction<{ sessionId: string; status: CoworkSessionStatus }>) {
       const { sessionId, status } = action.payload;
+      const isCurrent = state.currentSession?.id === sessionId;
 
-      // Update in sessions list
+      // For non-current sessions (e.g. background cron tasks completing),
+      // only update unread markers — avoid mutating state.sessions, which
+      // would create a new array reference via Immer and trigger a full
+      // sidebar tree re-render.  That re-render causes a Flexbox layout
+      // recalculation that makes the adjacent conversation view flicker.
+      // The session status in the sidebar will catch up on the next
+      // loadSessions() (triggered by cowork:sessions:changed or polling).
+      if (!isCurrent) {
+        if (status === CoworkSessionStatusValue.Completed) {
+          markSessionUnread(state, sessionId);
+        }
+        return;
+      }
+
+      // Update in sessions list (current session path — safe to mutate)
       const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
       if (sessionIndex !== -1) {
         state.sessions[sessionIndex].status = status;
         state.sessions[sessionIndex].updatedAt = Date.now();
       }
 
-      // Update current session if applicable
-      if (state.currentSession?.id === sessionId) {
+      // Update current session (guaranteed non-null by isCurrent guard above)
+      if (state.currentSession) {
         state.currentSession.status = status;
         state.currentSession.updatedAt = Date.now();
-        // Streaming state is tied to the currently opened session only
-        state.isStreaming = status === CoworkSessionStatusValue.Running;
       }
+      // Streaming state is tied to the currently opened session only
+      state.isStreaming = status === CoworkSessionStatusValue.Running;
 
       if (status === CoworkSessionStatusValue.Completed) {
         markSessionUnread(state, sessionId);
