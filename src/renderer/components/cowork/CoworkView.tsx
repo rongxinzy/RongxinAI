@@ -102,7 +102,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       case 'ready':
         return i18nService.t('coworkOpenClawReadyNotice');
       case 'starting':
-        return i18nService.t('coworkOpenClawStarting');
+      case 'compiling':
+        return status.message || i18nService.t('coworkOpenClawStarting');
       case 'error':
         return i18nService.t('coworkOpenClawError');
       case 'running':

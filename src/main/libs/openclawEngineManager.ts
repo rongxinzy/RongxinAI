@@ -17,6 +17,7 @@ import {
 } from './gatewayLogRotation';
 import { getCodexHomeDir } from './openaiCodexAuth';
 import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
+import { t } from '../i18n';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 
 const gwDiagTs = (): string => {
@@ -34,7 +35,11 @@ type GatewayProcess = UtilityProcess | ChildProcess;
 const DEFAULT_OPENCLAW_VERSION = '2026.2.23';
 const DEFAULT_GATEWAY_PORT = 18789;
 const GATEWAY_PORT_SCAN_LIMIT = 80;
-const GATEWAY_BOOT_TIMEOUT_MS = 300 * 1000;
+// Boot timeout adapts to cache state: a warm cache means the gateway starts
+// quickly (~5-15s), while a cold cache requires V8 compilation (~25-35s) and
+// plugin loading on top.
+const GATEWAY_BOOT_TIMEOUT_MS_COLD = 600 * 1000; // 10 min — cold start may need V8 compilation
+const GATEWAY_BOOT_TIMEOUT_MS_WARM = 120 * 1000; // 2 min — warm start typically completes in <30s
 const GATEWAY_MAX_RESTART_ATTEMPTS = 5;
 const GATEWAY_RESTART_DELAYS = [3_000, 5_000, 10_000, 20_000, 30_000];
 
@@ -43,6 +48,7 @@ export type OpenClawEnginePhase =
   | 'installing'
   | 'ready'
   | 'starting'
+  | 'compiling'
   | 'running'
   | 'error';
 
@@ -177,6 +183,17 @@ export class OpenClawEngineManager extends EventEmitter {
   private gatewaySpawnedAt: number | null = null;
   private gatewayLogPrunedDateKey: string | null = null;
 
+  // ── Startup phase tracking (phased health probes) ──
+  private startupPhase: 'compiling' | 'modules-loading' | 'health-waiting' | 'running' = 'compiling';
+  private startupPhaseLogged: Set<string> = new Set();
+  private startupStderrBuffer = '';
+
+  // ── Cache warmup (pre-fork V8 compile-cache seeding) ──
+  private warmupProcess: ChildProcess | null = null;
+  private get warmingLockPath(): string {
+    return path.join(this.stateDir, '.cache-warming');
+  }
+
   constructor() {
     super();
 
@@ -283,6 +300,269 @@ export class OpenClawEngineManager extends EventEmitter {
     if (this.gatewayLogPrunedDateKey === dateKey) return;
     pruneGatewayLogs(this.logsDir, now);
     this.gatewayLogPrunedDateKey = dateKey;
+  }
+
+  // ── Compile-cache helpers ─────────────────────────────────────────────
+
+  /** Base directory containing all versioned cache subdirectories. */
+  private getCompileCacheBaseDir(): string {
+    return path.join(this.stateDir, '.compile-cache');
+  }
+
+  /** Fingerprint identifying the V8 / Node combination that determines bytecode compatibility. */
+  private getCacheVersionFingerprint(): string {
+    const v8Major = process.versions.v8.split('.')[0];
+    const nodeMajor = process.versions.node.split('.')[0];
+    return `v8-${v8Major}-node-${nodeMajor}`;
+  }
+
+  /** Versioned cache directory for the current V8 / Node combination. */
+  private getCompileCacheDir(): string {
+    return path.join(this.getCompileCacheBaseDir(), this.getCacheVersionFingerprint());
+  }
+
+  private isCompileCachePopulated(): boolean {
+    const cacheDir = this.getCompileCacheDir();
+    try {
+      if (!fs.existsSync(cacheDir)) return false;
+      const entries = fs.readdirSync(cacheDir);
+      return entries.some((entry) => {
+        const full = path.join(cacheDir, entry);
+        try { return fs.statSync(full).isFile(); } catch { return false; }
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Wait for an in-progress cache warmup (guarded by .cache-warming lock).
+   * Returns immediately if no warmup is running.
+   */
+  private async waitForWarmupIfInProgress(): Promise<void> {
+    if (!fs.existsSync(this.warmingLockPath)) return;
+
+    console.log('[OpenClaw] cache warmup already in progress, waiting...');
+    const t0 = Date.now();
+    const maxWaitMs = 120_000;
+
+    while (fs.existsSync(this.warmingLockPath)) {
+      if (Date.now() - t0 > maxWaitMs) {
+        console.warn('[OpenClaw] waited for cache warmup lock >2min, proceeding without it');
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    console.log(`[OpenClaw] cache warmup lock released after ${Date.now() - t0}ms`);
+  }
+
+  private cleanupWarmingLock(): void {
+    try {
+      if (fs.existsSync(this.warmingLockPath)) fs.unlinkSync(this.warmingLockPath);
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Run a compile-cache warmup before forking the gateway process.
+   *
+   * Generates a minimal launcher script that imports gateway-bundle.mjs under
+   * the same V8 compile-cache directory the real gateway will use.  The
+   * warmup-compile-cache.cjs helper is not in production builds, so we write
+   * an inlined equivalent into the state directory.
+   */
+  private async runCompileCacheWarmup(): Promise<void> {
+    // Double-check: avoid duplicate warmup via lock.
+    if (fs.existsSync(this.warmingLockPath)) return this.waitForWarmupIfInProgress();
+
+    fs.writeFileSync(this.warmingLockPath, String(process.pid), 'utf8');
+    console.log('[OpenClaw] Starting compile-cache warmup...');
+
+    const runtime = this.resolveRuntimeMetadata();
+    const bundlePath = path.join(runtime.root!, 'gateway-bundle.mjs');
+    if (!fs.existsSync(bundlePath)) {
+      console.warn('[OpenClaw] No gateway-bundle.mjs found, skipping warmup');
+      this.cleanupWarmingLock();
+      return;
+    }
+
+    const compileCacheDir = this.getCompileCacheDir();
+    ensureDir(compileCacheDir);
+
+    // Write an inlined warmup launcher to the state dir.
+    const launcherPath = path.join(this.stateDir, '.warmup-launcher.cjs');
+    const launcherSrc = [
+      `const { pathToFileURL } = require('node:url');`,
+      `const path = require('node:path');`,
+      `const fs = require('node:fs');`,
+      `const t0 = Date.now();`,
+      `const elapsed = () => Date.now() - t0 + 'ms';`,
+      `try { const { enableCompileCache } = require('node:module');`,
+      `  enableCompileCache(process.env.NODE_COMPILE_CACHE); } catch (_) {}`,
+      `const bundlePath = path.join(${JSON.stringify(path.dirname(bundlePath))}, 'gateway-bundle.mjs');`,
+      `process.stderr.write('[warmup] loading ' + bundlePath + '...\\n');`,
+      `import(pathToFileURL(bundlePath).href).then(() => {`,
+      `  try { require('node:module').flushCompileCache(); } catch (_) {}`,
+      `  process.stderr.write('[warmup] done (' + elapsed() + ')\\n');`,
+      `  process.exit(0);`,
+      `}).catch((err) => {`,
+      `  try { require('node:module').flushCompileCache(); } catch (_) {}`,
+      `  process.stderr.write('[warmup] finished with error (cache still written): ' + err.message + ' (' + elapsed() + ')\\n');`,
+      `  process.exit(0);`,
+      `});`,
+    ].join('\n');
+
+    // Write only if different to avoid unnecessary disk writes.
+    const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : '';
+    if (existing !== launcherSrc) {
+      fs.writeFileSync(launcherPath, launcherSrc, 'utf8');
+    }
+
+    return new Promise<void>((resolve) => {
+      const child = spawn(process.execPath, [launcherPath], {
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
+          NODE_COMPILE_CACHE: compileCacheDir,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+
+      this.warmupProcess = child;
+
+      child.stderr?.on('data', (chunk: Buffer) => {
+        const text = chunk.toString().trim();
+        if (text) console.log(`[OpenClaw warmup] ${text}`);
+      });
+
+      const done = (exitCode: number | null) => {
+        const elapsed = Date.now();
+        this.warmupProcess = null;
+        console.log(`[OpenClaw] cache warmup finished (exitCode=${exitCode})`);
+        this.cleanupWarmingLock();
+        // Remove the temp launcher on success.
+        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch {}
+        resolve();
+      };
+
+      child.once('exit', done);
+      child.once('error', (err) => {
+        console.warn(`[OpenClaw] cache warmup error: ${err.message}`);
+        this.warmupProcess = null;
+        this.cleanupWarmingLock();
+        resolve();
+      });
+
+      // Hard timeout: never block startup for more than 120s on warmup.
+      setTimeout(() => {
+        if (this.warmupProcess === child) {
+          console.warn('[OpenClaw] cache warmup timed out after 120s, killing');
+          try { child.kill(); } catch {}
+          this.warmupProcess = null;
+          this.cleanupWarmingLock();
+          resolve();
+        }
+      }, 120_000);
+    });
+  }
+
+  // ── Cache compatibility (detect stale / incompatible compile cache) ──
+
+  private v8CompatMarkerPath(): string {
+    return path.join(this.getCompileCacheDir(), 'v8-compat.json');
+  }
+
+  private writeV8CompatMarker(): void {
+    const cacheDir = this.getCompileCacheDir();
+    ensureDir(cacheDir);
+    const info = {
+      nodeVersion: process.versions.node,
+      v8Version: process.versions.v8,
+      electronVersion: process.versions.electron,
+      appVersion: app.getVersion(),
+      cacheVersion: this.getCacheVersionFingerprint(),
+      writtenAt: Date.now(),
+    };
+    fs.writeFileSync(this.v8CompatMarkerPath(), JSON.stringify(info, null, 2), 'utf8');
+    console.log(`[OpenClaw] wrote v8-compat marker: ${info.cacheVersion}`);
+    // Prune old cache versions so they don't accumulate indefinitely.
+    this.pruneOldCacheVersions();
+  }
+
+  /**
+   * Keep only the 2 most-recently-used versioned cache directories.
+   * Older versions are V8-incompatible and would never be hit again.
+   */
+  private pruneOldCacheVersions(): void {
+    const baseDir = this.getCompileCacheBaseDir();
+    if (!fs.existsSync(baseDir)) return;
+
+    try {
+      const entries = fs.readdirSync(baseDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && e.name.startsWith('v8-'))
+        .map((e) => ({
+          name: e.name,
+          path: path.join(baseDir, e.name),
+          mtime: (() => { try { return fs.statSync(path.join(baseDir, e.name)).mtimeMs; } catch { return 0; } })(),
+        }))
+        .sort((a, b) => b.mtime - a.mtime); // newest first
+
+      const toDelete = entries.slice(2);
+      for (const entry of toDelete) {
+        console.log(`[OpenClaw] Pruning old compile cache: ${entry.name}`);
+        try { fs.rmSync(entry.path, { recursive: true, force: true }); } catch { /* best-effort */ }
+      }
+    } catch (err) {
+      console.warn('[OpenClaw] Failed to prune old cache versions:', err);
+    }
+  }
+
+  /**
+   * Returns true if the compile cache is compatible with the current V8 version.
+   * V8 bytecode is tied to the V8 major version — a mismatch invalidates the cache.
+   */
+  private checkCompileCacheCompatibility(): boolean {
+    const markerPath = this.v8CompatMarkerPath();
+    if (!fs.existsSync(markerPath)) {
+      // No marker — cache may be from a different install or older version
+      // that predates the marker.  Treat as compatible if populated.
+      return this.isCompileCachePopulated();
+    }
+
+    try {
+      const marker = parseJsonFile<{ v8Version?: string }>(markerPath);
+      if (!marker?.v8Version) return false;
+
+      const currentV8Major = process.versions.v8.split('.')[0];
+      const markerV8Major = marker.v8Version.split('.')[0];
+
+      if (currentV8Major !== markerV8Major) {
+        console.log(
+          `[OpenClaw] V8 version mismatch — cache: ${marker.v8Version}, current: ${process.versions.v8}`,
+        );
+        return false;
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private clearCompileCache(): void {
+    const cacheDir = this.getCompileCacheDir();
+    if (!fs.existsSync(cacheDir)) return;
+
+    console.log('[OpenClaw] Clearing incompatible compile cache...');
+    try {
+      // Simple recursive removal of the cache directory.
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+      console.log('[OpenClaw] Compile cache cleared');
+    } catch (err) {
+      console.warn('[OpenClaw] Failed to clear compile cache:', err);
+    }
   }
 
   /**
@@ -393,6 +673,10 @@ export class OpenClawEngineManager extends EventEmitter {
 
   private async doStartGateway(): Promise<OpenClawEngineStatus> {
     this.shutdownRequested = false;
+    // Reset startup phase tracking for phased health probes.
+    this.startupPhase = 'compiling';
+    this.startupPhaseLogged = new Set();
+    this.startupStderrBuffer = '';
     const t0 = Date.now();
     const elapsed = () => `${Date.now() - t0}ms`;
 
@@ -462,11 +746,37 @@ export class OpenClawEngineManager extends EventEmitter {
     this.ensureConfigFile();
     console.log(`[OpenClaw] startGateway: pre-fork setup done (${elapsed()})`);
 
+    // ── Pre-fork cache warmup (Windows-only) ──
+    // On Windows, cold V8 compilation of the 27 MB gateway-bundle.mjs can
+    // take 25-35 s.  Pre-seed the compile cache so the real gateway process
+    // starts in ~5 s instead.
+    if (process.platform === 'win32') {
+      // Check if the existing cache is compatible (same V8 major version).
+      if (this.isCompileCachePopulated() && !this.checkCompileCacheCompatibility()) {
+        this.clearCompileCache();
+      }
+
+      if (!this.isCompileCachePopulated()) {
+        await this.waitForWarmupIfInProgress();
+        if (!this.isCompileCachePopulated()) {
+          this.setStatus({
+            phase: 'compiling',
+            version: runtime.version,
+            progressPercent: 5,
+            message: t('gatewayStartupPrecompiling'),
+            canRetry: false,
+          });
+          await this.runCompileCacheWarmup();
+          this.writeV8CompatMarker();
+        }
+      }
+    }
+
     this.setStatus({
       phase: 'starting',
       version: runtime.version,
       progressPercent: 10,
-      message: 'Starting OpenClaw gateway...',
+      message: t('gatewayStartupStarting'),
       canRetry: false,
     });
 
@@ -604,7 +914,13 @@ export class OpenClawEngineManager extends EventEmitter {
       console.log(`[OpenClaw] gateway process spawned (${elapsed()}), pid=${child.pid}`);
     });
 
-    const ready = await this.waitForGatewayReady(port, GATEWAY_BOOT_TIMEOUT_MS);
+    // Use a tighter timeout when the compile cache is warm (5-15s typical)
+    // and a generous one for cold starts (V8 compilation may take 25-35s).
+    const bootTimeoutMs = this.isCompileCachePopulated()
+      ? GATEWAY_BOOT_TIMEOUT_MS_WARM
+      : GATEWAY_BOOT_TIMEOUT_MS_COLD;
+    console.log(`[OpenClaw] boot timeout: ${bootTimeoutMs}ms (cache=${this.isCompileCachePopulated() ? 'warm' : 'cold'})`);
+    const ready = await this.waitForGatewayReady(port, bootTimeoutMs);
     console.log(`[OpenClaw] startGateway: waitForGatewayReady returned (${elapsed()}), ready=${ready}`);
     if (!ready) {
       this.setStatus({
@@ -637,6 +953,13 @@ export class OpenClawEngineManager extends EventEmitter {
     if (this.gatewayRestartTimer) {
       clearTimeout(this.gatewayRestartTimer);
       this.gatewayRestartTimer = null;
+    }
+
+    // Kill in-progress cache warmup (if any).
+    if (this.warmupProcess) {
+      try { this.warmupProcess.kill(); } catch { /* ignore */ }
+      this.warmupProcess = null;
+      this.cleanupWarmingLock();
     }
 
     if (this.gatewayProcess) {
@@ -1297,18 +1620,34 @@ export class OpenClawEngineManager extends EventEmitter {
           return;
         }
 
-        // Update progress from 10% → 90% during the wait, so the UI shows meaningful feedback.
-        const progress = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
+        // Update progress during the wait.  The range and label adapt to the
+        // sub-phase so the user sees meaningful detail (e.g. "Compiling..."
+        // during the V8 cold-compilation window, "Loading modules..." after).
+        let progressPct: number;
+        let phaseLabel: string;
+        if (this.startupPhase === 'compiling') {
+          // V8 compilation phase: stretch 12 → 50 across the timeout window.
+          progressPct = Math.min(50, 12 + Math.round((elapsedMs / timeoutMs) * 38));
+          phaseLabel = `${t('gatewayStartupCompiling')} (${Math.round(elapsedMs / 1000)}s)`;
+        } else if (this.startupPhase === 'modules-loading') {
+          // Module loading: stretch 50 → 90.
+          progressPct = Math.min(90, 50 + Math.round((elapsedMs / timeoutMs) * 40));
+          phaseLabel = `${t('gatewayStartupLoadingModules')} (${Math.round(elapsedMs / 1000)}s)`;
+        } else {
+          // Pre-fork or health-waiting: 10 → 90 as before.
+          progressPct = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
+          phaseLabel = `${t('gatewayStartupStarting')} (${Math.round(elapsedMs / 1000)}s)`;
+        }
         this.setStatus({
-          phase: 'starting',
+          phase: this.startupPhase === 'compiling' ? 'compiling' : 'starting',
           version: this.status.version,
-          progressPercent: progress,
-          message: `Starting OpenClaw gateway... (${Math.round(elapsedMs / 1000)}s)`,
+          progressPercent: progressPct,
+          message: phaseLabel,
           canRetry: false,
         });
 
         if (pollCount % 5 === 0) {
-          console.log(`[OpenClaw] waitForGatewayReady: poll #${pollCount}, elapsed=${elapsedMs}ms, progress=${progress}%`);
+          console.log(`[OpenClaw] waitForGatewayReady: poll #${pollCount}, elapsed=${elapsedMs}ms, progress=${progressPct}%`);
         }
 
         setTimeout(() => {
@@ -1389,6 +1728,58 @@ export class OpenClawEngineManager extends EventEmitter {
     );
   }
 
+  /**
+   * Parse a line of gateway stderr for startup milestone markers and emit
+   * phased status updates so the user sees meaningful progress instead of a
+   * static "Starting..." message during cold V8 compilation (25-35s).
+   */
+  private handleStartupStderrLine(text: string): void {
+    // Only act when gateway is in the startup window.
+    if (this.status.phase !== 'starting' && this.status.phase !== 'compiling') return;
+
+    // Buffer partial lines across chunk boundaries.
+    this.startupStderrBuffer += text;
+    if (!this.startupStderrBuffer.includes('\n') && this.startupStderrBuffer.length < 2000) return;
+
+    const lines = this.startupStderrBuffer.split('\n');
+    // Keep the last (possibly incomplete) line in the buffer.
+    this.startupStderrBuffer = this.startupStderrBuffer.endsWith('\n') ? '' : (lines.pop() ?? '');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.includes('[openclaw-launcher] loading bundle') && !this.startupPhaseLogged.has('compiling')) {
+        this.startupPhaseLogged.add('compiling');
+        this.startupPhase = 'compiling';
+        this.setStatus({
+          phase: 'compiling',
+          version: this.status.version,
+          progressPercent: 12,
+          message: t('gatewayStartupCompiling'),
+          canRetry: false,
+        });
+      }
+
+      if (trimmed.includes('[openclaw-launcher] import ok') && !this.startupPhaseLogged.has('modules-loading')) {
+        this.startupPhaseLogged.add('modules-loading');
+        this.startupPhase = 'modules-loading';
+        this.setStatus({
+          phase: 'starting',
+          version: this.status.version,
+          progressPercent: 50,
+          message: t('gatewayStartupLoadingModules'),
+          canRetry: false,
+        });
+      }
+    }
+
+    // Trim buffer to avoid unbounded growth on unexpected output.
+    if (this.startupStderrBuffer.length > 4096) {
+      this.startupStderrBuffer = this.startupStderrBuffer.slice(-2048);
+    }
+  }
+
   private attachGatewayProcessLogs(child: GatewayProcess): void {
     ensureDir(this.logsDir);
     this.pruneGatewayLogsIfNeeded();
@@ -1415,12 +1806,14 @@ export class OpenClawEngineManager extends EventEmitter {
     child.stdout?.on('data', (chunk) => {
       appendLog(chunk, 'stdout');
       const text = typeof chunk === 'string' ? chunk : chunk.toString();
+      this.handleStartupStderrLine(text);
       logStartupMilestone(text);
       console.log(`[OpenClaw stdout] ${OpenClawEngineManager.rewriteUtcTimestamps(text)}`);
     });
     child.stderr?.on('data', (chunk) => {
       appendLog(chunk, 'stderr');
       const text = typeof chunk === 'string' ? chunk : chunk.toString();
+      this.handleStartupStderrLine(text);
       logStartupMilestone(text);
       console.error(`[OpenClaw stderr] ${OpenClawEngineManager.rewriteUtcTimestamps(text)}`);
     });

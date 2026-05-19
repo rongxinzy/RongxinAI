@@ -1506,6 +1506,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
       case 'ready':
         return i18nService.t('coworkOpenClawReadyNotice');
       case 'starting':
+      case 'compiling':
         return i18nService.t('coworkOpenClawStarting');
       case 'error':
         return i18nService.t('coworkOpenClawError');

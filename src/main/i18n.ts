@@ -69,6 +69,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillErrClawhubNotFound: '在 ClawHub 上未找到该技能，请检查链接是否正确。',
     skillErrClawhubDownloadFailed: '从 ClawHub 下载技能失败，请稍后重试。',
 
+    // Gateway startup phases
+    gatewayStartupPrecompiling: '正在预编译网关模块...',
+    gatewayStartupCompiling: '正在编译网关模块...',
+    gatewayStartupLoadingModules: '正在加载网关模块...',
+    gatewayStartupStarting: '正在启动 AI 引擎...',
+
     // Auth quota
     authPlanFree: '免费',
     authPlanStandard: '标准',
@@ -313,6 +319,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Invalid skill source. Use owner/repo, repo URL, npm package spec, ClawHub URL, or a GitHub tree/blob URL.',
     skillErrClawhubNotFound: 'Skill not found on ClawHub. Please check the URL.',
     skillErrClawhubDownloadFailed: 'Failed to download skill from ClawHub. Please try again later.',
+
+    // Gateway startup phases
+    gatewayStartupPrecompiling: 'Pre-compiling gateway bundle...',
+    gatewayStartupCompiling: 'Compiling gateway bundle...',
+    gatewayStartupLoadingModules: 'Loading gateway modules...',
+    gatewayStartupStarting: 'Starting AI engine...',
 
     // Auth quota
     authPlanFree: 'Free',

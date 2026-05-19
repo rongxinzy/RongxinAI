@@ -14,7 +14,8 @@ const resolveEngineStatusText = (status: OpenClawEngineStatus): string => {
     case 'ready':
       return i18nService.t('coworkOpenClawReadyNotice');
     case 'starting':
-      return i18nService.t('coworkOpenClawStarting');
+    case 'compiling':
+      return status.message || i18nService.t('coworkOpenClawStarting');
     case 'error':
       return i18nService.t('coworkOpenClawError');
     case 'running':
@@ -42,7 +43,7 @@ const EngineStartupOverlay: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  if (!status || status.phase !== 'starting') {
+  if (!status || (status.phase !== 'starting' && status.phase !== 'compiling')) {
     return null;
   }
 
