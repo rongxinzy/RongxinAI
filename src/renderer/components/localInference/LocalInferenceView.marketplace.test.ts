@@ -45,21 +45,355 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
   expect(keys).not.toContain('threads');
   expect(keys).not.toContain('threadsBatch');
   expect(keys).not.toContain('mmap');
+  expect(keys).not.toContain('reasoning');
+  expect(keys).not.toContain('reasoningFormat');
+  expect(keys).not.toContain('reasoningBudget');
 });
 
 test('llama.cpp inference option metadata uses OpenAI-compatible request parameter keys', async () => {
   const module = await import('./LocalInferenceView');
   const getInferenceOptionFields = (module as unknown as {
-    __test__getInferenceOptionFields?: () => Array<{ key: string; paramName: string }>;
+    __test__getInferenceOptionFields?: () => Array<{ key: string; group: string; paramName: string }>;
   }).__test__getInferenceOptionFields;
 
   expect(typeof getInferenceOptionFields).toBe('function');
   if (!getInferenceOptionFields) return;
 
-  const paramNames = getInferenceOptionFields().map((field) => field.paramName);
+  const fields = getInferenceOptionFields();
+  const paramNames = fields.map((field) => field.paramName);
+  const basicKeys = fields.filter((field) => field.group === 'basic').map((field) => field.key);
+  const advancedKeys = fields.filter((field) => field.group === 'advanced').map((field) => field.key);
+
   expect(paramNames).toContain('max_tokens');
   expect(paramNames).toContain('reasoning_format');
-  expect(paramNames).toContain('thinking_forced_open');
+  expect(paramNames).toContain('chat_template_kwargs.enable_thinking');
+  expect(paramNames).toContain('thinking_budget_tokens');
+  expect(paramNames).not.toContain('thinking_forced_open');
   expect(paramNames).not.toContain('num_predict');
   expect(paramNames.every((paramName) => !paramName.startsWith('--'))).toBe(true);
+  expect(basicKeys).toEqual([
+    'num_predict',
+    'thinking_forced_open',
+    'temperature',
+    'top_p',
+  ]);
+  expect(advancedKeys).toEqual([
+    'top_k',
+    'min_p',
+    'repeat_penalty',
+    'presence_penalty',
+    'reasoning_format',
+    'thinking_budget_tokens',
+    'cache_prompt',
+    'seed',
+    'stop',
+  ]);
+  expect([...basicKeys, ...advancedKeys].sort()).toEqual(fields.map((field) => field.key).sort());
+});
+
+test('streaming assistant display shows waiting dots until content or thinking arrives', async () => {
+  const module = await import('./LocalInferenceView');
+  const buildStreamingAssistantMessage = (module as unknown as {
+    __test__buildStreamingAssistantMessage?: (input: {
+      content: string;
+      thinking: string;
+      thinkingDisabled: boolean;
+    }) => { content: string; thinking?: string; waiting?: boolean; hiddenThinking?: boolean };
+  }).__test__buildStreamingAssistantMessage;
+
+  expect(typeof buildStreamingAssistantMessage).toBe('function');
+  if (!buildStreamingAssistantMessage) return;
+
+  expect(buildStreamingAssistantMessage({
+    content: '',
+    thinking: '',
+    thinkingDisabled: false,
+  })).toEqual(expect.objectContaining({
+    content: '',
+    waiting: true,
+  }));
+
+  expect(buildStreamingAssistantMessage({
+    content: '',
+    thinking: 'checking',
+    thinkingDisabled: false,
+  })).toEqual(expect.objectContaining({
+    content: '',
+    thinking: 'checking',
+    waiting: false,
+  }));
+
+  expect(buildStreamingAssistantMessage({
+    content: 'answer',
+    thinking: 'checking',
+    thinkingDisabled: false,
+  })).toEqual(expect.objectContaining({
+    content: 'answer',
+    thinking: 'checking',
+    waiting: false,
+  }));
+});
+
+test('streaming assistant display hides thinking when thinking is disabled', async () => {
+  const module = await import('./LocalInferenceView');
+  const buildStreamingAssistantMessage = (module as unknown as {
+    __test__buildStreamingAssistantMessage?: (input: {
+      content: string;
+      thinking: string;
+      thinkingDisabled: boolean;
+    }) => { content: string; thinking?: string; waiting?: boolean; hiddenThinking?: boolean };
+  }).__test__buildStreamingAssistantMessage;
+
+  expect(typeof buildStreamingAssistantMessage).toBe('function');
+  if (!buildStreamingAssistantMessage) return;
+
+  const message = buildStreamingAssistantMessage({
+    content: '',
+    thinking: 'hidden',
+    thinkingDisabled: true,
+  });
+
+  expect(message.thinking).toBeUndefined();
+  expect(message.hiddenThinking).toBe(true);
+  expect(message.waiting).toBe(true);
+});
+
+test('new prompt scroll target points at the next assistant response start', async () => {
+  const module = await import('./LocalInferenceView');
+  const getNewAssistantScrollTargetIndex = (module as unknown as {
+    __test__getNewAssistantScrollTargetIndex?: (historyLength: number) => number;
+  }).__test__getNewAssistantScrollTargetIndex;
+  const getAssistantScrollTop = (module as unknown as {
+    __test__getAssistantScrollTop?: (input: {
+      containerScrollTop: number;
+      containerTop: number;
+      targetTop: number;
+      offset?: number;
+    }) => number;
+  }).__test__getAssistantScrollTop;
+
+  expect(typeof getNewAssistantScrollTargetIndex).toBe('function');
+  expect(typeof getAssistantScrollTop).toBe('function');
+  if (!getNewAssistantScrollTargetIndex) return;
+  if (!getAssistantScrollTop) return;
+
+  expect(getNewAssistantScrollTargetIndex(0)).toBe(1);
+  expect(getNewAssistantScrollTargetIndex(4)).toBe(5);
+  expect(getAssistantScrollTop({
+    containerScrollTop: 320,
+    containerTop: 100,
+    targetTop: 240,
+  })).toBe(440);
+  expect(getAssistantScrollTop({
+    containerScrollTop: 5,
+    containerTop: 100,
+    targetTop: 110,
+  })).toBe(0);
+});
+
+test('jump-to-bottom visibility logic only triggers when content remains below viewport', async () => {
+  const module = await import('./LocalInferenceView');
+  const isScrollNearBottom = (module as unknown as {
+    __test__isScrollNearBottom?: (input: {
+      scrollTop: number;
+      clientHeight: number;
+      scrollHeight: number;
+      threshold?: number;
+    }) => boolean;
+  }).__test__isScrollNearBottom;
+  const hasHiddenContentBelow = (module as unknown as {
+    __test__hasHiddenContentBelow?: (input: {
+      scrollTop: number;
+      clientHeight: number;
+      scrollHeight: number;
+      threshold?: number;
+    }) => boolean;
+  }).__test__hasHiddenContentBelow;
+
+  expect(typeof isScrollNearBottom).toBe('function');
+  expect(typeof hasHiddenContentBelow).toBe('function');
+  if (!isScrollNearBottom) return;
+  if (!hasHiddenContentBelow) return;
+
+  expect(isScrollNearBottom({
+    scrollTop: 900,
+    clientHeight: 300,
+    scrollHeight: 1260,
+  })).toBe(true);
+
+  expect(isScrollNearBottom({
+    scrollTop: 720,
+    clientHeight: 300,
+    scrollHeight: 1260,
+  })).toBe(false);
+
+  expect(hasHiddenContentBelow({
+    scrollTop: 720,
+    clientHeight: 300,
+    scrollHeight: 1260,
+  })).toBe(true);
+
+  expect(hasHiddenContentBelow({
+    scrollTop: 952,
+    clientHeight: 300,
+    scrollHeight: 1260,
+  })).toBe(false);
+});
+
+test('final assistant message hides thinking when thinking is disabled', async () => {
+  const module = await import('./LocalInferenceView');
+  const buildAssistantMessage = (module as unknown as {
+    __test__buildAssistantMessage?: (input: {
+      content: string;
+      thinking: string;
+      metrics: unknown;
+      thinkingDisabled: boolean;
+    }) => { content: string; thinking?: string; hiddenThinking?: boolean };
+  }).__test__buildAssistantMessage;
+
+  expect(typeof buildAssistantMessage).toBe('function');
+  if (!buildAssistantMessage) return;
+
+  const message = buildAssistantMessage({
+    content: 'answer',
+    thinking: 'hidden chain',
+    metrics: null,
+    thinkingDisabled: true,
+  });
+
+  expect(message.content).toBe('answer');
+  expect(message.thinking).toBeUndefined();
+  expect(message.hiddenThinking).toBe(true);
+});
+
+test('final assistant message explains hidden thinking when no visible answer exists', async () => {
+  const module = await import('./LocalInferenceView');
+  const buildAssistantMessage = (module as unknown as {
+    __test__buildAssistantMessage?: (input: {
+      content: string;
+      thinking: string;
+      metrics: unknown;
+      thinkingDisabled: boolean;
+    }) => { content: string; thinking?: string; hiddenThinking?: boolean };
+  }).__test__buildAssistantMessage;
+
+  expect(typeof buildAssistantMessage).toBe('function');
+  if (!buildAssistantMessage) return;
+
+  const message = buildAssistantMessage({
+    content: '',
+    thinking: 'hidden chain',
+    metrics: null,
+    thinkingDisabled: true,
+  });
+
+  expect(message.content).toBeTruthy();
+  expect(message.content).not.toContain('hidden chain');
+  expect(message.thinking).toBeUndefined();
+  expect(message.hiddenThinking).toBe(true);
+});
+
+test('metrics summary uses usage token counts first', async () => {
+  const module = await import('./LocalInferenceView');
+  const formatMetricsSummary = (module as unknown as {
+    __test__formatMetricsSummary?: (metrics: unknown) => string;
+  }).__test__formatMetricsSummary;
+
+  expect(typeof formatMetricsSummary).toBe('function');
+  if (!formatMetricsSummary) return;
+
+  const summary = formatMetricsSummary({
+    usage: {
+      prompt_tokens: 11,
+      completion_tokens: 13,
+      total_tokens: 24,
+    },
+    timings: {
+      predicted_n: 99,
+      predicted_per_second: 8.25,
+    },
+  });
+
+  expect(summary).toContain('11');
+  expect(summary).toContain('13');
+  expect(summary).toContain('24');
+  expect(summary).toContain('8.3');
+});
+
+test('metrics summary falls back to timings and legacy fields', async () => {
+  const module = await import('./LocalInferenceView');
+  const formatMetricsSummary = (module as unknown as {
+    __test__formatMetricsSummary?: (metrics: unknown) => string;
+  }).__test__formatMetricsSummary;
+
+  expect(typeof formatMetricsSummary).toBe('function');
+  if (!formatMetricsSummary) return;
+
+  expect(formatMetricsSummary({
+    timings: {
+      prompt_n: 7,
+      predicted_n: 5,
+      predicted_per_second: 3,
+    },
+  })).toContain('7');
+  expect(formatMetricsSummary({
+    prompt_eval_count: 4,
+    eval_count: 6,
+    predicted_per_second: 2,
+  })).toContain('10');
+});
+
+test('request preview exposes the important llama.cpp body fields', async () => {
+  const module = await import('./LocalInferenceView');
+  const buildRequestPreview = (module as unknown as {
+    __test__buildRequestPreview?: (input: {
+      model: string;
+      systemPrompt: string;
+      options: Record<string, unknown>;
+    }) => Record<string, unknown>;
+  }).__test__buildRequestPreview;
+
+  expect(typeof buildRequestPreview).toBe('function');
+  if (!buildRequestPreview) return;
+
+  const preview = buildRequestPreview({
+    model: 'DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+    systemPrompt: 'reply with over',
+    options: {
+      max_tokens: 256,
+      reasoning_format: 'none',
+      chat_template_kwargs: { enable_thinking: false },
+      thinking_budget_tokens: 0,
+      temperature: 0.7,
+    },
+  });
+
+  expect(preview).toEqual({
+    model: 'DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+    messages: [{ role: 'system', content: 'reply with over' }],
+    max_tokens: 256,
+    reasoning_format: 'none',
+    chat_template_kwargs: { enable_thinking: false },
+    thinking_budget_tokens: 0,
+  });
+});
+
+test('composer height maps to safe chat padding and jump button offset', async () => {
+  const module = await import('./LocalInferenceView');
+  const getChatBottomPadding = (module as unknown as {
+    __test__getChatBottomPadding?: (composerHeight: number) => number;
+  }).__test__getChatBottomPadding;
+  const getJumpToBottomOffset = (module as unknown as {
+    __test__getJumpToBottomOffset?: (composerHeight: number) => number;
+  }).__test__getJumpToBottomOffset;
+
+  expect(typeof getChatBottomPadding).toBe('function');
+  expect(typeof getJumpToBottomOffset).toBe('function');
+  if (!getChatBottomPadding) return;
+  if (!getJumpToBottomOffset) return;
+
+  expect(getChatBottomPadding(48)).toBe(120);
+  expect(getChatBottomPadding(136)).toBe(156);
+  expect(getJumpToBottomOffset(48)).toBe(92);
+  expect(getJumpToBottomOffset(136)).toBe(152);
 });

@@ -122,15 +122,19 @@ function joinThinking(officialThinking: string, legacyThinking: string): string 
 }
 
 function resolveFinalChunk(current: LlamaCppChatChunk | null, next: LlamaCppChatChunk): LlamaCppChatChunk | null {
-  if (!next.done) return current;
   if (hasReliableMetrics(next)) return next;
+  if (!next.done) return current;
   return current ?? next;
 }
 
 function hasReliableMetrics(chunk: LlamaCppChatChunk): boolean {
-  return isFiniteNumber(chunk.eval_count)
+  return isFiniteNumber(chunk.prompt_eval_count)
+    || isFiniteNumber(chunk.eval_count)
     || isFiniteNumber(chunk.predicted_per_second)
+    || isFiniteNumber(readNestedNumber(chunk.usage, 'prompt_tokens'))
     || isFiniteNumber(readNestedNumber(chunk.usage, 'completion_tokens'))
+    || isFiniteNumber(readNestedNumber(chunk.usage, 'total_tokens'))
+    || isFiniteNumber(readNestedNumber(chunk.timings, 'prompt_n'))
     || isFiniteNumber(readNestedNumber(chunk.timings, 'predicted_n'))
     || isFiniteNumber(readNestedNumber(chunk.timings, 'predicted_per_second'));
 }

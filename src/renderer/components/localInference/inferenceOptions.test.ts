@@ -17,6 +17,7 @@ test('normalizes inference options for llama.cpp requests', () => {
     presence_penalty: 0.4,
     reasoning_format: 'deepseek',
     thinking_forced_open: 'enabled',
+    thinking_budget_tokens: 256,
     cache_prompt: 'disabled',
   });
 
@@ -29,10 +30,30 @@ test('normalizes inference options for llama.cpp requests', () => {
     min_p: 0.1,
     presence_penalty: 0.4,
     reasoning_format: 'deepseek',
-    thinking_forced_open: true,
+    chat_template_kwargs: {
+      enable_thinking: true,
+    },
+    thinking_budget_tokens: 256,
     cache_prompt: false,
     seed: 42,
     stop: ['###', 'END'],
+  }));
+  expect(normalized).not.toHaveProperty('thinking_forced_open');
+});
+
+test('disabling thinking sends llama.cpp template flag and zero thinking budget', () => {
+  const normalized = normalizeOptions({
+    ...DEFAULT_INFERENCE_OPTIONS,
+    thinking_forced_open: 'disabled',
+    thinking_budget_tokens: 512,
+  });
+
+  expect(normalized).toEqual(expect.objectContaining({
+    reasoning_format: 'none',
+    chat_template_kwargs: {
+      enable_thinking: false,
+    },
+    thinking_budget_tokens: 0,
   }));
 });
 

@@ -10,6 +10,7 @@ export type InferenceOptions = {
   presence_penalty: number;
   reasoning_format: 'auto' | 'none' | 'deepseek' | 'deepseek-legacy';
   thinking_forced_open: 'auto' | 'enabled' | 'disabled';
+  thinking_budget_tokens: number;
   cache_prompt: 'auto' | 'enabled' | 'disabled';
 };
 
@@ -25,6 +26,7 @@ export const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
   presence_penalty: 0,
   reasoning_format: 'auto',
   thinking_forced_open: 'auto',
+  thinking_budget_tokens: -1,
   cache_prompt: 'auto',
 };
 
@@ -40,6 +42,7 @@ const QWEN35_08B_INFERENCE_OPTIONS: InferenceOptions = {
   presence_penalty: 0.6,
   reasoning_format: 'auto',
   thinking_forced_open: 'auto',
+  thinking_budget_tokens: -1,
   cache_prompt: 'auto',
 };
 
@@ -67,8 +70,16 @@ export function normalizeOptions(options: InferenceOptions): Record<string, unkn
     min_p: options.min_p,
     presence_penalty: options.presence_penalty,
     ...(options.reasoning_format !== 'auto' ? { reasoning_format: options.reasoning_format } : {}),
-    ...(options.thinking_forced_open === 'enabled' ? { thinking_forced_open: true } : {}),
-    ...(options.thinking_forced_open === 'disabled' ? { thinking_forced_open: false } : {}),
+    ...(options.thinking_forced_open === 'disabled' ? { reasoning_format: 'none' } : {}),
+    ...(options.thinking_forced_open !== 'auto'
+      ? { chat_template_kwargs: { enable_thinking: options.thinking_forced_open === 'enabled' } }
+      : {}),
+    ...(options.thinking_forced_open === 'disabled'
+      ? { thinking_budget_tokens: 0 }
+      : {}),
+    ...(options.thinking_forced_open !== 'disabled' && options.thinking_budget_tokens >= 0
+      ? { thinking_budget_tokens: options.thinking_budget_tokens }
+      : {}),
     ...(options.cache_prompt === 'enabled' ? { cache_prompt: true } : {}),
     ...(options.cache_prompt === 'disabled' ? { cache_prompt: false } : {}),
     ...(options.seed >= 0 ? { seed: options.seed } : {}),
@@ -88,6 +99,7 @@ export function areInferenceOptionsEqual(left: InferenceOptions, right: Inferenc
     && left.presence_penalty === right.presence_penalty
     && left.reasoning_format === right.reasoning_format
     && left.thinking_forced_open === right.thinking_forced_open
+    && left.thinking_budget_tokens === right.thinking_budget_tokens
     && left.cache_prompt === right.cache_prompt;
 }
 

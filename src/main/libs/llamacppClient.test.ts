@@ -108,6 +108,31 @@ describe('LlamaCppClient', () => {
     }));
   });
 
+  test('maps timings-only metrics chunks from OpenAI-compatible SSE', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => sseResponse([
+      { choices: [{ delta: { content: 'hi' } }] },
+      {
+        timings: { prompt_n: 4, predicted_n: 6, predicted_per_second: 12 },
+      },
+      '[DONE]',
+    ])));
+    const chunks: unknown[] = [];
+    const client = new LlamaCppClient();
+
+    await client.chat({
+      model: 'qwen3:8b',
+      messages: [{ role: 'user', content: 'hello' }],
+      stream: true,
+    }, (chunk) => chunks.push(chunk));
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      prompt_eval_count: 4,
+      eval_count: 6,
+      predicted_per_second: 12,
+      timings: expect.objectContaining({ prompt_n: 4 }),
+    }));
+  });
+
   test('cancels the SSE reader when chat generation is aborted', async () => {
     let cancelled = false;
     const fetchMock = vi.fn(async () => {

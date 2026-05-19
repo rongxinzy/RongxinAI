@@ -82,6 +82,29 @@ describe('llamacpp stream reducer', () => {
     expect(state.finalChunk?.predicted_per_second).toBe(17.5);
   });
 
+  test('preserves metrics from a timings chunk before a synthetic done chunk', () => {
+    let state = createLlamaCppStreamState();
+
+    state = reduceLlamaCppStreamChunk(state, {
+      message: { role: 'assistant', content: 'answer' },
+    });
+    state = reduceLlamaCppStreamChunk(state, {
+      timings: {
+        prompt_n: 8,
+        predicted_n: 12,
+        predicted_per_second: 18.5,
+      },
+    });
+    state = reduceLlamaCppStreamChunk(state, {
+      done: true,
+      done_reason: 'stop',
+    });
+
+    expect(state.finalChunk?.timings?.prompt_n).toBe(8);
+    expect(state.finalChunk?.timings?.predicted_n).toBe(12);
+    expect(state.finalChunk?.timings?.predicted_per_second).toBe(18.5);
+  });
+
   test('splits legacy think markup out of content', () => {
     expect(splitThinkMarkup('<think>hidden</think>visible')).toEqual({
       thinking: 'hidden',
