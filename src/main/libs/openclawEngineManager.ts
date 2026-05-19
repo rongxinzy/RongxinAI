@@ -450,6 +450,72 @@ export class OpenClawEngineManager extends EventEmitter {
     });
   }
 
+  // ── Cache compatibility (detect stale / incompatible compile cache) ──
+
+  private v8CompatMarkerPath(): string {
+    return path.join(this.getCompileCacheDir(), 'v8-compat.json');
+  }
+
+  private writeV8CompatMarker(): void {
+    const cacheDir = this.getCompileCacheDir();
+    ensureDir(cacheDir);
+    const info = {
+      nodeVersion: process.versions.node,
+      v8Version: process.versions.v8,
+      electronVersion: process.versions.electron,
+      appVersion: app.getVersion(),
+      writtenAt: Date.now(),
+    };
+    fs.writeFileSync(this.v8CompatMarkerPath(), JSON.stringify(info, null, 2), 'utf8');
+    console.log(`[OpenClaw] wrote v8-compat marker: v8=${info.v8Version} node=${info.nodeVersion}`);
+  }
+
+  /**
+   * Returns true if the compile cache is compatible with the current V8 version.
+   * V8 bytecode is tied to the V8 major version — a mismatch invalidates the cache.
+   */
+  private checkCompileCacheCompatibility(): boolean {
+    const markerPath = this.v8CompatMarkerPath();
+    if (!fs.existsSync(markerPath)) {
+      // No marker — cache may be from a different install or older version
+      // that predates the marker.  Treat as compatible if populated.
+      return this.isCompileCachePopulated();
+    }
+
+    try {
+      const marker = parseJsonFile<{ v8Version?: string }>(markerPath);
+      if (!marker?.v8Version) return false;
+
+      const currentV8Major = process.versions.v8.split('.')[0];
+      const markerV8Major = marker.v8Version.split('.')[0];
+
+      if (currentV8Major !== markerV8Major) {
+        console.log(
+          `[OpenClaw] V8 version mismatch — cache: ${marker.v8Version}, current: ${process.versions.v8}`,
+        );
+        return false;
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private clearCompileCache(): void {
+    const cacheDir = this.getCompileCacheDir();
+    if (!fs.existsSync(cacheDir)) return;
+
+    console.log('[OpenClaw] Clearing incompatible compile cache...');
+    try {
+      // Simple recursive removal of the cache directory.
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+      console.log('[OpenClaw] Compile cache cleared');
+    } catch (err) {
+      console.warn('[OpenClaw] Failed to clear compile cache:', err);
+    }
+  }
+
   /**
    * Resolve the directory where the OpenClaw gateway writes its daily rolling
    * logs (openclaw-YYYY-MM-DD.log).  Returns null when no candidate exists.
@@ -635,17 +701,25 @@ export class OpenClawEngineManager extends EventEmitter {
     // On Windows, cold V8 compilation of the 27 MB gateway-bundle.mjs can
     // take 25-35 s.  Pre-seed the compile cache so the real gateway process
     // starts in ~5 s instead.
-    if (process.platform === 'win32' && !this.isCompileCachePopulated()) {
-      await this.waitForWarmupIfInProgress();
+    if (process.platform === 'win32') {
+      // Check if the existing cache is compatible (same V8 major version).
+      if (this.isCompileCachePopulated() && !this.checkCompileCacheCompatibility()) {
+        this.clearCompileCache();
+      }
+
       if (!this.isCompileCachePopulated()) {
-        this.setStatus({
-          phase: 'compiling',
-          version: runtime.version,
-          progressPercent: 5,
-          message: 'Pre-compiling gateway bundle for faster startup...',
-          canRetry: false,
-        });
-        await this.runCompileCacheWarmup();
+        await this.waitForWarmupIfInProgress();
+        if (!this.isCompileCachePopulated()) {
+          this.setStatus({
+            phase: 'compiling',
+            version: runtime.version,
+            progressPercent: 5,
+            message: 'Pre-compiling gateway bundle for faster startup...',
+            canRetry: false,
+          });
+          await this.runCompileCacheWarmup();
+          this.writeV8CompatMarker();
+        }
       }
     }
 
