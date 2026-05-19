@@ -299,8 +299,21 @@ export class OpenClawEngineManager extends EventEmitter {
 
   // ── Compile-cache helpers ─────────────────────────────────────────────
 
-  private getCompileCacheDir(): string {
+  /** Base directory containing all versioned cache subdirectories. */
+  private getCompileCacheBaseDir(): string {
     return path.join(this.stateDir, '.compile-cache');
+  }
+
+  /** Fingerprint identifying the V8 / Node combination that determines bytecode compatibility. */
+  private getCacheVersionFingerprint(): string {
+    const v8Major = process.versions.v8.split('.')[0];
+    const nodeMajor = process.versions.node.split('.')[0];
+    return `v8-${v8Major}-node-${nodeMajor}`;
+  }
+
+  /** Versioned cache directory for the current V8 / Node combination. */
+  private getCompileCacheDir(): string {
+    return path.join(this.getCompileCacheBaseDir(), this.getCacheVersionFingerprint());
   }
 
   private isCompileCachePopulated(): boolean {
@@ -464,10 +477,41 @@ export class OpenClawEngineManager extends EventEmitter {
       v8Version: process.versions.v8,
       electronVersion: process.versions.electron,
       appVersion: app.getVersion(),
+      cacheVersion: this.getCacheVersionFingerprint(),
       writtenAt: Date.now(),
     };
     fs.writeFileSync(this.v8CompatMarkerPath(), JSON.stringify(info, null, 2), 'utf8');
-    console.log(`[OpenClaw] wrote v8-compat marker: v8=${info.v8Version} node=${info.nodeVersion}`);
+    console.log(`[OpenClaw] wrote v8-compat marker: ${info.cacheVersion}`);
+    // Prune old cache versions so they don't accumulate indefinitely.
+    this.pruneOldCacheVersions();
+  }
+
+  /**
+   * Keep only the 2 most-recently-used versioned cache directories.
+   * Older versions are V8-incompatible and would never be hit again.
+   */
+  private pruneOldCacheVersions(): void {
+    const baseDir = this.getCompileCacheBaseDir();
+    if (!fs.existsSync(baseDir)) return;
+
+    try {
+      const entries = fs.readdirSync(baseDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && e.name.startsWith('v8-'))
+        .map((e) => ({
+          name: e.name,
+          path: path.join(baseDir, e.name),
+          mtime: (() => { try { return fs.statSync(path.join(baseDir, e.name)).mtimeMs; } catch { return 0; } })(),
+        }))
+        .sort((a, b) => b.mtime - a.mtime); // newest first
+
+      const toDelete = entries.slice(2);
+      for (const entry of toDelete) {
+        console.log(`[OpenClaw] Pruning old compile cache: ${entry.name}`);
+        try { fs.rmSync(entry.path, { recursive: true, force: true }); } catch { /* best-effort */ }
+      }
+    } catch (err) {
+      console.warn('[OpenClaw] Failed to prune old cache versions:', err);
+    }
   }
 
   /**
