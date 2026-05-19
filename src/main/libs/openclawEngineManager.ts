@@ -43,6 +43,7 @@ export type OpenClawEnginePhase =
   | 'installing'
   | 'ready'
   | 'starting'
+  | 'compiling'
   | 'running'
   | 'error';
 
@@ -176,6 +177,11 @@ export class OpenClawEngineManager extends EventEmitter {
   private secretEnvVars: Record<string, string> = {};
   private gatewaySpawnedAt: number | null = null;
   private gatewayLogPrunedDateKey: string | null = null;
+
+  // ── Startup phase tracking (phased health probes) ──
+  private startupPhase: 'compiling' | 'modules-loading' | 'health-waiting' | 'running' = 'compiling';
+  private startupPhaseLogged: Set<string> = new Set();
+  private startupStderrBuffer = '';
 
   constructor() {
     super();
@@ -393,6 +399,10 @@ export class OpenClawEngineManager extends EventEmitter {
 
   private async doStartGateway(): Promise<OpenClawEngineStatus> {
     this.shutdownRequested = false;
+    // Reset startup phase tracking for phased health probes.
+    this.startupPhase = 'compiling';
+    this.startupPhaseLogged = new Set();
+    this.startupStderrBuffer = '';
     const t0 = Date.now();
     const elapsed = () => `${Date.now() - t0}ms`;
 
@@ -1297,13 +1307,29 @@ export class OpenClawEngineManager extends EventEmitter {
           return;
         }
 
-        // Update progress from 10% → 90% during the wait, so the UI shows meaningful feedback.
-        const progress = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
+        // Update progress during the wait.  The range and label adapt to the
+        // sub-phase so the user sees meaningful detail (e.g. "Compiling..."
+        // during the V8 cold-compilation window, "Loading modules..." after).
+        let progressPct: number;
+        let phaseLabel: string;
+        if (this.startupPhase === 'compiling') {
+          // V8 compilation phase: stretch 12 → 50 across the timeout window.
+          progressPct = Math.min(50, 12 + Math.round((elapsedMs / timeoutMs) * 38));
+          phaseLabel = `Compiling gateway bundle... (${Math.round(elapsedMs / 1000)}s)`;
+        } else if (this.startupPhase === 'modules-loading') {
+          // Module loading: stretch 50 → 90.
+          progressPct = Math.min(90, 50 + Math.round((elapsedMs / timeoutMs) * 40));
+          phaseLabel = `Loading gateway modules... (${Math.round(elapsedMs / 1000)}s)`;
+        } else {
+          // Pre-fork or health-waiting: 10 → 90 as before.
+          progressPct = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
+          phaseLabel = `Starting OpenClaw gateway... (${Math.round(elapsedMs / 1000)}s)`;
+        }
         this.setStatus({
-          phase: 'starting',
+          phase: this.startupPhase === 'compiling' ? 'compiling' : 'starting',
           version: this.status.version,
-          progressPercent: progress,
-          message: `Starting OpenClaw gateway... (${Math.round(elapsedMs / 1000)}s)`,
+          progressPercent: progressPct,
+          message: phaseLabel,
           canRetry: false,
         });
 
@@ -1389,6 +1415,58 @@ export class OpenClawEngineManager extends EventEmitter {
     );
   }
 
+  /**
+   * Parse a line of gateway stderr for startup milestone markers and emit
+   * phased status updates so the user sees meaningful progress instead of a
+   * static "Starting..." message during cold V8 compilation (25-35s).
+   */
+  private handleStartupStderrLine(text: string): void {
+    // Only act when gateway is in the startup window.
+    if (this.status.phase !== 'starting' && this.status.phase !== 'compiling') return;
+
+    // Buffer partial lines across chunk boundaries.
+    this.startupStderrBuffer += text;
+    if (!this.startupStderrBuffer.includes('\n') && this.startupStderrBuffer.length < 2000) return;
+
+    const lines = this.startupStderrBuffer.split('\n');
+    // Keep the last (possibly incomplete) line in the buffer.
+    this.startupStderrBuffer = this.startupStderrBuffer.endsWith('\n') ? '' : (lines.pop() ?? '');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.includes('[openclaw-launcher] loading bundle') && !this.startupPhaseLogged.has('compiling')) {
+        this.startupPhaseLogged.add('compiling');
+        this.startupPhase = 'compiling';
+        this.setStatus({
+          phase: 'compiling',
+          version: this.status.version,
+          progressPercent: 12,
+          message: 'Compiling gateway bundle...',
+          canRetry: false,
+        });
+      }
+
+      if (trimmed.includes('[openclaw-launcher] import ok') && !this.startupPhaseLogged.has('modules-loading')) {
+        this.startupPhaseLogged.add('modules-loading');
+        this.startupPhase = 'modules-loading';
+        this.setStatus({
+          phase: 'starting',
+          version: this.status.version,
+          progressPercent: 50,
+          message: 'Loading gateway modules...',
+          canRetry: false,
+        });
+      }
+    }
+
+    // Trim buffer to avoid unbounded growth on unexpected output.
+    if (this.startupStderrBuffer.length > 4096) {
+      this.startupStderrBuffer = this.startupStderrBuffer.slice(-2048);
+    }
+  }
+
   private attachGatewayProcessLogs(child: GatewayProcess): void {
     ensureDir(this.logsDir);
     this.pruneGatewayLogsIfNeeded();
@@ -1415,12 +1493,14 @@ export class OpenClawEngineManager extends EventEmitter {
     child.stdout?.on('data', (chunk) => {
       appendLog(chunk, 'stdout');
       const text = typeof chunk === 'string' ? chunk : chunk.toString();
+      this.handleStartupStderrLine(text);
       logStartupMilestone(text);
       console.log(`[OpenClaw stdout] ${OpenClawEngineManager.rewriteUtcTimestamps(text)}`);
     });
     child.stderr?.on('data', (chunk) => {
       appendLog(chunk, 'stderr');
       const text = typeof chunk === 'string' ? chunk : chunk.toString();
+      this.handleStartupStderrLine(text);
       logStartupMilestone(text);
       console.error(`[OpenClaw stderr] ${OpenClawEngineManager.rewriteUtcTimestamps(text)}`);
     });

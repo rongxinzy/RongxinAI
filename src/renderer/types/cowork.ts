@@ -147,6 +147,7 @@ export type OpenClawEnginePhase =
   | 'installing'
   | 'ready'
   | 'starting'
+  | 'compiling'
   | 'running'
   | 'error';
 
