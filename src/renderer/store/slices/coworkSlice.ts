@@ -225,21 +225,26 @@ const coworkSlice = createSlice({
 
     addMessage(state, action: PayloadAction<{ sessionId: string; message: CoworkMessage }>) {
       const { sessionId, message } = action.payload;
+      const isCurrent = state.currentSession?.id === sessionId;
 
-      if (state.currentSession?.id === sessionId) {
-        const exists = state.currentSession.messages.some((item) => item.id === message.id);
+      if (isCurrent) {
+        const exists = state.currentSession!.messages.some((item) => item.id === message.id);
         if (!exists) {
-          state.currentSession.messages.push(message);
-          state.currentSession.updatedAt = message.timestamp;
-          state.currentSession.totalMessages += 1;
+          state.currentSession!.messages.push(message);
+          state.currentSession!.updatedAt = message.timestamp;
+          state.currentSession!.totalMessages += 1;
+        }
+        // Update session in list (current session only — safe to mutate)
+        const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
+        if (sessionIndex !== -1) {
+          state.sessions[sessionIndex].updatedAt = message.timestamp;
         }
       }
-
-      // Update session in list
-      const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        state.sessions[sessionIndex].updatedAt = message.timestamp;
-      }
+      // For non-current sessions (background cron tasks etc.), skip
+      // mutating state.sessions — the updatedAt bump would create a new
+      // array reference via Immer, triggering a full sidebar re-render
+      // and a Flexbox layout recalculation that flickers the conversation
+      // view.  The sidebar catches up on the next loadSessions().
 
       markSessionUnread(state, sessionId);
     },
