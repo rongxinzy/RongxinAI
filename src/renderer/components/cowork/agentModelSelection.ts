@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
+import { OpenClawProviderId } from '../../../shared/providers';
 import type { RootState } from '../../store';
 import { type Model,selectAgentSelectedModel } from '../../store/slices/modelSlice';
 import type { CoworkAgentEngine } from '../../types/cowork';
@@ -18,7 +19,13 @@ type ResolveAgentModelSelectionResult = {
   selectedModel: Model | null;
   usesFallback: boolean;
   hasInvalidExplicitModel: boolean;
+  invalidExplicitModelRef: string | null;
+  hasUnavailableLlamaCppModel: boolean;
 };
+
+export function isLlamaCppModelRef(modelRef: string): boolean {
+  return modelRef.trim().startsWith(`${OpenClawProviderId.LlamaCpp}/`);
+}
 
 /**
  * Determine which Model object the prompt input should use for capability
@@ -53,23 +60,53 @@ export function resolveAgentModelSelection({
   if (normalizedSessionModel) {
     const explicitSessionModel = resolveOpenClawModelRef(normalizedSessionModel, availableModels) ?? null;
     if (explicitSessionModel) {
-      return { selectedModel: explicitSessionModel, usesFallback: false, hasInvalidExplicitModel: false };
+      return {
+        selectedModel: explicitSessionModel,
+        usesFallback: false,
+        hasInvalidExplicitModel: false,
+        invalidExplicitModelRef: null,
+        hasUnavailableLlamaCppModel: false,
+      };
     }
 
-    return { selectedModel: fallbackModel, usesFallback: true, hasInvalidExplicitModel: true };
+    return {
+      selectedModel: fallbackModel,
+      usesFallback: true,
+      hasInvalidExplicitModel: true,
+      invalidExplicitModelRef: normalizedSessionModel,
+      hasUnavailableLlamaCppModel: isLlamaCppModelRef(normalizedSessionModel),
+    };
   }
 
   const normalizedAgentModel = agentModel.trim();
   if (normalizedAgentModel) {
     const explicitModel = resolveOpenClawModelRef(normalizedAgentModel, availableModels) ?? null;
     if (explicitModel) {
-      return { selectedModel: explicitModel, usesFallback: false, hasInvalidExplicitModel: false };
+      return {
+        selectedModel: explicitModel,
+        usesFallback: false,
+        hasInvalidExplicitModel: false,
+        invalidExplicitModelRef: null,
+        hasUnavailableLlamaCppModel: false,
+      };
     }
 
-    return { selectedModel: fallbackModel, usesFallback: true, hasInvalidExplicitModel: false };
+    return {
+      selectedModel: fallbackModel,
+      usesFallback: true,
+      hasInvalidExplicitModel: false,
+      invalidExplicitModelRef: normalizedAgentModel,
+      hasUnavailableLlamaCppModel: isLlamaCppModelRef(normalizedAgentModel),
+    };
   }
 
-  return { selectedModel: fallbackModel, usesFallback: true, hasInvalidExplicitModel: false };
+  return {
+    selectedModel: fallbackModel,
+    usesFallback: true,
+    hasInvalidExplicitModel: false,
+    invalidExplicitModelRef: null,
+    hasUnavailableLlamaCppModel: false,
+  };
 }
 
 /**

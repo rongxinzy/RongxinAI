@@ -19,7 +19,6 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
@@ -40,11 +39,8 @@ import type {
   MarketplaceModel,
   MarketplaceSearchParams,
 } from '../../../shared/marketplace';
-import { OpenClawProviderId, ProviderName } from '../../../shared/providers';
-import { agentService } from '../../services/agent';
-import { configService } from '../../services/config';
+import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
-import { setDefaultSelectedModel, setSelectedModel as setAgentSelectedModel } from '../../store/slices/modelSlice';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import MarkdownContent from '../MarkdownContent';
@@ -252,7 +248,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(null);
@@ -671,6 +666,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
       const result = await window.electron.llamacpp.loadModel(request.input);
       setRunningModels(result.runningModels);
+      notifyLlamaCppRunningModelsChanged();
       resetInferenceConversation();
       setSelectedModel(request.input.model);
       setLaunchTarget(null);
@@ -684,6 +680,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       const result = await window.electron.llamacpp.unloadModel(modelName);
       setRunningModels(result.runningModels);
+      notifyLlamaCppRunningModelsChanged();
     });
   };
 
@@ -692,6 +689,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       await window.electron.llamacpp.deleteModel(modelName);
       await refreshLocalModels();
       await refreshRunningModels();
+      notifyLlamaCppRunningModelsChanged();
     });
   };
 
@@ -699,22 +697,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       const result = await window.electron.llamacpp.setOpenClawModel(modelName);
       if (!result.success) throw new Error(result.error || i18nService.t('localInferenceSetOpenClawFailed'));
-      const model = {
-        id: modelName,
-        name: modelName,
-        provider: 'Llama.cpp',
-        providerKey: ProviderName.LlamaCpp,
-        openClawProviderId: OpenClawProviderId.LlamaCpp,
-        supportsImage: false,
-      };
-      if (result.config) {
-        await configService.updateConfig(result.config);
-      }
-      dispatch(setDefaultSelectedModel(model));
-      if (result.defaultAgent?.id) {
-        dispatch(setAgentSelectedModel({ agentId: result.defaultAgent.id, model }));
-      }
-      await agentService.loadAgents();
+      notifyLlamaCppRunningModelsChanged();
       showToast(i18nService.t('localInferenceSetOpenClawDone').replace('{name}', modelName), LocalInferenceToastKind.Success);
     });
   };

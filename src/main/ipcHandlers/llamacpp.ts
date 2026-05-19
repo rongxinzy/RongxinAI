@@ -10,8 +10,9 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp';
 import { ApiFormat, ProviderName } from '../../shared/providers';
+import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
-import { buildLlamaCppOpenClawAppConfig, type LlamaCppOpenClawAppConfig,removeLlamaCppModelFromAppConfig } from '../libs/llamacppOpenClawBinding';
+import { type LlamaCppOpenClawAppConfig, removeLlamaCppModelFromAppConfig } from '../libs/llamacppOpenClawBinding';
 import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
@@ -29,6 +30,36 @@ export function registerLlamaCppIpcHandlers(
     };
   },
 ): void {
+  const refreshRunningModelBindings = async (reason: string): Promise<void> => {
+    try {
+      const client = await manager.client();
+      const runningModels = await client.runningModels();
+      const changed = updateLlamaCppRunningModels(
+        runningModels.map((model) => ({
+          id: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
+          name: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
+          supportsImage: false,
+        })).filter((model) => model.id),
+      );
+      if (changed) {
+        await options.syncOpenClawConfig({
+          reason,
+          restartGatewayIfRunning: true,
+          forceGatewayRestartIfRunning: true,
+        });
+      }
+    } catch {
+      const changed = updateLlamaCppRunningModels([]);
+      if (changed) {
+        await options.syncOpenClawConfig({
+          reason,
+          restartGatewayIfRunning: true,
+          forceGatewayRestartIfRunning: true,
+        });
+      }
+    }
+  };
+
   const broadcast = (channel: string, payload: unknown): void => {
     BrowserWindow.getAllWindows().forEach((win) => {
       if (win.isDestroyed()) return;
@@ -39,7 +70,16 @@ export function registerLlamaCppIpcHandlers(
   const sendProgress = (progress: LlamaCppInstallProgress) => broadcast(LlamaCppIpcChannel.InstallProgress, progress);
 
   migrateLegacyLlamaCppConfig(options.getStore());
-  manager.on('status', sendStatus);
+  manager.on('status', (status) => {
+    sendStatus(status);
+    if (status.status === 'running') {
+      void refreshRunningModelBindings('llamacpp-status-running');
+      return;
+    }
+    if (status.status === 'stopped' || status.status === 'error' || status.status === 'not-installed' || status.status === 'installed') {
+      void refreshRunningModelBindings('llamacpp-status-not-running');
+    }
+  });
   manager.on('install-progress', sendProgress);
   const activeInstalls = new Map<string, AbortController>();
   const activeChats = new Map<string, AbortController>();
@@ -64,7 +104,15 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.ListRunningModels, async () => {
     const client = await manager.client();
-    return await client.runningModels();
+    const runningModels = await client.runningModels();
+    updateLlamaCppRunningModels(
+      runningModels.map((model) => ({
+        id: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
+        name: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
+        supportsImage: false,
+      })).filter((model) => model.id),
+    );
+    return runningModels;
   });
   ipcMain.handle(LlamaCppIpcChannel.DeleteModel, async (_event, name: string) => {
     const result = await manager.deleteModel(name);
@@ -78,6 +126,7 @@ export function registerLlamaCppIpcHandlers(
 
     const next = removeLlamaCppModelFromAppConfig(current, result.removedModelName);
     store.set('app_config', next.config);
+    await refreshRunningModelBindings('llamacpp-model-deleted');
 
     return {
       ...result,
@@ -91,14 +140,18 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
-    return await manager.loadModel({ ...input, model: modelName });
+    const result = await manager.loadModel({ ...input, model: modelName });
+    await refreshRunningModelBindings('llamacpp-model-loaded');
+    return result;
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
     const client = await manager.client();
     await client.unloadModel(modelName);
-    return { success: true, runningModels: await client.runningModels() };
+    const runningModels = await client.runningModels();
+    await refreshRunningModelBindings('llamacpp-model-unloaded');
+    return { success: true, runningModels };
   });
   ipcMain.handle(LlamaCppIpcChannel.InstallModel, async (_event, input: LlamaCppInstallModelInput) => {
     const modelId = input.modelId.trim();
@@ -168,35 +221,15 @@ export function registerLlamaCppIpcHandlers(
     return { success: true, cancelled: true };
   });
   ipcMain.handle(LlamaCppIpcChannel.SetOpenClawModel, async (_event, modelName: string) => {
-    const current = options.getStore().get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
-    const next = buildLlamaCppOpenClawAppConfig(current, modelName, `${manager.getBaseUrl()}/v1`);
     const normalizedModelName = modelName.trim();
+    if (!normalizedModelName) {
+      throw new Error('Model name is required');
+    }
     const openClawModelRef = `llamacpp/${normalizedModelName}`;
-    options.getStore().set('app_config', next);
-
-    const defaultAgent = (() => {
-      try {
-        const agentManager = options.getAgentManager?.();
-        const agent = agentManager?.getDefaultAgent?.();
-        if (!agent) return null;
-        return agentManager.updateAgent(agent.id, { model: openClawModelRef });
-      } catch (error) {
-        console.warn('[LlamaCpp] failed to update the default OpenClaw agent model:', error);
-        return null;
-      }
-    })();
-
-    const syncResult = await options.syncOpenClawConfig({
-      reason: 'llamacpp-local-model-selected',
-      restartGatewayIfRunning: true,
-      forceGatewayRestartIfRunning: true,
-    });
+    await refreshRunningModelBindings('llamacpp-model-visibility-refresh');
     return {
-      success: syncResult.success,
-      error: syncResult.error,
-      config: next,
+      success: true,
       modelRef: openClawModelRef,
-      defaultAgent,
     };
   });
 }

@@ -43,6 +43,7 @@ import {
 } from './libs/agentEngine';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import { clearServerModelMetadata, getAllServerModelMetadata, getCurrentApiConfig, resolveAllEnabledProviderConfigs, resolveCurrentApiConfig, resolveRawApiConfig, setAuthTokensGetter, setServerBaseUrlGetter, setStoreGetter, updateServerModelMetadata } from './libs/claudeSettings';
+import { isLlamaCppModelRunning } from './libs/claudeSettings';
 import {
   clearCopilotTokenState,
   initCopilotTokenManager,
@@ -278,6 +279,22 @@ const normalizeOpenClawModelRef = (modelRef: string): string => {
   });
 
   return qualification.status === 'qualified' ? qualification.primaryModel : normalized;
+};
+
+const validateSessionModelAvailability = (modelRef: string): { available: boolean; message?: string } => {
+  const parsed = parsePrimaryModelRef(modelRef);
+  if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) {
+    return { available: true };
+  }
+
+  if (isLlamaCppModelRunning(parsed.modelId)) {
+    return { available: true };
+  }
+
+  return {
+    available: false,
+    message: t('coworkLlamaCppModelNotRunning'),
+  };
 };
 
 // Provider IDs that were renamed in past refactors. Any stored agent model ref
@@ -1468,6 +1485,7 @@ const getCoworkEngineRouter = () => {
     if (!openClawRuntimeAdapter) {
       openClawRuntimeAdapter = new OpenClawRuntimeAdapter(getCoworkStore(), getOpenClawEngineManager(), {
         normalizeModelRef: normalizeOpenClawModelRef,
+        isModelAvailableForSession: validateSessionModelAvailability,
       });
       // Wire up channel session sync for IM conversations via OpenClaw
       try {
@@ -1486,6 +1504,10 @@ const getCoworkEngineRouter = () => {
               const agent = getCoworkStore().getAgent(newAgentId);
               const model = agent?.model || '';
               if (model && openClawRuntimeAdapter) {
+                const availability = validateSessionModelAvailability(model);
+                if (!availability.available) {
+                  return;
+                }
                 const client = openClawRuntimeAdapter.getGatewayClient();
                 if (client) {
                   void client.request('sessions.patch', { key: sessionKey, model }).catch((err) => {
