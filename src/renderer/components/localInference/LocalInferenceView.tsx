@@ -81,7 +81,7 @@ type SuggestedLaunchOptions = {
   summary: string;
 };
 
-type LaunchGpuPreset = 'service-default' | 'single-auto' | 'gpu0' | 'gpu1' | 'dual-gpu' | 'custom';
+type LaunchGpuPreset = 'service-default' | 'single-auto' | 'dual-gpu' | 'custom';
 type LaunchAccelerationMode = 'auto' | 'cpu' | 'custom';
 
 type LaunchRequest = {
@@ -120,7 +120,7 @@ type OllamaServiceConfigFormState = {
   reasoningBudget: string;
 };
 
-type ServiceConfigGroup = 'basic' | 'performance' | 'cache' | 'reasoning' | 'advanced';
+type ServiceConfigGroup = 'basic' | 'advanced';
 type ServiceConfigField = {
   key: keyof OllamaServiceConfigFormState;
   labelKey: string;
@@ -157,40 +157,24 @@ const MARKETPLACE_CARD_MIN_HEIGHT = 236;
 const MARKETPLACE_FILTER_PANEL_HEIGHT = 160;
 const smallOutlineButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass = 'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
-const SERVICE_CONFIG_GROUPS: Array<{ id: ServiceConfigGroup; titleKey: string }> = [
-  { id: 'basic', titleKey: 'localInferenceServiceConfigGroupBasic' },
-  { id: 'performance', titleKey: 'localInferenceServiceConfigGroupPerformance' },
-  { id: 'cache', titleKey: 'localInferenceServiceConfigGroupCache' },
-  { id: 'reasoning', titleKey: 'localInferenceServiceConfigGroupReasoning' },
-  { id: 'advanced', titleKey: 'localInferenceServiceConfigGroupAdvanced' },
-];
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
-  { key: 'ctxSize', labelKey: 'localInferenceServiceConfigCtxSizeLabel', paramName: 'ctx-size', group: 'basic', type: 'input', placeholder: '16384', hintKey: 'localInferenceServiceConfigCtxSizeHint', restartRequired: true },
-  { key: 'parallel', labelKey: 'localInferenceServiceConfigParallelLabel', paramName: 'parallel', group: 'basic', type: 'input', placeholder: '1', hintKey: 'localInferenceServiceConfigParallelHint', restartRequired: true },
-  { key: 'gpuLayers', labelKey: 'localInferenceServiceConfigGpuLayersLabel', paramName: 'gpu-layers', group: 'basic', type: 'input', placeholder: 'auto', hintKey: 'localInferenceServiceConfigGpuLayersHint', restartRequired: true },
-  { key: 'device', labelKey: 'localInferenceServiceConfigDeviceLabel', paramName: 'device', group: 'basic', type: 'input', placeholder: '0,1', hintKey: 'localInferenceServiceConfigDeviceHint', restartRequired: true },
   { key: 'modelsMax', labelKey: 'localInferenceServiceConfigModelsMaxLabel', paramName: 'models-max', group: 'basic', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigModelsMaxHint', restartRequired: true },
-  { key: 'host', labelKey: 'localInferenceServiceConfigHostLabel', paramName: 'host', group: 'basic', type: 'input', placeholder: '127.0.0.1', hintKey: 'localInferenceServiceConfigHostHint', restartRequired: true },
-  { key: 'port', labelKey: 'localInferenceServiceConfigPortLabel', paramName: 'port', group: 'basic', type: 'input', placeholder: '8080', hintKey: 'localInferenceServiceConfigPortHint', restartRequired: true },
-  { key: 'batchSize', labelKey: 'localInferenceServiceConfigBatchSizeLabel', paramName: 'batch-size', group: 'performance', type: 'input', placeholder: '2048', hintKey: 'localInferenceServiceConfigBatchSizeHint', restartRequired: true },
-  { key: 'ubatchSize', labelKey: 'localInferenceServiceConfigUbatchSizeLabel', paramName: 'ubatch-size', group: 'performance', type: 'input', placeholder: '512', hintKey: 'localInferenceServiceConfigUbatchSizeHint', restartRequired: true },
-  { key: 'threads', labelKey: 'localInferenceServiceConfigThreadsLabel', paramName: 'threads', group: 'performance', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsHint', restartRequired: true },
-  { key: 'threadsBatch', labelKey: 'localInferenceServiceConfigThreadsBatchLabel', paramName: 'threads-batch', group: 'performance', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsBatchHint', restartRequired: true },
-  { key: 'threadsHttp', labelKey: 'localInferenceServiceConfigThreadsHttpLabel', paramName: 'threads-http', group: 'performance', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsHttpHint', restartRequired: true },
-  { key: 'timeout', labelKey: 'localInferenceServiceConfigTimeoutLabel', paramName: 'timeout', group: 'performance', type: 'input', placeholder: '600', hintKey: 'localInferenceServiceConfigTimeoutHint', restartRequired: true },
-  { key: 'cachePrompt', labelKey: 'localInferenceServiceConfigCachePromptLabel', paramName: 'cache-prompt', group: 'cache', type: 'select', hintKey: 'localInferenceServiceConfigCachePromptHint', restartRequired: true },
-  { key: 'cacheReuse', labelKey: 'localInferenceServiceConfigCacheReuseLabel', paramName: 'cache-reuse', group: 'cache', type: 'input', placeholder: '256', hintKey: 'localInferenceServiceConfigCacheReuseHint', restartRequired: true },
-  { key: 'cacheRam', labelKey: 'localInferenceServiceConfigCacheRamLabel', paramName: 'cache-ram', group: 'cache', type: 'input', placeholder: '8192', hintKey: 'localInferenceServiceConfigCacheRamHint', restartRequired: true },
-  { key: 'modelsAutoload', labelKey: 'localInferenceServiceConfigModelsAutoloadLabel', paramName: 'models-autoload', group: 'cache', type: 'select', hintKey: 'localInferenceServiceConfigModelsAutoloadHint', restartRequired: true },
-  { key: 'jinja', labelKey: 'localInferenceServiceConfigJinjaLabel', paramName: 'jinja', group: 'reasoning', type: 'select', hintKey: 'localInferenceServiceConfigJinjaHint', restartRequired: true },
-  { key: 'reasoning', labelKey: 'localInferenceServiceConfigReasoningLabel', paramName: 'reasoning', group: 'reasoning', type: 'select', hintKey: 'localInferenceServiceConfigReasoningHint', restartRequired: true },
-  { key: 'reasoningFormat', labelKey: 'localInferenceServiceConfigReasoningFormatLabel', paramName: 'reasoning-format', group: 'reasoning', type: 'select', hintKey: 'localInferenceServiceConfigReasoningFormatHint', restartRequired: true },
-  { key: 'reasoningBudget', labelKey: 'localInferenceServiceConfigReasoningBudgetLabel', paramName: 'reasoning-budget', group: 'reasoning', type: 'input', placeholder: '-1', hintKey: 'localInferenceServiceConfigReasoningBudgetHint', restartRequired: true },
+  { key: 'modelsAutoload', labelKey: 'localInferenceServiceConfigModelsAutoloadLabel', paramName: 'models-autoload', group: 'basic', type: 'select', hintKey: 'localInferenceServiceConfigModelsAutoloadHint', restartRequired: true },
+  { key: 'parallel', labelKey: 'localInferenceServiceConfigParallelLabel', paramName: 'parallel', group: 'basic', type: 'input', placeholder: '1', hintKey: 'localInferenceServiceConfigParallelHint', restartRequired: true },
+  { key: 'timeout', labelKey: 'localInferenceServiceConfigTimeoutLabel', paramName: 'timeout', group: 'basic', type: 'input', placeholder: '600', hintKey: 'localInferenceServiceConfigTimeoutHint', restartRequired: true },
+  { key: 'threadsHttp', labelKey: 'localInferenceServiceConfigThreadsHttpLabel', paramName: 'threads-http', group: 'advanced', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigThreadsHttpHint', restartRequired: true },
+  { key: 'cachePrompt', labelKey: 'localInferenceServiceConfigCachePromptLabel', paramName: 'cache-prompt', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigCachePromptHint', restartRequired: true },
+  { key: 'cacheReuse', labelKey: 'localInferenceServiceConfigCacheReuseLabel', paramName: 'cache-reuse', group: 'advanced', type: 'input', placeholder: '256', hintKey: 'localInferenceServiceConfigCacheReuseHint', restartRequired: true },
+  { key: 'cacheRam', labelKey: 'localInferenceServiceConfigCacheRamLabel', paramName: 'cache-ram', group: 'advanced', type: 'input', placeholder: '8192', hintKey: 'localInferenceServiceConfigCacheRamHint', restartRequired: true },
+  { key: 'jinja', labelKey: 'localInferenceServiceConfigJinjaLabel', paramName: 'jinja', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigJinjaHint', restartRequired: true },
+  { key: 'reasoning', labelKey: 'localInferenceServiceConfigReasoningLabel', paramName: 'reasoning', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigReasoningHint', restartRequired: true },
+  { key: 'reasoningFormat', labelKey: 'localInferenceServiceConfigReasoningFormatLabel', paramName: 'reasoning-format', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigReasoningFormatHint', restartRequired: true },
+  { key: 'reasoningBudget', labelKey: 'localInferenceServiceConfigReasoningBudgetLabel', paramName: 'reasoning-budget', group: 'advanced', type: 'input', placeholder: '-1', hintKey: 'localInferenceServiceConfigReasoningBudgetHint', restartRequired: true },
+  { key: 'device', labelKey: 'localInferenceServiceConfigDeviceLabel', paramName: 'device', group: 'advanced', type: 'input', placeholderKey: 'localInferenceLaunchDefault', hintKey: 'localInferenceServiceConfigDeviceHint', restartRequired: true },
   { key: 'splitMode', labelKey: 'localInferenceServiceConfigSplitModeLabel', paramName: 'split-mode', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigSplitModeHint', restartRequired: true },
   { key: 'tensorSplit', labelKey: 'localInferenceServiceConfigTensorSplitLabel', paramName: 'tensor-split', group: 'advanced', type: 'input', placeholder: '3,2', hintKey: 'localInferenceServiceConfigTensorSplitHint', restartRequired: true },
   { key: 'mainGpu', labelKey: 'localInferenceServiceConfigMainGpuLabel', paramName: 'main-gpu', group: 'advanced', type: 'input', placeholder: '0', hintKey: 'localInferenceServiceConfigMainGpuHint', restartRequired: true },
   { key: 'flashAttn', labelKey: 'localInferenceServiceConfigFlashAttnLabel', paramName: 'flash-attn', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigFlashAttnHint', restartRequired: true },
-  { key: 'mmap', labelKey: 'localInferenceServiceConfigMmapLabel', paramName: 'mmap', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigMmapHint', restartRequired: true },
   { key: 'mlock', labelKey: 'localInferenceServiceConfigMlockLabel', paramName: 'mlock', group: 'advanced', type: 'select', hintKey: 'localInferenceServiceConfigMlockHint', restartRequired: true },
 ];
 const INFERENCE_OPTION_FIELDS: InferenceOptionField[] = [
@@ -259,7 +243,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
-  const installedModelNames = useMemo(() => new Set(localModels.map((m) => m.name)), [localModels]);
   const installedModelPathMap = useMemo(() => new Map(
     localModels
       .filter((model): model is OllamaModel & { path: string } => Boolean(model.path))
@@ -780,7 +763,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             />
           ) : activeTab === 'marketplace' ? (
             <MarketplacePanel
-              isRunning={isRunning}
               loading={loading}
               models={marketplaceModels}
               marketplaceLoading={marketplaceLoading}
@@ -791,7 +773,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               query={marketplaceQuery}
               task={marketplaceTask}
               size={marketplaceSize}
-              installedModelNames={installedModelNames}
               installedModelPathMap={installedModelPathMap}
               installProgress={pullProgress}
               onQueryChange={setMarketplaceQuery}
@@ -979,6 +960,7 @@ function OllamaServiceConfigDialog({
 }) {
   const [form, setForm] = useState<OllamaServiceConfigFormState>(() => serviceConfigToForm(config));
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     setForm(serviceConfigToForm(config));
@@ -986,6 +968,32 @@ function OllamaServiceConfigDialog({
 
   const updateForm = (key: keyof OllamaServiceConfigFormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+  const renderField = (field: ServiceConfigField) => {
+    const placeholder = field.placeholderKey ? i18nService.t(field.placeholderKey) : field.placeholder ?? '';
+    const label = i18nService.t(field.labelKey);
+    const hint = i18nService.t(field.hintKey);
+    return field.type === 'select' ? (
+      <ServiceConfigSelect
+        key={field.key}
+        label={label}
+        paramName={field.paramName}
+        value={form[field.key]}
+        hint={hint}
+        onChange={(value) => updateForm(field.key, value)}
+        options={getServiceConfigSelectOptions(field.key)}
+      />
+    ) : (
+      <ServiceConfigInput
+        key={field.key}
+        label={label}
+        paramName={field.paramName}
+        value={form[field.key]}
+        placeholder={placeholder}
+        hint={hint}
+        onChange={(value) => updateForm(field.key, value)}
+      />
+    );
   };
 
   const save = async () => {
@@ -1062,45 +1070,36 @@ function OllamaServiceConfigDialog({
               </p>
             )}
             <div className="space-y-5">
-              {SERVICE_CONFIG_GROUPS.map((group) => {
-                const fields = SERVICE_CONFIG_FIELDS.filter((field) => field.group === group.id);
-                return (
-                  <div key={group.id} className="space-y-3">
-                    <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-2">
-                      <h4 className="text-sm font-semibold text-foreground">{i18nService.t(group.titleKey)}</h4>
-                      <span className="text-[11px] text-secondary">{i18nService.t('localInferenceServiceConfigRestartRequired')}</span>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {fields.map((field) => {
-                        const placeholder = field.placeholderKey ? i18nService.t(field.placeholderKey) : field.placeholder ?? '';
-                        const label = i18nService.t(field.labelKey);
-                        const hint = i18nService.t(field.hintKey);
-                        return field.type === 'select' ? (
-                          <ServiceConfigSelect
-                            key={field.key}
-                            label={label}
-                            paramName={field.paramName}
-                            value={form[field.key]}
-                            hint={hint}
-                            onChange={(value) => updateForm(field.key, value)}
-                            options={getServiceConfigSelectOptions(field.key)}
-                          />
-                        ) : (
-                          <ServiceConfigInput
-                            key={field.key}
-                            label={label}
-                            paramName={field.paramName}
-                            value={form[field.key]}
-                            placeholder={placeholder}
-                            hint={hint}
-                            onChange={(value) => updateForm(field.key, value)}
-                          />
-                        );
-                      })}
-                    </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-2">
+                  <h4 className="text-sm font-semibold text-foreground">{i18nService.t('localInferenceServiceConfigGroupBasic')}</h4>
+                  <span className="text-[11px] text-secondary">{i18nService.t('localInferenceServiceConfigRestartRequired')}</span>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {SERVICE_CONFIG_FIELDS.filter((field) => field.group === 'basic').map(renderField)}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen((current) => !current)}
+                  className="flex w-full items-center justify-between gap-3 border-b border-border/70 pb-2 text-left"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground">{i18nService.t('localInferenceServiceConfigGroupAdvanced')}</span>
+                    <span className="mt-1 block text-xs text-secondary">{i18nService.t('localInferenceServiceConfigAdvancedDescription')}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-secondary">
+                    {advancedOpen ? i18nService.t('hide') : i18nService.t('show')}
+                  </span>
+                </button>
+                {advancedOpen && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {SERVICE_CONFIG_FIELDS.filter((field) => field.group === 'advanced').map(renderField)}
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
             <p className="mt-4 text-xs text-secondary">
               {running && !managedByApp
@@ -1599,16 +1598,6 @@ function LaunchModelDialog({
                     description: i18nService.t('localInferenceLaunchGpuSingleAutoHint'),
                   },
                   {
-                    value: 'gpu0',
-                    label: i18nService.t('localInferenceLaunchGpu0'),
-                    description: i18nService.t('localInferenceLaunchGpu0Hint'),
-                  },
-                  {
-                    value: 'gpu1',
-                    label: i18nService.t('localInferenceLaunchGpu1'),
-                    description: i18nService.t('localInferenceLaunchGpu1Hint'),
-                  },
-                  {
                     value: 'dual-gpu',
                     label: i18nService.t('localInferenceLaunchGpuDual'),
                     description: i18nService.t('localInferenceLaunchGpuDualHint'),
@@ -1636,7 +1625,7 @@ function LaunchModelDialog({
               <LaunchTextInput
                 label={i18nService.t('localInferenceLaunchGpuCustomValue')}
                 value={form.customGpuDevices}
-                placeholder="0,1"
+                placeholder="CUDA0,CUDA1"
                 hint={i18nService.t('localInferenceLaunchGpuCustomValueHint')}
                 onChange={(value) => updateForm('customGpuDevices', value)}
               />
@@ -2275,6 +2264,7 @@ function EmptyState({ title, action }: { title: string; action?: React.ReactNode
 function parseOptionalInteger(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed)) return undefined;
   const parsed = Number.parseInt(trimmed, 10);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
@@ -2303,12 +2293,8 @@ function resolveLaunchServiceConfig(preset: string, customGpuDevices: string): P
       return null;
     case 'single-auto':
       return { device: '', splitMode: 'none' };
-    case 'gpu0':
-      return { device: '0', splitMode: 'none' };
-    case 'gpu1':
-      return { device: '1', splitMode: 'none' };
     case 'dual-gpu':
-      return { device: '0,1', splitMode: 'layer' };
+      return { device: '', splitMode: 'layer' };
     case 'custom': {
       const normalized = normalizeGpuDeviceList(customGpuDevices);
       return normalized ? { device: normalized, splitMode: 'none' } : null;
@@ -2330,7 +2316,7 @@ function normalizeGpuDeviceList(value: string): string {
   return value
     .split(',')
     .map((part) => part.trim())
-    .filter((part) => /^\d+$/.test(part))
+    .filter((part) => /^[A-Za-z0-9_.:-]+$/.test(part) && !/^\d+$/.test(part))
     .join(',');
 }
 
@@ -2617,7 +2603,6 @@ function MarketplacePanel({
   query,
   task,
   size,
-  installedModelNames,
   installedModelPathMap,
   installProgress,
   onQueryChange,
@@ -2638,7 +2623,6 @@ function MarketplacePanel({
   query: string;
   task: string;
   size: string;
-  installedModelNames: Set<string>;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
   onQueryChange: (v: string) => void;

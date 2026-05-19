@@ -22,16 +22,29 @@ test('marketplace page sizing defaults stay within supported range', async () =>
 test('llama.cpp service config field metadata uses UI parameter keys without CLI prefixes', async () => {
   const module = await import('./LocalInferenceView');
   const getServiceConfigFields = (module as unknown as {
-    __test__getServiceConfigFields?: () => Array<{ key: string; paramName: string }>;
+    __test__getServiceConfigFields?: () => Array<{ key: string; group: string; paramName: string }>;
   }).__test__getServiceConfigFields;
 
   expect(typeof getServiceConfigFields).toBe('function');
   if (!getServiceConfigFields) return;
 
   const fields = getServiceConfigFields();
+  const keys = fields.map((field) => field.key);
+  const basicKeys = fields.filter((field) => field.group === 'basic').map((field) => field.key);
+
   expect(fields.length).toBeGreaterThan(0);
   expect(fields.map((field) => field.paramName)).toContain('parallel');
   expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
+  expect(basicKeys).toEqual(['modelsMax', 'modelsAutoload', 'parallel', 'timeout']);
+  expect(keys).not.toContain('host');
+  expect(keys).not.toContain('port');
+  expect(keys).not.toContain('ctxSize');
+  expect(keys).not.toContain('gpuLayers');
+  expect(keys).not.toContain('batchSize');
+  expect(keys).not.toContain('ubatchSize');
+  expect(keys).not.toContain('threads');
+  expect(keys).not.toContain('threadsBatch');
+  expect(keys).not.toContain('mmap');
 });
 
 test('llama.cpp inference option metadata uses OpenAI-compatible request parameter keys', async () => {
