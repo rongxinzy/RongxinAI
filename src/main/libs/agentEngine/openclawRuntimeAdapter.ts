@@ -5171,4 +5171,69 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   async ensureReady(): Promise<void> {
     await this.ensureGatewayClientReady();
   }
+
+  /**
+   * Push the current openclaw.json content to the gateway via the config.apply
+   * RPC, letting the gateway's hybrid reload engine decide whether a hot-reload
+   * or a graceful in-process restart is needed.
+   *
+   * Returns true if the gateway indicated a restart is pending, false if the
+   * config was hot-applied, or null if the gateway client is unavailable.
+   *
+   * This is a fire-and-forget optimisation on top of the file-based config
+   * sync — the file is always written first, so if this RPC fails, the
+   * gateway's chokidar file watcher will still pick up the change.
+   */
+  async applyConfig(rawConfig: string, reason: string): Promise<{
+    applied: boolean;
+    restartRequired: boolean;
+    error?: string;
+  } | null> {
+    const client = this.gatewayClient;
+    if (!client) return null;
+
+    try {
+      // Get current config hash for optimistic concurrency control.
+      const { hash: baseHash } = await client.request<{ hash?: string }>(
+        'config.get',
+        {},
+        { timeoutMs: 5_000 },
+      );
+
+      const result = await client.request<{
+        ok?: boolean;
+        restartRequired?: boolean;
+        error?: string;
+      }>(
+        'config.apply',
+        {
+          raw: rawConfig,
+          baseHash,
+          note: `lobsterai:${reason}`,
+        },
+        { timeoutMs: 10_000, expectFinal: true },
+      );
+
+      if (!result.ok) {
+        console.warn(
+          `[OpenClawRuntime] config.apply failed: ${result.error || 'unknown'}`,
+        );
+        return { applied: false, restartRequired: false, error: result.error };
+      }
+
+      console.log(
+        `[OpenClawRuntime] config.apply ok, restartRequired=${!!result.restartRequired}`,
+      );
+      return {
+        applied: true,
+        restartRequired: !!result.restartRequired,
+      };
+    } catch (err) {
+      console.warn(
+        '[OpenClawRuntime] config.apply RPC error:',
+        (err as Error)?.message || err,
+      );
+      return null;
+    }
+  }
 }

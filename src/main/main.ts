@@ -1303,6 +1303,19 @@ const syncOpenClawConfig = async (
 
   if (!needsHardRestart) {
     console.log(`${D()} ──── NO RESTART, hot-reload only. reason=${options.reason}`);
+
+    // Push config via RPC for faster hot-reload than waiting for chokidar.
+    if (syncResult.changed && openClawRuntimeAdapter) {
+      try {
+        const rawConfig = fs.readFileSync(getOpenClawEngineManager().getConfigPath(), 'utf8');
+        if (rawConfig) {
+          openClawRuntimeAdapter.applyConfig(rawConfig, options.reason).catch((err) => {
+            console.warn(`${D()} config.apply RPC failed (non-fatal):`, (err as Error)?.message || err);
+          });
+        }
+      } catch { /* file may not exist yet */ }
+    }
+
     return {
       success: true,
       changed: syncResult.changed,
