@@ -866,6 +866,10 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   /** Holds the client between start() and onHelloOk so stopGatewayClient can clean it up. */
   private pendingGatewayClient: GatewayClientLike | null = null;
   private gatewayReadyPromise: Promise<void> | null = null;
+  /** Gateway disconnect/connect notification callbacks. */
+  private gatewayDisconnectCallbacks: Array<(reason: string) => void> = [];
+  private gatewayConnectCallbacks: Array<() => void> = [];
+
   /** Serializes concurrent calls to ensureGatewayClientReady to prevent duplicate clients. */
   private gatewayClientInitLock: Promise<void> | null = null;
   private channelSessionSync: OpenClawChannelSessionSync | null = null;
@@ -2032,6 +2036,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         settleResolve();
         this.lastTickTimestamp = Date.now();
         this.startTickWatchdog();
+        this.notifyGatewayReconnected();
       },
       onConnectError: (error: Error) => {
         console.error('[ChannelSync] GatewayClient: onConnectError —', error.message);
@@ -2069,6 +2074,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         }
 
         console.warn('[OpenClawRuntime] gateway WS disconnected — code:', _code, 'reason:', reason, formatCorrelationId());
+        this.notifyGatewayDisconnected(reason || 'OpenClaw gateway client disconnected');
         const disconnectedError = new Error(reason || 'OpenClaw gateway client disconnected');
         const activeSessionIds = Array.from(this.activeTurns.keys());
         activeSessionIds.forEach((sessionId) => {
@@ -5251,6 +5257,44 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         (err as Error)?.message || err,
       );
       return null;
+    }
+  }
+
+  // ─── Gateway lifecycle notifications ────────────────────────────────────
+
+  /**
+   * Register a callback to be invoked when the gateway WebSocket disconnects
+   * unexpectedly (not when intentionally stopped via stopGatewayClient).
+   */
+  onGatewayDisconnect(callback: (reason: string) => void): () => void {
+    this.gatewayDisconnectCallbacks.push(callback);
+    return () => {
+      const idx = this.gatewayDisconnectCallbacks.indexOf(callback);
+      if (idx >= 0) this.gatewayDisconnectCallbacks.splice(idx, 1);
+    };
+  }
+
+  /**
+   * Register a callback to be invoked when the gateway successfully
+   * (re)connects (onHelloOk received).
+   */
+  onGatewayReconnect(callback: () => void): () => void {
+    this.gatewayConnectCallbacks.push(callback);
+    return () => {
+      const idx = this.gatewayConnectCallbacks.indexOf(callback);
+      if (idx >= 0) this.gatewayConnectCallbacks.splice(idx, 1);
+    };
+  }
+
+  private notifyGatewayDisconnected(reason: string): void {
+    for (const cb of this.gatewayDisconnectCallbacks) {
+      try { cb(reason); } catch { /* isolate */ }
+    }
+  }
+
+  private notifyGatewayReconnected(): void {
+    for (const cb of this.gatewayConnectCallbacks) {
+      try { cb(); } catch { /* isolate */ }
     }
   }
 }
