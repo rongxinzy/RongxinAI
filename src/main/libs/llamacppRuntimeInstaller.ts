@@ -50,7 +50,7 @@ export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstall
 
   return {
     kind: 'needs-manual',
-    message: `The prebuilt llama.cpp runtime is missing. Run npm run llamacpp:runtime:download -- ${targetId} before starting the app, or set LLAMACPP_BIN to a prebuilt llama-server executable.`,
+    message: `The prebuilt llama.cpp runtime is missing. Run npm run llamacpp:runtime:download -- ${targetId} before starting the app. If the download returns 404, the published release asset is missing and you must either set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL, build locally with npm run llamacpp:runtime:${targetId}, or set LLAMACPP_BIN to a prebuilt llama-server executable.`,
   };
 }
 
