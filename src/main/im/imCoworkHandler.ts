@@ -12,6 +12,8 @@ import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt
 import type { CoworkMessage,CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
 import type { CoworkRuntime, PermissionRequest, PermissionResult } from '../libs/agentEngine/types';
+import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
+import { serializeForLog } from '../libs/sanitizeForLog';
 import { buildIMMediaInstruction } from './imMediaInstruction';
 import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
 import {
@@ -179,6 +181,8 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   private async processMessageInternal(message: IMMessage, forceNewSession: boolean): Promise<string> {
+    const cid = generateCorrelationId();
+    return runWithCorrelationId(cid, async () => {
     const coworkSessionId = await this.getOrCreateCoworkSession(
       message.conversationId,
       message.platform,
@@ -219,26 +223,14 @@ export class IMCoworkHandler extends EventEmitter {
         systemPrompt,
         claudeSessionId: null,
       });
-      console.log('[IMCoworkHandler] System prompt changed, reset claudeSessionId for IM session', JSON.stringify({
-        coworkSessionId,
-        platform: message.platform,
-      }));
+      console.log(`[IMCoworkHandler] System prompt changed, reset claudeSessionId for IM session coworkSessionId=${serializeForLog(coworkSessionId)} platform=${serializeForLog(message.platform)}`);
     }
     if (!hasAvailableSkills) {
       console.warn('[IMCoworkHandler] Skills auto-routing prompt missing for current IM turn');
     }
 
     // 打印完整的输入消息日志
-    console.log(`[IMCoworkHandler] 处理消息:`, JSON.stringify({
-      platform: message.platform,
-      conversationId: message.conversationId,
-      coworkSessionId,
-      isActive,
-      originalContent: message.content,
-      formattedContent,
-      attachments: message.attachments,
-      hasAvailableSkills,
-    }, null, 2));
+    console.log(`[IMCoworkHandler] 处理消息: platform=${serializeForLog(message.platform)} conversationId=${serializeForLog(message.conversationId)} coworkSessionId=${serializeForLog(coworkSessionId)} isActive=${isActive} hasAvailableSkills=${hasAvailableSkills}`);
 
     const onSessionStartError = (error: unknown) => {
       this.rejectAccumulator(
@@ -259,6 +251,7 @@ export class IMCoworkHandler extends EventEmitter {
     }
 
     return responsePromise;
+    });
   }
 
   /**

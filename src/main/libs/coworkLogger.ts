@@ -2,6 +2,9 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
+import { formatCorrelationId } from './logCorrelation';
+import { serializeForLog } from './sanitizeForLog';
+
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
 
 let logFilePath: string | null = null;
@@ -54,14 +57,27 @@ function formatTimestamp(): string {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}.${millisecond}${sign}${offsetHour}:${offsetMinute}`;
 }
 
-export function coworkLog(level: 'INFO' | 'WARN' | 'ERROR', tag: string, message: string, extra?: Record<string, unknown>): void {
+/**
+ * Write a log entry to cowork.log.
+ *
+ * Extra fields are now sanitized via serializeForLog to prevent
+ * credentials/tokens from appearing in the log file.  Correlation IDs
+ * are automatically included when called within a runWithCorrelationId
+ * context (e.g. from a cowork:session:start handler).
+ */
+export function coworkLog(
+  level: 'INFO' | 'WARN' | 'ERROR',
+  tag: string,
+  message: string,
+  extra?: Record<string, unknown>,
+): void {
   try {
     rotateIfNeeded();
-    const parts = [`[${formatTimestamp()}] [${level}] [${tag}] ${message}`];
+    const cid = formatCorrelationId();
+    const parts = [`[${formatTimestamp()}] [${level}] [${tag}] ${cid ? cid + ' ' : ''}${message}`];
     if (extra) {
       for (const [key, value] of Object.entries(extra)) {
-        const serialized = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-        parts.push(`  ${key}: ${serialized}`);
+        parts.push(`  ${key}: ${serializeForLog(value)}`);
       }
     }
     parts.push('');
