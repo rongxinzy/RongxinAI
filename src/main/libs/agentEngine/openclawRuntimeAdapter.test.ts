@@ -14,6 +14,18 @@ vi.mock('electron', () => ({
 
 import { OpenClawRuntimeAdapter, pickPersistedAssistantSegment } from './openclawRuntimeAdapter';
 
+function setAvailabilityGuard(
+  adapter: OpenClawRuntimeAdapter,
+  guard: (modelRef: string) => { available: boolean; message?: string },
+): void {
+  (adapter as unknown as {
+    options: { isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string } };
+  }).options = {
+    ...(adapter as unknown as { options: Record<string, unknown> }).options,
+    isModelAvailableForSession: guard,
+  };
+}
+
 test('pickPersistedAssistantSegment: stream authority keeps previous when same length or longer', () => {
   expect(pickPersistedAssistantSegment('aa', 'a', true)).toEqual({
     content: 'aa',
@@ -359,6 +371,34 @@ test('continueSession sends the session cwd to OpenClaw chat.send', async () => 
   expect(chatSend?.params).toMatchObject({
     cwd: path.resolve('/tmp/lobsterai-selected-project'),
   });
+});
+
+test('continueSession rejects an unavailable llama.cpp model before patching or chat.send', async () => {
+  const { adapter, requests } = createRunTurnAdapter({
+    agentModel: 'llamacpp/qwen-local',
+  });
+  setAvailabilityGuard(adapter, () => ({
+    available: false,
+    message: 'This llama.cpp model is not running.',
+  }));
+
+  await expect(adapter.continueSession('session-1', 'hello'))
+    .rejects.toThrow('This llama.cpp model is not running.');
+
+  expect(requests).toEqual([]);
+});
+
+test('patchSession rejects an unavailable llama.cpp model before sessions.patch', async () => {
+  const { adapter, requests } = createPatchAdapter();
+  setAvailabilityGuard(adapter, () => ({
+    available: false,
+    message: 'This llama.cpp model is not running.',
+  }));
+
+  await expect(adapter.patchSession('session-1', { model: 'llamacpp/qwen-local' }))
+    .rejects.toThrow('This llama.cpp model is not running.');
+
+  expect(requests).toEqual([]);
 });
 
 // ==================== Reconcile tests ====================

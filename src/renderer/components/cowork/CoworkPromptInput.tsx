@@ -206,6 +206,8 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
   const {
     selectedModel: agentSelectedModel,
     hasInvalidExplicitModel: agentModelIsInvalid,
+    invalidExplicitModelRef,
+    hasUnavailableLlamaCppModel,
   } = resolveAgentModelSelection({
     sessionModel: currentSession && currentSession.id === sessionId ? currentSession.modelOverride : '',
     agentModel: currentAgent?.model ?? '',
@@ -319,6 +321,12 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
 
     const trimmedValue = value.trim();
     if ((!trimmedValue && attachments.length === 0) || isStreaming || disabled || isPatchingModel) return;
+    if (hasUnavailableLlamaCppModel) {
+      window.dispatchEvent(new CustomEvent('app:showToast', {
+        detail: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
+      }));
+      return;
+    }
     setShowFolderRequiredWarning(false);
 
     // Get active skills prompts and combine them
@@ -405,7 +413,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
     dispatch(clearDraftAttachments(draftKey));
     setImageVisionHint(false);
-  }, [value, isStreaming, disabled, isPatchingModel, onSubmit, activeSkillIds, skills, attachments, showFolderSelector, workingDirectory, dispatch, draftKey, effectiveSelectedModel?.id, modelSupportsImage]);
+  }, [value, isStreaming, disabled, isPatchingModel, hasUnavailableLlamaCppModel, onSubmit, activeSkillIds, skills, attachments, showFolderSelector, workingDirectory, dispatch, draftKey, effectiveSelectedModel?.id, modelSupportsImage]);
 
   const handleSelectSkill = useCallback((skill: Skill) => {
     dispatch(toggleActiveSkill(skill.id));
@@ -775,7 +783,9 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     void handleIncomingFiles(files);
   }, [disabled, handleIncomingFiles, isStreaming]);
 
-  const canSubmit = !disabled && !isPatchingModel && !agentModelIsInvalid && (!!value.trim() || attachments.length > 0);
+  const canSubmit = !disabled && !isPatchingModel && !agentModelIsInvalid && !hasUnavailableLlamaCppModel && (!!value.trim() || attachments.length > 0);
+  const invalidModelLabel = invalidExplicitModelRef?.split('/').pop() || invalidExplicitModelRef || '';
+
   const enhancedContainerClass = isDraggingFiles
     ? `${containerClass} ring-2 ring-primary/50 border-primary/60`
     : containerClass;
@@ -900,8 +910,8 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                     <ModelSelector
                       dropdownDirection="up"
                       disabled={isPatchingModel || isPersistingAgentModel}
-                      value={agentModelIsInvalid && currentSession?.modelOverride
-                        ? { id: '__invalid__', name: currentSession.modelOverride.split('/').pop() || currentSession.modelOverride } as Model
+                      value={(agentModelIsInvalid && invalidExplicitModelRef)
+                        ? { id: '__invalid__', name: invalidModelLabel } as Model
                         : agentSelectedModel}
                       onChange={async (nextModel) => {
                         if (isPatchingModel || isPersistingAgentModel) return;
@@ -957,7 +967,9 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                     />
                     {agentModelIsInvalid && (
                       <span className="max-w-60 text-[11px] leading-4 text-red-500">
-                        {i18nService.t('agentModelInvalidHint')}
+                        {hasUnavailableLlamaCppModel
+                          ? i18nService.t('agentLlamaCppModelNotRunningHint')
+                          : i18nService.t('agentModelInvalidHint')}
                       </span>
                     )}
                   </div>

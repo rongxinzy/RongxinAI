@@ -26,6 +26,7 @@ import {
   rejectPairingRequest,
 } from './im/imPairingStore';
 import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
+import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import {
@@ -42,6 +43,7 @@ import {
 } from './libs/agentEngine';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import { clearServerModelMetadata, getAllServerModelMetadata, getCurrentApiConfig, resolveAllEnabledProviderConfigs, resolveCurrentApiConfig, resolveRawApiConfig, setAuthTokensGetter, setServerBaseUrlGetter, setStoreGetter, updateServerModelMetadata } from './libs/claudeSettings';
+import { isLlamaCppModelRunning } from './libs/claudeSettings';
 import {
   clearCopilotTokenState,
   initCopilotTokenManager,
@@ -54,6 +56,7 @@ import { registerProxyTokenRefresher, startCoworkOpenAICompatProxy, stopCoworkOp
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
 import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
+import { LlamaCppManager } from './libs/llamacppManager';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { McpServerManager } from './libs/mcpServerManager';
@@ -276,6 +279,22 @@ const normalizeOpenClawModelRef = (modelRef: string): string => {
   });
 
   return qualification.status === 'qualified' ? qualification.primaryModel : normalized;
+};
+
+const validateSessionModelAvailability = (modelRef: string): { available: boolean; message?: string } => {
+  const parsed = parsePrimaryModelRef(modelRef);
+  if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) {
+    return { available: true };
+  }
+
+  if (isLlamaCppModelRunning(parsed.modelId)) {
+    return { available: true };
+  }
+
+  return {
+    available: false,
+    message: t('coworkLlamaCppModelNotRunning'),
+  };
 };
 
 // Provider IDs that were renamed in past refactors. Any stored agent model ref
@@ -814,6 +833,7 @@ let imGatewayManager: IMGatewayManager | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
 let openClawEngineManager: OpenClawEngineManager | null = null;
+let llamaCppManager: LlamaCppManager | null = null;
 let ollamaManager: OllamaManager | null = null;
 let openClawConfigSync: OpenClawConfigSync | null = null;
 let openClawBootstrapPromise: Promise<OpenClawEngineStatus> | null = null;
@@ -867,6 +887,13 @@ const getOpenClawEngineManager = (): OpenClawEngineManager => {
     openClawEngineManager = new OpenClawEngineManager();
   }
   return openClawEngineManager;
+};
+
+const getLlamaCppManager = (): LlamaCppManager => {
+  if (!llamaCppManager) {
+    llamaCppManager = new LlamaCppManager(() => getLlamaCppServiceConfig(getStore()));
+  }
+  return llamaCppManager;
 };
 
 const getOllamaManager = (): OllamaManager => {
@@ -1458,6 +1485,7 @@ const getCoworkEngineRouter = () => {
     if (!openClawRuntimeAdapter) {
       openClawRuntimeAdapter = new OpenClawRuntimeAdapter(getCoworkStore(), getOpenClawEngineManager(), {
         normalizeModelRef: normalizeOpenClawModelRef,
+        isModelAvailableForSession: validateSessionModelAvailability,
       });
       // Wire up channel session sync for IM conversations via OpenClaw
       try {
@@ -1476,6 +1504,10 @@ const getCoworkEngineRouter = () => {
               const agent = getCoworkStore().getAgent(newAgentId);
               const model = agent?.model || '';
               if (model && openClawRuntimeAdapter) {
+                const availability = validateSessionModelAvailability(model);
+                if (!availability.available) {
+                  return;
+                }
                 const client = openClawRuntimeAdapter.getGatewayClient();
                 if (client) {
                   void client.request('sessions.patch', { key: sessionKey, model }).catch((err) => {
@@ -5705,6 +5737,12 @@ if (!gotTheLock) {
       });
     }
 
+    if (llamaCppManager) {
+      await llamaCppManager.shutdownForQuit().catch((error) => {
+        console.error('[LlamaCpp] Failed to stop service on quit:', error);
+      });
+    }
+
     // Stop the cron job polling
     try {
       getCronJobService().stopPolling();
@@ -5825,12 +5863,19 @@ if (!gotTheLock) {
     }
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
+    registerLlamaCppIpcHandlers(getLlamaCppManager(), {
+      getStore,
+      syncOpenClawConfig,
+      getAgentManager,
+    });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
       syncOpenClawConfig,
       getAgentManager,
     });
-    registerMarketplaceIpcHandlers();
+    registerMarketplaceIpcHandlers({
+      getModelsDir: () => getLlamaCppManager().getModelsDir(),
+    });
     // Inject auth getters for lobsterai-server provider routing
     // The getter proactively triggers a background token refresh when the
     // accessToken is within 5 minutes of expiry, so that the SDK always

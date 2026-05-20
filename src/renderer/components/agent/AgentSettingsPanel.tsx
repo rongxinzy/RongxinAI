@@ -16,6 +16,7 @@ import { getAgentDisplayName, getAgentDisplayNameById, isDefaultAgentId } from '
 import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
+import { isLlamaCppModelRef } from '../cowork/agentModelSelection';
 import TrashIcon from '../icons/TrashIcon';
 import AgentAvatarPicker from './AgentAvatarPicker';
 import AgentConfirmDialog from './AgentConfirmDialog';
@@ -109,7 +110,10 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       setIdentity(nextIdentity);
       setUserInfo(nextUserInfo);
       setIcon(a.icon);
-      setModel(resolveOpenClawModelRef(a.model, availableModels) ?? null);
+      const resolvedModel = resolveOpenClawModelRef(a.model, availableModels) ?? null;
+      setModel(resolvedModel ?? (isLlamaCppModelRef(a.model)
+        ? { id: '__invalid__', name: a.model.split('/').pop() || a.model } as Model
+        : null));
       setWorkingDirectory(a.workingDirectory ?? '');
       setSkillIds(a.skillIds ?? []);
       initialValuesRef.current = {

@@ -55,6 +55,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorContentFiltered: '内容未通过安全审核，请修改后重试。',
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
+    coworkLlamaCppModelNotRunning: '该 llama.cpp 模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
 
@@ -304,6 +305,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Content did not pass the safety review. Please modify and try again.',
     coworkErrorServerError: 'Server error occurred. Please try again later.',
     coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
+    coworkLlamaCppModelNotRunning: 'This llama.cpp model is not running. Load it from Local Inference first or choose another model.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',
