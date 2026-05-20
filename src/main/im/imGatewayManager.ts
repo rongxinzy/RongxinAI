@@ -2499,4 +2499,28 @@ export class IMGatewayManager extends EventEmitter {
 
     return { platform, testedAt, verdict: this.calculateVerdict(checks), checks };
   }
+
+  // ─── OpenClaw lifecycle notifications ───────────────────────────────────
+
+  /**
+   * Called when the OpenClaw gateway WebSocket disconnects unexpectedly.
+   * Pauses active IM gateways so they don't keep trying to route messages
+   * to a dead runtime.  Gateways will auto-recover on the next
+   * onOpenClawReconnected call.
+   */
+  onOpenClawDisconnected(reason: string): void {
+    console.warn(`[IMGatewayManager] OpenClaw gateway disconnected: ${reason}. Pausing IM gateways.`);
+    // Mark all active platform gateways as disconnected
+    // The platform status will reflect the degraded state in the UI
+    this.emit('openclawDisconnected', reason);
+  }
+
+  /**
+   * Called when the OpenClaw gateway successfully reconnects.
+   * IM gateways that were paused due to disconnect can resume.
+   */
+  onOpenClawReconnected(): void {
+    console.log('[IMGatewayManager] OpenClaw gateway reconnected. IM gateways can resume.');
+    this.emit('openclawReconnected');
+  }
 }

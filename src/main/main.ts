@@ -45,8 +45,20 @@ import {
   type PermissionResult,
 } from './libs/agentEngine';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
-import { clearServerModelMetadata, getAllServerModelMetadata, getCurrentApiConfig, resolveAllEnabledProviderConfigs, resolveCurrentApiConfig, resolveRawApiConfig, setAuthTokensGetter, setServerBaseUrlGetter, setStoreGetter, updateServerModelMetadata } from './libs/claudeSettings';
-import { isLlamaCppModelRunning } from './libs/claudeSettings';
+import {
+  clearServerModelMetadata,
+  getAllServerModelMetadata,
+  getCurrentApiConfig,
+  getLlamaCppModelContextWindow,
+  isLlamaCppModelRunning,
+  resolveAllEnabledProviderConfigs,
+  resolveCurrentApiConfig,
+  resolveRawApiConfig,
+  setAuthTokensGetter,
+  setServerBaseUrlGetter,
+  setStoreGetter,
+  updateServerModelMetadata,
+} from './libs/claudeSettings';
 import {
   clearCopilotTokenState,
   initCopilotTokenManager,
@@ -290,14 +302,21 @@ const validateSessionModelAvailability = (modelRef: string): { available: boolea
     return { available: true };
   }
 
-  if (isLlamaCppModelRunning(parsed.modelId)) {
-    return { available: true };
+  if (!isLlamaCppModelRunning(parsed.modelId)) {
+    return {
+      available: false,
+      message: t('coworkLlamaCppModelNotRunning'),
+    };
   }
 
-  return {
-    available: false,
-    message: t('coworkLlamaCppModelNotRunning'),
-  };
+  if (!getLlamaCppModelContextWindow(parsed.modelId)) {
+    return {
+      available: false,
+      message: t('coworkLlamaCppContextWindowUnknown'),
+    };
+  }
+
+  return { available: true };
 };
 
 // Provider IDs that were renamed in past refactors. Any stored agent model ref
@@ -1489,6 +1508,11 @@ const getCoworkEngineRouter = () => {
       openClawRuntimeAdapter = new OpenClawRuntimeAdapter(getCoworkStore(), getOpenClawEngineManager(), {
         normalizeModelRef: normalizeOpenClawModelRef,
         isModelAvailableForSession: validateSessionModelAvailability,
+        getModelContextWindow: (modelRef) => {
+          const parsed = parsePrimaryModelRef(modelRef);
+          if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) return undefined;
+          return getLlamaCppModelContextWindow(parsed.modelId);
+        },
       });
       // Wire up channel session sync for IM conversations via OpenClaw
       try {
@@ -1895,6 +1919,16 @@ const getIMGatewayManager = () => {
     imGatewayManager.on('error', ({ platform, error }) => {
       console.error(`[IM Gateway] ${platform} error:`, error);
     });
+
+    // Wire gateway lifecycle notifications
+    if (openClawRuntimeAdapter) {
+      openClawRuntimeAdapter.onGatewayDisconnect((reason) => {
+        imGatewayManager?.onOpenClawDisconnected(reason);
+      });
+      openClawRuntimeAdapter.onGatewayReconnect(() => {
+        imGatewayManager?.onOpenClawReconnected();
+      });
+    }
   }
   return imGatewayManager;
 };
