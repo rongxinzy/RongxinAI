@@ -29,9 +29,88 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  build-llamacpp-runtime-macos:
+    if: ${{ github.event_name == 'push' || inputs.build_macos }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm install
+      - name: Build llama.cpp runtime
+        run: npm run llamacpp:runtime:mac-arm64
+      - name: Pack llama.cpp runtime
+        run: |
+          mkdir -p release
+          tar -czf release/llamacpp-runtime-mac-arm64.tar.gz -C vendor/llamacpp-runtime mac-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llamacpp-runtime-mac-arm64
+          path: release/llamacpp-runtime-mac-arm64.tar.gz
+          retention-days: 7
+
+  build-llamacpp-runtime-windows:
+    if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\npm-cache
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm install
+      - name: Build llama.cpp runtime
+        run: npm run llamacpp:runtime:win-x64
+      - name: Pack llama.cpp runtime
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          tar -czf release/llamacpp-runtime-win-x64.tar.gz -C vendor/llamacpp-runtime win-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llamacpp-runtime-win-x64
+          path: release/llamacpp-runtime-win-x64.tar.gz
+          retention-days: 7
+
+  build-llamacpp-runtime-linux:
+    if: ${{ github.event_name == 'push' || inputs.build_linux }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm install
+      - name: Build llama.cpp runtime
+        run: npm run llamacpp:runtime:linux-x64
+      - name: Pack llama.cpp runtime
+        run: |
+          mkdir -p release
+          tar -czf release/llamacpp-runtime-linux-x64.tar.gz -C vendor/llamacpp-runtime linux-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llamacpp-runtime-linux-x64
+          path: release/llamacpp-runtime-linux-x64.tar.gz
+          retention-days: 7
+
   # ========== macOS 构建 ==========
   build-macos:
     if: ${{ github.event_name == 'push' || inputs.build_macos }}
+    needs: build-llamacpp-runtime-macos
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +124,17 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       
       - run: npm install
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: llamacpp-runtime-mac-arm64
+          path: release
+
+      - name: Restore llama.cpp runtime
+        run: |
+          mkdir -p vendor/llamacpp-runtime
+          tar -xzf release/llamacpp-runtime-mac-arm64.tar.gz -C vendor/llamacpp-runtime
+          node scripts/sync-llamacpp-runtime-current.cjs mac-arm64
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -64,6 +154,7 @@ jobs:
   # ========== Windows 构建 ==========
   build-windows:
     if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    needs: build-llamacpp-runtime-windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +168,17 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
       
       - run: npm install
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: llamacpp-runtime-win-x64
+          path: release
+
+      - name: Restore llama.cpp runtime
+        run: |
+          New-Item -ItemType Directory -Force -Path vendor/llamacpp-runtime | Out-Null
+          tar -xzf release/llamacpp-runtime-win-x64.tar.gz -C vendor/llamacpp-runtime
+          node scripts/sync-llamacpp-runtime-current.cjs win-x64
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -102,6 +204,7 @@ jobs:
   # ========== Linux 构建 ==========
   build-linux:
     if: ${{ github.event_name == 'push' || inputs.build_linux }}
+    needs: build-llamacpp-runtime-linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,6 +224,17 @@ jobs:
       
       - run: npm install
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: llamacpp-runtime-linux-x64
+          path: release
+
+      - name: Restore llama.cpp runtime
+        run: |
+          mkdir -p vendor/llamacpp-runtime
+          tar -xzf release/llamacpp-runtime-linux-x64.tar.gz -C vendor/llamacpp-runtime
+          node scripts/sync-llamacpp-runtime-current.cjs linux-x64
+
       - name: Install pnpm
         run: npm install -g pnpm
 
@@ -139,7 +253,7 @@ jobs:
 
   # ========== 创建 Release ==========
   create-release:
-    needs: [build-macos, build-windows, build-linux]
+    needs: [build-llamacpp-runtime-macos, build-llamacpp-runtime-windows, build-llamacpp-runtime-linux, build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -154,6 +268,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            artifacts/llamacpp-runtime-mac-arm64/*.tar.gz
+            artifacts/llamacpp-runtime-win-x64/*.tar.gz
+            artifacts/llamacpp-runtime-linux-x64/*.tar.gz
             artifacts/macos-build/*.dmg
             artifacts/windows-build/*.exe
             artifacts/linux-build/*

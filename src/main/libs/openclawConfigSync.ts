@@ -662,6 +662,12 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     normalizeBaseUrl: normalizeOllamaNativeBaseUrl,
   },
 
+  [ProviderName.LlamaCpp]: {
+    providerId: OpenClawProviderId.LlamaCpp,
+    resolveApi: ({ apiType, baseURL }) => mapApiTypeToOpenClawApi(apiType, undefined, baseURL),
+    normalizeBaseUrl: stripChatCompletionsSuffix,
+  },
+
   [ProviderName.Copilot]: {
     providerId: OpenClawProviderId.LobsteraiCopilot,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,

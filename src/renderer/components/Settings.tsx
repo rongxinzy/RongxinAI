@@ -3,12 +3,12 @@ import { ArrowTopRightOnSquareIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChip
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { OllamaStatusSnapshot } from '../../shared/ollama';
-import { OpenClawProviderId, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { type AppConfig, defaultConfig, getCustomProviderDefaultName, getProviderDisplayName, getVisibleProviders, isCustomProvider } from '../config';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
+import { collectAvailableModels } from '../services/availableModels';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import { decryptSecret, decryptWithPassword, EncryptedPayload, encryptWithPassword, PasswordEncryptedPayload } from '../services/encryption';
@@ -66,7 +66,6 @@ export type SettingsOpenOptions = {
 
 interface SettingsProps extends SettingsOpenOptions {
   onClose: () => void;
-  onShowLocalInference?: () => void;
   enterpriseConfig?: {
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
@@ -105,16 +104,6 @@ const resolveModelSupportsImageForProvider = (
   providerName: string,
   model: { id: string; supportsImage?: boolean },
 ): boolean => ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage);
-
-const getOpenClawProviderIdForConfig = (
-  providerName: string,
-  providerConfig: ProviderConfig,
-): string => {
-  if (providerName === ProviderName.OpenAI && providerConfig.authType === 'oauth') {
-    return OpenClawProviderId.OpenAICodex;
-  }
-  return ProviderRegistry.getOpenClawProviderId(providerName);
-};
 
 interface ProviderExportEntry {
   enabled: boolean;
@@ -182,48 +171,10 @@ const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfi
 
   return config.apiKey.trim().length > 0;
 };
-const getOllamaProviderStatusBadge = (
-  providerConfig: ProviderConfig,
-  status: OllamaStatusSnapshot | null,
-): ProviderStatusBadge => {
-  if (!providerConfig.enabled) {
-    return {
-      labelKey: 'providerStatusOff',
-      className: 'bg-red-500/20 text-red-600 dark:text-red-400',
-    };
-  }
-
-  if (status?.status === 'running') {
-    return {
-      labelKey: status.managedByApp ? 'ollamaProviderServiceConnected' : 'ollamaProviderServiceExternal',
-      className: status.managedByApp
-        ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-        : 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-    };
-  }
-
-  if (status?.status === 'starting') {
-    return {
-      labelKey: 'ollamaProviderServiceStarting',
-      className: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-    };
-  }
-
-  return {
-    labelKey: 'ollamaProviderServiceStopped',
-    className: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-  };
-};
-
 const getProviderStatusBadge = (
   provider: ProviderType,
   providerConfig: ProviderConfig,
-  ollamaStatus: OllamaStatusSnapshot | null,
 ): ProviderStatusBadge => {
-  if (provider === ProviderName.Ollama) {
-    return getOllamaProviderStatusBadge(providerConfig, ollamaStatus);
-  }
-
   const enabled = providerConfig.enabled && hasProviderAuthConfigured(provider, providerConfig);
   return enabled
     ? {
@@ -423,8 +374,9 @@ const getDefaultProviders = (): ProvidersConfig => {
 
 const getDefaultActiveProvider = (): ProviderType => {
   const providers = (defaultConfig.providers ?? {}) as ProvidersConfig;
-  const firstEnabledProvider = providerKeys.find(providerKey => providers[providerKey]?.enabled);
-  return firstEnabledProvider ?? providerKeys[0];
+  const visibleProviderKeys = providerKeys.filter((providerKey) => providerKey !== ProviderName.LlamaCpp);
+  const firstEnabledProvider = visibleProviderKeys.find(providerKey => providers[providerKey]?.enabled);
+  return firstEnabledProvider ?? visibleProviderKeys[0];
 };
 
 // System shortcuts that should not be captured (clipboard, undo, select-all, quit, etc.)
@@ -570,7 +522,7 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
   );
 };
 
-const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, initialTab, notice, noticeI18nKey, noticeExtra, enterpriseConfig }) => {
+const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, noticeI18nKey, noticeExtra, enterpriseConfig }) => {
   const dispatch = useDispatch();
   // 状态
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
@@ -629,8 +581,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
   // Add state for providers configuration
   const [providers, setProviders] = useState<ProvidersConfig>(() => getDefaultProviders());
-  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusSnapshot | null>(null);
-
 
   // authType defaults to undefined on first open, which should behave as OAuth mode
   const minimaxIsOAuthMode = providers.minimax.authType !== 'apikey';
@@ -675,21 +625,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
   useEffect(() => {
     setShowApiKey(false);
   }, [activeProvider]);
-
-  const refreshOllamaStatus = useCallback(async () => {
-    const status = await window.electron.ollama.status();
-    setOllamaStatus(status);
-    return status;
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'model') return;
-    void refreshOllamaStatus().catch(() => undefined);
-    const unsubscribe = window.electron.ollama.onStatusChanged((status) => {
-      setOllamaStatus(status);
-    });
-    return unsubscribe;
-  }, [activeTab, refreshOllamaStatus]);
 
   const handleExportLogs = useCallback(async () => {
     if (isExportingLogs) {
@@ -1060,7 +995,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
   // Compute visible providers based on language, including active custom_N entries
   const visibleProviders = useMemo(() => {
-    const visibleKeys = getVisibleProviders(language);
+    const visibleKeys = getVisibleProviders(language).filter((key) => key !== ProviderName.LlamaCpp);
     const filtered: Partial<ProvidersConfig> = {};
     for (const key of visibleKeys) {
       if (providers[key as keyof ProvidersConfig]) {
@@ -1739,11 +1674,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
         Object.entries(providers).map(([providerKey, providerConfig]) => {
           const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
           const hasValidAuth = hasProviderAuthConfigured(providerKey as ProviderType, providerConfig);
+          const normalizedEnabled = providerConfig.enabled && hasValidAuth;
           return [
             providerKey,
             {
               ...providerConfig,
-              enabled: providerConfig.enabled && hasValidAuth,
+              enabled: normalizedEnabled,
               apiFormat,
               baseUrl: resolveBaseUrl(providerKey as ProviderType, providerConfig.baseUrl, apiFormat),
             },
@@ -1753,7 +1689,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
       // Find the first enabled provider to use as the primary API
       const firstEnabledProvider = Object.entries(normalizedProviders).find(
-        ([_, config]) => config.enabled
+        ([providerKey, config]) => providerKey !== ProviderName.LlamaCpp && config.enabled
       );
 
       const primaryProvider = firstEnabledProvider
@@ -1793,22 +1729,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
       });
 
       // 更新 Redux store 中的可用模型列表
-      const allModels: { id: string; name: string; provider?: string; providerKey?: string; openClawProviderId?: string; supportsImage?: boolean }[] = [];
-      Object.entries(normalizedProviders).forEach(([providerName, config]) => {
-        if (config.enabled && config.models) {
-          const openClawProviderId = getOpenClawProviderIdForConfig(providerName, config);
-          config.models.forEach(model => {
-            allModels.push({
-              id: model.id,
-              name: model.name,
-              provider: getProviderDisplayName(providerName, config),
-              providerKey: providerName,
-              openClawProviderId,
-              supportsImage: resolveModelSupportsImageForProvider(providerName, model),
-            });
-          });
-        }
-      });
+      const allModels = await collectAvailableModels(configService.getConfig());
       dispatch(setAvailableModels(allModels));
 
       if (hasCoworkConfigChanges) {
@@ -3138,24 +3059,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
                       </div>
                     </div>
                     <div className="flex items-center ml-2 gap-1">
-                      {providerKey === ProviderName.Ollama && config.enabled && (
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            ollamaStatus?.status === 'running'
-                              ? 'bg-green-400'
-                              : ollamaStatus?.status === 'starting'
-                                ? 'bg-blue-400'
-                                : 'bg-amber-400'
-                          }`}
-                          title={i18nService.t(
-                            ollamaStatus?.status === 'running'
-                              ? 'ollamaProviderServiceConnected'
-                              : ollamaStatus?.status === 'starting'
-                                ? 'ollamaProviderServiceStarting'
-                                : 'ollamaProviderServiceStopped',
-                          )}
-                        />
-                      )}
                       {isCustom && (
                         <button
                           type="button"
@@ -3211,7 +3114,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
             {/* Provider Settings - Right Side */}
             <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
               {(() => {
-                const statusBadge = getProviderStatusBadge(activeProvider, providers[activeProvider], ollamaStatus);
+                const statusBadge = getProviderStatusBadge(
+                  activeProvider,
+                  providers[activeProvider],
+                );
                 return (
               <div className="flex items-center justify-between pb-2 border-b border-border">
                 <div className="flex items-center gap-1.5">
@@ -3239,31 +3145,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
               </div>
                 );
               })()}
-
-              {activeProvider === ProviderName.Ollama && (
-                <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-foreground">
-                        {i18nService.t('ollamaProviderConfigOnlyTitle')}
-                      </p>
-                      <p className="mt-1 text-[11px] leading-5 text-secondary">
-                        {i18nService.t('ollamaProviderConfigOnlyDescription')}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onShowLocalInference?.();
-                      }}
-                      className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-raised"
-                    >
-                      {i18nService.t('ollamaProviderOpenLocalInference')}
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
@@ -4228,76 +4109,77 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
               </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="text-xs font-medium text-foreground">
-                    {i18nService.t('availableModels')}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddModel}
-                    className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
-                  >
-                    <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
-                    {i18nService.t('addModel')}
-                  </button>
-                </div>
-
-                {/* Models List */}
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                  {(providers[activeProvider].models ?? []).map(model => (
-                    <div
-                      key={model.id}
-                      className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
+              {(
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <h3 className="text-xs font-medium text-foreground">
+                      {i18nService.t('availableModels')}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleAddModel}
+                      className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
                     >
-                      <div className="flex items-center justify-between gap-2 min-w-0">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-green-400"></div>
-                          <div className="min-w-0">
-                            <div className="text-foreground font-medium text-[11px] truncate">{model.name}</div>
-                            <div className="text-[10px] text-secondary truncate">{model.id}</div>
+                      <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
+                      {i18nService.t('addModel')}
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                    {(providers[activeProvider].models ?? []).map(model => (
+                      <div
+                        key={model.id}
+                        className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
+                      >
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-green-400"></div>
+                            <div className="min-w-0">
+                              <div className="text-foreground font-medium text-[11px] truncate">{model.name}</div>
+                              <div className="text-[10px] text-secondary truncate">{model.id}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center shrink-0 space-x-1">
+                            {model.supportsImage && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                                {i18nService.t('imageInput')}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
+                              className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteModel(model.id)}
+                              className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center shrink-0 space-x-1">
-                          {model.supportsImage && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
-                              {i18nService.t('imageInput')}
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
-                            className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteModel(model.id)}
-                            className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <TrashIcon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
-                    <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
-                      <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
-                      <button
-                        type="button"
-                        onClick={handleAddModel}
-                        className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
-                      >
-                        <PlusCircleIcon className="h-3 w-3 mr-1" />
-                        {i18nService.t('addFirstModel')}
-                      </button>
-                    </div>
-                  )}
+                    {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
+                      <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
+                        <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
+                        <button
+                          type="button"
+                          onClick={handleAddModel}
+                          className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
+                        >
+                          <PlusCircleIcon className="h-3 w-3 mr-1" />
+                          {i18nService.t('addFirstModel')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         );

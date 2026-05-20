@@ -6,7 +6,6 @@ import {
   type AppUpdateRuntimeState,
   AppUpdateStatus,
 } from '../shared/appUpdate/constants';
-import { OpenClawProviderId, ProviderName, ProviderRegistry } from '../shared/providers';
 import { CoworkView } from './components/cowork';
 import CoworkPermissionModal from './components/cowork/CoworkPermissionModal';
 import CoworkQuestionWizard from './components/cowork/CoworkQuestionWizard';
@@ -21,10 +20,11 @@ import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import AppUpdateModal from './components/update/AppUpdateModal';
 import WindowTitleBar from './components/window/WindowTitleBar';
-import { defaultConfig, getProviderDisplayName } from './config';
+import { defaultConfig } from './config';
 import type { ApiConfig } from './services/api';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
+import { collectAvailableModels, LLAMACPP_RUNNING_MODELS_CHANGED_EVENT } from './services/availableModels';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
@@ -40,16 +40,6 @@ import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
 import type { CoworkPermissionResult } from './types/cowork';
-
-const getOpenClawProviderIdForConfig = (
-  providerName: string,
-  providerConfig: { authType?: string },
-): string => {
-  if (providerName === ProviderName.OpenAI && providerConfig.authType === 'oauth') {
-    return OpenClawProviderId.OpenAICodex;
-  }
-  return ProviderRegistry.getOpenClawProviderId(providerName);
-};
 
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
 const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
@@ -160,31 +150,7 @@ const App: React.FC = () => {
         };
         apiService.setConfig(apiConfig);
 
-        const providerModels: { id: string; name: string; provider?: string; providerKey?: string; openClawProviderId?: string; supportsImage?: boolean }[] = [];
-        if (config.providers) {
-          Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
-            if (providerConfig.enabled && providerConfig.models) {
-              const openClawProviderId = getOpenClawProviderIdForConfig(providerName, providerConfig);
-              providerConfig.models.forEach((model: { id: string; name: string; supportsImage?: boolean }) => {
-                providerModels.push({
-                  id: model.id,
-                  name: model.name,
-                  provider: getProviderDisplayName(providerName, providerConfig),
-                  providerKey: providerName,
-                  openClawProviderId,
-                  supportsImage: model.supportsImage ?? false,
-                });
-              });
-            }
-          });
-        }
-        const fallbackModels = config.model.availableModels.map(model => ({
-          id: model.id,
-          name: model.name,
-          providerKey: undefined,
-          supportsImage: model.supportsImage ?? false,
-        }));
-        const resolvedModels = providerModels.length > 0 ? providerModels : fallbackModels;
+        const resolvedModels = await collectAvailableModels(config);
         if (resolvedModels.length > 0) {
           dispatch(setAvailableModels(resolvedModels));
           const allModels = store.getState().model.availableModels;
@@ -216,6 +182,34 @@ const App: React.FC = () => {
 
     void initializeApp();
   }, [dispatch, waitWithTimeout]);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
+
+    const refreshAvailableModels = async () => {
+      const config = configService.getConfig();
+      const allModels = await collectAvailableModels(config);
+      if (allModels.length > 0) {
+        dispatch(setAvailableModels(allModels));
+      }
+    };
+
+    const handleConfigUpdated = () => {
+      void refreshAvailableModels().catch(() => undefined);
+    };
+    const handleLlamaCppRunningModelsChanged = () => {
+      void refreshAvailableModels().catch(() => undefined);
+    };
+
+    window.addEventListener('config-updated', handleConfigUpdated);
+    window.addEventListener(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT, handleLlamaCppRunningModelsChanged);
+    return () => {
+      window.removeEventListener('config-updated', handleConfigUpdated);
+      window.removeEventListener(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT, handleLlamaCppRunningModelsChanged);
+    };
+  }, [dispatch, isInitialized]);
 
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {
@@ -471,28 +465,11 @@ const handleConfirmUpdate = useCallback(async () => {
       apiKey: config.api.key,
       baseUrl: config.api.baseUrl,
     });
-
-    if (config.providers) {
-      const allModels: { id: string; name: string; provider?: string; providerKey?: string; openClawProviderId?: string; supportsImage?: boolean }[] = [];
-      Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
-        if (providerConfig.enabled && providerConfig.models) {
-          const openClawProviderId = getOpenClawProviderIdForConfig(providerName, providerConfig);
-          providerConfig.models.forEach((model: { id: string; name: string; supportsImage?: boolean }) => {
-            allModels.push({
-              id: model.id,
-              name: model.name,
-              provider: getProviderDisplayName(providerName, providerConfig),
-              providerKey: providerName,
-              openClawProviderId,
-              supportsImage: model.supportsImage ?? false,
-            });
-          });
-        }
-      });
+    void collectAvailableModels(config).then((allModels) => {
       if (allModels.length > 0) {
         dispatch(setAvailableModels(allModels));
       }
-    }
+    }).catch(() => undefined);
   };
 
   const isShortcutInputActive = () => {
@@ -567,6 +544,15 @@ const handleConfirmUpdate = useCallback(async () => {
     };
     window.addEventListener('app:ask-ai', handler);
     return () => window.removeEventListener('app:ask-ai', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      setShowSettings(false);
+      setMainView('localInference');
+    };
+    window.addEventListener('app:show-local-inference', handler);
+    return () => window.removeEventListener('app:show-local-inference', handler);
   }, []);
 
   // 监听托盘菜单打开设置的 IPC 事件
@@ -681,7 +667,6 @@ const handleConfirmUpdate = useCallback(async () => {
           {showSettings && (
             <Settings
               onClose={handleCloseSettings}
-              onShowLocalInference={handleShowLocalInference}
               initialTab={settingsOptions.initialTab}
               notice={settingsOptions.notice}
               enterpriseConfig={enterpriseConfig}
@@ -764,7 +749,6 @@ const handleConfirmUpdate = useCallback(async () => {
       {showSettings && (
         <Settings
           onClose={handleCloseSettings}
-          onShowLocalInference={handleShowLocalInference}
           initialTab={settingsOptions.initialTab}
           notice={settingsOptions.notice}
           enterpriseConfig={enterpriseConfig}

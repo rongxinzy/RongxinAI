@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { ProviderName } from '../../shared/providers';
 import { isDesignedAgentAvatarIcon } from '../../shared/agent/avatar';
 import type { Agent } from '../coworkStore';
 
@@ -140,9 +141,16 @@ export function resolveQualifiedAgentModelRef(options: {
       };
     }
 
+    if (explicitTarget.providerId !== ProviderName.LlamaCpp) {
+      return {
+        status: 'qualified',
+        primaryModel: explicitTarget.primaryModel,
+      };
+    }
+
     return {
-      status: 'qualified',
-      primaryModel: explicitTarget.primaryModel,
+      status: 'unresolved',
+      modelId: explicitTarget.modelId,
     };
   }
 

@@ -112,6 +112,7 @@ type GatewayClientCtor = new (options: Record<string, unknown>) => GatewayClient
 
 type OpenClawRuntimeAdapterOptions = {
   normalizeModelRef?: (modelRef: string) => string;
+  isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
 };
 
 type ChatEventState = 'delta' | 'final' | 'aborted' | 'error';
@@ -1005,6 +1006,15 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     return this.options.normalizeModelRef?.(normalized) ?? normalized;
   }
 
+  private assertModelAvailableForSession(modelRef: string): void {
+    const normalized = modelRef.trim();
+    if (!normalized) return;
+    const availability = this.options.isModelAvailableForSession?.(normalized);
+    if (availability && !availability.available) {
+      throw new Error(availability.message || 'The selected model is not available.');
+    }
+  }
+
   setChannelSessionSync(sync: OpenClawChannelSessionSync): void {
     this.channelSessionSync = sync;
   }
@@ -1434,6 +1444,10 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         : {}),
     };
 
+    if (normalizedPatch.model) {
+      this.assertModelAvailableForSession(normalizedPatch.model);
+    }
+
     const sendPatch = async (): Promise<void> => {
       const client = this.requireGatewayClient();
       await client.request('sessions.patch', {
@@ -1670,6 +1684,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const currentModel = session.modelOverride
       ? rawCurrentModel
       : (rawCurrentModel ? this.normalizeModelRef(rawCurrentModel) : '');
+    this.assertModelAvailableForSession(currentModel);
     if (!session.modelOverride && currentModel && currentModel !== rawCurrentModel && agent?.id) {
       this.store.updateAgent(agent.id, { model: currentModel });
     }

@@ -36,6 +36,7 @@ export const ProviderName = {
   StepFun: 'stepfun',
   Volcengine: 'volcengine',
   OpenRouter: 'openrouter',
+  LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
   Custom: 'custom',
   LobsteraiServer: 'lobsterai-server',
@@ -63,6 +64,7 @@ export const OpenClawProviderId = {
   OpenRouter: 'openrouter',
   Copilot: 'github-copilot',
   LobsteraiCopilot: 'lobsterai-copilot',
+  LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
   Lobster: 'lobster',
 } as const;
@@ -399,6 +401,22 @@ const PROVIDER_DEFINITIONS = [
     enPriority: 0,
     defaultModels: [],
   },
+  {
+    id: ProviderName.LlamaCpp,
+    label: 'Llama.cpp',
+    website: 'https://github.com/ggerganov/llama.cpp',
+    openClawProviderId: OpenClawProviderId.LlamaCpp,
+    defaultBaseUrl: 'http://127.0.0.1:8080/v1',
+    defaultApiFormat: ApiFormat.OpenAI,
+    codingPlanSupported: false,
+    switchableBaseUrls: {
+      anthropic: 'http://127.0.0.1:8080',
+      openai: 'http://127.0.0.1:8080/v1',
+    },
+    region: 'china',
+    enPriority: 0,
+    defaultModels: [],
+  },
   // ── Global ──
   {
     id: ProviderName.Copilot,
@@ -638,7 +656,7 @@ class ProviderRegistryImpl {
   /**
    * Provider IDs for English locale display:
    * EN_PRIORITY providers first (sorted by enPriority), then CHINA, then remaining GLOBAL.
-   * ollama and custom are always pushed to the end, with custom last.
+   * local providers are always pushed to the end, with Ollama last.
    */
   idsForEnLocale(): readonly string[] {
     const priority = this.defs
@@ -652,10 +670,13 @@ class ProviderRegistryImpl {
     const unique = [...new Set(orderedProviders)];
 
     // Move local providers to the end.
-    const ollamaIdx = unique.indexOf(ProviderName.Ollama);
-    if (ollamaIdx !== -1) {
-      unique.splice(ollamaIdx, 1);
+    for (const localProvider of [ProviderName.LlamaCpp, ProviderName.Ollama]) {
+      const idx = unique.indexOf(localProvider);
+      if (idx !== -1) {
+        unique.splice(idx, 1);
+      }
     }
+    unique.push(ProviderName.LlamaCpp);
     unique.push(ProviderName.Ollama);
     return unique;
   }
