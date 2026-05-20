@@ -33,6 +33,7 @@ import type {
 } from '../../../shared/llamacpp';
 import {
   createLlamaCppStreamState as createOllamaStreamState,
+  getLlamaCppLaunchContextLimitViolation,
   reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
 } from '../../../shared/llamacpp';
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
@@ -190,6 +191,9 @@ const CHAT_JUMP_TO_BOTTOM_MIN_OFFSET = 92;
 const CHAT_JUMP_TO_BOTTOM_GAP = 16;
 const LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_PROGRESS_DISMISS_MS = 5_000;
+const LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS = 500;
+const LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS = 3_000;
+const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
 const DIRECT_ANSWER_SYSTEM_HINT = [
   'Answer as quickly and directly as possible.',
   'Skip unnecessary drafts, long internal monologues, and unrelated exploration.',
@@ -482,6 +486,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
   const [loading, setLoading] = useState(false);
+  const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [pullName, setPullName] = useState('');
   const [activePullName, setActivePullName] = useState<string | null>(null);
@@ -631,6 +636,24 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setRunningModels(models);
     return models;
   }, []);
+
+  const waitForUnloadSettle = useCallback(
+    async (modelName: string) => {
+      const deadline = Date.now() + LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS;
+      let latestModels = await refreshRunningModels();
+      while (
+        latestModels.some(model => model.name === modelName || model.model === modelName)
+        && Date.now() < deadline
+      ) {
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS);
+        });
+        latestModels = await refreshRunningModels();
+      }
+      return latestModels;
+    },
+    [refreshRunningModels],
+  );
 
   const handleMarketplaceInstall = useCallback(
     async (model: MarketplaceModel) => {
@@ -955,14 +978,44 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   };
 
   const handleUnload = (modelName: string) => {
+    if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
+    const unloadStartedAtMs = Date.now();
+    setUnloadingModelName(modelName);
     void runAction(async () => {
-      const result = await window.electron.llamacpp.unloadModel(modelName);
-      setRunningModels(result.runningModels);
-      notifyLlamaCppRunningModelsChanged();
+      try {
+        const result = await window.electron.llamacpp.unloadModel(modelName);
+        let latestRunningModels = result.runningModels;
+        setRunningModels(latestRunningModels);
+        if (!result.confirmed) {
+          latestRunningModels = await waitForUnloadSettle(modelName);
+        }
+        notifyLlamaCppRunningModelsChanged();
+        if (result.warning) {
+          const stillVisible = latestRunningModels.some(
+            model => model.name === modelName || model.model === modelName,
+          );
+          if (result.confirmed || stillVisible) {
+            showToast(result.warning, LocalInferenceToastKind.Info);
+          }
+        }
+      } finally {
+        const remainingBusyMs = getRemainingBusyMs({
+          startedAtMs: unloadStartedAtMs,
+          nowMs: Date.now(),
+          minimumBusyMs: LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
+        });
+        if (remainingBusyMs > 0) {
+          await new Promise<void>(resolve => {
+            window.setTimeout(resolve, remainingBusyMs);
+          });
+        }
+        setUnloadingModelName(current => (current === modelName ? null : current));
+      }
     });
   };
 
   const handleDelete = (modelName: string) => {
+    if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
     void runAction(async () => {
       await window.electron.llamacpp.deleteModel(modelName);
       await refreshLocalModels();
@@ -972,6 +1025,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   };
 
   const handleSetOpenClawModel = (modelName: string) => {
+    if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
     void runAction(async () => {
       const result = await window.electron.llamacpp.setOpenClawModel(modelName);
       if (!result.success)
@@ -1194,6 +1248,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             <ModelsPanel
               isRunning={isRunning}
               loading={loading}
+              unloadingModelName={unloadingModelName}
               localModels={localModels}
               runningModels={runningModels}
               pullName={pullName}
@@ -1845,6 +1900,7 @@ function StatusBadge({ status }: { status: string }) {
 function ModelsPanel({
   isRunning,
   loading,
+  unloadingModelName,
   localModels,
   runningModels,
   pullName,
@@ -1862,6 +1918,7 @@ function ModelsPanel({
 }: {
   isRunning: boolean;
   loading: boolean;
+  unloadingModelName: string | null;
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
   pullName: string;
@@ -1932,7 +1989,7 @@ function ModelsPanel({
         ) : localModels.length === 0 ? (
           <EmptyState title={i18nService.t('localInferenceNoModels')} />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
             {localModels.map(model => {
               const runningModel = runningModels.find(
                 item => item.name === model.name || item.model === model.name,
@@ -1943,11 +2000,18 @@ function ModelsPanel({
                   model={model}
                   runningModel={runningModel}
                   loading={loading}
-                  onConfigureLaunch={() => onConfigureLaunch(model)}
+                  unloading={unloadingModelName === model.name}
+                  onConfigureLaunch={() => {
+                    if (shouldBlockModelAction({ modelName: model.name, unloadingModelName })) return;
+                    onConfigureLaunch(model);
+                  }}
                   onUnload={() => onUnload(model.name)}
                   onDelete={() => onDelete(model.name)}
                   onSetOpenClawModel={() => onSetOpenClawModel(model.name)}
-                  onOpenInference={() => onOpenInference(model.name)}
+                  onOpenInference={() => {
+                    if (shouldBlockModelAction({ modelName: model.name, unloadingModelName })) return;
+                    onOpenInference(model.name);
+                  }}
                 />
               );
             })}
@@ -1962,6 +2026,7 @@ function ModelCard({
   model,
   runningModel,
   loading,
+  unloading,
   onConfigureLaunch,
   onUnload,
   onDelete,
@@ -1971,6 +2036,7 @@ function ModelCard({
   model: OllamaModel;
   runningModel?: OllamaRunningModel;
   loading: boolean;
+  unloading: boolean;
   onConfigureLaunch: () => void;
   onUnload: () => void;
   onDelete: () => void;
@@ -1978,8 +2044,13 @@ function ModelCard({
   onOpenInference: () => void;
 }) {
   const isRunning = Boolean(runningModel);
+  const { cardBusy, buttonsDisabled } = getModelCardBusyState({
+    modelName: model.name,
+    unloadingModelName: unloading ? model.name : null,
+    globalLoading: loading,
+  });
   return (
-    <div className="flex flex-col gap-3 border-b border-border px-3 py-3 last:border-b-0 md:flex-row md:items-center md:justify-between">
+    <div className={`flex flex-col gap-3 border-b border-border px-3 py-3 last:border-b-0 md:flex-row md:items-center md:justify-between ${cardBusy ? 'bg-surface-raised/20' : ''}`}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="truncate font-mono text-sm font-medium text-foreground">{model.name}</h3>
@@ -2019,23 +2090,42 @@ function ModelCard({
             </span>
           ) : null}
         </div>
+        {cardBusy && (
+          <div className="mt-3 max-w-xs rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+              <ArrowPathIcon className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span>{i18nService.t('localInferenceUnloadingHint')}</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-raised">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
+            </div>
+          </div>
+        )}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <div
+        className={`flex shrink-0 flex-wrap items-center gap-2 ${cardBusy ? 'pointer-events-none' : ''}`}
+      >
         {isRunning ? (
           <button
             type="button"
             onClick={onUnload}
-            disabled={loading}
+            disabled={buttonsDisabled}
             className={smallOutlineButtonClass}
           >
-            <StopIcon className="h-3.5 w-3.5" />
-            {i18nService.t('localInferenceUnload')}
+            {cardBusy ? (
+              <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <StopIcon className="h-3.5 w-3.5" />
+            )}
+            {cardBusy
+              ? i18nService.t('localInferenceUnloading')
+              : i18nService.t('localInferenceUnload')}
           </button>
         ) : (
           <button
             type="button"
             onClick={onConfigureLaunch}
-            disabled={loading}
+            disabled={buttonsDisabled}
             className={smallOutlineButtonClass}
           >
             <PlayIcon className="h-3.5 w-3.5" />
@@ -2045,7 +2135,7 @@ function ModelCard({
         <button
           type="button"
           onClick={onOpenInference}
-          disabled={!isRunning}
+          disabled={!isRunning || buttonsDisabled}
           className={smallOutlineButtonClass}
         >
           <ServerStackIcon className="h-3.5 w-3.5" />
@@ -2054,14 +2144,19 @@ function ModelCard({
         <button
           type="button"
           onClick={onSetOpenClawModel}
-          disabled={!isRunning || loading}
+          disabled={!isRunning || buttonsDisabled}
           title={!isRunning ? i18nService.t('localInferenceUseOpenClawDisabledHint') : undefined}
           className={smallOutlineButtonClass}
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
           {i18nService.t('localInferenceUseOpenClaw')}
         </button>
-        <button type="button" onClick={onDelete} className={smallDangerButtonClass}>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={buttonsDisabled}
+          className={smallDangerButtonClass}
+        >
           <TrashIcon className="h-3.5 w-3.5" />
           {i18nService.t('delete')}
         </button>
@@ -2144,6 +2239,10 @@ function LaunchModelDialog({
     input: buildInput(),
     gpuPreset: form.gpuPreset,
     customGpuDevices: form.customGpuDevices,
+  });
+  const launchContextLimitViolation = getLaunchContextLimitViolation({
+    requestedContextLength: parseOptionalInteger(form.numCtx),
+    trainedContextLength: model.trained_context_length ?? model.details?.context_length,
   });
   const servicePatch = resolveLaunchServiceConfig(form.gpuPreset, form.customGpuDevices);
   const gpuPresetChangesService =
@@ -2324,6 +2423,20 @@ function LaunchModelDialog({
                 />
               )}
             </div>
+            {launchContextLimitViolation && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                {i18nService
+                  .t('localInferenceLaunchContextExceedsTrainingLimit')
+                  .replace(
+                    '{requested}',
+                    String(launchContextLimitViolation.requestedContextLength),
+                  )
+                  .replace(
+                    '{trained}',
+                    String(launchContextLimitViolation.trainedContextLength),
+                  )}
+              </p>
+            )}
           </section>
 
           <section className="space-y-3 rounded-xl border border-border px-4 py-3">
@@ -2375,7 +2488,7 @@ function LaunchModelDialog({
           <button
             type="button"
             onClick={() => onLaunch(buildLaunchRequest(), false)}
-            disabled={loading}
+            disabled={loading || Boolean(launchContextLimitViolation)}
             className={
               smallOutlineButtonClass.replace('h-7', 'h-9').replace('text-xs', 'text-sm') +
               ' justify-center px-4'
@@ -2387,7 +2500,7 @@ function LaunchModelDialog({
           <button
             type="button"
             onClick={() => onLaunch(buildLaunchRequest(), true)}
-            disabled={loading}
+            disabled={loading || Boolean(launchContextLimitViolation)}
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             <BeakerIcon className="h-4 w-4" />
@@ -3435,6 +3548,40 @@ function parseOptionalBoolean(value: string): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
+}
+
+function getLaunchContextLimitViolation(input: {
+  requestedContextLength?: number;
+  trainedContextLength?: number;
+}) {
+  return getLlamaCppLaunchContextLimitViolation(input);
+}
+
+function getModelCardBusyState(input: {
+  modelName: string;
+  unloadingModelName: string | null;
+  globalLoading: boolean;
+}): { cardBusy: boolean; buttonsDisabled: boolean } {
+  const cardBusy = Boolean(input.unloadingModelName && input.unloadingModelName === input.modelName);
+  return {
+    cardBusy,
+    buttonsDisabled: input.globalLoading || cardBusy,
+  };
+}
+
+function shouldBlockModelAction(input: {
+  modelName: string;
+  unloadingModelName: string | null;
+}): boolean {
+  return Boolean(input.unloadingModelName && input.unloadingModelName === input.modelName);
+}
+
+function getRemainingBusyMs(input: {
+  startedAtMs: number;
+  nowMs: number;
+  minimumBusyMs: number;
+}): number {
+  return Math.max(0, input.minimumBusyMs - Math.max(0, input.nowMs - input.startedAtMs));
 }
 
 function resolveAccelerationNumGpu(mode: string, customGpuLayers: string): number | undefined {
@@ -4572,11 +4719,33 @@ export const __test__getEffectiveChatScrollHeight = (scrollHeight: number, tailS
   getEffectiveChatScrollHeight(scrollHeight, tailSpacer);
 export const __test__findLatestUserMessageIndex = (messages: InferenceMessage[]) =>
   findLatestUserMessageIndex(messages);
+export const __test__getLaunchContextLimitMessage = (input: {
+  requestedContextLength?: number;
+  trainedContextLength?: number;
+}) => getLaunchContextLimitViolation(input);
+export const __test__getModelCardBusyState = (input: {
+  modelName: string;
+  unloadingModelName: string | null;
+  globalLoading: boolean;
+}) => getModelCardBusyState(input);
+export const __test__shouldBlockModelAction = (input: {
+  modelName: string;
+  unloadingModelName: string | null;
+}) => shouldBlockModelAction(input);
+export const __test__getRemainingBusyMs = (input: {
+  startedAtMs: number;
+  nowMs: number;
+  minimumBusyMs: number;
+}) => getRemainingBusyMs(input);
 export const __test__isInstallTerminalPhase = (phase: LlamaCppInstallProgress['phase']) =>
   isInstallTerminalPhase(phase);
 export const __test__getLocalInferenceToastAutoDismissMs = () =>
   getLocalInferenceToastAutoDismissMs();
 export const __test__getLocalInferenceProgressDismissMs = () =>
   getLocalInferenceProgressDismissMs();
+export const __test__matchesRunningModelName = (
+  modelName: string,
+  models: OllamaRunningModel[],
+) => models.some(model => model.name === modelName || model.model === modelName);
 
 export default LocalInferenceView;

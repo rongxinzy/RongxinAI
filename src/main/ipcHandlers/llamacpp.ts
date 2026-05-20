@@ -1,16 +1,20 @@
 import { BrowserWindow, ipcMain } from 'electron';
 
+import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
   LlamaCppChatPayload,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
+  LlamaCppModelUnloadResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import { LlamaCppIpcChannel } from '../../shared/llamacpp';
+import { getLlamaCppLaunchContextLimitViolation, LlamaCppIpcChannel } from '../../shared/llamacpp';
+import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
+import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import {
   buildLlamaCppRunningModelBinding,
   buildLlamaCppOpenClawAppConfig,
@@ -22,48 +26,166 @@ import type { SqliteStore } from '../sqliteStore';
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
 const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {};
+const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
+const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
+const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
+const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
+const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
+
+export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
+  return reason === 'llamacpp-model-visibility-refresh';
+}
+
+export function getTotalFreeVramMiB(snapshot: NvidiaSmiSnapshot | null | undefined): number | null {
+  if (!snapshot?.available || snapshot.gpus.length === 0) return null;
+  const values = snapshot.gpus
+    .map(gpu => gpu.memoryFreeMiB)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+export function getRequiredVramRecoveryMiB(sizeVramBytes?: number): number | null {
+  if (!Number.isFinite(sizeVramBytes) || !sizeVramBytes || sizeVramBytes <= 0) return null;
+  const sizeVramMiB = sizeVramBytes / (1024 * 1024);
+  return Math.max(64, Math.min(512, Math.round(sizeVramMiB * 0.25)));
+}
+
+export function hasRecoveredVram(input: {
+  beforeSnapshot: NvidiaSmiSnapshot | null | undefined;
+  currentSnapshot: NvidiaSmiSnapshot | null | undefined;
+  sizeVramBytes?: number;
+}): boolean {
+  const beforeFreeMiB = getTotalFreeVramMiB(input.beforeSnapshot);
+  const currentFreeMiB = getTotalFreeVramMiB(input.currentSnapshot);
+  const requiredRecoveryMiB = getRequiredVramRecoveryMiB(input.sizeVramBytes);
+  if (beforeFreeMiB === null || currentFreeMiB === null || requiredRecoveryMiB === null) {
+    return false;
+  }
+  return currentFreeMiB - beforeFreeMiB >= requiredRecoveryMiB;
+}
+
+function matchesRunningModelName(
+  model: { name?: string; model?: string; id?: string },
+  modelName: string,
+): boolean {
+  return model.name === modelName || model.model === modelName || model.id === modelName;
+}
+
+export async function waitForLlamaCppModelUnloadConfirmation(input: {
+  modelName: string;
+  listRunningModels: () => Promise<Awaited<ReturnType<LlamaCppManager['listRunningModels']>>>;
+  timeoutMs?: number;
+  intervalMs?: number;
+  stableMissingPolls?: number;
+}): Promise<{
+  confirmed: boolean;
+  runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>;
+}> {
+  const timeoutMs = input.timeoutMs ?? LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS;
+  const intervalMs = input.intervalMs ?? LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS;
+  const stableMissingPolls = Math.max(
+    1,
+    input.stableMissingPolls ?? LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS,
+  );
+  const deadline = Date.now() + timeoutMs;
+  let latestRunningModels = await input.listRunningModels();
+  let missingPolls = latestRunningModels.some(model =>
+    matchesRunningModelName(model, input.modelName),
+  )
+    ? 0
+    : 1;
+
+  if (missingPolls >= stableMissingPolls) {
+    return { confirmed: true, runningModels: latestRunningModels };
+  }
+
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+    latestRunningModels = await input.listRunningModels();
+    if (latestRunningModels.some(model => matchesRunningModelName(model, input.modelName))) {
+      missingPolls = 0;
+      continue;
+    }
+    missingPolls += 1;
+    if (missingPolls >= stableMissingPolls) {
+      return { confirmed: true, runningModels: latestRunningModels };
+    }
+  }
+
+  return {
+    confirmed: false,
+    runningModels: latestRunningModels,
+  };
+}
 
 export function registerLlamaCppIpcHandlers(
   manager: LlamaCppManager,
   options: {
     getStore: () => SqliteStore;
-    syncOpenClawConfig: (options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean }) => Promise<{ success: boolean; error?: string }>;
+    syncOpenClawConfig: (options: {
+      reason: string;
+      restartGatewayIfRunning?: boolean;
+      forceGatewayRestartIfRunning?: boolean;
+    }) => Promise<{ success: boolean; error?: string }>;
     getAgentManager?: () => {
       getDefaultAgent: () => { id: string } | null;
       updateAgent: (agentId: string, updates: { model?: string }) => unknown;
     };
   },
 ): void {
-  const refreshRunningModelBindings = async (): Promise<void> => {
+  const updateRunningModelBindings = async (
+    runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
+    reason: string,
+  ): Promise<void> => {
+    const changed = updateLlamaCppRunningModels(
+      runningModels
+        .map(model => buildLlamaCppRunningModelBinding(model))
+        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
+    );
+    if (changed && shouldSyncOpenClawAfterRunningModelRefresh(reason)) {
+      await options.syncOpenClawConfig({
+        reason,
+        restartGatewayIfRunning: true,
+        forceGatewayRestartIfRunning: true,
+      });
+    }
+  };
+
+  const refreshRunningModelBindings = async (
+    reason = 'llamacpp-model-visibility-refresh',
+  ): Promise<void> => {
     try {
-      const runningModels = await manager.listRunningModels();
-      updateLlamaCppRunningModels(
-        runningModels
-          .map((model) => buildLlamaCppRunningModelBinding(model))
-          .filter((model): model is NonNullable<typeof model> => Boolean(model)),
-      );
+      await updateRunningModelBindings(await manager.listRunningModels(), reason);
     } catch {
-      updateLlamaCppRunningModels([]);
+      await updateRunningModelBindings([], reason);
     }
   };
 
   const broadcast = (channel: string, payload: unknown): void => {
-    BrowserWindow.getAllWindows().forEach((win) => {
+    BrowserWindow.getAllWindows().forEach(win => {
       if (win.isDestroyed()) return;
       win.webContents.send(channel, payload);
     });
   };
-  const sendStatus = (status: LlamaCppStatusSnapshot) => broadcast(LlamaCppIpcChannel.StatusChanged, status);
-  const sendProgress = (progress: LlamaCppInstallProgress) => broadcast(LlamaCppIpcChannel.InstallProgress, progress);
+  const sendStatus = (status: LlamaCppStatusSnapshot) =>
+    broadcast(LlamaCppIpcChannel.StatusChanged, status);
+  const sendProgress = (progress: LlamaCppInstallProgress) =>
+    broadcast(LlamaCppIpcChannel.InstallProgress, progress);
 
   migrateLegacyLlamaCppConfig(options.getStore());
-  manager.on('status', (status) => {
+  manager.on('status', status => {
     sendStatus(status);
     if (status.status === 'running') {
       void refreshRunningModelBindings();
       return;
     }
-    if (status.status === 'stopped' || status.status === 'error' || status.status === 'not-installed' || status.status === 'installed') {
+    if (
+      status.status === 'stopped' ||
+      status.status === 'error' ||
+      status.status === 'not-installed' ||
+      status.status === 'installed'
+    ) {
       void refreshRunningModelBindings();
     }
   });
@@ -78,12 +200,17 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
-  ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () => getLlamaCppServiceConfig(options.getStore()));
-  ipcMain.handle(LlamaCppIpcChannel.SetServiceConfig, async (_event, config: LlamaCppServiceConfig) => {
-    const sanitized = sanitizeLlamaCppServiceConfig(config);
-    options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
-    return sanitized;
-  });
+  ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
+    getLlamaCppServiceConfig(options.getStore()),
+  );
+  ipcMain.handle(
+    LlamaCppIpcChannel.SetServiceConfig,
+    async (_event, config: LlamaCppServiceConfig) => {
+      const sanitized = sanitizeLlamaCppServiceConfig(config);
+      options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
+      return sanitized;
+    },
+  );
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
 
   ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
@@ -91,11 +218,7 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.ListRunningModels, async () => {
     const runningModels = await manager.listRunningModels();
-    updateLlamaCppRunningModels(
-      runningModels
-        .map((model) => buildLlamaCppRunningModelBinding(model))
-        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
-    );
+    await updateRunningModelBindings(runningModels, 'llamacpp-model-visibility-refresh');
     return runningModels;
   });
   ipcMain.handle(LlamaCppIpcChannel.DeleteModel, async (_event, name: string) => {
@@ -124,6 +247,22 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
+    const localModels = await manager.listLocalModels();
+    const targetModel = localModels.find(
+      model => model.name === modelName || model.id === modelName,
+    );
+    const contextLimitViolation = getLlamaCppLaunchContextLimitViolation({
+      requestedContextLength: input.options?.ctxSize,
+      trainedContextLength:
+        targetModel?.trained_context_length ?? targetModel?.details?.context_length,
+    });
+    if (contextLimitViolation) {
+      throw new Error(
+        t('llamacppLaunchContextExceedsTrainingLimit')
+          .replace('{requested}', String(contextLimitViolation.requestedContextLength))
+          .replace('{trained}', String(contextLimitViolation.trainedContextLength)),
+      );
+    }
     const result = await manager.loadModel({ ...input, model: modelName });
     await refreshRunningModelBindings();
     return result;
@@ -131,46 +270,101 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
+    const beforeRunningModels = await manager.listRunningModels();
+    const unloadingModel = beforeRunningModels.find(
+      model => model.name === modelName || model.model === modelName || model.id === modelName,
+    );
+    const beforeSnapshot = unloadingModel?.size_vram ? await getNvidiaSmiSnapshot() : null;
     const client = await manager.client();
     await client.unloadModel(modelName);
-    const runningModels = await manager.listRunningModels();
-    await refreshRunningModelBindings();
-    return { success: true, runningModels };
-  });
-  ipcMain.handle(LlamaCppIpcChannel.InstallModel, async (_event, input: LlamaCppInstallModelInput) => {
-    const modelId = input.modelId.trim();
-    if (!modelId) throw new Error('Model ID is required');
-    if (activeInstalls.has(modelId)) {
-      throw new Error(`Model install already in progress: ${modelId}`);
+    const confirmation = await waitForLlamaCppModelUnloadConfirmation({
+      modelName,
+      listRunningModels: () => manager.listRunningModels(),
+    });
+    await updateRunningModelBindings(
+      confirmation.runningModels,
+      confirmation.confirmed ? 'llamacpp-model-unloaded' : 'llamacpp-model-visibility-refresh',
+    );
+    const result: LlamaCppModelUnloadResult = {
+      success: true,
+      confirmed: confirmation.confirmed,
+      runningModels: confirmation.runningModels,
+    };
+    if (!confirmation.confirmed) {
+      result.warning = t('llamacppUnloadConfirmationPending');
     }
-    const controller = new AbortController();
-    activeInstalls.set(modelId, controller);
-    try {
-      await manager.installModel(input, (progress) => {
-        broadcast(LlamaCppIpcChannel.InstallProgress, progress);
-      }, { signal: controller.signal });
-      return { success: true };
-    } catch (error) {
-      if (controller.signal.aborted || isAbortError(error)) {
-        broadcast(LlamaCppIpcChannel.InstallProgress, { modelId, modelName: input.displayName ?? modelId, phase: 'cancelled' });
-        return { success: false, cancelled: true };
+    if (unloadingModel?.size_vram && beforeSnapshot?.available) {
+      const deadline = Date.now() + LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS;
+      let recovered = false;
+      while (Date.now() < deadline) {
+        const currentSnapshot = await getNvidiaSmiSnapshot();
+        if (
+          hasRecoveredVram({
+            beforeSnapshot,
+            currentSnapshot,
+            sizeVramBytes: unloadingModel.size_vram,
+          })
+        ) {
+          recovered = true;
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS));
       }
-      broadcast(LlamaCppIpcChannel.InstallProgress, {
-        modelId,
-        modelName: input.displayName ?? modelId,
-        phase: 'failed',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    } finally {
-      activeInstalls.delete(modelId);
+      if (!recovered && confirmation.confirmed) {
+        result.warning = t('llamacppUnloadVramRecoveryPending');
+      }
     }
+    return result;
   });
+  ipcMain.handle(
+    LlamaCppIpcChannel.InstallModel,
+    async (_event, input: LlamaCppInstallModelInput) => {
+      const modelId = input.modelId.trim();
+      if (!modelId) throw new Error('Model ID is required');
+      if (activeInstalls.has(modelId)) {
+        throw new Error(`Model install already in progress: ${modelId}`);
+      }
+      const controller = new AbortController();
+      activeInstalls.set(modelId, controller);
+      try {
+        await manager.installModel(
+          input,
+          progress => {
+            broadcast(LlamaCppIpcChannel.InstallProgress, progress);
+          },
+          { signal: controller.signal },
+        );
+        return { success: true };
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          broadcast(LlamaCppIpcChannel.InstallProgress, {
+            modelId,
+            modelName: input.displayName ?? modelId,
+            phase: 'cancelled',
+          });
+          return { success: false, cancelled: true };
+        }
+        broadcast(LlamaCppIpcChannel.InstallProgress, {
+          modelId,
+          modelName: input.displayName ?? modelId,
+          phase: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      } finally {
+        activeInstalls.delete(modelId);
+      }
+    },
+  );
   ipcMain.handle(LlamaCppIpcChannel.CancelInstall, async (_event, modelId: string) => {
     const normalizedModelId = modelId.trim();
     const controller = activeInstalls.get(normalizedModelId);
     if (!controller) return { success: true, cancelled: false };
-    broadcast(LlamaCppIpcChannel.InstallProgress, { modelId: normalizedModelId, modelName: normalizedModelId, phase: 'cancelling' });
+    broadcast(LlamaCppIpcChannel.InstallProgress, {
+      modelId: normalizedModelId,
+      modelName: normalizedModelId,
+      phase: 'cancelling',
+    });
     controller.abort(new Error('Install cancelled'));
     return { success: true, cancelled: true };
   });
@@ -178,26 +372,35 @@ export function registerLlamaCppIpcHandlers(
     const client = await manager.client();
     return await client.chat({ ...payload, stream: false });
   });
-  ipcMain.handle(LlamaCppIpcChannel.ChatStream, async (_event, requestId: string, payload: LlamaCppChatPayload) => {
-    if (typeof requestId !== 'string' || !requestId.trim()) throw new Error('Request ID is required');
-    if (activeChats.has(requestId)) throw new Error(`Chat stream already in progress: ${requestId}`);
-    const controller = new AbortController();
-    activeChats.set(requestId, controller);
-    const client = await manager.client();
-    try {
-      await client.chat({ ...payload, stream: true }, (chunk) => {
-        broadcast(LlamaCppIpcChannel.ChatStreamChunk, { requestId, chunk });
-      }, { signal: controller.signal });
-      return { success: true };
-    } catch (error) {
-      if (controller.signal.aborted || isAbortError(error)) {
-        throw new Error('Generation cancelled', { cause: error });
+  ipcMain.handle(
+    LlamaCppIpcChannel.ChatStream,
+    async (_event, requestId: string, payload: LlamaCppChatPayload) => {
+      if (typeof requestId !== 'string' || !requestId.trim())
+        throw new Error('Request ID is required');
+      if (activeChats.has(requestId))
+        throw new Error(`Chat stream already in progress: ${requestId}`);
+      const controller = new AbortController();
+      activeChats.set(requestId, controller);
+      const client = await manager.client();
+      try {
+        await client.chat(
+          { ...payload, stream: true },
+          chunk => {
+            broadcast(LlamaCppIpcChannel.ChatStreamChunk, { requestId, chunk });
+          },
+          { signal: controller.signal },
+        );
+        return { success: true };
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          throw new Error('Generation cancelled', { cause: error });
+        }
+        throw error;
+      } finally {
+        activeChats.delete(requestId);
       }
-      throw error;
-    } finally {
-      activeChats.delete(requestId);
-    }
-  });
+    },
+  );
   ipcMain.handle(LlamaCppIpcChannel.CancelChatStream, async (_event, requestId: string) => {
     const controller = activeChats.get(requestId);
     if (!controller) return { success: true, cancelled: false };
@@ -240,7 +443,10 @@ export function registerLlamaCppIpcHandlers(
 }
 
 export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceConfig {
-  return sanitizeLlamaCppServiceConfig(store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? DEFAULT_LLAMACPP_SERVICE_CONFIG);
+  return sanitizeLlamaCppServiceConfig(
+    store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ??
+      DEFAULT_LLAMACPP_SERVICE_CONFIG,
+  );
 }
 
 function migrateLegacyLlamaCppConfig(store: SqliteStore): void {
@@ -250,14 +456,21 @@ function migrateLegacyLlamaCppConfig(store: SqliteStore): void {
 function migrateLegacyServiceConfig(store: SqliteStore): void {
   const existing = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY);
   if (existing) return;
-  const legacy = store.get<{ cudaVisibleDevices?: string; numParallel?: string }>(OLLAMA_SERVICE_CONFIG_KEY);
+  const legacy = store.get<{ cudaVisibleDevices?: string; numParallel?: string }>(
+    OLLAMA_SERVICE_CONFIG_KEY,
+  );
   if (!legacy) return;
-  store.set(LLAMACPP_SERVICE_CONFIG_KEY, sanitizeLlamaCppServiceConfig({
-    device: legacy.cudaVisibleDevices,
-  }));
+  store.set(
+    LLAMACPP_SERVICE_CONFIG_KEY,
+    sanitizeLlamaCppServiceConfig({
+      device: legacy.cudaVisibleDevices,
+    }),
+  );
 }
 
-export function sanitizeLlamaCppServiceConfig(config: LlamaCppServiceConfig | undefined): LlamaCppServiceConfig {
+export function sanitizeLlamaCppServiceConfig(
+  config: LlamaCppServiceConfig | undefined,
+): LlamaCppServiceConfig {
   const next: LlamaCppServiceConfig = {};
   const host = config?.host?.trim();
   const port = normalizeIntegerString(config?.port);
@@ -310,11 +523,13 @@ export function sanitizeLlamaCppServiceConfig(config: LlamaCppServiceConfig | un
   if (isOnOffAuto(config?.reasoning)) next.reasoning = config.reasoning;
   if (isReasoningFormat(config?.reasoningFormat)) next.reasoningFormat = config.reasoningFormat;
   if (reasoningBudget) next.reasoningBudget = reasoningBudget;
-  if (config?.reasoningBudgetMessage?.trim()) next.reasoningBudgetMessage = config.reasoningBudgetMessage.trim();
+  if (config?.reasoningBudgetMessage?.trim())
+    next.reasoningBudgetMessage = config.reasoningBudgetMessage.trim();
   if (config?.chatTemplate?.trim()) next.chatTemplate = config.chatTemplate.trim();
   if (config?.chatTemplateFile?.trim()) next.chatTemplateFile = config.chatTemplateFile.trim();
   if (typeof config?.skipChatParsing === 'boolean') next.skipChatParsing = config.skipChatParsing;
-  if (typeof config?.prefillAssistant === 'boolean') next.prefillAssistant = config.prefillAssistant;
+  if (typeof config?.prefillAssistant === 'boolean')
+    next.prefillAssistant = config.prefillAssistant;
   if (typeof config?.noMmap === 'boolean') next.noMmap = config.noMmap;
   if (typeof config?.mlock === 'boolean') next.mlock = config.mlock;
   return next;
@@ -350,8 +565,12 @@ function isOnOffAuto(value: unknown): value is 'on' | 'off' | 'auto' {
   return value === 'on' || value === 'off' || value === 'auto';
 }
 
-function isReasoningFormat(value: unknown): value is NonNullable<LlamaCppServiceConfig['reasoningFormat']> {
-  return value === 'none' || value === 'deepseek' || value === 'deepseek-legacy' || value === 'auto';
+function isReasoningFormat(
+  value: unknown,
+): value is NonNullable<LlamaCppServiceConfig['reasoningFormat']> {
+  return (
+    value === 'none' || value === 'deepseek' || value === 'deepseek-legacy' || value === 'auto'
+  );
 }
 
 function isAbortError(error: unknown): boolean {

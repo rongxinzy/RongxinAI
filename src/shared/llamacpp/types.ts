@@ -167,6 +167,13 @@ export type LlamaCppModelLaunchResult = {
   runningModels: LlamaCppRunningModel[];
 };
 
+export type LlamaCppModelUnloadResult = {
+  success: true;
+  runningModels: LlamaCppRunningModel[];
+  confirmed: boolean;
+  warning?: string;
+};
+
 export type LlamaCppChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;

@@ -32,13 +32,10 @@ test('normalizes inference options for llama.cpp requests', () => {
     seed: 42,
     stop: ['###', 'END'],
   }));
-  expect(normalized).not.toHaveProperty('thinking_forced_open');
-  expect(normalized).not.toHaveProperty('reasoning_format');
   expect(normalized).not.toHaveProperty('chat_template_kwargs');
-  expect(normalized).not.toHaveProperty('thinking_budget_tokens');
 });
 
-test('loading inference options clears deprecated thinking-specific settings', () => {
+test('loading inference options ignores deprecated thinking-specific settings', () => {
   const storage = new Map<string, string>();
   const originalLocalStorage = globalThis.localStorage;
   Object.defineProperty(globalThis, 'localStorage', {
@@ -63,10 +60,14 @@ test('loading inference options clears deprecated thinking-specific settings', (
   }));
 
   const loaded = loadInferenceOptions();
-  expect(loaded.reasoning_format).toBe('auto');
-  expect(loaded.thinking_forced_open).toBe('auto');
-  expect(loaded.thinking_budget_tokens).toBe(-1);
   expect(loaded.direct_answer_mode).toBe('enabled');
+  expect(loaded).toEqual(expect.objectContaining({
+    ...DEFAULT_INFERENCE_OPTIONS,
+    direct_answer_mode: 'enabled',
+  }));
+  expect(loaded).not.toHaveProperty('reasoning_format');
+  expect(loaded).not.toHaveProperty('thinking_forced_open');
+  expect(loaded).not.toHaveProperty('thinking_budget_tokens');
 
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -84,9 +85,10 @@ test('returns a Qwen preset with a shorter thinking budget', () => {
     repeat_penalty: 1.05,
     min_p: 0.05,
     presence_penalty: 0.6,
-    reasoning_format: 'auto',
-    thinking_forced_open: 'auto',
   }));
+  expect(recommended).not.toHaveProperty('reasoning_format');
+  expect(recommended).not.toHaveProperty('thinking_forced_open');
+  expect(recommended).not.toHaveProperty('thinking_budget_tokens');
 });
 
 test('detects when a preset can be auto-applied', () => {

@@ -11,6 +11,7 @@ import type {
   LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
+  LlamaCppModelUnloadResult,
   LlamaCppRunningModel,
   LlamaCppRuntimeInstallResult,
   LlamaCppServiceConfig,
@@ -415,7 +416,7 @@ interface IElectronAPI {
     deleteModel: (name: string) => Promise<{ success: boolean; deleted?: boolean; reason?: 'not-local-file' | 'not-app-managed'; error?: string; removedModelName?: string; clearedDefaultModel?: boolean }>;
     showModel: (name: string) => Promise<unknown>;
     loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
-    unloadModel: (name: string) => Promise<LlamaCppModelLaunchResult>;
+    unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
     installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
     pullModel: (name: string) => Promise<{ success: boolean }>;

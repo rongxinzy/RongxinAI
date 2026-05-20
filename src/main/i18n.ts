@@ -58,6 +58,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkLlamaCppModelNotRunning: '该 llama.cpp 模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
     coworkLlamaCppContextWindowUnknown: '该 llama.cpp 模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
     coworkLlamaCppContextLimitReached: '该 llama.cpp 会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
+    llamacppUnloadVramRecoveryPending: '模型已从 llama.cpp 运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
+    llamacppUnloadConfirmationPending: '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
+    llamacppLaunchContextExceedsTrainingLimit: '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
     // IM error replies (differentiated by error kind)
@@ -320,6 +323,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkLlamaCppModelNotRunning: 'This llama.cpp model is not running. Load it from Local Inference first or choose another model.',
     coworkLlamaCppContextWindowUnknown: 'The running llama.cpp model did not report an effective context window. Reload it from Local Inference before sending again.',
     coworkLlamaCppContextLimitReached: 'This llama.cpp session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
+    llamacppUnloadVramRecoveryPending: 'The model has been removed from the llama.cpp running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
+    llamacppUnloadConfirmationPending: 'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
+    llamacppLaunchContextExceedsTrainingLimit: 'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',
