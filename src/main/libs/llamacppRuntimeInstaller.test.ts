@@ -6,7 +6,6 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   createLlamaCppRuntimeInstallPlan,
   ensureLlamaCppRuntimeCurrent,
-  executeLlamaCppRuntimeInstallPlan,
   resolveLlamaCppRuntimeExecutablePath,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
@@ -41,10 +40,6 @@ describe('llamacpp runtime installer planning', () => {
       arch: 'arm64',
       isPackaged: true,
       existingExecutablePath: executablePath,
-      projectRoot: '/repo',
-      sourceDir: '/src/llama.cpp',
-      sourceExists: true,
-      buildScriptExists: true,
     });
 
     expect(plan).toEqual({
@@ -53,44 +48,29 @@ describe('llamacpp runtime installer planning', () => {
     });
   });
 
-  test('builds from local llama.cpp source in development', () => {
+  test('requires a prebuilt runtime in development instead of building from source', () => {
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: 'linux',
       arch: 'x64',
       isPackaged: false,
       existingExecutablePath: null,
-      projectRoot: '/repo',
-      sourceDir: '/src/llama.cpp',
-      sourceExists: true,
-      buildScriptExists: true,
-      cmakePath: '/usr/bin/cmake',
-      nodePath: '/usr/bin/node',
     });
 
-    expect(plan).toEqual({
-      kind: 'build',
-      targetId: 'linux-x64',
-      scriptPath: path.join('/repo', 'scripts', 'run-build-llamacpp-runtime.cjs'),
-      sourceDir: '/src/llama.cpp',
-    });
+    expect(plan.kind).toBe('needs-manual');
+    expect(plan.message).toContain('prebuilt');
   });
 
-  test('requires CMake before planning a development build', () => {
+  test('does not mention CMake when the prebuilt development runtime is missing', () => {
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: 'darwin',
       arch: 'arm64',
       isPackaged: false,
       existingExecutablePath: null,
-      projectRoot: '/repo',
-      sourceDir: '/src/llama.cpp',
-      sourceExists: true,
-      buildScriptExists: true,
-      cmakePath: null,
-      nodePath: '/usr/bin/node',
     });
 
     expect(plan.kind).toBe('needs-manual');
-    expect(plan.message).toContain('CMake');
+    expect(plan.message).not.toContain('CMake');
+    expect(plan.message).toContain('npm run llamacpp:runtime:download -- mac-arm64');
   });
 
   test('does not ask packaged Windows users to compile llama.cpp', () => {
@@ -99,10 +79,6 @@ describe('llamacpp runtime installer planning', () => {
       arch: 'x64',
       isPackaged: true,
       existingExecutablePath: null,
-      projectRoot: 'C:\\app',
-      sourceDir: 'C:\\llama.cpp',
-      sourceExists: true,
-      buildScriptExists: true,
     });
 
     expect(plan.kind).toBe('needs-manual');
@@ -126,30 +102,4 @@ describe('llamacpp runtime installer planning', () => {
     expect(fs.existsSync(resolveLlamaCppRuntimeExecutablePath(projectRoot, 'current', 'darwin'))).toBe(true);
   });
 
-  test('syncs current runtime after a successful build plan', async () => {
-    const projectRoot = createTempProjectRoot();
-    const currentExecutablePath = resolveLlamaCppRuntimeExecutablePath(projectRoot, 'current', 'darwin');
-    const scriptPath = path.join(projectRoot, 'noop-build.cjs');
-    fs.writeFileSync(scriptPath, 'process.exit(0);\n');
-    const plan = {
-      kind: 'build' as const,
-      targetId: 'mac-arm64',
-      scriptPath,
-      sourceDir: '/src/llama.cpp',
-    };
-
-    const result = await executeLlamaCppRuntimeInstallPlan(plan, {
-      projectRoot,
-      sourceDir: '/src/llama.cpp',
-      nodePath: process.execPath,
-      syncRuntimeCurrent: async (targetId) => {
-        writeTargetExecutable(projectRoot, targetId);
-        await ensureLlamaCppRuntimeCurrent(projectRoot, targetId, 'darwin');
-      },
-      findExecutable: async () => fs.existsSync(currentExecutablePath) ? currentExecutablePath : null,
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.executablePath).toBe(currentExecutablePath);
-  });
 });

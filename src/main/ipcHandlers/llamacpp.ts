@@ -9,7 +9,6 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp';
-import { ApiFormat, ProviderName } from '../../shared/providers';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
 import { type LlamaCppOpenClawAppConfig, removeLlamaCppModelFromAppConfig } from '../libs/llamacppOpenClawBinding';
@@ -240,7 +239,6 @@ export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceCon
 
 function migrateLegacyLlamaCppConfig(store: SqliteStore): void {
   migrateLegacyServiceConfig(store);
-  migrateLegacyAppConfig(store);
 }
 
 function migrateLegacyServiceConfig(store: SqliteStore): void {
@@ -251,35 +249,6 @@ function migrateLegacyServiceConfig(store: SqliteStore): void {
   store.set(LLAMACPP_SERVICE_CONFIG_KEY, sanitizeLlamaCppServiceConfig({
     device: legacy.cudaVisibleDevices,
   }));
-}
-
-function migrateLegacyAppConfig(store: SqliteStore): void {
-  const current = store.get<LlamaCppOpenClawAppConfig>('app_config');
-  const legacyProvider = current?.providers?.[ProviderName.Ollama];
-  if (!current || !legacyProvider) return;
-
-  const providers = { ...(current.providers ?? {}) };
-  if (!providers[ProviderName.LlamaCpp]) {
-    providers[ProviderName.LlamaCpp] = {
-      enabled: legacyProvider.enabled,
-      apiKey: legacyProvider.apiKey?.trim() || 'no-key',
-      baseUrl: 'http://127.0.0.1:8080/v1',
-      apiFormat: ApiFormat.OpenAI,
-      models: legacyProvider.models ?? [],
-    };
-  }
-  delete providers[ProviderName.Ollama];
-
-  const model = { ...(current.model ?? {}) };
-  if (model.defaultModelProvider === ProviderName.Ollama) {
-    model.defaultModelProvider = ProviderName.LlamaCpp;
-  }
-
-  store.set('app_config', {
-    ...current,
-    providers,
-    model,
-  });
 }
 
 export function sanitizeLlamaCppServiceConfig(config: LlamaCppServiceConfig | undefined): LlamaCppServiceConfig {

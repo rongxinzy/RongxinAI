@@ -593,8 +593,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handlePrepare = () => {
     void runAction(async () => {
       if (status?.status === 'not-installed') {
-        await window.electron.llamacpp.install();
-        showToast(i18nService.t('localInferenceInstallOpened'));
+        const result = await window.electron.llamacpp.install();
+        showToast(result?.success
+          ? i18nService.t('localInferenceRuntimeReady')
+          : result?.error || i18nService.t('localInferenceRuntimeMissing'));
       } else if (status?.status === 'installed' || status?.status === 'stopped') {
         await window.electron.llamacpp.start();
       } else {

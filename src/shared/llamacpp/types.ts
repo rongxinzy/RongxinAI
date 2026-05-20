@@ -24,12 +24,6 @@ export type LlamaCppRuntimeInstallPlan =
     executablePath: string;
   }
   | {
-    kind: 'build';
-    targetId: string;
-    scriptPath: string;
-    sourceDir: string;
-  }
-  | {
     kind: 'needs-manual';
     message: string;
   };

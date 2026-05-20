@@ -11,6 +11,7 @@ import type {
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeInstallResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -401,7 +402,7 @@ interface IElectronAPI {
   };
   llamacpp: {
     status: () => Promise<LlamaCppStatusSnapshot>;
-    install: () => Promise<LlamaCppStatusSnapshot>;
+    install: () => Promise<LlamaCppRuntimeInstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
     restart: () => Promise<LlamaCppStatusSnapshot>;

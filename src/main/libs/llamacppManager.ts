@@ -20,16 +20,10 @@ import type {
 import { LlamaCppClient } from './llamacppClient';
 import {
   createLlamaCppRuntimeInstallPlan,
-  ensureCMakeDependency,
   ensureLlamaCppRuntimeCurrent,
   executeLlamaCppRuntimeInstallPlan,
-  findCMakePath,
-  findNodePath,
   getProjectRoot,
-  pathExists,
-  resolveDefaultLlamaCppSourceDir,
   resolveLlamaCppRuntimeTargetId,
-  syncLlamaCppRuntimeCurrent,
 } from './llamacppRuntimeInstaller';
 
 const execFileAsync = promisify(execFile);
@@ -147,66 +141,20 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     const existingExecutablePath = await findLlamaCppExecutable();
-    const sourceDir = resolveDefaultLlamaCppSourceDir();
-    const scriptPath = path.join(projectRoot, 'scripts', 'run-build-llamacpp-runtime.cjs');
-    const sourceExists = pathExists(sourceDir);
-    const buildScriptExists = pathExists(scriptPath);
-    let cmakePath = await findCMakePath();
-    if (!existingExecutablePath && !app.isPackaged && sourceExists && buildScriptExists && !cmakePath) {
-      this.setStatus({
-        status: 'installing',
-        executablePath: this.executablePath ?? undefined,
-        managedByApp: false,
-        error: undefined,
-      });
-      const cmakeResult = await ensureCMakeDependency();
-      if (!cmakeResult.success) {
-        const result: LlamaCppRuntimeInstallResult = {
-          success: false,
-          plan: {
-            kind: 'needs-manual',
-            message: cmakeResult.error ?? 'CMake is required to build llama.cpp runtime.',
-          },
-          error: cmakeResult.error,
-        };
-        this.setStatus({
-          status: 'not-installed',
-          executablePath: undefined,
-          managedByApp: false,
-          error: result.error,
-        });
-        return result;
-      }
-      cmakePath = cmakeResult.cmakePath ?? await findCMakePath();
-    }
-    const nodePath = await findNodePath();
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: process.platform,
       arch: process.arch,
       isPackaged: app.isPackaged,
       existingExecutablePath,
-      projectRoot,
-      sourceDir,
-      sourceExists,
-      buildScriptExists,
-      cmakePath,
-      nodePath,
     });
     this.setStatus({
-      status: plan.kind === 'build' ? 'installing' : this.status.status,
+      status: this.status.status,
       executablePath: existingExecutablePath ?? this.executablePath ?? undefined,
       managedByApp: false,
       error: undefined,
     });
 
-    const result = await executeLlamaCppRuntimeInstallPlan(plan, {
-      projectRoot,
-      sourceDir,
-      cmakePath,
-      nodePath,
-      findExecutable: findLlamaCppExecutable,
-      syncRuntimeCurrent: (runtimeTargetId) => syncLlamaCppRuntimeCurrent(projectRoot, runtimeTargetId),
-    });
+    const result = await executeLlamaCppRuntimeInstallPlan(plan);
 
     if (result.success && result.executablePath) {
       this.executablePath = result.executablePath;
@@ -580,8 +528,12 @@ export async function findLlamaCppExecutable(): Promise<string | null> {
   const envPath = process.env.LLAMACPP_BIN?.trim();
   if (envPath && fs.existsSync(envPath)) return envPath;
 
-  for (const candidate of getKnownLlamaCppExecutablePaths()) {
+  for (const candidate of getKnownLlamaCppExecutablePaths(app.isPackaged)) {
     if (fs.existsSync(candidate)) return candidate;
+  }
+
+  if (app.isPackaged) {
+    return null;
   }
 
   const command = process.platform === 'win32' ? 'where' : 'which';
@@ -594,20 +546,21 @@ export async function findLlamaCppExecutable(): Promise<string | null> {
   }
 }
 
-function getKnownLlamaCppExecutablePaths(): string[] {
+function getKnownLlamaCppExecutablePaths(isPackaged: boolean): string[] {
   const extension = process.platform === 'win32' ? '.exe' : '';
   const resourceRoot = process.resourcesPath || path.join(__dirname, '..', '..');
-  return [
+  const candidates = [
     path.join(resourceRoot, 'llamacpp', `llama-server${extension}`),
     path.join(resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
     path.join(__dirname, '..', '..', 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
     path.join(__dirname, '..', '..', 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
     path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
     path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
-    '/opt/homebrew/bin/llama-server',
-    '/usr/local/bin/llama-server',
-    '/usr/bin/llama-server',
   ];
+  if (!isPackaged) {
+    candidates.push('/opt/homebrew/bin/llama-server', '/usr/local/bin/llama-server', '/usr/bin/llama-server');
+  }
+  return candidates;
 }
 
 export function modelLaunchOptionsToPreset(options: NonNullable<LlamaCppModelLaunchInput['options']>): Record<string, string | number | boolean> {

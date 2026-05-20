@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const { spawnSync } = require('child_process');
 const path = require('path');
 
@@ -22,24 +23,33 @@ function resolveHostTargetId() {
   return `${platform}-${arch}`;
 }
 
-const targetId = resolveHostTargetId();
-const rootDir = path.resolve(__dirname, '..');
-const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const env = { ...process.env };
-
-if (process.platform === 'win32') {
-  const nodeDir = path.dirname(process.execPath);
-  const pathEntries = Object.entries(env).filter(([k]) => k.toUpperCase() === 'PATH');
-  const pathValue = pathEntries.map(([, v]) => v).join(path.delimiter);
-  for (const [k] of pathEntries) delete env[k];
-  env.PATH = `${nodeDir}${path.delimiter}${pathValue}`;
+function resolveExecutableName(targetId) {
+  return targetId.startsWith('win-') ? 'llama-server.exe' : 'llama-server';
 }
 
-const result = spawnSync(npmBin, ['run', `llamacpp:runtime:${targetId}`], {
+const targetId = resolveHostTargetId();
+const rootDir = path.resolve(__dirname, '..');
+const runtimeDir = path.join(rootDir, 'vendor', 'llamacpp-runtime', targetId);
+const executableName = resolveExecutableName(targetId);
+const targetExecutable = path.join(runtimeDir, 'bin', executableName);
+
+if (!fs.existsSync(targetExecutable)) {
+  console.error(`[llamacpp-runtime-host] Missing prebuilt llama.cpp runtime for ${targetId}.`);
+  console.error('[llamacpp-runtime-host] Run `npm run llamacpp:runtime:download` to fetch the prebuilt runtime, or set LLAMACPP_BIN to an existing llama-server executable.');
+  process.exit(1);
+}
+
+const result = spawnSync(process.execPath, [
+  path.join(rootDir, 'scripts', 'sync-llamacpp-runtime-current.cjs'),
+  targetId,
+], {
   cwd: rootDir,
-  env,
   stdio: 'inherit',
-  shell: true,
 });
+
+const currentExecutable = path.join(rootDir, 'vendor', 'llamacpp-runtime', 'current', 'bin', executableName);
+if (result.status === 0 && fs.existsSync(currentExecutable)) {
+  console.log(`[llamacpp-runtime-host] Runtime ready: ${path.relative(rootDir, currentExecutable)}`);
+}
 
 process.exit(typeof result.status === 'number' ? result.status : 1);
