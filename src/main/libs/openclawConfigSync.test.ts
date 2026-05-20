@@ -356,3 +356,108 @@ describe('provider registry coverage', () => {
     }
   });
 });
+
+// ==================== Contract tests: buildProviderSelection ====================
+
+import { buildProviderSelection } from './openclawConfigSync';
+
+const REQUIRED_SELECTION_KEYS = ['providerId', 'legacyModelId', 'sessionModelId', 'primaryModel', 'providerConfig'] as const;
+const REQUIRED_PROVIDER_CONFIG_KEYS = ['baseUrl', 'api', 'auth', 'models'] as const;
+const REQUIRED_MODEL_KEYS = ['id', 'name', 'api', 'input'] as const;
+
+describe('buildProviderSelection contract', () => {
+  const baseOptions = {
+    apiKey: 'test-key',
+    baseURL: 'https://api.example.com/v1',
+    modelId: 'test-model',
+    apiType: undefined as 'anthropic' | 'openai' | undefined,
+  };
+
+  test('output has all required top-level keys', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    for (const key of REQUIRED_SELECTION_KEYS) {
+      expect(result).toHaveProperty(key);
+    }
+  });
+
+  test('primaryModel follows providerId/modelId format', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.DeepSeek });
+    expect(result.primaryModel).toBe(`${result.providerId}/${result.sessionModelId}`);
+  });
+
+  test('providerConfig has all required keys', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.OpenAI, apiType: 'openai' });
+    for (const key of REQUIRED_PROVIDER_CONFIG_KEYS) {
+      expect(result.providerConfig).toHaveProperty(key);
+    }
+  });
+
+  test('providerConfig.models[0] has all required keys', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Moonshot });
+    const model = result.providerConfig.models[0];
+    for (const key of REQUIRED_MODEL_KEYS) {
+      expect(model).toHaveProperty(key);
+    }
+  });
+
+  test('model.id matches sessionModelId', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    expect(result.providerConfig.models[0].id).toBe(result.sessionModelId);
+  });
+
+  test('model.input is text array for non-vision models', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.DeepSeek });
+    expect(result.providerConfig.models[0].input).toEqual(['text']);
+  });
+
+  test('model.input includes image for vision-supported models', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic', supportsImage: true });
+    expect(result.providerConfig.models[0].input).toContain('image');
+  });
+
+  test('apiKey uses env var placeholder for providers with resolveApiKey', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    expect(result.providerConfig.apiKey).toMatch(/^\$\{LOBSTER_APIKEY_/);
+  });
+
+  test('apiKey uses env var placeholder for unknown providers', () => {
+    const result = buildProviderSelection({ ...baseOptions, providerName: 'unknown-provider' });
+    expect(result.providerConfig.apiKey).toMatch(/^\$\{LOBSTER_APIKEY_/);
+  });
+
+  // ─── All registered providers ──────────────────────────────────────────
+
+  const majorProviders = [
+    { name: ProviderName.Anthropic, apiType: 'anthropic' as const },
+    { name: ProviderName.OpenAI, apiType: 'openai' as const },
+    { name: ProviderName.DeepSeek, apiType: undefined },
+    { name: ProviderName.Moonshot, apiType: undefined },
+    { name: ProviderName.Ollama, apiType: undefined },
+    { name: ProviderName.LlamaCpp, apiType: undefined },
+  ];
+
+  for (const { name, apiType } of majorProviders) {
+    test(`buildProviderSelection for ${name} produces valid contract`, () => {
+      const result = buildProviderSelection({ ...baseOptions, providerName: name, apiType });
+
+      // Top-level keys
+      expect(typeof result.providerId).toBe('string');
+      expect(result.providerId.length).toBeGreaterThan(0);
+      expect(typeof result.primaryModel).toBe('string');
+      expect(result.primaryModel.startsWith(result.providerId + '/')).toBe(true);
+
+      // Provider config
+      expect(typeof result.providerConfig.baseUrl).toBe('string');
+      expect(result.providerConfig.baseUrl.length).toBeGreaterThan(0);
+      expect(['api-key', 'oauth']).toContain(result.providerConfig.auth);
+
+      // Models
+      expect(result.providerConfig.models.length).toBeGreaterThanOrEqual(1);
+      const model = result.providerConfig.models[0];
+      expect(typeof model.id).toBe('string');
+      expect(model.id.length).toBeGreaterThan(0);
+      expect(Array.isArray(model.input)).toBe(true);
+      expect(model.input.length).toBeGreaterThan(0);
+    });
+  }
+});
