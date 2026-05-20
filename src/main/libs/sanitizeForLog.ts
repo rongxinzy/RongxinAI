@@ -6,7 +6,7 @@ const CIRCULAR_VALUE = '[circular]';
 const TRUNCATED_ITEMS_KEY = '__truncatedItems';
 const TRUNCATED_KEYS_KEY = '__truncatedKeys';
 
-export const SENSITIVE_LOG_KEY_PATTERN = /(api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token)/i;
+export const SENSITIVE_LOG_KEY_PATTERN = /(api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token|bearer|credential|private[-_]?key|client[-_]?secret|app[-_]?secret|bot[-_]?token)/i;
 
 const TRANSPORT_ERROR_TEXT_PATTERNS = [
   /fetch failed/i,

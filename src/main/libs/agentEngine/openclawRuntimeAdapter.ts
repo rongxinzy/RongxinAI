@@ -6,6 +6,7 @@ import * as path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
+import { formatCorrelationId } from '../logCorrelation';
 import type { CoworkExecutionMode, CoworkMessage, CoworkMessageMetadata, CoworkSession, CoworkSessionStatus, CoworkStore } from '../../coworkStore';
 import { t } from '../../i18n';
 import { getCommandDangerLevel,isDeleteCommand } from '../commandSafety';
@@ -2067,7 +2068,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           return;
         }
 
-        console.warn('[OpenClawRuntime] gateway WS disconnected — code:', _code, 'reason:', reason);
+        console.warn('[OpenClawRuntime] gateway WS disconnected — code:', _code, 'reason:', reason, formatCorrelationId());
         const disconnectedError = new Error(reason || 'OpenClaw gateway client disconnected');
         const activeSessionIds = Array.from(this.activeTurns.keys());
         activeSessionIds.forEach((sessionId) => {

@@ -18,6 +18,8 @@ import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkStore } from './coworkStore';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
+import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
+import { createLogger } from './libs/structuredLog';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
 import {
@@ -2996,7 +2998,11 @@ if (!gotTheLock) {
 
   // Cowork IPC handlers
   ipcMain.handle('cowork:session:start', async (_event, rawOptions: unknown) => {
+    const cid = generateCorrelationId();
+    const log = createLogger('CoworkSession').withContext({ cid });
     const options = CoworkSessionStartSchema.input.parse(rawOptions);
+    log.info('session start requested', { prompt: options.prompt.slice(0, 80), agentId: options.agentId });
+    return runWithCorrelationId(cid, async () => {
     try {
       const engineStatus = await ensureOpenClawRunningForCowork();
       if (engineStatus.phase !== 'running') {
@@ -3111,6 +3117,7 @@ if (!gotTheLock) {
         error: error instanceof Error ? error.message : 'Failed to start session',
       };
     }
+    });
   });
 
   ipcMain.handle('cowork:session:continue', async (_event, options: {
