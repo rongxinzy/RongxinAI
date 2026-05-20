@@ -284,7 +284,6 @@ export const useAgentSidebarState = () => {
   }, [loadAgentTasks, sortedEnabledAgents]);
 
   useEffect(() => {
-    if (sessions.length === 0) return;
     setTaskPreviewsByAgentId((previous) => {
       let changed = false;
       const next = { ...previous };
@@ -311,18 +310,36 @@ export const useAgentSidebarState = () => {
         }
       });
 
-      // Remove task previews for sessions that were deleted from the
-      // backend (e.g. via batch delete).  Only prune the *current* agent:
-      // Redux sessions are scoped to the active agent after a switch, so
-      // pruning all agents would wipe cached previews of inactive agents
-      // and briefly show "no tasks" until the user switches back.
+      // Prune task previews for sessions that were deleted from the
+      // backend (e.g. via batch delete).  Redux sessions are scoped to
+      // the active agent after a switch, so we only prune agents whose
+      // task data has already been loaded via loadAgentTasks/loadMoreTasks.
+      // When sessions is empty (all sessions of the current agent were
+      // deleted), still prune the current agent so the sidebar reflects
+      // the empty state immediately.
       const sessionIdSet = new Set(sessions.map((s) => s.id));
-      const currentTasks = next[currentAgentId];
-      if (currentTasks && loadedAgentIdsRef.current.has(currentAgentId)) {
-        const filtered = currentTasks.filter((task) => sessionIdSet.has(task.id));
-        if (filtered.length !== currentTasks.length) {
-          next[currentAgentId] = filtered;
+      const pruneAgent = (agentId: string) => {
+        const tasks = next[agentId];
+        if (!tasks || !loadedAgentIdsRef.current.has(agentId)) return;
+        const filtered = tasks.filter((task) => sessionIdSet.has(task.id));
+        if (filtered.length !== tasks.length) {
+          next[agentId] = filtered;
           changed = true;
+        }
+      };
+
+      // Always prune the current agent (even when sessions is empty).
+      pruneAgent(currentAgentId);
+
+      // Prune the primary source agent of the Redux sessions.
+      // When sessions is non-empty, the first session's agent is the one
+      // that loadSessions(agentId) was called for.  Pruning this agent
+      // covers the common case where batch delete removes sessions from
+      // the currently filtered view.
+      if (sessions.length > 0) {
+        const primaryAgentId = normalizeAgentId(sessions[0].agentId);
+        if (primaryAgentId !== currentAgentId) {
+          pruneAgent(primaryAgentId);
         }
       }
 
