@@ -138,7 +138,7 @@ const IPC_MAX_DEPTH = 5;
 const IPC_MAX_KEYS = 80;
 const IPC_MAX_ITEMS = 40;
 const MAX_INLINE_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const ENGINE_NOT_READY_CODE = 'ENGINE_NOT_READY';
+import { ENGINE_NOT_READY_CODE } from '../common/coworkError';
 const HIDDEN_SKILL_MARKETPLACE_IDS = new Set(['youdaonote', 'youdao-note', 'youdao_note']);
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',

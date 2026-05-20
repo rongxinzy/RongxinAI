@@ -58,6 +58,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkLlamaCppModelNotRunning: '该 llama.cpp 模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
+    // IM error replies (differentiated by error kind)
+    imErrorAuthExpired: 'AI 助手认证已过期，请打开应用更新 API 密钥。',
+    imErrorRateLimited: 'AI 助手请求过于频繁，请稍后重试。',
+    imErrorBudgetExceeded: 'AI 助手账户余额不足，请充值后重试。',
+    imErrorEngineNotReady: 'AI 引擎正在启动中，请稍候再试。',
+    imErrorTransient: 'AI 助手暂时不可用 ({error})，正在自动恢复中，请稍后重试。',
+    imErrorContentFiltered: '消息内容未通过安全审核，请修改后重试。',
+    imErrorInputTooLong: '消息内容过长，请精简后重试。',
+    imErrorExecutionLimit: '任务执行超时或达到上限，请简化需求后重试。',
+    imErrorUnknown: '处理消息时遇到错误: {error}。请稍后重试。',
 
     // Exec approval continuation
     execApprovalApproved: '用户已确认执行该命令，请检查执行结果并继续。',
@@ -309,6 +319,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',
+    // IM error replies (differentiated by error kind)
+    imErrorAuthExpired:
+      'AI assistant authentication expired. Please open the app to update your API key.',
+    imErrorRateLimited: 'AI assistant is receiving too many requests. Please try again later.',
+    imErrorBudgetExceeded: 'AI assistant account balance insufficient. Please top up and try again.',
+    imErrorEngineNotReady: 'AI engine is starting up. Please wait and try again.',
+    imErrorTransient: 'AI assistant temporarily unavailable ({error}). Automatically recovering, please try later.',
+    imErrorContentFiltered: 'Message content did not pass safety review. Please revise and try again.',
+    imErrorInputTooLong: 'Message content too long. Please shorten and try again.',
+    imErrorExecutionLimit: 'Task timed out or reached limit. Please simplify and try again.',
+    imErrorUnknown: 'Error processing message: {error}. Please try again.',
 
     // Exec approval continuation
     execApprovalApproved:

@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 
+import { CoworkErrorKind, type CoworkError, ENGINE_NOT_READY_CODE } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import type { CoworkMessage,CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
@@ -899,15 +900,49 @@ export class IMCoworkHandler extends EventEmitter {
   /**
    * Handle session error event
    */
-  private handleError(sessionId: string, error: string): void {
+  private handleError(sessionId: string, error: CoworkError): void {
     // Only process error events from IM sessions
     if (!this.ensureTrackedSession(sessionId)) return;
 
     this.clearPendingPermissionsBySessionId(sessionId);
     const accumulator = this.messageAccumulators.get(sessionId);
-    if (accumulator) {
-      this.cleanupAccumulator(sessionId);
-      accumulator.reject?.(new Error(error));
+    if (!accumulator) return;
+
+    // Generate differentiated IM reply based on error kind
+    const replyText = this.formatErrorReply(error);
+    this.cleanupAccumulator(sessionId);
+    accumulator.reject?.(new Error(replyText));
+  }
+
+  /**
+   * Generate a user-friendly IM reply text based on the error kind.
+   * Different error categories get different guidance so IM users
+   * know whether to wait, retry, or take action.
+   */
+  private formatErrorReply(error: CoworkError): string {
+    switch (error.kind) {
+      case CoworkErrorKind.AuthExpired:
+        return t('imErrorAuthExpired');
+      case CoworkErrorKind.RateLimited:
+        return t('imErrorRateLimited');
+      case CoworkErrorKind.BudgetExceeded:
+        return t('imErrorBudgetExceeded');
+      case CoworkErrorKind.EngineNotReady:
+        return t('imErrorEngineNotReady');
+      case CoworkErrorKind.NetworkError:
+      case CoworkErrorKind.ServerError:
+      case CoworkErrorKind.GatewayDisconnected:
+      case CoworkErrorKind.ServiceRestart:
+        return t('imErrorTransient', { error: error.message });
+      case CoworkErrorKind.ContentFiltered:
+        return t('imErrorContentFiltered');
+      case CoworkErrorKind.InputTooLong:
+        return t('imErrorInputTooLong');
+      case CoworkErrorKind.ToolTimeout:
+      case CoworkErrorKind.MaxIterations:
+        return t('imErrorExecutionLimit');
+      default:
+        return t('imErrorUnknown', { error: error.message });
     }
   }
 

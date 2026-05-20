@@ -1,4 +1,4 @@
-import { CoworkErrorKind, getUserErrorI18nKey, type CoworkError } from '../../common/coworkError';
+import { CoworkErrorKind, ENGINE_NOT_READY_CODE, getUserErrorI18nKey, type CoworkError } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import { COWORK_SESSION_PAGE_SIZE } from '../../shared/cowork/constants';
@@ -329,7 +329,7 @@ class CoworkService {
 
     // Show a user-visible error when session start fails
     if (result.error) {
-      const errorContent = result.code === 'ENGINE_NOT_READY'
+      const errorContent = result.code === ENGINE_NOT_READY_CODE
         ? i18nService.t('coworkErrorEngineNotReady')
         : classifyError(result.error);
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: errorContent }));
@@ -378,7 +378,7 @@ class CoworkService {
       }
       // Show a user-visible error message in the session
       if (result.error) {
-        const errorContent = result.code === 'ENGINE_NOT_READY'
+        const errorContent = result.code === ENGINE_NOT_READY_CODE
           ? i18nService.t('coworkErrorEngineNotReady')
           : classifyError(result.error);
         store.dispatch(addMessage({
