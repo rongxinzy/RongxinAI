@@ -1895,6 +1895,16 @@ const getIMGatewayManager = () => {
     imGatewayManager.on('error', ({ platform, error }) => {
       console.error(`[IM Gateway] ${platform} error:`, error);
     });
+
+    // Wire gateway lifecycle notifications
+    if (openClawRuntimeAdapter) {
+      openClawRuntimeAdapter.onGatewayDisconnect((reason) => {
+        imGatewayManager?.onOpenClawDisconnected(reason);
+      });
+      openClawRuntimeAdapter.onGatewayReconnect(() => {
+        imGatewayManager?.onOpenClawReconnected();
+      });
+    }
   }
   return imGatewayManager;
 };
