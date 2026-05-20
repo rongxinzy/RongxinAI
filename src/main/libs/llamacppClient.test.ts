@@ -24,6 +24,8 @@ describe('LlamaCppClient', () => {
       path: '/models/qwen3.gguf',
       size: 123,
       status: 'loaded',
+      trained_context_length: 32768,
+      runtime_context_length: 4096,
       details: expect.objectContaining({
         parameter_size: '8B',
         context_length: 32768,
@@ -182,6 +184,38 @@ describe('LlamaCppClient', () => {
     const client = new LlamaCppClient();
 
     await expect(client.loadModel({ model: 'missing' })).rejects.toThrow('HTTP 404');
+  });
+
+  test('falls back to cached launch context when router args do not expose runtime ctx-size', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/models/load')) {
+        return jsonResponse({});
+      }
+      return jsonResponse({
+        data: [{
+          id: 'qwen3:8b',
+          path: '/models/qwen3.gguf',
+          meta: { size: 123, n_params: 8_000_000_000, n_ctx_train: 32768 },
+          status: { value: 'loaded', args: ['--threads', '8'] },
+        }],
+      });
+    }));
+
+    const client = new LlamaCppClient('http://127.0.0.1:8080/');
+
+    await expect(client.loadModel({
+      model: 'qwen3:8b',
+      options: { ctxSize: 8192 },
+    })).resolves.toEqual({
+      success: true,
+      runningModels: [
+        expect.objectContaining({
+          name: 'qwen3:8b',
+          trained_context_length: 32768,
+          runtime_context_length: 8192,
+        }),
+      ],
+    });
   });
 });
 

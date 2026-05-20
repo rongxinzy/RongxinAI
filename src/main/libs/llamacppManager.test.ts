@@ -242,6 +242,40 @@ test('scanLocalGgufModels finds nested ModelScope downloads', () => {
   ]);
 });
 
+test('loadModel reloads the router catalog after writing a new model preset', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-load-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const ggufPath = path.join(modelsDir, 'modelscope', 'unsloth', 'Qwen3.5-0.8B-GGUF', 'Qwen3.5-0.8B-Q4_0.gguf');
+  fs.mkdirSync(path.dirname(ggufPath), { recursive: true });
+  fs.writeFileSync(ggufPath, 'gguf');
+
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  manager.getPresetPath = () => presetPath;
+
+  const calls: string[] = [];
+  manager.client = async () => ({
+    listModels: async () => {
+      calls.push(fs.existsSync(presetPath) ? 'reload-after-preset' : 'reload-before-preset');
+      return [];
+    },
+    loadModel: async () => {
+      calls.push('load');
+      return { success: true, runningModels: [] };
+    },
+  } as any);
+
+  await manager.loadModel({
+    model: 'Qwen3.5-0.8B-GGUF',
+    options: { ctxSize: 4096 },
+  });
+
+  expect(calls).toEqual([
+    'reload-before-preset',
+    'reload-after-preset',
+    'load',
+  ]);
+});
+
 test('deleteModel removes empty parent directories after deleting a GGUF file', async () => {
   const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-delete-'));
   const repoDir = path.join(modelsDir, 'modelscope', 'unsloth', 'Qwen3.5-0.8B-GGUF');

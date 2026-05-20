@@ -64,6 +64,7 @@ type OpenAIChatCompletionChunk = {
 
 export class LlamaCppClient {
   private readonly baseUrl: string;
+  private readonly lastLoadRuntimeContextByModel = new Map<string, number>();
 
   constructor(baseUrl = 'http://127.0.0.1:8080') {
     this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -79,13 +80,24 @@ export class LlamaCppClient {
   }
 
   async listModels(): Promise<LlamaCppModel[]> {
-    const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models?reload=1', { method: 'GET', timeoutMs: 30_000 });
-    return (payload.data ?? []).map(toLlamaCppModel);
+    const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models?reload=1', {
+      method: 'GET',
+      timeoutMs: 30_000,
+    });
+    return (payload.data ?? []).map(model =>
+      toLlamaCppModel(
+        model,
+        this.lastLoadRuntimeContextByModel.get((model.id || model.path || 'unknown').trim()),
+      ),
+    );
   }
 
   async runningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
     const models = await this.listModelsWithTimeout(timeoutMs);
-    return models.filter((model) => model.status === 'loaded' || model.status === 'loading' || model.status === 'sleeping');
+    return models.filter(
+      model =>
+        model.status === 'loaded' || model.status === 'loading' || model.status === 'sleeping',
+    );
   }
 
   async showModel(name: string): Promise<unknown> {
@@ -97,11 +109,15 @@ export class LlamaCppClient {
   }
 
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
+    const modelName = input.model.trim();
     await this.requestJson('/models/load', {
       method: 'POST',
       timeoutMs: 300_000,
       body: JSON.stringify({ model: input.model }),
     });
+    if (typeof input.options?.ctxSize === 'number' && input.options.ctxSize > 0) {
+      this.lastLoadRuntimeContextByModel.set(modelName, input.options.ctxSize);
+    }
     return { success: true, runningModels: await this.runningModels() };
   }
 
@@ -120,43 +136,57 @@ export class LlamaCppClient {
   ): Promise<LlamaCppChatChunk | void> {
     const body = toOpenAIChatPayload(payload, Boolean(onChunk) && payload.stream !== false);
     if (!onChunk || payload.stream === false) {
-      return toLlamaCppFinalChatChunk(await this.requestJson<OpenAIChatCompletion>('/v1/chat/completions', {
-        method: 'POST',
-        body: JSON.stringify({ ...body, stream: false }),
-        signal: options.signal,
-      }));
+      return toLlamaCppFinalChatChunk(
+        await this.requestJson<OpenAIChatCompletion>('/v1/chat/completions', {
+          method: 'POST',
+          body: JSON.stringify({ ...body, stream: false }),
+          signal: options.signal,
+        }),
+      );
     }
 
     let sawDone = false;
     let sawDoneChunk = false;
-    await this.requestSse('/v1/chat/completions', {
-      method: 'POST',
-      body: JSON.stringify({ ...body, stream: true, stream_options: { include_usage: true } }),
-      signal: options.signal,
-    }, (chunk) => {
-      if (chunk === '[DONE]') {
-        sawDone = true;
-        if (!sawDoneChunk) {
-          onChunk({ model: payload.model, done: true, done_reason: 'stop' });
+    await this.requestSse(
+      '/v1/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...body, stream: true, stream_options: { include_usage: true } }),
+        signal: options.signal,
+      },
+      chunk => {
+        if (chunk === '[DONE]') {
+          sawDone = true;
+          if (!sawDoneChunk) {
+            onChunk({ model: payload.model, done: true, done_reason: 'stop' });
+          }
+          return;
         }
-        return;
-      }
-      const parsed = JSON.parse(chunk) as OpenAIChatCompletionChunk;
-      const mapped = toLlamaCppStreamChunk(parsed);
-      if (mapped.done) {
-        sawDone = true;
-        sawDoneChunk = true;
-      }
-      onChunk(mapped);
-    });
+        const parsed = JSON.parse(chunk) as OpenAIChatCompletionChunk;
+        const mapped = toLlamaCppStreamChunk(parsed);
+        if (mapped.done) {
+          sawDone = true;
+          sawDoneChunk = true;
+        }
+        onChunk(mapped);
+      },
+    );
     if (!sawDone) {
       throw new Error('llama.cpp chat stream ended without a done chunk');
     }
   }
 
   private async listModelsWithTimeout(timeoutMs: number): Promise<LlamaCppModel[]> {
-    const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models', { method: 'GET', timeoutMs });
-    return (payload.data ?? []).map(toLlamaCppModel);
+    const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models', {
+      method: 'GET',
+      timeoutMs,
+    });
+    return (payload.data ?? []).map(model =>
+      toLlamaCppModel(
+        model,
+        this.lastLoadRuntimeContextByModel.get((model.id || model.path || 'unknown').trim()),
+      ),
+    );
   }
 
   private async requestJson<T>(
@@ -165,7 +195,7 @@ export class LlamaCppClient {
   ): Promise<T> {
     const response = await this.fetch(path, options);
     if (response.status === 204) return undefined as T;
-    return await response.json() as T;
+    return (await response.json()) as T;
   }
 
   private async requestSse(
@@ -216,15 +246,18 @@ export class LlamaCppClient {
   private emitSseFrame(frame: string, onChunk: StreamCallback<string>): void {
     const dataLines = frame
       .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice('data:'.length).trim());
+      .map(line => line.trim())
+      .filter(line => line.startsWith('data:'))
+      .map(line => line.slice('data:'.length).trim());
     for (const data of dataLines) {
       if (data) onChunk(data);
     }
   }
 
-  private async fetch(path: string, options: RequestInit & { timeoutMs?: number }): Promise<Response> {
+  private async fetch(
+    path: string,
+    options: RequestInit & { timeoutMs?: number },
+  ): Promise<Response> {
     const controller = new AbortController();
     const externalSignal = options.signal;
     const abortFromExternal = () => controller.abort(externalSignal?.reason);
@@ -245,7 +278,9 @@ export class LlamaCppClient {
       });
       if (!response.ok) {
         const text = await response.text().catch(() => '');
-        throw new Error(`llama.cpp ${path} failed: HTTP ${response.status}${text ? ` ${text}` : ''}`);
+        throw new Error(
+          `llama.cpp ${path} failed: HTTP ${response.status}${text ? ` ${text}` : ''}`,
+        );
       }
       return response;
     } finally {
@@ -255,11 +290,14 @@ export class LlamaCppClient {
   }
 }
 
-function toOpenAIChatPayload(payload: LlamaCppChatPayload, stream: boolean): Record<string, unknown> {
+function toOpenAIChatPayload(
+  payload: LlamaCppChatPayload,
+  stream: boolean,
+): Record<string, unknown> {
   const options = payload.options ?? {};
   return {
     model: payload.model,
-    messages: payload.messages.map((message) => ({
+    messages: payload.messages.map(message => ({
       role: message.role,
       content: message.content,
       ...(message.thinking ? { reasoning_content: message.thinking } : {}),
@@ -288,7 +326,9 @@ function toLlamaCppFinalChatChunk(response: OpenAIChatCompletion): LlamaCppChatC
       content: choice?.message?.content ?? '',
       thinking: choice?.message?.reasoning_content ?? undefined,
       tool_calls: choice?.message?.tool_calls as LlamaCppChatChunk['message'] extends infer T
-        ? T extends { tool_calls?: infer U } ? U : never
+        ? T extends { tool_calls?: infer U }
+          ? U
+          : never
         : never,
     },
     done: true,
@@ -311,7 +351,9 @@ function toLlamaCppStreamChunk(chunk: OpenAIChatCompletionChunk): LlamaCppChatCh
       content: choice?.delta?.content ?? '',
       thinking: choice?.delta?.reasoning_content ?? undefined,
       tool_calls: choice?.delta?.tool_calls as LlamaCppChatChunk['message'] extends infer T
-        ? T extends { tool_calls?: infer U } ? U : never
+        ? T extends { tool_calls?: infer U }
+          ? U
+          : never
         : never,
     },
     done: Boolean(finishReason || chunk.usage),
@@ -324,10 +366,16 @@ function toLlamaCppStreamChunk(chunk: OpenAIChatCompletionChunk): LlamaCppChatCh
   };
 }
 
-function toLlamaCppModel(model: LlamaCppRouterModel): LlamaCppModel {
+function toLlamaCppModel(
+  model: LlamaCppRouterModel,
+  fallbackRuntimeContextLength?: number,
+): LlamaCppModel {
   const name = model.id || model.path || 'unknown';
   const statusValue = model.status?.failed ? 'error' : model.status?.value;
   const status = isLlamaCppModelStatus(statusValue) ? statusValue : 'unloaded';
+  const trainedContextLength = model.meta?.n_ctx_train;
+  const runtimeContextLength =
+    parseRuntimeContextLength(model.status?.args) ?? fallbackRuntimeContextLength;
   return {
     name,
     id: name,
@@ -337,22 +385,51 @@ function toLlamaCppModel(model: LlamaCppRouterModel): LlamaCppModel {
     source: model.in_cache ? 'cache' : 'local',
     status,
     args: model.status?.args,
+    trained_context_length: trainedContextLength,
+    runtime_context_length: runtimeContextLength,
+    effective_options: runtimeContextLength ? { ctxSize: runtimeContextLength } : undefined,
     details: {
       format: 'gguf',
-      parameter_size: typeof model.meta?.n_params === 'number'
-        ? formatParameterCount(model.meta.n_params)
-        : undefined,
-      context_length: model.meta?.n_ctx_train,
+      parameter_size:
+        typeof model.meta?.n_params === 'number'
+          ? formatParameterCount(model.meta.n_params)
+          : undefined,
+      context_length: trainedContextLength,
     },
   };
 }
 
+function parseRuntimeContextLength(args: string[] | undefined): number | undefined {
+  if (!Array.isArray(args) || args.length === 0) return undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index]?.trim() ?? '';
+    if (!current) continue;
+
+    if ((current === '--ctx-size' || current === '-c') && index + 1 < args.length) {
+      const parsed = Number.parseInt(args[index + 1] ?? '', 10);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      continue;
+    }
+
+    const inlineMatch = current.match(/^--ctx-size=(\d+)$/);
+    if (inlineMatch) {
+      const parsed = Number.parseInt(inlineMatch[1], 10);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+
+  return undefined;
+}
+
 function isLlamaCppModelStatus(value: unknown): value is LlamaCppModel['status'] {
-  return value === 'loaded'
-    || value === 'loading'
-    || value === 'unloaded'
-    || value === 'sleeping'
-    || value === 'error';
+  return (
+    value === 'loaded' ||
+    value === 'loading' ||
+    value === 'unloaded' ||
+    value === 'sleeping' ||
+    value === 'error'
+  );
 }
 
 function formatParameterCount(value: number): string {

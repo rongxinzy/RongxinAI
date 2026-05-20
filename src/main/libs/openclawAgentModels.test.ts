@@ -357,4 +357,17 @@ describe('resolveQualifiedAgentModelRef', () => {
       modelId: 'qwen-local',
     });
   });
+
+  test('does not rewrite explicit ollama refs to llama.cpp when model ids match', () => {
+    expect(resolveQualifiedAgentModelRef({
+      agentModel: 'ollama/qwen-local',
+      availableProviders: {
+        ollama: { models: [{ id: 'qwen-local' }] },
+        llamacpp: { models: [{ id: 'qwen-local' }] },
+      },
+    })).toEqual({
+      status: 'qualified',
+      primaryModel: 'ollama/qwen-local',
+    });
+  });
 });
