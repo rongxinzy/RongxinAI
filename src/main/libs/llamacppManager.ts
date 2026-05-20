@@ -37,6 +37,7 @@ type RequestOptions = { signal?: AbortSignal };
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
   private process: ChildProcessWithoutNullStreams | null = null;
+  private runtimeContextLengthByModel = new Map<string, number>();
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
@@ -58,7 +59,10 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   getModelsDir(): string {
-    return this.getServiceConfig().modelsDir?.trim() || path.join(app.getPath('userData'), 'models', 'llamacpp');
+    return (
+      this.getServiceConfig().modelsDir?.trim() ||
+      path.join(app.getPath('userData'), 'models', 'llamacpp')
+    );
   }
 
   getPresetPath(): string {
@@ -109,24 +113,39 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
-    this.process = spawn(this.executablePath, buildLlamaServerArgs(this.getServiceConfig(), this.getModelsDir(), this.getPresetPath()), {
-      detached: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: buildLlamaCppServeEnv(process.env, this.getServiceConfig()),
-    });
+    this.process = spawn(
+      this.executablePath,
+      buildLlamaServerArgs(this.getServiceConfig(), this.getModelsDir(), this.getPresetPath()),
+      {
+        detached: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: buildLlamaCppServeEnv(process.env, this.getServiceConfig()),
+      },
+    );
 
-    this.process.stdout.on('data', (chunk) => console.debug(`[LlamaCpp] ${chunk.toString().trim()}`));
-    this.process.stderr.on('data', (chunk) => console.warn(`[LlamaCpp] ${chunk.toString().trim()}`));
+    this.process.stdout.on('data', chunk => console.debug(`[LlamaCpp] ${chunk.toString().trim()}`));
+    this.process.stderr.on('data', chunk => console.warn(`[LlamaCpp] ${chunk.toString().trim()}`));
     this.process.on('exit', (code, signal) => {
-      console.log(`[LlamaCpp] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
+      console.log(
+        `[LlamaCpp] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`,
+      );
       this.process = null;
       if (this.status.status === 'running' || this.status.status === 'starting') {
-        this.setStatus({ status: 'stopped', executablePath: this.executablePath ?? undefined, managedByApp: false });
+        this.setStatus({
+          status: 'stopped',
+          executablePath: this.executablePath ?? undefined,
+          managedByApp: false,
+        });
       }
     });
-    this.process.on('error', (error) => {
+    this.process.on('error', error => {
       console.warn('[LlamaCpp] process failed:', error);
-      this.setStatus({ status: 'error', error: error.message, executablePath: this.executablePath ?? undefined, managedByApp: false });
+      this.setStatus({
+        status: 'error',
+        error: error.message,
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+      });
     });
 
     await this.waitUntilHealthy(30_000);
@@ -186,12 +205,16 @@ export class LlamaCppManager extends EventEmitter {
         return this.status;
       }
 
-      this.setStatus({ status: 'stopped', executablePath: this.executablePath ?? undefined, managedByApp: false });
+      this.setStatus({
+        status: 'stopped',
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+      });
       return this.status;
     }
 
     const child = this.process;
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timeout = setTimeout(() => {
         child.kill('SIGKILL');
         resolve();
@@ -213,7 +236,11 @@ export class LlamaCppManager extends EventEmitter {
       return this.status;
     }
 
-    this.setStatus({ status: 'stopped', executablePath: this.executablePath ?? undefined, managedByApp: false });
+    this.setStatus({
+      status: 'stopped',
+      executablePath: this.executablePath ?? undefined,
+      managedByApp: false,
+    });
     return this.status;
   }
 
@@ -234,7 +261,26 @@ export class LlamaCppManager extends EventEmitter {
     if (!modelName) throw new Error('Model name is required');
     await this.writeModelPreset({ ...input, model: modelName });
     const client = await this.client();
-    return await client.loadModel({ ...input, model: modelName });
+    await client.listModels();
+    const result = await client.loadModel({ ...input, model: modelName });
+    const resolvedRuntimeContextLength =
+      input.options?.ctxSize ?? normalizePositiveInteger(this.getServiceConfig().ctxSize);
+    if (resolvedRuntimeContextLength) {
+      this.runtimeContextLengthByModel.set(modelName, resolvedRuntimeContextLength);
+    }
+    return {
+      ...result,
+      runningModels: this.hydrateRunningModels(result.runningModels),
+    };
+  }
+
+  async listRunningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
+    const runningModels = await (await this.client()).runningModels(timeoutMs);
+    return this.hydrateRunningModels(runningModels);
+  }
+
+  getRuntimeContextLength(modelName: string): number | undefined {
+    return this.runtimeContextLengthByModel.get(modelName.trim());
   }
 
   async listLocalModels(): Promise<LlamaCppModel[]> {
@@ -247,11 +293,19 @@ export class LlamaCppManager extends EventEmitter {
     return mergeLocalModels(routerModels, scanLocalGgufModels(this.getModelsDir()));
   }
 
-  async deleteModel(name: string): Promise<{ success: boolean; deleted?: boolean; reason?: 'not-local-file' | 'not-app-managed'; error?: string; removedModelName?: string }> {
+  async deleteModel(
+    name: string,
+  ): Promise<{
+    success: boolean;
+    deleted?: boolean;
+    reason?: 'not-local-file' | 'not-app-managed';
+    error?: string;
+    removedModelName?: string;
+  }> {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
     const models = await this.listLocalModels();
-    const model = models.find((item) => item.name === modelName || item.id === modelName);
+    const model = models.find(item => item.name === modelName || item.id === modelName);
     const modelPath = model?.path;
     if (!modelPath || !isGgufPath(modelPath)) {
       return {
@@ -289,12 +343,22 @@ export class LlamaCppManager extends EventEmitter {
     const filePath = resolved.filePath;
 
     const url = resolved.downloadUrl || buildModelScopeFileUrl(modelId, filePath, input.revision);
-    const safeModelDir = path.join(this.getModelsDir(), 'modelscope', ...modelId.split('/').map(sanitizePathSegment));
+    const safeModelDir = path.join(
+      this.getModelsDir(),
+      'modelscope',
+      ...modelId.split('/').map(sanitizePathSegment),
+    );
     fs.mkdirSync(safeModelDir, { recursive: true });
     const targetPath = resolveModelScopeTargetPath(safeModelDir, filePath);
     const installedThisAttempt = new Set<string>();
     if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
-      onProgress?.({ phase: 'done', modelId, modelName: input.displayName ?? modelId, percent: 100, targetPath });
+      onProgress?.({
+        phase: 'done',
+        modelId,
+        modelName: input.displayName ?? modelId,
+        percent: 100,
+        targetPath,
+      });
       await this.refreshModelsAfterInstall();
       return {
         name: resolveInstalledModelName(this.getModelsDir(), targetPath),
@@ -308,27 +372,17 @@ export class LlamaCppManager extends EventEmitter {
       };
     }
 
-    onProgress?.({ phase: 'downloading', modelId, modelName: input.displayName ?? modelId, targetPath });
+    onProgress?.({
+      phase: 'downloading',
+      modelId,
+      modelName: input.displayName ?? modelId,
+      targetPath,
+    });
     try {
-      await downloadFile(url, targetPath, (completed, total) => {
-        onProgress?.({
-          phase: 'downloading-progress',
-          modelId,
-          modelName: input.displayName ?? modelId,
-          completed,
-          total,
-          percent: total ? Math.round((completed / total) * 100) : undefined,
-          targetPath,
-        });
-      }, options.signal);
-      installedThisAttempt.add(targetPath);
-
-      if (input.mmprojFilePath?.trim()) {
-        const mmprojFilePath = input.mmprojFilePath.trim();
-        const mmprojUrl = buildModelScopeFileUrl(modelId, mmprojFilePath, input.revision);
-        const mmprojTargetPath = resolveModelScopeTargetPath(safeModelDir, mmprojFilePath);
-        onProgress?.({ phase: 'downloading', modelId, modelName: input.displayName ?? modelId, targetPath: mmprojTargetPath });
-        await downloadFile(mmprojUrl, mmprojTargetPath, (completed, total) => {
+      await downloadFile(
+        url,
+        targetPath,
+        (completed, total) => {
           onProgress?.({
             phase: 'downloading-progress',
             modelId,
@@ -336,9 +390,39 @@ export class LlamaCppManager extends EventEmitter {
             completed,
             total,
             percent: total ? Math.round((completed / total) * 100) : undefined,
-            targetPath: mmprojTargetPath,
+            targetPath,
           });
-        }, options.signal);
+        },
+        options.signal,
+      );
+      installedThisAttempt.add(targetPath);
+
+      if (input.mmprojFilePath?.trim()) {
+        const mmprojFilePath = input.mmprojFilePath.trim();
+        const mmprojUrl = buildModelScopeFileUrl(modelId, mmprojFilePath, input.revision);
+        const mmprojTargetPath = resolveModelScopeTargetPath(safeModelDir, mmprojFilePath);
+        onProgress?.({
+          phase: 'downloading',
+          modelId,
+          modelName: input.displayName ?? modelId,
+          targetPath: mmprojTargetPath,
+        });
+        await downloadFile(
+          mmprojUrl,
+          mmprojTargetPath,
+          (completed, total) => {
+            onProgress?.({
+              phase: 'downloading-progress',
+              modelId,
+              modelName: input.displayName ?? modelId,
+              completed,
+              total,
+              percent: total ? Math.round((completed / total) * 100) : undefined,
+              targetPath: mmprojTargetPath,
+            });
+          },
+          options.signal,
+        );
         installedThisAttempt.add(mmprojTargetPath);
       }
     } catch (error) {
@@ -347,7 +431,13 @@ export class LlamaCppManager extends EventEmitter {
       throw error;
     }
 
-    onProgress?.({ phase: 'done', modelId, modelName: input.displayName ?? modelId, percent: 100, targetPath });
+    onProgress?.({
+      phase: 'done',
+      modelId,
+      modelName: input.displayName ?? modelId,
+      percent: 100,
+      targetPath,
+    });
     await this.refreshModelsAfterInstall();
 
     return {
@@ -371,37 +461,43 @@ export class LlamaCppManager extends EventEmitter {
     const client = new LlamaCppClient(this.getBaseUrl());
     let runningModels: LlamaCppRunningModel[];
     try {
-      runningModels = await client.runningModels(QUIT_RUNNING_MODELS_TIMEOUT_MS);
+      runningModels = await this.listRunningModels(QUIT_RUNNING_MODELS_TIMEOUT_MS);
     } catch (error) {
-      console.debug('[LlamaCpp] skipped model unload during quit because running models could not be listed:', error);
+      console.debug(
+        '[LlamaCpp] skipped model unload during quit because running models could not be listed:',
+        error,
+      );
       return;
     }
 
-    const modelNames = Array.from(new Set(
-      runningModels
-        .map((model) => (model.name || model.model || '').trim())
-        .filter(Boolean),
-    ));
+    const modelNames = Array.from(
+      new Set(runningModels.map(model => (model.name || model.model || '').trim()).filter(Boolean)),
+    );
     if (modelNames.length === 0) return;
 
     console.log(`[LlamaCpp] unloading ${modelNames.length} model(s) during app quit`);
     const results = await Promise.allSettled(
-      modelNames.map(async (modelName) => {
+      modelNames.map(async modelName => {
         await client.unloadModel(modelName, QUIT_UNLOAD_MODEL_TIMEOUT_MS);
       }),
     );
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.warn(`[LlamaCpp] failed to unload model ${modelNames[index]} during quit:`, result.reason);
+        console.warn(
+          `[LlamaCpp] failed to unload model ${modelNames[index]} during quit:`,
+          result.reason,
+        );
       }
     });
   }
 
   private async writeModelPreset(input: LlamaCppModelLaunchInput): Promise<void> {
     const models = await this.listLocalModels().catch(() => [] as LlamaCppModel[]);
-    const model = models.find((item) => item.name === input.model || item.id === input.model);
+    const model = models.find(item => item.name === input.model || item.id === input.model);
     const modelPath = input.modelPath || model?.path;
-    const existing = fs.existsSync(this.getPresetPath()) ? fs.readFileSync(this.getPresetPath(), 'utf-8') : 'version = 1\n\n';
+    const existing = fs.existsSync(this.getPresetPath())
+      ? fs.readFileSync(this.getPresetPath(), 'utf-8')
+      : 'version = 1\n\n';
     const next = upsertIniSection(existing, input.model, {
       ...(modelPath ? { model: modelPath } : {}),
       ...modelLaunchOptionsToPreset(input.options ?? {}),
@@ -430,7 +526,7 @@ export class LlamaCppManager extends EventEmitter {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       if (await this.isHealthy()) return;
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 250));
     }
     this.setStatus({
       status: 'error',
@@ -440,7 +536,11 @@ export class LlamaCppManager extends EventEmitter {
     });
   }
 
-  private setStatus(patch: Omit<Partial<LlamaCppStatusSnapshot>, 'checkedAt'> & { status: LlamaCppStatusSnapshot['status'] }): void {
+  private setStatus(
+    patch: Omit<Partial<LlamaCppStatusSnapshot>, 'checkedAt'> & {
+      status: LlamaCppStatusSnapshot['status'];
+    },
+  ): void {
     this.status = {
       ...this.status,
       ...patch,
@@ -456,14 +556,57 @@ export class LlamaCppManager extends EventEmitter {
       // The model list will be refreshed when the service is started.
     }
   }
+
+  private hydrateRunningModels(runningModels: LlamaCppRunningModel[]): LlamaCppRunningModel[] {
+    const visibleModelNames = new Set<string>();
+    const hydrated = runningModels.map(model => {
+      const modelName = (model.name || model.model || model.id || '').trim();
+      if (modelName) {
+        visibleModelNames.add(modelName);
+      }
+      const runtimeContextLength =
+        model.runtime_context_length ??
+        (modelName ? this.runtimeContextLengthByModel.get(modelName) : undefined);
+      if (modelName && runtimeContextLength) {
+        this.runtimeContextLengthByModel.set(modelName, runtimeContextLength);
+      }
+      const trainedContextLength =
+        model.trained_context_length ?? model.details?.context_length ?? model.context_length;
+      return {
+        ...model,
+        context_length: trainedContextLength,
+        trained_context_length: trainedContextLength,
+        runtime_context_length: runtimeContextLength,
+        effective_options: runtimeContextLength
+          ? { ctxSize: runtimeContextLength }
+          : model.effective_options,
+      };
+    });
+
+    for (const cachedModelName of Array.from(this.runtimeContextLengthByModel.keys())) {
+      if (!visibleModelNames.has(cachedModelName)) {
+        this.runtimeContextLengthByModel.delete(cachedModelName);
+      }
+    }
+
+    return hydrated;
+  }
 }
 
-export function buildLlamaServerArgs(config: LlamaCppServiceConfig, modelsDir: string, presetPath: string): string[] {
+export function buildLlamaServerArgs(
+  config: LlamaCppServiceConfig,
+  modelsDir: string,
+  presetPath: string,
+): string[] {
   const args = [
-    '--host', config.host?.trim() || DEFAULT_HOST,
-    '--port', config.port?.trim() || DEFAULT_PORT,
-    '--models-dir', modelsDir,
-    '--models-preset', presetPath,
+    '--host',
+    config.host?.trim() || DEFAULT_HOST,
+    '--port',
+    config.port?.trim() || DEFAULT_PORT,
+    '--models-dir',
+    modelsDir,
+    '--models-preset',
+    presetPath,
     '--props',
     '--slots',
     '--no-ui',
@@ -520,7 +663,17 @@ function appendArg(args: string[], name: string, value: string | undefined): voi
   args.push(name, trimmed);
 }
 
-function buildLlamaCppServeEnv(baseEnv: NodeJS.ProcessEnv, _config: LlamaCppServiceConfig): NodeJS.ProcessEnv {
+function normalizePositiveInteger(value: string | undefined): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function buildLlamaCppServeEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  _config: LlamaCppServiceConfig,
+): NodeJS.ProcessEnv {
   return { ...baseEnv };
 }
 
@@ -539,7 +692,10 @@ export async function findLlamaCppExecutable(): Promise<string | null> {
   const command = process.platform === 'win32' ? 'where' : 'which';
   try {
     const { stdout } = await execFileAsync(command, ['llama-server'], { timeout: 1000 });
-    const first = stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    const first = stdout
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(Boolean);
     return first || null;
   } catch {
     return null;
@@ -552,18 +708,48 @@ function getKnownLlamaCppExecutablePaths(isPackaged: boolean): string[] {
   const candidates = [
     path.join(resourceRoot, 'llamacpp', `llama-server${extension}`),
     path.join(resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
-    path.join(__dirname, '..', '..', 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-    path.join(__dirname, '..', '..', 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
+    path.join(
+      __dirname,
+      '..',
+      '..',
+      'vendor',
+      'llamacpp-runtime',
+      'current',
+      `llama-server${extension}`,
+    ),
+    path.join(
+      __dirname,
+      '..',
+      '..',
+      'vendor',
+      'llamacpp-runtime',
+      'current',
+      'bin',
+      `llama-server${extension}`,
+    ),
     path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-    path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
+    path.join(
+      process.cwd(),
+      'vendor',
+      'llamacpp-runtime',
+      'current',
+      'bin',
+      `llama-server${extension}`,
+    ),
   ];
   if (!isPackaged) {
-    candidates.push('/opt/homebrew/bin/llama-server', '/usr/local/bin/llama-server', '/usr/bin/llama-server');
+    candidates.push(
+      '/opt/homebrew/bin/llama-server',
+      '/usr/local/bin/llama-server',
+      '/usr/bin/llama-server',
+    );
   }
   return candidates;
 }
 
-export function modelLaunchOptionsToPreset(options: NonNullable<LlamaCppModelLaunchInput['options']>): Record<string, string | number | boolean> {
+export function modelLaunchOptionsToPreset(
+  options: NonNullable<LlamaCppModelLaunchInput['options']>,
+): Record<string, string | number | boolean> {
   return {
     ...(options.ctxSize !== undefined ? { 'ctx-size': options.ctxSize } : {}),
     ...(options.batchSize !== undefined ? { 'batch-size': options.batchSize } : {}),
@@ -578,14 +764,20 @@ export function modelLaunchOptionsToPreset(options: NonNullable<LlamaCppModelLau
     ...(options.flashAttn ? { 'flash-attn': options.flashAttn } : {}),
     ...(options.parallel !== undefined ? { parallel: options.parallel } : {}),
     ...(options.reasoning ? { reasoning: options.reasoning } : {}),
-    ...(options.reasoningFormat && options.reasoningFormat !== 'auto' ? { 'reasoning-format': options.reasoningFormat } : {}),
+    ...(options.reasoningFormat && options.reasoningFormat !== 'auto'
+      ? { 'reasoning-format': options.reasoningFormat }
+      : {}),
     ...(options.chatTemplate ? { 'chat-template': options.chatTemplate } : {}),
   };
 }
 
-function upsertIniSection(source: string, section: string, values: Record<string, string | number | boolean>): string {
+function upsertIniSection(
+  source: string,
+  section: string,
+  values: Record<string, string | number | boolean>,
+): string {
   const lines = source.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === `[${section}]`);
+  const start = lines.findIndex(line => line.trim() === `[${section}]`);
   const rendered = [
     `[${section}]`,
     ...Object.entries(values).map(([key, value]) => `${key} = ${value}`),
@@ -596,11 +788,7 @@ function upsertIniSection(source: string, section: string, values: Record<string
   }
   let end = start + 1;
   while (end < lines.length && !/^\s*\[.+\]\s*$/.test(lines[end])) end += 1;
-  return [
-    ...lines.slice(0, start),
-    ...rendered,
-    ...lines.slice(end),
-  ].join('\n').trimEnd() + '\n';
+  return [...lines.slice(0, start), ...rendered, ...lines.slice(end)].join('\n').trimEnd() + '\n';
 }
 
 export async function resolveModelScopeInstallRequest(input: LlamaCppInstallModelInput): Promise<{
@@ -609,7 +797,10 @@ export async function resolveModelScopeInstallRequest(input: LlamaCppInstallMode
 }> {
   const downloadUrl = input.downloadUrl?.trim();
   if (downloadUrl) {
-    const filePath = input.filePath?.trim() || new URL(downloadUrl).pathname.split('/').filter(Boolean).pop() || 'model.gguf';
+    const filePath =
+      input.filePath?.trim() ||
+      new URL(downloadUrl).pathname.split('/').filter(Boolean).pop() ||
+      'model.gguf';
     if (!isGgufPath(filePath)) {
       throw new Error('Only GGUF model files can be installed for llama.cpp.');
     }
@@ -628,12 +819,18 @@ export async function resolveModelScopeInstallRequest(input: LlamaCppInstallMode
   const files = await fetchModelScopeRepoFiles(modelId, input.revision);
   const ggufFile = chooseModelScopeInstallFile(files);
   if (!ggufFile) {
-    throw new Error(`No GGUF files were found in ModelScope model ${modelId}. Use a GGUF repository or specify owner/repo::file.gguf.`);
+    throw new Error(
+      `No GGUF files were found in ModelScope model ${modelId}. Use a GGUF repository or specify owner/repo::file.gguf.`,
+    );
   }
   return { filePath: ggufFile };
 }
 
-export function buildModelScopeFileUrl(modelId: string, filePath: string, revision = 'master'): string {
+export function buildModelScopeFileUrl(
+  modelId: string,
+  filePath: string,
+  revision = 'master',
+): string {
   const [owner, repo] = modelId.split('/');
   if (!owner || !repo) throw new Error('ModelScope model ID must be in owner/repo format.');
   const params = new URLSearchParams({
@@ -650,9 +847,12 @@ async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): P
     Revision: revision,
     Recursive: 'true',
   });
-  const response = await fetch(`https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo/files?${params.toString()}`, {
-    headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-installer' },
-  });
+  const response = await fetch(
+    `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo/files?${params.toString()}`,
+    {
+      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-installer' },
+    },
+  );
   if (!response.ok) {
     throw new Error(`Failed to read ModelScope model files: HTTP ${response.status}`);
   }
@@ -663,22 +863,25 @@ async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): P
 export function extractModelScopeFilePaths(payload: unknown): string[] {
   const records = extractRecords(payload);
   const paths = records
-    .map((record) => readRecordString(record.Path)
-      || readRecordString(record.path)
-      || readRecordString(record.FilePath)
-      || readRecordString(record.filePath)
-      || readRecordString(record.Name)
-      || readRecordString(record.name))
+    .map(
+      record =>
+        readRecordString(record.Path) ||
+        readRecordString(record.path) ||
+        readRecordString(record.FilePath) ||
+        readRecordString(record.filePath) ||
+        readRecordString(record.Name) ||
+        readRecordString(record.name),
+    )
     .filter((value): value is string => Boolean(value));
   return [...new Set(paths)];
 }
 
 export function chooseModelScopeInstallFile(files: string[]): string | undefined {
-  const ggufFiles = files.filter((file) => isGgufPath(file) && !/^mmproj/i.test(path.basename(file)));
+  const ggufFiles = files.filter(file => isGgufPath(file) && !/^mmproj/i.test(path.basename(file)));
   if (ggufFiles.length === 0) return undefined;
   const preferred = ['q4_k_m', 'q5_k_m', 'q4_0', 'q8_0'];
   for (const quantization of preferred) {
-    const match = ggufFiles.find((file) => path.basename(file).toLowerCase().includes(quantization));
+    const match = ggufFiles.find(file => path.basename(file).toLowerCase().includes(quantization));
     if (match) return match;
   }
   return ggufFiles.sort((a, b) => a.localeCompare(b))[0];
@@ -687,9 +890,9 @@ export function chooseModelScopeInstallFile(files: string[]): string | undefined
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
   const root = path.resolve(modelsDir);
   if (!fs.existsSync(root)) return [];
-  const files = walkGgufFiles(root).filter((filePath) => !/^mmproj/i.test(path.basename(filePath)));
+  const files = walkGgufFiles(root).filter(filePath => !/^mmproj/i.test(path.basename(filePath)));
   const nameCounts = new Map<string, number>();
-  return files.map((filePath) => {
+  return files.map(filePath => {
     const baseName = resolveInstalledModelName(root, filePath);
     const count = nameCounts.get(baseName) ?? 0;
     nameCounts.set(baseName, count + 1);
@@ -704,12 +907,19 @@ export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
       size: stat.size,
       source: filePath.includes(`${path.sep}modelscope${path.sep}`) ? 'modelscope' : 'local',
       status: 'unloaded',
-      details: { format: 'gguf', quantization_level: inferQuantizationFromFilename(path.basename(filePath)) },
+      details: {
+        format: 'gguf',
+        quantization_level: inferQuantizationFromFilename(path.basename(filePath)),
+      },
     };
   });
 }
 
-export function mergeLocalModels(routerModels: LlamaCppModel[], scannedModels: LlamaCppModel[], modelsDir?: string): LlamaCppModel[] {
+export function mergeLocalModels(
+  routerModels: LlamaCppModel[],
+  scannedModels: LlamaCppModel[],
+  modelsDir?: string,
+): LlamaCppModel[] {
   const merged = new Map<string, LlamaCppModel>();
   for (const model of scannedModels) {
     merged.set(model.path ? `path:${path.resolve(model.path)}` : `name:${model.name}`, model);
@@ -778,7 +988,9 @@ function resolveInstalledModelName(modelsDir: string, modelPath: string): string
 }
 
 function inferQuantizationFromFilename(fileName: string): string | undefined {
-  return fileName.toUpperCase().match(/\b(Q[2-8](?:_[A-Z0-9]+){0,3}|F16|F32|BF16|IQ[1-4]_[A-Z0-9_]+)\b/)?.[1];
+  return fileName
+    .toUpperCase()
+    .match(/\b(Q[2-8](?:_[A-Z0-9]+){0,3}|F16|F32|BF16|IQ[1-4]_[A-Z0-9_]+)\b/)?.[1];
 }
 
 function extractRecords(payload: unknown): Record<string, unknown>[] {
@@ -790,11 +1002,11 @@ function extractRecords(payload: unknown): Record<string, unknown>[] {
     const item = stack.pop();
     if (Array.isArray(item)) {
       if (item.every(isRecord)) records.push(...item);
-      item.forEach((child) => stack.push(child));
+      item.forEach(child => stack.push(child));
       continue;
     }
     if (!isRecord(item)) continue;
-    Object.values(item).forEach((child) => {
+    Object.values(item).forEach(child => {
       if (Array.isArray(child) || isRecord(child)) stack.push(child);
     });
   }
@@ -851,7 +1063,9 @@ function resolveModelScopeTargetPath(modelDir: string, filePath: string): string
     .map(sanitizePathSegment)
     .filter(Boolean);
   const fileName = segments.pop() || 'model.gguf';
-  const normalizedFileName = fileName.toLowerCase().endsWith('.gguf') ? fileName : `${fileName}.gguf`;
+  const normalizedFileName = fileName.toLowerCase().endsWith('.gguf')
+    ? fileName
+    : `${fileName}.gguf`;
   const targetDir = path.join(modelDir, ...segments);
   fs.mkdirSync(targetDir, { recursive: true });
   return path.join(targetDir, normalizedFileName);
@@ -877,7 +1091,9 @@ async function downloadFile(
     const resumed = resumeFrom > 0 && response.status === 206;
     const totalHeader = response.headers.get('content-length');
     const contentRangeTotal = parseContentRangeTotal(response.headers.get('content-range'));
-    const total = contentRangeTotal ?? (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
+    const total =
+      contentRangeTotal ??
+      (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
     const file = fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' });
     const reader = response.body.getReader();
     let completed = resumed ? resumeFrom : 0;
@@ -889,13 +1105,13 @@ async function downloadFile(
         if (done) break;
         completed += value.byteLength;
         if (!file.write(Buffer.from(value))) {
-          await new Promise<void>((resolve) => file.once('drain', resolve));
+          await new Promise<void>(resolve => file.once('drain', resolve));
         }
         onProgress(completed, Number.isFinite(total) ? total : undefined);
       }
       completedSuccessfully = true;
     } finally {
-      await new Promise<void>((resolve) => file.end(resolve));
+      await new Promise<void>(resolve => file.end(resolve));
     }
     if (completedSuccessfully) {
       fs.renameSync(tempPath, targetPath);

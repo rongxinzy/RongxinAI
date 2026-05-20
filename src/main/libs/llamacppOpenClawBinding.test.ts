@@ -1,7 +1,11 @@
 import { expect, test } from 'vitest';
 
 import { ProviderName } from '../../shared/providers';
-import { removeLlamaCppModelFromAppConfig } from './llamacppOpenClawBinding';
+import {
+  buildLlamaCppRunningModelBinding,
+  deriveLlamaCppOpenClawMaxTokens,
+  removeLlamaCppModelFromAppConfig,
+} from './llamacppOpenClawBinding';
 
 test('removeLlamaCppModelFromAppConfig removes deleted llama.cpp model and clears default selection', () => {
   const result = removeLlamaCppModelFromAppConfig({
@@ -28,4 +32,35 @@ test('removeLlamaCppModelFromAppConfig removes deleted llama.cpp model and clear
   expect(result.config.providers?.[ProviderName.LlamaCpp]?.models).toEqual([
     { id: 'qwen3:0.6b', name: 'qwen3:0.6b', supportsImage: false },
   ]);
+});
+
+test('buildLlamaCppRunningModelBinding uses runtime context length for OpenClaw contextWindow', () => {
+  expect(buildLlamaCppRunningModelBinding({
+    name: 'qwen-local',
+    details: { context_length: 32768 },
+    trained_context_length: 32768,
+    runtime_context_length: 4096,
+  })).toEqual({
+    id: 'qwen-local',
+    name: 'qwen-local',
+    supportsImage: false,
+    contextWindow: 4096,
+    contextTokens: 4096,
+    maxTokens: 1024,
+  });
+});
+
+test('buildLlamaCppRunningModelBinding caps OpenClaw maxTokens below the runtime context window', () => {
+  expect(deriveLlamaCppOpenClawMaxTokens(4096)).toBe(1024);
+  expect(deriveLlamaCppOpenClawMaxTokens(8192)).toBe(2048);
+  expect(deriveLlamaCppOpenClawMaxTokens(16384)).toBe(4096);
+  expect(deriveLlamaCppOpenClawMaxTokens(32768)).toBe(4096);
+});
+
+test('buildLlamaCppRunningModelBinding returns null when runtime context length is unknown', () => {
+  expect(buildLlamaCppRunningModelBinding({
+    name: 'qwen-local',
+    details: { context_length: 32768 },
+    trained_context_length: 32768,
+  })).toBeNull();
 });

@@ -11,7 +11,12 @@ import type {
 import { LlamaCppIpcChannel } from '../../shared/llamacpp';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
-import { type LlamaCppOpenClawAppConfig, removeLlamaCppModelFromAppConfig } from '../libs/llamacppOpenClawBinding';
+import {
+  buildLlamaCppRunningModelBinding,
+  buildLlamaCppOpenClawAppConfig,
+  type LlamaCppOpenClawAppConfig,
+  removeLlamaCppModelFromAppConfig,
+} from '../libs/llamacppOpenClawBinding';
 import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
@@ -31,14 +36,11 @@ export function registerLlamaCppIpcHandlers(
 ): void {
   const refreshRunningModelBindings = async (reason: string): Promise<void> => {
     try {
-      const client = await manager.client();
-      const runningModels = await client.runningModels();
+      const runningModels = await manager.listRunningModels();
       const changed = updateLlamaCppRunningModels(
-        runningModels.map((model) => ({
-          id: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
-          name: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
-          supportsImage: false,
-        })).filter((model) => model.id),
+        runningModels
+          .map((model) => buildLlamaCppRunningModelBinding(model))
+          .filter((model): model is NonNullable<typeof model> => Boolean(model)),
       );
       if (changed) {
         await options.syncOpenClawConfig({
@@ -102,14 +104,11 @@ export function registerLlamaCppIpcHandlers(
     return await manager.listLocalModels();
   });
   ipcMain.handle(LlamaCppIpcChannel.ListRunningModels, async () => {
-    const client = await manager.client();
-    const runningModels = await client.runningModels();
+    const runningModels = await manager.listRunningModels();
     updateLlamaCppRunningModels(
-      runningModels.map((model) => ({
-        id: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
-        name: model.name?.trim() || model.model?.trim() || model.id?.trim() || '',
-        supportsImage: false,
-      })).filter((model) => model.id),
+      runningModels
+        .map((model) => buildLlamaCppRunningModelBinding(model))
+        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
     );
     return runningModels;
   });
@@ -148,7 +147,7 @@ export function registerLlamaCppIpcHandlers(
     if (!modelName) throw new Error('Model name is required');
     const client = await manager.client();
     await client.unloadModel(modelName);
-    const runningModels = await client.runningModels();
+    const runningModels = await manager.listRunningModels();
     await refreshRunningModelBindings('llamacpp-model-unloaded');
     return { success: true, runningModels };
   });
@@ -224,11 +223,33 @@ export function registerLlamaCppIpcHandlers(
     if (!normalizedModelName) {
       throw new Error('Model name is required');
     }
+    const current = options.getStore().get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
+    const next = buildLlamaCppOpenClawAppConfig(current, normalizedModelName);
     const openClawModelRef = `llamacpp/${normalizedModelName}`;
+    options.getStore().set('app_config', next);
+    const defaultAgent = (() => {
+      try {
+        const agentManager = options.getAgentManager?.();
+        const agent = agentManager?.getDefaultAgent?.();
+        if (!agent) return null;
+        return agentManager.updateAgent(agent.id, { model: openClawModelRef });
+      } catch (error) {
+        console.warn('[LlamaCpp] failed to update the default OpenClaw agent model:', error);
+        return null;
+      }
+    })();
     await refreshRunningModelBindings('llamacpp-model-visibility-refresh');
+    const syncResult = await options.syncOpenClawConfig({
+      reason: 'llamacpp-local-model-selected',
+      restartGatewayIfRunning: true,
+      forceGatewayRestartIfRunning: true,
+    });
     return {
-      success: true,
+      success: syncResult.success,
+      error: syncResult.error,
+      config: next,
       modelRef: openClawModelRef,
+      defaultAgent,
     };
   });
 }

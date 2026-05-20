@@ -56,6 +56,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
     coworkLlamaCppModelNotRunning: '该 llama.cpp 模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
+    coworkLlamaCppContextWindowUnknown: '该 llama.cpp 模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
+    coworkLlamaCppContextLimitReached: '该 llama.cpp 会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
     // IM error replies (differentiated by error kind)
@@ -316,6 +318,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorServerError: 'Server error occurred. Please try again later.',
     coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
     coworkLlamaCppModelNotRunning: 'This llama.cpp model is not running. Load it from Local Inference first or choose another model.',
+    coworkLlamaCppContextWindowUnknown: 'The running llama.cpp model did not report an effective context window. Reload it from Local Inference before sending again.',
+    coworkLlamaCppContextLimitReached: 'This llama.cpp session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',

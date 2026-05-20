@@ -128,6 +128,11 @@ export type LlamaCppModel = {
     quantization_level?: string;
     context_length?: number;
   };
+  trained_context_length?: number;
+  runtime_context_length?: number;
+  effective_options?: {
+    ctxSize?: number;
+  };
 };
 
 export type LlamaCppRunningModel = LlamaCppModel & {

@@ -33,12 +33,18 @@ type ProviderModelConfig = {
   id: string;
   name: string;
   supportsImage?: boolean;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
 };
 
 type ProviderModelInputConfig = {
   id: string;
   name?: string;
   supportsImage?: boolean;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
 };
 
 export type ApiConfigResolution = {
@@ -50,6 +56,9 @@ export type ApiConfigResolution = {
     codingPlanEnabled: boolean;
     supportsImage?: boolean;
     modelName?: string;
+    contextWindow?: number;
+    contextTokens?: number;
+    maxTokens?: number;
   };
 };
 
@@ -119,6 +128,9 @@ function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
         id: model.id,
         name: model.name,
         supportsImage: model.supportsImage,
+        contextWindow: model.contextWindow,
+        contextTokens: model.contextTokens,
+        maxTokens: model.maxTokens,
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
@@ -140,6 +152,12 @@ export function isLlamaCppModelRunning(modelId: string): boolean {
   const normalized = modelId.trim();
   if (!normalized) return false;
   return llamaCppRunningModelCache.some((model) => model.id === normalized);
+}
+
+export function getLlamaCppModelContextWindow(modelId: string): number | undefined {
+  const normalized = modelId.trim();
+  if (!normalized) return undefined;
+  return llamaCppRunningModelCache.find((model) => model.id === normalized)?.contextWindow;
 }
 
 function buildServerFallbackModels(effectiveModelId: string): NonNullable<LocalProviderConfig['models']> {
@@ -172,6 +190,15 @@ function normalizeProviderModels(providerName: string, models?: ProviderModelInp
         model.id,
         model.supportsImage,
       ),
+      contextWindow: typeof model.contextWindow === 'number' && model.contextWindow > 0
+        ? model.contextWindow
+        : undefined,
+      contextTokens: typeof model.contextTokens === 'number' && model.contextTokens > 0
+        ? model.contextTokens
+        : undefined,
+      maxTokens: typeof model.maxTokens === 'number' && model.maxTokens > 0
+        ? model.maxTokens
+        : undefined,
     }));
 }
 
@@ -190,6 +217,9 @@ type MatchedProvider = {
   baseURL: string;
   supportsImage?: boolean;
   modelName?: string;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
 };
 
 function getEffectiveProviderApiFormat(providerName: string, apiFormat: unknown): AnthropicApiFormat {
@@ -389,6 +419,9 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       baseURL,
       supportsImage: matchedModel?.supportsImage,
       modelName: matchedModel?.name,
+      contextWindow: matchedModel?.contextWindow,
+      contextTokens: matchedModel?.contextTokens,
+      maxTokens: matchedModel?.maxTokens,
     },
   };
 }
