@@ -504,9 +504,9 @@ interface IElectronAPI {
       }) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
     };
   };
-  ipcRenderer: {
-    send: (channel: string, ...args: any[]) => void;
-    on: (channel: string, func: (...args: any[]) => void) => () => void;
+  appEvents: {
+    onOpenSettings: (callback: () => void) => () => void;
+    onNewTask: (callback: () => void) => () => void;
   };
   window: {
     minimize: () => void;

@@ -17,6 +17,7 @@ import { AgentManager } from './agentManager';
 import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkStore } from './coworkStore';
+import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
 import {
@@ -2994,16 +2995,8 @@ if (!gotTheLock) {
   });
 
   // Cowork IPC handlers
-  ipcMain.handle('cowork:session:start', async (_event, options: {
-    prompt: string;
-    cwd?: string;
-    systemPrompt?: string;
-    title?: string;
-    activeSkillIds?: string[];
-    imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-    agentId?: string;
-    modelOverride?: string;
-  }) => {
+  ipcMain.handle('cowork:session:start', async (_event, rawOptions: unknown) => {
+    const options = CoworkSessionStartSchema.input.parse(rawOptions);
     try {
       const engineStatus = await ensureOpenClawRunningForCowork();
       if (engineStatus.phase !== 'running') {
@@ -5196,12 +5189,8 @@ if (!gotTheLock) {
   };
 
   // API 代理处理程序 - 解决 CORS 问题
-  ipcMain.handle('api:fetch', async (_event, options: {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-  }) => {
+  ipcMain.handle('api:fetch', async (_event, rawOptions: unknown) => {
+    const options = ApiFetchSchema.input.parse(rawOptions);
     console.log(`[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`);
 
     const doFetch = async (headers: Record<string, string>) => {
@@ -5260,13 +5249,8 @@ if (!gotTheLock) {
   });
 
   // SSE 流式 API 代理
-  ipcMain.handle('api:stream', async (event, options: {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-    requestId: string;
-  }) => {
+  ipcMain.handle('api:stream', async (event, rawOptions: unknown) => {
+    const options = ApiStreamSchema.input.parse(rawOptions);
     const controller = new AbortController();
 
     // 存储 controller 以便后续取消
