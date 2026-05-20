@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import type { CoworkExecutionMode, CoworkMessage, CoworkMessageMetadata, CoworkSession, CoworkSessionStatus, CoworkStore } from '../../coworkStore';
 import { t } from '../../i18n';
@@ -1544,7 +1545,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       tryContinue(10);
     }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
-      this.emit('error', sessionId, `Failed to resolve OpenClaw approval: ${message}`);
+      this.emit('error', sessionId, classifyCoworkError(`Failed to resolve OpenClaw approval: ${message}`));
     }).finally(() => {
       this.pendingApprovals.delete(requestId);
     });
@@ -1698,7 +1699,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     } catch (error) {
       this.store.updateSession(sessionId, { status: 'error' });
       const message = error instanceof Error ? error.message : String(error);
-      this.emit('error', sessionId, message);
+      this.emit('error', sessionId, classifyCoworkError(message));
       throw error;
     }
 
@@ -1789,7 +1790,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       this.cleanupSessionTurn(sessionId);
       this.store.updateSession(sessionId, { status: 'error' });
       const message = error instanceof Error ? error.message : String(error);
-      this.emit('error', sessionId, message);
+      this.emit('error', sessionId, classifyCoworkError(message));
       this.rejectTurn(sessionId, new Error(message));
       throw error;
     }
@@ -2071,7 +2072,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         const activeSessionIds = Array.from(this.activeTurns.keys());
         activeSessionIds.forEach((sessionId) => {
           this.store.updateSession(sessionId, { status: 'error' });
-          this.emit('error', sessionId, disconnectedError.message);
+          this.emit('error', sessionId, classifyCoworkError(disconnectedError.message));
           this.cleanupSessionTurn(sessionId);
           this.rejectTurn(sessionId, disconnectedError);
         });
@@ -2850,7 +2851,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           metadata: { error: errorMessage },
         });
         this.emit('message', sessionId, errorMsg);
-        this.emit('error', sessionId, errorMessage);
+        this.emit('error', sessionId, classifyCoworkError(errorMessage));
         this.cleanupSessionTurn(sessionId);
         this.rejectTurn(sessionId, new Error(errorMessage));
         void this.reconcileWithHistory(sessionId, erroredSessionKey);
@@ -3565,7 +3566,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       const errorMessage = payload.errorMessage?.trim() || errorMessageFromMessage?.trim() || 'OpenClaw run failed';
       const erroredSessionKey = turn.sessionKey;
       this.store.updateSession(sessionId, { status: 'error' });
-      this.emit('error', sessionId, errorMessage);
+      this.emit('error', sessionId, classifyCoworkError(errorMessage));
       this.cleanupSessionTurn(sessionId);
       this.rejectTurn(sessionId, new Error(errorMessage));
       // Reconcile even on error so the UI shows messages already delivered.
@@ -3877,7 +3878,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       metadata: { error: errorMessage },
     });
     this.emit('message', sessionId, errorMsg);
-    this.emit('error', sessionId, errorMessage);
+    this.emit('error', sessionId, classifyCoworkError(errorMessage));
     this.cleanupSessionTurn(sessionId);
     this.rejectTurn(sessionId, new Error(errorMessage));
     void this.reconcileWithHistory(sessionId, erroredSessionKey);

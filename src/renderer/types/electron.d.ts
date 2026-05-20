@@ -1,3 +1,4 @@
+import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
@@ -467,7 +468,7 @@ interface IElectronAPI {
     cancelStream: (requestId: string) => Promise<boolean>;
     onStreamData: (requestId: string, callback: (chunk: string) => void) => () => void;
     onStreamDone: (requestId: string, callback: () => void) => () => void;
-    onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
+    onStreamError: (requestId: string, callback: (error: CoworkError) => void) => () => void;
     onStreamAbort: (requestId: string, callback: () => void) => () => void;
   };
   getApiConfig: () => Promise<CoworkApiConfig | null>;
@@ -644,7 +645,7 @@ interface IElectronAPI {
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => () => void;
-    onStreamError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
+    onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) => () => void;
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => () => void;
   };
   dialog: {

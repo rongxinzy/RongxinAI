@@ -1468,7 +1468,7 @@ const bindCoworkRuntimeForwarder = (): void => {
     }
   });
 
-  runtime.on('error', (sessionId: string, error: string) => {
+  runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
     // Mark session as error in store so the .catch() fallback can detect duplicates.
     try { getCoworkStore().updateSession(sessionId, { status: 'error' }); } catch { /* ignore */ }
     const windows = BrowserWindow.getAllWindows();
