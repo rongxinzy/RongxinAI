@@ -9,9 +9,6 @@ export type InferenceOptions = {
   min_p: number;
   presence_penalty: number;
   direct_answer_mode: 'disabled' | 'enabled';
-  reasoning_format: 'auto' | 'none' | 'deepseek' | 'deepseek-legacy';
-  thinking_forced_open: 'auto' | 'enabled' | 'disabled';
-  thinking_budget_tokens: number;
   cache_prompt: 'auto' | 'enabled' | 'disabled';
 };
 
@@ -26,9 +23,6 @@ export const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
   min_p: 0.05,
   presence_penalty: 0,
   direct_answer_mode: 'disabled',
-  reasoning_format: 'auto',
-  thinking_forced_open: 'auto',
-  thinking_budget_tokens: -1,
   cache_prompt: 'auto',
 };
 
@@ -43,26 +37,14 @@ const QWEN35_08B_INFERENCE_OPTIONS: InferenceOptions = {
   min_p: 0.05,
   presence_penalty: 0.6,
   direct_answer_mode: 'disabled',
-  reasoning_format: 'auto',
-  thinking_forced_open: 'auto',
-  thinking_budget_tokens: -1,
   cache_prompt: 'auto',
 };
-
-function clearDeprecatedThinkingOptions(options: InferenceOptions): InferenceOptions {
-  return {
-    ...options,
-    reasoning_format: 'auto',
-    thinking_forced_open: 'auto',
-    thinking_budget_tokens: -1,
-  };
-}
 
 export function loadInferenceOptions(): InferenceOptions {
   try {
     const raw = localStorage.getItem('lobsterai:llamacpp-inference-options');
     if (!raw) return DEFAULT_INFERENCE_OPTIONS;
-    return clearDeprecatedThinkingOptions({ ...DEFAULT_INFERENCE_OPTIONS, ...JSON.parse(raw) });
+    return sanitizeInferenceOptions({ ...DEFAULT_INFERENCE_OPTIONS, ...JSON.parse(raw) });
   } catch {
     return DEFAULT_INFERENCE_OPTIONS;
   }
@@ -99,9 +81,6 @@ export function areInferenceOptionsEqual(left: InferenceOptions, right: Inferenc
     && left.min_p === right.min_p
     && left.presence_penalty === right.presence_penalty
     && left.direct_answer_mode === right.direct_answer_mode
-    && left.reasoning_format === right.reasoning_format
-    && left.thinking_forced_open === right.thinking_forced_open
-    && left.thinking_budget_tokens === right.thinking_budget_tokens
     && left.cache_prompt === right.cache_prompt;
 }
 
@@ -114,14 +93,6 @@ export function isQwen35_08BModel(modelName: string): boolean {
   return normalized.includes('qwen3.5-0.8b') || normalized.includes('qwen3-0.8b');
 }
 
-export function isThinkingModel(modelName: string): boolean {
-  const normalized = modelName.toLowerCase();
-  return /\b(deepseek-r1|qwq|qwen3|qwen-3|qwen3\.5|qwen-3\.5|gpt-oss|reasoning|think|thinking|phi4-reasoning)\b/.test(normalized)
-    || normalized.includes('deepseek-r1')
-    || normalized.includes('distill-qwen')
-    || normalized.includes('distill-llama');
-}
-
 export function getRecommendedInferenceOptions(modelName: string): InferenceOptions {
   return isQwen35_08BModel(modelName)
     ? QWEN35_08B_INFERENCE_OPTIONS
@@ -130,4 +101,40 @@ export function getRecommendedInferenceOptions(modelName: string): InferenceOpti
 
 export function shouldApplyModelPreset(options: InferenceOptions): boolean {
   return isDefaultInferenceOptions(options) || areInferenceOptionsEqual(options, QWEN35_08B_INFERENCE_OPTIONS);
+}
+
+function sanitizeInferenceOptions(options: Record<string, unknown>): InferenceOptions {
+  return {
+    temperature:
+      typeof options.temperature === 'number'
+        ? options.temperature
+        : DEFAULT_INFERENCE_OPTIONS.temperature,
+    top_p: typeof options.top_p === 'number' ? options.top_p : DEFAULT_INFERENCE_OPTIONS.top_p,
+    top_k: typeof options.top_k === 'number' ? options.top_k : DEFAULT_INFERENCE_OPTIONS.top_k,
+    num_predict:
+      typeof options.num_predict === 'number'
+        ? options.num_predict
+        : DEFAULT_INFERENCE_OPTIONS.num_predict,
+    repeat_penalty:
+      typeof options.repeat_penalty === 'number'
+        ? options.repeat_penalty
+        : DEFAULT_INFERENCE_OPTIONS.repeat_penalty,
+    seed: typeof options.seed === 'number' ? options.seed : DEFAULT_INFERENCE_OPTIONS.seed,
+    stop: typeof options.stop === 'string' ? options.stop : DEFAULT_INFERENCE_OPTIONS.stop,
+    min_p: typeof options.min_p === 'number' ? options.min_p : DEFAULT_INFERENCE_OPTIONS.min_p,
+    presence_penalty:
+      typeof options.presence_penalty === 'number'
+        ? options.presence_penalty
+        : DEFAULT_INFERENCE_OPTIONS.presence_penalty,
+    direct_answer_mode:
+      options.direct_answer_mode === 'enabled' || options.direct_answer_mode === 'disabled'
+        ? options.direct_answer_mode
+        : DEFAULT_INFERENCE_OPTIONS.direct_answer_mode,
+    cache_prompt:
+      options.cache_prompt === 'auto'
+      || options.cache_prompt === 'enabled'
+      || options.cache_prompt === 'disabled'
+        ? options.cache_prompt
+        : DEFAULT_INFERENCE_OPTIONS.cache_prompt,
+  };
 }

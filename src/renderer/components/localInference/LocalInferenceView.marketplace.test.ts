@@ -256,6 +256,127 @@ test('final assistant message falls back to a generic notice when no visible ans
   expect(message.hiddenThinking).toBeUndefined();
 });
 
+test('launch dialog flags ctx-size values that exceed the trained context limit', async () => {
+  const module = await import('./LocalInferenceView');
+  const getLaunchContextLimitMessage = (module as unknown as {
+    __test__getLaunchContextLimitMessage?: (input: {
+      requestedContextLength?: number;
+      trainedContextLength?: number;
+    }) => { requestedContextLength: number; trainedContextLength: number } | null;
+  }).__test__getLaunchContextLimitMessage;
+
+  expect(typeof getLaunchContextLimitMessage).toBe('function');
+  if (!getLaunchContextLimitMessage) return;
+
+  expect(getLaunchContextLimitMessage({
+    requestedContextLength: 32768,
+    trainedContextLength: 32768,
+  })).toBeNull();
+
+  expect(getLaunchContextLimitMessage({
+    requestedContextLength: 32769,
+    trainedContextLength: 32768,
+  })).toEqual({
+    requestedContextLength: 32769,
+    trainedContextLength: 32768,
+  });
+});
+
+test('model card busy state only locks the unloading model card', async () => {
+  const module = await import('./LocalInferenceView');
+  const getModelCardBusyState = (module as unknown as {
+    __test__getModelCardBusyState?: (input: {
+      modelName: string;
+      unloadingModelName: string | null;
+      globalLoading: boolean;
+    }) => { cardBusy: boolean; buttonsDisabled: boolean };
+  }).__test__getModelCardBusyState;
+
+  expect(typeof getModelCardBusyState).toBe('function');
+  if (!getModelCardBusyState) return;
+
+  expect(getModelCardBusyState({
+    modelName: 'model-a',
+    unloadingModelName: 'model-a',
+    globalLoading: false,
+  })).toEqual({
+    cardBusy: true,
+    buttonsDisabled: true,
+  });
+
+  expect(getModelCardBusyState({
+    modelName: 'model-b',
+    unloadingModelName: 'model-a',
+    globalLoading: false,
+  })).toEqual({
+    cardBusy: false,
+    buttonsDisabled: false,
+  });
+
+  expect(getModelCardBusyState({
+    modelName: 'model-b',
+    unloadingModelName: null,
+    globalLoading: true,
+  })).toEqual({
+    cardBusy: false,
+    buttonsDisabled: true,
+  });
+});
+
+test('model action guard blocks operations for the unloading model only', async () => {
+  const module = await import('./LocalInferenceView');
+  const shouldBlockModelAction = (module as unknown as {
+    __test__shouldBlockModelAction?: (input: {
+      modelName: string;
+      unloadingModelName: string | null;
+    }) => boolean;
+  }).__test__shouldBlockModelAction;
+
+  expect(typeof shouldBlockModelAction).toBe('function');
+  if (!shouldBlockModelAction) return;
+
+  expect(shouldBlockModelAction({
+    modelName: 'model-a',
+    unloadingModelName: 'model-a',
+  })).toBe(true);
+
+  expect(shouldBlockModelAction({
+    modelName: 'model-b',
+    unloadingModelName: 'model-a',
+  })).toBe(false);
+
+  expect(shouldBlockModelAction({
+    modelName: 'model-a',
+    unloadingModelName: null,
+  })).toBe(false);
+});
+
+test('unload busy state keeps a minimum visible duration', async () => {
+  const module = await import('./LocalInferenceView');
+  const getRemainingBusyMs = (module as unknown as {
+    __test__getRemainingBusyMs?: (input: {
+      startedAtMs: number;
+      nowMs: number;
+      minimumBusyMs: number;
+    }) => number;
+  }).__test__getRemainingBusyMs;
+
+  expect(typeof getRemainingBusyMs).toBe('function');
+  if (!getRemainingBusyMs) return;
+
+  expect(getRemainingBusyMs({
+    startedAtMs: 100,
+    nowMs: 250,
+    minimumBusyMs: 500,
+  })).toBe(350);
+
+  expect(getRemainingBusyMs({
+    startedAtMs: 100,
+    nowMs: 700,
+    minimumBusyMs: 500,
+  })).toBe(0);
+});
+
 test('metrics summary uses usage token counts first', async () => {
   const module = await import('./LocalInferenceView');
   const formatMetricsSummary = (module as unknown as {
