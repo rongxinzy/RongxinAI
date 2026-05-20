@@ -1,0 +1,721 @@
+/**
+ * IPC Zod schemas for input/output validation at the main process boundary.
+ *
+ * Every ipcMain.handle handler should validate its input with the corresponding
+ * schema before processing, and return output that conforms to the output schema.
+ *
+ * Pattern:
+ *   import { CoworkSessionStartSchema } from '@shared/ipc/schemas';
+ *   const input = CoworkSessionStartSchema.input.parse(rawInput);
+ */
+
+import { z } from 'zod';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Standard success envelope returned by most handlers. */
+export const IpcSuccess = <T extends z.ZodTypeAny>(data: T) =>
+  z.object({ success: z.literal(true), ...(data ? (data as { _output: unknown })._output ?? {} : {}) });
+
+/** Standard error envelope. */
+export const IpcError = z.object({ success: z.literal(false), error: z.string().optional() });
+
+/** Generic IPC result — success with optional extra fields or error string. */
+export const IpcResult = <T extends z.ZodTypeAny>(data: T) =>
+  z.union([IpcSuccess(data), IpcError]);
+
+// ─── Store ──────────────────────────────────────────────────────────────────
+
+export const StoreGetSchema = {
+  input: z.object({ key: z.string().min(1) }),
+  output: z.any(),
+};
+
+export const StoreSetSchema = {
+  input: z.object({ key: z.string().min(1), value: z.any() }),
+  output: z.void(),
+};
+
+export const StoreRemoveSchema = {
+  input: z.object({ key: z.string().min(1) }),
+  output: z.void(),
+};
+
+// ─── Skills ─────────────────────────────────────────────────────────────────
+
+export const SkillsSetEnabledSchema = {
+  input: z.object({ id: z.string().min(1), enabled: z.boolean() }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const SkillsDeleteSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const SkillsDownloadSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const SkillsUpgradeSchema = {
+  input: z.tuple([z.string().min(1), z.string().min(1)]),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const SkillsConfirmInstallSchema = {
+  input: z.tuple([z.string().min(1), z.string().min(1)]),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const SkillsGetConfigSchema = {
+  input: z.string().min(1),
+  output: z.record(z.string(), z.string()).nullable(),
+};
+
+export const SkillsSetConfigSchema = {
+  input: z.object({ skillId: z.string().min(1), config: z.record(z.string(), z.string()) }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const SkillsTestEmailConnectivitySchema = {
+  input: z.object({ skillId: z.string().min(1), config: z.record(z.string(), z.string()) }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+// ─── MCP ────────────────────────────────────────────────────────────────────
+
+export const McpCreateSchema = {
+  input: z.object({}).passthrough(),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const McpUpdateSchema = {
+  input: z.object({ id: z.string().min(1) }).passthrough(),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const McpDeleteSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const McpSetEnabledSchema = {
+  input: z.object({ id: z.string().min(1), enabled: z.boolean() }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const McpBridgeSyncDoneSchema = {
+  output: z.object({ tools: z.number(), error: z.string().optional() }),
+};
+
+// ─── API ────────────────────────────────────────────────────────────────────
+
+export const ApiFetchSchema = {
+  input: z.object({
+    url: z.string().url(),
+    method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
+    headers: z.record(z.string(), z.string()),
+    body: z.string().optional(),
+  }),
+  output: z.object({ status: z.number(), data: z.unknown() }).passthrough(),
+};
+
+export const ApiStreamSchema = {
+  input: z.object({
+    url: z.string().url(),
+    method: z.enum(['GET', 'POST']),
+    headers: z.record(z.string(), z.string()),
+    body: z.string().optional(),
+    requestId: z.string().min(1),
+  }),
+  output: z.void(),
+};
+
+// ─── Window ─────────────────────────────────────────────────────────────────
+
+export const WindowShowSystemMenuSchema = {
+  input: z.object({ x: z.number().optional(), y: z.number().optional() }),
+};
+
+export const WindowStateChangedSchema = {
+  output: z.object({ isMaximized: z.boolean(), isFullscreen: z.boolean(), isFocused: z.boolean() }),
+};
+
+// ─── Cowork Session ─────────────────────────────────────────────────────────
+
+const ImageAttachmentSchema = z.object({
+  name: z.string(),
+  mimeType: z.string(),
+  base64Data: z.string(),
+});
+
+export const CoworkSessionStartSchema = {
+  input: z.object({
+    prompt: z.string().min(1),
+    cwd: z.string().optional(),
+    systemPrompt: z.string().optional(),
+    title: z.string().optional(),
+    activeSkillIds: z.array(z.string()).optional(),
+    agentId: z.string().optional(),
+    modelOverride: z.string().optional(),
+    imageAttachments: z.array(ImageAttachmentSchema).optional(),
+  }),
+  output: IpcResult(z.object({
+    session: z.object({
+      id: z.string(),
+      title: z.string(),
+      status: z.string(),
+      createdAt: z.number(),
+      updatedAt: z.number(),
+    }).passthrough(),
+    engineStatus: z.object({}).passthrough().optional(),
+  })),
+};
+
+export const CoworkSessionContinueSchema = {
+  input: z.object({
+    sessionId: z.string().min(1),
+    prompt: z.string(),
+    systemPrompt: z.string().optional(),
+    activeSkillIds: z.array(z.string()).optional(),
+    imageAttachments: z.array(ImageAttachmentSchema).optional(),
+  }),
+  output: IpcResult(z.object({ engineStatus: z.object({}).passthrough().optional() })),
+};
+
+export const CoworkSessionStopSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const CoworkSessionDeleteSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const CoworkSessionDeleteBatchSchema = {
+  input: z.array(z.string().min(1)),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const CoworkSessionPinSchema = {
+  input: z.object({ sessionId: z.string().min(1), pinned: z.boolean() }),
+  output: IpcResult(z.object({ pinOrder: z.number().nullable().optional() })),
+};
+
+export const CoworkSessionRenameSchema = {
+  input: z.object({ sessionId: z.string().min(1), title: z.string().min(1) }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const CoworkSessionGetSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({ session: z.object({}).passthrough() })),
+};
+
+export const CoworkSessionListSchema = {
+  input: z.object({
+    limit: z.number().int().positive().optional(),
+    offset: z.number().int().min(0).optional(),
+    agentId: z.string().optional(),
+  }).optional(),
+  output: IpcResult(z.object({
+    sessions: z.array(z.object({}).passthrough()),
+    hasMore: z.boolean().optional(),
+  })),
+};
+
+export const CoworkSessionGetMessagesSchema = {
+  input: z.object({
+    sessionId: z.string().min(1),
+    limit: z.number().int().positive().optional(),
+    offset: z.number().int().min(0).optional(),
+  }),
+  output: IpcResult(z.object({
+    messages: z.array(z.object({}).passthrough()),
+  })),
+};
+
+export const CoworkSessionExportResultImageSchema = {
+  input: z.object({
+    rect: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }),
+    defaultFileName: z.string().optional(),
+  }),
+  output: IpcResult(z.object({ path: z.string().optional(), canceled: z.boolean().optional() })),
+};
+
+export const CoworkSessionCaptureImageChunkSchema = {
+  input: z.object({
+    rect: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }),
+  }),
+  output: IpcResult(z.object({
+    width: z.number().optional(),
+    height: z.number().optional(),
+    pngBase64: z.string().optional(),
+  })),
+};
+
+export const CoworkSessionSaveResultImageSchema = {
+  input: z.object({
+    pngBase64: z.string().min(1),
+    defaultFileName: z.string().optional(),
+  }),
+  output: IpcResult(z.object({ path: z.string().optional(), canceled: z.boolean().optional() })),
+};
+
+export const CoworkSessionExportTextSchema = {
+  input: z.object({
+    content: z.string(),
+    defaultFileName: z.string().optional(),
+    fileExtension: z.string().optional(),
+  }),
+  output: IpcResult(z.object({ path: z.string().optional(), canceled: z.boolean().optional() })),
+};
+
+// ─── Cowork Permission ──────────────────────────────────────────────────────
+
+export const CoworkPermissionRespondSchema = {
+  input: z.object({
+    requestId: z.string().min(1),
+    result: z.object({}).passthrough(),
+  }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+// ─── Cowork Config ──────────────────────────────────────────────────────────
+
+export const CoworkConfigSetSchema = {
+  input: z.object({
+    workingDirectory: z.string().optional(),
+    executionMode: z.enum(['auto', 'local', 'sandbox']).optional(),
+    agentEngine: z.literal('openclaw').optional(),
+    memoryEnabled: z.boolean().optional(),
+    memoryImplicitUpdateEnabled: z.boolean().optional(),
+    memoryLlmJudgeEnabled: z.boolean().optional(),
+    memoryGuardLevel: z.enum(['strict', 'standard', 'relaxed']).optional(),
+    memoryUserMemoriesMaxItems: z.number().int().min(1).max(60).optional(),
+    skipMissedJobs: z.boolean().optional(),
+    embeddingEnabled: z.boolean().optional(),
+    embeddingProvider: z.string().optional(),
+    embeddingModel: z.string().optional(),
+    embeddingLocalModelPath: z.string().optional(),
+    embeddingVectorWeight: z.number().optional(),
+    embeddingRemoteBaseUrl: z.string().optional(),
+    embeddingRemoteApiKey: z.string().optional(),
+  }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+// ─── Cowork Memory ──────────────────────────────────────────────────────────
+
+export const CoworkMemoryListEntriesSchema = {
+  input: z.object({
+    query: z.string().optional(),
+    status: z.enum(['created', 'stale', 'deleted', 'all']).optional(),
+    includeDeleted: z.boolean().optional(),
+    limit: z.number().int().positive().optional(),
+    offset: z.number().int().min(0).optional(),
+  }),
+  output: IpcResult(z.object({
+    entries: z.array(z.object({}).passthrough()),
+  })),
+};
+
+export const CoworkMemoryCreateEntrySchema = {
+  input: z.object({
+    text: z.string().min(1),
+    confidence: z.number().min(0).max(1).optional(),
+    isExplicit: z.boolean().optional(),
+  }),
+  output: IpcResult(z.object({ entry: z.object({}).passthrough() })),
+};
+
+export const CoworkMemoryUpdateEntrySchema = {
+  input: z.object({
+    id: z.string().min(1),
+    text: z.string().optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    status: z.enum(['created', 'stale', 'deleted']).optional(),
+    isExplicit: z.boolean().optional(),
+  }),
+  output: IpcResult(z.object({ entry: z.object({}).passthrough() })),
+};
+
+export const CoworkMemoryDeleteEntrySchema = {
+  input: z.object({ id: z.string().min(1) }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+// ─── Cowork Bootstrap ───────────────────────────────────────────────────────
+
+export const CoworkBootstrapReadSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({ content: z.string().optional() })),
+};
+
+export const CoworkBootstrapWriteSchema = {
+  input: z.object({ filename: z.string().min(1), content: z.string() }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+// ─── Dialog ─────────────────────────────────────────────────────────────────
+
+export const DialogSelectFileSchema = {
+  input: z.object({
+    title: z.string().optional(),
+    filters: z.array(z.object({
+      name: z.string(),
+      extensions: z.array(z.string()),
+    })).optional(),
+  }).optional(),
+  output: z.string().nullable(),
+};
+
+export const DialogSelectFilesSchema = {
+  input: z.object({
+    title: z.string().optional(),
+    filters: z.array(z.object({
+      name: z.string(),
+      extensions: z.array(z.string()),
+    })).optional(),
+  }).optional(),
+  output: z.array(z.string()).nullable(),
+};
+
+export const DialogSaveInlineFileSchema = {
+  input: z.object({
+    dataBase64: z.string().min(1),
+    fileName: z.string().optional(),
+    mimeType: z.string().optional(),
+    cwd: z.string().optional(),
+  }),
+  output: z.string().nullable(),
+};
+
+export const DialogReadFileAsDataUrlSchema = {
+  input: z.string().min(1),
+  output: z.string().nullable(),
+};
+
+export const DialogGenerateThumbnailSchema = {
+  input: z.string().min(1),
+  output: z.string().nullable(),
+};
+
+export const DialogShowMessageBoxSchema = {
+  input: z.object({
+    message: z.string().min(1),
+    type: z.enum(['none', 'info', 'error', 'question', 'warning']).optional(),
+    title: z.string().optional(),
+  }),
+  output: z.object({}).passthrough().nullable(),
+};
+
+// ─── Shell ──────────────────────────────────────────────────────────────────
+
+export const ShellOpenPathSchema = {
+  input: z.string().min(1),
+  output: z.string().nullable(),
+};
+
+export const ShellShowItemInFolderSchema = {
+  input: z.string().min(1),
+  output: z.void(),
+};
+
+export const ShellOpenExternalSchema = {
+  input: z.string().min(1),
+  output: z.void(),
+};
+
+export const ShellOpenHtmlInBrowserSchema = {
+  input: z.string().min(1),
+  output: z.void(),
+};
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+export const AuthLoginSchema = {
+  input: z.object({ loginUrl: z.string().optional() }).optional(),
+  output: z.object({}).passthrough().nullable(),
+};
+
+export const AuthExchangeSchema = {
+  input: z.object({ code: z.string().min(1) }),
+  output: z.object({}).passthrough().nullable(),
+};
+
+export const AuthGetUserSchema = {
+  output: z.object({}).passthrough().nullable(),
+};
+
+export const AuthRefreshTokenSchema = {
+  output: z.object({}).passthrough().nullable(),
+};
+
+export const AuthCallbackSchema = {
+  output: z.object({ code: z.string() }),
+};
+
+// ─── App ────────────────────────────────────────────────────────────────────
+
+export const AppSetAutoLaunchSchema = {
+  input: z.boolean(),
+  output: z.void(),
+};
+
+export const AppSetPreventSleepSchema = {
+  input: z.boolean(),
+  output: z.void(),
+};
+
+// ─── Log ────────────────────────────────────────────────────────────────────
+
+export const LogFromRendererSchema = {
+  input: z.object({
+    level: z.string().min(1),
+    tag: z.string().min(1),
+    message: z.string().min(1),
+  }),
+};
+
+// ─── IM ─────────────────────────────────────────────────────────────────────
+
+export const ImConfigSetSchema = {
+  input: z.object({ config: z.object({}).passthrough(), options: z.object({ syncGateway: z.boolean().optional() }).optional() }),
+  output: z.void(),
+};
+
+export const ImGatewayStartSchema = {
+  input: z.string().min(1),
+  output: z.void(),
+};
+
+export const ImGatewayStopSchema = {
+  input: z.string().min(1),
+  output: z.void(),
+};
+
+export const ImGatewayTestSchema = {
+  input: z.object({ platform: z.string().min(1), configOverride: z.object({}).passthrough().optional() }),
+  output: z.void(),
+};
+
+export const ImPairingApproveSchema = {
+  input: z.object({ platform: z.string().min(1), code: z.string().min(1) }),
+  output: z.void(),
+};
+
+export const ImPairingRejectSchema = {
+  input: z.object({ platform: z.string().min(1), code: z.string().min(1) }),
+  output: z.void(),
+};
+
+export const ImPairingListSchema = {
+  input: z.string().min(1),
+  output: z.array(z.object({}).passthrough()),
+};
+
+// ─── IM Instance ────────────────────────────────────────────────────────────
+
+export const ImInstanceAddSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const ImInstanceDeleteSchema = {
+  input: z.string().min(1),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+export const ImInstanceSetConfigSchema = {
+  input: z.object({
+    instanceId: z.string().min(1),
+    config: z.object({}).passthrough(),
+    options: z.object({ syncGateway: z.boolean().optional() }).optional(),
+  }),
+  output: IpcResult(z.object({}).passthrough()),
+};
+
+// ─── Feishu Install ─────────────────────────────────────────────────────────
+
+export const FeishuInstallQrcodeSchema = {
+  input: z.boolean(),
+  output: z.object({
+    url: z.string(),
+    deviceCode: z.string(),
+    interval: z.number(),
+    expireIn: z.number(),
+  }),
+};
+
+export const FeishuInstallPollSchema = {
+  input: z.string().min(1),
+  output: z.object({
+    done: z.boolean(),
+    appId: z.string().optional(),
+    appSecret: z.string().optional(),
+    domain: z.string().optional(),
+    error: z.string().optional(),
+  }),
+};
+
+export const FeishuInstallVerifySchema = {
+  input: z.object({ appId: z.string().min(1), appSecret: z.string().min(1) }),
+  output: z.object({ success: z.boolean(), error: z.string().optional() }),
+};
+
+// ─── DingTalk Install ───────────────────────────────────────────────────────
+
+export const DingTalkInstallQrcodeSchema = {
+  output: z.object({
+    url: z.string(),
+    deviceCode: z.string(),
+    interval: z.number(),
+    expireIn: z.number(),
+  }),
+};
+
+export const DingTalkInstallPollSchema = {
+  input: z.string().min(1),
+  output: z.object({
+    done: z.boolean(),
+    clientId: z.string().optional(),
+    clientSecret: z.string().optional(),
+    error: z.string().optional(),
+  }),
+};
+
+export const DingTalkInstallVerifySchema = {
+  input: z.object({ clientId: z.string().min(1), clientSecret: z.string().min(1) }),
+  output: z.object({ success: z.boolean(), error: z.string().optional() }),
+};
+
+// ─── GitHub Copilot ─────────────────────────────────────────────────────────
+
+export const GitHubCopilotPollSchema = {
+  input: z.object({
+    deviceCode: z.string().min(1),
+    interval: z.number(),
+    expiresIn: z.number(),
+  }),
+  output: z.object({
+    success: z.boolean(),
+    token: z.string().optional(),
+    githubUser: z.string().optional(),
+    baseUrl: z.string().optional(),
+    error: z.string().optional(),
+  }),
+};
+
+export const GitHubCopilotRefreshTokenSchema = {
+  output: z.object({
+    success: z.boolean(),
+    token: z.string().optional(),
+    baseUrl: z.string().optional(),
+    error: z.string().optional(),
+  }),
+};
+
+export const GitHubCopilotTokenUpdatedSchema = {
+  output: z.object({ token: z.string(), baseUrl: z.string() }),
+};
+
+// ─── OpenAI Codex OAuth ─────────────────────────────────────────────────────
+
+export const OpenAICodexOAuthStartSchema = {
+  output: z.union([
+    z.object({ success: z.literal(true), email: z.string().nullable(), accountId: z.string().nullable(), expiresAt: z.number() }),
+    z.object({ success: z.literal(false), error: z.string() }),
+  ]),
+};
+
+export const OpenAICodexOAuthStatusSchema = {
+  output: z.union([
+    z.object({ loggedIn: z.literal(true), email: z.string().nullable(), accountId: z.string().nullable(), expiresAt: z.number() }),
+    z.object({ loggedIn: z.literal(false) }),
+  ]),
+};
+
+// ─── Cowork Stream Events (main → renderer push) ────────────────────────────
+
+export const CoworkStreamMessageSchema = {
+  output: z.object({ sessionId: z.string(), message: z.object({}).passthrough() }),
+};
+
+export const CoworkStreamMessageUpdateSchema = {
+  output: z.object({
+    sessionId: z.string(),
+    messageId: z.string(),
+    content: z.string(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  }),
+};
+
+export const CoworkStreamPermissionSchema = {
+  output: z.object({ sessionId: z.string(), request: z.object({}).passthrough() }),
+};
+
+export const CoworkStreamPermissionDismissSchema = {
+  output: z.object({ requestId: z.string() }),
+};
+
+export const CoworkStreamCompleteSchema = {
+  output: z.object({ sessionId: z.string(), claudeSessionId: z.string().nullable() }),
+};
+
+export const CoworkStreamErrorSchema = {
+  output: z.object({ sessionId: z.string(), error: z.string() }),
+};
+
+export const CoworkSessionsChangedSchema = {
+  output: z.object({ sessionId: z.string().optional() }),
+};
+
+// ─── OpenClaw Engine ────────────────────────────────────────────────────────
+
+export const OpenClawEngineStatusSchema = {
+  output: z.object({}).passthrough(),
+};
+
+// ─── OpenClaw Session Policy ────────────────────────────────────────────────
+
+export const OpenClawSessionPolicyGetSchema = {
+  output: IpcResult(z.object({ config: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }).passthrough() })),
+};
+
+export const OpenClawSessionPolicySetSchema = {
+  input: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }),
+  output: IpcResult(z.object({ config: z.object({}).passthrough().optional() })),
+};
+
+// ─── OpenClaw Session Patch ─────────────────────────────────────────────────
+
+export const OpenClawSessionPatchSchema = {
+  input: z.object({
+    sessionId: z.string().min(1),
+    patch: z.object({
+      model: z.string().nullable().optional(),
+      thinkingLevel: z.string().nullable().optional(),
+      reasoningLevel: z.string().nullable().optional(),
+      elevatedLevel: z.string().nullable().optional(),
+      responseUsage: z.enum(['off', 'tokens', 'full']).nullable().optional(),
+      sendPolicy: z.enum(['allow', 'deny']).nullable().optional(),
+    }),
+  }),
+  output: IpcResult(z.object({ session: z.object({}).passthrough() })),
+};
+
+// ─── App Config ─────────────────────────────────────────────────────────────
+
+export const AppConfigGetRecentCwdsSchema = {
+  input: z.number().int().positive().optional(),
+  output: z.array(z.string()),
+};
+
+// ─── Network ────────────────────────────────────────────────────────────────
+
+export const NetworkStatusChangeSchema = {
+  input: z.enum(['online', 'offline']),
+};
