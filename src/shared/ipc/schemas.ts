@@ -13,16 +13,15 @@ import { z } from 'zod';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Standard success envelope returned by most handlers. */
-export const IpcSuccess = <T extends z.ZodTypeAny>(data: T) =>
-  z.object({ success: z.literal(true), ...(data ? (data as { _output: unknown })._output ?? {} : {}) });
-
 /** Standard error envelope. */
 export const IpcError = z.object({ success: z.literal(false), error: z.string().optional() });
 
-/** Generic IPC result — success with optional extra fields or error string. */
-export const IpcResult = <T extends z.ZodTypeAny>(data: T) =>
-  z.union([IpcSuccess(data), IpcError]);
+/** Generic IPC result — { success: true, ...data } | { success: false, error? } */
+export const IpcResult = <T extends z.ZodRawShape>(data: T) =>
+  z.union([
+    z.object({ success: z.literal(true), ...data }),
+    IpcError,
+  ]);
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
@@ -45,27 +44,27 @@ export const StoreRemoveSchema = {
 
 export const SkillsSetEnabledSchema = {
   input: z.object({ id: z.string().min(1), enabled: z.boolean() }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const SkillsDeleteSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const SkillsDownloadSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const SkillsUpgradeSchema = {
   input: z.tuple([z.string().min(1), z.string().min(1)]),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const SkillsConfirmInstallSchema = {
   input: z.tuple([z.string().min(1), z.string().min(1)]),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const SkillsGetConfigSchema = {
@@ -75,34 +74,34 @@ export const SkillsGetConfigSchema = {
 
 export const SkillsSetConfigSchema = {
   input: z.object({ skillId: z.string().min(1), config: z.record(z.string(), z.string()) }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const SkillsTestEmailConnectivitySchema = {
   input: z.object({ skillId: z.string().min(1), config: z.record(z.string(), z.string()) }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 // ─── MCP ────────────────────────────────────────────────────────────────────
 
 export const McpCreateSchema = {
   input: z.object({}).passthrough(),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const McpUpdateSchema = {
   input: z.object({ id: z.string().min(1) }).passthrough(),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const McpDeleteSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const McpSetEnabledSchema = {
   input: z.object({ id: z.string().min(1), enabled: z.boolean() }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const McpBridgeSyncDoneSchema = {
@@ -161,7 +160,7 @@ export const CoworkSessionStartSchema = {
     modelOverride: z.string().optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
   }),
-  output: IpcResult(z.object({
+  output: IpcResult({
     session: z.object({
       id: z.string(),
       title: z.string(),
@@ -170,7 +169,7 @@ export const CoworkSessionStartSchema = {
       updatedAt: z.number(),
     }).passthrough(),
     engineStatus: z.object({}).passthrough().optional(),
-  })),
+  }),
 };
 
 export const CoworkSessionContinueSchema = {
@@ -181,37 +180,37 @@ export const CoworkSessionContinueSchema = {
     activeSkillIds: z.array(z.string()).optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
   }),
-  output: IpcResult(z.object({ engineStatus: z.object({}).passthrough().optional() })),
+  output: IpcResult({ engineStatus: z.object({}).passthrough().optional() }),
 };
 
 export const CoworkSessionStopSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const CoworkSessionDeleteSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const CoworkSessionDeleteBatchSchema = {
   input: z.array(z.string().min(1)),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const CoworkSessionPinSchema = {
   input: z.object({ sessionId: z.string().min(1), pinned: z.boolean() }),
-  output: IpcResult(z.object({ pinOrder: z.number().nullable().optional() })),
+  output: IpcResult({ pinOrder: z.number().nullable().optional() }),
 };
 
 export const CoworkSessionRenameSchema = {
   input: z.object({ sessionId: z.string().min(1), title: z.string().min(1) }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const CoworkSessionGetSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({ session: z.object({}).passthrough() })),
+  output: IpcResult({ session: z.object({}).passthrough() }),
 };
 
 export const CoworkSessionListSchema = {
@@ -220,10 +219,10 @@ export const CoworkSessionListSchema = {
     offset: z.number().int().min(0).optional(),
     agentId: z.string().optional(),
   }).optional(),
-  output: IpcResult(z.object({
+  output: IpcResult({
     sessions: z.array(z.object({}).passthrough()),
     hasMore: z.boolean().optional(),
-  })),
+  }),
 };
 
 export const CoworkSessionGetMessagesSchema = {
@@ -232,9 +231,9 @@ export const CoworkSessionGetMessagesSchema = {
     limit: z.number().int().positive().optional(),
     offset: z.number().int().min(0).optional(),
   }),
-  output: IpcResult(z.object({
+  output: IpcResult({
     messages: z.array(z.object({}).passthrough()),
-  })),
+  }),
 };
 
 export const CoworkSessionExportResultImageSchema = {
@@ -242,18 +241,18 @@ export const CoworkSessionExportResultImageSchema = {
     rect: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }),
     defaultFileName: z.string().optional(),
   }),
-  output: IpcResult(z.object({ path: z.string().optional(), canceled: z.boolean().optional() })),
+  output: IpcResult({ path: z.string().optional(), canceled: z.boolean().optional() }),
 };
 
 export const CoworkSessionCaptureImageChunkSchema = {
   input: z.object({
     rect: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }),
   }),
-  output: IpcResult(z.object({
+  output: IpcResult({
     width: z.number().optional(),
     height: z.number().optional(),
     pngBase64: z.string().optional(),
-  })),
+  }),
 };
 
 export const CoworkSessionSaveResultImageSchema = {
@@ -261,7 +260,7 @@ export const CoworkSessionSaveResultImageSchema = {
     pngBase64: z.string().min(1),
     defaultFileName: z.string().optional(),
   }),
-  output: IpcResult(z.object({ path: z.string().optional(), canceled: z.boolean().optional() })),
+  output: IpcResult({ path: z.string().optional(), canceled: z.boolean().optional() }),
 };
 
 export const CoworkSessionExportTextSchema = {
@@ -270,7 +269,7 @@ export const CoworkSessionExportTextSchema = {
     defaultFileName: z.string().optional(),
     fileExtension: z.string().optional(),
   }),
-  output: IpcResult(z.object({ path: z.string().optional(), canceled: z.boolean().optional() })),
+  output: IpcResult({ path: z.string().optional(), canceled: z.boolean().optional() }),
 };
 
 // ─── Cowork Permission ──────────────────────────────────────────────────────
@@ -280,7 +279,7 @@ export const CoworkPermissionRespondSchema = {
     requestId: z.string().min(1),
     result: z.object({}).passthrough(),
   }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 // ─── Cowork Config ──────────────────────────────────────────────────────────
@@ -304,7 +303,7 @@ export const CoworkConfigSetSchema = {
     embeddingRemoteBaseUrl: z.string().optional(),
     embeddingRemoteApiKey: z.string().optional(),
   }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 // ─── Cowork Memory ──────────────────────────────────────────────────────────
@@ -317,9 +316,9 @@ export const CoworkMemoryListEntriesSchema = {
     limit: z.number().int().positive().optional(),
     offset: z.number().int().min(0).optional(),
   }),
-  output: IpcResult(z.object({
+  output: IpcResult({
     entries: z.array(z.object({}).passthrough()),
-  })),
+  }),
 };
 
 export const CoworkMemoryCreateEntrySchema = {
@@ -328,7 +327,7 @@ export const CoworkMemoryCreateEntrySchema = {
     confidence: z.number().min(0).max(1).optional(),
     isExplicit: z.boolean().optional(),
   }),
-  output: IpcResult(z.object({ entry: z.object({}).passthrough() })),
+  output: IpcResult({ entry: z.object({}).passthrough() }),
 };
 
 export const CoworkMemoryUpdateEntrySchema = {
@@ -339,24 +338,24 @@ export const CoworkMemoryUpdateEntrySchema = {
     status: z.enum(['created', 'stale', 'deleted']).optional(),
     isExplicit: z.boolean().optional(),
   }),
-  output: IpcResult(z.object({ entry: z.object({}).passthrough() })),
+  output: IpcResult({ entry: z.object({}).passthrough() }),
 };
 
 export const CoworkMemoryDeleteEntrySchema = {
   input: z.object({ id: z.string().min(1) }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 // ─── Cowork Bootstrap ───────────────────────────────────────────────────────
 
 export const CoworkBootstrapReadSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({ content: z.string().optional() })),
+  output: IpcResult({ content: z.string().optional() }),
 };
 
 export const CoworkBootstrapWriteSchema = {
   input: z.object({ filename: z.string().min(1), content: z.string() }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 // ─── Dialog ─────────────────────────────────────────────────────────────────
@@ -521,12 +520,12 @@ export const ImPairingListSchema = {
 
 export const ImInstanceAddSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const ImInstanceDeleteSchema = {
   input: z.string().min(1),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 export const ImInstanceSetConfigSchema = {
@@ -535,7 +534,7 @@ export const ImInstanceSetConfigSchema = {
     config: z.object({}).passthrough(),
     options: z.object({ syncGateway: z.boolean().optional() }).optional(),
   }),
-  output: IpcResult(z.object({}).passthrough()),
+  output: IpcResult({}),
 };
 
 // ─── Feishu Install ─────────────────────────────────────────────────────────
@@ -682,12 +681,12 @@ export const OpenClawEngineStatusSchema = {
 // ─── OpenClaw Session Policy ────────────────────────────────────────────────
 
 export const OpenClawSessionPolicyGetSchema = {
-  output: IpcResult(z.object({ config: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }).passthrough() })),
+  output: IpcResult({ config: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }).passthrough() }),
 };
 
 export const OpenClawSessionPolicySetSchema = {
   input: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }),
-  output: IpcResult(z.object({ config: z.object({}).passthrough().optional() })),
+  output: IpcResult({ config: z.object({}).passthrough().optional() }),
 };
 
 // ─── OpenClaw Session Patch ─────────────────────────────────────────────────
@@ -704,7 +703,7 @@ export const OpenClawSessionPatchSchema = {
       sendPolicy: z.enum(['allow', 'deny']).nullable().optional(),
     }),
   }),
-  output: IpcResult(z.object({ session: z.object({}).passthrough() })),
+  output: IpcResult({ session: z.object({}).passthrough() }),
 };
 
 // ─── App Config ─────────────────────────────────────────────────────────────
