@@ -34,30 +34,16 @@ export function registerLlamaCppIpcHandlers(
     };
   },
 ): void {
-  const refreshRunningModelBindings = async (reason: string): Promise<void> => {
+  const refreshRunningModelBindings = async (): Promise<void> => {
     try {
       const runningModels = await manager.listRunningModels();
-      const changed = updateLlamaCppRunningModels(
+      updateLlamaCppRunningModels(
         runningModels
           .map((model) => buildLlamaCppRunningModelBinding(model))
           .filter((model): model is NonNullable<typeof model> => Boolean(model)),
       );
-      if (changed) {
-        await options.syncOpenClawConfig({
-          reason,
-          restartGatewayIfRunning: true,
-          forceGatewayRestartIfRunning: true,
-        });
-      }
     } catch {
-      const changed = updateLlamaCppRunningModels([]);
-      if (changed) {
-        await options.syncOpenClawConfig({
-          reason,
-          restartGatewayIfRunning: true,
-          forceGatewayRestartIfRunning: true,
-        });
-      }
+      updateLlamaCppRunningModels([]);
     }
   };
 
@@ -74,11 +60,11 @@ export function registerLlamaCppIpcHandlers(
   manager.on('status', (status) => {
     sendStatus(status);
     if (status.status === 'running') {
-      void refreshRunningModelBindings('llamacpp-status-running');
+      void refreshRunningModelBindings();
       return;
     }
     if (status.status === 'stopped' || status.status === 'error' || status.status === 'not-installed' || status.status === 'installed') {
-      void refreshRunningModelBindings('llamacpp-status-not-running');
+      void refreshRunningModelBindings();
     }
   });
   manager.on('install-progress', sendProgress);
@@ -124,7 +110,7 @@ export function registerLlamaCppIpcHandlers(
 
     const next = removeLlamaCppModelFromAppConfig(current, result.removedModelName);
     store.set('app_config', next.config);
-    await refreshRunningModelBindings('llamacpp-model-deleted');
+    await refreshRunningModelBindings();
 
     return {
       ...result,
@@ -139,7 +125,7 @@ export function registerLlamaCppIpcHandlers(
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
     const result = await manager.loadModel({ ...input, model: modelName });
-    await refreshRunningModelBindings('llamacpp-model-loaded');
+    await refreshRunningModelBindings();
     return result;
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
@@ -148,7 +134,7 @@ export function registerLlamaCppIpcHandlers(
     const client = await manager.client();
     await client.unloadModel(modelName);
     const runningModels = await manager.listRunningModels();
-    await refreshRunningModelBindings('llamacpp-model-unloaded');
+    await refreshRunningModelBindings();
     return { success: true, runningModels };
   });
   ipcMain.handle(LlamaCppIpcChannel.InstallModel, async (_event, input: LlamaCppInstallModelInput) => {
@@ -238,11 +224,10 @@ export function registerLlamaCppIpcHandlers(
         return null;
       }
     })();
-    await refreshRunningModelBindings('llamacpp-model-visibility-refresh');
+    await refreshRunningModelBindings();
     const syncResult = await options.syncOpenClawConfig({
       reason: 'llamacpp-local-model-selected',
-      restartGatewayIfRunning: true,
-      forceGatewayRestartIfRunning: true,
+      restartGatewayIfRunning: false,
     });
     return {
       success: syncResult.success,
