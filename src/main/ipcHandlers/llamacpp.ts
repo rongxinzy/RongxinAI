@@ -43,8 +43,7 @@ export function registerLlamaCppIpcHandlers(
       if (changed) {
         await options.syncOpenClawConfig({
           reason,
-          restartGatewayIfRunning: true,
-          forceGatewayRestartIfRunning: true,
+          restartGatewayIfRunning: false,
         });
       }
     } catch {
@@ -52,8 +51,7 @@ export function registerLlamaCppIpcHandlers(
       if (changed) {
         await options.syncOpenClawConfig({
           reason,
-          restartGatewayIfRunning: true,
-          forceGatewayRestartIfRunning: true,
+          restartGatewayIfRunning: false,
         });
       }
     }

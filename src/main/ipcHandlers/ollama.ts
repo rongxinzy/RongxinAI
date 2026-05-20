@@ -183,8 +183,7 @@ export function registerOllamaIpcHandlers(
 
     const syncResult = await options.syncOpenClawConfig({
       reason: 'ollama-local-model-selected',
-      restartGatewayIfRunning: true,
-      forceGatewayRestartIfRunning: true,
+      restartGatewayIfRunning: false,
     });
     return {
       success: syncResult.success,
