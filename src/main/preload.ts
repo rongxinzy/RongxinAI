@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+import type { CoworkError } from '../common/coworkError';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
@@ -231,8 +232,8 @@ contextBridge.exposeInMainWorld('electron', {
     onStreamDone: (requestId: string, callback: () => void) =>
       onPushVoid(ApiIpc.streamDone(requestId), callback),
 
-    onStreamError: (requestId: string, callback: (error: string) => void) =>
-      onPush<string>(ApiIpc.streamError(requestId), callback),
+    onStreamError: (requestId: string, callback: (error: CoworkError) => void) =>
+      onPush<CoworkError>(ApiIpc.streamError(requestId), callback),
 
     onStreamAbort: (requestId: string, callback: () => void) =>
       onPushVoid(ApiIpc.streamAbort(requestId), callback),
@@ -442,7 +443,7 @@ contextBridge.exposeInMainWorld('electron', {
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => onPush(CoworkStreamIpc.Complete, callback),
     onStreamError: (
-      callback: (data: { sessionId: string; error: string }) => void,
+      callback: (data: { sessionId: string; error: CoworkError }) => void,
     ) => onPush(CoworkStreamIpc.Error, callback),
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) =>
       onPush(CoworkStreamIpc.SessionsChanged, callback),

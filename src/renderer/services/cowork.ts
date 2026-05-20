@@ -1,3 +1,4 @@
+import { CoworkErrorKind, ENGINE_NOT_READY_CODE, getUserErrorI18nKey, type CoworkError } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import { COWORK_SESSION_PAGE_SIZE } from '../../shared/cowork/constants';
@@ -39,7 +40,11 @@ import type {
 } from '../types/cowork';
 import { i18nService } from './i18n';
 
-const classifyError = (error: string): string => {
+const classifyError = (error: string | CoworkError): string => {
+  if (typeof error === 'object' && 'kind' in error) {
+    const key = getUserErrorI18nKey(error.kind);
+    return key ? i18nService.t(key) : error.message;
+  }
   const key = classifyErrorKey(error);
   return key ? i18nService.t(key) : error;
 };
@@ -152,14 +157,26 @@ class CoworkService {
     // Error listener
     const errorCleanup = cowork.onStreamError(({ sessionId, error }) => {
       store.dispatch(updateSessionStatus({ sessionId, status: 'error' }));
-      // Surface the error as a visible message so the user knows what happened.
-      if (error) {
+
+      // Differentiated behavior by error kind:
+      // - Auth expired → trigger global re-auth flow
+      // - Engine not ready → handled separately by engine status overlay
+      // - Rate limited → show transient warning with retry hint
+      // - Others → surface as system message
+      if (error.kind === CoworkErrorKind.AuthExpired) {
+        window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
+      }
+
+      const userMessage = error.message || '';
+      if (userMessage) {
+        const i18nKey = getUserErrorI18nKey(error.kind);
+        const content = i18nKey ? i18nService.t(i18nKey) : userMessage;
         store.dispatch(addMessage({
           sessionId,
           message: {
             id: `error-${Date.now()}`,
             type: 'system',
-            content: classifyError(error),
+            content: content || userMessage,
             timestamp: Date.now(),
           },
         }));
@@ -312,7 +329,7 @@ class CoworkService {
 
     // Show a user-visible error when session start fails
     if (result.error) {
-      const errorContent = result.code === 'ENGINE_NOT_READY'
+      const errorContent = result.code === ENGINE_NOT_READY_CODE
         ? i18nService.t('coworkErrorEngineNotReady')
         : classifyError(result.error);
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: errorContent }));
@@ -361,7 +378,7 @@ class CoworkService {
       }
       // Show a user-visible error message in the session
       if (result.error) {
-        const errorContent = result.code === 'ENGINE_NOT_READY'
+        const errorContent = result.code === ENGINE_NOT_READY_CODE
           ? i18nService.t('coworkErrorEngineNotReady')
           : classifyError(result.error);
         store.dispatch(addMessage({

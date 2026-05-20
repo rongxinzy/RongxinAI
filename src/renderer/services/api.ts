@@ -496,7 +496,7 @@ class ApiService {
 
         const removeErrorListener = window.electron.api.onStreamError(requestId, (error) => {
           this.cleanup();
-          reject(new ApiError(error));
+          reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
 
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
@@ -662,7 +662,7 @@ class ApiService {
 
         const removeErrorListener = window.electron.api.onStreamError(requestId, (error) => {
           this.cleanup();
-          reject(new ApiError(error));
+          reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
 
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
@@ -860,7 +860,7 @@ class ApiService {
 
         const removeErrorListener = window.electron.api.onStreamError(requestId, (error) => {
           this.cleanup();
-          reject(new ApiError(error));
+          reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
 
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {

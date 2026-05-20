@@ -138,7 +138,7 @@ const IPC_MAX_DEPTH = 5;
 const IPC_MAX_KEYS = 80;
 const IPC_MAX_ITEMS = 40;
 const MAX_INLINE_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const ENGINE_NOT_READY_CODE = 'ENGINE_NOT_READY';
+import { ENGINE_NOT_READY_CODE } from '../common/coworkError';
 const HIDDEN_SKILL_MARKETPLACE_IDS = new Set(['youdaonote', 'youdao-note', 'youdao_note']);
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
@@ -1468,7 +1468,7 @@ const bindCoworkRuntimeForwarder = (): void => {
     }
   });
 
-  runtime.on('error', (sessionId: string, error: string) => {
+  runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
     // Mark session as error in store so the .catch() fallback can detect duplicates.
     try { getCoworkStore().updateSession(sessionId, { status: 'error' }); } catch { /* ignore */ }
     const windows = BrowserWindow.getAllWindows();
