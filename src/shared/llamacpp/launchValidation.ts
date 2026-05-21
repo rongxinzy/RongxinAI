@@ -18,6 +18,6 @@ export function getLlamaCppLaunchContextLimitViolation(input: {
 }
 
 function normalizePositiveInteger(value: number | undefined): number | undefined {
-  if (!Number.isInteger(value) || value <= 0) return undefined;
+  if (value === undefined || !Number.isInteger(value) || value <= 0) return undefined;
   return value;
 }
