@@ -19,6 +19,7 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
+import type { TriageConfig } from '../../shared/triage';
 import type {
   OllamaCancelPullResult,
   OllamaChatChunk,
@@ -440,6 +441,10 @@ interface IElectronAPI {
   };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
+  };
+  triage: {
+    getConfig: () => Promise<TriageConfig>;
+    setConfig: (config: TriageConfig) => Promise<TriageConfig>;
   };
   hardware: {
     nvidiaSmi: () => Promise<NvidiaSmiSnapshot>;
