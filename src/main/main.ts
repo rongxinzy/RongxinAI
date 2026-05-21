@@ -5179,7 +5179,7 @@ if (!gotTheLock) {
 
   ipcMain.handle('shell:openHtmlInBrowser', async (_event, htmlContent: string) => {
     try {
-      const tmpDir = path.join(os.tmpdir(), 'lobsterai-preview');
+      const tmpDir = path.join(os.tmpdir(), 'rongxinai-preview');
       fs.mkdirSync(tmpDir, { recursive: true });
       const tmpFile = path.join(tmpDir, `preview-${Date.now()}.html`);
       fs.writeFileSync(tmpFile, htmlContent, 'utf-8');
@@ -5842,7 +5842,7 @@ if (!gotTheLock) {
     // We don't trigger permission dialogs at startup to avoid annoying users
 
     // Ensure default working directory exists
-    const defaultProjectDir = path.join(os.homedir(), 'lobsterai', 'project');
+    const defaultProjectDir = path.join(os.homedir(), 'rongxinai', 'project');
     if (!fs.existsSync(defaultProjectDir)) {
       fs.mkdirSync(defaultProjectDir, { recursive: true });
       console.log('Created default project directory:', defaultProjectDir);
