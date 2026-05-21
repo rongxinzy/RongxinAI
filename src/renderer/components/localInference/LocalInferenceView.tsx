@@ -888,7 +888,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             : result?.error || i18nService.t('localInferenceRuntimeMissing'),
         );
       } else if (status?.status === 'installed' || status?.status === 'stopped') {
-        await window.electron.llamacpp.start();
+        const startStatus = await window.electron.llamacpp.start();
+        if (startStatus.status !== 'running') {
+          showToast(
+            startStatus.error || i18nService.t('localInferenceLaunchRestartFailed'),
+            LocalInferenceToastKind.Error,
+          );
+          return;
+        }
       } else {
         await refreshStatus();
       }
