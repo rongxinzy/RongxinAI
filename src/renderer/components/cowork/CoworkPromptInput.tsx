@@ -783,7 +783,16 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     void handleIncomingFiles(files);
   }, [disabled, handleIncomingFiles, isStreaming]);
 
-  const canSubmit = !disabled && !isPatchingModel && !agentModelIsInvalid && !hasUnavailableLlamaCppModel && (!!value.trim() || attachments.length > 0);
+  const [isGatewayReady, setIsGatewayReady] = useState(true);
+  useEffect(() => {
+    coworkService.getOpenClawEngineStatus().then((s) => {
+      setIsGatewayReady(!s || s.phase === 'running');
+    });
+    return coworkService.onOpenClawEngineStatus((s) => {
+      setIsGatewayReady(s.phase === 'running');
+    });
+  }, []);
+  const canSubmit = isGatewayReady && !disabled && !isPatchingModel && !agentModelIsInvalid && !hasUnavailableLlamaCppModel && (!!value.trim() || attachments.length > 0);
   const invalidModelLabel = invalidExplicitModelRef?.split('/').pop() || invalidExplicitModelRef || '';
 
   const enhancedContainerClass = isDraggingFiles
