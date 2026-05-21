@@ -21,11 +21,22 @@ const TAG = '[OpenClaw Memory]';
 // Types
 // ---------------------------------------------------------------------------
 
+export interface MemorySource {
+  /** Short session ID (first 8 hex chars of SHA) or null for manually-added entries. */
+  sessionId: string | null;
+  /** Who produced the information. */
+  role: 'user' | 'assistant' | 'tool' | 'system' | 'im';
+  /** ISO date (YYYY-MM-DD) when the memory was created. */
+  date: string;
+}
+
 export interface OpenClawMemoryEntry {
   /** SHA-1 of the normalised text – stable across reads. */
   id: string;
   /** Raw text without the leading "- ". */
   text: string;
+  /** Source provenance metadata (null for legacy entries or manual additions). */
+  source: MemorySource | null;
 }
 
 export interface OpenClawMemoryStats {
@@ -87,6 +98,48 @@ function isBulletLine(line: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Source provenance (Phase 2.2a)
+// ---------------------------------------------------------------------------
+
+/**
+ * Inline source comment at the end of a memory bullet line.
+ *
+ * Format: <!-- source:s=<sessionId_8chars>:r=<role>:t=<YYYY-MM-DD> -->
+ *
+ * This is a standard Markdown comment that OpenClaw's parsers ignore.
+ * Legacy entries without this comment will have `source: null`.
+ */
+const SOURCE_RE = /<!--\s*source:s=([a-f0-9]{1,8}):r=([a-z]+):t=(\d{4}-\d{2}-\d{2})\s*-->$/;
+
+function parseSourceFromLine(line: string): MemorySource | null {
+  const match = line.match(SOURCE_RE);
+  if (!match) return null;
+  const role = match[2] as MemorySource['role'];
+  const validRoles = new Set<string>(['user', 'assistant', 'tool', 'system', 'im']);
+  return {
+    sessionId: match[1] || null,
+    role: validRoles.has(role) ? (role as MemorySource['role']) : 'system',
+    date: match[3],
+  };
+}
+
+function stripSourceComment(line: string): string {
+  return line.replace(SOURCE_RE, '').trimEnd();
+}
+
+function formatSourceComment(source: MemorySource): string {
+  return `<!-- source:s=${source.sessionId || 'manual'}:r=${source.role}:t=${source.date} -->`;
+}
+
+function formatMemoryLine(entry: OpenClawMemoryEntry): string {
+  const line = `- ${entry.text}`;
+  if (entry.source) {
+    return `${line} ${formatSourceComment(entry.source)}`;
+  }
+  return line;
+}
+
+// ---------------------------------------------------------------------------
 // Parsing & serialisation
 // ---------------------------------------------------------------------------
 
@@ -105,15 +158,22 @@ export function parseMemoryMd(content: string): OpenClawMemoryEntry[] {
   const seen = new Set<string>();
 
   for (const line of lines) {
-    const match = line.trim().match(BULLET_RE);
+    const trimmed = line.trim();
+    const match = trimmed.match(BULLET_RE);
     if (!match?.[1]) continue;
-    const text = match[1].replace(/\s+/g, ' ').trim();
+
+    // Strip source comment before fingerprinting so metadata changes
+    // don't change the entry ID.
+    const rawText = match[1];
+    const cleanText = stripSourceComment(rawText);
+    const text = cleanText.replace(/\s+/g, ' ').trim();
     if (!text) continue;
 
+    const source = parseSourceFromLine(trimmed);
     const fp = fingerprint(text);
     if (seen.has(fp)) continue;
     seen.add(fp);
-    entries.push({ id: fp, text });
+    entries.push({ id: fp, text, source });
   }
 
   return entries;
@@ -124,7 +184,7 @@ export function parseMemoryMd(content: string): OpenClawMemoryEntry[] {
  */
 export function serializeMemoryMd(entries: OpenClawMemoryEntry[]): string {
   if (entries.length === 0) return `${HEADER}\n`;
-  const lines = entries.map((e) => `- ${e.text}`);
+  const lines = entries.map((e) => formatMemoryLine(e));
   return `${HEADER}\n\n${lines.join('\n')}\n`;
 }
 
@@ -195,11 +255,17 @@ function rebuildMemoryMd(
 
           if (desiredById.has(fp)) {
             // Entry still exists (possibly with updated text via id change)
-            // Keep it at its original position
+            // Keep it at its original position, preserving source if available
             const desiredText = desiredById.get(fp)!;
+            // Look up the full entry to preserve source metadata
+            const desiredEntry = entries.find((e) => e.text === desiredText);
+            const source = desiredEntry?.source || parseSourceFromLine(line.trim());
             // Preserve original indentation
             const indent = line.match(/^(\s*)/)?.[1] ?? '';
-            result.push(`${indent}- ${desiredText}`);
+            const formatted = source
+              ? `${indent}- ${desiredText} ${formatSourceComment(source)}`
+              : `${indent}- ${desiredText}`;
+            result.push(formatted.trimEnd());
             desiredById.delete(fp); // mark as handled
             continue;
           }
@@ -227,7 +293,7 @@ function rebuildMemoryMd(
       result.push('');
     }
     for (const e of newEntries) {
-      result.push(`- ${e.text}`);
+      result.push(formatMemoryLine(e));
     }
   }
 
@@ -235,17 +301,16 @@ function rebuildMemoryMd(
   // matched to an original bullet (e.g. entries whose text was updated,
   // producing a new id). These are effectively "updated" entries that
   // lost their positional anchor.
-  const remaining = [...desiredById.values()].filter((text) => {
-    // Exclude entries that were already appended as newEntries
-    return !newEntries.some((ne) => ne.text === text);
+  const remaining = entries.filter((e) => {
+    return !newEntries.some((ne) => ne.id === e.id) && desiredById.has(e.id);
   });
   if (remaining.length > 0) {
     const lastLine = result[result.length - 1];
     if (lastLine !== undefined && lastLine.trim() !== '') {
       result.push('');
     }
-    for (const text of remaining) {
-      result.push(`- ${text}`);
+    for (const e of remaining) {
+      result.push(formatMemoryLine(e));
     }
   }
 
@@ -289,12 +354,20 @@ export function writeMemoryEntries(filePath: string, entries: OpenClawMemoryEntr
   console.log(`${TAG} writeMemoryEntries: wrote ${entries.length} entries to ${filePath}`);
 }
 
-export function addMemoryEntry(filePath: string, text: string): OpenClawMemoryEntry {
+export function addMemoryEntry(
+  filePath: string,
+  text: string,
+  source?: MemorySource | null,
+): OpenClawMemoryEntry {
   const trimmed = text.replace(/\s+/g, ' ').trim();
   if (!trimmed) throw new Error('Memory text is required');
 
   const entries = readMemoryEntries(filePath);
-  const entry: OpenClawMemoryEntry = { id: fingerprint(trimmed), text: trimmed };
+  const entry: OpenClawMemoryEntry = {
+    id: fingerprint(trimmed),
+    text: trimmed,
+    source: source || null,
+  };
 
   if (entries.some((e) => e.id === entry.id)) {
     console.log(`${TAG} addMemoryEntry: duplicate skipped (id=${entry.id.slice(0, 8)}…)`);
@@ -303,7 +376,10 @@ export function addMemoryEntry(filePath: string, text: string): OpenClawMemoryEn
 
   entries.push(entry);
   writeMemoryEntries(filePath, entries);
-  console.log(`${TAG} addMemoryEntry: added "${trimmed.slice(0, 40)}…" (id=${entry.id.slice(0, 8)}…)`);
+  const sourceInfo = entry.source
+    ? ` [source:s=${entry.source.sessionId}:r=${entry.source.role}:t=${entry.source.date}]`
+    : '';
+  console.log(`${TAG} addMemoryEntry: added "${trimmed.slice(0, 40)}…" (id=${entry.id.slice(0, 8)}…)${sourceInfo}`);
   return entry;
 }
 
@@ -323,7 +399,11 @@ export function updateMemoryEntry(
   }
 
   // Note: ID changes because it's content-based (fingerprint of text)
-  const updated: OpenClawMemoryEntry = { id: fingerprint(trimmed), text: trimmed };
+  const updated: OpenClawMemoryEntry = {
+    id: fingerprint(trimmed),
+    text: trimmed,
+    source: entries[idx].source, // preserve source metadata on update
+  };
   const oldText = entries[idx].text;
   entries[idx] = updated;
   writeMemoryEntries(filePath, entries);
@@ -406,7 +486,7 @@ export function migrateSqliteToMemoryMd(
         skipped++;
         continue;
       }
-      existing.push({ id, text });
+      existing.push({ id, text, source: null });
       existingIds.add(id);
       added++;
     }
@@ -557,7 +637,8 @@ export function syncMemoryFileOnWorkspaceChange(
     let added = 0;
     for (const entry of oldEntries) {
       if (newIds.has(entry.id)) continue;
-      newEntries.push(entry);
+      // Preserve source metadata from old file
+      newEntries.push({ ...entry, source: entry.source || null });
       newIds.add(entry.id);
       added++;
     }
