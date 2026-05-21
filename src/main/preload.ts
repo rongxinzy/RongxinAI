@@ -36,6 +36,7 @@ import {
 } from '../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
+import { TriageIpcChannel } from '../shared/triage';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { OpenClawSessionIpc } from './openclawSession/constants';
@@ -193,6 +194,11 @@ contextBridge.exposeInMainWorld('electron', {
   },
   marketplace: {
     search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
+  },
+
+  triage: {
+    getConfig: () => ipcRenderer.invoke(TriageIpcChannel.GetConfig),
+    setConfig: (config: unknown) => ipcRenderer.invoke(TriageIpcChannel.SetConfig, config),
   },
 
   hardware: {
