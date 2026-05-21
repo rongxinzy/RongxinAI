@@ -96,6 +96,7 @@ import {
   readBootstrapFile,
   readMemoryEntries,
   resolveMemoryFilePath,
+  type MemorySource,
   searchMemoryEntries,
   updateMemoryEntry,
   writeBootstrapFile,
@@ -3790,10 +3791,18 @@ if (!gotTheLock) {
     text: string;
     confidence?: number;
     isExplicit?: boolean;
+    source?: MemorySource;
   }) => {
     try {
       const filePath = resolveMemoryFilePath(getMainAgentWorkspacePath(getOpenClawEngineManager().getStateDir()));
-      const entry = addMemoryEntry(filePath, input.text);
+      const source = input.source && typeof input.source === 'object'
+        ? {
+            sessionId: typeof input.source.sessionId === 'string' ? input.source.sessionId : null,
+            role: (['user', 'assistant', 'tool', 'system', 'im'] as const).includes(input.source.role as MemorySource['role']) ? input.source.role : 'system',
+            date: typeof input.source.date === 'string' ? input.source.date : new Date().toISOString().slice(0, 10),
+          } as MemorySource
+        : undefined;
+      const entry = addMemoryEntry(filePath, input.text, source);
       return { success: true, entry };
     } catch (error) {
       return {

@@ -594,6 +594,32 @@ export function ensureDefaultIdentity(workingDirectory: string | undefined): voi
 }
 
 // ---------------------------------------------------------------------------
+// Source provenance helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a MemorySource from session context.
+ *
+ * @param sessionId - Full Cowork session ID; we shorten to first 8 hex chars
+ * @param role - Who said it (user/assistant/tool/system/im)
+ * @param date - Optional ISO date string; defaults to today
+ */
+export function buildMemorySource(
+  sessionId: string | null,
+  role: MemorySource['role'],
+  date?: string,
+): MemorySource {
+  const shortId = sessionId
+    ? sessionId.replace(/-/g, '').slice(0, 8)
+    : null;
+  return {
+    sessionId: shortId,
+    role,
+    date: date || new Date().toISOString().slice(0, 10),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Workspace change sync
 // ---------------------------------------------------------------------------
 
