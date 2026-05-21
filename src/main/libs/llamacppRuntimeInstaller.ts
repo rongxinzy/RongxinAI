@@ -1,16 +1,31 @@
+import extractZip from 'extract-zip';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import * as tar from 'tar';
 
 import type {
   LlamaCppRuntimeInstallPlan,
   LlamaCppRuntimeInstallResult,
 } from '../../shared/llamacpp';
 
+const LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
+const LLAMACPP_RUNTIME_RELEASE_TAG = 'b9244';
+const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
+  'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
+  'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
+  'win-x64': 'llama-{tag}-bin-win-cpu-x64.zip',
+  'win-arm64': 'llama-{tag}-bin-win-cpu-arm64.zip',
+  'linux-x64': 'llama-{tag}-bin-ubuntu-x64.tar.gz',
+  'linux-arm64': 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
+};
+
 export type LlamaCppRuntimeInstallContext = {
   platform: NodeJS.Platform;
   arch: string;
   isPackaged: boolean;
   existingExecutablePath: string | null;
+  userRuntimeRoot?: string;
 };
 
 export function resolveLlamaCppExecutableName(platform: NodeJS.Platform): string {
@@ -25,6 +40,28 @@ export function resolveLlamaCppRuntimeTargetId(platform: NodeJS.Platform, arch: 
   return null;
 }
 
+export function resolveLlamaCppRuntimeAssetName(targetId: string): string {
+  const template = LLAMACPP_RUNTIME_ASSETS[targetId];
+  if (!template) throw new Error(`Unsupported prebuilt llama.cpp runtime target: ${targetId}`);
+  return template.replace(/\{tag\}/g, LLAMACPP_RUNTIME_RELEASE_TAG);
+}
+
+export function resolveLlamaCppRuntimeDownloadUrl(
+  targetId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const assetName = resolveLlamaCppRuntimeAssetName(targetId);
+  const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
+  if (explicitUrl) {
+    return explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName);
+  }
+  const baseUrl = env.LLAMACPP_RUNTIME_BASE_URL?.trim();
+  if (baseUrl) {
+    return `${baseUrl.replace(/\/$/, '')}/${assetName}`;
+  }
+  return `https://github.com/${LLAMACPP_RUNTIME_GITHUB_REPO}/releases/download/${LLAMACPP_RUNTIME_RELEASE_TAG}/${assetName}`;
+}
+
 export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstallContext): LlamaCppRuntimeInstallPlan {
   if (context.existingExecutablePath) {
     return {
@@ -37,14 +74,28 @@ export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstall
   if (!targetId) {
     return {
       kind: 'needs-manual',
-      message: `Unsupported platform for bundled llama.cpp runtime: ${context.platform}/${context.arch}.`,
+      message: `Unsupported platform for llama.cpp runtime: ${context.platform}/${context.arch}.`,
     };
   }
 
   if (context.isPackaged) {
+    if (!context.userRuntimeRoot) {
+      return {
+        kind: 'needs-manual',
+        message: 'The app could not resolve the local llama.cpp runtime install directory.',
+      };
+    }
     return {
-      kind: 'needs-manual',
-      message: 'The packaged app is missing the bundled llama.cpp runtime. Please reinstall using the full installer that includes resources/llamacpp.',
+      kind: 'download',
+      targetId,
+      runtimeRoot: context.userRuntimeRoot,
+      executablePath: path.join(
+        context.userRuntimeRoot,
+        'current',
+        'bin',
+        resolveLlamaCppExecutableName(context.platform),
+      ),
+      url: resolveLlamaCppRuntimeDownloadUrl(targetId),
     };
   }
 
@@ -63,6 +114,23 @@ export async function executeLlamaCppRuntimeInstallPlan(
       plan,
       executablePath: plan.executablePath,
     };
+  }
+
+  if (plan.kind === 'download') {
+    try {
+      await installDownloadedRuntime(plan);
+      return {
+        success: true,
+        plan,
+        executablePath: plan.executablePath,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        plan,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   if (plan.kind === 'needs-manual') {
@@ -123,4 +191,110 @@ export function resolveLlamaCppRuntimeExecutablePath(
 
 export function getProjectRoot(): string {
   return process.cwd();
+}
+
+async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan, { kind: 'download' }>): Promise<void> {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-runtime-'));
+  const archiveName = path.basename(new URL(plan.url).pathname) || resolveLlamaCppRuntimeAssetName(plan.targetId);
+  const archivePath = path.join(tempDir, archiveName);
+  const extractDir = path.join(tempDir, 'extract');
+  const executableName = path.basename(plan.executablePath);
+
+  try {
+    await downloadFile(plan.url, archivePath);
+    fs.mkdirSync(extractDir, { recursive: true });
+    await extractArchive(archivePath, extractDir);
+
+    const extractedExecutable = findExecutablePath(extractDir, executableName);
+    if (!extractedExecutable) {
+      throw new Error(`Downloaded llama.cpp runtime archive does not contain ${executableName}.`);
+    }
+
+    const currentRuntimeRoot = path.join(plan.runtimeRoot, 'current');
+    const targetBinDir = path.join(currentRuntimeRoot, 'bin');
+    fs.rmSync(currentRuntimeRoot, { recursive: true, force: true });
+    fs.mkdirSync(targetBinDir, { recursive: true });
+    copyDirectoryContents(path.dirname(extractedExecutable), targetBinDir);
+    writeRuntimeBuildInfo(currentRuntimeRoot, plan, archiveName);
+
+    if (!fs.existsSync(plan.executablePath)) {
+      throw new Error(`Installed llama.cpp runtime is missing ${path.join('bin', executableName)}.`);
+    }
+    if (process.platform !== 'win32') {
+      fs.chmodSync(plan.executablePath, 0o755);
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function downloadFile(url: string, outputPath: string): Promise<void> {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'RongxinAI/llamacpp-runtime-installer' },
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`Download failed: HTTP ${response.status} ${response.statusText} (${url})`);
+  }
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  const arrayBuffer = await response.arrayBuffer();
+  fs.writeFileSync(outputPath, Buffer.from(arrayBuffer));
+}
+
+async function extractArchive(archivePath: string, extractDir: string): Promise<void> {
+  if (archivePath.endsWith('.zip')) {
+    await extractZip(archivePath, { dir: extractDir });
+    return;
+  }
+  if (archivePath.endsWith('.tar.gz')) {
+    await tar.x({ file: archivePath, cwd: extractDir });
+    return;
+  }
+  throw new Error(`Unsupported llama.cpp runtime archive format: ${archivePath}`);
+}
+
+function copyDirectoryContents(sourceDir: string, targetDir: string): void {
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(targetPath, { recursive: true });
+      copyDirectoryContents(sourcePath, targetPath);
+      continue;
+    }
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+
+function findExecutablePath(rootDir: string, executableName: string): string | null {
+  const queue = [rootDir];
+  while (queue.length > 0) {
+    const currentDir = queue.shift();
+    if (!currentDir) continue;
+    const directExecutable = path.join(currentDir, executableName);
+    if (fs.existsSync(directExecutable)) return directExecutable;
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) queue.push(path.join(currentDir, entry.name));
+    }
+  }
+  return null;
+}
+
+function writeRuntimeBuildInfo(
+  runtimeRoot: string,
+  plan: Extract<LlamaCppRuntimeInstallPlan, { kind: 'download' }>,
+  archiveName: string,
+): void {
+  fs.writeFileSync(
+    path.join(runtimeRoot, 'runtime-build-info.json'),
+    JSON.stringify({
+      target: plan.targetId,
+      version: LLAMACPP_RUNTIME_RELEASE_TAG,
+      source: 'official-release',
+      sourceUrl: plan.url,
+      assetName: archiveName,
+      installedAt: new Date().toISOString(),
+    }, null, 2) + '\n',
+    'utf8',
+  );
 }

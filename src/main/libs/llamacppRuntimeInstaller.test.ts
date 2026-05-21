@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   createLlamaCppRuntimeInstallPlan,
   ensureLlamaCppRuntimeCurrent,
+  resolveLlamaCppRuntimeDownloadUrl,
   resolveLlamaCppRuntimeExecutablePath,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
@@ -73,16 +74,23 @@ describe('llamacpp runtime installer planning', () => {
     expect(plan.message).toContain('npm run llamacpp:runtime:download -- mac-arm64');
   });
 
-  test('does not ask packaged Windows users to compile llama.cpp', () => {
+  test('plans an in-app download for packaged Windows users when runtime is missing', () => {
+    const runtimeRoot = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming', 'RongxinAI', 'llamacpp-runtime');
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: 'win32',
       arch: 'x64',
       isPackaged: true,
       existingExecutablePath: null,
+      userRuntimeRoot: runtimeRoot,
     });
 
-    expect(plan.kind).toBe('needs-manual');
-    expect(plan.message).toContain('full installer');
+    expect(plan).toEqual({
+      kind: 'download',
+      targetId: 'win-x64',
+      runtimeRoot,
+      executablePath: path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe'),
+      url: 'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+    });
   });
 
   test('resolves platform target ids', () => {
@@ -90,6 +98,12 @@ describe('llamacpp runtime installer planning', () => {
     expect(resolveLlamaCppRuntimeTargetId('darwin', 'x64')).toBe('mac-x64');
     expect(resolveLlamaCppRuntimeTargetId('win32', 'x64')).toBe('win-x64');
     expect(resolveLlamaCppRuntimeTargetId('linux', 'arm64')).toBe('linux-arm64');
+  });
+
+  test('resolves official runtime download URLs for packaged installs', () => {
+    expect(resolveLlamaCppRuntimeDownloadUrl('mac-arm64')).toBe(
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
+    );
   });
 
   test('repairs current runtime when a target runtime already exists', async () => {

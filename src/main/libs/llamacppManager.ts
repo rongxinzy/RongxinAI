@@ -173,7 +173,7 @@ export class LlamaCppManager extends EventEmitter {
   async installRuntime(): Promise<LlamaCppRuntimeInstallResult> {
     const projectRoot = getProjectRoot();
     const targetId = resolveLlamaCppRuntimeTargetId(process.platform, process.arch);
-    if (targetId) {
+    if (!app.isPackaged && targetId) {
       await ensureLlamaCppRuntimeCurrent(projectRoot, targetId);
     }
 
@@ -183,6 +183,7 @@ export class LlamaCppManager extends EventEmitter {
       arch: process.arch,
       isPackaged: app.isPackaged,
       existingExecutablePath,
+      userRuntimeRoot: getUserLlamaCppRuntimeRoot(),
     });
     this.setStatus({
       status: this.status.status,
@@ -730,6 +731,7 @@ function getKnownLlamaCppExecutablePaths(isPackaged: boolean): string[] {
   const extension = process.platform === 'win32' ? '.exe' : '';
   const resourceRoot = process.resourcesPath || path.join(__dirname, '..', '..');
   const candidates = [
+    path.join(getUserLlamaCppRuntimeRoot(), 'current', 'bin', `llama-server${extension}`),
     path.join(resourceRoot, 'llamacpp', `llama-server${extension}`),
     path.join(resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
     path.join(
@@ -769,6 +771,10 @@ function getKnownLlamaCppExecutablePaths(isPackaged: boolean): string[] {
     );
   }
   return candidates;
+}
+
+function getUserLlamaCppRuntimeRoot(): string {
+  return path.join(app.getPath('userData'), 'llamacpp-runtime');
 }
 
 export function modelLaunchOptionsToPreset(

@@ -13,12 +13,16 @@
     {
       "from": "dist",
       "to": "dist",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     {
       "from": "dist-electron",
       "to": "dist-electron",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     "!**/*.map",
     "!**/*.d.ts",
@@ -50,19 +54,14 @@
       "filter": [
         "**/*"
       ]
-    },
-    {
-      "from": "vendor/llamacpp-runtime/current",
-      "to": "llamacpp",
-      "filter": [
-        "**/*"
-      ]
     }
   ],
   "protocols": [
     {
       "name": "RongxinAI",
-      "schemes": ["rongxinai"]
+      "schemes": [
+        "rongxinai"
+      ]
     }
   ],
   "mac": {
@@ -143,13 +142,6 @@
           "!**/test/**",
           "!**/__tests__/**"
         ]
-      },
-      {
-        "from": "vendor/llamacpp-runtime/current",
-        "to": "llamacpp",
-        "filter": [
-          "**/*"
-        ]
       }
     ]
   },
@@ -167,13 +159,6 @@
       {
         "from": "build-tar/win-resources.tar",
         "to": "win-resources.tar"
-      },
-      {
-        "from": "vendor/llamacpp-runtime/current",
-        "to": "llamacpp",
-        "filter": [
-          "**/*"
-        ]
       }
     ]
   },
@@ -245,13 +230,6 @@
           "!**/tests/**",
           "!**/test/**",
           "!**/__tests__/**"
-        ]
-      },
-      {
-        "from": "vendor/llamacpp-runtime/current",
-        "to": "llamacpp",
-        "filter": [
-          "**/*"
         ]
       }
     ],
