@@ -133,9 +133,16 @@ type CoworkConfigUpdate = Partial<
   >
 >;
 
+interface MemorySource {
+  sessionId: string | null;
+  role: 'user' | 'assistant' | 'tool' | 'system' | 'im';
+  date: string;
+}
+
 interface CoworkUserMemoryEntry {
   id: string;
   text: string;
+  source?: MemorySource | null;
 }
 
 interface CoworkMemoryStats {
@@ -626,6 +633,7 @@ interface IElectronAPI {
     }) => Promise<{ success: boolean; entries?: CoworkUserMemoryEntry[]; error?: string }>;
     createMemoryEntry: (input: {
       text: string;
+      source?: { sessionId?: string | null; role?: string; date?: string };
     }) => Promise<{ success: boolean; entry?: CoworkUserMemoryEntry; error?: string }>;
     updateMemoryEntry: (input: {
       id: string;

@@ -418,8 +418,10 @@ contextBridge.exposeInMainWorld('electron', {
       query?: string; status?: 'created' | 'stale' | 'deleted' | 'all';
       includeDeleted?: boolean; limit?: number; offset?: number;
     }) => ipcRenderer.invoke(CoworkMemoryIpc.ListEntries, input),
-    createMemoryEntry: (input: { text: string; confidence?: number; isExplicit?: boolean }) =>
-      ipcRenderer.invoke(CoworkMemoryIpc.CreateEntry, input),
+    createMemoryEntry: (input: {
+      text: string; confidence?: number; isExplicit?: boolean;
+      source?: { sessionId?: string | null; role?: string; date?: string };
+    }) => ipcRenderer.invoke(CoworkMemoryIpc.CreateEntry, input),
     updateMemoryEntry: (input: {
       id: string; text?: string; confidence?: number;
       status?: 'created' | 'stale' | 'deleted'; isExplicit?: boolean;
