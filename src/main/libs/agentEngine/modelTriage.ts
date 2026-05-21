@@ -1,6 +1,19 @@
 import type { TriageConfig, TriageResult, TriageState, TriageTier } from '../../../shared/triage';
 import { TRIAGE_TIER_ORDER } from '../../../shared/triage';
 
+const LLAMACPP_BASE_URL = 'http://127.0.0.1:8080';
+const TRIAGE_LOCAL_MODEL_TIMEOUT_MS = 3_000;
+
+/**
+ * Build a classifier-friendly snippet from user input.
+ * Truncate to 200 chars to keep the classification fast and prevent prompt injection.
+ */
+function truncateForClassification(prompt: string): string {
+  const singleLine = prompt.replace(/\n/g, ' ').trim();
+  if (singleLine.length <= 200) return singleLine;
+  return singleLine.slice(0, 197) + '...';
+}
+
 /**
  * Classify a user message using rule-based heuristics.
  *
@@ -115,4 +128,103 @@ export function createTriageState(): TriageState {
     lastSwitchRound: 0,
     activeTier: 'standard',
   };
+}
+
+// ─── Phase 2.1b: Local model classification ──────────────────────────────
+
+/**
+ * Classification prompt sent to the local model.
+ * The user message is appended after this system prompt.
+ *
+ * Design goals:
+ * - Isolate classification from user content (separate system prompt)
+ * - Request structured output (single word)
+ * - Keep the prompt small for fast inference on small models
+ */
+const TRIAGE_CLASSIFIER_PROMPT = `Classify the following user message into exactly one category:
+- light: simple greeting, thanks, goodbye, small talk, simple factual question, short translation
+- standard: normal conversation, general question, moderate instruction
+- heavy: complex coding task, architecture design, debugging, long analysis, refactoring
+
+Reply with only one word: light, standard, or heavy.`;
+
+interface LocalClassificationResponse {
+  category: 'light' | 'standard' | 'heavy' | null;
+  error?: string;
+}
+
+/**
+ * Classify a user message using a local llama.cpp model.
+ *
+ * Sends the classification prompt + truncated user message to the
+ * llama.cpp server's /v1/chat/completions endpoint.
+ *
+ * Returns null on any failure — caller should fall back to standard tier.
+ */
+export async function classifyByLocalModel(
+  prompt: string,
+  triageModelName: string,
+  config: TriageConfig,
+): Promise<TriageResult | null> {
+  const truncated = truncateForClassification(prompt);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TRIAGE_LOCAL_MODEL_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${LLAMACPP_BASE_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: triageModelName,
+        messages: [
+          { role: 'system', content: TRIAGE_CLASSIFIER_PROMPT },
+          { role: 'user', content: truncated },
+        ],
+        max_tokens: 5,
+        temperature: 0,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const body = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const rawText = body?.choices?.[0]?.message?.content?.trim().toLowerCase() || '';
+
+    const category = parseClassificationResponse(rawText);
+    if (!category) {
+      return null;
+    }
+
+    return tierToResult(category, config);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function parseClassificationResponse(text: string): 'light' | 'standard' | 'heavy' | null {
+  if (/\blight\b/.test(text)) return 'light';
+  if (/\bheavy\b/.test(text)) return 'heavy';
+  if (/\bstandard\b/.test(text)) return 'standard';
+  return null;
+}
+
+function tierToResult(
+  tier: 'light' | 'standard' | 'heavy',
+  config: TriageConfig,
+): TriageResult {
+  if (tier === 'light' && config.rules.lightModelRef) {
+    return { tier: 'light', modelRef: config.rules.lightModelRef, reason: 'llm: light' };
+  }
+  if (tier === 'heavy' && config.rules.heavyModelRef) {
+    return { tier: 'heavy', modelRef: config.rules.heavyModelRef, reason: 'llm: heavy' };
+  }
+  return { tier, modelRef: null, reason: `llm: ${tier}` };
 }
