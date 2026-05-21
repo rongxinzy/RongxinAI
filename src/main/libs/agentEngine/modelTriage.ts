@@ -130,6 +130,42 @@ export function createTriageState(): TriageState {
   };
 }
 
+/**
+ * Full triage classification pipeline:
+ * 1. Try rule-based classification first (<1ms)
+ * 2. If result is ambiguous and local model triage is enabled,
+ *    try LLM-based classification (100-500ms, 3s timeout)
+ * 3. If all else fails, return standard tier
+ */
+export async function classifyMessage(
+  prompt: string,
+  conversationDepth: number,
+  config: TriageConfig,
+): Promise<TriageResult> {
+  const ruleResult = classifyByRules(prompt, conversationDepth, config);
+
+  // Definitive rule matches — return immediately
+  if (ruleResult.reason.startsWith('light:') || ruleResult.reason.startsWith('heavy:')) {
+    return ruleResult;
+  }
+  if (ruleResult.reason === 'deep-conversation') {
+    return ruleResult;
+  }
+
+  // Ambiguous cases — try local model if configured
+  if (
+    config.rules.useLocalModelTriage &&
+    config.rules.triageModelName
+  ) {
+    const llmResult = await classifyByLocalModel(prompt, config.rules.triageModelName, config);
+    if (llmResult) {
+      return llmResult;
+    }
+  }
+
+  return ruleResult;
+}
+
 // ─── Phase 2.1b: Local model classification ──────────────────────────────
 
 /**

@@ -33,7 +33,7 @@ import {
 } from '../openclawEngineManager';
 import { parsePrimaryModelRef } from '../openclawAgentModels';
 import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
-import { classifyByRules, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
+import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
 import {
   extractGatewayHistoryEntries,
   extractGatewayMessageText,
@@ -1883,13 +1883,12 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     if (
       triageConfig?.enabled &&
       !session.modelOverride &&
-      currentModel &&
-      triageConfig.rules.lightModelRef
+      currentModel
     ) {
       const conversationDepth = (session.messages?.length ?? 0);
-      const ruleResult = classifyByRules(prompt, conversationDepth, triageConfig);
+      const classification = await classifyMessage(prompt, conversationDepth, triageConfig);
 
-      if (ruleResult.modelRef) {
+      if (classification.modelRef) {
         let triageState = this.triageStateBySession.get(sessionId);
         if (!triageState) {
           triageState = createTriageState();
@@ -1898,7 +1897,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
 
         // Cross-provider safety check
         const currentProvider = extractProviderId(currentModel);
-        const targetProvider = extractProviderId(ruleResult.modelRef);
+        const targetProvider = extractProviderId(classification.modelRef);
         const isCrossProvider =
           currentProvider && targetProvider && currentProvider !== targetProvider;
         if (isCrossProvider && !triageConfig.rules.allowCrossProviderSwitch) {
@@ -1906,18 +1905,18 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
             '[ModelTriage] skipped: cross-provider switch blocked',
             `sessionId=${sessionId}`,
             `from=${currentModel}`,
-            `to=${ruleResult.modelRef}`,
+            `to=${classification.modelRef}`,
             `reason=allowCrossProviderSwitch is false`,
           );
         } else if (
           shouldAllowSwitch(
-            ruleResult.tier,
+            classification.tier,
             conversationDepth,
             triageState,
             triageConfig.rules.cooldownRounds,
           )
         ) {
-          triageResult = ruleResult;
+          triageResult = classification;
           triageState.lastSwitchRound = conversationDepth;
           triageState.activeTier = triageResult.tier;
           console.log(
