@@ -43,6 +43,65 @@ function resolveOpenClawRuntimeTargetId(context) {
   return null;
 }
 
+function resolveLlamaCppRuntimeTargetId(context) {
+  const platform = context?.electronPlatformName;
+  const arch = resolveTargetArch(context);
+
+  if (platform === 'darwin') {
+    return arch === 'x64' ? 'mac-x64' : 'mac-arm64';
+  }
+  if (platform === 'win32') {
+    return arch === 'arm64' ? 'win-arm64' : 'win-x64';
+  }
+  if (platform === 'linux') {
+    return arch === 'arm64' ? 'linux-arm64' : 'linux-x64';
+  }
+
+  return null;
+}
+
+function resolveLlamaCppExecutableName(targetId) {
+  return targetId && targetId.startsWith('win-') ? 'llama-server.exe' : 'llama-server';
+}
+
+function getLlamaCppRuntimeBuildHint(targetId) {
+  if (!targetId) {
+    return 'npm run llamacpp:runtime:download';
+  }
+  return 'npm run llamacpp:runtime:download:' + targetId;
+}
+
+function syncCurrentLlamaCppRuntimeForTarget(context) {
+  const runtimeBase = path.join(__dirname, '..', 'vendor', 'llamacpp-runtime');
+  const currentRoot = path.join(runtimeBase, 'current');
+  const targetId = resolveLlamaCppRuntimeTargetId(context);
+
+  if (!targetId) {
+    return { runtimeRoot: currentRoot, targetId: null };
+  }
+
+  const targetRoot = path.join(runtimeBase, targetId);
+  if (!existsSync(targetRoot)) {
+    return { runtimeRoot: currentRoot, targetId };
+  }
+
+  const currentBuildInfo = readRuntimeBuildInfo(currentRoot);
+  const executableName = resolveLlamaCppExecutableName(targetId);
+  const currentExecutable = path.join(currentRoot, 'bin', executableName);
+  let currentIsSymlink = false;
+  try {
+    currentIsSymlink = lstatSync(currentRoot).isSymbolicLink();
+  } catch {}
+
+  if (currentBuildInfo?.target !== targetId || !existsSync(currentExecutable) || currentIsSymlink) {
+    rmSync(currentRoot, { recursive: true, force: true });
+    cpSync(targetRoot, currentRoot, { recursive: true });
+    console.log('[electron-builder-hooks] Synced llama.cpp runtime ' + targetId + ' -> current');
+  }
+
+  return { runtimeRoot: currentRoot, targetId };
+}
+
 function readRuntimeBuildInfo(runtimeRoot) {
   const buildInfoPath = path.join(runtimeRoot, 'runtime-build-info.json');
   if (!existsSync(buildInfoPath)) {
@@ -172,6 +231,33 @@ function ensureBundledLocalExtensions(runtimeRoot, buildHint) {
       + `. Run \`${buildHint}\` before packaging.`,
     );
   }
+}
+
+function ensureBundledLlamaCppRuntime(context) {
+  const { runtimeRoot, targetId } = syncCurrentLlamaCppRuntimeForTarget(context);
+  const buildHint = getLlamaCppRuntimeBuildHint(targetId);
+  const executableName = resolveLlamaCppExecutableName(targetId);
+  if (targetId) {
+    const targetRoot = path.join(__dirname, '..', 'vendor', 'llamacpp-runtime', targetId);
+    if (!existsSync(targetRoot)) {
+      throw new Error(
+        '[electron-builder-hooks] Missing llama.cpp runtime target: '
+        + targetRoot
+        + '. Run `' + buildHint + '` before packaging.'
+      );
+    }
+  }
+  const executablePath = path.join(runtimeRoot, 'bin', executableName);
+
+  if (!existsSync(executablePath)) {
+    throw new Error(
+      '[electron-builder-hooks] Bundled llama.cpp runtime is incomplete. Missing: '
+      + executablePath
+      + '. Run `' + buildHint + '` before packaging.',
+    );
+  }
+
+  console.log('[electron-builder-hooks] Verified llama.cpp runtime: ' + executablePath);
 }
 
 function ensureBundledOpenClawRuntime(context) {
@@ -509,6 +595,7 @@ function installSkillDependencies() {
 
 async function beforePack(context) {
   ensureBundledOpenClawRuntime(context);
+  ensureBundledLlamaCppRuntime(context);
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
 

@@ -43,8 +43,8 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
-      - name: Build llama.cpp runtime
-        run: npm run llamacpp:runtime:mac-arm64
+      - name: Download llama.cpp runtime
+        run: npm run llamacpp:runtime:download:mac-arm64
       - name: Pack llama.cpp runtime
         run: |
           mkdir -p release
@@ -69,8 +69,8 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
-      - name: Build llama.cpp runtime
-        run: npm run llamacpp:runtime:win-x64
+      - name: Download llama.cpp runtime
+        run: npm run llamacpp:runtime:download:win-x64
       - name: Pack llama.cpp runtime
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
@@ -95,8 +95,8 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-
       - run: npm install
-      - name: Build llama.cpp runtime
-        run: npm run llamacpp:runtime:linux-x64
+      - name: Download llama.cpp runtime
+        run: npm run llamacpp:runtime:download:linux-x64
       - name: Pack llama.cpp runtime
         run: |
           mkdir -p release
