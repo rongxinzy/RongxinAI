@@ -38,6 +38,7 @@ export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
   private process: ChildProcessWithoutNullStreams | null = null;
   private runtimeContextLengthByModel = new Map<string, number>();
+  private startupStderr = '';
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
@@ -123,14 +124,31 @@ export class LlamaCppManager extends EventEmitter {
       },
     );
 
+    this.startupStderr = '';
     this.process.stdout.on('data', chunk => console.debug(`[LlamaCpp] ${chunk.toString().trim()}`));
-    this.process.stderr.on('data', chunk => console.warn(`[LlamaCpp] ${chunk.toString().trim()}`));
+    this.process.stderr.on('data', chunk => {
+      const text = chunk.toString().trim();
+      console.warn(`[LlamaCpp] ${text}`);
+      this.startupStderr += (this.startupStderr ? '\n' : '') + text;
+    });
     this.process.on('exit', (code, signal) => {
       console.log(
         `[LlamaCpp] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`,
       );
       this.process = null;
-      if (this.status.status === 'running' || this.status.status === 'starting') {
+      if (this.status.status === 'starting') {
+        const stderrSnippet = this.startupStderr
+          ? `: ${this.startupStderr.slice(0, 300)}`
+          : ` (exit code ${code ?? 'null'})`;
+        this.setStatus({
+          status: 'error',
+          error: `llama.cpp exited unexpectedly during startup${stderrSnippet}`,
+          executablePath: this.executablePath ?? undefined,
+          managedByApp: false,
+        });
+        return;
+      }
+      if (this.status.status === 'running') {
         this.setStatus({
           status: 'stopped',
           executablePath: this.executablePath ?? undefined,
@@ -526,12 +544,18 @@ export class LlamaCppManager extends EventEmitter {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       if (await this.isHealthy()) return;
+      if (this.status.status === 'error' || this.status.status === 'stopped') {
+        return; // exit handler already set an error
+      }
       await new Promise(resolve => setTimeout(resolve, 250));
     }
+    const detail = this.startupStderr
+      ? ` (stderr: ${this.startupStderr.slice(0, 300)})`
+      : '';
     this.setStatus({
       status: 'error',
       executablePath: this.executablePath ?? undefined,
-      error: 'llama.cpp did not become ready before timeout',
+      error: `llama.cpp did not become ready before timeout${detail}`,
       managedByApp: Boolean(this.process),
     });
   }
