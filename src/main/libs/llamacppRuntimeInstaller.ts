@@ -11,6 +11,8 @@ import type {
 
 const LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const LLAMACPP_RUNTIME_RELEASE_TAG = 'b9244';
+const LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL =
+  'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download';
 const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
@@ -50,16 +52,26 @@ export function resolveLlamaCppRuntimeDownloadUrl(
   targetId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
+  return resolveLlamaCppRuntimeDownloadUrls(targetId, env)[0];
+}
+
+export function resolveLlamaCppRuntimeDownloadUrls(
+  targetId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
   const assetName = resolveLlamaCppRuntimeAssetName(targetId);
   const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
   if (explicitUrl) {
-    return explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName);
+    return [explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName)];
   }
   const baseUrl = env.LLAMACPP_RUNTIME_BASE_URL?.trim();
   if (baseUrl) {
-    return `${baseUrl.replace(/\/$/, '')}/${assetName}`;
+    return [`${baseUrl.replace(/\/$/, '')}/${assetName}`];
   }
-  return `https://github.com/${LLAMACPP_RUNTIME_GITHUB_REPO}/releases/download/${LLAMACPP_RUNTIME_RELEASE_TAG}/${assetName}`;
+  return [
+    `${LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL}/${LLAMACPP_RUNTIME_RELEASE_TAG}/${assetName}`,
+    `https://github.com/${LLAMACPP_RUNTIME_GITHUB_REPO}/releases/download/${LLAMACPP_RUNTIME_RELEASE_TAG}/${assetName}`,
+  ];
 }
 
 export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstallContext): LlamaCppRuntimeInstallPlan {
@@ -85,6 +97,7 @@ export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstall
         message: 'The app could not resolve the local llama.cpp runtime install directory.',
       };
     }
+    const [url, ...fallbackUrls] = resolveLlamaCppRuntimeDownloadUrls(targetId);
     return {
       kind: 'download',
       targetId,
@@ -95,7 +108,8 @@ export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstall
         'bin',
         resolveLlamaCppExecutableName(context.platform),
       ),
-      url: resolveLlamaCppRuntimeDownloadUrl(targetId),
+      url,
+      fallbackUrls,
     };
   }
 
@@ -201,7 +215,7 @@ async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan
   const executableName = path.basename(plan.executablePath);
 
   try {
-    await downloadFile(plan.url, archivePath);
+    const sourceUrl = await downloadFile(plan.url, archivePath, plan.fallbackUrls);
     fs.mkdirSync(extractDir, { recursive: true });
     await extractArchive(archivePath, extractDir);
 
@@ -215,7 +229,7 @@ async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan
     fs.rmSync(currentRuntimeRoot, { recursive: true, force: true });
     fs.mkdirSync(targetBinDir, { recursive: true });
     copyDirectoryContents(path.dirname(extractedExecutable), targetBinDir);
-    writeRuntimeBuildInfo(currentRuntimeRoot, plan, archiveName);
+    writeRuntimeBuildInfo(currentRuntimeRoot, { ...plan, url: sourceUrl }, archiveName);
 
     if (!fs.existsSync(plan.executablePath)) {
       throw new Error(`Installed llama.cpp runtime is missing ${path.join('bin', executableName)}.`);
@@ -228,17 +242,26 @@ async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan
   }
 }
 
-async function downloadFile(url: string, outputPath: string): Promise<void> {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'RongxinAI/llamacpp-runtime-installer' },
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`Download failed: HTTP ${response.status} ${response.statusText} (${url})`);
+async function downloadFile(url: string, outputPath: string, fallbackUrls: string[] = []): Promise<string> {
+  const attempts = [url, ...fallbackUrls];
+  const errors: string[] = [];
+
+  for (const attemptUrl of attempts) {
+    const response = await fetch(attemptUrl, {
+      headers: { 'User-Agent': 'RongxinAI/llamacpp-runtime-installer' },
+    });
+    if (!response.ok || !response.body) {
+      errors.push(`HTTP ${response.status} ${response.statusText} (${attemptUrl})`);
+      continue;
+    }
+
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    const arrayBuffer = await response.arrayBuffer();
+    fs.writeFileSync(outputPath, Buffer.from(arrayBuffer));
+    return attemptUrl;
   }
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  const arrayBuffer = await response.arrayBuffer();
-  fs.writeFileSync(outputPath, Buffer.from(arrayBuffer));
+  throw new Error(`Download failed: ${errors.join('; ')}`);
 }
 
 async function extractArchive(archivePath: string, extractDir: string): Promise<void> {

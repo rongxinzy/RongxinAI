@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import {
   createLlamaCppRuntimeInstallPlan,
+  resolveLlamaCppRuntimeDownloadUrls,
   ensureLlamaCppRuntimeCurrent,
   resolveLlamaCppRuntimeDownloadUrl,
   resolveLlamaCppRuntimeExecutablePath,
@@ -89,7 +90,10 @@ describe('llamacpp runtime installer planning', () => {
       targetId: 'win-x64',
       runtimeRoot,
       executablePath: path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe'),
-      url: 'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      fallbackUrls: [
+        'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      ],
     });
   });
 
@@ -102,8 +106,12 @@ describe('llamacpp runtime installer planning', () => {
 
   test('resolves official runtime download URLs for packaged installs', () => {
     expect(resolveLlamaCppRuntimeDownloadUrl('mac-arm64')).toBe(
-      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
     );
+    expect(resolveLlamaCppRuntimeDownloadUrls('mac-arm64')).toEqual([
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
+    ]);
   });
 
   test('repairs current runtime when a target runtime already exists', async () => {
