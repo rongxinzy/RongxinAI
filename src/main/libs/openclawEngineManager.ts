@@ -1638,11 +1638,14 @@ export class OpenClawEngineManager extends EventEmitter {
           progressPct = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
           phaseLabel = `${t('gatewayStartupStarting')} (${Math.round(elapsedMs / 1000)}s)`;
         }
+        const retrySuffix = this.gatewayRestartAttempt > 0
+          ? ` (${t('gatewayStartupRetryAttempt') || 'auto-retry'} ${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS})`
+          : '';
         this.setStatus({
           phase: this.startupPhase === 'compiling' ? 'compiling' : 'starting',
           version: this.status.version,
           progressPercent: progressPct,
-          message: phaseLabel,
+          message: phaseLabel + retrySuffix,
           canRetry: false,
         });
 
