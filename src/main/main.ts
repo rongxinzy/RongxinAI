@@ -31,7 +31,7 @@ import {
 import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
 import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
-import { registerTriageIpcHandlers } from './ipcHandlers/triage';
+import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import {
   getCronJobService,
@@ -1514,6 +1514,7 @@ const getCoworkEngineRouter = () => {
           if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) return undefined;
           return getLlamaCppModelContextWindow(parsed.modelId);
         },
+        getTriageConfig: () => getTriageConfig(getStore()),
       });
       // Wire up channel session sync for IM conversations via OpenClaw
       try {
