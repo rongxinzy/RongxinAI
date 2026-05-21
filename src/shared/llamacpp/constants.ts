@@ -1,6 +1,7 @@
 export const LlamaCppIpcChannel = {
   Status: 'llamacpp:status',
   Install: 'llamacpp:install',
+  UninstallRuntime: 'llamacpp:runtime:uninstall',
   Start: 'llamacpp:start',
   Stop: 'llamacpp:stop',
   Restart: 'llamacpp:restart',

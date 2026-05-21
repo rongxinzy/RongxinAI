@@ -14,6 +14,7 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
   LlamaCppRuntimeInstallResult,
+  LlamaCppRuntimeUninstallResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -86,7 +87,7 @@ export class LlamaCppManager extends EventEmitter {
       // Continue with executable detection.
     }
 
-    const executablePath = await findLlamaCppExecutable();
+    const executablePath = await findLlamaCppExecutable(this.getServiceConfig());
     this.executablePath = executablePath;
     this.setStatus({
       status: executablePath ? 'installed' : 'not-installed',
@@ -100,7 +101,7 @@ export class LlamaCppManager extends EventEmitter {
     if (await this.isHealthy()) return this.status;
 
     if (!this.executablePath) {
-      this.executablePath = await findLlamaCppExecutable();
+      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
     }
     if (!this.executablePath) {
       this.setStatus({ status: 'not-installed', managedByApp: false });
@@ -177,7 +178,7 @@ export class LlamaCppManager extends EventEmitter {
       await ensureLlamaCppRuntimeCurrent(projectRoot, targetId);
     }
 
-    const existingExecutablePath = await findLlamaCppExecutable();
+    const existingExecutablePath = await findLlamaCppExecutable(this.getServiceConfig());
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: process.platform,
       arch: process.arch,
@@ -210,6 +211,34 @@ export class LlamaCppManager extends EventEmitter {
       });
     }
     return result;
+  }
+
+  async uninstallRuntime(): Promise<LlamaCppRuntimeUninstallResult> {
+    const runtimeRoot = getUserLlamaCppRuntimeRoot();
+    try {
+      if (this.process && this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
+        await this.stop();
+      }
+
+      const deleted = fs.existsSync(runtimeRoot);
+      fs.rmSync(runtimeRoot, { recursive: true, force: true });
+
+      if (this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
+        this.executablePath = null;
+      }
+
+      const status = await this.detect();
+      return { success: true, deleted, runtimeRoot, status };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.setStatus({
+        status: 'error',
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: Boolean(this.process),
+        error: message,
+      });
+      return { success: false, deleted: false, runtimeRoot, status: this.status, error: message };
+    }
   }
 
   async stop(): Promise<LlamaCppStatusSnapshot> {
@@ -702,11 +731,17 @@ function buildLlamaCppServeEnv(
   return { ...baseEnv };
 }
 
-export async function findLlamaCppExecutable(): Promise<string | null> {
-  const envPath = process.env.LLAMACPP_BIN?.trim();
-  if (envPath && fs.existsSync(envPath)) return envPath;
-
-  for (const candidate of getKnownLlamaCppExecutablePaths(app.isPackaged)) {
+export async function findLlamaCppExecutable(config: LlamaCppServiceConfig = {}): Promise<string | null> {
+  for (const candidate of buildLlamaCppExecutableCandidates({
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+    resourceRoot: process.resourcesPath || path.join(__dirname, '..', '..'),
+    appRoot: path.join(__dirname, '..', '..'),
+    cwd: process.cwd(),
+    userRuntimeRoot: getUserLlamaCppRuntimeRoot(),
+    envPath: process.env.LLAMACPP_BIN,
+    configuredExecutablePath: config.customExecutablePath,
+  })) {
     if (fs.existsSync(candidate)) return candidate;
   }
 
@@ -727,50 +762,38 @@ export async function findLlamaCppExecutable(): Promise<string | null> {
   }
 }
 
-function getKnownLlamaCppExecutablePaths(isPackaged: boolean): string[] {
-  const extension = process.platform === 'win32' ? '.exe' : '';
-  const resourceRoot = process.resourcesPath || path.join(__dirname, '..', '..');
+export function buildLlamaCppExecutableCandidates(input: {
+  platform: NodeJS.Platform;
+  isPackaged: boolean;
+  resourceRoot: string;
+  appRoot: string;
+  cwd: string;
+  userRuntimeRoot: string;
+  envPath?: string;
+  configuredExecutablePath?: string;
+}): string[] {
+  const extension = input.platform === 'win32' ? '.exe' : '';
   const candidates = [
-    path.join(getUserLlamaCppRuntimeRoot(), 'current', 'bin', `llama-server${extension}`),
-    path.join(resourceRoot, 'llamacpp', `llama-server${extension}`),
-    path.join(resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
-    path.join(
-      __dirname,
-      '..',
-      '..',
-      'vendor',
-      'llamacpp-runtime',
-      'current',
-      `llama-server${extension}`,
-    ),
-    path.join(
-      __dirname,
-      '..',
-      '..',
-      'vendor',
-      'llamacpp-runtime',
-      'current',
-      'bin',
-      `llama-server${extension}`,
-    ),
-    path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-    path.join(
-      process.cwd(),
-      'vendor',
-      'llamacpp-runtime',
-      'current',
-      'bin',
-      `llama-server${extension}`,
-    ),
+    input.envPath?.trim(),
+    input.configuredExecutablePath?.trim(),
+    path.join(input.userRuntimeRoot, 'current', 'bin', `llama-server${extension}`),
+    path.join(input.resourceRoot, 'llamacpp', `llama-server${extension}`),
+    path.join(input.resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
   ];
-  if (!isPackaged) {
+
+  if (!input.isPackaged) {
     candidates.push(
+      path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
+      path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
+      path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
+      path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
       '/opt/homebrew/bin/llama-server',
       '/usr/local/bin/llama-server',
       '/usr/bin/llama-server',
     );
   }
-  return candidates;
+
+  return Array.from(new Set(candidates.filter((candidate): candidate is string => Boolean(candidate))));
 }
 
 function getUserLlamaCppRuntimeRoot(): string {
@@ -974,7 +997,7 @@ export function mergeLocalModels(
   return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function isPathInside(target: string, root: string): boolean {
+export function isPathInside(target: string, root: string): boolean {
   const relative = path.relative(root, target);
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
