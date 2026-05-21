@@ -93,6 +93,7 @@ type LaunchRequest = {
 type OllamaServiceConfigFormState = {
   host: string;
   port: string;
+  customExecutablePath: string;
   device: string;
   modelsMax: string;
   modelsAutoload: string;
@@ -209,6 +210,16 @@ const smallOutlineButtonClass =
 const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
+  {
+    key: 'customExecutablePath',
+    labelKey: 'localInferenceServiceConfigExecutablePathLabel',
+    paramName: 'llama-server',
+    group: 'advanced',
+    type: 'input',
+    placeholderKey: 'localInferenceServiceConfigExecutablePathPlaceholder',
+    hintKey: 'localInferenceServiceConfigExecutablePathHint',
+    restartRequired: true,
+  },
   {
     key: 'modelsMax',
     labelKey: 'localInferenceServiceConfigModelsMaxLabel',
@@ -918,6 +929,33 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     });
   };
 
+  const handleUninstallRuntime = () => {
+    void runAction(async () => {
+      const result = await window.electron.llamacpp.uninstallRuntime();
+      if (!result.success) {
+        showToast(
+          result.error || i18nService.t('localInferenceRuntimeUninstallFailed'),
+          LocalInferenceToastKind.Error,
+        );
+        return;
+      }
+
+      showToast(
+        result.deleted
+          ? i18nService.t('localInferenceRuntimeUninstalled')
+          : i18nService.t('localInferenceRuntimeNotInstalled'),
+        LocalInferenceToastKind.Success,
+      );
+      if (result.status.status === 'running') {
+        await refreshLocalModels();
+        await refreshRunningModels();
+      } else {
+        setRunningModels([]);
+      }
+      await refreshStatus();
+    });
+  };
+
   const handlePull = () => {
     if (!normalizedPullName) return;
     setActivePullName(normalizedPullName);
@@ -1235,6 +1273,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onToggle={() => setServicePopoverOpen(current => !current)}
               onPrepare={handlePrepare}
               onStop={handleStop}
+              onUninstallRuntime={handleUninstallRuntime}
               onOpenServiceConfig={() => {
                 setServicePopoverOpen(false);
                 setServiceConfigDialogOpen(true);
@@ -1364,6 +1403,7 @@ function ServicePopover({
   onToggle,
   onPrepare,
   onStop,
+  onUninstallRuntime,
   onOpenServiceConfig,
   onRefresh,
 }: {
@@ -1376,6 +1416,7 @@ function ServicePopover({
   onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
+  onUninstallRuntime: () => void;
   onOpenServiceConfig: () => void;
   onRefresh: () => void;
 }) {
@@ -1386,6 +1427,11 @@ function ServicePopover({
     status?.status === 'not-installed' ||
     status?.status === 'installed' ||
     status?.status === 'stopped';
+  const canUninstallRuntime =
+    !running &&
+    status?.status !== undefined &&
+    status.status !== 'unknown' &&
+    status.status !== 'not-installed';
   const actionLabel =
     status?.status === 'not-installed'
       ? i18nService.t('localInferenceInstall')
@@ -1490,6 +1536,17 @@ function ServicePopover({
                 {i18nService.t('localInferenceStop')}
               </button>
             ) : null}
+            {canUninstallRuntime ? (
+              <button
+                type="button"
+                onClick={onUninstallRuntime}
+                disabled={loading}
+                className={smallDangerButtonClass}
+              >
+                <TrashIcon className="h-3.5 w-3.5" />
+                {i18nService.t('localInferenceRuntimeUninstall')}
+              </button>
+            ) : null}
           </div>
         </div>
       )}
@@ -1557,6 +1614,7 @@ function OllamaServiceConfigDialog({
     const result = await onSave({
       host: form.host,
       port: form.port,
+      customExecutablePath: form.customExecutablePath,
       device: form.device,
       modelsMax: form.modelsMax,
       ...(form.modelsAutoload ? { modelsAutoload: form.modelsAutoload === 'true' } : {}),
@@ -3661,6 +3719,7 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
   return {
     host: config.host ?? '',
     port: config.port ?? '',
+    customExecutablePath: config.customExecutablePath ?? '',
     device: config.device ?? '',
     modelsMax: config.modelsMax ?? '',
     modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),

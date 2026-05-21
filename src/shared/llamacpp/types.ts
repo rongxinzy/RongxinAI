@@ -42,6 +42,14 @@ export type LlamaCppRuntimeInstallResult = {
   error?: string;
 };
 
+export type LlamaCppRuntimeUninstallResult = {
+  success: boolean;
+  deleted: boolean;
+  runtimeRoot: string;
+  status: LlamaCppStatusSnapshot;
+  error?: string;
+};
+
 export type LlamaCppInstallProgressPhase =
   | 'starting'
   | 'detecting'
@@ -70,6 +78,7 @@ export type LlamaCppServiceConfig = {
   host?: string;
   port?: string;
   modelsDir?: string;
+  customExecutablePath?: string;
   modelsMax?: string;
   modelsAutoload?: boolean;
   timeout?: string;

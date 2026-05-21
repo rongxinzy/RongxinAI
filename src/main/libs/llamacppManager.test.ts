@@ -5,13 +5,76 @@ import { expect, test } from 'vitest';
 
 import {
   buildLlamaServerArgs,
+  buildLlamaCppExecutableCandidates,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
+  isPathInside,
   LlamaCppManager,
   mergeLocalModels,
   modelLaunchOptionsToPreset,
   scanLocalGgufModels,
 } from './llamacppManager';
+
+test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
+  expect(buildLlamaCppExecutableCandidates({
+    platform: 'win32',
+    isPackaged: true,
+    resourceRoot: 'C:/App/resources',
+    appRoot: 'C:/App/resources/app.asar',
+    cwd: 'C:/work/RongxinAI',
+    userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime',
+    envPath: 'C:/custom/env/llama-server.exe',
+    configuredExecutablePath: 'C:/custom/ui/llama-server.exe',
+  }).slice(0, 5)).toEqual([
+    'C:/custom/env/llama-server.exe',
+    'C:/custom/ui/llama-server.exe',
+    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/bin/llama-server.exe',
+    'C:/App/resources/llamacpp/llama-server.exe',
+    'C:/App/resources/llamacpp/bin/llama-server.exe',
+  ]);
+});
+
+test('buildLlamaCppExecutableCandidates only includes dev vendor and system paths outside packaged app', () => {
+  const candidates = buildLlamaCppExecutableCandidates({
+    platform: 'darwin',
+    isPackaged: false,
+    resourceRoot: '/app/resources',
+    appRoot: '/repo',
+    cwd: '/repo',
+    userRuntimeRoot: '/Users/tester/Library/Application Support/RongxinAI/llamacpp-runtime',
+  });
+
+  expect(candidates).toEqual(expect.arrayContaining([
+    '/repo/vendor/llamacpp-runtime/current/llama-server',
+    '/repo/vendor/llamacpp-runtime/current/bin/llama-server',
+    '/opt/homebrew/bin/llama-server',
+  ]));
+});
+
+test('buildLlamaCppExecutableCandidates omits dev vendor and system paths in packaged app', () => {
+  const candidates = buildLlamaCppExecutableCandidates({
+    platform: 'darwin',
+    isPackaged: true,
+    resourceRoot: '/Applications/RongxinAI.app/Contents/Resources',
+    appRoot: '/Applications/RongxinAI.app/Contents/Resources/app.asar',
+    cwd: '/repo',
+    userRuntimeRoot: '/Users/tester/Library/Application Support/RongxinAI/llamacpp-runtime',
+  });
+
+  expect(candidates).not.toContain('/repo/vendor/llamacpp-runtime/current/bin/llama-server');
+  expect(candidates).not.toContain('/opt/homebrew/bin/llama-server');
+});
+
+test('isPathInside matches only paths inside the managed runtime root', () => {
+  expect(isPathInside(
+    '/Users/tester/AppData/RongxinAI/llamacpp-runtime/current/bin/llama-server',
+    '/Users/tester/AppData/RongxinAI/llamacpp-runtime',
+  )).toBe(true);
+  expect(isPathInside(
+    '/Users/tester/AppData/RongxinAI/llamacpp-runtime-older/current/bin/llama-server',
+    '/Users/tester/AppData/RongxinAI/llamacpp-runtime',
+  )).toBe(false);
+});
 
 test('buildLlamaServerArgs uses the fixed local router defaults and model discovery flags', () => {
   expect(buildLlamaServerArgs({}, '/models/llamacpp', '/presets/models-preset.ini')).toEqual([

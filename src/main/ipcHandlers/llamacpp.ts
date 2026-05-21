@@ -197,6 +197,7 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Install, async () => {
     return await manager.installRuntime();
   });
+  ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
@@ -475,6 +476,7 @@ export function sanitizeLlamaCppServiceConfig(
   const host = config?.host?.trim();
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
+  const customExecutablePath = config?.customExecutablePath?.trim();
   const modelsMax = normalizeIntegerString(config?.modelsMax);
   const modelsAutoload = config?.modelsAutoload as unknown;
   const timeout = normalizeIntegerString(config?.timeout);
@@ -496,6 +498,7 @@ export function sanitizeLlamaCppServiceConfig(
   if (host) next.host = host;
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
+  if (customExecutablePath) next.customExecutablePath = customExecutablePath;
   if (modelsMax) next.modelsMax = modelsMax;
   if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
   if (modelsAutoload === 'true') next.modelsAutoload = true;
