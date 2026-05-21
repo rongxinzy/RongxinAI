@@ -29,6 +29,7 @@ export type LlamaCppRuntimeInstallPlan =
     runtimeRoot: string;
     executablePath: string;
     url: string;
+    fallbackUrls?: string[];
   }
   | {
     kind: 'needs-manual';

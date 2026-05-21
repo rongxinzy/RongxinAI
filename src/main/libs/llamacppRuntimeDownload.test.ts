@@ -5,6 +5,7 @@ const scriptPath = path.resolve(process.cwd(), 'scripts', 'download-llamacpp-run
 const {
   formatDownloadFailureMessage,
   resolveRuntimeDownloadSource,
+  resolveRuntimeDownloadSources,
   resolveRuntimeReleaseTag,
 } = require(scriptPath) as {
   formatDownloadFailureMessage: (
@@ -18,17 +19,25 @@ const {
     targetId: string,
     options?: { env?: NodeJS.ProcessEnv; rootDir?: string },
   ) => string;
+  resolveRuntimeDownloadSources: (
+    targetId: string,
+    options?: { env?: NodeJS.ProcessEnv; rootDir?: string },
+  ) => string[];
   resolveRuntimeReleaseTag: (rootDir: string, env?: NodeJS.ProcessEnv) => string;
 };
 
 describe('llamacpp runtime download script', () => {
-  test('defaults to the configured upstream llama.cpp release asset', () => {
+  test('defaults to the configured Gitee asset with GitHub fallback', () => {
     const rootDir = process.cwd();
 
     expect(resolveRuntimeReleaseTag(rootDir, {})).toBe('b9244');
     expect(resolveRuntimeDownloadSource('win-x64', { rootDir, env: {} })).toBe(
-      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
     );
+    expect(resolveRuntimeDownloadSources('win-x64', { rootDir, env: {} })).toEqual([
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+    ]);
   });
 
   test('maps the official asset names per target', () => {
@@ -41,7 +50,7 @@ describe('llamacpp runtime download script', () => {
         env: { LLAMACPP_RUNTIME_RELEASE_TAG: 'b9243' },
       }),
     ).toBe(
-      'https://github.com/ggml-org/llama.cpp/releases/download/b9243/llama-b9243-bin-ubuntu-arm64.tar.gz',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9243/llama-b9243-bin-ubuntu-arm64.tar.gz',
     );
   });
 

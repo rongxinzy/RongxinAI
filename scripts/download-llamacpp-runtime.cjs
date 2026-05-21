@@ -9,6 +9,8 @@ const tar = require('tar');
 
 const DEFAULT_LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const DEFAULT_LLAMACPP_RUNTIME_RELEASE_TAG = 'b9244';
+const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL =
+  'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download';
 const OfficialAssetByTarget = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
@@ -104,25 +106,32 @@ function resolveArchiveExtension(archiveName) {
 }
 
 function resolveRuntimeDownloadSource(targetId, options = {}) {
+  return resolveRuntimeDownloadSources(targetId, options)[0];
+}
+
+function resolveRuntimeDownloadSources(targetId, options = {}) {
   const env = options.env ?? process.env;
   const rootDir = options.rootDir ?? path.resolve(__dirname, '..');
   const assetName = resolveOfficialRuntimeAssetName(targetId, env);
 
   const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
   if (explicitUrl) {
-    return explicitUrl
+    return [explicitUrl
       .replace(/\{target\}/g, targetId)
-      .replace(/\{asset\}/g, assetName);
+      .replace(/\{asset\}/g, assetName)];
   }
 
   const baseUrl = env.LLAMACPP_RUNTIME_BASE_URL?.trim();
   if (baseUrl) {
-    return `${baseUrl.replace(/\/$/, '')}/${assetName}`;
+    return [`${baseUrl.replace(/\/$/, '')}/${assetName}`];
   }
 
   const repo = resolveGitHubRepo(env);
   const releaseTag = resolveRuntimeReleaseTag(rootDir, env);
-  return `https://github.com/${repo}/releases/download/${releaseTag}/${assetName}`;
+  return [
+    `${DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL}/${releaseTag}/${assetName}`,
+    `https://github.com/${repo}/releases/download/${releaseTag}/${assetName}`,
+  ];
 }
 
 function formatDownloadFailureMessage(status, statusText, url, targetId, rootDir) {
@@ -171,6 +180,19 @@ async function downloadFile(url, outputPath, rootDir, targetId) {
     file.end((error) => error ? reject(error) : resolve());
   });
   if (total > 0) process.stdout.write('\n');
+  return url;
+}
+
+async function downloadFileWithFallback(urls, outputPath, rootDir, targetId) {
+  const errors = [];
+  for (const url of urls) {
+    try {
+      return await downloadFile(url, outputPath, rootDir, targetId);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw new Error(errors.join('; '));
 }
 
 async function main() {
@@ -184,12 +206,13 @@ async function main() {
   if (fs.existsSync(targetExecutable)) {
     console.log(`[download-llamacpp-runtime] Runtime already exists: ${targetRuntimeDir}`);
   } else {
-    const url = resolveRuntimeDownloadSource(targetId, { rootDir });
+    const urls = resolveRuntimeDownloadSources(targetId, { rootDir });
+    const url = urls[0];
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-runtime-'));
     const archiveName = path.basename(new URL(url).pathname) || resolveOfficialRuntimeAssetName(targetId);
     const archivePath = path.join(tempDir, archiveName);
     const extractDir = path.join(tempDir, 'extract');
-    await downloadFile(url, archivePath, rootDir, targetId);
+    const sourceUrl = await downloadFileWithFallback(urls, archivePath, rootDir, targetId);
     fs.mkdirSync(extractDir, { recursive: true });
     await extractArchive(archivePath, extractDir);
     fs.rmSync(targetRuntimeDir, { recursive: true, force: true });
@@ -199,7 +222,7 @@ async function main() {
       targetId,
       executableName,
       rootDir,
-      sourceUrl: url,
+      sourceUrl,
       assetName: archiveName,
     });
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -321,5 +344,6 @@ module.exports = {
   resolveHostTargetId,
   resolveOfficialRuntimeAssetName,
   resolveRuntimeDownloadSource,
+  resolveRuntimeDownloadSources,
   resolveRuntimeReleaseTag,
 };
