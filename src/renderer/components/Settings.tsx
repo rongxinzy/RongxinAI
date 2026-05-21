@@ -556,6 +556,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const [triageLightModel, setTriageLightModel] = useState('');
   const [triageHeavyModel, setTriageHeavyModel] = useState('');
   const [triageAllowCrossProvider, setTriageAllowCrossProvider] = useState(false);
+  const [triageUseLocalModel, setTriageUseLocalModel] = useState(false);
+  const [triageModelName, setTriageModelName] = useState('');
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
   const initialThemeIdRef = useRef<string>(themeService.getThemeId());
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
@@ -973,6 +975,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       setTriageLightModel(config.rules.lightModelRef);
       setTriageHeavyModel(config.rules.heavyModelRef);
       setTriageAllowCrossProvider(config.rules.allowCrossProviderSwitch);
+      setTriageUseLocalModel(config.rules.useLocalModelTriage);
+      setTriageModelName(config.rules.triageModelName);
     }).catch(() => { /* triage not available */ });
   }, []);
 
@@ -4318,6 +4322,63 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       ⚠ {i18nService.t('modelTriageCrossProviderWarning') || '跨服务商切换可能导致对话数据发送到第三方服务器，请确认您信任目标服务商。'}
                     </p>
                   )}
+
+                  {/* ── Local Model Triage (Phase 2.1b) ────────────── */}
+                  <div className="mt-3 pt-3 border-t border-border-subtle">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-xs font-medium text-secondary">
+                          {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
+                        </span>
+                        <p className="text-[11px] text-secondary mt-0.5">
+                          {i18nService.t('modelTriageUseLocalModelHint') || '规则无法确定时，调用本地 llama.cpp 小模型进行分类（需已启动）。'}
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
+                        <input
+                          type="checkbox"
+                          checked={triageUseLocalModel}
+                          onChange={async (e) => {
+                            const value = e.target.checked;
+                            setTriageUseLocalModel(value);
+                            const config = await window.electron.triage.getConfig();
+                            await window.electron.triage.setConfig({
+                              ...config,
+                              rules: { ...config.rules, useLocalModelTriage: value },
+                            });
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
+                      </label>
+                    </div>
+
+                    {triageUseLocalModel && (
+                      <div>
+                        <label className="text-xs font-medium text-secondary block mb-1">
+                          {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
+                        </label>
+                        <input
+                          type="text"
+                          value={triageModelName}
+                          onChange={async (e) => {
+                            const value = e.target.value;
+                            setTriageModelName(value);
+                            const config = await window.electron.triage.getConfig();
+                            await window.electron.triage.setConfig({
+                              ...config,
+                              rules: { ...config.rules, triageModelName: value },
+                            });
+                          }}
+                          placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
+                          className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                        />
+                        <p className="text-[11px] text-secondary mt-1">
+                          {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
