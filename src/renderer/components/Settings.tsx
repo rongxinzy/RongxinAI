@@ -552,6 +552,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<ProviderType | null>(null);
   const [isImportingProviders, setIsImportingProviders] = useState(false);
   const [isExportingProviders, setIsExportingProviders] = useState(false);
+  const [triageEnabled, setTriageEnabled] = useState(false);
+  const [triageLightModel, setTriageLightModel] = useState('');
+  const [triageHeavyModel, setTriageHeavyModel] = useState('');
+  const [triageAllowCrossProvider, setTriageAllowCrossProvider] = useState(false);
+  const [triageUseLocalModel, setTriageUseLocalModel] = useState(false);
+  const [triageModelName, setTriageModelName] = useState('');
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
   const initialThemeIdRef = useRef<string>(themeService.getThemeId());
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
@@ -961,6 +967,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       themeService.restoreTheme(initialThemeId, initialTheme);
       i18nService.setLanguage(initialLanguage, { persist: false });
     };
+  }, []);
+
+  useEffect(() => {
+    window.electron.triage.getConfig().then((config) => {
+      setTriageEnabled(config.enabled);
+      setTriageLightModel(config.rules.lightModelRef);
+      setTriageHeavyModel(config.rules.heavyModelRef);
+      setTriageAllowCrossProvider(config.rules.allowCrossProviderSwitch);
+      setTriageUseLocalModel(config.rules.useLocalModelTriage);
+      setTriageModelName(config.rules.triageModelName);
+    }).catch(() => { /* triage not available */ });
   }, []);
 
   // 监听标签页切换，确保内容区域滚动到顶部
@@ -4175,6 +4192,190 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <PlusCircleIcon className="h-3 w-3 mr-1" />
                           {i18nService.t('addFirstModel')}
                         </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Model Triage ────────────────────────────────────── */}
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">
+                    {i18nService.t('modelTriageTitle') || '自动模型路由'}
+                  </h3>
+                  <p className="text-xs text-secondary mt-0.5">
+                    {i18nService.t('modelTriageDescription') || '开启后，简单消息自动使用轻量模型以降低延迟和成本，复杂任务保持使用默认模型。'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
+                  <input
+                    type="checkbox"
+                    checked={triageEnabled}
+                    onChange={async (e) => {
+                      const enabled = e.target.checked;
+                      setTriageEnabled(enabled);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({ ...config, enabled });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
+                </label>
+              </div>
+
+              {triageEnabled && (
+                <div className="space-y-3 ml-1 pl-3 border-l-2 border-primary-muted">
+                  <div>
+                    <label className="text-xs font-medium text-secondary block mb-1">
+                      {i18nService.t('modelTriageLightModelLabel') || '轻量模型'}
+                    </label>
+                    <select
+                      value={triageLightModel}
+                      onChange={async (e) => {
+                        const value = e.target.value;
+                        setTriageLightModel(value);
+                        const config = await window.electron.triage.getConfig();
+                        await window.electron.triage.setConfig({
+                          ...config,
+                          rules: { ...config.rules, lightModelRef: value },
+                        });
+                      }}
+                      className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                    >
+                      <option value="">{i18nService.t('modelTriageNoModel') || '不指定（使用当前模型）'}</option>
+                      {Object.entries(visibleProviders).flatMap(([provider, config]) => {
+                        const providerKey = provider as ProviderType;
+                        const models = config.models || [];
+                        return models.map((model: { id: string; name: string }) => {
+                          const ref = `${providerKey}/${model.id}`;
+                          return (
+                            <option key={ref} value={ref}>
+                              [{providerKey}] {model.name || model.id}
+                            </option>
+                          );
+                        });
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-secondary block mb-1">
+                      {i18nService.t('modelTriageHeavyModelLabel') || '强推理模型（可选）'}
+                    </label>
+                    <select
+                      value={triageHeavyModel}
+                      onChange={async (e) => {
+                        const value = e.target.value;
+                        setTriageHeavyModel(value);
+                        const config = await window.electron.triage.getConfig();
+                        await window.electron.triage.setConfig({
+                          ...config,
+                          rules: { ...config.rules, heavyModelRef: value },
+                        });
+                      }}
+                      className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                    >
+                      <option value="">{i18nService.t('modelTriageNoModel') || '不指定（使用当前模型）'}</option>
+                      {Object.entries(visibleProviders).flatMap(([provider, config]) => {
+                        const providerKey = provider as ProviderType;
+                        const models = config.models || [];
+                        return models.map((model: { id: string; name: string }) => {
+                          const ref = `${providerKey}/${model.id}`;
+                          return (
+                            <option key={ref} value={ref}>
+                              [{providerKey}] {model.name || model.id}
+                            </option>
+                          );
+                        });
+                      })}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-secondary">
+                      {i18nService.t('modelTriageAllowCrossProviderLabel') || '允许跨服务商切换'}
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={triageAllowCrossProvider}
+                        onChange={async (e) => {
+                          const value = e.target.checked;
+                          setTriageAllowCrossProvider(value);
+                          const config = await window.electron.triage.getConfig();
+                          await window.electron.triage.setConfig({
+                            ...config,
+                            rules: { ...config.rules, allowCrossProviderSwitch: value },
+                          });
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
+                    </label>
+                  </div>
+
+                  {triageAllowCrossProvider && (
+                    <p className="text-[11px] text-amber-500">
+                      ⚠ {i18nService.t('modelTriageCrossProviderWarning') || '跨服务商切换可能导致对话数据发送到第三方服务器，请确认您信任目标服务商。'}
+                    </p>
+                  )}
+
+                  {/* ── Local Model Triage (Phase 2.1b) ────────────── */}
+                  <div className="mt-3 pt-3 border-t border-border-subtle">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-xs font-medium text-secondary">
+                          {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
+                        </span>
+                        <p className="text-[11px] text-secondary mt-0.5">
+                          {i18nService.t('modelTriageUseLocalModelHint') || '规则无法确定时，调用本地 llama.cpp 小模型进行分类（需已启动）。'}
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
+                        <input
+                          type="checkbox"
+                          checked={triageUseLocalModel}
+                          onChange={async (e) => {
+                            const value = e.target.checked;
+                            setTriageUseLocalModel(value);
+                            const config = await window.electron.triage.getConfig();
+                            await window.electron.triage.setConfig({
+                              ...config,
+                              rules: { ...config.rules, useLocalModelTriage: value },
+                            });
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
+                      </label>
+                    </div>
+
+                    {triageUseLocalModel && (
+                      <div>
+                        <label className="text-xs font-medium text-secondary block mb-1">
+                          {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
+                        </label>
+                        <input
+                          type="text"
+                          value={triageModelName}
+                          onChange={async (e) => {
+                            const value = e.target.value;
+                            setTriageModelName(value);
+                            const config = await window.electron.triage.getConfig();
+                            await window.electron.triage.setConfig({
+                              ...config,
+                              rules: { ...config.rules, triageModelName: value },
+                            });
+                          }}
+                          placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
+                          className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                        />
+                        <p className="text-[11px] text-secondary mt-1">
+                          {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
+                        </p>
                       </div>
                     )}
                   </div>

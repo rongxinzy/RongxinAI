@@ -32,6 +32,8 @@ import {
   type OpenClawGatewayConnectionInfo,
 } from '../openclawEngineManager';
 import { parsePrimaryModelRef } from '../openclawAgentModels';
+import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
+import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
 import {
   extractGatewayHistoryEntries,
   extractGatewayMessageText,
@@ -127,6 +129,7 @@ type OpenClawRuntimeAdapterOptions = {
   normalizeModelRef?: (modelRef: string) => string;
   isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
   getModelContextWindow?: (modelRef: string) => number | undefined;
+  getTriageConfig?: () => TriageConfig;
 };
 
 type ChatEventState = 'delta' | 'final' | 'aborted' | 'error';
@@ -901,6 +904,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   private readonly sessionModelPatchQueue = new Map<string, Promise<void>>();
   private readonly gatewayHistoryCountBySession = new Map<string, number>();
   private readonly latestTurnTokenBySession = new Map<string, number>();
+  private readonly triageStateBySession = new Map<string, TriageState>();
 
   /**
    * Sessions that were manually stopped by the user via stopSession().
@@ -1760,7 +1764,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     sessionId: string;
     sessionKey: string;
     model: string;
-    source: 'sessionOverride' | 'agentModel';
+    source: 'sessionOverride' | 'agentModel' | 'triage';
   }): Promise<void> {
     const { sessionId, sessionKey, model, source } = options;
     if (!model) {
@@ -1872,15 +1876,79 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     if (!session.modelOverride && currentModel && currentModel !== rawCurrentModel && agent?.id) {
       this.store.updateAgent(agent.id, { model: currentModel });
     }
+
+    // ── Model Triage ────────────────────────────────────────────────────
+    let triageResult: TriageResult | null = null;
+    const triageConfig = this.options.getTriageConfig?.();
+    if (
+      triageConfig?.enabled &&
+      !session.modelOverride &&
+      currentModel
+    ) {
+      const conversationDepth = (session.messages?.length ?? 0);
+      const classification = await classifyMessage(prompt, conversationDepth, triageConfig);
+
+      if (classification.modelRef) {
+        let triageState = this.triageStateBySession.get(sessionId);
+        if (!triageState) {
+          triageState = createTriageState();
+          this.triageStateBySession.set(sessionId, triageState);
+        }
+
+        // Cross-provider safety check
+        const currentProvider = extractProviderId(currentModel);
+        const targetProvider = extractProviderId(classification.modelRef);
+        const isCrossProvider =
+          currentProvider && targetProvider && currentProvider !== targetProvider;
+        if (isCrossProvider && !triageConfig.rules.allowCrossProviderSwitch) {
+          console.debug(
+            '[ModelTriage] skipped: cross-provider switch blocked',
+            `sessionId=${sessionId}`,
+            `from=${currentModel}`,
+            `to=${classification.modelRef}`,
+            `reason=allowCrossProviderSwitch is false`,
+          );
+        } else if (
+          shouldAllowSwitch(
+            classification.tier,
+            conversationDepth,
+            triageState,
+            triageConfig.rules.cooldownRounds,
+          )
+        ) {
+          triageResult = classification;
+          triageState.lastSwitchRound = conversationDepth;
+          triageState.activeTier = triageResult.tier;
+          console.log(
+            '[ModelTriage]',
+            `sessionId=${sessionId}`,
+            `tier=${triageResult.tier}`,
+            `reason=${triageResult.reason}`,
+            `from=${currentModel}`,
+            `to=${triageResult.modelRef}`,
+            `crossProvider=${isCrossProvider}`,
+          );
+        }
+      }
+    }
+
+    const effectiveModel = triageResult?.modelRef || currentModel;
+    const effectiveSource = triageResult?.modelRef
+      ? 'triage'
+      : session.modelOverride
+        ? 'sessionOverride'
+        : 'agentModel';
+    // ── End Model Triage ────────────────────────────────────────────────
+
     try {
       await this.ensureSessionModelForTurn({
         sessionId,
         sessionKey,
-        model: currentModel,
-        source: session.modelOverride ? 'sessionOverride' : 'agentModel',
+        model: effectiveModel,
+        source: effectiveSource,
       });
       await this.assertLlamaCppContextBudget({
-        modelRef: currentModel,
+        modelRef: effectiveModel,
         sessionKey,
       });
     } catch (error) {

@@ -36,6 +36,7 @@ import {
 } from '../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
+import { TriageIpcChannel } from '../shared/triage';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { OpenClawSessionIpc } from './openclawSession/constants';
@@ -193,6 +194,11 @@ contextBridge.exposeInMainWorld('electron', {
   },
   marketplace: {
     search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
+  },
+
+  triage: {
+    getConfig: () => ipcRenderer.invoke(TriageIpcChannel.GetConfig),
+    setConfig: (config: unknown) => ipcRenderer.invoke(TriageIpcChannel.SetConfig, config),
   },
 
   hardware: {
@@ -412,8 +418,10 @@ contextBridge.exposeInMainWorld('electron', {
       query?: string; status?: 'created' | 'stale' | 'deleted' | 'all';
       includeDeleted?: boolean; limit?: number; offset?: number;
     }) => ipcRenderer.invoke(CoworkMemoryIpc.ListEntries, input),
-    createMemoryEntry: (input: { text: string; confidence?: number; isExplicit?: boolean }) =>
-      ipcRenderer.invoke(CoworkMemoryIpc.CreateEntry, input),
+    createMemoryEntry: (input: {
+      text: string; confidence?: number; isExplicit?: boolean;
+      source?: { sessionId?: string | null; role?: string; date?: string };
+    }) => ipcRenderer.invoke(CoworkMemoryIpc.CreateEntry, input),
     updateMemoryEntry: (input: {
       id: string; text?: string; confidence?: number;
       status?: 'created' | 'stale' | 'deleted'; isExplicit?: boolean;

@@ -690,6 +690,7 @@ class CoworkService {
 
   async createMemoryEntry(input: {
     text: string;
+    source?: { sessionId?: string | null; role?: string; date?: string };
   }): Promise<CoworkUserMemoryEntry | null> {
     const api = window.electron?.cowork?.createMemoryEntry;
     if (!api) return null;
