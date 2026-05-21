@@ -61,6 +61,14 @@ function sanitizeTriageConfig(raw: unknown): TriageConfig {
         typeof input.rules === 'object' && input.rules !== null
           ? Math.max(1, Number((input.rules as Record<string, unknown>).cooldownRounds) || DEFAULT_TRIAGE_CONFIG.rules.cooldownRounds)
           : DEFAULT_TRIAGE_CONFIG.rules.cooldownRounds,
+      useLocalModelTriage:
+        typeof input.rules === 'object' && input.rules !== null
+          ? Boolean((input.rules as Record<string, unknown>).useLocalModelTriage)
+          : DEFAULT_TRIAGE_CONFIG.rules.useLocalModelTriage,
+      triageModelName:
+        typeof input.rules === 'object' && input.rules !== null
+          ? String((input.rules as Record<string, unknown>).triageModelName || '')
+          : DEFAULT_TRIAGE_CONFIG.rules.triageModelName,
     },
   };
 }
