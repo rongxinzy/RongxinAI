@@ -1824,9 +1824,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
   // 快捷键更新处理
   const handleShortcutChange = (key: keyof typeof shortcuts, value: string) => {
-    // Check for conflicts with other shortcuts
-    const conflictKey = Object.keys(shortcuts).find(
-      k => k !== key && shortcuts[k as keyof typeof shortcuts] === value
+    // Check for conflicts with other shortcuts (skip unset values)
+    const conflictKey = value && Object.keys(shortcuts).find(
+      k => k !== key && shortcuts[k as keyof typeof shortcuts] && shortcuts[k as keyof typeof shortcuts] === value
     );
     if (conflictKey) {
       const conflictLabel = i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey);
