@@ -1,5 +1,5 @@
 import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import { ArrowTopRightOnSquareIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, KeyIcon, ShieldCheckIcon, SignalIcon, SunIcon, UserCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon, ArrowsRightLeftIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, KeyIcon, ShieldCheckIcon, SignalIcon, SunIcon, UserCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -37,7 +37,7 @@ import IMSettings from './im/IMSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
 import ThemedSelect from './ui/ThemedSelect';
 
-type TabType = 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'coworkMemory' | 'coworkAgent' | 'shortcuts' | 'im' | 'email' | 'about';
+type TabType = 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'triage' | 'coworkMemory' | 'coworkAgent' | 'shortcuts' | 'im' | 'email' | 'about';
 
 const SettingsSlidersIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -2429,6 +2429,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       { key: 'appearance' as TabType,     label: i18nService.t('appearance'),     icon: <SunIcon className="h-5 w-5" /> },
       { key: 'coworkAgentEngine' as TabType, label: i18nService.t('coworkAgentEngine'), icon: <CpuChipIcon className="h-5 w-5" /> },
       { key: 'model' as TabType,          label: i18nService.t('model'),          icon: <CubeIcon className="h-5 w-5" /> },
+      { key: 'triage' as TabType,         label: i18nService.t('triageTab'),      icon: <ArrowsRightLeftIcon className="h-5 w-5" /> },
       { key: 'im' as TabType,             label: i18nService.t('imBot'),          icon: <ChatBubbleLeftIcon className="h-5 w-5" /> },
       { key: 'email' as TabType,          label: i18nService.t('emailTab'),       icon: <EnvelopeIcon className="h-5 w-5" /> },
       { key: 'coworkMemory' as TabType,   label: i18nService.t('coworkMemoryTitle'), icon: <BrainIcon className="h-5 w-5" /> },
@@ -4195,32 +4196,47 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
               )}
             </div>
+          </div>
+        );
 
-            {/* ── Model Triage (global defaults) ──────────────────── */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <div>
-                <h3 className="text-sm font-medium text-foreground">
-                  {i18nService.t('modelTriageTitle') || '自动模型路由'}
-                </h3>
-                <p className="text-xs text-secondary mt-0.5">
-                  各 Agent 在 Agent 设置的「路由」tab 中分别启用和配置。此处为全局默认参数。
-                </p>
+      case 'triage':
+        return (
+          <div className="max-w-2xl space-y-6">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">
+                {i18nService.t('modelTriageTitle') || '自动模型路由'}
+              </h3>
+              <p className="text-xs text-secondary mt-1">
+                各 Agent 在 Agent 设置的「路由」tab 中分别启用和配置。此处为全局默认参数。
+              </p>
+            </div>
+
+            {/* Global Defaults */}
+            <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
+              <h4 className="text-sm font-medium text-foreground">全局默认参数</h4>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm text-foreground">冷却轮次</label>
+                  <p className="text-xs text-secondary mt-0.5">切换后需等待 N 轮才能再次切换，防止频繁抖动</p>
+                </div>
+                <input type="number" min="1" max="20" value={triageCooldownRounds}
+                  onChange={async (e) => {
+                    const value = Math.max(1, Number(e.target.value) || 3);
+                    setTriageCooldownRounds(value);
+                    const config = await window.electron.triage.getConfig();
+                    await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, cooldownRounds: value } });
+                  }}
+                  className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground shrink-0" />
               </div>
 
-              <div className="mt-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-foreground">冷却轮次</label>
-                  <input type="number" min="1" max="20" value={triageCooldownRounds}
-                    onChange={async (e) => {
-                      const value = Math.max(1, Number(e.target.value) || 3);
-                      setTriageCooldownRounds(value);
-                      const config = await window.electron.triage.getConfig();
-                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, cooldownRounds: value } });
-                    }}
-                    className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm text-foreground">对话路由上限</label>
+                  <p className="text-xs text-secondary mt-0.5">超过此轮数后视为深度对话，使用默认模型</p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-foreground">对话路由上限（轮）</label>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs text-secondary">轮</span>
                   <input type="number" min="1" max="100" value={triageMaxConversationRounds}
                     onChange={async (e) => {
                       const value = Math.max(1, Number(e.target.value) || 20);
@@ -4230,51 +4246,53 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     }}
                     className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground" />
                 </div>
-
-                <div className="pt-3 border-t border-border-subtle space-y-2">
-                  <div className="text-xs text-secondary">本地模型分类（实验性）</div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-medium text-secondary">
-                        {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
-                      </span>
-                      <p className="text-[11px] text-secondary mt-0.5">
-                        {i18nService.t('modelTriageUseLocalModelHint') || '规则无法确定时，调用本地 llama.cpp 小模型进行分类（需已启动）。'}
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
-                      <input type="checkbox" checked={triageUseLocalModel}
-                        onChange={async (e) => {
-                          const value = e.target.checked;
-                          setTriageUseLocalModel(value);
-                          const config = await window.electron.triage.getConfig();
-                          await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, useLocalModelTriage: value } });
-                        }}
-                        className="sr-only peer" />
-                      <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
-                    </label>
-                  </div>
-                  {triageUseLocalModel && (
-                    <div>
-                      <label className="text-xs font-medium text-secondary block mb-1">
-                        {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
-                      </label>
-                      <input type="text" value={triageModelName}
-                        onChange={async (e) => {
-                          const value = e.target.value;
-                          setTriageModelName(value);
-                          const config = await window.electron.triage.getConfig();
-                          await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, triageModelName: value } });
-                        }}
-                        placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
-                        className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground" />
-                      <p className="text-[11px] text-secondary mt-1">
-                        {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
-                      </p>
-                    </div>
-                  )}
-                </div>
               </div>
+            </div>
+
+            {/* Local Model Classifier */}
+            <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
+              <h4 className="text-sm font-medium text-foreground">本地模型分类（实验性）</h4>
+              <p className="text-xs text-secondary">规则无法确定路由目标时，调用本地 llama.cpp 小模型进行分类</p>
+
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-sm text-foreground">
+                    {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
+                  </span>
+                  <p className="text-xs text-secondary mt-0.5">需先在本地推理页启动 llama.cpp 并加载模型</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
+                  <input type="checkbox" checked={triageUseLocalModel}
+                    onChange={async (e) => {
+                      const value = e.target.checked;
+                      setTriageUseLocalModel(value);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, useLocalModelTriage: value } });
+                    }}
+                    className="sr-only peer" />
+                  <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
+                </label>
+              </div>
+
+              {triageUseLocalModel && (
+                <div>
+                  <label className="text-xs font-medium text-secondary block mb-1">
+                    {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
+                  </label>
+                  <input type="text" value={triageModelName}
+                    onChange={async (e) => {
+                      const value = e.target.value;
+                      setTriageModelName(value);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, triageModelName: value } });
+                    }}
+                    placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
+                    className="w-full max-w-xs text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground" />
+                  <p className="text-xs text-secondary mt-1">
+                    {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );
