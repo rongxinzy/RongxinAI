@@ -90,6 +90,7 @@ class AgentService {
     skillIds?: string[];
     enabled?: boolean;
     pinned?: boolean;
+    triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
   }): Promise<Agent | null> {
     try {
       const agent = await window.electron?.agents?.update(id, updates);

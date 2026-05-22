@@ -130,6 +130,7 @@ type OpenClawRuntimeAdapterOptions = {
   isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
   getModelContextWindow?: (modelRef: string) => number | undefined;
   getTriageConfig?: () => TriageConfig;
+  getAgent?: (agentId: string) => { triageOverride?: import('../../../shared/triage').AgentTriageOverride } | null;
 };
 
 type ChatEventState = 'delta' | 'final' | 'aborted' | 'error';
@@ -1879,7 +1880,20 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
 
     // ── Model Triage ────────────────────────────────────────────────────
     let triageResult: TriageResult | null = null;
-    const triageConfig = this.options.getTriageConfig?.();
+    const globalTriage = this.options.getTriageConfig?.();
+    // Merge Agent-level triage override with global defaults
+    const agent = agentId ? this.options.getAgent?.(agentId) : null;
+    const agentTriage = agent?.triageOverride;
+    const triageConfig: TriageConfig | null = (agentTriage?.enabled || globalTriage?.enabled) ? {
+      ...globalTriage,
+      enabled: agentTriage?.enabled ?? globalTriage?.enabled ?? false,
+      rules: {
+        ...globalTriage?.rules,
+        ...(agentTriage?.lightModelRef !== undefined ? { lightModelRef: agentTriage.lightModelRef } : {}),
+        ...(agentTriage?.heavyModelRef !== undefined ? { heavyModelRef: agentTriage.heavyModelRef } : {}),
+        ...(agentTriage?.allowCrossProviderSwitch !== undefined ? { allowCrossProviderSwitch: agentTriage.allowCrossProviderSwitch } : {}),
+      },
+    } as TriageConfig : null;
     if (
       triageConfig?.enabled &&
       !session.modelOverride &&
@@ -5584,6 +5598,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     this.gatewayHistoryCountBySession.delete(sessionId);
     this.latestTurnTokenBySession.delete(sessionId);
     this.stoppedSessions.delete(sessionId);
+    this.triageStateBySession.delete(sessionId);
 
     // Clean up active turn and related run-id mappings
     this.cleanupSessionTurn(sessionId);
