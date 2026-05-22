@@ -276,7 +276,7 @@ async function extractArchive(archivePath: string, extractDir: string): Promise<
   throw new Error(`Unsupported llama.cpp runtime archive format: ${archivePath}`);
 }
 
-function copyDirectoryContents(sourceDir: string, targetDir: string): void {
+export function copyDirectoryContents(sourceDir: string, targetDir: string): void {
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     const sourcePath = path.join(sourceDir, entry.name);
     const targetPath = path.join(targetDir, entry.name);

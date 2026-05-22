@@ -13,6 +13,7 @@ import {
   InformationCircleIcon,
   PaperAirplaneIcon,
   PlayIcon,
+  QuestionMarkCircleIcon,
   ServerStackIcon,
   StopIcon,
   TrashIcon,
@@ -524,6 +525,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
   const [servicePopoverOpen, setServicePopoverOpen] = useState(false);
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
+  const [importGuideOpen, setImportGuideOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
   const toastTimerRef = useRef<number | null>(null);
@@ -926,6 +928,25 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     });
   };
 
+  const handleImportRuntime = () => {
+    void runAction(async () => {
+      const result = await window.electron.llamacpp.importRuntime();
+      if (!result.success) {
+        if (result.error === '已取消') return;
+        showToast(
+          result.error || i18nService.t('localInferenceImportRuntimeFailed'),
+          LocalInferenceToastKind.Error,
+        );
+        return;
+      }
+      showToast(
+        i18nService.t('localInferenceImportRuntimeSuccess'),
+        LocalInferenceToastKind.Success,
+      );
+      await refreshStatus();
+    });
+  };
+
   const handleUninstallRuntime = () => {
     void runAction(async () => {
       const result = await window.electron.llamacpp.uninstallRuntime();
@@ -937,12 +958,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         return;
       }
 
-      showToast(
-        result.deleted
-          ? i18nService.t('localInferenceRuntimeUninstalled')
-          : i18nService.t('localInferenceRuntimeNotInstalled'),
-        LocalInferenceToastKind.Success,
-      );
+      if (result.deleted) {
+        showToast(
+          i18nService.t('localInferenceRuntimeUninstalled'),
+          LocalInferenceToastKind.Success,
+        );
+      } else {
+        showToast(
+          i18nService.t('localInferenceRuntimeNotInstalled'),
+          LocalInferenceToastKind.Info,
+        );
+      }
       if (result.status.status === 'running') {
         await refreshLocalModels();
         await refreshRunningModels();
@@ -1270,7 +1296,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onToggle={() => setServicePopoverOpen(current => !current)}
               onPrepare={handlePrepare}
               onStop={handleStop}
+              onImportRuntime={handleImportRuntime}
               onUninstallRuntime={handleUninstallRuntime}
+              onOpenImportGuide={() => setImportGuideOpen(true)}
               onOpenServiceConfig={() => {
                 setServicePopoverOpen(false);
                 setServiceConfigDialogOpen(true);
@@ -1386,9 +1414,127 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onSave={handleSaveServiceConfig}
         />
       )}
+      {importGuideOpen && (
+        <ImportGuideDialog onClose={() => setImportGuideOpen(false)} />
+      )}
     </div>
   );
 };
+
+function ImportGuideDialog({ onClose }: { onClose: () => void }) {
+  const platform = window.electron.platform as string;
+  const isWin = platform === 'win32';
+  const isMac = platform === 'darwin';
+
+  const executable = isWin ? 'llama-server.exe' : 'llama-server';
+
+  const filesKey = isWin
+    ? 'localInferenceImportGuideFilesWin'
+    : isMac
+      ? 'localInferenceImportGuideFilesMac'
+      : 'localInferenceImportGuideFilesLinux';
+
+  const noteKey = isWin
+    ? 'localInferenceImportGuideStep1WinNote'
+    : isMac
+      ? 'localInferenceImportGuideStep1MacNote'
+      : 'localInferenceImportGuideStep1LinuxNote';
+
+  const openUrl = useCallback(() => {
+    const url = i18nService.t('localInferenceImportGuideStep1Url');
+    window.electron.shell.openExternal(url).catch(() => undefined);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-foreground">
+              {i18nService.t('localInferenceImportGuideTitle')}
+            </h3>
+            <p className="mt-1 text-sm text-secondary">
+              {i18nService.t('localInferenceImportGuideDescription')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            aria-label={i18nService.t('close')}
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-4 py-4">
+          {/* OS info */}
+          <div className="rounded-lg border border-border bg-surface/60 px-3 py-2.5 mb-4">
+            <p className="text-xs font-medium text-foreground">
+              {isWin ? 'Windows' : isMac ? 'macOS' : 'Linux'}
+            </p>
+            <p className="mt-1 text-xs text-secondary">
+              {i18nService.t(filesKey)} ({executable})
+            </p>
+          </div>
+
+          {/* Steps */}
+          <ol className="space-y-4 text-sm">
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">1</span>
+              <div className="min-w-0">
+                <p className="text-foreground">
+                  {i18nService.t('localInferenceImportGuideStep1')}
+                </p>
+                <button
+                  type="button"
+                  onClick={openUrl}
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  {i18nService.t('localInferenceImportGuideStep1LinkLabel')}
+                  <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+                </button>
+                <p className="mt-1 text-xs text-secondary">
+                  {i18nService.t(noteKey)}
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">2</span>
+              <p className="text-foreground pt-0.5">
+                {i18nService.t('localInferenceImportGuideStep2')}
+              </p>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">3</span>
+              <p className="text-foreground pt-0.5">
+                {i18nService.t('localInferenceImportGuideStep3')}
+              </p>
+            </li>
+          </ol>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          >
+            {i18nService.t('localInferenceImportGuideClose')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ServicePopover({
   containerRef,
@@ -1400,7 +1546,9 @@ function ServicePopover({
   onToggle,
   onPrepare,
   onStop,
+  onImportRuntime,
   onUninstallRuntime,
+  onOpenImportGuide,
   onOpenServiceConfig,
   onRefresh,
 }: {
@@ -1413,7 +1561,9 @@ function ServicePopover({
   onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
+  onImportRuntime: () => void;
   onUninstallRuntime: () => void;
+  onOpenImportGuide: () => void;
   onOpenServiceConfig: () => void;
   onRefresh: () => void;
 }) {
@@ -1521,6 +1671,29 @@ function ServicePopover({
                 <PlayIcon className="h-3.5 w-3.5" />
                 {actionLabel}
               </button>
+            )}
+            {!running && status?.status === 'not-installed' && (
+              <>
+                <button
+                  type="button"
+                  onClick={onImportRuntime}
+                  disabled={loading}
+                  className={smallOutlineButtonClass}
+                  title={i18nService.t('localInferenceImportRuntimeTooltip')}
+                >
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                  {i18nService.t('localInferenceImportRuntime')}
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenImportGuide}
+                  disabled={loading}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                  title={i18nService.t('localInferenceImportGuideTitle')}
+                >
+                  <QuestionMarkCircleIcon className="h-4 w-4" />
+                </button>
+              </>
             )}
             {running && managedByApp ? (
               <button
