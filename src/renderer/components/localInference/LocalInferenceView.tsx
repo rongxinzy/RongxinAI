@@ -2887,7 +2887,6 @@ function LaunchSelect({
 function InferencePanel({
   isRunning,
   selectedModel,
-  selectedRunningModel,
   runnableModels,
   systemPrompt,
   prompt,
