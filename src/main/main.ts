@@ -1516,6 +1516,9 @@ const getCoworkEngineRouter = () => {
           return getLlamaCppModelContextWindow(parsed.modelId);
         },
         getTriageConfig: () => getTriageConfig(getStore()),
+        getAgent: (agentId: string) => {
+          return getAgentManager().getAgent(agentId) ?? null;
+        },
       });
       // Wire up channel session sync for IM conversations via OpenClaw
       try {

@@ -148,7 +148,7 @@ export async function classifyMessage(
   if (ruleResult.reason.startsWith('light:') || ruleResult.reason.startsWith('heavy:')) {
     return ruleResult;
   }
-  if (ruleResult.reason === 'deep-conversation') {
+  if (ruleResult.reason === 'deep-conversation' || ruleResult.reason === 'heavy-rule-match-no-model') {
     return ruleResult;
   }
 
