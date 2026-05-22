@@ -512,9 +512,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       <Modal
         onClose={handleClose}
         overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-        className="w-[calc(100vw-56px)] max-w-[854px] h-[82vh] max-h-[664px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface border border-border/80 flex flex-col overflow-hidden"
+        className="w-[calc(100vw-56px)] max-w-[854px] h-[82vh] max-h-[664px] flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 px-7 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <AgentAvatarPicker value={icon} onChange={setIcon} />
             <div className="min-w-0 flex-1 pt-0.5">
@@ -545,7 +545,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         </div>
 
         {/* Tab bar */}
-        <div className="flex shrink-0 border-b border-border px-7">
+        <div className="flex shrink-0 border-b border-border px-4">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -566,7 +566,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         </div>
 
         {/* Tab content */}
-        <div className="px-7 py-7 overflow-hidden flex-1 min-h-0">
+        <div className="px-4 py-3 overflow-hidden flex-1 min-h-0">
           {activeTab === AgentDetailTab.Prompt && renderTextEditor(
             systemPrompt,
             setSystemPrompt,
@@ -737,7 +737,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-border">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
           <AgentDetailToolbar
             model={model}
             onModelChange={setModel}
