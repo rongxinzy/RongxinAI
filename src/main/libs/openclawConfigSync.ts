@@ -1426,7 +1426,23 @@ export class OpenClawConfigSync {
                 // Preserve existing plugins fields (load, deny, etc.) so
                 // runtime-seeded values survive config rewrites and don't
                 // cause a plugins diff → gateway restart.
-                ...existingPlugins,
+                ...(() => {
+                  const preservedPlugins = { ...existingPlugins };
+                  const thirdPartyDir = findThirdPartyExtensionsDir();
+                  if (!thirdPartyDir) {
+                    const existingLoad = preservedPlugins.load;
+                    if (
+                      existingLoad &&
+                      typeof existingLoad === 'object' &&
+                      !Array.isArray(existingLoad)
+                    ) {
+                      const nextLoad = { ...(existingLoad as Record<string, unknown>) };
+                      delete nextLoad.paths;
+                      preservedPlugins.load = nextLoad;
+                    }
+                  }
+                  return preservedPlugins;
+                })(),
                 // Third-party plugins live in a separate `extensions/` dir (not
                 // `dist/extensions/`) and need `load.paths` so the gateway discovers
                 // them with origin="config", bypassing the bundled-channel-entry
