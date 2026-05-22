@@ -326,10 +326,14 @@ export class OpenClawEngineManager extends EventEmitter {
     try {
       if (!fs.existsSync(cacheDir)) return false;
       const entries = fs.readdirSync(cacheDir);
-      return entries.some((entry) => {
+      const hasFiles = entries.some((entry) => {
         const full = path.join(cacheDir, entry);
         try { return fs.statSync(full).isFile(); } catch { return false; }
       });
+      if (!hasFiles) return false;
+      // v8-compat marker must exist — without it, the warmup was interrupted
+      // and the cache may be corrupt (e.g. killed mid-write by stopGateway).
+      return fs.existsSync(this.v8CompatMarkerPath());
     } catch {
       return false;
     }
@@ -956,10 +960,14 @@ export class OpenClawEngineManager extends EventEmitter {
     }
 
     // Kill in-progress cache warmup (if any).
+    // Also clear the compile cache to prevent corrupted/partial files
+    // from being treated as valid on the next start (see doStartGateway).
     if (this.warmupProcess) {
+      console.log('[OpenClaw] killing in-progress compile cache warmup, clearing cache to avoid corruption');
       try { this.warmupProcess.kill(); } catch { /* ignore */ }
       this.warmupProcess = null;
       this.cleanupWarmingLock();
+      this.clearCompileCache();
     }
 
     if (this.gatewayProcess) {
@@ -1875,6 +1883,8 @@ export class OpenClawEngineManager extends EventEmitter {
 
     if (this.gatewayRestartAttempt >= GATEWAY_MAX_RESTART_ATTEMPTS) {
       console.error(`${gwDiagTs()} gateway auto-restart limit reached (${GATEWAY_MAX_RESTART_ATTEMPTS} attempts), giving up`);
+      // Last resort: clear potentially corrupt compile cache so manual restart works
+      this.clearCompileCache();
       this.setStatus({
         phase: 'error',
         version: this.status.version,
@@ -1882,6 +1892,13 @@ export class OpenClawEngineManager extends EventEmitter {
         canRetry: true,
       });
       return;
+    }
+
+    // On the last retry attempt, clear the compile cache to recover from
+    // potential cache corruption (e.g. warmup killed mid-write)
+    if (this.gatewayRestartAttempt === GATEWAY_MAX_RESTART_ATTEMPTS - 1) {
+      console.log(`${gwDiagTs()} clearing compile cache before final restart attempt`);
+      this.clearCompileCache();
     }
 
     const delay = GATEWAY_RESTART_DELAYS[Math.min(this.gatewayRestartAttempt, GATEWAY_RESTART_DELAYS.length - 1)];
