@@ -348,6 +348,7 @@ export interface CreateAgentRequest {
   skillIds?: string[];
   source?: AgentSource;
   presetId?: string;
+  triageOverride?: import('../shared/triage').AgentTriageOverride;
 }
 
 export interface UpdateAgentRequest {

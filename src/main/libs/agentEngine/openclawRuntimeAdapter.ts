@@ -1882,8 +1882,8 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     let triageResult: TriageResult | null = null;
     const globalTriage = this.options.getTriageConfig?.();
     // Merge Agent-level triage override with global defaults
-    const agent = agentId ? this.options.getAgent?.(agentId) : null;
-    const agentTriage = agent?.triageOverride;
+    const agentRecord = agentId ? this.options.getAgent?.(agentId) : null;
+    const agentTriage = agentRecord?.triageOverride;
     const triageConfig: TriageConfig | null = (agentTriage?.enabled || globalTriage?.enabled) ? {
       ...globalTriage,
       enabled: agentTriage?.enabled ?? globalTriage?.enabled ?? false,
