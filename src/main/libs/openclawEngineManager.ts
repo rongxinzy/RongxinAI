@@ -784,7 +784,8 @@ export class OpenClawEngineManager extends EventEmitter {
       canRetry: false,
     });
 
-    const compileCacheDir = path.join(this.stateDir, '.compile-cache');
+    const compileCacheDir = this.getCompileCacheDir();
+    ensureDir(compileCacheDir);
     console.log(`[OpenClaw] compile cache dir: ${compileCacheDir}`);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();
     const cliShimDir = this.ensureBundledCliShims();
@@ -1356,8 +1357,8 @@ export class OpenClawEngineManager extends EventEmitter {
       `// ─── Compile cache setup ───\n` +
       `try {\n` +
       `  const { enableCompileCache, getCompileCacheDir } = require('node:module');\n` +
-      `  const _ccDir = path.join(process.env.OPENCLAW_STATE_DIR || __dirname, '.compile-cache');\n` +
-      `  enableCompileCache(_ccDir);\n` +
+      `  const _ccDir = process.env.NODE_COMPILE_CACHE || path.join(process.env.OPENCLAW_STATE_DIR || __dirname, '.compile-cache');\n` +
+      `  if (_ccDir) { enableCompileCache(_ccDir); }\n` +
       `  _log('compile-cache dir=' + getCompileCacheDir());\n` +
       `} catch (_) {}\n` +
       `// ─── Load bundle ───\n` +
