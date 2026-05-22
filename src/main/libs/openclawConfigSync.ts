@@ -677,6 +677,7 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
   [ProviderName.LlamaCpp]: {
     providerId: OpenClawProviderId.LlamaCpp,
     resolveApi: ({ apiType, baseURL }) => mapApiTypeToOpenClawApi(apiType, undefined, baseURL),
+    resolveApiKey: () => undefined,
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
 
