@@ -47,6 +47,23 @@ export interface TriageState {
 export const TriageIpcChannel = {
   GetConfig: 'triage:config:get',
   SetConfig: 'triage:config:set',
+  GetAgentConfig: 'triage:agent-config:get',
+  SetAgentConfig: 'triage:agent-config:set',
 } as const;
 
 export type TriageIpcChannel = (typeof TriageIpcChannel)[keyof typeof TriageIpcChannel];
+
+/** Agent-level triage override. Fields left undefined inherit from global defaults. */
+export interface AgentTriageOverride {
+  enabled?: boolean;
+  lightModelRef?: string;
+  heavyModelRef?: string;
+  allowCrossProviderSwitch?: boolean;
+}
+
+export const EMPTY_AGENT_TRIAGE_OVERRIDE: AgentTriageOverride = {
+  enabled: undefined,
+  lightModelRef: undefined,
+  heavyModelRef: undefined,
+  allowCrossProviderSwitch: undefined,
+};

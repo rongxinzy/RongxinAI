@@ -331,6 +331,7 @@ export interface Agent {
   isDefault: boolean;
   source: AgentSource;
   presetId: string;
+  triageOverride?: import('../shared/triage').AgentTriageOverride;
   createdAt: number;
   updatedAt: number;
 }
@@ -360,6 +361,7 @@ export interface UpdateAgentRequest {
   skillIds?: string[];
   enabled?: boolean;
   pinned?: boolean;
+  triageOverride?: import('../shared/triage').AgentTriageOverride | null;
 }
 
 
@@ -1980,8 +1982,8 @@ export class CoworkStore {
     this.db
       .prepare(
         `
-      INSERT INTO agents (id, name, description, system_prompt, identity, model, working_directory, icon, skill_ids, enabled, is_default, source, preset_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?)
+      INSERT INTO agents (id, name, description, system_prompt, identity, model, working_directory, icon, skill_ids, enabled, is_default, source, preset_id, triage_override, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -1996,6 +1998,7 @@ export class CoworkStore {
         JSON.stringify(request.skillIds || []),
         request.source || 'custom',
         request.presetId || '',
+        request.triageOverride ? JSON.stringify(request.triageOverride) : null,
         now,
         now,
       );
@@ -2070,6 +2073,10 @@ export class CoworkStore {
         setClauses.push('pin_order = NULL');
       }
     }
+    if (updates.triageOverride !== undefined) {
+      setClauses.push('triage_override = ?');
+      values.push(updates.triageOverride ? JSON.stringify(updates.triageOverride) : null);
+    }
 
     values.push(id);
     this.db.prepare(`UPDATE agents SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
@@ -2098,6 +2105,7 @@ export class CoworkStore {
     is_default: number;
     source: string;
     preset_id: string;
+    triage_override?: string | null;
     created_at: number;
     updated_at: number;
   }): Agent {
@@ -2106,6 +2114,14 @@ export class CoworkStore {
       skillIds = JSON.parse(row.skill_ids);
     } catch {
       skillIds = [];
+    }
+    let triageOverride = undefined;
+    if (row.triage_override) {
+      try {
+        triageOverride = JSON.parse(row.triage_override);
+      } catch {
+        triageOverride = undefined;
+      }
     }
     return {
       id: row.id,
@@ -2123,6 +2139,7 @@ export class CoworkStore {
       isDefault: Boolean(row.is_default),
       source: row.source as AgentSource,
       presetId: row.preset_id,
+      triageOverride,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
