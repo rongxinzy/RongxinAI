@@ -320,6 +320,67 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(provider.models).toHaveLength(3);
   });
 
+  test('clears stale plugins.load.paths when current third-party extensions dir is unavailable', async () => {
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        plugins: {
+          load: {
+            paths: ['/Users/whz/Desktop/rongx/LobsterAI/vendor/openclaw-runtime/linux-x64/third-party-extensions'],
+            watch: true,
+          },
+          entries: {
+            'mcp-bridge': { enabled: true },
+          },
+        },
+      }, null, 2),
+    );
+
+    const { OpenClawConfigSync } = await import('./openclawConfigSync');
+
+    const sync = new OpenClawConfigSync({
+      engineManager: {
+        getConfigPath: () => configPath,
+        getGatewayToken: () => 'gateway-token',
+        getStateDir: () => stateDir,
+        getBaseDir: () => tmpDir,
+      } as never,
+      getCoworkConfig: () => ({
+        workingDirectory: tmpDir,
+        systemPrompt: '',
+        executionMode: 'local',
+        agentEngine: 'openclaw',
+        memoryEnabled: false,
+        memoryImplicitUpdateEnabled: false,
+        memoryLlmJudgeEnabled: false,
+        memoryGuardLevel: 'balanced',
+        memoryUserMemoriesMaxItems: 100,
+        skipMissedJobs: false,
+      }),
+      isEnterprise: () => false,
+      getTelegramInstances: () => [],
+      getDiscordOpenClawConfig: () => null,
+      getDingTalkInstances: () => [],
+      getFeishuInstances: () => [],
+      getQQInstances: () => [],
+      getWecomConfig: () => null,
+      getWecomInstances: () => [],
+      getPopoInstances: () => [],
+      getNeteaseBeeChanConfig: () => null,
+      getWeixinConfig: () => null,
+      getIMSettings: () => null,
+      getSkillsList: () => [],
+      getAgents: () => [],
+    });
+
+    const result = sync.sync('stale-third-party-path');
+    expect(result.ok).toBe(true);
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    expect(config.plugins.load.paths).toBeUndefined();
+    expect(config.plugins.load.watch).toBe(true);
+  });
+
   test('maps OpenAI OAuth mode to the OpenAI Codex provider', async () => {
     const { AuthType, OpenClawApi, OpenClawProviderId, ProviderName } = await import('../../shared/providers');
     const { buildProviderSelection } = await import('./openclawConfigSync');

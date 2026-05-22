@@ -116,9 +116,6 @@ type OllamaServiceConfigFormState = {
   mmap: string;
   mlock: string;
   jinja: string;
-  reasoning: string;
-  reasoningFormat: string;
-  reasoningBudget: string;
 };
 
 type ServiceConfigGroup = 'basic' | 'advanced';
@@ -1638,17 +1635,6 @@ function OllamaServiceConfigDialog({
       ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
       ...(form.mlock ? { mlock: form.mlock === 'true' } : {}),
       ...(form.jinja ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> } : {}),
-      ...(form.reasoning
-        ? { reasoning: form.reasoning as NonNullable<OllamaServiceConfig['reasoning']> }
-        : {}),
-      ...(form.reasoningFormat
-        ? {
-            reasoningFormat: form.reasoningFormat as NonNullable<
-              OllamaServiceConfig['reasoningFormat']
-            >,
-          }
-        : {}),
-      reasoningBudget: form.reasoningBudget,
       ...(form.splitMode
         ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> }
         : {}),
@@ -1917,15 +1903,7 @@ function getServiceConfigSelectOptions(
       return booleanSelectOptions();
     case 'flashAttn':
     case 'jinja':
-    case 'reasoning':
       return onOffAutoOptions();
-    case 'reasoningFormat':
-      return [
-        { value: 'none', label: 'none' },
-        { value: 'deepseek', label: 'deepseek' },
-        { value: 'deepseek-legacy', label: 'deepseek-legacy' },
-        { value: 'auto', label: 'auto' },
-      ];
     default:
       return [];
   }
@@ -3190,18 +3168,6 @@ function InferencePanel({
                 <h2 className="truncate text-sm font-medium text-foreground">{selectedModel}</h2>
               </div>
             </div>
-            {selectedRunningModel?.trained_context_length && (
-              <Badge>
-                {i18nService.t('localInferenceTrainedContext')}:{' '}
-                {selectedRunningModel.trained_context_length}
-              </Badge>
-            )}
-            {selectedRunningModel?.runtime_context_length && (
-              <Badge tone="success">
-                {i18nService.t('localInferenceRuntimeContext')}:{' '}
-                {selectedRunningModel.runtime_context_length}
-              </Badge>
-            )}
           </div>
           <div
             ref={chatScrollRef}
@@ -3742,9 +3708,6 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
     mmap: config.noMmap === undefined ? '' : String(!config.noMmap),
     mlock: config.mlock === undefined ? '' : String(config.mlock),
     jinja: config.jinja ?? '',
-    reasoning: config.reasoning ?? '',
-    reasoningFormat: config.reasoningFormat ?? '',
-    reasoningBudget: config.reasoningBudget ?? '',
   };
 }
 

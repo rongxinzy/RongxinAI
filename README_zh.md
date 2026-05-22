@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>基于 OpenClaw 与 Ollama 的本地 AI Agent 工作台</strong>
+  <strong>基于 OpenClaw 与 llama.cpp 的本地 AI Agent 工作台</strong>
 </p>
 
 <p align="center">
@@ -23,14 +23,14 @@
 
 ---
 
-RongxinAI 是一个本地优先的桌面 AI Agent 工作台。它将 **OpenClaw Agent runtime**、**Ollama 本地模型推理**、技能系统、MCP 扩展、定时任务和 IM/邮件触达整合到同一个应用中，面向办公自动化、数据分析、文档生成、信息检索和个人助理场景。
+RongxinAI 是一个本地优先的桌面 AI Agent 工作台。它将 **OpenClaw Agent runtime**、**llama.cpp 本地模型推理**、技能系统、MCP 扩展、定时任务和 IM/邮件触达整合到同一个应用中，面向办公自动化、数据分析、文档生成、信息检索和个人助理场景。
 
 项目目标不是做一个单纯聊天客户端，而是提供一个可以在本机执行任务、管理工具权限、调度长期任务、接入本地模型并可通过移动端触发的 Agent 工作环境。
 
 ## 核心能力
 
 - **OpenClaw Agent 工作流**：通过 Cowork 会话执行文件操作、命令运行、网页访问、文档处理等任务。
-- **Ollama 本地推理**：管理本地模型、拉取模型、配置模型启动参数，并把本地模型接入 OpenClaw。
+- **llama.cpp 本地推理**：管理本地 GGUF 模型、安装与加载模型、配置启动参数，并把本地模型接入 OpenClaw。
 - **技能系统**：内置文档、表格、PPT、PDF、Web 搜索、网页自动化、视频生成、投研、邮件等技能。
 - **MCP 扩展**：支持配置 MCP Server，把外部工具和数据源接入 Agent。
 - **定时任务**：支持自然语言或 GUI 创建周期任务，例如每日简报、邮箱整理、定期报告。
@@ -45,7 +45,7 @@ RongxinAI 是一个本地优先的桌面 AI Agent 工作台。它将 **OpenClaw 
   <img src="docs/res/rongxinai_architecture_zh.svg" alt="RongxinAI 架构" width="760">
 </p>
 
-RongxinAI 使用 Electron 严格进程隔离架构。Renderer 负责 React UI，Preload 通过 `contextBridge` 暴露受控 IPC，Main Process 负责本地存储、OpenClaw runtime 生命周期、Ollama 服务管理、技能/MCP/IM 调度。
+RongxinAI 使用 Electron 严格进程隔离架构。Renderer 负责 React UI，Preload 通过 `contextBridge` 暴露受控 IPC，Main Process 负责本地存储、OpenClaw runtime 生命周期、llama.cpp 服务管理、技能/MCP/IM 调度。
 
 ## 快速开始
 
@@ -124,9 +124,9 @@ Cowork 是 RongxinAI 的核心会话系统。用户发起任务后，Renderer �
 | `complete` | 会话执行完成 |
 | `error` | 会话执行失败 |
 
-### Ollama 本地推理
+### llama.cpp 本地推理
 
-本地推理页面用于管理 Ollama 服务、本地模型、模型市场和模型启动参数。模型级参数会作为 Ollama request options 传入，例如上下文长度、GPU offload 层数、线程数、批处理大小、主 GPU、内存映射和驻留时间。服务级参数会作为 `ollama serve` 的环境变量写入，仅在启动或重启 Ollama 服务时生效。
+本地推理页面用于管理 llama.cpp 服务、本地 GGUF 模型、模型市场和模型启动参数。模型级参数覆盖运行时启动与请求行为，例如上下文长度、GPU offload 层数、线程数、批处理大小、主 GPU、内存映射和驻留时间。服务级参数作用于受应用管理的 `llama-server` 进程，并在启动或重启 llama.cpp 服务后生效。
 
 ### 技能与 MCP
 
@@ -179,7 +179,7 @@ Cowork 是 RongxinAI 的核心会话系统。用户发起任务后，Renderer �
 | 样式 | Tailwind CSS |
 | 状态管理 | Redux Toolkit |
 | Agent runtime | OpenClaw |
-| 本地模型 | Ollama |
+| 本地模型 | llama.cpp |
 | 存储 | better-sqlite3 |
 | 文档渲染 | react-markdown / Mermaid / KaTeX |
 
