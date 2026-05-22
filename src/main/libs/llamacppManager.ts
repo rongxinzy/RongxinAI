@@ -13,6 +13,7 @@ import type {
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeUninstallResult,
   LlamaCppServiceConfig,
@@ -20,10 +21,12 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppClient } from './llamacppClient';
 import {
+  copyDirectoryContents,
   createLlamaCppRuntimeInstallPlan,
   ensureLlamaCppRuntimeCurrent,
   executeLlamaCppRuntimeInstallPlan,
   getProjectRoot,
+  resolveLlamaCppExecutableName,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
 
@@ -211,6 +214,91 @@ export class LlamaCppManager extends EventEmitter {
       });
     }
     return result;
+  }
+
+  /**
+   * Import a user-provided llama.cpp runtime from a local directory.
+   * Copies all files from the directory containing llama-server into
+   * <runtimeRoot>/current/bin/, matching the existing auto-download
+   * copy strategy. Platform differences (DLLs, dylibs, .so) are handled
+   * automatically by copying the full directory.
+   */
+  async importRuntime(sourceDir: string): Promise<LlamaCppRuntimeImportResult> {
+    const executableName = resolveLlamaCppExecutableName(process.platform);
+    const sourceExecutable = path.join(sourceDir, executableName);
+
+    if (!fs.existsSync(sourceExecutable)) {
+      return {
+        success: false,
+        error: `未在所选目录中找到 ${executableName}。请选择包含 ${executableName} 的目录。`,
+      };
+    }
+
+    // Verify the executable is actually runnable
+    try {
+      if (process.platform !== 'win32') {
+        fs.accessSync(sourceExecutable, fs.constants.X_OK);
+      }
+    } catch {
+      return {
+        success: false,
+        error: `${executableName} 没有执行权限，请先设置可执行权限（chmod +x）。`,
+      };
+    }
+
+    const runtimeRoot = getUserLlamaCppRuntimeRoot();
+    const currentRuntimeRoot = path.join(runtimeRoot, 'current');
+    const targetBinDir = path.join(currentRuntimeRoot, 'bin');
+    const targetExecutable = path.join(targetBinDir, executableName);
+
+    try {
+      // Stop the running process if it's managed by us
+      if (this.process && this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
+        await this.stop();
+      }
+
+      // Clear existing runtime and copy the user's files
+      fs.rmSync(currentRuntimeRoot, { recursive: true, force: true });
+      fs.mkdirSync(targetBinDir, { recursive: true });
+      copyDirectoryContents(sourceDir, targetBinDir);
+
+      if (!fs.existsSync(targetExecutable)) {
+        throw new Error(`复制后缺少 ${executableName}，请检查源目录内容。`);
+      }
+
+      if (process.platform !== 'win32') {
+        fs.chmodSync(targetExecutable, 0o755);
+      }
+
+      // Write build info
+      fs.writeFileSync(
+        path.join(currentRuntimeRoot, 'runtime-build-info.json'),
+        JSON.stringify({
+          target: resolveLlamaCppRuntimeTargetId(process.platform, process.arch),
+          source: 'user-import',
+          importedFrom: sourceDir,
+          importedAt: new Date().toISOString(),
+        }, null, 2) + '\n',
+        'utf8',
+      );
+
+      this.executablePath = targetExecutable;
+      this.setStatus({
+        status: 'installed',
+        executablePath: targetExecutable,
+        managedByApp: false,
+      });
+      return { success: true, executablePath: targetExecutable };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.setStatus({
+        status: 'not-installed',
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+        error: message,
+      });
+      return { success: false, error: message };
+    }
   }
 
   async uninstallRuntime(): Promise<LlamaCppRuntimeUninstallResult> {

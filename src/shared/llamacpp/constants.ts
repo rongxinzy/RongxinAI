@@ -20,6 +20,7 @@ export const LlamaCppIpcChannel = {
   ChatStream: 'llamacpp:chat-stream',
   CancelChatStream: 'llamacpp:cancel-chat-stream',
   SetOpenClawModel: 'llamacpp:set-openclaw-model',
+  ImportRuntime: 'llamacpp:import-runtime',
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
   ChatStreamChunk: 'llamacpp:chat-stream-chunk',

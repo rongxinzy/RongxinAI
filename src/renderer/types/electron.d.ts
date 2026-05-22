@@ -13,6 +13,7 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppModelUnloadResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeUninstallResult,
   LlamaCppServiceConfig,
@@ -414,6 +415,7 @@ interface IElectronAPI {
   llamacpp: {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
+    importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;

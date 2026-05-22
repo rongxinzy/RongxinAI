@@ -51,6 +51,12 @@ export type LlamaCppRuntimeUninstallResult = {
   error?: string;
 };
 
+export type LlamaCppRuntimeImportResult = {
+  success: boolean;
+  executablePath?: string;
+  error?: string;
+};
+
 export type LlamaCppInstallProgressPhase =
   | 'starting'
   | 'detecting'

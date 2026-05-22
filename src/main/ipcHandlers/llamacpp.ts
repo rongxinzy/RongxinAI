@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
@@ -7,6 +7,7 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelUnloadResult,
+  LlamaCppRuntimeImportResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -198,6 +199,25 @@ export function registerLlamaCppIpcHandlers(
     return await manager.installRuntime();
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
+  ipcMain.handle(LlamaCppIpcChannel.ImportRuntime, async () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) {
+      return { success: false, error: '没有活动窗口' };
+    }
+
+    const executableName = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
+    const result = await dialog.showOpenDialog(win, {
+      title: t('localInferenceImportRuntimeDialogTitle'),
+      message: t('localInferenceImportRuntimeDialogMessage').replace('{name}', executableName),
+      properties: ['openDirectory'],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, error: '已取消' };
+    }
+
+    return await manager.importRuntime(result.filePaths[0]);
+  });
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
