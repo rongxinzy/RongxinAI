@@ -2127,10 +2127,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   };
 
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
-    // Only export providers that have been configured: enabled, custom, or have an API key set.
-    // Skip unconfigured preset providers to avoid exporting never-used default models.
-    const configuredEntries = Object.entries(providers).filter(([key, cfg]) =>
-      cfg.enabled || isCustomProvider(key) || (cfg as ProviderConfig).apiKey?.trim()
+    // Only export providers that have an API key configured, regardless of enabled state.
+    // Skip preset providers that were never configured to avoid exporting default models.
+    const configuredEntries = Object.entries(providers).filter(([, cfg]) =>
+      (cfg as ProviderConfig).apiKey?.trim()
     );
     const entries = await Promise.all(
       configuredEntries.map(async ([providerKey, providerConfig]) => {
