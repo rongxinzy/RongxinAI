@@ -1894,6 +1894,13 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         ...(agentTriage?.allowCrossProviderSwitch !== undefined ? { allowCrossProviderSwitch: agentTriage.allowCrossProviderSwitch } : {}),
       },
     } as TriageConfig : null;
+    if (!triageConfig?.enabled) {
+      console.debug('[ModelTriage] skipped: triage not enabled', `agentId=${agentId}`, `agentTriageEnabled=${agentTriage?.enabled}`, `globalEnabled=${globalTriage?.enabled}`);
+    } else if (session.modelOverride) {
+      console.debug('[ModelTriage] skipped: session has modelOverride', `sessionId=${sessionId}`, `override=${session.modelOverride}`);
+    } else if (!currentModel) {
+      console.debug('[ModelTriage] skipped: no currentModel', `sessionId=${sessionId}`, `agentId=${agentId}`);
+    }
     if (
       triageConfig?.enabled &&
       !session.modelOverride &&
@@ -1942,7 +1949,24 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
             `to=${triageResult.modelRef}`,
             `crossProvider=${isCrossProvider}`,
           );
+        } else {
+          console.debug(
+            '[ModelTriage] skipped: cooldown or tier unchanged',
+            `sessionId=${sessionId}`,
+            `tier=${classification.tier}`,
+            `activeTier=${triageState.activeTier}`,
+            `round=${conversationDepth}`,
+            `lastSwitch=${triageState.lastSwitchRound}`,
+            `cooldown=${triageConfig.rules.cooldownRounds}`,
+          );
         }
+      } else {
+        console.debug(
+          '[ModelTriage] classification returned no modelRef',
+          `sessionId=${sessionId}`,
+          `tier=${classification.tier}`,
+          `reason=${classification.reason}`,
+        );
       }
     }
 
