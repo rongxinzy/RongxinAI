@@ -366,13 +366,11 @@ const IMSettings: React.FC = () => {
         await imService.loadStatus();
       } else {
         // Not connected — keep QR visible with reconnect overlay.
-        setWeixinQrError(waitResult.message || '');
         setWeixinQrStatus('expired');
       }
     } catch (err) {
       if (weixinTimerRef.current) { clearTimeout(weixinTimerRef.current); weixinTimerRef.current = null; }
       if (!isMountedRef.current) return;
-      setWeixinQrError(String(err));
       setWeixinQrStatus('expired');
     }
   };
@@ -2063,12 +2061,6 @@ const IMSettings: React.FC = () => {
                     <div className="flex items-center justify-center gap-1.5 text-xs text-secondary">
                       <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
                       {i18nService.t('imWeixinQrWaiting') || 'Waiting for scan...'}
-                    </div>
-                  )}
-                  {weixinQrStatus === 'expired' && weixinQrError && (
-                    <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                      <XCircleIcon className="h-4 w-4 flex-shrink-0" />
-                      {weixinQrError}
                     </div>
                   )}
                 </div>
