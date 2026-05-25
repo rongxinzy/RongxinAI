@@ -2053,7 +2053,7 @@ const IMSettings: React.FC = () => {
                           className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg"
                         >
                           <ArrowPathIcon className="h-4 w-4 inline mr-1.5" />
-                          {i18nService.t('imWeixinScanBtn')}
+                    {i18nService.t('imWeixinQrRefresh')}
                         </button>
                       </div>
                     )}
