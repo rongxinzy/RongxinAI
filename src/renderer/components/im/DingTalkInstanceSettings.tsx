@@ -146,7 +146,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
   const [nameValue, setNameValue] = useState(instance.instanceName);
 
   // QR code scanning state
-  const [qrStatus, setQrStatus] = useState<'idle' | 'loading' | 'showing' | 'success' | 'error'>('idle');
+  const [qrStatus, setQrStatus] = useState<'idle' | 'loading' | 'showing' | 'success' | 'expired' | 'error'>('idle');
   const [qrUrl, setQrUrl] = useState('');
   const [qrTimeLeft, setQrTimeLeft] = useState(0);
   const [qrError, setQrError] = useState('');
@@ -184,8 +184,8 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
             clearInterval(qrCountdownTimerRef.current!);
             qrCountdownTimerRef.current = null;
             if (qrPollTimerRef.current) { clearInterval(qrPollTimerRef.current); qrPollTimerRef.current = null; }
-            setQrStatus('error');
-            setQrError(i18nService.t('dingtalkBotCreateWizardQrcodeExpired'));
+            // QR expired: keep it visible with a reconnect overlay.
+            setQrStatus('expired');
             return 0;
           }
           return prev - 1;
@@ -206,8 +206,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
           } else if (pollResult.error) {
             clearInterval(qrPollTimerRef.current!); qrPollTimerRef.current = null;
             clearInterval(qrCountdownTimerRef.current!); qrCountdownTimerRef.current = null;
-            setQrStatus('error');
-            setQrError(pollResult.error);
+            setQrStatus('expired');
           }
         } catch { /* keep retrying */ }
       }, intervalMs);
@@ -316,7 +315,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
       {/* Scan QR code section */}
       <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center space-y-3">
-        {(qrStatus === 'idle' || qrStatus === 'error') && (
+        {qrStatus === 'idle' && (
           <>
             <button
               type="button"
@@ -328,7 +327,18 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
             <p className="text-xs text-secondary">
               {i18nService.t('dingtalkBotCreateWizardScanHint')}
             </p>
-            {qrStatus === 'error' && qrError && (
+          </>
+        )}
+        {qrStatus === 'error' && (
+          <>
+            <button
+              type="button"
+              onClick={() => void handleStartQr()}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {i18nService.t('dingtalkBotCreateWizardScanBtn')}
+            </button>
+            {qrError && (
               <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
                 <XCircleIcon className="h-4 w-4 flex-shrink-0" />
                 {qrError}
@@ -342,17 +352,33 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
             <span className="text-xs text-secondary">{i18nService.t('dingtalkBotCreateWizardGenerating')}</span>
           </div>
         )}
-        {qrStatus === 'showing' && qrUrl && (
+        {(qrStatus === 'showing' || qrStatus === 'expired') && qrUrl && (
           <div className="flex flex-col items-center gap-2">
-            <div className="p-2 bg-white rounded-lg inline-block">
-              <QRCodeSVG value={qrUrl} size={160} />
+            <div className="relative inline-block">
+              <div className={`p-2 bg-white rounded-lg ${qrStatus === 'expired' ? 'opacity-30' : ''}`}>
+                <QRCodeSVG value={qrUrl} size={160} />
+              </div>
+              {qrStatus === 'expired' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => void handleStartQr()}
+                    className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg"
+                  >
+                    <ArrowPathIcon className="h-4 w-4 inline mr-1.5" />
+                    {i18nService.t('dingtalkBotCreateWizardScanBtn')}
+                  </button>
+                </div>
+              )}
             </div>
             <p className="text-xs text-secondary max-w-[240px]">
-              {i18nService.t('dingtalkBotCreateWizardQrcodeDesc')}
+              {qrStatus === 'expired'
+                ? i18nService.t('dingtalkBotCreateWizardQrcodeExpired')
+                : i18nService.t('dingtalkBotCreateWizardQrcodeDesc')}
             </p>
-            <p className="text-xs text-secondary">
-              {qrTimeLeft}s
-            </p>
+            {qrStatus === 'showing' && (
+              <p className="text-xs text-secondary">{qrTimeLeft}s</p>
+            )}
           </div>
         )}
         {qrStatus === 'success' && (
