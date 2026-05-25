@@ -1359,9 +1359,13 @@ export class IMGatewayManager extends EventEmitter {
       return { connected: false, message: 'OpenClaw Gateway is not connected.' };
     }
     try {
+      // RPC timeout at 65s (60s QR lifetime + 5s grace).
+      // Must be passed as third argument (options.timeoutMs) to override
+      // the GatewayClient default of 30s, not just as a handler param.
       const result = await client.request<{ connected: boolean; message: string; accountId?: string }>(
         'web.login.wait',
-        { timeoutMs: 480000, ...(accountId ? { accountId } : {}) },
+        { timeoutMs: 65_000, ...(accountId ? { accountId } : {}) },
+        { timeoutMs: 65_000 },
       );
       console.log('[IMGatewayManager] Weixin QR login wait result:', JSON.stringify({ connected: result.connected, message: result.message, accountId: result.accountId }));
       if (result.connected) {
@@ -1375,7 +1379,7 @@ export class IMGatewayManager extends EventEmitter {
       return result;
     } catch (err) {
       console.error('[IMGatewayManager] Weixin QR login wait failed:', err);
-      return { connected: false, message: `Login failed: ${String(err)}` };
+      return { connected: false, message: String(err) };
     }
   }
 
