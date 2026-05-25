@@ -44,7 +44,7 @@ type GatewayClientLike = {
   request: <T = Record<string, unknown>>(
     method: string,
     params?: unknown,
-    opts?: { expectFinal?: boolean },
+    opts?: { expectFinal?: boolean; timeoutMs?: number | null },
   ) => Promise<T>;
 };
 
@@ -1361,7 +1361,8 @@ export class IMGatewayManager extends EventEmitter {
     try {
       const result = await client.request<{ connected: boolean; message: string; accountId?: string }>(
         'web.login.wait',
-        { timeoutMs: 480000, ...(accountId ? { accountId } : {}) },
+        { timeoutMs: 480_000, ...(accountId ? { accountId } : {}) },
+        { timeoutMs: 65_000 },
       );
       console.log('[IMGatewayManager] Weixin QR login wait result:', JSON.stringify({ connected: result.connected, message: result.message, accountId: result.accountId }));
       if (result.connected) {
@@ -1375,7 +1376,7 @@ export class IMGatewayManager extends EventEmitter {
       return result;
     } catch (err) {
       console.error('[IMGatewayManager] Weixin QR login wait failed:', err);
-      return { connected: false, message: `Login failed: ${String(err)}` };
+      return { connected: false, message: String(err) };
     }
   }
 
