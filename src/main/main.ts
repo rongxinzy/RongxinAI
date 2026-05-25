@@ -1282,8 +1282,64 @@ const scheduleDeferredGatewayRestart = (reason: string) => {
   }, DEFERRED_RESTART_MAX_WAIT_MS);
 };
 
+// Debounce state for syncOpenClawConfig (Phase 1 / O4).
+// Merges rapid successive calls within a 500ms window to avoid redundant
+// config writes and restart evaluations.  Only the *last* call's options
+// are used for the debounced execution (except restartGatewayIfRunning,
+// which is OR-merged so no request is silently dropped).
+let _syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _syncDebouncePromise: Promise<{
+  success: boolean;
+  changed: boolean;
+  mcpBridgeConfigChanged?: boolean;
+  status?: OpenClawEngineStatus;
+  error?: string;
+}> | null = null;
+let _syncDebounceOptions: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean } | null = null;
+const SYNC_DEBOUNCE_MS = 500;
+
 const syncOpenClawConfig = async (
   options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean } = { reason: 'unknown' },
+): Promise<{ success: boolean; changed: boolean; mcpBridgeConfigChanged?: boolean; status?: OpenClawEngineStatus; error?: string }> => {
+  // Debounce: merge non-startup calls within SYNC_DEBOUNCE_MS.
+  if (options.reason !== 'startup') {
+    if (_syncDebouncePromise) {
+      // Merge restartGatewayIfRunning flag so no request is silently dropped.
+      if (options.restartGatewayIfRunning && _syncDebounceOptions) {
+        _syncDebounceOptions.restartGatewayIfRunning = true;
+      }
+      if (options.forceGatewayRestartIfRunning && _syncDebounceOptions) {
+        _syncDebounceOptions.forceGatewayRestartIfRunning = true;
+      }
+      return _syncDebouncePromise;
+    }
+
+    _syncDebounceOptions = { ...options };
+
+    _syncDebouncePromise = new Promise((resolve) => {
+      if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+      _syncDebounceTimer = setTimeout(async () => {
+        try {
+          const result = await doSyncOpenClawConfig(_syncDebounceOptions!);
+          resolve(result);
+        } finally {
+          _syncDebounceTimer = null;
+          _syncDebouncePromise = null;
+          _syncDebounceOptions = null;
+        }
+      }, SYNC_DEBOUNCE_MS);
+    });
+
+    return _syncDebouncePromise;
+  }
+
+  // Startup calls execute immediately — the gateway isn't running yet
+  // and we need the config written before anything else (Phase 1 / O1).
+  return doSyncOpenClawConfig(options);
+};
+
+const doSyncOpenClawConfig = async (
+  options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean },
 ): Promise<{ success: boolean; changed: boolean; mcpBridgeConfigChanged?: boolean; status?: OpenClawEngineStatus; error?: string }> => {
   const D = gwDiagTs;
   console.log(`${D()} ──── syncOpenClawConfig START reason=${options.reason} restartIfRunning=${!!options.restartGatewayIfRunning} forceRestart=${!!options.forceGatewayRestartIfRunning}`);
@@ -1306,6 +1362,25 @@ const syncOpenClawConfig = async (
   try {
     mergeEnterpriseOpenclawConfig(getOpenClawEngineManager().getConfigPath());
   } catch { /* non-critical */ }
+
+  // Fast path: when the gateway is not running, skip the env-var diff
+  // diagnostic logging and restart-decision logic.  The config file has
+  // already been written by sync() above; we only need to seed the
+  // secret-env-var state so that the next sync (after gateway start) does
+  // not spuriously detect a change.
+  //
+  // This saves ~1.5 s on cold startup (Phase 1 / O1).
+  const manager = getOpenClawEngineManager();
+  const gatewayStatus = manager.getStatus();
+  if (gatewayStatus.phase !== 'running') {
+    const fastEnvVars = getOpenClawConfigSync().collectSecretEnvVars();
+    manager.setSecretEnvVars(fastEnvVars);
+    console.log(`${D()} ──── FAST PATH: gateway not running (phase=${gatewayStatus.phase}), env vars seeded (${Object.keys(fastEnvVars).length} keys). reason=${options.reason}`);
+    return {
+      success: true,
+      changed: syncResult.changed,
+    };
+  }
 
   const nextSecretEnvVars = getOpenClawConfigSync().collectSecretEnvVars();
   const prevSecretEnvVars = getOpenClawEngineManager().getSecretEnvVars();
@@ -1375,31 +1450,17 @@ const syncOpenClawConfig = async (
     };
   }
 
-  const manager = getOpenClawEngineManager();
-  const status = manager.getStatus();
-  if (status.phase !== 'running') {
-    console.log(`${D()} ──── RESTART NEEDED but gateway not running (phase=${status.phase}), skipping. reason=${options.reason}`);
-    return {
-      success: true,
-      changed: true,
-      status,
-    };
-  }
-
-  // Binding changes are user actions (switching agent/model for a channel).
-  // Deferring the restart would keep routing messages with stale config, so
-  // force immediate restart regardless of active workloads.
   if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged && !options.forceGatewayRestartIfRunning) {
     console.log(`${D()} ──── RESTART DEFERRED (active workloads). reason=${options.reason}`);
     scheduleDeferredGatewayRestart(options.reason);
     return {
       success: true,
       changed: true,
-      status,
+      status: gatewayStatus,
     };
   }
 
-  console.log(`${D()} ──── HARD RESTART EXECUTING. reason=${options.reason}, phase=${status.phase}, port=${status.message?.match(/loopback:(\d+)/)?.[1] ?? 'unknown'}`);
+  console.log(`${D()} ──── HARD RESTART EXECUTING. reason=${options.reason}, phase=${gatewayStatus.phase}, port=${gatewayStatus.message?.match(/loopback:(\d+)/)?.[1] ?? 'unknown'}`);
   if (openClawRuntimeAdapter) {
     openClawRuntimeAdapter.disconnectGatewayClient();
   }
