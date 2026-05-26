@@ -4250,6 +4250,23 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       }
     }
 
+    // When the API returns an empty response (e.g. MiniMax/MiMo 400 due
+    // to missing reasoning_content on replayed thinking blocks —
+    // openclaw#81416), the Gateway retries automatically with a
+    // visible-answer continuation prompt using the same runId.  Keep the
+    // turn alive so streaming delta events from the retry are not dropped
+    // by isRecentlyClosedRunId / sessionIdByRunId cleanup.
+    // The turn timeout watchdog handles cleanup if no retry ever arrives.
+    if (!turn.currentText.trim() && !turn.committedAssistantText.trim()) {
+      console.debug(
+        '[OpenClawRuntime] deferring run close — empty response, awaiting potential Gateway retry',
+        `sessionId=${sessionId}`,
+        `runId=${payload.runId ?? turn.runId}`,
+      );
+      this.store.updateSession(sessionId, { status: 'idle' });
+      return;
+    }
+
     this.store.updateSession(sessionId, { status: 'completed' });
     this.emit('complete', sessionId, payload.runId ?? turn.runId);
     this.cleanupSessionTurn(sessionId);
