@@ -490,7 +490,7 @@ const McpManager: React.FC = () => {
       {activeTab === 'installed' && (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredInstalled.length === 0 ? (
-            <div className="col-span-2 text-center py-12 text-sm text-secondary">
+            <div className="col-span-full text-center py-12 text-sm text-secondary">
               {i18nService.t('mcpNoInstalledServers')}
             </div>
           ) : (
@@ -582,7 +582,7 @@ const McpManager: React.FC = () => {
         <div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredMarketplace.length === 0 ? (
-              <div className="col-span-2 text-center py-12 text-sm text-secondary">
+              <div className="col-span-full text-center py-12 text-sm text-secondary">
                 {i18nService.t('noMcpServersAvailable')}
               </div>
             ) : (
