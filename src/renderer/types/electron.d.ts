@@ -1,7 +1,26 @@
+import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
+import type {
+  LlamaCppCancelInstallResult,
+  LlamaCppChatChunk,
+  LlamaCppChatPayload,
+  LlamaCppInstallModelInput,
+  LlamaCppInstallProgress,
+  LlamaCppModel,
+  LlamaCppModelLaunchInput,
+  LlamaCppModelLaunchResult,
+  LlamaCppModelUnloadResult,
+  LlamaCppRunningModel,
+  LlamaCppRuntimeImportResult,
+  LlamaCppRuntimeInstallResult,
+  LlamaCppRuntimeUninstallResult,
+  LlamaCppServiceConfig,
+  LlamaCppStatusSnapshot,
+} from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
+import type { TriageConfig } from '../../shared/triage';
 import type {
   OllamaCancelPullResult,
   OllamaChatChunk,
@@ -115,9 +134,16 @@ type CoworkConfigUpdate = Partial<
   >
 >;
 
+interface MemorySource {
+  sessionId: string | null;
+  role: 'user' | 'assistant' | 'tool' | 'system' | 'im';
+  date: string;
+}
+
 interface CoworkUserMemoryEntry {
   id: string;
   text: string;
+  source?: MemorySource | null;
 }
 
 interface CoworkMemoryStats {
@@ -149,6 +175,7 @@ type OpenClawEnginePhase =
   | 'installing'
   | 'ready'
   | 'starting'
+  | 'compiling'
   | 'running'
   | 'error';
 
@@ -385,8 +412,48 @@ interface IElectronAPI {
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
     onChatStreamChunk: (callback: (payload: { requestId: string; chunk: OllamaChatChunk }) => void) => () => void;
   };
+  llamacpp: {
+    status: () => Promise<LlamaCppStatusSnapshot>;
+    install: () => Promise<LlamaCppRuntimeInstallResult>;
+    importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
+    uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
+    start: () => Promise<LlamaCppStatusSnapshot>;
+    stop: () => Promise<LlamaCppStatusSnapshot>;
+    restart: () => Promise<LlamaCppStatusSnapshot>;
+    getServiceConfig: () => Promise<LlamaCppServiceConfig>;
+    setServiceConfig: (config: LlamaCppServiceConfig) => Promise<LlamaCppServiceConfig>;
+    modelsDir: () => Promise<string>;
+    listLocalModels: () => Promise<LlamaCppModel[]>;
+    listRunningModels: () => Promise<LlamaCppRunningModel[]>;
+    deleteModel: (name: string) => Promise<{ success: boolean; deleted?: boolean; reason?: 'not-local-file' | 'not-app-managed'; error?: string; removedModelName?: string; clearedDefaultModel?: boolean }>;
+    showModel: (name: string) => Promise<unknown>;
+    loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
+    unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
+    installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
+    cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
+    pullModel: (name: string) => Promise<{ success: boolean }>;
+    cancelPull: (name: string) => Promise<LlamaCppCancelInstallResult>;
+    chat: (payload: LlamaCppChatPayload) => Promise<LlamaCppChatChunk>;
+    chatStream: (requestId: string, payload: LlamaCppChatPayload) => Promise<{ success: boolean }>;
+    cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
+    setOpenClawModel: (modelName: string) => Promise<{
+      success: boolean;
+      error?: string;
+      config?: AppConfig;
+      modelRef?: string;
+      defaultAgent?: Agent | null;
+    }>;
+    onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
+    onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
+    onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
+    onChatStreamChunk: (callback: (payload: { requestId: string; chunk: LlamaCppChatChunk }) => void) => () => void;
+  };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
+  };
+  triage: {
+    getConfig: () => Promise<TriageConfig>;
+    setConfig: (config: TriageConfig) => Promise<TriageConfig>;
   };
   hardware: {
     nvidiaSmi: () => Promise<NvidiaSmiSnapshot>;
@@ -395,7 +462,7 @@ interface IElectronAPI {
     list: () => Promise<Agent[]>;
     get: (id: string) => Promise<Agent | null>;
     create: (request: { id?: string; name: string; description?: string; systemPrompt?: string; identity?: string; model?: string; workingDirectory?: string; icon?: string; skillIds?: string[]; source?: string; presetId?: string }) => Promise<Agent>;
-    update: (id: string, updates: { name?: string; description?: string; systemPrompt?: string; identity?: string; model?: string; workingDirectory?: string; icon?: string; skillIds?: string[]; enabled?: boolean; pinned?: boolean }) => Promise<Agent>;
+    update: (id: string, updates: { name?: string; description?: string; systemPrompt?: string; identity?: string; model?: string; workingDirectory?: string; icon?: string; skillIds?: string[]; enabled?: boolean; pinned?: boolean; triageOverride?: import('../../shared/triage').AgentTriageOverride | null }) => Promise<Agent>;
     delete: (id: string) => Promise<boolean>;
     presets: () => Promise<PresetAgent[]>;
     presetTemplates: () => Promise<PresetAgent[]>;
@@ -418,7 +485,7 @@ interface IElectronAPI {
     cancelStream: (requestId: string) => Promise<boolean>;
     onStreamData: (requestId: string, callback: (chunk: string) => void) => () => void;
     onStreamDone: (requestId: string, callback: () => void) => () => void;
-    onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
+    onStreamError: (requestId: string, callback: (error: CoworkError) => void) => () => void;
     onStreamAbort: (requestId: string, callback: () => void) => () => void;
   };
   getApiConfig: () => Promise<CoworkApiConfig | null>;
@@ -455,9 +522,9 @@ interface IElectronAPI {
       }) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
     };
   };
-  ipcRenderer: {
-    send: (channel: string, ...args: any[]) => void;
-    on: (channel: string, func: (...args: any[]) => void) => () => void;
+  appEvents: {
+    onOpenSettings: (callback: () => void) => () => void;
+    onNewTask: (callback: () => void) => () => void;
   };
   window: {
     minimize: () => void;
@@ -568,6 +635,7 @@ interface IElectronAPI {
     }) => Promise<{ success: boolean; entries?: CoworkUserMemoryEntry[]; error?: string }>;
     createMemoryEntry: (input: {
       text: string;
+      source?: { sessionId?: string | null; role?: string; date?: string };
     }) => Promise<{ success: boolean; entry?: CoworkUserMemoryEntry; error?: string }>;
     updateMemoryEntry: (input: {
       id: string;
@@ -595,8 +663,8 @@ interface IElectronAPI {
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => () => void;
-    onStreamError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
-    onSessionsChanged: (callback: () => void) => () => void;
+    onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) => () => void;
+    onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => () => void;
   };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;

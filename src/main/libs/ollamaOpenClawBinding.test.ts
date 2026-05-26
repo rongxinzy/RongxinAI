@@ -47,4 +47,15 @@ describe('buildOllamaOpenClawAppConfig', () => {
   test('rejects blank model names', () => {
     expect(() => buildOllamaOpenClawAppConfig({}, '   ')).toThrow('Model name is required');
   });
+
+  test('keeps the localhost OpenAI-compatible provider shape for OpenClaw sessions', () => {
+    const next = buildOllamaOpenClawAppConfig({}, 'qwen3:0.6b');
+
+    expect(next.providers?.ollama?.baseUrl).toBe('http://localhost:11434/v1');
+    expect(next.providers?.ollama?.apiFormat).toBe('openai');
+    expect(next.model).toEqual({
+      defaultModel: 'qwen3:0.6b',
+      defaultModelProvider: 'ollama',
+    });
+  });
 });

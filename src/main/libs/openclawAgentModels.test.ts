@@ -345,4 +345,29 @@ describe('resolveQualifiedAgentModelRef', () => {
       primaryModel: 'openai-codex/gpt-5.3-codex',
     });
   });
+
+  test('treats unavailable qualified refs as unresolved when no provider currently serves the model', () => {
+    expect(resolveQualifiedAgentModelRef({
+      agentModel: 'llamacpp/qwen-local',
+      availableProviders: {
+        'lobsterai-server': { models: [{ id: 'deepseek-v3.2' }] },
+      },
+    })).toEqual({
+      status: 'unresolved',
+      modelId: 'qwen-local',
+    });
+  });
+
+  test('does not rewrite explicit ollama refs to llama.cpp when model ids match', () => {
+    expect(resolveQualifiedAgentModelRef({
+      agentModel: 'ollama/qwen-local',
+      availableProviders: {
+        ollama: { models: [{ id: 'qwen-local' }] },
+        llamacpp: { models: [{ id: 'qwen-local' }] },
+      },
+    })).toEqual({
+      status: 'qualified',
+      primaryModel: 'ollama/qwen-local',
+    });
+  });
 });

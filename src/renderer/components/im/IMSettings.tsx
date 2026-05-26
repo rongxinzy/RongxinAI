@@ -110,7 +110,7 @@ const IMSettings: React.FC = () => {
   const [wecomQuickSetupStatus, setWecomQuickSetupStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [wecomQuickSetupError, setWecomQuickSetupError] = useState<string>('');
   // Weixin QR login state
-  const [weixinQrStatus, setWeixinQrStatus] = useState<'idle' | 'loading' | 'showing' | 'waiting' | 'success' | 'error'>('idle');
+  const [weixinQrStatus, setWeixinQrStatus] = useState<'idle' | 'loading' | 'showing' | 'waiting' | 'success' | 'expired' | 'error'>('idle');
   const [weixinQrUrl, setWeixinQrUrl] = useState<string>('');
   const [weixinQrError, setWeixinQrError] = useState<string>('');
   const [weixinAllowFromInput, setWeixinAllowFromInput] = useState<string>('');
@@ -341,13 +341,13 @@ const IMSettings: React.FC = () => {
       setWeixinQrUrl(startResult.qrDataUrl);
       setWeixinQrStatus('showing');
 
-      // QR expires in ~2 minutes. Show error and let user retry.
+      // QR expires in 1 minute.  Keep the QR visible but show a reconnect
+      // overlay — don't tear down the display or show a red error.
       if (weixinTimerRef.current) clearTimeout(weixinTimerRef.current);
       weixinTimerRef.current = setTimeout(() => {
         if (!isMountedRef.current) return;
-        setWeixinQrStatus('error');
-        setWeixinQrError(i18nService.t('imWeixinQrExpired'));
-      }, 120000);
+        setWeixinQrStatus('expired');
+      }, 60_000);
 
       // Start polling for scan result
       setWeixinQrStatus('waiting');
@@ -365,14 +365,13 @@ const IMSettings: React.FC = () => {
         await imService.updateConfig({ weixin: fullConfig });
         await imService.loadStatus();
       } else {
-        setWeixinQrStatus('error');
-        setWeixinQrError(waitResult.message || i18nService.t('imWeixinQrFailed'));
+        // Not connected — keep QR visible with reconnect overlay.
+        setWeixinQrStatus('expired');
       }
     } catch (err) {
       if (weixinTimerRef.current) { clearTimeout(weixinTimerRef.current); weixinTimerRef.current = null; }
       if (!isMountedRef.current) return;
-      setWeixinQrStatus('error');
-      setWeixinQrError(String(err));
+      setWeixinQrStatus('expired');
     }
   };
 
@@ -1995,7 +1994,7 @@ const IMSettings: React.FC = () => {
           <div className="space-y-3">
             {/* Scan QR code section */}
             <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center space-y-3">
-              {(weixinQrStatus === 'idle' || weixinQrStatus === 'error') && (
+              {weixinQrStatus === 'idle' && (
                 <>
                   <button
                     type="button"
@@ -2007,7 +2006,18 @@ const IMSettings: React.FC = () => {
                   <p className="text-xs text-secondary">
                     {i18nService.t('imWeixinScanHint')}
                   </p>
-                  {weixinQrStatus === 'error' && weixinQrError && (
+                </>
+              )}
+              {weixinQrStatus === 'error' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleWeixinQrLogin()}
+                    className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {i18nService.t('imWeixinScanBtn')}
+                  </button>
+                  {weixinQrError && (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
                       <XCircleIcon className="h-4 w-4 flex-shrink-0" />
                       {weixinQrError}
@@ -2023,16 +2033,36 @@ const IMSettings: React.FC = () => {
                   </span>
                 </div>
               )}
-              {(weixinQrStatus === 'showing' || weixinQrStatus === 'waiting') && weixinQrUrl && (
+              {(weixinQrStatus === 'showing' || weixinQrStatus === 'waiting' || weixinQrStatus === 'expired') && weixinQrUrl && (
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-foreground">
-                    {i18nService.t('imWeixinQrScanPrompt')}
+                    {weixinQrStatus === 'expired'
+                      ? i18nService.t('imWeixinQrExpired')
+                      : i18nService.t('imWeixinQrScanPrompt')}
                   </p>
-                  <div className="flex justify-center">
-                    <div className="p-3 bg-white rounded-lg border border-border-subtle">
+                  <div className="relative inline-block">
+                    <div className={`p-3 bg-white rounded-lg border border-border-subtle ${weixinQrStatus === 'expired' ? 'opacity-30' : ''}`}>
                       <QRCodeSVG value={weixinQrUrl} size={192} />
                     </div>
+                    {weixinQrStatus === 'expired' && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => void handleWeixinQrLogin()}
+                          className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg"
+                        >
+                          <ArrowPathIcon className="h-4 w-4 inline mr-1.5" />
+                    {i18nService.t('imWeixinQrRefresh')}
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  {weixinQrStatus === 'waiting' && (
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-secondary">
+                      <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
+                      {i18nService.t('imWeixinQrWaiting') || 'Waiting for scan...'}
+                    </div>
+                  )}
                 </div>
               )}
               {weixinQrStatus === 'success' && (

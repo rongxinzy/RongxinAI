@@ -217,3 +217,134 @@ test('unknown: returns original error string', () => {
 test('unknown: empty string', () => {
   expect(classifyError('')).toBe('');
 });
+
+// ==================== New typed CoworkError model ====================
+
+import {
+  classifyCoworkError,
+  CoworkErrorKind,
+  ENGINE_NOT_READY_CODE,
+  getErrorLogLevel,
+  getUserErrorI18nKey,
+  isTransient,
+  makeCoworkError,
+} from './coworkError';
+
+// ─── Structured classification ────────────────────────────────────────────
+
+test('typed: classifyCoworkError returns structured object', () => {
+  const result = classifyCoworkError('Request failed with status 401');
+  expect(result.kind).toBe(CoworkErrorKind.AuthExpired);
+  expect(result.statusCode).toBe(401);
+  expect(result.message).toBe('Request failed with status 401');
+});
+
+test('typed: classifyCoworkError extracts statusCode for rate limit', () => {
+  const result = classifyCoworkError('Request failed with status 429');
+  expect(result.kind).toBe(CoworkErrorKind.RateLimited);
+  expect(result.statusCode).toBe(429);
+});
+
+test('typed: classifyCoworkError extracts server error code', () => {
+  const result = classifyCoworkError('Request failed with status 502');
+  expect(result.kind).toBe(CoworkErrorKind.ServerError);
+  expect(result.statusCode).toBe(502);
+});
+
+test('typed: classifyCoworkError returns Unknown for unclassified', () => {
+  const result = classifyCoworkError('Something completely unexpected');
+  expect(result.kind).toBe(CoworkErrorKind.Unknown);
+  expect(result.message).toBe('Something completely unexpected');
+});
+
+test('typed: classifyCoworkError preserves raw string', () => {
+  const raw = 'authentication_error: invalid key';
+  const result = classifyCoworkError(raw);
+  expect(result.raw).toBe(raw);
+});
+
+// ─── Log levels ────────────────────────────────────────────────────────────
+
+test('log: auth expired is error level', () => {
+  expect(getErrorLogLevel(CoworkErrorKind.AuthExpired)).toBe('error');
+});
+
+test('log: rate limited is warn level', () => {
+  expect(getErrorLogLevel(CoworkErrorKind.RateLimited)).toBe('warn');
+});
+
+test('log: engine not ready is info level', () => {
+  expect(getErrorLogLevel(CoworkErrorKind.EngineNotReady)).toBe('info');
+});
+
+test('log: tool permission denied is debug level', () => {
+  expect(getErrorLogLevel(CoworkErrorKind.ToolPermissionDenied)).toBe('debug');
+});
+
+test('log: server error is warn level', () => {
+  expect(getErrorLogLevel(CoworkErrorKind.ServerError)).toBe('warn');
+});
+
+test('log: budget exceeded is error level', () => {
+  expect(getErrorLogLevel(CoworkErrorKind.BudgetExceeded)).toBe('error');
+});
+
+// ─── Transience ────────────────────────────────────────────────────────────
+
+test('transient: rate limited is transient', () => {
+  expect(isTransient(CoworkErrorKind.RateLimited)).toBe(true);
+});
+
+test('transient: network error is transient', () => {
+  expect(isTransient(CoworkErrorKind.NetworkError)).toBe(true);
+});
+
+test('transient: server error is transient', () => {
+  expect(isTransient(CoworkErrorKind.ServerError)).toBe(true);
+});
+
+test('transient: gateway disconnected is transient', () => {
+  expect(isTransient(CoworkErrorKind.GatewayDisconnected)).toBe(true);
+});
+
+test('transient: auth expired is NOT transient', () => {
+  expect(isTransient(CoworkErrorKind.AuthExpired)).toBe(false);
+});
+
+test('transient: budget exceeded is NOT transient', () => {
+  expect(isTransient(CoworkErrorKind.BudgetExceeded)).toBe(false);
+});
+
+test('transient: unknown is NOT transient', () => {
+  expect(isTransient(CoworkErrorKind.Unknown)).toBe(false);
+});
+
+// ─── I18n key mapping ──────────────────────────────────────────────────────
+
+test('i18n: all known kinds have an i18n key', () => {
+  const kinds = Object.values(CoworkErrorKind);
+  for (const kind of kinds) {
+    const key = getUserErrorI18nKey(kind);
+    expect(key).toBeTruthy();
+    expect(key).toMatch(/^coworkError/);
+  }
+});
+
+// ─── Factory ────────────────────────────────────────────────────────────────
+
+test('factory: makeCoworkError creates structured error', () => {
+  const err = makeCoworkError(CoworkErrorKind.ToolTimeout, 'Tool timed out after 30s', {
+    statusCode: 408,
+    provider: 'openai',
+  });
+  expect(err.kind).toBe(CoworkErrorKind.ToolTimeout);
+  expect(err.message).toBe('Tool timed out after 30s');
+  expect(err.statusCode).toBe(408);
+  expect(err.provider).toBe('openai');
+});
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+test('constants: ENGINE_NOT_READY_CODE is typed literal', () => {
+  expect(ENGINE_NOT_READY_CODE).toBe('ENGINE_NOT_READY');
+});

@@ -7,10 +7,13 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 
+import { CoworkErrorKind, type CoworkError, ENGINE_NOT_READY_CODE } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import type { CoworkMessage,CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
 import type { CoworkRuntime, PermissionRequest, PermissionResult } from '../libs/agentEngine/types';
+import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
+import { serializeForLog } from '../libs/sanitizeForLog';
 import { buildIMMediaInstruction } from './imMediaInstruction';
 import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
 import {
@@ -178,6 +181,8 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   private async processMessageInternal(message: IMMessage, forceNewSession: boolean): Promise<string> {
+    const cid = generateCorrelationId();
+    return runWithCorrelationId(cid, async () => {
     const coworkSessionId = await this.getOrCreateCoworkSession(
       message.conversationId,
       message.platform,
@@ -218,26 +223,14 @@ export class IMCoworkHandler extends EventEmitter {
         systemPrompt,
         claudeSessionId: null,
       });
-      console.log('[IMCoworkHandler] System prompt changed, reset claudeSessionId for IM session', JSON.stringify({
-        coworkSessionId,
-        platform: message.platform,
-      }));
+      console.log(`[IMCoworkHandler] System prompt changed, reset claudeSessionId for IM session coworkSessionId=${serializeForLog(coworkSessionId)} platform=${serializeForLog(message.platform)}`);
     }
     if (!hasAvailableSkills) {
       console.warn('[IMCoworkHandler] Skills auto-routing prompt missing for current IM turn');
     }
 
     // 打印完整的输入消息日志
-    console.log(`[IMCoworkHandler] 处理消息:`, JSON.stringify({
-      platform: message.platform,
-      conversationId: message.conversationId,
-      coworkSessionId,
-      isActive,
-      originalContent: message.content,
-      formattedContent,
-      attachments: message.attachments,
-      hasAvailableSkills,
-    }, null, 2));
+    console.log(`[IMCoworkHandler] 处理消息: platform=${serializeForLog(message.platform)} conversationId=${serializeForLog(message.conversationId)} coworkSessionId=${serializeForLog(coworkSessionId)} isActive=${isActive} hasAvailableSkills=${hasAvailableSkills}`);
 
     const onSessionStartError = (error: unknown) => {
       this.rejectAccumulator(
@@ -258,6 +251,7 @@ export class IMCoworkHandler extends EventEmitter {
     }
 
     return responsePromise;
+    });
   }
 
   /**
@@ -899,15 +893,49 @@ export class IMCoworkHandler extends EventEmitter {
   /**
    * Handle session error event
    */
-  private handleError(sessionId: string, error: string): void {
+  private handleError(sessionId: string, error: CoworkError): void {
     // Only process error events from IM sessions
     if (!this.ensureTrackedSession(sessionId)) return;
 
     this.clearPendingPermissionsBySessionId(sessionId);
     const accumulator = this.messageAccumulators.get(sessionId);
-    if (accumulator) {
-      this.cleanupAccumulator(sessionId);
-      accumulator.reject?.(new Error(error));
+    if (!accumulator) return;
+
+    // Generate differentiated IM reply based on error kind
+    const replyText = this.formatErrorReply(error);
+    this.cleanupAccumulator(sessionId);
+    accumulator.reject?.(new Error(replyText));
+  }
+
+  /**
+   * Generate a user-friendly IM reply text based on the error kind.
+   * Different error categories get different guidance so IM users
+   * know whether to wait, retry, or take action.
+   */
+  private formatErrorReply(error: CoworkError): string {
+    switch (error.kind) {
+      case CoworkErrorKind.AuthExpired:
+        return t('imErrorAuthExpired');
+      case CoworkErrorKind.RateLimited:
+        return t('imErrorRateLimited');
+      case CoworkErrorKind.BudgetExceeded:
+        return t('imErrorBudgetExceeded');
+      case CoworkErrorKind.EngineNotReady:
+        return t('imErrorEngineNotReady');
+      case CoworkErrorKind.NetworkError:
+      case CoworkErrorKind.ServerError:
+      case CoworkErrorKind.GatewayDisconnected:
+      case CoworkErrorKind.ServiceRestart:
+        return t('imErrorTransient', { error: error.message });
+      case CoworkErrorKind.ContentFiltered:
+        return t('imErrorContentFiltered');
+      case CoworkErrorKind.InputTooLong:
+        return t('imErrorInputTooLong');
+      case CoworkErrorKind.ToolTimeout:
+      case CoworkErrorKind.MaxIterations:
+        return t('imErrorExecutionLimit');
+      default:
+        return t('imErrorUnknown', { error: error.message });
     }
   }
 

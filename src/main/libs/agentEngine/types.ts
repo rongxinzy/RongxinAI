@@ -1,4 +1,5 @@
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
+import type { CoworkError } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
 
 export type CoworkAgentEngine = 'openclaw';
@@ -31,7 +32,7 @@ export interface CoworkRuntimeEvents {
   messageUpdate: (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => void;
   permissionRequest: (sessionId: string, request: PermissionRequest) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;
-  error: (sessionId: string, error: string) => void;
+  error: (sessionId: string, error: CoworkError) => void;
   sessionStopped: (sessionId: string) => void;
 }
 

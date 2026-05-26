@@ -177,6 +177,7 @@ export class SqliteStore {
         is_default INTEGER NOT NULL DEFAULT 0,
         source TEXT NOT NULL DEFAULT 'custom',
         preset_id TEXT NOT NULL DEFAULT '',
+        triage_override TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
@@ -295,6 +296,10 @@ export class SqliteStore {
       }
       if (!agentColNames.includes('pin_order')) {
         this.db.exec('ALTER TABLE agents ADD COLUMN pin_order INTEGER;');
+        this.didRunMigration = true;
+      }
+      if (!agentColNames.includes('triage_override')) {
+        this.db.exec("ALTER TABLE agents ADD COLUMN triage_override TEXT;");
         this.didRunMigration = true;
       }
     } catch {

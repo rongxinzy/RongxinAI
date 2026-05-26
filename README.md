@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>A local AI Agent workspace powered by OpenClaw and Ollama</strong>
+  <strong>A local AI Agent workspace powered by OpenClaw and llama.cpp</strong>
 </p>
 
 <p align="center">
@@ -23,14 +23,14 @@
 
 ---
 
-RongxinAI is a local-first desktop AI Agent workspace. It brings together the **OpenClaw Agent runtime**, **Ollama local model inference**, skills, MCP extensions, scheduled tasks, and IM/email reachability in one application for productivity automation, data analysis, document generation, research, and personal assistant workflows.
+RongxinAI is a local-first desktop AI Agent workspace. It brings together the **OpenClaw Agent runtime**, **llama.cpp local model inference**, skills, MCP extensions, scheduled tasks, and IM/email reachability in one application for productivity automation, data analysis, document generation, research, and personal assistant workflows.
 
 It is not just a chat client. RongxinAI is designed as an execution environment where an Agent can work on your machine, request tool permissions, run recurring tasks, use local models, and be triggered from desktop or mobile channels.
 
 ## Key Features
 
 - **OpenClaw Agent workflows**: Run file operations, shell commands, browser tasks, document processing, and multi-step work through Cowork sessions.
-- **Ollama local inference**: Manage local models, pull models, configure launch parameters, and connect local models to OpenClaw.
+- **llama.cpp local inference**: Manage local GGUF models, install and load models, configure launch parameters, and connect local models to OpenClaw.
 - **Skills system**: Built-in skills for documents, spreadsheets, presentations, PDFs, web search, browser automation, video generation, investment research, and email.
 - **MCP extensions**: Configure MCP servers to connect external tools and data sources to the Agent.
 - **Scheduled tasks**: Create recurring jobs from natural language or the GUI, such as daily briefings, inbox cleanup, and periodic reports.
@@ -45,7 +45,7 @@ It is not just a chat client. RongxinAI is designed as an execution environment 
   <img src="docs/res/rongxinai_architecture_en.svg" alt="RongxinAI architecture" width="760">
 </p>
 
-RongxinAI uses Electron with strict process isolation. The Renderer hosts the React UI, Preload exposes controlled IPC through `contextBridge`, and the Main Process manages local storage, OpenClaw runtime lifecycle, Ollama service control, skill/MCP orchestration, and IM/email gateways.
+RongxinAI uses Electron with strict process isolation. The Renderer hosts the React UI, Preload exposes controlled IPC through `contextBridge`, and the Main Process manages local storage, OpenClaw runtime lifecycle, llama.cpp service control, skill/MCP orchestration, and IM/email gateways.
 
 ## Quick Start
 
@@ -124,9 +124,9 @@ Key stream events:
 | `complete` | The session has finished |
 | `error` | The session failed |
 
-### Ollama Local Inference
+### llama.cpp Local Inference
 
-The local inference page manages the Ollama service, local models, model marketplace, and model launch parameters. Model-level parameters are sent as Ollama request options, including context length, GPU offload layers, threads, batch size, main GPU, memory mapping, and keep-alive. Service-level parameters are written as environment variables for `ollama serve` and only take effect after starting or restarting the Ollama service.
+The local inference page manages the llama.cpp service, local GGUF models, the model marketplace, and model launch parameters. Model-level parameters cover runtime launch and request behavior, including context length, GPU offload layers, threads, batch size, main GPU, memory mapping, and keep-alive. Service-level parameters apply to the managed `llama-server` process and take effect after starting or restarting the llama.cpp service.
 
 ### Skills And MCP
 
@@ -179,7 +179,7 @@ This README documents the channels currently intended for product exposure and m
 | Styling | Tailwind CSS |
 | State | Redux Toolkit |
 | Agent runtime | OpenClaw |
-| Local models | Ollama |
+| Local models | llama.cpp |
 | Storage | better-sqlite3 |
 | Rendering | react-markdown / Mermaid / KaTeX |
 

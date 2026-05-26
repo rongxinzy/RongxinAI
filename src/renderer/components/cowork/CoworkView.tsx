@@ -102,7 +102,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       case 'ready':
         return i18nService.t('coworkOpenClawReadyNotice');
       case 'starting':
-        return i18nService.t('coworkOpenClawStarting');
+      case 'compiling':
+        return status.message || i18nService.t('coworkOpenClawStarting');
       case 'error':
         return i18nService.t('coworkOpenClawError');
       case 'running':
@@ -435,7 +436,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     if (!currentSession || currentSession.status !== 'running') return;
 
     const runningSessionId = currentSession.id;
+    let lastFocusTime = 0;
+    const FOCUS_DEBOUNCE_MS = 2000;
+
     const handleWindowFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusTime < FOCUS_DEBOUNCE_MS) return;
+      lastFocusTime = now;
       void coworkService.loadSession(runningSessionId);
     };
 
@@ -508,7 +515,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   );
 
   // Engine status banner for error/non-running states (starting overlay is now global in App.tsx)
-  const engineStatusBanner = shouldShowEngineStatus && openClawStatus && openClawStatus.phase !== 'starting' ? (
+  const engineStatusBanner = shouldShowEngineStatus && openClawStatus && openClawStatus.phase !== 'starting' && openClawStatus.phase !== 'compiling' && openClawStatus.phase !== 'error' ? (
     <div className={`shrink-0 flex items-center justify-between px-4 py-2 text-xs ${isEngineError
       ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
       : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'

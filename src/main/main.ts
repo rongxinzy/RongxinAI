@@ -17,6 +17,9 @@ import { AgentManager } from './agentManager';
 import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkStore } from './coworkStore';
+import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
+import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
+import { createLogger } from './libs/structuredLog';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
 import {
@@ -26,7 +29,9 @@ import {
   rejectPairingRequest,
 } from './im/imPairingStore';
 import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
+import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
+import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import {
   getCronJobService,
@@ -41,7 +46,20 @@ import {
   type PermissionResult,
 } from './libs/agentEngine';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
-import { clearServerModelMetadata, getAllServerModelMetadata, getCurrentApiConfig, resolveAllEnabledProviderConfigs, resolveCurrentApiConfig, resolveRawApiConfig, setAuthTokensGetter, setServerBaseUrlGetter, setStoreGetter, updateServerModelMetadata } from './libs/claudeSettings';
+import {
+  clearServerModelMetadata,
+  getAllServerModelMetadata,
+  getCurrentApiConfig,
+  getLlamaCppModelContextWindow,
+  isLlamaCppModelRunning,
+  resolveAllEnabledProviderConfigs,
+  resolveCurrentApiConfig,
+  resolveRawApiConfig,
+  setAuthTokensGetter,
+  setServerBaseUrlGetter,
+  setStoreGetter,
+  updateServerModelMetadata,
+} from './libs/claudeSettings';
 import {
   clearCopilotTokenState,
   initCopilotTokenManager,
@@ -54,6 +72,7 @@ import { registerProxyTokenRefresher, startCoworkOpenAICompatProxy, stopCoworkOp
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
 import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
+import { LlamaCppManager } from './libs/llamacppManager';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { McpServerManager } from './libs/mcpServerManager';
@@ -77,6 +96,7 @@ import {
   readBootstrapFile,
   readMemoryEntries,
   resolveMemoryFilePath,
+  type MemorySource,
   searchMemoryEntries,
   updateMemoryEntry,
   writeBootstrapFile,
@@ -134,7 +154,7 @@ const IPC_MAX_DEPTH = 5;
 const IPC_MAX_KEYS = 80;
 const IPC_MAX_ITEMS = 40;
 const MAX_INLINE_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const ENGINE_NOT_READY_CODE = 'ENGINE_NOT_READY';
+import { ENGINE_NOT_READY_CODE } from '../common/coworkError';
 const HIDDEN_SKILL_MARKETPLACE_IDS = new Set(['youdaonote', 'youdao-note', 'youdao_note']);
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
@@ -276,6 +296,29 @@ const normalizeOpenClawModelRef = (modelRef: string): string => {
   });
 
   return qualification.status === 'qualified' ? qualification.primaryModel : normalized;
+};
+
+const validateSessionModelAvailability = (modelRef: string): { available: boolean; message?: string } => {
+  const parsed = parsePrimaryModelRef(modelRef);
+  if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) {
+    return { available: true };
+  }
+
+  if (!isLlamaCppModelRunning(parsed.modelId)) {
+    return {
+      available: false,
+      message: t('coworkLlamaCppModelNotRunning'),
+    };
+  }
+
+  if (!getLlamaCppModelContextWindow(parsed.modelId)) {
+    return {
+      available: false,
+      message: t('coworkLlamaCppContextWindowUnknown'),
+    };
+  }
+
+  return { available: true };
 };
 
 // Provider IDs that were renamed in past refactors. Any stored agent model ref
@@ -814,6 +857,7 @@ let imGatewayManager: IMGatewayManager | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
 let openClawEngineManager: OpenClawEngineManager | null = null;
+let llamaCppManager: LlamaCppManager | null = null;
 let ollamaManager: OllamaManager | null = null;
 let openClawConfigSync: OpenClawConfigSync | null = null;
 let openClawBootstrapPromise: Promise<OpenClawEngineStatus> | null = null;
@@ -867,6 +911,13 @@ const getOpenClawEngineManager = (): OpenClawEngineManager => {
     openClawEngineManager = new OpenClawEngineManager();
   }
   return openClawEngineManager;
+};
+
+const getLlamaCppManager = (): LlamaCppManager => {
+  if (!llamaCppManager) {
+    llamaCppManager = new LlamaCppManager(() => getLlamaCppServiceConfig(getStore()));
+  }
+  return llamaCppManager;
 };
 
 const getOllamaManager = (): OllamaManager => {
@@ -1231,8 +1282,64 @@ const scheduleDeferredGatewayRestart = (reason: string) => {
   }, DEFERRED_RESTART_MAX_WAIT_MS);
 };
 
+// Debounce state for syncOpenClawConfig (Phase 1 / O4).
+// Merges rapid successive calls within a 500ms window to avoid redundant
+// config writes and restart evaluations.  Only the *last* call's options
+// are used for the debounced execution (except restartGatewayIfRunning,
+// which is OR-merged so no request is silently dropped).
+let _syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _syncDebouncePromise: Promise<{
+  success: boolean;
+  changed: boolean;
+  mcpBridgeConfigChanged?: boolean;
+  status?: OpenClawEngineStatus;
+  error?: string;
+}> | null = null;
+let _syncDebounceOptions: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean } | null = null;
+const SYNC_DEBOUNCE_MS = 500;
+
 const syncOpenClawConfig = async (
   options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean } = { reason: 'unknown' },
+): Promise<{ success: boolean; changed: boolean; mcpBridgeConfigChanged?: boolean; status?: OpenClawEngineStatus; error?: string }> => {
+  // Debounce: merge non-startup calls within SYNC_DEBOUNCE_MS.
+  if (options.reason !== 'startup') {
+    if (_syncDebouncePromise) {
+      // Merge restartGatewayIfRunning flag so no request is silently dropped.
+      if (options.restartGatewayIfRunning && _syncDebounceOptions) {
+        _syncDebounceOptions.restartGatewayIfRunning = true;
+      }
+      if (options.forceGatewayRestartIfRunning && _syncDebounceOptions) {
+        _syncDebounceOptions.forceGatewayRestartIfRunning = true;
+      }
+      return _syncDebouncePromise;
+    }
+
+    _syncDebounceOptions = { ...options };
+
+    _syncDebouncePromise = new Promise((resolve) => {
+      if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+      _syncDebounceTimer = setTimeout(async () => {
+        try {
+          const result = await doSyncOpenClawConfig(_syncDebounceOptions!);
+          resolve(result);
+        } finally {
+          _syncDebounceTimer = null;
+          _syncDebouncePromise = null;
+          _syncDebounceOptions = null;
+        }
+      }, SYNC_DEBOUNCE_MS);
+    });
+
+    return _syncDebouncePromise;
+  }
+
+  // Startup calls execute immediately — the gateway isn't running yet
+  // and we need the config written before anything else (Phase 1 / O1).
+  return doSyncOpenClawConfig(options);
+};
+
+const doSyncOpenClawConfig = async (
+  options: { reason: string; restartGatewayIfRunning?: boolean; forceGatewayRestartIfRunning?: boolean },
 ): Promise<{ success: boolean; changed: boolean; mcpBridgeConfigChanged?: boolean; status?: OpenClawEngineStatus; error?: string }> => {
   const D = gwDiagTs;
   console.log(`${D()} ──── syncOpenClawConfig START reason=${options.reason} restartIfRunning=${!!options.restartGatewayIfRunning} forceRestart=${!!options.forceGatewayRestartIfRunning}`);
@@ -1255,6 +1362,25 @@ const syncOpenClawConfig = async (
   try {
     mergeEnterpriseOpenclawConfig(getOpenClawEngineManager().getConfigPath());
   } catch { /* non-critical */ }
+
+  // Fast path: when the gateway is not running, skip the env-var diff
+  // diagnostic logging and restart-decision logic.  The config file has
+  // already been written by sync() above; we only need to seed the
+  // secret-env-var state so that the next sync (after gateway start) does
+  // not spuriously detect a change.
+  //
+  // This saves ~1.5 s on cold startup (Phase 1 / O1).
+  const manager = getOpenClawEngineManager();
+  const gatewayStatus = manager.getStatus();
+  if (gatewayStatus.phase !== 'running') {
+    const fastEnvVars = getOpenClawConfigSync().collectSecretEnvVars();
+    manager.setSecretEnvVars(fastEnvVars);
+    console.log(`${D()} ──── FAST PATH: gateway not running (phase=${gatewayStatus.phase}), env vars seeded (${Object.keys(fastEnvVars).length} keys). reason=${options.reason}`);
+    return {
+      success: true,
+      changed: syncResult.changed,
+    };
+  }
 
   const nextSecretEnvVars = getOpenClawConfigSync().collectSecretEnvVars();
   const prevSecretEnvVars = getOpenClawEngineManager().getSecretEnvVars();
@@ -1291,6 +1417,12 @@ const syncOpenClawConfig = async (
   // regardless of the restartGatewayIfRunning flag.  The OpenClaw gateway
   // pins its config snapshot at startup, so a hot-reload alone won't pick
   // up a new callbackUrl — the gateway must be fully restarted.
+  //
+  // bindingsChanged also requires a hard restart.  The top-level "bindings"
+  // key in openclaw.json does not match any hot-reload prefix in the
+  // gateway's BASE_RELOAD_RULES and falls through to the tail rule
+  // (restartGateway=true).  On Windows, the gateway cannot restart itself
+  // in-process (no SIGUSR1), so a full kill+spawn is the only reliable path.
   const mcpBridgeForceRestart = !!syncResult.mcpBridgeConfigChanged;
   const needsHardRestart = secretEnvVarsChanged || syncResult.bindingsChanged || mcpBridgeForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
 
@@ -1298,6 +1430,19 @@ const syncOpenClawConfig = async (
 
   if (!needsHardRestart) {
     console.log(`${D()} ──── NO RESTART, hot-reload only. reason=${options.reason}`);
+
+    // Push config via RPC for faster hot-reload than waiting for chokidar.
+    if (syncResult.changed && openClawRuntimeAdapter) {
+      try {
+        const rawConfig = fs.readFileSync(getOpenClawEngineManager().getConfigPath(), 'utf8');
+        if (rawConfig) {
+          openClawRuntimeAdapter.applyConfig(rawConfig, options.reason).catch((err) => {
+            console.warn(`${D()} config.apply RPC failed (non-fatal):`, (err as Error)?.message || err);
+          });
+        }
+      } catch { /* file may not exist yet */ }
+    }
+
     return {
       success: true,
       changed: syncResult.changed,
@@ -1305,31 +1450,17 @@ const syncOpenClawConfig = async (
     };
   }
 
-  const manager = getOpenClawEngineManager();
-  const status = manager.getStatus();
-  if (status.phase !== 'running') {
-    console.log(`${D()} ──── RESTART NEEDED but gateway not running (phase=${status.phase}), skipping. reason=${options.reason}`);
-    return {
-      success: true,
-      changed: true,
-      status,
-    };
-  }
-
-  // Binding changes and explicit force-restart requests are user actions where
-  // keeping the old gateway alive would keep routing messages with stale config.
-  // Force immediate restart so the next request sees the selected model/agent.
   if (hasActiveGatewayWorkloads() && !syncResult.bindingsChanged && !options.forceGatewayRestartIfRunning) {
     console.log(`${D()} ──── RESTART DEFERRED (active workloads). reason=${options.reason}`);
     scheduleDeferredGatewayRestart(options.reason);
     return {
       success: true,
       changed: true,
-      status,
+      status: gatewayStatus,
     };
   }
 
-  console.log(`${D()} ──── HARD RESTART EXECUTING. reason=${options.reason}, phase=${status.phase}, port=${status.message?.match(/loopback:(\d+)/)?.[1] ?? 'unknown'}`);
+  console.log(`${D()} ──── HARD RESTART EXECUTING. reason=${options.reason}, phase=${gatewayStatus.phase}, port=${gatewayStatus.message?.match(/loopback:(\d+)/)?.[1] ?? 'unknown'}`);
   if (openClawRuntimeAdapter) {
     openClawRuntimeAdapter.disconnectGatewayClient();
   }
@@ -1421,7 +1552,7 @@ const bindCoworkRuntimeForwarder = (): void => {
     }
   });
 
-  runtime.on('error', (sessionId: string, error: string) => {
+  runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
     // Mark session as error in store so the .catch() fallback can detect duplicates.
     try { getCoworkStore().updateSession(sessionId, { status: 'error' }); } catch { /* ignore */ }
     const windows = BrowserWindow.getAllWindows();
@@ -1439,6 +1570,16 @@ const getCoworkEngineRouter = () => {
     if (!openClawRuntimeAdapter) {
       openClawRuntimeAdapter = new OpenClawRuntimeAdapter(getCoworkStore(), getOpenClawEngineManager(), {
         normalizeModelRef: normalizeOpenClawModelRef,
+        isModelAvailableForSession: validateSessionModelAvailability,
+        getModelContextWindow: (modelRef) => {
+          const parsed = parsePrimaryModelRef(modelRef);
+          if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) return undefined;
+          return getLlamaCppModelContextWindow(parsed.modelId);
+        },
+        getTriageConfig: () => getTriageConfig(getStore()),
+        getAgent: (agentId: string) => {
+          return getAgentManager().getAgent(agentId) ?? null;
+        },
       });
       // Wire up channel session sync for IM conversations via OpenClaw
       try {
@@ -1457,6 +1598,10 @@ const getCoworkEngineRouter = () => {
               const agent = getCoworkStore().getAgent(newAgentId);
               const model = agent?.model || '';
               if (model && openClawRuntimeAdapter) {
+                const availability = validateSessionModelAvailability(model);
+                if (!availability.available) {
+                  return;
+                }
                 const client = openClawRuntimeAdapter.getGatewayClient();
                 if (client) {
                   void client.request('sessions.patch', { key: sessionKey, model }).catch((err) => {
@@ -1841,6 +1986,16 @@ const getIMGatewayManager = () => {
     imGatewayManager.on('error', ({ platform, error }) => {
       console.error(`[IM Gateway] ${platform} error:`, error);
     });
+
+    // Wire gateway lifecycle notifications
+    if (openClawRuntimeAdapter) {
+      openClawRuntimeAdapter.onGatewayDisconnect((reason) => {
+        imGatewayManager?.onOpenClawDisconnected(reason);
+      });
+      openClawRuntimeAdapter.onGatewayReconnect(() => {
+        imGatewayManager?.onOpenClawReconnected();
+      });
+    }
   }
   return imGatewayManager;
 };
@@ -2943,16 +3098,12 @@ if (!gotTheLock) {
   });
 
   // Cowork IPC handlers
-  ipcMain.handle('cowork:session:start', async (_event, options: {
-    prompt: string;
-    cwd?: string;
-    systemPrompt?: string;
-    title?: string;
-    activeSkillIds?: string[];
-    imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-    agentId?: string;
-    modelOverride?: string;
-  }) => {
+  ipcMain.handle('cowork:session:start', async (_event, rawOptions: unknown) => {
+    const cid = generateCorrelationId();
+    const log = createLogger('CoworkSession').withContext({ cid });
+    const options = CoworkSessionStartSchema.input.parse(rawOptions);
+    log.info('session start requested', { prompt: options.prompt.slice(0, 80), agentId: options.agentId });
+    return runWithCorrelationId(cid, async () => {
     try {
       const engineStatus = await ensureOpenClawRunningForCowork();
       if (engineStatus.phase !== 'running') {
@@ -3067,6 +3218,7 @@ if (!gotTheLock) {
         error: error instanceof Error ? error.message : 'Failed to start session',
       };
     }
+    });
   });
 
   ipcMain.handle('cowork:session:continue', async (_event, options: {
@@ -3703,10 +3855,18 @@ if (!gotTheLock) {
     text: string;
     confidence?: number;
     isExplicit?: boolean;
+    source?: MemorySource;
   }) => {
     try {
       const filePath = resolveMemoryFilePath(getMainAgentWorkspacePath(getOpenClawEngineManager().getStateDir()));
-      const entry = addMemoryEntry(filePath, input.text);
+      const source = input.source && typeof input.source === 'object'
+        ? {
+            sessionId: typeof input.source.sessionId === 'string' ? input.source.sessionId : null,
+            role: (['user', 'assistant', 'tool', 'system', 'im'] as const).includes(input.source.role as MemorySource['role']) ? input.source.role : 'system',
+            date: typeof input.source.date === 'string' ? input.source.date : new Date().toISOString().slice(0, 10),
+          } as MemorySource
+        : undefined;
+      const entry = addMemoryEntry(filePath, input.text, source);
       return { success: true, entry };
     } catch (error) {
       return {
@@ -5094,7 +5254,7 @@ if (!gotTheLock) {
 
   ipcMain.handle('shell:openHtmlInBrowser', async (_event, htmlContent: string) => {
     try {
-      const tmpDir = path.join(os.tmpdir(), 'lobsterai-preview');
+      const tmpDir = path.join(os.tmpdir(), 'rongxinai-preview');
       fs.mkdirSync(tmpDir, { recursive: true });
       const tmpFile = path.join(tmpDir, `preview-${Date.now()}.html`);
       fs.writeFileSync(tmpFile, htmlContent, 'utf-8');
@@ -5145,12 +5305,8 @@ if (!gotTheLock) {
   };
 
   // API 代理处理程序 - 解决 CORS 问题
-  ipcMain.handle('api:fetch', async (_event, options: {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-  }) => {
+  ipcMain.handle('api:fetch', async (_event, rawOptions: unknown) => {
+    const options = ApiFetchSchema.input.parse(rawOptions);
     console.log(`[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`);
 
     const doFetch = async (headers: Record<string, string>) => {
@@ -5209,13 +5365,8 @@ if (!gotTheLock) {
   });
 
   // SSE 流式 API 代理
-  ipcMain.handle('api:stream', async (event, options: {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-    requestId: string;
-  }) => {
+  ipcMain.handle('api:stream', async (event, rawOptions: unknown) => {
+    const options = ApiStreamSchema.input.parse(rawOptions);
     const controller = new AbortController();
 
     // 存储 controller 以便后续取消
@@ -5686,6 +5837,12 @@ if (!gotTheLock) {
       });
     }
 
+    if (llamaCppManager) {
+      await llamaCppManager.shutdownForQuit().catch((error) => {
+        console.error('[LlamaCpp] Failed to stop service on quit:', error);
+      });
+    }
+
     // Stop the cron job polling
     try {
       getCronJobService().stopPolling();
@@ -5760,7 +5917,7 @@ if (!gotTheLock) {
     // We don't trigger permission dialogs at startup to avoid annoying users
 
     // Ensure default working directory exists
-    const defaultProjectDir = path.join(os.homedir(), 'lobsterai', 'project');
+    const defaultProjectDir = path.join(os.homedir(), 'rongxinai', 'project');
     if (!fs.existsSync(defaultProjectDir)) {
       fs.mkdirSync(defaultProjectDir, { recursive: true });
       console.log('Created default project directory:', defaultProjectDir);
@@ -5806,12 +5963,20 @@ if (!gotTheLock) {
     }
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
+    registerLlamaCppIpcHandlers(getLlamaCppManager(), {
+      getStore,
+      syncOpenClawConfig,
+      getAgentManager,
+    });
+    registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
       syncOpenClawConfig,
       getAgentManager,
     });
-    registerMarketplaceIpcHandlers();
+    registerMarketplaceIpcHandlers({
+      getModelsDir: () => getLlamaCppManager().getModelsDir(),
+    });
     // Inject auth getters for lobsterai-server provider routing
     // The getter proactively triggers a background token refresh when the
     // accessToken is within 5 minutes of expiry, so that the SDK always

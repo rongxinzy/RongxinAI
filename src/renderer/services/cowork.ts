@@ -1,3 +1,4 @@
+import { CoworkErrorKind, ENGINE_NOT_READY_CODE, getUserErrorI18nKey, type CoworkError } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import { COWORK_SESSION_PAGE_SIZE } from '../../shared/cowork/constants';
@@ -39,7 +40,11 @@ import type {
 } from '../types/cowork';
 import { i18nService } from './i18n';
 
-const classifyError = (error: string): string => {
+const classifyError = (error: string | CoworkError): string => {
+  if (typeof error === 'object' && 'kind' in error) {
+    const key = getUserErrorI18nKey(error.kind);
+    return key ? i18nService.t(key) : error.message;
+  }
   const key = classifyErrorKey(error);
   return key ? i18nService.t(key) : error;
 };
@@ -152,14 +157,26 @@ class CoworkService {
     // Error listener
     const errorCleanup = cowork.onStreamError(({ sessionId, error }) => {
       store.dispatch(updateSessionStatus({ sessionId, status: 'error' }));
-      // Surface the error as a visible message so the user knows what happened.
-      if (error) {
+
+      // Differentiated behavior by error kind:
+      // - Auth expired → trigger global re-auth flow
+      // - Engine not ready → handled separately by engine status overlay
+      // - Rate limited → show transient warning with retry hint
+      // - Others → surface as system message
+      if (error.kind === CoworkErrorKind.AuthExpired) {
+        window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
+      }
+
+      const userMessage = error.message || '';
+      if (userMessage) {
+        const i18nKey = getUserErrorI18nKey(error.kind);
+        const content = i18nKey ? i18nService.t(i18nKey) : userMessage;
         store.dispatch(addMessage({
           sessionId,
           message: {
             id: `error-${Date.now()}`,
             type: 'system',
-            content: classifyError(error),
+            content: content || userMessage,
             timestamp: Date.now(),
           },
         }));
@@ -169,21 +186,21 @@ class CoworkService {
 
     // Sessions changed listener (new channel sessions discovered by polling,
     // or reconcileWithHistory replaced messages for a channel session)
-    const sessionsChangedCleanup = cowork.onSessionsChanged(() => {
+    const sessionsChangedCleanup = cowork.onSessionsChanged((data) => {
       const beforeState = store.getState().cowork;
-      console.log('[CoworkService] onSessionsChanged: received IPC event, before sessions:', beforeState.sessions.length, 'sessionIds:', beforeState.sessions.map(s => s.id).slice(0, 5));
+      const changedSessionId = data?.sessionId;
+      console.log('[CoworkService] onSessionsChanged: received IPC event, changedSessionId:', changedSessionId, 'before sessions:', beforeState.sessions.length, 'sessionIds:', beforeState.sessions.map(s => s.id).slice(0, 5));
       void this.loadSessions().then(() => {
         const state = store.getState().cowork;
         console.log('[CoworkService] onSessionsChanged: loadSessions complete, total sessions:', state.sessions.length, 'sessionIds:', state.sessions.map(s => s.id).slice(0, 5));
 
-        // Reload the active session's full message list so that messages
-        // replaced by reconcileWithHistory (bulk SQLite replace) are reflected
-        // in the conversation view, not just the sidebar.  Without this,
-        // user messages synced from gateway history would only appear after
-        // the user manually re-enters the conversation.
         const currentId = state.currentSessionId;
         if (currentId) {
-          void this.loadSession(currentId);
+          // Only reload the current session if the change affects it directly,
+          // or if no specific sessionId was provided (backward compat).
+          if (!changedSessionId || changedSessionId === currentId) {
+            void this.loadSession(currentId);
+          }
         }
       }).catch((err) => {
         console.error('[CoworkService] onSessionsChanged: loadSessions FAILED:', err);
@@ -312,7 +329,7 @@ class CoworkService {
 
     // Show a user-visible error when session start fails
     if (result.error) {
-      const errorContent = result.code === 'ENGINE_NOT_READY'
+      const errorContent = result.code === ENGINE_NOT_READY_CODE
         ? i18nService.t('coworkErrorEngineNotReady')
         : classifyError(result.error);
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: errorContent }));
@@ -361,7 +378,7 @@ class CoworkService {
       }
       // Show a user-visible error message in the session
       if (result.error) {
-        const errorContent = result.code === 'ENGINE_NOT_READY'
+        const errorContent = result.code === ENGINE_NOT_READY_CODE
           ? i18nService.t('coworkErrorEngineNotReady')
           : classifyError(result.error);
         store.dispatch(addMessage({
@@ -673,6 +690,7 @@ class CoworkService {
 
   async createMemoryEntry(input: {
     text: string;
+    source?: { sessionId?: string | null; role?: string; date?: string };
   }): Promise<CoworkUserMemoryEntry | null> {
     const api = window.electron?.cowork?.createMemoryEntry;
     if (!api) return null;

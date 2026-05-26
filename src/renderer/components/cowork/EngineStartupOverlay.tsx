@@ -1,5 +1,5 @@
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
-import React, { useEffect,useState } from 'react';
+import { ChatBubbleLeftRightIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -14,21 +14,38 @@ const resolveEngineStatusText = (status: OpenClawEngineStatus): string => {
     case 'ready':
       return i18nService.t('coworkOpenClawReadyNotice');
     case 'starting':
-      return i18nService.t('coworkOpenClawStarting');
+    case 'compiling':
+      return status.message || i18nService.t('coworkOpenClawStarting');
     case 'error':
-      return i18nService.t('coworkOpenClawError');
+      return status.message || i18nService.t('coworkOpenClawError');
     case 'running':
     default:
       return i18nService.t('coworkOpenClawRunning');
   }
 };
 
+const HIDE_DELAY_MS = 600;
+
 /**
- * Global overlay shown when the OpenClaw gateway is starting up.
- * Renders on top of all views (cowork, skills, scheduled tasks, mcp).
+ * Non-blocking floating popup shown when the OpenClaw gateway is starting or in error.
+ * Visual style matches the llamacpp config dialog card: rounded-xl, border-border, shadow-2xl.
  */
 const EngineStartupOverlay: React.FC = () => {
   const [status, setStatus] = useState<OpenClawEngineStatus | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stickyStatusRef = useRef<OpenClawEngineStatus | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return clearHideTimer;
+  }, [clearHideTimer]);
 
   useEffect(() => {
     coworkService.getOpenClawEngineStatus().then((s) => {
@@ -37,46 +54,122 @@ const EngineStartupOverlay: React.FC = () => {
 
     const unsubscribe = coworkService.onOpenClawEngineStatus((s) => {
       setStatus(s);
+
+      const shouldShow = s.phase === 'starting' || s.phase === 'compiling' || s.phase === 'error';
+
+      if (shouldShow) {
+        clearHideTimer();
+        stickyStatusRef.current = s;
+        setVisible(true);
+      } else if (s.phase === 'running') {
+        clearHideTimer();
+        hideTimerRef.current = setTimeout(() => {
+          stickyStatusRef.current = null;
+          setVisible(false);
+        }, HIDE_DELAY_MS);
+      }
     });
 
     return unsubscribe;
+  }, [clearHideTimer]);
+
+  const retry = useCallback(() => {
+    coworkService.restartOpenClawGateway().catch(() => { /* handled by status event */ });
   }, []);
 
-  if (!status || status.phase !== 'starting') {
+  const displayStatus = status &&
+    (status.phase === 'starting' || status.phase === 'compiling' || status.phase === 'error')
+    ? status
+    : stickyStatusRef.current;
+
+  if (!visible || !displayStatus) {
     return null;
   }
 
-  const progressPercent = typeof status.progressPercent === 'number'
-    ? Math.max(0, Math.min(100, Math.round(status.progressPercent)))
+  const isStarting = displayStatus.phase === 'starting' || displayStatus.phase === 'compiling';
+  const isError = displayStatus.phase === 'error';
+
+  const progressPercent = typeof displayStatus.progressPercent === 'number'
+    ? Math.max(0, Math.min(100, Math.round(displayStatus.progressPercent)))
     : null;
 
+  const tone = isError
+    ? {
+        Icon: ExclamationTriangleIcon,
+        iconClass: 'bg-red-500/15 text-red-500',
+        messageClass: 'text-red-700 dark:text-red-200',
+      }
+    : {
+        Icon: ChatBubbleLeftRightIcon,
+        iconClass: 'bg-primary/15 text-primary',
+        messageClass: 'text-foreground',
+      };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-card">
-        <div className="flex flex-col items-center text-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center animate-pulse">
-            <ChatBubbleLeftRightIcon className="h-5 w-5" />
-          </div>
-          <div className="text-sm text-foreground">
-            {resolveEngineStatusText(status)}
-          </div>
-          {progressPercent !== null && (
-            <div className="w-full space-y-1">
-              <div className="h-1.5 w-full rounded-full bg-primary/15 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${progressPercent}%` }}
-                />
+    <div className="pointer-events-none absolute top-0 left-0 right-0 z-50 flex justify-center">
+      <div className="pointer-events-auto mt-2 w-full max-w-sm animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
+        <div className="flex items-start gap-3 px-4 py-3">
+          <span
+            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+              isStarting ? `${tone.iconClass} animate-pulse` : tone.iconClass
+            }`}
+          >
+            <tone.Icon className="h-4 w-4" />
+          </span>
+
+          <div className={`min-w-0 flex-1 text-sm leading-6 ${tone.messageClass}`}>
+            <div>{resolveEngineStatusText(displayStatus)}</div>
+            {progressPercent !== null && isStarting && (
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-1 flex-1 rounded-full bg-primary/15 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <span className="text-xs text-secondary">{progressPercent}%</span>
               </div>
-              <div className="text-xs text-secondary">
-                {progressPercent}%
+            )}
+            {isError && (
+              <div className="mt-0.5 text-xs opacity-80">
+                {i18nService.t('coworkOpenClawErrorHint') || '请检查网络连接或重试'}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        {isError && (
+          <div className="flex justify-end gap-2 border-t border-border bg-surface/40 px-4 py-2">
+            <button
+              type="button"
+              onClick={retry}
+              className="inline-flex h-8 items-center rounded-lg bg-red-500/15 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/25 dark:text-red-400"
+            >
+              {i18nService.t('retry') || '重试'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default EngineStartupOverlay;
+
+export function useGatewayReady(): boolean {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    coworkService.getOpenClawEngineStatus().then((s) => {
+      setReady(s?.phase === 'running');
+    });
+
+    const unsubscribe = coworkService.onOpenClawEngineStatus((s) => {
+      setReady(s.phase === 'running');
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return ready;
+}

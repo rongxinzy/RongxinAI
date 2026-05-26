@@ -40,7 +40,7 @@ npm run openclaw:runtime:host   # current platform
 
 RongxinAI is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
 1. **Cowork Mode** - AI-assisted task sessions powered by OpenClaw as the primary agent runtime
-2. **Ollama Local Inference** - local model service management, model launch options, and local model integration with OpenClaw
+2. **llama.cpp Local Inference** - local model service management, model launch options, and local model integration with OpenClaw
 3. **Skills and MCP** - built-in skills, remote skill marketplace, and MCP server configuration
 4. **Artifacts System** - rich preview of code outputs (HTML, SVG, React, Mermaid)
 
@@ -70,7 +70,7 @@ Public-facing product documentation should use the RongxinAI name. Some legacy i
 - Window lifecycle management
 - SQLite storage via `better-sqlite3` (`src/main/sqliteStore.ts`)
 - Agent engine routing (`src/main/libs/agentEngine/coworkEngineRouter.ts`) - dispatches to `openclawRuntimeAdapter.ts` (OpenClaw)
-- Ollama lifecycle and local inference management (`src/main/libs/ollamaManager.ts`, `src/shared/ollama/`)
+- llama.cpp lifecycle and local inference management (`src/main/libs/llamacppManager.ts`, `src/shared/llamacpp/`)
 - Skill management (`src/main/skillManager.ts`)
 - MCP server configuration and marketplace integration
 - IM/email gateways (`src/main/im/`) - public-facing channels are WeChat, WeCom, DingTalk, Feishu/Lark, QQ, and Email. Legacy/global connector code may exist; do not re-expose it in UI or docs unless explicitly requested.
@@ -100,7 +100,7 @@ src/main/
     │   └── openclawRuntimeAdapter.ts # OpenClaw gateway adapter
     ├── openclawEngineManager.ts # OpenClaw runtime lifecycle (install/start/status)
     ├── openclawConfigSync.ts    # Syncs cowork config → OpenClaw config files
-    ├── ollamaManager.ts         # Ollama service lifecycle and configuration
+    ├── llamacppManager.ts       # llama.cpp service lifecycle and configuration
 
 src/renderer/
 ├── types/cowork.ts      # Cowork type definitions
@@ -117,7 +117,7 @@ src/renderer/
 │   │   ├── CoworkSessionList.tsx   # Session sidebar
 │   │   ├── CoworkSessionDetail.tsx # Message display
 │   │   └── CoworkPermissionModal.tsx # Tool permission UI
-│   ├── localInference/  # Ollama local inference UI
+│   ├── localInference/  # llama.cpp local inference UI
 │   ├── skills/          # Skill management and marketplace UI
 │   ├── mcp/             # MCP server configuration UI
 │   └── artifacts/       # Artifact renderers
@@ -136,7 +136,7 @@ SKILLs/                  # Custom skill definitions for cowork sessions
 2. **Cowork Session**: User sends prompt → `coworkService.startSession()` → IPC to main → `CoworkEngineRouter` → OpenClaw gateway (primary) → streaming events back to renderer via IPC → Redux updates
 3. **Tool Permissions**: Agent requests tool use → `CoworkEngineRouter` emits `permissionRequest` → UI shows `CoworkPermissionModal` → user approves/denies → result sent back to engine
 4. **Persistence**: Cowork sessions stored in SQLite (`cowork_sessions`, `cowork_messages` tables)
-5. **Local Inference**: Renderer invokes Ollama IPC → main process manages `ollama serve`, model pull/list/run state, and service/model launch parameters
+5. **Local Inference**: Renderer invokes llama.cpp IPC → main process manages `llama-server`, model install/list/load state, and service/model launch parameters
 
 ### Cowork System
 
@@ -179,7 +179,7 @@ The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-
 - **i18n**: Simple key-value translation in `services/i18n.ts`, supports Chinese (default) and English. Language auto-detected from system locale on first run.
 - **Path alias**: `@` maps to `src/renderer/` in Vite config for imports.
 - **Skills**: Custom skill definitions in `SKILLs/` directory, configured via `skills.config.json`
-- **Ollama parameters**: service-level options are environment variables for `ollama serve`; model-level options are request options passed when starting/running a model.
+- **llama.cpp parameters**: service-level options control the managed `llama-server` process; model-level options are passed when loading or running a model.
 
 ### Artifacts System
 

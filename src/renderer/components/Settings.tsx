@@ -1,14 +1,14 @@
 import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import { ArrowTopRightOnSquareIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, KeyIcon, ShieldCheckIcon, SignalIcon, SunIcon, UserCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon, ArrowsRightLeftIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, KeyIcon, ShieldCheckIcon, SignalIcon, SunIcon, UserCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { OllamaStatusSnapshot } from '../../shared/ollama';
-import { OpenClawProviderId, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { type AppConfig, defaultConfig, getCustomProviderDefaultName, getProviderDisplayName, getVisibleProviders, isCustomProvider } from '../config';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
+import { collectAvailableModels } from '../services/availableModels';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import { decryptSecret, decryptWithPassword, EncryptedPayload, encryptWithPassword, PasswordEncryptedPayload } from '../services/encryption';
@@ -37,7 +37,7 @@ import IMSettings from './im/IMSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
 import ThemedSelect from './ui/ThemedSelect';
 
-type TabType = 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'coworkMemory' | 'coworkAgent' | 'shortcuts' | 'im' | 'email' | 'about';
+type TabType = 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'triage' | 'coworkMemory' | 'coworkAgent' | 'shortcuts' | 'im' | 'email' | 'about';
 
 const SettingsSlidersIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
@@ -66,7 +66,6 @@ export type SettingsOpenOptions = {
 
 interface SettingsProps extends SettingsOpenOptions {
   onClose: () => void;
-  onShowLocalInference?: () => void;
   enterpriseConfig?: {
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
@@ -105,16 +104,6 @@ const resolveModelSupportsImageForProvider = (
   providerName: string,
   model: { id: string; supportsImage?: boolean },
 ): boolean => ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage);
-
-const getOpenClawProviderIdForConfig = (
-  providerName: string,
-  providerConfig: ProviderConfig,
-): string => {
-  if (providerName === ProviderName.OpenAI && providerConfig.authType === 'oauth') {
-    return OpenClawProviderId.OpenAICodex;
-  }
-  return ProviderRegistry.getOpenClawProviderId(providerName);
-};
 
 interface ProviderExportEntry {
   enabled: boolean;
@@ -182,48 +171,10 @@ const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfi
 
   return config.apiKey.trim().length > 0;
 };
-const getOllamaProviderStatusBadge = (
-  providerConfig: ProviderConfig,
-  status: OllamaStatusSnapshot | null,
-): ProviderStatusBadge => {
-  if (!providerConfig.enabled) {
-    return {
-      labelKey: 'providerStatusOff',
-      className: 'bg-red-500/20 text-red-600 dark:text-red-400',
-    };
-  }
-
-  if (status?.status === 'running') {
-    return {
-      labelKey: status.managedByApp ? 'ollamaProviderServiceConnected' : 'ollamaProviderServiceExternal',
-      className: status.managedByApp
-        ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-        : 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-    };
-  }
-
-  if (status?.status === 'starting') {
-    return {
-      labelKey: 'ollamaProviderServiceStarting',
-      className: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-    };
-  }
-
-  return {
-    labelKey: 'ollamaProviderServiceStopped',
-    className: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-  };
-};
-
 const getProviderStatusBadge = (
   provider: ProviderType,
   providerConfig: ProviderConfig,
-  ollamaStatus: OllamaStatusSnapshot | null,
 ): ProviderStatusBadge => {
-  if (provider === ProviderName.Ollama) {
-    return getOllamaProviderStatusBadge(providerConfig, ollamaStatus);
-  }
-
   const enabled = providerConfig.enabled && hasProviderAuthConfigured(provider, providerConfig);
   return enabled
     ? {
@@ -423,8 +374,9 @@ const getDefaultProviders = (): ProvidersConfig => {
 
 const getDefaultActiveProvider = (): ProviderType => {
   const providers = (defaultConfig.providers ?? {}) as ProvidersConfig;
-  const firstEnabledProvider = providerKeys.find(providerKey => providers[providerKey]?.enabled);
-  return firstEnabledProvider ?? providerKeys[0];
+  const visibleProviderKeys = providerKeys.filter((providerKey) => providerKey !== ProviderName.LlamaCpp);
+  const firstEnabledProvider = visibleProviderKeys.find(providerKey => providers[providerKey]?.enabled);
+  return firstEnabledProvider ?? visibleProviderKeys[0];
 };
 
 // System shortcuts that should not be captured (clipboard, undo, select-all, quit, etc.)
@@ -570,7 +522,7 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
   );
 };
 
-const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, initialTab, notice, noticeI18nKey, noticeExtra, enterpriseConfig }) => {
+const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, noticeI18nKey, noticeExtra, enterpriseConfig }) => {
   const dispatch = useDispatch();
   // 状态
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
@@ -600,6 +552,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<ProviderType | null>(null);
   const [isImportingProviders, setIsImportingProviders] = useState(false);
   const [isExportingProviders, setIsExportingProviders] = useState(false);
+  // Global triage defaults — Agent-level settings are per-Agent in AgentSettingsPanel
+  const [triageCooldownRounds, setTriageCooldownRounds] = useState(3);
+  const [triageMaxConversationRounds, setTriageMaxConversationRounds] = useState(20);
+  const [triageUseLocalModel, setTriageUseLocalModel] = useState(false);
+  const [triageModelName, setTriageModelName] = useState('');
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
   const initialThemeIdRef = useRef<string>(themeService.getThemeId());
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
@@ -629,8 +586,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
   // Add state for providers configuration
   const [providers, setProviders] = useState<ProvidersConfig>(() => getDefaultProviders());
-  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusSnapshot | null>(null);
-
 
   // authType defaults to undefined on first open, which should behave as OAuth mode
   const minimaxIsOAuthMode = providers.minimax.authType !== 'apikey';
@@ -675,21 +630,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
   useEffect(() => {
     setShowApiKey(false);
   }, [activeProvider]);
-
-  const refreshOllamaStatus = useCallback(async () => {
-    const status = await window.electron.ollama.status();
-    setOllamaStatus(status);
-    return status;
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'model') return;
-    void refreshOllamaStatus().catch(() => undefined);
-    const unsubscribe = window.electron.ollama.onStatusChanged((status) => {
-      setOllamaStatus(status);
-    });
-    return unsubscribe;
-  }, [activeTab, refreshOllamaStatus]);
 
   const handleExportLogs = useCallback(async () => {
     if (isExportingLogs) {
@@ -1028,6 +968,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
     };
   }, []);
 
+  useEffect(() => {
+    window.electron.triage.getConfig().then((config) => {
+      setTriageCooldownRounds(config.rules.cooldownRounds);
+      setTriageMaxConversationRounds(config.rules.maxConversationRoundsForTriage);
+      setTriageUseLocalModel(config.rules.useLocalModelTriage);
+      setTriageModelName(config.rules.triageModelName);
+    }).catch(() => { /* triage not available */ });
+  }, []);
+
   // 监听标签页切换，确保内容区域滚动到顶部
   useEffect(() => {
     if (contentRef.current) {
@@ -1060,7 +1009,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
   // Compute visible providers based on language, including active custom_N entries
   const visibleProviders = useMemo(() => {
-    const visibleKeys = getVisibleProviders(language);
+    const visibleKeys = getVisibleProviders(language).filter((key) => key !== ProviderName.LlamaCpp);
     const filtered: Partial<ProvidersConfig> = {};
     for (const key of visibleKeys) {
       if (providers[key as keyof ProvidersConfig]) {
@@ -1506,6 +1455,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
       case 'ready':
         return i18nService.t('coworkOpenClawReadyNotice');
       case 'starting':
+      case 'compiling':
         return i18nService.t('coworkOpenClawStarting');
       case 'error':
         return i18nService.t('coworkOpenClawError');
@@ -1738,11 +1688,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
         Object.entries(providers).map(([providerKey, providerConfig]) => {
           const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
           const hasValidAuth = hasProviderAuthConfigured(providerKey as ProviderType, providerConfig);
+          const normalizedEnabled = providerConfig.enabled && hasValidAuth;
           return [
             providerKey,
             {
               ...providerConfig,
-              enabled: providerConfig.enabled && hasValidAuth,
+              enabled: normalizedEnabled,
               apiFormat,
               baseUrl: resolveBaseUrl(providerKey as ProviderType, providerConfig.baseUrl, apiFormat),
             },
@@ -1752,7 +1703,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
       // Find the first enabled provider to use as the primary API
       const firstEnabledProvider = Object.entries(normalizedProviders).find(
-        ([_, config]) => config.enabled
+        ([providerKey, config]) => providerKey !== ProviderName.LlamaCpp && config.enabled
       );
 
       const primaryProvider = firstEnabledProvider
@@ -1792,22 +1743,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
       });
 
       // 更新 Redux store 中的可用模型列表
-      const allModels: { id: string; name: string; provider?: string; providerKey?: string; openClawProviderId?: string; supportsImage?: boolean }[] = [];
-      Object.entries(normalizedProviders).forEach(([providerName, config]) => {
-        if (config.enabled && config.models) {
-          const openClawProviderId = getOpenClawProviderIdForConfig(providerName, config);
-          config.models.forEach(model => {
-            allModels.push({
-              id: model.id,
-              name: model.name,
-              provider: getProviderDisplayName(providerName, config),
-              providerKey: providerName,
-              openClawProviderId,
-              supportsImage: resolveModelSupportsImageForProvider(providerName, model),
-            });
-          });
-        }
-      });
+      const allModels = await collectAvailableModels(configService.getConfig());
       dispatch(setAvailableModels(allModels));
 
       if (hasCoworkConfigChanges) {
@@ -1888,9 +1824,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
 
   // 快捷键更新处理
   const handleShortcutChange = (key: keyof typeof shortcuts, value: string) => {
-    // Check for conflicts with other shortcuts
-    const conflictKey = Object.keys(shortcuts).find(
-      k => k !== key && shortcuts[k as keyof typeof shortcuts] === value
+    // Check for conflicts with other shortcuts (skip unset values)
+    const conflictKey = value && Object.keys(shortcuts).find(
+      k => k !== key && shortcuts[k as keyof typeof shortcuts] && shortcuts[k as keyof typeof shortcuts] === value
     );
     if (conflictKey) {
       const conflictLabel = i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey);
@@ -2191,8 +2127,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
   };
 
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
+    // Only export providers that have an API key configured, regardless of enabled state.
+    // Skip preset providers that were never configured to avoid exporting default models.
+    const configuredEntries = Object.entries(providers).filter(([, cfg]) =>
+      (cfg as ProviderConfig).apiKey?.trim()
+    );
     const entries = await Promise.all(
-      Object.entries(providers).map(async ([providerKey, providerConfig]) => {
+      configuredEntries.map(async ([providerKey, providerConfig]) => {
         const apiKey = await encryptWithPassword(providerConfig.apiKey, password);
         const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
         return [
@@ -2493,6 +2434,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
       { key: 'appearance' as TabType,     label: i18nService.t('appearance'),     icon: <SunIcon className="h-5 w-5" /> },
       { key: 'coworkAgentEngine' as TabType, label: i18nService.t('coworkAgentEngine'), icon: <CpuChipIcon className="h-5 w-5" /> },
       { key: 'model' as TabType,          label: i18nService.t('model'),          icon: <CubeIcon className="h-5 w-5" /> },
+      { key: 'triage' as TabType,         label: i18nService.t('triageTab'),      icon: <ArrowsRightLeftIcon className="h-5 w-5" /> },
       { key: 'im' as TabType,             label: i18nService.t('imBot'),          icon: <ChatBubbleLeftIcon className="h-5 w-5" /> },
       { key: 'email' as TabType,          label: i18nService.t('emailTab'),       icon: <EnvelopeIcon className="h-5 w-5" /> },
       { key: 'coworkMemory' as TabType,   label: i18nService.t('coworkMemoryTitle'), icon: <BrainIcon className="h-5 w-5" /> },
@@ -3137,24 +3079,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
                       </div>
                     </div>
                     <div className="flex items-center ml-2 gap-1">
-                      {providerKey === ProviderName.Ollama && config.enabled && (
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            ollamaStatus?.status === 'running'
-                              ? 'bg-green-400'
-                              : ollamaStatus?.status === 'starting'
-                                ? 'bg-blue-400'
-                                : 'bg-amber-400'
-                          }`}
-                          title={i18nService.t(
-                            ollamaStatus?.status === 'running'
-                              ? 'ollamaProviderServiceConnected'
-                              : ollamaStatus?.status === 'starting'
-                                ? 'ollamaProviderServiceStarting'
-                                : 'ollamaProviderServiceStopped',
-                          )}
-                        />
-                      )}
                       {isCustom && (
                         <button
                           type="button"
@@ -3210,7 +3134,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
             {/* Provider Settings - Right Side */}
             <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
               {(() => {
-                const statusBadge = getProviderStatusBadge(activeProvider, providers[activeProvider], ollamaStatus);
+                const statusBadge = getProviderStatusBadge(
+                  activeProvider,
+                  providers[activeProvider],
+                );
                 return (
               <div className="flex items-center justify-between pb-2 border-b border-border">
                 <div className="flex items-center gap-1.5">
@@ -3238,31 +3165,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
               </div>
                 );
               })()}
-
-              {activeProvider === ProviderName.Ollama && (
-                <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-foreground">
-                        {i18nService.t('ollamaProviderConfigOnlyTitle')}
-                      </p>
-                      <p className="mt-1 text-[11px] leading-5 text-secondary">
-                        {i18nService.t('ollamaProviderConfigOnlyDescription')}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onShowLocalInference?.();
-                      }}
-                      className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-raised"
-                    >
-                      {i18nService.t('ollamaProviderOpenLocalInference')}
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
@@ -4227,76 +4129,175 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onShowLocalInference, init
               </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="text-xs font-medium text-foreground">
-                    {i18nService.t('availableModels')}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddModel}
-                    className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
-                  >
-                    <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
-                    {i18nService.t('addModel')}
-                  </button>
-                </div>
-
-                {/* Models List */}
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                  {(providers[activeProvider].models ?? []).map(model => (
-                    <div
-                      key={model.id}
-                      className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
+              {(
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <h3 className="text-xs font-medium text-foreground">
+                      {i18nService.t('availableModels')}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleAddModel}
+                      className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
                     >
-                      <div className="flex items-center justify-between gap-2 min-w-0">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-green-400"></div>
-                          <div className="min-w-0">
-                            <div className="text-foreground font-medium text-[11px] truncate">{model.name}</div>
-                            <div className="text-[10px] text-secondary truncate">{model.id}</div>
+                      <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
+                      {i18nService.t('addModel')}
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                    {(providers[activeProvider].models ?? []).map(model => (
+                      <div
+                        key={model.id}
+                        className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
+                      >
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-green-400"></div>
+                            <div className="min-w-0">
+                              <div className="text-foreground font-medium text-[11px] truncate">{model.name}</div>
+                              <div className="text-[10px] text-secondary truncate">{model.id}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center shrink-0 space-x-1">
+                            {model.supportsImage && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                                {i18nService.t('imageInput')}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
+                              className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteModel(model.id)}
+                              className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center shrink-0 space-x-1">
-                          {model.supportsImage && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
-                              {i18nService.t('imageInput')}
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
-                            className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteModel(model.id)}
-                            className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <TrashIcon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
-                    <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
-                      <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
-                      <button
-                        type="button"
-                        onClick={handleAddModel}
-                        className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
-                      >
-                        <PlusCircleIcon className="h-3 w-3 mr-1" />
-                        {i18nService.t('addFirstModel')}
-                      </button>
-                    </div>
-                  )}
+                    {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
+                      <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
+                        <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
+                        <button
+                          type="button"
+                          onClick={handleAddModel}
+                          className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
+                        >
+                          <PlusCircleIcon className="h-3 w-3 mr-1" />
+                          {i18nService.t('addFirstModel')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'triage':
+        return (
+          <div className="max-w-2xl space-y-6">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">
+                {i18nService.t('modelTriageTitle') || '自动模型路由'}
+              </h3>
+              <p className="text-xs text-secondary mt-1">
+                各 Agent 在 Agent 设置的「路由」tab 中分别启用和配置。此处为全局默认参数。
+              </p>
+            </div>
+
+            {/* Global Defaults */}
+            <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
+              <h4 className="text-sm font-medium text-foreground">全局默认参数</h4>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm text-foreground">冷却轮次</label>
+                  <p className="text-xs text-secondary mt-0.5">切换后需等待 N 轮才能再次切换，防止频繁抖动</p>
+                </div>
+                <input type="number" min="1" max="20" value={triageCooldownRounds}
+                  onChange={async (e) => {
+                    const value = Math.max(1, Number(e.target.value) || 3);
+                    setTriageCooldownRounds(value);
+                    const config = await window.electron.triage.getConfig();
+                    await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, cooldownRounds: value } });
+                  }}
+                  className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground shrink-0" />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm text-foreground">对话路由上限</label>
+                  <p className="text-xs text-secondary mt-0.5">超过此轮数后视为深度对话，使用默认模型</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs text-secondary">轮</span>
+                  <input type="number" min="1" max="100" value={triageMaxConversationRounds}
+                    onChange={async (e) => {
+                      const value = Math.max(1, Number(e.target.value) || 20);
+                      setTriageMaxConversationRounds(value);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, maxConversationRoundsForTriage: value } });
+                    }}
+                    className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground" />
                 </div>
               </div>
+            </div>
+
+            {/* Local Model Classifier */}
+            <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
+              <h4 className="text-sm font-medium text-foreground">本地模型分类（实验性）</h4>
+              <p className="text-xs text-secondary">规则无法确定路由目标时，调用本地 llama.cpp 小模型进行分类</p>
+
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-sm text-foreground">
+                    {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
+                  </span>
+                  <p className="text-xs text-secondary mt-0.5">需先在本地推理页启动 llama.cpp 并加载模型</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
+                  <input type="checkbox" checked={triageUseLocalModel}
+                    onChange={async (e) => {
+                      const value = e.target.checked;
+                      setTriageUseLocalModel(value);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, useLocalModelTriage: value } });
+                    }}
+                    className="sr-only peer" />
+                  <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
+                </label>
+              </div>
+
+              {triageUseLocalModel && (
+                <div>
+                  <label className="text-xs font-medium text-secondary block mb-1">
+                    {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
+                  </label>
+                  <input type="text" value={triageModelName}
+                    onChange={async (e) => {
+                      const value = e.target.value;
+                      setTriageModelName(value);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, triageModelName: value } });
+                    }}
+                    placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
+                    className="w-full max-w-xs text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground" />
+                  <p className="text-xs text-secondary mt-1">
+                    {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );

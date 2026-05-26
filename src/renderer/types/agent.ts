@@ -16,6 +16,7 @@ export interface Agent {
   isDefault: boolean;
   source: AgentSource;
   presetId: string;
+  triageOverride?: import('../../shared/triage').AgentTriageOverride;
   createdAt: number;
   updatedAt: number;
 }

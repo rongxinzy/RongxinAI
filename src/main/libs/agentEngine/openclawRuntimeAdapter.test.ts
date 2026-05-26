@@ -14,6 +14,18 @@ vi.mock('electron', () => ({
 
 import { OpenClawRuntimeAdapter, pickPersistedAssistantSegment } from './openclawRuntimeAdapter';
 
+function setAvailabilityGuard(
+  adapter: OpenClawRuntimeAdapter,
+  guard: (modelRef: string) => { available: boolean; message?: string },
+): void {
+  (adapter as unknown as {
+    options: { isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string } };
+  }).options = {
+    ...(adapter as unknown as { options: Record<string, unknown> }).options,
+    isModelAvailableForSession: guard,
+  };
+}
+
 test('pickPersistedAssistantSegment: stream authority keeps previous when same length or longer', () => {
   expect(pickPersistedAssistantSegment('aa', 'a', true)).toEqual({
     content: 'aa',
@@ -282,6 +294,7 @@ function createRunTurnAdapter(options: {
   adapter.gatewayClientEntryPath = '/tmp/openclaw-gateway-client.js';
   adapter.gatewayReadyPromise = Promise.resolve();
   adapter.reconcileWithHistory = async () => {};
+  adapter.on('error', () => {});
 
   if (options.cachedModel) {
     adapter.lastPatchedModelBySession.set(session.id, options.cachedModel);
@@ -359,6 +372,95 @@ test('continueSession sends the session cwd to OpenClaw chat.send', async () => 
   expect(chatSend?.params).toMatchObject({
     cwd: path.resolve('/tmp/lobsterai-selected-project'),
   });
+});
+
+test('continueSession rejects an unavailable llama.cpp model before patching or chat.send', async () => {
+  const { adapter, requests } = createRunTurnAdapter({
+    agentModel: 'llamacpp/qwen-local',
+  });
+  setAvailabilityGuard(adapter, () => ({
+    available: false,
+    message: 'This llama.cpp model is not running.',
+  }));
+
+  await expect(adapter.continueSession('session-1', 'hello'))
+    .rejects.toThrow('This llama.cpp model is not running.');
+
+  expect(requests).toEqual([]);
+});
+
+test('continueSession rejects running llama.cpp models when runtime context length is unknown', async () => {
+  const { adapter, requests } = createRunTurnAdapter({
+    agentModel: 'llamacpp/qwen-local',
+  });
+  setAvailabilityGuard(adapter, () => ({ available: true }));
+  (adapter as unknown as { options: Record<string, unknown> }).options = {
+    ...(adapter as unknown as { options: Record<string, unknown> }).options,
+    getModelContextWindow: () => undefined,
+  };
+
+  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow(
+    '未报告实际可用上下文窗口',
+  );
+
+  expect(requests.some((request) => request.method === 'chat.send')).toBe(false);
+});
+
+test('continueSession allows new llama.cpp turns when only context window is cached', async () => {
+  const { adapter, requests } = createRunTurnAdapter({
+    agentModel: 'llamacpp/qwen-local',
+  });
+  setAvailabilityGuard(adapter, () => ({ available: true }));
+  (adapter as unknown as { options: Record<string, unknown> }).options = {
+    ...(adapter as unknown as { options: Record<string, unknown> }).options,
+    getModelContextWindow: () => 16384,
+  };
+  (adapter as unknown as {
+    sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
+  }).sessionTokenBudgetCache.set(
+    'agent:main:lobsterai:session-1',
+    { contextTokens: 16384 },
+  );
+
+  await adapter.continueSession('session-1', 'hello');
+
+  expect(requests.some((request) => request.method === 'chat.send')).toBe(true);
+});
+
+test('continueSession rejects llama.cpp turns when fresh total tokens exceed runtime window', async () => {
+  const { adapter, requests } = createRunTurnAdapter({
+    agentModel: 'llamacpp/qwen-local',
+  });
+  setAvailabilityGuard(adapter, () => ({ available: true }));
+  (adapter as unknown as { options: Record<string, unknown> }).options = {
+    ...(adapter as unknown as { options: Record<string, unknown> }).options,
+    getModelContextWindow: () => 4096,
+  };
+  (adapter as unknown as {
+    sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
+  }).sessionTokenBudgetCache.set(
+    'agent:main:lobsterai:session-1',
+    { contextTokens: 4096, totalTokens: 4096, totalTokensFresh: true },
+  );
+
+  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow(
+    '已接近上下文上限',
+  );
+
+  expect(requests.some((request) => request.method === 'chat.send')).toBe(false);
+});
+
+test('patchSession rejects an unavailable llama.cpp model before sessions.patch', async () => {
+  const { adapter, requests } = createPatchAdapter();
+  setAvailabilityGuard(adapter, () => ({
+    available: false,
+    message: 'This llama.cpp model is not running.',
+  }));
+
+  await expect(adapter.patchSession('session-1', { model: 'llamacpp/qwen-local' }))
+    .rejects.toThrow('This llama.cpp model is not running.');
+
+  expect(requests).toEqual([]);
 });
 
 // ==================== Reconcile tests ====================

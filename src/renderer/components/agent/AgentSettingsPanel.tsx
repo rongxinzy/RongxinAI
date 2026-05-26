@@ -1,7 +1,8 @@
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { AgentTriageOverride } from '@shared/triage';
+import React, { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { agentService } from '../../services/agent';
@@ -16,6 +17,7 @@ import { getAgentDisplayName, getAgentDisplayNameById, isDefaultAgentId } from '
 import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
+import { isLlamaCppModelRef } from '../cowork/agentModelSelection';
 import TrashIcon from '../icons/TrashIcon';
 import AgentAvatarPicker from './AgentAvatarPicker';
 import AgentConfirmDialog from './AgentConfirmDialog';
@@ -56,6 +58,12 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<AgentDetailTab>(AgentDetailTab.Prompt);
+
+  // Agent triage state — useReducer to avoid races
+  const [triageCustom, setTriageCustom] = useState(false);
+  const triageReducer = (s: AgentTriageOverride, a: Partial<AgentTriageOverride>) => ({ ...s, ...a });
+  const [triageOverride, dispatchTriage] = useReducer(triageReducer, {});
+  const initialTriageRef = useRef<AgentTriageOverride | null>(null);
 
   // IM binding state — keys are 'telegram' (single) or 'dingtalk:<instanceId>' (multi)
   const [imConfig, setImConfig] = useState<IMGatewayConfig | null>(null);
@@ -109,9 +117,17 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       setIdentity(nextIdentity);
       setUserInfo(nextUserInfo);
       setIcon(a.icon);
-      setModel(resolveOpenClawModelRef(a.model, availableModels) ?? null);
+      const resolvedModel = resolveOpenClawModelRef(a.model, availableModels) ?? null;
+      setModel(resolvedModel ?? (isLlamaCppModelRef(a.model)
+        ? { id: '__invalid__', name: a.model.split('/').pop() || a.model } as Model
+        : null));
       setWorkingDirectory(a.workingDirectory ?? '');
       setSkillIds(a.skillIds ?? []);
+      // Load triage override
+      const loadedTriage = a.triageOverride ?? {};
+      dispatchTriage({ enabled: undefined, lightModelRef: undefined, heavyModelRef: undefined, allowCrossProviderSwitch: undefined, ...loadedTriage });
+      setTriageCustom(Boolean(loadedTriage.enabled !== undefined || loadedTriage.lightModelRef || loadedTriage.heavyModelRef || loadedTriage.allowCrossProviderSwitch !== undefined));
+      initialTriageRef.current = loadedTriage;
       initialValuesRef.current = {
         name: a.name,
         description: a.description,
@@ -158,6 +174,12 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     if (workingDirectory !== init.workingDirectory) return true;
     if (skillIds.length !== init.skillIds.length || skillIds.some((id, i) => id !== init.skillIds[i])) return true;
     if (boundKeys.size !== initialBoundKeys.size || [...boundKeys].some((k) => !initialBoundKeys.has(k))) return true;
+    const currentTriage = triageCustom ? {
+      ...triageOverride,
+      ...(triageOverride.enabled === undefined ? {} : { enabled: triageOverride.enabled }),
+    } : null;
+    const prevTriage = initialTriageRef.current;
+    if (JSON.stringify(currentTriage) !== JSON.stringify(prevTriage)) return true;
     return false;
   }, [name, description, systemPrompt, identity, userInfo, icon, model, workingDirectory, skillIds, boundKeys, initialBoundKeys]);
 
@@ -189,6 +211,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         workingDirectory: workingDirectory.trim(),
         icon: icon.trim(),
         skillIds,
+        triageOverride: triageCustom ? triageOverride : null,
       });
       if (!result) {
         window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }));
@@ -304,6 +327,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     { key: AgentDetailTab.User, label: i18nService.t('coworkBootstrapUserTitle') },
     { key: AgentDetailTab.Skills, label: i18nService.t('agentTabSkills') },
     { key: AgentDetailTab.Im, label: i18nService.t('agentTabIM') },
+    { key: AgentDetailTab.Triage, label: i18nService.t('agentTabTriage') },
   ];
 
   const renderTextEditor = (
@@ -488,9 +512,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       <Modal
         onClose={handleClose}
         overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-        className="w-[calc(100vw-56px)] max-w-[854px] h-[82vh] max-h-[664px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface border border-border/80 flex flex-col overflow-hidden"
+        className="w-[calc(100vw-56px)] max-w-[854px] h-[82vh] max-h-[664px] flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 px-7 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <AgentAvatarPicker value={icon} onChange={setIcon} />
             <div className="min-w-0 flex-1 pt-0.5">
@@ -521,7 +545,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         </div>
 
         {/* Tab bar */}
-        <div className="flex shrink-0 border-b border-border px-7">
+        <div className="flex shrink-0 border-b border-border px-4">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -542,7 +566,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         </div>
 
         {/* Tab content */}
-        <div className="px-7 py-7 overflow-hidden flex-1 min-h-0">
+        <div className="px-4 py-3 overflow-hidden flex-1 min-h-0">
           {activeTab === AgentDetailTab.Prompt && renderTextEditor(
             systemPrompt,
             setSystemPrompt,
@@ -585,10 +609,135 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               </div>
             </div>
           )}
+
+          {activeTab === AgentDetailTab.Triage && (
+            <div className="h-full overflow-y-auto">
+              <div className="space-y-4">
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-surface/60 p-3">
+                  <div>
+                    <span className="text-sm font-medium text-foreground">
+                      {i18nService.t('agentTriageEnable')}
+                    </span>
+                    <p className="mt-0.5 text-xs text-secondary">
+                      {i18nService.t('agentTriageEnableHint')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTriageCustom(true);
+                      dispatchTriage({ enabled: !triageOverride.enabled });
+                    }}
+                    className={`w-9 h-5 rounded-full flex items-center transition-colors shrink-0 ${
+                      triageOverride.enabled ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
+                    }`}
+                  >
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform ${
+                        triageOverride.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {triageOverride.enabled && (
+                  <div className="space-y-4">
+                    {/* Tier overview */}
+                    <div className="rounded-lg border border-border bg-surface/40 p-3 space-y-2">
+                      <h4 className="text-sm font-medium text-foreground">路由策略</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-green-500/15 text-[10px] font-medium text-green-600">轻</span>
+                          <div className="text-xs text-secondary">
+                            {i18nService.t('agentTriageLightModelHint')}
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-500/15 text-[10px] font-medium text-blue-600">标</span>
+                          <div className="text-xs text-secondary">
+                            {i18nService.t('agentTriageStandardNote')}
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500/15 text-[10px] font-medium text-red-600">强</span>
+                          <div className="text-xs text-secondary">
+                            {i18nService.t('agentTriageHeavyModelHint')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Light model */}
+                    <div>
+                      <label className="text-sm font-medium text-foreground block mb-1">
+                        {i18nService.t('agentTriageLightModel')}
+                      </label>
+                      <select
+                        value={triageOverride.lightModelRef || ''}
+                        onChange={(e) => dispatchTriage({ lightModelRef: e.target.value })}
+                        className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                      >
+                        <option value="">不指定（使用 Agent 默认模型）</option>
+                        {availableModels.map((m) => {
+                          const ref = `${m.providerKey || 'unknown'}/${m.id}`;
+                          return <option key={ref} value={ref}>{m.name || m.id}</option>;
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Heavy model */}
+                    <div>
+                      <label className="text-sm font-medium text-foreground block mb-1">
+                        {i18nService.t('agentTriageHeavyModel')}
+                      </label>
+                      <select
+                        value={triageOverride.heavyModelRef || ''}
+                        onChange={(e) => dispatchTriage({ heavyModelRef: e.target.value })}
+                        className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                      >
+                        <option value="">不指定（使用 Agent 默认模型）</option>
+                        {availableModels.map((m) => {
+                          const ref = `${m.providerKey || 'unknown'}/${m.id}`;
+                          return <option key={ref} value={ref}>{m.name || m.id}</option>;
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Cross provider */}
+                    <label className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">
+                        {i18nService.t('agentTriageCrossProvider')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => dispatchTriage({ allowCrossProviderSwitch: !triageOverride.allowCrossProviderSwitch })}
+                        className={`w-9 h-5 rounded-full flex items-center transition-colors ${
+                          triageOverride.allowCrossProviderSwitch ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
+                        }`}
+                      >
+                        <div
+                          className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform ${
+                            triageOverride.allowCrossProviderSwitch ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                          }`}
+                        />
+                      </button>
+                    </label>
+
+                    {triageOverride.allowCrossProviderSwitch && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        跨服务商切换可能导致对话数据发送到第三方服务器，请确认您信任目标服务商。
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-border">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
           <AgentDetailToolbar
             model={model}
             onModelChange={setModel}

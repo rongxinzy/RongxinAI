@@ -33,12 +33,18 @@ type ProviderModelConfig = {
   id: string;
   name: string;
   supportsImage?: boolean;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
 };
 
 type ProviderModelInputConfig = {
   id: string;
   name?: string;
   supportsImage?: boolean;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
 };
 
 export type ApiConfigResolution = {
@@ -50,6 +56,9 @@ export type ApiConfigResolution = {
     codingPlanEnabled: boolean;
     supportsImage?: boolean;
     modelName?: string;
+    contextWindow?: number;
+    contextTokens?: number;
+    maxTokens?: number;
   };
 };
 
@@ -77,6 +86,7 @@ export function setServerBaseUrlGetter(getter: () => string): void {
 // Cached server model metadata (populated when auth:getModels is called)
 // Keyed by modelId → { supportsImage }
 let serverModelMetadataCache: Map<string, { supportsImage?: boolean }> = new Map();
+let llamaCppRunningModelCache: ProviderModelConfig[] = [];
 
 const serializeServerModelMetadata = (
   models: Array<{ modelId: string; supportsImage?: boolean }>,
@@ -111,6 +121,45 @@ export function getAllServerModelMetadata(): Array<{ modelId: string; supportsIm
   }));
 }
 
+function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
+  return JSON.stringify(
+    models
+      .map((model) => ({
+        id: model.id,
+        name: model.name,
+        supportsImage: model.supportsImage,
+        contextWindow: model.contextWindow,
+        contextTokens: model.contextTokens,
+        maxTokens: model.maxTokens,
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  );
+}
+
+export function updateLlamaCppRunningModels(models: ProviderModelInputConfig[]): boolean {
+  const normalized = normalizeProviderModels(ProviderName.LlamaCpp, models);
+  const previous = serializeLlamaCppRunningModels(llamaCppRunningModelCache);
+  const next = serializeLlamaCppRunningModels(normalized);
+  llamaCppRunningModelCache = normalized;
+  return previous !== next;
+}
+
+export function getLlamaCppRunningModels(): ProviderModelConfig[] {
+  return llamaCppRunningModelCache.map((model) => ({ ...model }));
+}
+
+export function isLlamaCppModelRunning(modelId: string): boolean {
+  const normalized = modelId.trim();
+  if (!normalized) return false;
+  return llamaCppRunningModelCache.some((model) => model.id === normalized);
+}
+
+export function getLlamaCppModelContextWindow(modelId: string): number | undefined {
+  const normalized = modelId.trim();
+  if (!normalized) return undefined;
+  return llamaCppRunningModelCache.find((model) => model.id === normalized)?.contextWindow;
+}
+
 function buildServerFallbackModels(effectiveModelId: string): NonNullable<LocalProviderConfig['models']> {
   const models = getAllServerModelMetadata().map((model) => ({
     id: model.modelId,
@@ -141,6 +190,15 @@ function normalizeProviderModels(providerName: string, models?: ProviderModelInp
         model.id,
         model.supportsImage,
       ),
+      contextWindow: typeof model.contextWindow === 'number' && model.contextWindow > 0
+        ? model.contextWindow
+        : undefined,
+      contextTokens: typeof model.contextTokens === 'number' && model.contextTokens > 0
+        ? model.contextTokens
+        : undefined,
+      maxTokens: typeof model.maxTokens === 'number' && model.maxTokens > 0
+        ? model.maxTokens
+        : undefined,
     }));
 }
 
@@ -159,6 +217,9 @@ type MatchedProvider = {
   baseURL: string;
   supportsImage?: boolean;
   modelName?: string;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
 };
 
 function getEffectiveProviderApiFormat(providerName: string, apiFormat: unknown): AnthropicApiFormat {
@@ -172,7 +233,17 @@ function getEffectiveProviderApiFormat(providerName: string, apiFormat: unknown)
 }
 
 function providerRequiresApiKey(providerName: string): boolean {
-  return providerName !== ProviderName.Ollama;
+  return providerName !== ProviderName.Ollama && providerName !== ProviderName.LlamaCpp;
+}
+
+function getEffectiveProviderModels(
+  providerName: string,
+  providerConfig: LocalProviderConfig,
+): ProviderModelConfig[] {
+  if (providerName === ProviderName.LlamaCpp) {
+    return getLlamaCppRunningModels();
+  }
+  return normalizeProviderModels(providerName, providerConfig.models);
 }
 
 function shouldUseOpenAICodexOAuth(providerName: string, providerConfig: LocalProviderConfig): boolean {
@@ -216,10 +287,14 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
     modelId: string;
   } | null => {
     for (const [providerName, providerConfig] of Object.entries(providers)) {
-      if (!providerConfig?.enabled || !providerConfig.models || providerConfig.models.length === 0) {
+      const models = getEffectiveProviderModels(providerName, providerConfig);
+      if (
+        (!providerConfig?.enabled && providerName !== ProviderName.LlamaCpp)
+        || models.length === 0
+      ) {
         continue;
       }
-      const fallbackModel = providerConfig.models.find((model) => model.id?.trim());
+      const fallbackModel = models.find((model) => model.id?.trim());
       if (!fallbackModel) {
         continue;
       }
@@ -257,20 +332,24 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
 
   if (preferredProviderName) {
     const preferredProvider = providers[preferredProviderName];
+    const preferredModels = preferredProvider
+      ? getEffectiveProviderModels(preferredProviderName, preferredProvider)
+      : [];
     if (
-      preferredProvider?.enabled
-      && preferredProvider.models?.some((model) => model.id === modelId)
+      ((preferredProvider?.enabled || preferredProviderName === ProviderName.LlamaCpp))
+      && preferredModels.some((model) => model.id === modelId)
     ) {
       providerEntry = [preferredProviderName, preferredProvider];
     }
   }
 
   if (!providerEntry) {
-    providerEntry = Object.entries(providers).find(([, provider]) => {
-      if (!provider?.enabled || !provider.models) {
+    providerEntry = Object.entries(providers).find(([providerName, provider]) => {
+      const models = getEffectiveProviderModels(providerName, provider);
+      if ((!provider?.enabled && providerName !== ProviderName.LlamaCpp) || models.length === 0) {
         return false;
       }
-      return provider.models.some((model) => model.id === modelId);
+      return models.some((model) => model.id === modelId);
     });
   }
 
@@ -290,7 +369,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   const providerConfig = shouldUseOpenAICodexOAuth(providerName, storedProviderConfig)
     ? { ...storedProviderConfig, authType: 'oauth' as const }
     : storedProviderConfig;
-  const normalizedProviderModels = normalizeProviderModels(providerName, providerConfig.models);
+  const normalizedProviderModels = getEffectiveProviderModels(providerName, providerConfig);
 
   // MiniMax OAuth mode guard: if OAuth is selected but login has not been completed
   // (no access token), do not use the stale API key as an OAuth token.
@@ -340,6 +419,9 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       baseURL,
       supportsImage: matchedModel?.supportsImage,
       modelName: matchedModel?.name,
+      contextWindow: matchedModel?.contextWindow,
+      contextTokens: matchedModel?.contextTokens,
+      maxTokens: matchedModel?.maxTokens,
     },
   };
 }
@@ -581,7 +663,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
   const result: ProviderRawConfig[] = [];
 
   for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
-    if (!providerConfig?.enabled) continue;
+    if (!providerConfig?.enabled && providerName !== ProviderName.LlamaCpp) continue;
     if (providerName === ProviderName.LobsteraiServer) continue;
 
     // When minimax is in OAuth mode, use oauthAccessToken and oauthBaseUrl
@@ -592,7 +674,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
       if (!oauthToken) continue; // OAuth not completed, skip
       const oauthBaseUrl = ((providerConfig as any).oauthBaseUrl?.trim()) || providerConfig.baseUrl?.trim() || '';
       if (!oauthBaseUrl) continue;
-      const models = normalizeProviderModels(providerName, providerConfig.models);
+      const models = getEffectiveProviderModels(providerName, providerConfig);
       if (models.length === 0) continue;
       result.push({
         providerName,
@@ -638,7 +720,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
     if (!effectiveBaseURL) continue;
 
-    const models = normalizeProviderModels(providerName, providerConfig.models);
+    const models = getEffectiveProviderModels(providerName, providerConfig);
     if (models.length === 0) continue;
 
     result.push({

@@ -55,8 +55,26 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorContentFiltered: '内容未通过安全审核，请修改后重试。',
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
+    coworkLlamaCppModelNotRunning: '该 llama.cpp 模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
+    coworkLlamaCppContextWindowUnknown: '该 llama.cpp 模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
+    coworkLlamaCppContextLimitReached: '该 llama.cpp 会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
+    llamacppUnloadVramRecoveryPending: '模型已从 llama.cpp 运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
+    llamacppUnloadConfirmationPending: '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
+    llamacppLaunchContextExceedsTrainingLimit: '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
+    localInferenceImportRuntimeDialogTitle: '选择 llama.cpp 运行时目录',
+    localInferenceImportRuntimeDialogMessage: '请选择包含 {name} 可执行文件的目录。该目录中的所有文件将被复制到 RongxinAI 管理的运行时目录中。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
+    // IM error replies (differentiated by error kind)
+    imErrorAuthExpired: 'AI 助手认证已过期，请打开应用更新 API 密钥。',
+    imErrorRateLimited: 'AI 助手请求过于频繁，请稍后重试。',
+    imErrorBudgetExceeded: 'AI 助手账户余额不足，请充值后重试。',
+    imErrorEngineNotReady: 'AI 引擎正在启动中，请稍候再试。',
+    imErrorTransient: 'AI 助手暂时不可用 ({error})，正在自动恢复中，请稍后重试。',
+    imErrorContentFiltered: '消息内容未通过安全审核，请修改后重试。',
+    imErrorInputTooLong: '消息内容过长，请精简后重试。',
+    imErrorExecutionLimit: '任务执行超时或达到上限，请简化需求后重试。',
+    imErrorUnknown: '处理消息时遇到错误: {error}。请稍后重试。',
 
     // Exec approval continuation
     execApprovalApproved: '用户已确认执行该命令，请检查执行结果并继续。',
@@ -68,6 +86,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '无效的技能来源。支持 owner/repo、仓库链接、npm 包名、ClawHub 链接或 GitHub tree/blob 链接。',
     skillErrClawhubNotFound: '在 ClawHub 上未找到该技能，请检查链接是否正确。',
     skillErrClawhubDownloadFailed: '从 ClawHub 下载技能失败，请稍后重试。',
+
+    // Gateway startup phases
+    gatewayStartupPrecompiling: '正在预编译网关模块...',
+    gatewayStartupCompiling: '正在编译网关模块...',
+    gatewayStartupLoadingModules: '正在加载网关模块...',
+    gatewayStartupStarting: '正在启动 AI 引擎...',
 
     // Auth quota
     authPlanFree: '免费',
@@ -298,9 +322,28 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Content did not pass the safety review. Please modify and try again.',
     coworkErrorServerError: 'Server error occurred. Please try again later.',
     coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
+    coworkLlamaCppModelNotRunning: 'This llama.cpp model is not running. Load it from Local Inference first or choose another model.',
+    coworkLlamaCppContextWindowUnknown: 'The running llama.cpp model did not report an effective context window. Reload it from Local Inference before sending again.',
+    coworkLlamaCppContextLimitReached: 'This llama.cpp session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
+    llamacppUnloadVramRecoveryPending: 'The model has been removed from the llama.cpp running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
+    llamacppUnloadConfirmationPending: 'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
+    llamacppLaunchContextExceedsTrainingLimit: 'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
+    localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Runtime Directory',
+    localInferenceImportRuntimeDialogMessage: 'Select the directory containing the {name} executable. All files in this directory will be copied into the RongxinAI-managed runtime directory.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',
+    // IM error replies (differentiated by error kind)
+    imErrorAuthExpired:
+      'AI assistant authentication expired. Please open the app to update your API key.',
+    imErrorRateLimited: 'AI assistant is receiving too many requests. Please try again later.',
+    imErrorBudgetExceeded: 'AI assistant account balance insufficient. Please top up and try again.',
+    imErrorEngineNotReady: 'AI engine is starting up. Please wait and try again.',
+    imErrorTransient: 'AI assistant temporarily unavailable ({error}). Automatically recovering, please try later.',
+    imErrorContentFiltered: 'Message content did not pass safety review. Please revise and try again.',
+    imErrorInputTooLong: 'Message content too long. Please shorten and try again.',
+    imErrorExecutionLimit: 'Task timed out or reached limit. Please simplify and try again.',
+    imErrorUnknown: 'Error processing message: {error}. Please try again.',
 
     // Exec approval continuation
     execApprovalApproved:
@@ -313,6 +356,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Invalid skill source. Use owner/repo, repo URL, npm package spec, ClawHub URL, or a GitHub tree/blob URL.',
     skillErrClawhubNotFound: 'Skill not found on ClawHub. Please check the URL.',
     skillErrClawhubDownloadFailed: 'Failed to download skill from ClawHub. Please try again later.',
+
+    // Gateway startup phases
+    gatewayStartupPrecompiling: 'Pre-compiling gateway bundle...',
+    gatewayStartupCompiling: 'Compiling gateway bundle...',
+    gatewayStartupLoadingModules: 'Loading gateway modules...',
+    gatewayStartupStarting: 'Starting AI engine...',
 
     // Auth quota
     authPlanFree: 'Free',

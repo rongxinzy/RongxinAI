@@ -1,5 +1,5 @@
 {
-  "appId": "com.lobsterai.app",
+  "appId": "com.rongxinai.app",
   "productName": "RongxinAI",
   "executableName": "RongxinAI",
   "directories": {
@@ -13,12 +13,16 @@
     {
       "from": "dist",
       "to": "dist",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     {
       "from": "dist-electron",
       "to": "dist-electron",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     "!**/*.map",
     "!**/*.d.ts",
@@ -55,7 +59,9 @@
   "protocols": [
     {
       "name": "RongxinAI",
-      "schemes": ["rongxinai"]
+      "schemes": [
+        "rongxinai"
+      ]
     }
   ],
   "mac": {
