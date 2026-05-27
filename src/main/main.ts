@@ -732,7 +732,7 @@ const checkCalendarPermission = async (): Promise<string> => {
           $Outlook.Version
         } catch { exit 1 }
       `;
-      await execAsync('powershell -Command "' + checkScript + '"', { timeout: 10000 });
+      await execAsync('powershell -Command "' + checkScript + '"', { timeout: 10000, windowsHide: true });
       console.log('[Permissions] Windows Outlook is available');
       return 'authorized';
     } catch {

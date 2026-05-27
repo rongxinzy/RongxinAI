@@ -280,7 +280,7 @@ function normalizeWindowsPath(input: string | undefined): string | null {
 
 function listWindowsCommandPaths(command: string): string[] {
   try {
-    const output = execSync(command, { encoding: 'utf-8', timeout: 5000 });
+    const output = execSync(command, { encoding: 'utf-8', timeout: 5000, windowsHide: true });
     const parsed = output
       .split(/\r?\n/)
       .map((line) => normalizeWindowsPath(line))
@@ -302,7 +302,7 @@ function listGitInstallPathsFromRegistry(): string[] {
 
   for (const key of registryKeys) {
     try {
-      const output = execSync(`reg query "${key}" /v InstallPath`, { encoding: 'utf-8', timeout: 5000 });
+      const output = execSync(`reg query "${key}" /v InstallPath`, { encoding: 'utf-8', timeout: 5000, windowsHide: true });
       for (const line of output.split(/\r?\n/)) {
         const match = line.match(/InstallPath\s+REG_\w+\s+(.+)$/i);
         const root = normalizeWindowsPath(match?.[1]);

@@ -247,7 +247,7 @@ export class SkillServiceManager {
         throw new Error('Web-search runtime is incomplete and npm is not available to repair it');
       }
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
-      execSync('npm install', { cwd: skillPath, stdio: 'ignore', env });
+      execSync('npm install', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
     }
 
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
@@ -256,7 +256,7 @@ export class SkillServiceManager {
         throw new Error('Web-search dist files are missing/outdated and npm is not available to rebuild them');
       }
       console.log('[SkillServices] Compiling web-search TypeScript...');
-      execSync('npm run build', { cwd: skillPath, stdio: 'ignore', env });
+      execSync('npm run build', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
     }
 
     if (!this.isWebSearchRuntimeHealthy(skillPath)) {

@@ -50,6 +50,7 @@ function hasCommand(command: string, env: NodeJS.ProcessEnv): boolean {
     stdio: 'pipe',
     env,
     shell: isWin,
+    windowsHide: isWin,
     timeout: 5000,
   });
   if (result.status !== 0) {
@@ -102,11 +103,11 @@ function resolveWindowsRegistryPath(): string | null {
   try {
     const machinePath = execSync(
       'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path',
-      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }
+      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }
     );
     const userPath = execSync(
       'reg query "HKCU\\Environment" /v Path',
-      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }
+      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }
     );
 
     const extract = (output: string): string => {
@@ -2586,6 +2587,7 @@ export class SkillManager {
         timeout: 120000, // 2 minute timeout
         env,
         shell: isWin,
+        windowsHide: isWin,
       });
 
       console.log(`[skills] npm install exit code: ${result.status}`);
