@@ -784,6 +784,17 @@ export class CoworkStore {
     this.markOrphanImplicitMemoriesStale();
   }
 
+  deleteSessionsByAgentId(agentId: string): string[] {
+    const rows = this.db
+      .prepare('SELECT id FROM cowork_sessions WHERE agent_id = ?')
+      .all(agentId) as { id: string }[];
+    const ids = rows.map(r => r.id);
+    if (ids.length > 0) {
+      this.deleteSessions(ids);
+    }
+    return ids;
+  }
+
   setSessionPinned(id: string, pinned: boolean): number | null {
     if (!pinned) {
       this.db.prepare('UPDATE cowork_sessions SET pinned = 0, pin_order = NULL WHERE id = ?').run(id);
