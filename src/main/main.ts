@@ -17,6 +17,7 @@ import { AgentManager } from './agentManager';
 import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkStore } from './coworkStore';
+import { CoworkStreamIpc } from '../shared/ipc/channels';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { createLogger } from './libs/structuredLog';
@@ -3445,6 +3446,31 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.Delete, async (_event, id: string) => {
     try {
       const result = getAgentManager().deleteAgent(id);
+
+      // Cascade delete all Cowork sessions belonging to the deleted agent
+      const coworkStore = getCoworkStore();
+      const deletedSessionIds = coworkStore.deleteSessionsByAgentId(id);
+
+      // Clean up IM session mappings for deleted sessions
+      if (deletedSessionIds.length > 0) {
+        try {
+          const imStore = getIMGatewayManager()?.getIMStore();
+          if (imStore) {
+            for (const sessionId of deletedSessionIds) {
+              imStore.deleteSessionMappingByCoworkSessionId(sessionId);
+            }
+          }
+        } catch {
+          // IM store may not be initialised yet; safe to ignore.
+        }
+
+        // Notify renderer to refresh session lists
+        const windows = BrowserWindow.getAllWindows();
+        for (const win of windows) {
+          if (win.isDestroyed()) continue;
+          win.webContents.send(CoworkStreamIpc.SessionsChanged, { agentId: id, deletedSessionIds });
+        }
+      }
 
       // Clean up IM platform bindings that reference the deleted agent
       // so that channels fall back to the default 'main' agent.
