@@ -1,6 +1,6 @@
 /**
  * Unit tests for logger.ts logic:
- *   - Log filename pattern (daily rotation naming)
+ *   - Log filename pattern (daily rotation naming, dev vs prod)
  *   - pruneOldLogs: which files get deleted
  *   - getRecentMainLogEntries: which files are included and ordering
  *
@@ -15,7 +15,7 @@ import { test, expect } from 'vitest';
 // ---------------------------------------------------------------------------
 
 const LOG_RETENTION_DAYS = 7;
-const LOG_FILE_RE = /^main-\d{4}-\d{2}-\d{2}(\.old)?\.log$/;
+const LOG_FILE_RE = /^main(-dev)?-\d{4}-\d{2}-\d{2}(\.old)?\.log$/;
 
 type FileEntry = { name: string; mtimeMs: number };
 
@@ -91,6 +91,14 @@ test('pattern: rejects non-log extension', () => {
 
 test('pattern: rejects extra prefix', () => {
   expect(LOG_FILE_RE.test('renderer-2026-03-20.log')).toBeFalsy();
+});
+
+test('pattern: matches dev-mode daily log', () => {
+  expect(LOG_FILE_RE.test('main-dev-2026-03-20.log')).toBeTruthy();
+});
+
+test('pattern: matches dev-mode .old variant', () => {
+  expect(LOG_FILE_RE.test('main-dev-2026-03-19.old.log')).toBeTruthy();
 });
 
 // ---------------------------------------------------------------------------
