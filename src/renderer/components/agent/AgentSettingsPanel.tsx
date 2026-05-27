@@ -177,11 +177,13 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     const currentTriage = triageCustom ? {
       ...triageOverride,
       ...(triageOverride.enabled === undefined ? {} : { enabled: triageOverride.enabled }),
-    } : null;
-    const prevTriage = initialTriageRef.current;
+    } : {};
+    const prevTriage = initialTriageRef.current && Object.keys(initialTriageRef.current).length > 0
+      ? initialTriageRef.current
+      : {};
     if (JSON.stringify(currentTriage) !== JSON.stringify(prevTriage)) return true;
     return false;
-  }, [name, description, systemPrompt, identity, userInfo, icon, model, workingDirectory, skillIds, boundKeys, initialBoundKeys]);
+  }, [name, description, systemPrompt, identity, userInfo, icon, model, workingDirectory, skillIds, boundKeys, initialBoundKeys, triageCustom, triageOverride]);
 
   if (!agentId) return null;
 
