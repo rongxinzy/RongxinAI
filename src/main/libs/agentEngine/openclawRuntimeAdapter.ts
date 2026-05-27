@@ -3265,6 +3265,18 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         if (!currentTurn) return; // Already completed by handleChatFinal
         // If a new turn started for a different run, skip — the new run manages itself.
         if (endingRunId && !currentTurn.knownRunIds.has(endingRunId)) return;
+        // If handleChatFinal deferred the turn (session status 'idle') to wait
+        // for a Gateway retry, skip the fallback.  The retry will send its own
+        // lifecycle end + chat.final if it succeeds, or the turn timeout watchdog
+        // will clean up if it never completes.
+        const deferredSession = this.store.getSession(sessionId);
+        if (deferredSession?.status === 'idle') {
+          console.debug(
+            '[OpenClawRuntime] lifecycle end fallback: skipping — turn deferred for Gateway retry, sessionId:',
+            sessionId,
+          );
+          return;
+        }
         console.log(
           '[OpenClawRuntime] agent lifecycle end fallback: completing turn that missed chat final, sessionId:',
           sessionId,
