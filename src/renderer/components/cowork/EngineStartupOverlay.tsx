@@ -1,5 +1,6 @@
 import { ChatBubbleLeftRightIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -105,8 +106,8 @@ const EngineStartupOverlay: React.FC = () => {
         messageClass: 'text-foreground',
       };
 
-  return (
-    <div className="pointer-events-none absolute top-0 left-0 right-0 z-50 flex justify-center">
+  const element = (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[9999] flex justify-center">
       <div className="pointer-events-auto mt-2 w-full max-w-sm animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
         <div className="flex items-start gap-3 px-4 py-3">
           <span
@@ -152,6 +153,8 @@ const EngineStartupOverlay: React.FC = () => {
       </div>
     </div>
   );
+
+  return createPortal(element, document.body);
 };
 
 export default EngineStartupOverlay;
