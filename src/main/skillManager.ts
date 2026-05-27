@@ -2216,7 +2216,14 @@ export class SkillManager {
 
     // Root-level watch: only react to directory additions/removals (new/deleted skills).
     const rootWatchHandler = (_event: string, filename: string | null) => {
-      if (!filename) { this.scheduleNotify(); return; }
+      // On Windows, fs.watch (ReadDirectoryChangesW) frequently reports null
+      // filenames for unrelated filesystem activity (AV scans, search indexing,
+      // timestamp updates).  Ignoring null filenames avoids false
+      // skills-changed → syncOpenClawConfig chains that can trigger unwanted
+      // Gateway restarts.  Legitimate skill changes always go through explicit
+      // code paths (installSkill, deleteSkill, etc.) that call
+      // notifySkillsChanged directly.
+      if (!filename) { if (process.platform !== 'win32') this.scheduleNotify(); return; }
       // Ignore hidden files/dirs and known non-skill files
       if (filename.startsWith('.')) return;
       // Accept directory changes (new skill added/removed) and config file
@@ -2228,7 +2235,7 @@ export class SkillManager {
 
     // Skill-directory-level watch: only react to skill definition file changes.
     const skillDirWatchHandler = (_event: string, filename: string | null) => {
-      if (!filename) { this.scheduleNotify(); return; }
+      if (!filename) { if (process.platform !== 'win32') this.scheduleNotify(); return; }
       if (filename === SKILL_FILE_NAME || filename === SKILLS_CONFIG_FILE) {
         this.scheduleNotify();
       }
