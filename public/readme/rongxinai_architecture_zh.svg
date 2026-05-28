@@ -35,7 +35,7 @@
 
   <rect width="1120" height="820" rx="28" fill="url(#bg)"/>
   <text x="560" y="42" text-anchor="middle" class="title">RongxinAI 本地 AI Agent 工作台</text>
-  <text x="560" y="70" text-anchor="middle" class="bodyMuted">OpenClaw 负责 Agent 执行，Ollama 负责本地模型，Electron 负责桌面端安全边界</text>
+  <text x="560" y="70" text-anchor="middle" class="bodyMuted">OpenClaw 负责 Agent 执行，llama.cpp 负责本地 GGUF 模型，Electron 负责桌面端安全边界</text>
 
   <rect x="50" y="105" width="1020" height="285" rx="22" fill="#071A18" stroke="url(#green)" stroke-width="3" filter="url(#glow)"/>
   <text x="560" y="135" text-anchor="middle" class="label">Electron Main Process</text>
@@ -47,8 +47,8 @@
   <text x="345" y="209" text-anchor="middle" class="pill">主引擎</text>
 
   <rect x="470" y="165" width="260" height="110" rx="16" fill="#111827" stroke="#38BDF8" stroke-width="3"/>
-  <text x="500" y="205" class="labelBlue">Ollama 服务</text>
-  <text x="500" y="235" class="bodyBlue">本地模型、启动参数、模型市场</text>
+  <text x="500" y="205" class="labelBlue">llama.cpp 服务</text>
+  <text x="500" y="235" class="bodyBlue">GGUF 模型、启动参数、模型市场</text>
 
   <rect x="755" y="165" width="280" height="110" rx="16" fill="#111827" stroke="#A78BFA" stroke-width="3"/>
   <text x="785" y="205" class="labelPurple">Skill / MCP 管理</text>

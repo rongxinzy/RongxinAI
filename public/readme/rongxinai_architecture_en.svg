@@ -31,7 +31,7 @@
 
   <rect width="1120" height="820" rx="28" fill="url(#bg)"/>
   <text x="560" y="42" text-anchor="middle" class="title">RongxinAI Local AI Agent Workspace</text>
-  <text x="560" y="70" text-anchor="middle" class="bodyMuted">OpenClaw runs Agent workflows, Ollama serves local models, Electron owns the desktop security boundary</text>
+  <text x="560" y="70" text-anchor="middle" class="bodyMuted">OpenClaw runs Agent workflows, llama.cpp serves local GGUF models, Electron owns the desktop security boundary</text>
 
   <rect x="50" y="105" width="1020" height="285" rx="22" fill="#071A18" stroke="url(#green)" stroke-width="3" filter="url(#glow)"/>
   <text x="560" y="135" text-anchor="middle" class="label">Electron Main Process</text>
@@ -43,8 +43,8 @@
   <text x="345" y="209" text-anchor="middle" class="pill">Primary</text>
 
   <rect x="470" y="165" width="260" height="110" rx="16" fill="#111827" stroke="#38BDF8" stroke-width="3"/>
-  <text x="500" y="205" class="labelBlue">Ollama Service</text>
-  <text x="500" y="235" class="bodyBlue">Local models, launch options, marketplace</text>
+  <text x="500" y="205" class="labelBlue">llama.cpp Service</text>
+  <text x="500" y="235" class="bodyBlue">GGUF models, launch options, marketplace</text>
 
   <rect x="755" y="165" width="280" height="110" rx="16" fill="#111827" stroke="#A78BFA" stroke-width="3"/>
   <text x="785" y="205" class="labelPurple">Skill / MCP Manager</text>
