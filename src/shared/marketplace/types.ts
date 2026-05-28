@@ -40,9 +40,13 @@ export type MarketplaceSearchParams = {
   task?: MarketplaceTaskFilter;
   size?: MarketplaceSizeFilter;
   limit?: number;
+  pageNumber?: number;
   featuredOnly?: boolean;
 };
 
 export type MarketplaceSearchResult = {
   models: MarketplaceModel[];
+  totalCount?: number;
+  nextPageNumber?: number;
+  warning?: string;
 };
