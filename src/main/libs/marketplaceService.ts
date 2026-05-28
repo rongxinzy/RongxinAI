@@ -71,24 +71,22 @@ export class MarketplaceService {
   ) {}
 
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
-    const limit = resolveLimit(params.limit, DEFAULT_LIMIT);
-    const curated = this.searchLocal({ ...params, limit });
     try {
       const online = await this.searchOnline(params);
-      const merged = online.reachedLimit
-        ? online.models
-        : mergeMarketplaceModels(online.models, curated, limit);
       return {
         models: sortMarketplaceModels(
-          annotateInstalledModels(merged, scanInstalledModels(this.getModelsDir())),
+          annotateInstalledModels(online.models, scanInstalledModels(this.getModelsDir())),
           params,
-        ).slice(0, limit),
+        ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT)),
         totalCount: online.totalCount,
         nextPageNumber: online.nextPageNumber,
         warning: online.warning,
       };
     } catch (error) {
-      return { models: curated, warning: toMarketplaceWarning(error) };
+      return {
+        models: this.searchLocal({ ...params, limit: resolveLimit(params.limit, DEFAULT_LIMIT) }),
+        warning: toMarketplaceWarning(error),
+      };
     }
   }
 
@@ -183,7 +181,7 @@ export class MarketplaceService {
       ? lastPage + 1
       : undefined;
     return {
-      models: mergeMarketplaceModels(models, this.searchLocal({ ...params, featuredOnly: true, limit }), limit),
+      models: models.slice(0, limit),
       totalCount,
       nextPageNumber,
     };
@@ -215,7 +213,7 @@ export class MarketplaceService {
     if (models.length === 0) {
       throw new Error('ModelScope search returned no GGUF repositories');
     }
-    return mergeMarketplaceModels(models, this.searchLocal({ ...params, featuredOnly: true, limit: DEFAULT_LIMIT }), DEFAULT_LIMIT);
+    return models.slice(0, DEFAULT_LIMIT);
   }
 
   private async fetchModelScopeLibrary(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
