@@ -54,6 +54,10 @@
       "filter": [
         "**/*"
       ]
+    },
+    {
+      "from": "resources/modelscope.tokens.local.json",
+      "to": "modelscope.tokens.local.json"
     }
   ],
   "protocols": [

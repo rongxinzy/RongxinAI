@@ -177,10 +177,9 @@ type RequestPreviewInput = {
   options: Record<string, unknown>;
 };
 
-const MARKETPLACE_MIN_PAGE_SIZE = 6;
-const MARKETPLACE_MAX_PAGE_SIZE = 24;
-const MARKETPLACE_CARD_MIN_HEIGHT = 236;
-const MARKETPLACE_FILTER_PANEL_HEIGHT = 160;
+const MARKETPLACE_PAGE_SIZE = 6;
+const MARKETPLACE_HOME_MAX_MODEL_COUNT = 2000;
+const MARKETPLACE_SEARCH_MAX_MODEL_COUNT = 3000;
 const CHAT_NEAR_BOTTOM_THRESHOLD = 96;
 const CHAT_HIDDEN_BELOW_THRESHOLD = 8;
 const ASSISTANT_SCROLL_TOP_OFFSET = 0;
@@ -593,14 +592,30 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [clearInstallProgressDismissTimer],
   );
 
-  const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
+  const searchMarketplace = useCallback(async (
+    params: MarketplaceSearchParams,
+    options: { append?: boolean } = {},
+  ) => {
     const id = ++marketplaceSearchRef.current;
+    const modelCap = getMarketplaceModelCap({
+      query: marketplaceQuery,
+      task: marketplaceTask,
+      size: marketplaceSize,
+    });
     setMarketplaceLoading(true);
     setMarketplaceError(null);
     try {
       const result = await window.electron.marketplace.search(params);
       if (id === marketplaceSearchRef.current) {
-        setMarketplaceModels(result.models);
+        setMarketplaceModels(current => {
+          const nextModels = options.append
+            ? mergeMarketplaceModelLists(current, result.models)
+            : result.models;
+          if (!modelCap) return nextModels;
+          const cappedModels = nextModels.slice(0, modelCap);
+          return cappedModels;
+        });
+        setMarketplaceError(result.warning ?? null);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
@@ -613,7 +628,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setMarketplaceLoading(false);
       }
     }
-  }, []);
+  }, [marketplaceQuery, marketplaceSize, marketplaceTask]);
 
   const runningModelNames = useMemo(
     () => new Set(runningModels.map(model => model.name || model.model).filter(Boolean)),
@@ -779,12 +794,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         }
         if (isInstallTerminalPhase(progress.phase)) {
           void refreshLocalModels().catch(() => undefined);
-          void searchMarketplace({
-            query: marketplaceQuery.trim() || undefined,
-            task: marketplaceTask === 'all' ? undefined : (marketplaceTask as any),
-            size: marketplaceSize === 'all' ? undefined : (marketplaceSize as any),
-            limit: 120,
-          }).catch(() => undefined);
+          void searchMarketplace(buildMarketplaceSearchParams({
+            query: marketplaceQuery,
+            task: marketplaceTask,
+            size: marketplaceSize,
+          })).catch(() => undefined);
         }
       }),
     ];
@@ -877,16 +891,21 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, [runnableModels, selectedModel]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void searchMarketplace({
-        query: marketplaceQuery.trim() || undefined,
-        task: marketplaceTask === 'all' ? undefined : (marketplaceTask as any),
-        size: marketplaceSize === 'all' ? undefined : (marketplaceSize as any),
-        limit: 120,
-      });
-    }, 200);
-    return () => window.clearTimeout(timeout);
-  }, [marketplaceQuery, marketplaceTask, marketplaceSize, searchMarketplace]);
+    if (activeTab !== 'marketplace' || marketplaceModels.length > 0 || marketplaceLoading) return;
+    void searchMarketplace(buildMarketplaceSearchParams({
+      query: marketplaceQuery,
+      task: marketplaceTask,
+      size: marketplaceSize,
+    }));
+  }, [
+    activeTab,
+    marketplaceLoading,
+    marketplaceModels.length,
+    marketplaceQuery,
+    marketplaceSize,
+    marketplaceTask,
+    searchMarketplace,
+  ]);
 
   const handlePrepare = () => {
     void runAction(async () => {
@@ -981,6 +1000,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handlePull = () => {
     if (!normalizedPullName) return;
+    if (!isModelScopeRepoId(normalizedPullName)) {
+      showToast(
+        i18nService.t('localInferencePullInvalidRepo'),
+        LocalInferenceToastKind.Error,
+      );
+      return;
+    }
     setActivePullName(normalizedPullName);
     setPullProgress(current => ({
       ...current,
@@ -1356,12 +1382,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onTaskChange={setMarketplaceTask}
               onSizeChange={setMarketplaceSize}
               onSearch={() =>
-                void searchMarketplace({
-                  query: marketplaceQuery.trim() || undefined,
-                  task: marketplaceTask === 'all' ? undefined : (marketplaceTask as any),
-                  size: marketplaceSize === 'all' ? undefined : (marketplaceSize as any),
-                  limit: 120,
-                })
+                void searchMarketplace(buildMarketplaceSearchParams({
+                  query: marketplaceQuery,
+                  task: marketplaceTask,
+                  size: marketplaceSize,
+                  confirmed: true,
+                }))
               }
               onInstall={handleMarketplaceInstall}
               onCancelPull={handleCancelPull}
@@ -4300,6 +4326,93 @@ function buildRequestPreview({
   return preview;
 }
 
+function buildMarketplaceSearchParams(input: {
+  query: string;
+  task: string;
+  size: string;
+  confirmed?: boolean;
+  pageNumber?: number;
+}): MarketplaceSearchParams {
+  const hasActiveFilters = Boolean(input.query.trim()) || input.task !== 'all' || input.size !== 'all';
+  return {
+    query: input.query.trim() || undefined,
+    task: input.task === 'all' ? undefined : (input.task as MarketplaceSearchParams['task']),
+    size: input.size === 'all' ? undefined : (input.size as MarketplaceSearchParams['size']),
+    limit: hasActiveFilters ? MARKETPLACE_SEARCH_MAX_MODEL_COUNT : MARKETPLACE_HOME_MAX_MODEL_COUNT,
+    pageNumber: input.pageNumber,
+  };
+}
+
+function isModelScopeRepoId(value: string): boolean {
+  return /^[^/\s]+\/[^/\s]+$/.test(value.trim());
+}
+
+function mergeMarketplaceModelLists(
+  current: MarketplaceModel[],
+  next: MarketplaceModel[],
+): MarketplaceModel[] {
+  const merged = new Map<string, MarketplaceModel>();
+  for (const model of [...current, ...next]) {
+    merged.set(model.repoId || model.id, model);
+  }
+  return Array.from(merged.values());
+}
+
+function getMarketplaceModelCap(input: {
+  query: string;
+  task: string;
+  size: string;
+}): number | null {
+  const hasActiveFilters = Boolean(input.query.trim()) || input.task !== 'all' || input.size !== 'all';
+  return hasActiveFilters ? null : MARKETPLACE_HOME_MAX_MODEL_COUNT;
+}
+
+type MarketplacePageItem = number | 'ellipsis' | 'remote-more';
+
+function buildMarketplacePageItems(input: {
+  currentPage: number;
+  pageCount: number;
+  hasRemoteNextPage: boolean;
+  siblingCount?: number;
+}): MarketplacePageItem[] {
+  const { currentPage, pageCount, hasRemoteNextPage } = input;
+  const siblingCount = input.siblingCount ?? 2;
+  const simplePageLimit = siblingCount * 2 + 5;
+  if (pageCount <= simplePageLimit) {
+    return [
+      ...Array.from({ length: pageCount }, (_, index) => index + 1),
+      ...(hasRemoteNextPage ? (['remote-more'] as const) : []),
+    ];
+  }
+
+  const pages = new Set<number>([1, pageCount]);
+  for (
+    let page = Math.max(2, currentPage - siblingCount);
+    page <= Math.min(pageCount - 1, currentPage + siblingCount);
+    page += 1
+  ) {
+    pages.add(page);
+  }
+
+  const sortedPages = Array.from(pages).sort((a, b) => a - b);
+  const items: MarketplacePageItem[] = [];
+  for (const page of sortedPages) {
+    const previous = items[items.length - 1];
+    if (typeof previous === 'number' && page - previous > 1) {
+      items.push('ellipsis');
+    }
+    items.push(page);
+  }
+  if (hasRemoteNextPage) items.push('remote-more');
+  return items;
+}
+
+function getMarketplacePaginationSiblingCount(width: number): number {
+  if (width > 0 && width < 420) return 0;
+  if (width > 0 && width < 560) return 1;
+  return 2;
+}
+
 function MarketplacePanel({
   loading,
   models,
@@ -4341,30 +4454,44 @@ function MarketplacePanel({
 }) {
   const [installingModel, setInstallingModel] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [pageSize, setPageSize] = useState(estimateMarketplacePageSize());
   const [page, setPage] = useState(1);
+  const [paginationWidth, setPaginationWidth] = useState(0);
+  const paginationRef = useRef<HTMLDivElement | null>(null);
   const hasActiveFilters = Boolean(query.trim()) || task !== 'all' || size !== 'all';
   const featuredModels = useMemo(() => models.filter(model => model.isFeatured), [models]);
-  const pageCount = Math.max(1, Math.ceil(models.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(models.length / MARKETPLACE_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pageStart = (currentPage - 1) * pageSize;
+  const pageStart = (currentPage - 1) * MARKETPLACE_PAGE_SIZE;
   const visibleModels = useMemo(
-    () => models.slice(pageStart, pageStart + pageSize),
-    [models, pageStart, pageSize],
+    () => models.slice(pageStart, pageStart + MARKETPLACE_PAGE_SIZE),
+    [models, pageStart],
+  );
+  const pageItems = useMemo(
+    () => buildMarketplacePageItems({
+      currentPage,
+      pageCount,
+      hasRemoteNextPage: false,
+      siblingCount: getMarketplacePaginationSiblingCount(paginationWidth),
+    }),
+    [currentPage, pageCount, paginationWidth],
   );
 
   useEffect(() => {
     setPage(1);
-  }, [models, query, task, size]);
+  }, [query, task, size]);
 
   useEffect(() => {
-    const updatePageSize = () => {
-      setPageSize(estimateMarketplacePageSize(window.innerWidth, window.innerHeight));
-    };
-    updatePageSize();
-    window.addEventListener('resize', updatePageSize);
-    return () => window.removeEventListener('resize', updatePageSize);
-  }, []);
+    const element = paginationRef.current;
+    if (!element) return;
+
+    setPaginationWidth(element.clientWidth);
+    const resizeObserver = new ResizeObserver(entries => {
+      const entry = entries[0];
+      setPaginationWidth(entry.contentRect.width);
+    });
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, [pageCount]);
 
   useEffect(() => {
     if (page > pageCount) {
@@ -4379,6 +4506,9 @@ function MarketplacePanel({
     } finally {
       setInstallingModel(null);
     }
+  };
+  const handleNextPage = async () => {
+    setPage(value => Math.min(pageCount, value + 1));
   };
 
   return (
@@ -4454,8 +4584,10 @@ function MarketplacePanel({
               </div>
               <button
                 type="submit"
-                className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                disabled={marketplaceLoading}
+                className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
+                {marketplaceLoading && <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />}
                 {i18nService.t('marketplaceSearch')}
               </button>
             </div>
@@ -4552,36 +4684,16 @@ function MarketplacePanel({
         </section>
       )}
 
-      {models.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-          <span>
-            {i18nService
-              .t('marketplaceResultSummary')
-              .replace('{shown}', String(visibleModels.length))
-              .replace('{total}', String(models.length))}
-          </span>
-          <div className="flex items-center gap-3">
-            <span>{i18nService.t('marketplaceDataSourceHint')}</span>
-            <span>
-              {i18nService
-                .t('marketplacePageSummary')
-                .replace('{page}', String(currentPage))
-                .replace('{total}', String(pageCount))}
-            </span>
-          </div>
-        </div>
-      )}
-
       {marketplaceLoading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-secondary">
+        <div className="flex min-h-[620px] items-center justify-center text-sm text-secondary">
           <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
           {i18nService.t('loading')}
         </div>
       ) : models.length === 0 ? (
         <EmptyState title={i18nService.t('marketplaceNoModels')} />
       ) : (
-        <>
-          <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex min-h-[620px] flex-col">
+          <div className="grid content-start gap-3 md:grid-cols-2">
             {visibleModels.map(model => {
               const progress = installProgress[model.repoId];
               const installedModelName = model.installedPath
@@ -4592,11 +4704,11 @@ function MarketplacePanel({
               return (
                 <div
                   key={model.id}
-                  className="flex min-h-[200px] flex-col justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-surface-raised"
+                  className="flex h-[168px] min-w-0 flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-3 transition-colors hover:bg-surface-raised"
                 >
-                  <div>
+                  <div className="min-h-0 overflow-hidden">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{model.repoId}</h3>
+                      <h3 className="max-h-10 min-w-0 overflow-hidden break-all text-sm font-semibold leading-5 text-foreground">{model.repoId}</h3>
                       <span
                         className={`inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium ${
                           installed
@@ -4615,8 +4727,8 @@ function MarketplacePanel({
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-secondary">{model.description}</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <p className="mt-1.5 max-h-10 overflow-hidden text-xs leading-5 text-secondary">{model.description}</p>
+                    <div className="mt-2 flex max-h-5 flex-wrap gap-1.5 overflow-hidden">
                       {model.sizes.map(s => (
                         <span
                           key={s}
@@ -4634,26 +4746,8 @@ function MarketplacePanel({
                         </span>
                       ))}
                     </div>
-                    <div className="mt-3 space-y-1 text-[11px] text-secondary">
-                      <div>
-                        {i18nService.t('marketplaceRepoLabel')}:{' '}
-                        <span className="font-mono text-foreground">{model.repoId}</span>
-                      </div>
-                      {model.filePath && (
-                        <div>
-                          {i18nService.t('marketplaceRecommendedFileLabel')}:{' '}
-                          <span className="font-mono text-foreground">{model.filePath}</span>
-                        </div>
-                      )}
-                      {model.installedPath && (
-                        <div>
-                          {i18nService.t('marketplaceInstalledPathLabel')}:{' '}
-                          <span className="font-mono text-foreground">{model.installedPath}</span>
-                        </div>
-                      )}
-                    </div>
                     {progress && (
-                      <div className="mt-3 rounded-md bg-surface-raised px-2.5 py-2">
+                      <div className="mt-2 rounded-md bg-surface-raised px-2 py-1.5">
                         <div className="flex items-center justify-between gap-2 text-[11px] text-secondary">
                           <span>{formatPullProgress(progress)}</span>
                           {typeof progress.percent === 'number' && <span>{progress.percent}%</span>}
@@ -4662,7 +4756,7 @@ function MarketplacePanel({
                       </div>
                     )}
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-2">
+                  <div className="mt-3 flex items-center justify-between gap-2">
                     <span className="text-xs text-secondary">
                       {formatDownloadCount(model.downloads)}
                     </span>
@@ -4705,29 +4799,54 @@ function MarketplacePanel({
             })}
           </div>
           {pageCount > 1 && (
-            <div className="flex items-center justify-center gap-2">
+            <div
+              ref={paginationRef}
+              className="mx-auto mt-auto grid w-full max-w-[560px] grid-cols-[5rem_minmax(0,1fr)_5rem] items-center gap-2 pt-4"
+            >
               <button
                 type="button"
                 onClick={() => setPage(value => Math.max(1, value - 1))}
                 disabled={currentPage <= 1}
-                className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 w-20 justify-self-start items-center justify-center rounded-md border border-border text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {i18nService.t('skillMarketplacePrevPage')}
               </button>
-              <span className="text-xs text-secondary">
-                {currentPage} / {pageCount}
-              </span>
+              <div className="flex min-w-0 items-center justify-center gap-1 overflow-hidden">
+                {pageItems.map((item, index) => {
+                  if (item === 'ellipsis' || item === 'remote-more') {
+                    return (
+                      <span key={`${item}-${index}`} className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-xs text-secondary">
+                        ...
+                      </span>
+                    );
+                  }
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-xs transition-colors ${
+                        item === currentPage
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-foreground/80 hover:bg-surface-raised'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
               <button
                 type="button"
-                onClick={() => setPage(value => Math.min(pageCount, value + 1))}
+                onClick={() => void handleNextPage()}
                 disabled={currentPage >= pageCount}
-                className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 w-20 justify-self-end items-center justify-center rounded-md border border-border text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {i18nService.t('skillMarketplaceNextPage')}
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -4823,14 +4942,6 @@ function CompactFilterSelect({
   );
 }
 
-function estimateMarketplacePageSize(width = 1280, height = 900): number {
-  const columns = width >= 768 ? 2 : 1;
-  const availableHeight = Math.max(320, height - MARKETPLACE_FILTER_PANEL_HEIGHT);
-  const rows = Math.max(1, Math.floor(availableHeight / MARKETPLACE_CARD_MIN_HEIGHT));
-  const pageSize = rows * columns;
-  return Math.max(MARKETPLACE_MIN_PAGE_SIZE, Math.min(MARKETPLACE_MAX_PAGE_SIZE, pageSize));
-}
-
 async function openExternalUrl(url: string): Promise<void> {
   const result = await window.electron.shell.openExternal(url);
   if (!result.success) {
@@ -4889,8 +5000,7 @@ export const __test__getServiceConfigFields = () =>
   SERVICE_CONFIG_FIELDS.map(field => ({ ...field }));
 export const __test__getInferenceOptionFields = () =>
   INFERENCE_OPTION_FIELDS.map(field => ({ ...field }));
-export const __test__estimateMarketplacePageSize = (width?: number, height?: number) =>
-  estimateMarketplacePageSize(width, height);
+export const __test__getMarketplacePageSize = () => MARKETPLACE_PAGE_SIZE;
 export const __test__buildAssistantMessage = (input: BuildAssistantMessageInput) =>
   buildAssistantMessage(input);
 export const __test__buildStreamingAssistantMessage = (
@@ -4902,6 +5012,20 @@ export const __test__formatMetricsSummary = (metrics: OllamaChatChunk) =>
   formatMetricsSummary(metrics);
 export const __test__buildRequestPreview = (input: RequestPreviewInput) =>
   buildRequestPreview(input);
+export const __test__buildMarketplaceSearchParams = (
+  input: Parameters<typeof buildMarketplaceSearchParams>[0],
+) => buildMarketplaceSearchParams(input);
+export const __test__isModelScopeRepoId = (value: string) => isModelScopeRepoId(value);
+export const __test__getMarketplaceModelCap = (
+  input: Parameters<typeof getMarketplaceModelCap>[0],
+) => getMarketplaceModelCap(input);
+export const __test__mergeMarketplaceModelLists = (
+  current: MarketplaceModel[],
+  next: MarketplaceModel[],
+) => mergeMarketplaceModelLists(current, next);
+export const __test__buildMarketplacePageItems = (
+  input: Parameters<typeof buildMarketplacePageItems>[0],
+) => buildMarketplacePageItems(input);
 export const __test__isScrollNearBottom = (input: Parameters<typeof isScrollNearBottom>[0]) =>
   isScrollNearBottom(input);
 export const __test__hasHiddenContentBelow = (input: Parameters<typeof hasHiddenContentBelow>[0]) =>
