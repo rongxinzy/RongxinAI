@@ -36,7 +36,13 @@ export function createModelScopeTokenPool(options: {
 }
 
 function parseEnvTokens(env: NodeJS.ProcessEnv): string[] {
-  return splitTokenValue(env.MODELSCOPE_TOKENS || env.MODELSCOPE_TOKEN || '');
+  return splitTokenValue(
+    env.MODELSCOPE_TOKENS
+    || env.MODELSCOPE_TOKEN
+    || env.MODELSCOPE_API_TOKENS
+    || env.MODELSCOPE_API_TOKEN
+    || '',
+  );
 }
 
 function readDotEnvTokens(cwd: string): string[] {
@@ -44,7 +50,13 @@ function readDotEnvTokens(cwd: string): string[] {
   if (!fs.existsSync(envPath)) return [];
   try {
     const parsed = parseDotEnv(fs.readFileSync(envPath, 'utf-8'));
-    return splitTokenValue(parsed.MODELSCOPE_TOKENS || parsed.MODELSCOPE_TOKEN || '');
+    return splitTokenValue(
+      parsed.MODELSCOPE_TOKENS
+      || parsed.MODELSCOPE_TOKEN
+      || parsed.MODELSCOPE_API_TOKENS
+      || parsed.MODELSCOPE_API_TOKEN
+      || '',
+    );
   } catch {
     return [];
   }
