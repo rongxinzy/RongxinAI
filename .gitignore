@@ -37,6 +37,8 @@ package-lock.json
 
 nul
 .work.env
+modelscope.tokens.local.json
+resources/modelscope.tokens.local.json
 
 .playwright-mcp/
 .cowork-temp/
@@ -53,5 +55,6 @@ sandbox/
 openspec/
 .superpowers/
 .diagram/
+spec/
 specs/
 localdocs/
