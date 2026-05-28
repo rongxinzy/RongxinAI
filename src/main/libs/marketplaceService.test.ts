@@ -263,6 +263,32 @@ test('MarketplaceService can request enough OpenAPI pages for large GGUF result 
   expect(result.models.at(-1)?.repoId).toBe('owner/model-750-GGUF');
 });
 
+test('MarketplaceService successful online search does not mix in curated models', async () => {
+  const fetchMock = vi.fn(async () => {
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        models: [
+          {
+            id: 'owner/only-search-result-GGUF',
+            display_name: 'only-search-result-GGUF',
+            downloads: 123,
+            tags: ['library:gguf'],
+          },
+        ],
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => 'test-token',
+  });
+  const result = await service.search({ query: 'only-search-result', limit: 10 });
+
+  expect(result.models.map(model => model.repoId)).toEqual(['owner/only-search-result-GGUF']);
+});
+
 test('MarketplaceService returns OpenAPI total count and next page number for paged loading', async () => {
   const fetchMock = vi.fn(async (url: string) => {
     const parsed = new URL(url);
