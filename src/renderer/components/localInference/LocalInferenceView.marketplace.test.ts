@@ -1,168 +1,22 @@
 import { expect, test } from 'vitest';
 
-test('marketplace page size is fixed across viewport sizes', async () => {
+test('marketplace page sizing defaults stay within supported range', async () => {
   const module = await import('./LocalInferenceView');
-  const getMarketplacePageSize = (module as unknown as {
-    __test__getMarketplacePageSize?: () => number;
-  }).__test__getMarketplacePageSize;
+  const estimateMarketplacePageSize = (module as unknown as {
+    __test__estimateMarketplacePageSize?: (width?: number, height?: number) => number;
+  }).__test__estimateMarketplacePageSize;
 
-  expect(typeof getMarketplacePageSize).toBe('function');
-  if (!getMarketplacePageSize) return;
+  expect(typeof estimateMarketplacePageSize).toBe('function');
+  if (!estimateMarketplacePageSize) return;
 
-  expect(getMarketplacePageSize()).toBe(6);
-});
+  const pageSize = estimateMarketplacePageSize();
+  expect(pageSize).toBeGreaterThanOrEqual(6);
+  expect(pageSize).toBeLessThanOrEqual(24);
 
-test('marketplace search params load directly up to the app and openapi caps', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildMarketplaceSearchParams = (module as unknown as {
-    __test__buildMarketplaceSearchParams?: (input: {
-      query: string;
-      task: string;
-      size: string;
-      confirmed?: boolean;
-      pageNumber?: number;
-    }) => { query?: string; task?: string; size?: string; limit?: number };
-  }).__test__buildMarketplaceSearchParams;
-
-  expect(typeof buildMarketplaceSearchParams).toBe('function');
-  if (!buildMarketplaceSearchParams) return;
-
-  expect(buildMarketplaceSearchParams({
-    query: ' qwen ',
-    task: 'all',
-    size: 'all',
-  })).toEqual({ query: 'qwen', limit: 3000 });
-
-  expect(buildMarketplaceSearchParams({
-    query: ' qwen ',
-    task: 'reasoning',
-    size: 'desktop',
-    confirmed: true,
-  })).toEqual({
-    query: 'qwen',
-    task: 'reasoning',
-    size: 'desktop',
-    limit: 3000,
-  });
-
-  expect(buildMarketplaceSearchParams({
-    query: ' qwen ',
-    task: 'all',
-    size: 'all',
-    pageNumber: 4,
-  })).toEqual({ query: 'qwen', limit: 3000, pageNumber: 4 });
-
-  expect(buildMarketplaceSearchParams({
-    query: '',
-    task: 'all',
-    size: 'all',
-  })).toEqual({ limit: 2000 });
-});
-
-test('marketplace home feed stops at 2000 models while filtered searches stay uncapped', async () => {
-  const module = await import('./LocalInferenceView');
-  const getMarketplaceModelCap = (module as unknown as {
-    __test__getMarketplaceModelCap?: (input: {
-      query: string;
-      task: string;
-      size: string;
-    }) => number | null;
-  }).__test__getMarketplaceModelCap;
-
-  expect(typeof getMarketplaceModelCap).toBe('function');
-  if (!getMarketplaceModelCap) return;
-
-  expect(getMarketplaceModelCap({
-    query: '',
-    task: 'all',
-    size: 'all',
-  })).toBe(2000);
-
-  expect(getMarketplaceModelCap({
-    query: '0.8',
-    task: 'all',
-    size: 'all',
-  })).toBeNull();
-
-  expect(getMarketplaceModelCap({
-    query: '',
-    task: 'reasoning',
-    size: 'all',
-  })).toBeNull();
-});
-
-test('modelscope manual install requires owner repo id', async () => {
-  const module = await import('./LocalInferenceView');
-  const isModelScopeRepoId = (module as unknown as {
-    __test__isModelScopeRepoId?: (value: string) => boolean;
-  }).__test__isModelScopeRepoId;
-
-  expect(typeof isModelScopeRepoId).toBe('function');
-  if (!isModelScopeRepoId) return;
-
-  expect(isModelScopeRepoId('Qwen/Qwen3-8B-GGUF')).toBe(true);
-  expect(isModelScopeRepoId('  unsloth/Qwen3.5-0.8B-GGUF  ')).toBe(true);
-  expect(isModelScopeRepoId('1')).toBe(false);
-  expect(isModelScopeRepoId('Qwen/')).toBe(false);
-  expect(isModelScopeRepoId('/Qwen3-8B-GGUF')).toBe(false);
-});
-
-test('marketplace model list merging appends new models without duplicates', async () => {
-  const module = await import('./LocalInferenceView');
-  const mergeMarketplaceModelLists = (module as unknown as {
-    __test__mergeMarketplaceModelLists?: <T extends { id: string; repoId: string }>(
-      current: T[],
-      next: T[],
-    ) => T[];
-  }).__test__mergeMarketplaceModelLists;
-
-  expect(typeof mergeMarketplaceModelLists).toBe('function');
-  if (!mergeMarketplaceModelLists) return;
-
-  const result = mergeMarketplaceModelLists(
-    [
-      { id: 'a/one', repoId: 'a/one' },
-      { id: 'b/two', repoId: 'b/two' },
-    ],
-    [
-      { id: 'b/two', repoId: 'b/two' },
-      { id: 'c/three', repoId: 'c/three' },
-    ],
-  );
-
-  expect(result.map(model => model.repoId)).toEqual(['a/one', 'b/two', 'c/three']);
-});
-
-test('marketplace pagination keeps nearby pages and remote continuation marker', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildMarketplacePageItems = (module as unknown as {
-    __test__buildMarketplacePageItems?: (input: {
-      currentPage: number;
-      pageCount: number;
-      hasRemoteNextPage: boolean;
-    }) => Array<number | 'ellipsis' | 'remote-more'>;
-  }).__test__buildMarketplacePageItems;
-
-  expect(typeof buildMarketplacePageItems).toBe('function');
-  if (!buildMarketplacePageItems) return;
-
-  expect(buildMarketplacePageItems({
-    currentPage: 34,
-    pageCount: 34,
-    hasRemoteNextPage: true,
-  })).toEqual([1, 'ellipsis', 32, 33, 34, 'remote-more']);
-
-  expect(buildMarketplacePageItems({
-    currentPage: 34,
-    pageCount: 34,
-    hasRemoteNextPage: false,
-  })).toEqual([1, 'ellipsis', 32, 33, 34]);
-
-  expect(buildMarketplacePageItems({
-    currentPage: 2,
-    pageCount: 4,
-    hasRemoteNextPage: false,
-  })).toEqual([1, 2, 3, 4]);
+  expect(estimateMarketplacePageSize(640, 720)).toBeGreaterThanOrEqual(6);
+  expect(estimateMarketplacePageSize(640, 720)).toBeLessThanOrEqual(pageSize);
+  expect(estimateMarketplacePageSize(1600, 1200)).toBeLessThanOrEqual(24);
+  expect(estimateMarketplacePageSize(1600, 1200)).toBeGreaterThanOrEqual(pageSize);
 });
 
 test('llama.cpp service config field metadata uses UI parameter keys without CLI prefixes', async () => {

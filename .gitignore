@@ -7,9 +7,7 @@ node_modules
 dist
 dist-electron
 .DS_Store
-.env
-.env.*
-!.env.example
+.env 
 .npmrc
 .claude/
 __pycache__/
@@ -28,7 +26,6 @@ resources/MinGit-*.zip
 resources/PortableGit-*.7z.exe
 resources/python-win/
 resources/python-*.zip
-resources/modelscope.tokens.local.json
 
 # SKILLs runtime files
 SKILLs/**/.connection
@@ -40,8 +37,6 @@ package-lock.json
 
 nul
 .work.env
-modelscope.tokens.local.json
-resources/modelscope.tokens.local.json
 
 .playwright-mcp/
 .cowork-temp/
@@ -58,6 +53,5 @@ sandbox/
 openspec/
 .superpowers/
 .diagram/
-spec/
 specs/
 localdocs/
