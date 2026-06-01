@@ -66,11 +66,11 @@ lint:
 # Renderer（Vite + tsc）
 build-renderer:
   stage: build
-  needs: [lint]
   script:
     - npm run build
     - test -f dist/index.html
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - src/renderer/**/*
         - vite.config.ts
@@ -82,7 +82,6 @@ build-renderer:
 # Main 进程（Electron tsc）
 build-main:
   stage: build
-  needs: [lint]
   script:
     - npm run compile:electron
     - test -f dist-electron/main.js
@@ -92,6 +91,7 @@ build-main:
       - dist-electron/
     expire_in: 1 hour
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - src/main/**/*
         - src/common/**/*
@@ -102,10 +102,10 @@ build-main:
 # Skills
 build-skills:
   stage: build
-  needs: []
   script:
     - npm run build:skills
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - SKILLs/**/*
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
@@ -115,7 +115,9 @@ build-skills:
 # ═══════════════════════════════════════════════════════
 test:
   stage: test
-  needs: [build-main]
+  needs:
+    - job: build-main
+      optional: true
   script:
     - npm test
   rules:
