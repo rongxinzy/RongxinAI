@@ -1,0 +1,123 @@
+# .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
+#
+# Stage: lint → build → test
+# 变更检测：GitLab 原生 rules:changes: 替代 dorny/paths-filter
+# 缓存：node_modules 基于 package.json hash
+# 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
+default:
+  image: rongxinai-ci:latest
+  before_script:
+    - npm install --prefer-offline --no-audit
+
+stages:
+  - lint
+  - build
+  - test
+
+variables:
+  NODE_OPTIONS: '--max-old-space-size=4096'
+
+# ─── 全局缓存 ───
+cache:
+  key:
+    files:
+      - package.json
+  paths:
+    - node_modules/
+  policy: pull-push
+
+# ═══════════════════════════════════════════════════════
+# Stage 1: Lint（仅变更的 TS/TSX 文件）
+# ═══════════════════════════════════════════════════════
+lint:
+  stage: lint
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
+        FILES=$(git diff --name-only --diff-filter=ACMR $CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD -- '*.ts' '*.tsx')
+      elif [ -n "$CI_COMMIT_BEFORE_SHA" ] && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+        FILES=$(git diff --name-only --diff-filter=ACMR $CI_COMMIT_BEFORE_SHA...HEAD -- '*.ts' '*.tsx')
+      else
+        FILES=$(git diff --name-only --diff-filter=ACMR HEAD~1 -- '*.ts' '*.tsx')
+      fi
+    - |
+      if [ -n "$FILES" ]; then
+        echo "Linting changed files:"
+        echo "$FILES"
+        echo "$FILES" | xargs -d '\n' npx eslint --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+      else
+        echo "No TypeScript files changed, skipping lint"
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+
+# ═══════════════════════════════════════════════════════
+# Stage 2: 构建
+# ═══════════════════════════════════════════════════════
+
+# Renderer（Vite + tsc）
+build-renderer:
+  stage: build
+  needs: [lint]
+  script:
+    - npm run build
+    - test -f dist/index.html
+  rules:
+    - changes:
+        - src/renderer/**/*
+        - vite.config.ts
+        - tsconfig.json
+        - tailwind.config.js
+        - postcss.config.js
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+
+# Main 进程（Electron tsc）
+build-main:
+  stage: build
+  needs: [lint]
+  script:
+    - npm run compile:electron
+    - test -f dist-electron/main.js
+    - test -f dist-electron/preload.js
+  artifacts:
+    paths:
+      - dist-electron/
+    expire_in: 1 hour
+  rules:
+    - changes:
+        - src/main/**/*
+        - src/common/**/*
+        - electron-tsconfig.json
+        - src/main/preload.ts
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+
+# Skills
+build-skills:
+  stage: build
+  needs: []
+  script:
+    - npm run build:skills
+  rules:
+    - changes:
+        - SKILLs/**/*
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+
+# ═══════════════════════════════════════════════════════
+# Stage 3: 测试
+# ═══════════════════════════════════════════════════════
+test:
+  stage: test
+  needs: [build-main]
+  script:
+    - npm test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
