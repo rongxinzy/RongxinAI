@@ -23,6 +23,16 @@ const AgentAvatarPicker: React.FC<AgentAvatarPickerProps> = ({ value, onChange }
     return parseAgentAvatarIcon(value) ?? DefaultAgentAvatar;
   }, [value]);
 
+  // Local draft state: tracks preview selection inside the popup only
+  const [draftAvatar, setDraftAvatar] = useState(selectedAvatar);
+
+  // Reset draft to the committed value whenever the popup opens
+  useEffect(() => {
+    if (isOpen) {
+      setDraftAvatar(selectedAvatar);
+    }
+  }, [isOpen, selectedAvatar]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -39,8 +49,9 @@ const AgentAvatarPicker: React.FC<AgentAvatarPickerProps> = ({ value, onChange }
     };
   }, [isOpen]);
 
-  const updateAvatar = (nextAvatar: typeof selectedAvatar) => {
-    onChange(encodeAgentAvatarIcon(nextAvatar));
+  const handleDone = () => {
+    onChange(encodeAgentAvatarIcon(draftAvatar));
+    setIsOpen(false);
   };
 
   return (
@@ -69,13 +80,13 @@ const AgentAvatarPicker: React.FC<AgentAvatarPickerProps> = ({ value, onChange }
           <div className="grid max-h-[360px] grid-cols-6 gap-x-4 gap-y-4 overflow-y-auto px-6 py-5">
             {AGENT_AVATAR_SVG_OPTIONS.map((option) => {
               const optionValue = encodeAgentAvatarIcon({ svg: option.svg });
-              const isSelected = selectedAvatar.svg === option.svg;
+              const isSelected = draftAvatar.svg === option.svg;
 
               return (
                 <button
                   key={option.svg}
                   type="button"
-                  onClick={() => updateAvatar({ svg: option.svg })}
+                  onClick={() => setDraftAvatar({ svg: option.svg })}
                   title={i18nService.t(option.labelKey)}
                   aria-label={i18nService.t(option.labelKey)}
                   className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 ${
@@ -98,7 +109,7 @@ const AgentAvatarPicker: React.FC<AgentAvatarPickerProps> = ({ value, onChange }
           <div className="border-t border-border px-6 py-4">
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={handleDone}
               className="text-sm font-medium text-foreground hover:text-primary transition-colors"
             >
               {i18nService.t('agentAvatarPickerDone')}
