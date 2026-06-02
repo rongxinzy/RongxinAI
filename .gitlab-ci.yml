@@ -71,12 +71,6 @@ build-renderer:
     - test -f dist/index.html
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - changes:
-        - src/renderer/**/*
-        - vite.config.ts
-        - tsconfig.json
-        - tailwind.config.js
-        - postcss.config.js
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # Main 进程（Electron tsc）
@@ -92,11 +86,6 @@ build-main:
     expire_in: 1 hour
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - changes:
-        - src/main/**/*
-        - src/common/**/*
-        - electron-tsconfig.json
-        - src/main/preload.ts
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # Skills
@@ -106,8 +95,6 @@ build-skills:
     - npm run build:skills
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - changes:
-        - SKILLs/**/*
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
