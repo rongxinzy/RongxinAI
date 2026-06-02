@@ -90,6 +90,7 @@ function setupDb(): void {
       is_default INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'custom',
       preset_id TEXT NOT NULL DEFAULT '',
+      triage_override TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
