@@ -1,4 +1,4 @@
-import { CoworkErrorKind, ENGINE_NOT_READY_CODE, getUserErrorI18nKey, type CoworkError } from '../../common/coworkError';
+import { type CoworkError,CoworkErrorKind, ENGINE_NOT_READY_CODE, getUserErrorI18nKey } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import { COWORK_SESSION_PAGE_SIZE } from '../../shared/cowork/constants';
@@ -25,6 +25,7 @@ import {
   updateSessionStatus,
   updateSessionTitle,
 } from '../store/slices/coworkSlice';
+import { clearActiveSkills, setActiveSkillIds } from '../store/slices/skillSlice';
 import type {
   CoworkApiConfig,
   CoworkConfigUpdate,
@@ -545,6 +546,13 @@ class CoworkService {
       }
       store.dispatch(setCurrentSession(result.session));
       store.dispatch(setStreaming(result.session.status === 'running'));
+
+      // Restore skill selection from session record
+      if (result.session.activeSkillIds?.length) {
+        store.dispatch(setActiveSkillIds(result.session.activeSkillIds));
+      } else {
+        store.dispatch(clearActiveSkills());
+      }
 
       const imResult = await cowork.remoteManaged(sessionId);
       if (requestId === this.latestLoadSessionRequestId) {

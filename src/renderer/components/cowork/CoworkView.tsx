@@ -15,7 +15,7 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import { addMessage, clearCurrentSession, setCurrentSession, setStreaming, updateSessionStatus } from '../../store/slices/coworkSlice';
 import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
-import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
+import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import ComposeIcon from '../icons/ComposeIcon';
@@ -269,9 +269,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       dispatch(setCurrentSession(tempSession));
       dispatch(setStreaming(true));
 
-      // Clear active skills and quick action selection after starting session
-      // so they don't persist to next session
-      dispatch(clearActiveSkills());
+      // Clear quick action selection after starting session
       dispatch(clearSelection());
 
       // Combine skill prompt with system prompt.
@@ -345,13 +343,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         imageAttachmentsBase64Lengths: imageAttachments?.map(a => a.base64Data.length),
       });
 
-      // Capture active skill IDs before clearing
+      // Capture active skill IDs for this message
       const sessionSkillIds = [...activeSkillIds];
-
-      // Clear active skills after capturing so they don't persist to next message
-      if (sessionSkillIds.length > 0) {
-        dispatch(clearActiveSkills());
-      }
 
       // Combine skill prompt with system prompt for continuation.
       // Skip auto-routing prompt for OpenClaw — skills are loaded natively.
