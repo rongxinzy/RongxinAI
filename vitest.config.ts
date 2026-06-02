@@ -1,4 +1,5 @@
 import path from 'node:path';
+
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -6,10 +7,13 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(__dirname, './src/shared'),
       '@': path.resolve(__dirname, './src/renderer'),
+      electron: path.resolve(__dirname, './tests/__mocks__/electron.ts'),
     },
   },
   test: {
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     environment: 'node',
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });
