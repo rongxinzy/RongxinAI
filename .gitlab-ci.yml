@@ -83,8 +83,8 @@ build-main:
   needs: [lint]
   script:
     - npm run compile:electron
-    - ls dist-electron/main.js dist-electron/main/main.js >/dev/null 2>&1
-    - ls dist-electron/preload.js dist-electron/main/preload.js >/dev/null 2>&1
+    - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
+    - test -n "$(find dist-electron -name "main.js" -o -name "preload.js")"
   artifacts:
     paths:
       - dist-electron/
