@@ -93,7 +93,6 @@ build-main:
 
 build-skills:
   stage: build
-  needs: []
   script:
     - npm run build:skills
   rules:
