@@ -119,14 +119,41 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       return;
     }
 
-    if (transportType === 'stdio' && !command.trim()) {
-      setError(i18nService.t('mcpCommandRequired'));
-      return;
+    let validatedCommand = '';
+    let validatedUrl = '';
+
+    // stdio — 命令校验（非空 + 格式）
+    if (transportType === 'stdio') {
+      const cmd = command.trim();
+      if (!cmd) {
+        setError(i18nService.t('mcpCommandRequired'));
+        return;
+      }
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._\-\/:\\\\ ]*$/.test(cmd)) {
+        setError(i18nService.t('mcpCommandInvalid'));
+        return;
+      }
+      validatedCommand = cmd;
     }
 
-    if ((transportType === 'sse' || transportType === 'http') && !url.trim()) {
-      setError(i18nService.t('mcpUrlRequired'));
-      return;
+    // SSE / HTTP — URL 校验（非空 + 格式 + 协议）
+    if (transportType === 'sse' || transportType === 'http') {
+      const rawUrl = url.trim();
+      if (!rawUrl) {
+        setError(i18nService.t('mcpUrlRequired'));
+        return;
+      }
+      try {
+        const parsed = new URL(rawUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          setError(i18nService.t('mcpUrlInvalid'));
+          return;
+        }
+      } catch {
+        setError(i18nService.t('mcpUrlInvalid'));
+        return;
+      }
+      validatedUrl = rawUrl;
     }
 
     // Validate required env vars
@@ -165,11 +192,11 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
     };
 
     if (transportType === 'stdio') {
-      data.command = command.trim();
+      data.command = validatedCommand;
       if (args.length > 0) data.args = args;
       if (Object.keys(env).length > 0) data.env = env;
     } else {
-      data.url = url.trim();
+      data.url = validatedUrl;
       if (Object.keys(headers).length > 0) data.headers = headers;
     }
 
