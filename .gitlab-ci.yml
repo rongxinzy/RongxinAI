@@ -57,7 +57,7 @@ lint:
       fi
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 2: 构建
@@ -77,7 +77,7 @@ build-renderer:
         - tsconfig.json
         - tailwind.config.js
         - postcss.config.js
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # Main 进程（Electron tsc）
 build-main:
@@ -97,7 +97,7 @@ build-main:
         - src/common/**/*
         - electron-tsconfig.json
         - src/main/preload.ts
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # Skills
 build-skills:
@@ -108,7 +108,7 @@ build-skills:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - SKILLs/**/*
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 3: 测试
@@ -122,4 +122,4 @@ test:
     - npm test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
