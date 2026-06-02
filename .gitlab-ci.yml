@@ -11,7 +11,7 @@ workflow:
 default:
   image: rongxinai-ci:latest
   before_script:
-    - ln -sf /opt/ci-cache/node_modules node_modules
+    - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
     - npm install --prefer-offline --no-audit
 
 stages:
