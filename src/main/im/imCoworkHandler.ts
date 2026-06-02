@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 
-import { CoworkErrorKind, type CoworkError, ENGINE_NOT_READY_CODE } from '../../common/coworkError';
+import { type CoworkError,CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import type { CoworkMessage,CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
