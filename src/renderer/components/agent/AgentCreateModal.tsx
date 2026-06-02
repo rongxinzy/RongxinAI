@@ -177,6 +177,28 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+
+    // 禁止使用保留名称
+    const reservedNames = ['主 Agent', 'Primary Agent'];
+    if (reservedNames.includes(name.trim())) {
+      window.dispatchEvent(new CustomEvent('app:showToast', {
+        detail: { message: i18nService.t('agentNameReserved'), autoClose: false },
+      }));
+      return;
+    }
+
+    // 禁止重复名称（大小写不敏感）
+    const trimmedLower = name.trim().toLowerCase();
+    const duplicate = agents.some(
+      (a) => a.name.trim().toLowerCase() === trimmedLower,
+    );
+    if (duplicate) {
+      window.dispatchEvent(new CustomEvent('app:showToast', {
+        detail: { message: i18nService.t('agentNameDuplicate'), autoClose: false },
+      }));
+      return;
+    }
+
     setCreating(true);
     try {
       if (userInfo !== initialUserInfoRef.current) {

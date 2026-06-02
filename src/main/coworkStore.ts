@@ -1991,6 +1991,21 @@ export class CoworkStore {
       return this.createAgent({ ...request, id: `${id}-${Date.now()}` });
     }
 
+    // 名称去重校验（大小写不敏感）
+    const dupName = this.getOne<{ id: string }>(
+      "SELECT id FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0",
+      [request.name.trim()],
+    );
+    if (dupName) {
+      throw new Error('Agent name already exists');
+    }
+
+    // 保留名校验
+    const reservedNames = ['主 Agent', 'Primary Agent'];
+    if (reservedNames.includes(request.name.trim())) {
+      throw new Error('Cannot use reserved agent name');
+    }
+
     this.db
       .prepare(
         `

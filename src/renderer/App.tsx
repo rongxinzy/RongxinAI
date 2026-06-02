@@ -333,15 +333,19 @@ const App: React.FC = () => {
     setMainView('cowork');
   }, [dispatch]);
 
-  const showToast = useCallback((message: string) => {
+  const showToast = useCallback((message: string, autoClose: boolean = true) => {
     setToastMessage(message);
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
     }
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastMessage(null);
+    if (autoClose) {
+      toastTimerRef.current = window.setTimeout(() => {
+        setToastMessage(null);
+        toastTimerRef.current = null;
+      }, 2200);
+    } else {
       toastTimerRef.current = null;
-    }, 2200);
+    }
   }, []);
 
   useEffect(() => {
@@ -521,8 +525,13 @@ const handleConfirmUpdate = useCallback(async () => {
   // Listen for toast events from child components
   useEffect(() => {
     const handler = (e: Event) => {
-      const message = (e as CustomEvent<string>).detail;
-      if (message) showToast(message);
+      const detail = (e as CustomEvent<{ message: string; autoClose?: boolean } | string>).detail;
+      if (!detail) return;
+      if (typeof detail === 'string') {
+        showToast(detail);
+      } else {
+        showToast(detail.message, detail.autoClose !== false);
+      }
     };
     window.addEventListener('app:showToast', handler);
     return () => window.removeEventListener('app:showToast', handler);
