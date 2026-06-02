@@ -11,16 +11,14 @@ import { migrateScheduledTaskRunsToOpenclaw, migrateScheduledTasksToOpenclaw } f
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
+import { CoworkStreamIpc } from '../shared/ipc/channels';
+import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
 import { AgentManager } from './agentManager';
 import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkStore } from './coworkStore';
-import { CoworkStreamIpc } from '../shared/ipc/channels';
-import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
-import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
-import { createLogger } from './libs/structuredLog';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
 import {
@@ -32,7 +30,6 @@ import {
 import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
 import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
-import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import {
   getCronJobService,
@@ -40,6 +37,7 @@ import {
   initScheduledTaskHelpers,
   registerScheduledTaskHandlers,
 } from './ipcHandlers/scheduledTask';
+import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import {
   type CoworkAgentEngine,
   CoworkEngineRouter,
@@ -74,6 +72,7 @@ import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUt
 import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
+import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { McpServerManager } from './libs/mcpServerManager';
@@ -93,11 +92,11 @@ import {
   deleteMemoryEntry,
   ensureDefaultIdentity,
   getMainAgentWorkspacePath,
+  type MemorySource,
   migrateSqliteToMemoryMd,
   readBootstrapFile,
   readMemoryEntries,
   resolveMemoryFilePath,
-  type MemorySource,
   searchMemoryEntries,
   updateMemoryEntry,
   writeBootstrapFile,
@@ -107,6 +106,7 @@ import { migrateMainAgentWorkspace } from './libs/openclawWorkspaceMigration';
 import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
+import { createLogger } from './libs/structuredLog';
 import {
   applySystemProxyEnv,
   resolveSystemProxyUrlForTargets,
@@ -3248,6 +3248,18 @@ if (!gotTheLock) {
           })),
         });
       }
+
+      // Persist active skill selection to session record
+      if (options.activeSkillIds !== undefined) {
+        try {
+          getCoworkStore().updateSession(options.sessionId, {
+            activeSkillIds: options.activeSkillIds,
+          });
+        } catch (error) {
+          console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
+        }
+      }
+
       runtime.continueSession(options.sessionId, options.prompt, {
         systemPrompt: mergeCoworkSystemPrompt(
           options.systemPrompt ?? existingSession?.systemPrompt,

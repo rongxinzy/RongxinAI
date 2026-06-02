@@ -712,7 +712,7 @@ export class CoworkStore {
     updates: Partial<
       Pick<
         CoworkSession,
-        'title' | 'claudeSessionId' | 'status' | 'cwd' | 'systemPrompt' | 'modelOverride' | 'executionMode'
+        'title' | 'claudeSessionId' | 'status' | 'cwd' | 'systemPrompt' | 'modelOverride' | 'executionMode' | 'activeSkillIds'
       >
     >,
     options: { touchUpdatedAt?: boolean } = {},
@@ -752,6 +752,10 @@ export class CoworkStore {
     if (updates.executionMode !== undefined) {
       setClauses.push('execution_mode = ?');
       values.push(updates.executionMode);
+    }
+    if (updates.activeSkillIds !== undefined) {
+      setClauses.push('active_skill_ids = ?');
+      values.push(JSON.stringify(updates.activeSkillIds));
     }
 
     if (setClauses.length === 0) return;
