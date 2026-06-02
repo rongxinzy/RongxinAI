@@ -7,6 +7,7 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(__dirname, './src/shared'),
       '@': path.resolve(__dirname, './src/renderer'),
+      electron: path.resolve(__dirname, './tests/__mocks__/electron.ts'),
     },
   },
   test: {
