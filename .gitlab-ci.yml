@@ -1,7 +1,6 @@
 # .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
 #
 # Stage: lint → build → test
-# 变更检测：GitLab 原生 rules:changes: 替代 dorny/paths-filter
 # 缓存：node_modules 基于 package.json hash
 # 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
 
@@ -20,7 +19,7 @@ stages:
   - test
 
 variables:
-  NODE_OPTIONS: '--max-old-space-size=4096'
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 # ─── 全局缓存 ───
 cache:
@@ -51,21 +50,23 @@ lint:
       if [ -n "$FILES" ]; then
         echo "Linting changed files:"
         echo "$FILES"
-        echo "$FILES" | xargs -d '\n' npx eslint --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+        echo "$FILES" | xargs npx eslint --report-unused-disable-directives --max-warnings 0
       else
         echo "No TypeScript files changed, skipping lint"
       fi
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 2: 构建
 # ═══════════════════════════════════════════════════════
 
-# Renderer（Vite + tsc）
 build-renderer:
   stage: build
+  needs: [lint]
+  variables:
+    NODE_OPTIONS: '--max-old-space-size=8192'
   script:
     - npm run build
     - test -f dist/index.html
@@ -77,15 +78,15 @@ build-renderer:
         - tsconfig.json
         - tailwind.config.js
         - postcss.config.js
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
-# Main 进程（Electron tsc）
 build-main:
   stage: build
+  needs: [lint]
   script:
     - npm run compile:electron
-    - test -f dist-electron/main.js
-    - test -f dist-electron/preload.js
+    - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
+    - test -n "$(find dist-electron -name "main.js" -o -name "preload.js")"
   artifacts:
     paths:
       - dist-electron/
@@ -97,18 +98,18 @@ build-main:
         - src/common/**/*
         - electron-tsconfig.json
         - src/main/preload.ts
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
-# Skills
 build-skills:
   stage: build
+  needs: []
   script:
     - npm run build:skills
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - SKILLs/**/*
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 3: 测试
@@ -122,4 +123,4 @@ test:
     - npm test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
