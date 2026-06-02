@@ -1,7 +1,7 @@
 # .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
 #
 # Stage: lint → build → test
-# 依赖：Runner 直接挂载 node_modules 到容器内
+# 依赖：宿主机只读卷 /opt/ci-cache/node_modules，lint 校验，其余只拷贝
 # 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
 
 workflow:
@@ -10,6 +10,8 @@ workflow:
 
 default:
   image: rongxinai-ci:latest
+  before_script:
+    - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
 
 stages:
   - lint
@@ -25,6 +27,7 @@ variables:
 lint:
   stage: lint
   before_script:
+    - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
     - npm install --prefer-offline --no-audit
   variables:
     GIT_DEPTH: 0
