@@ -11,7 +11,7 @@ workflow:
 default:
   image: rongxinai-ci:latest
   before_script:
-    - npm install --prefer-offline --no-audit
+    - '[ -d node_modules ] || npm install --prefer-offline --no-audit'
 
 stages:
   - lint

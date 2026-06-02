@@ -256,7 +256,7 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
   });
   runtime.emit('complete', session.id, null);
 
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setImmediate(resolve));
 
   expect(relayedReplies).toEqual([
     {
@@ -304,7 +304,7 @@ test('async reminder turns on channel-synced sessions are tracked lazily and rel
   });
   runtime.emit('complete', session.id, null);
 
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setImmediate(resolve));
 
   expect(relayedReplies).toEqual([
     {
@@ -330,7 +330,7 @@ test('falls back to normal agent execution when detector does not recognize a sc
   });
 
   const pending = handler.processMessage(createMessage({ content: '帮我总结一下今天的会议纪要' }));
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setImmediate(resolve));
 
   expect(runtime.startCalls.length).toBe(1);
   expect(runtime.startCalls[0].prompt).toBe('帮我总结一下今天的会议纪要');

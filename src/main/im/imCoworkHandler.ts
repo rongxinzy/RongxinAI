@@ -548,18 +548,12 @@ export class IMCoworkHandler extends EventEmitter {
     console.log('[IMCoworkHandler:handleMessage] sessionId:', sessionId, 'tracked:', tracked, 'messageType:', message.type);
     if (!tracked) return;
 
-    // Only use an existing accumulator — do NOT create a background accumulator here.
-    // ensureBackgroundAccumulator creates one without a resolve callback, so replies would
-    // be silently dropped. The proper accumulator (with resolve) is created synchronously
-    // by createAccumulatorPromise inside processMessageInternal before the session starts.
-    // When channel sync fires message events before processMessageInternal runs, we must
-    // skip accumulation rather than creating a broken background accumulator.
-    const accumulator = this.messageAccumulators.get(sessionId);
-    console.log('[IMCoworkHandler:handleMessage] accumulator exists:', !!accumulator, 'backgroundDelivery:', !!accumulator?.backgroundDelivery);
+    let accumulator = this.messageAccumulators.get(sessionId);
+    if (!accumulator) {
+      accumulator = this.ensureBackgroundAccumulator(sessionId);
+    }
     if (accumulator) {
       accumulator.messages.push(message);
-    } else {
-      console.warn('[IMCoworkHandler:handleMessage] no accumulator found for session, skipping message accumulation (possible race with processMessageInternal)');
     }
   }
 
