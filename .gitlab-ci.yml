@@ -20,6 +20,7 @@ stages:
 
 variables:
   NODE_OPTIONS: '--max-old-space-size=4096'
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 # ─── 全局缓存 ───
 cache:
