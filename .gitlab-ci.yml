@@ -1,7 +1,7 @@
 # .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
 #
 # Stage: lint → build → test
-# 缓存：node_modules 基于 package.json hash
+# 依赖：宿主机 /opt/ci-cache/node_modules 卷（只读挂载）
 # 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
 
 workflow:
@@ -11,6 +11,7 @@ workflow:
 default:
   image: rongxinai-ci:latest
   before_script:
+    - cp -r /opt/ci-cache/node_modules . 2>/dev/null || true
     - npm install --prefer-offline --no-audit
 
 stages:
@@ -20,15 +21,6 @@ stages:
 
 variables:
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-
-# ─── 全局缓存 ───
-cache:
-  key:
-    files:
-      - package.json
-  paths:
-    - node_modules/
-  policy: pull-push
 
 # ═══════════════════════════════════════════════════════
 # Stage 1: Lint（仅变更的 TS/TSX 文件）
