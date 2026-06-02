@@ -19,7 +19,6 @@ stages:
   - test
 
 variables:
-  NODE_OPTIONS: '--max-old-space-size=2048'
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 # ─── 全局缓存 ───
@@ -66,6 +65,8 @@ lint:
 build-renderer:
   stage: build
   needs: [lint]
+  variables:
+    NODE_OPTIONS: '--max-old-space-size=8192'
   script:
     - npm run build
     - test -f dist/index.html
