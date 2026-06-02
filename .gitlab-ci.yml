@@ -1,6 +1,8 @@
-# .gitlab-ci.yml
-# Stage: install → lint → build → test
-# 策略：单独 install job 产出 node_modules artifact，消除缓存竞态
+# .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
+#
+# Stage: lint → build → test
+# 缓存：node_modules 基于 package.json hash
+# 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
 
 workflow:
   auto_cancel:
@@ -8,9 +10,10 @@ workflow:
 
 default:
   image: rongxinai-ci:latest
+  before_script:
+    - npm install --prefer-offline --no-audit
 
 stages:
-  - .pre
   - lint
   - build
   - test
@@ -18,29 +21,20 @@ stages:
 variables:
   NODE_OPTIONS: '--max-old-space-size=4096'
 
-# ═══════════════════════════════════════════════════════
-# Stage .pre: 安装依赖（一次产出，全 pipeline 复用）
-# ═══════════════════════════════════════════════════════
-install:
-  stage: .pre
-  script:
-    - node --version
-    - npm --version
-    - npm install
-  artifacts:
-    paths:
-      - node_modules/
-    expire_in: 2 hours
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
+# ─── 全局缓存 ───
+cache:
+  key:
+    files:
+      - package.json
+  paths:
+    - node_modules/
+  policy: pull-push
 
 # ═══════════════════════════════════════════════════════
-# Stage 1: Lint
+# Stage 1: Lint（仅变更的 TS/TSX 文件）
 # ═══════════════════════════════════════════════════════
 lint:
   stage: lint
-  needs: [install]
   variables:
     GIT_DEPTH: 0
   script:
@@ -50,7 +44,7 @@ lint:
       elif [ -n "$CI_COMMIT_BEFORE_SHA" ] && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
         FILES=$(git diff --name-only --diff-filter=ACMR $CI_COMMIT_BEFORE_SHA...HEAD -- '*.ts' '*.tsx')
       else
-        FILES=""
+        FILES=$(git diff --name-only --diff-filter=ACMR HEAD~1 -- '*.ts' '*.tsx')
       fi
     - |
       if [ -n "$FILES" ]; then
@@ -70,17 +64,23 @@ lint:
 
 build-renderer:
   stage: build
-  needs: [install]
+  needs: [lint]
   script:
     - npm run build
     - test -f dist/index.html
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - src/renderer/**/*
+        - vite.config.ts
+        - tsconfig.json
+        - tailwind.config.js
+        - postcss.config.js
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 build-main:
   stage: build
-  needs: [install]
+  needs: [lint]
   script:
     - npm run compile:electron
     - test -f dist-electron/main.js
@@ -91,15 +91,22 @@ build-main:
     expire_in: 1 hour
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - src/main/**/*
+        - src/common/**/*
+        - electron-tsconfig.json
+        - src/main/preload.ts
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 build-skills:
   stage: build
-  needs: [install]
+  needs: []
   script:
     - npm run build:skills
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - SKILLs/**/*
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
@@ -108,7 +115,6 @@ build-skills:
 test:
   stage: test
   needs:
-    - install
     - job: build-main
       optional: true
   script:
