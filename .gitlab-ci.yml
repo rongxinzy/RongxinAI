@@ -19,7 +19,7 @@ stages:
   - test
 
 variables:
-  NODE_OPTIONS: '--max-old-space-size=4096'
+  NODE_OPTIONS: '--max-old-space-size=2048'
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 # ─── 全局缓存 ───
