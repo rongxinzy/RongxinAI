@@ -55,6 +55,7 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       
       - uses: actions/upload-artifact@v4
         with:
@@ -94,6 +95,7 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       
       - uses: actions/upload-artifact@v4
         with:
@@ -131,6 +133,7 @@ jobs:
         run: npm run dist:linux
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       
       - uses: actions/upload-artifact@v4
         with:

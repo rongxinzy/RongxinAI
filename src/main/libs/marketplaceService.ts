@@ -9,6 +9,18 @@ import {
 } from '../../shared/marketplace';
 import curatedModels from '../resources/modelscope-gguf-curated-models.json';
 
+type MarketplaceServiceOptions = {
+  getModelScopeToken?: () => string | null;
+};
+
+type OnlineSearchResult = {
+  models: MarketplaceModel[];
+  totalCount?: number;
+  nextPageNumber?: number;
+  reachedLimit?: boolean;
+  warning?: string;
+};
+
 type CuratedModelEntry = {
   name: string;
   description: string;
@@ -32,6 +44,11 @@ type MarketplaceIndexRecord = {
   parameterCount?: number;
 };
 
+type ModelScopeOpenApiPage = {
+  records: MarketplaceIndexRecord[];
+  totalCount?: number;
+};
+
 type InstalledModelRecord = {
   repoId: string;
   installedPath: string;
@@ -41,26 +58,35 @@ const MARKETPLACE_SOURCE = 'modelscope-gguf' as const;
 const DEFAULT_LIMIT = 120;
 const LOCAL_LIMIT = 100;
 const MARKETPLACE_TIMEOUT_MS = 8000;
-const MODEL_SCOPE_LIBRARY_URL = 'https://www.modelscope.cn/models?other=gguf';
+const MODEL_SCOPE_OPENAPI_RATE_LIMIT_RETRIES = 2;
+const MODEL_SCOPE_OPENAPI_PAGE_SIZE = 50;
+const MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT = 60;
+const MODEL_SCOPE_OPENAPI_MODELS_URL = 'https://modelscope.cn/openapi/v1/models';
 const MODEL_SCOPE_SEARCH_API_URL = 'https://www.modelscope.cn/api/v1/models';
 
 export class MarketplaceService {
-  constructor(private readonly getModelsDir: () => string = () => '') {}
+  constructor(
+    private readonly getModelsDir: () => string = () => '',
+    private readonly options: MarketplaceServiceOptions = {},
+  ) {}
 
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
-    const limit = resolveLimit(params.limit, DEFAULT_LIMIT);
-    const curated = this.searchLocal({ ...params, limit });
     try {
       const online = await this.searchOnline(params);
-      const merged = mergeMarketplaceModels(online, curated, limit);
       return {
         models: sortMarketplaceModels(
-          annotateInstalledModels(merged, scanInstalledModels(this.getModelsDir())),
+          annotateInstalledModels(online.models, scanInstalledModels(this.getModelsDir())),
           params,
-        ).slice(0, limit),
+        ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT)),
+        totalCount: online.totalCount,
+        nextPageNumber: online.nextPageNumber,
+        warning: online.warning,
       };
-    } catch {
-      return { models: curated };
+    } catch (error) {
+      return {
+        models: this.searchLocal({ ...params, limit: resolveLimit(params.limit, DEFAULT_LIMIT) }),
+        warning: toMarketplaceWarning(error),
+      };
     }
   }
 
@@ -75,17 +101,107 @@ export class MarketplaceService {
     ).slice(0, resolveLimit(params.limit, LOCAL_LIMIT));
   }
 
-  private async searchOnline(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
+  private async searchOnline(params: MarketplaceSearchParams): Promise<OnlineSearchResult> {
     const installed = scanInstalledModels(this.getModelsDir());
+    let openApiWarning: string | undefined;
+    const openApiResults = await this.fetchModelScopeOpenApi(params).catch(
+      (error): OnlineSearchResult | undefined => {
+        openApiWarning = toMarketplaceWarning(error);
+        return undefined;
+      },
+    );
+    if (openApiResults) {
+      return {
+        ...openApiResults,
+        models: annotateInstalledModels(filterMarketplaceModels(openApiResults.models, { ...params, query: undefined }), installed),
+      };
+    }
+
     const searchResults = await this.fetchModelScopeSearchApi(params).catch(
       (): MarketplaceModel[] | null => null,
     );
     if (searchResults && searchResults.length > 0) {
-      return annotateInstalledModels(filterMarketplaceModels(searchResults, params), installed);
+      return {
+        models: annotateInstalledModels(filterMarketplaceModels(searchResults, params), installed),
+        warning: openApiWarning,
+      };
     }
 
-    const libraryResults = await this.fetchModelScopeLibrary(params);
-    return annotateInstalledModels(filterMarketplaceModels(libraryResults, params), installed);
+    const libraryResults = await this.fetchModelScopeLibrary(params).catch((error): MarketplaceModel[] => {
+      if (openApiWarning) {
+        throw new Error(openApiWarning);
+      }
+      throw error;
+    });
+    return {
+      models: annotateInstalledModels(filterMarketplaceModels(libraryResults, params), installed),
+      warning: openApiWarning,
+    };
+  }
+
+  private async fetchModelScopeOpenApi(params: MarketplaceSearchParams): Promise<OnlineSearchResult> {
+    const token = this.options.getModelScopeToken?.();
+    if (!token) throw new Error('ModelScope OpenAPI token is not configured');
+
+    const startPage = Math.max(1, params.pageNumber ?? 1);
+    if (startPage > MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT) {
+      return { models: [], reachedLimit: true };
+    }
+    const models: MarketplaceModel[] = [];
+    let totalCount: number | undefined;
+    let lastPage = startPage - 1;
+    const maxPages = resolveOpenApiPageCount(params.limit);
+    for (let offset = 0; offset < maxPages; offset += 1) {
+      const page = startPage + offset;
+      if (page > MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT) break;
+      const payload = await this.fetchModelScopeOpenApiPage(
+        buildModelScopeOpenApiModelsUrl(params.query?.trim() ?? '', page),
+        token,
+      ).catch((error): null => {
+        if (models.length > 0) {
+          console.warn(`[Marketplace] ModelScope OpenAPI page ${page} failed after receiving ${models.length} model(s):`, error);
+          return null;
+        }
+        throw error;
+      });
+      if (!payload) break;
+      const pageResult = extractModelScopeOpenApiPage(payload);
+      const records = pageResult.records;
+      totalCount = pageResult.totalCount ?? totalCount;
+      if (pageResult.totalCount === 0 || records.length === 0) break;
+      models.push(...records.map((record) => toMarketplaceModelFromRecord(record)));
+      lastPage = page;
+      if (models.length >= resolveLimit(params.limit, DEFAULT_LIMIT)) break;
+    }
+    if (models.length === 0) return { models: [], totalCount };
+    const limit = resolveLimit(params.limit, DEFAULT_LIMIT);
+    const nextPageNumber = totalCount
+      && lastPage < MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT
+      && lastPage * MODEL_SCOPE_OPENAPI_PAGE_SIZE < totalCount
+      ? lastPage + 1
+      : undefined;
+    return {
+      models: models.slice(0, limit),
+      totalCount,
+      nextPageNumber,
+    };
+  }
+
+  private async fetchModelScopeOpenApiPage(url: string, initialToken: string): Promise<unknown> {
+    let token = initialToken;
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= MODEL_SCOPE_OPENAPI_RATE_LIMIT_RETRIES; attempt += 1) {
+      try {
+        return await fetchJsonWithTimeout(url, { Authorization: `Bearer ${token}` });
+      } catch (error) {
+        lastError = error;
+        if (!isRateLimitError(error)) throw error;
+        const nextToken = this.options.getModelScopeToken?.();
+        if (!nextToken || nextToken === token) break;
+        token = nextToken;
+      }
+    }
+    throw lastError;
   }
 
   private async fetchModelScopeSearchApi(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
@@ -97,7 +213,7 @@ export class MarketplaceService {
     if (models.length === 0) {
       throw new Error('ModelScope search returned no GGUF repositories');
     }
-    return mergeMarketplaceModels(models, this.searchLocal({ ...params, featuredOnly: true, limit: DEFAULT_LIMIT }), DEFAULT_LIMIT);
+    return models.slice(0, DEFAULT_LIMIT);
   }
 
   private async fetchModelScopeLibrary(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
@@ -172,6 +288,27 @@ function buildModelScopeSearchApiUrl(query: string): string {
   return `${MODEL_SCOPE_SEARCH_API_URL}?${params.toString()}`;
 }
 
+function buildModelScopeOpenApiModelsUrl(query: string, page: number): string {
+  const params = new URLSearchParams({
+    page_number: String(page),
+    page_size: String(MODEL_SCOPE_OPENAPI_PAGE_SIZE),
+    sort: 'downloads',
+    'filter.library': 'gguf',
+  });
+  if (query) {
+    params.set('search', query);
+  }
+  return `${MODEL_SCOPE_OPENAPI_MODELS_URL}?${params.toString()}`;
+}
+
+function resolveOpenApiPageCount(limit: number | undefined): number {
+  const resolvedLimit = resolveLimit(limit, DEFAULT_LIMIT);
+  return Math.min(
+    MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT,
+    Math.max(1, Math.ceil(resolvedLimit / MODEL_SCOPE_OPENAPI_PAGE_SIZE)),
+  );
+}
+
 function buildModelScopeLibraryUrl(query: string): string {
   const params = new URLSearchParams();
   params.set('other', 'gguf');
@@ -179,12 +316,12 @@ function buildModelScopeLibraryUrl(query: string): string {
   return `https://www.modelscope.cn/models?${params.toString()}`;
 }
 
-async function fetchJsonWithTimeout(url: string): Promise<unknown> {
+async function fetchJsonWithTimeout(url: string, headers: Record<string, string> = {}): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MARKETPLACE_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-marketplace' },
+      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-marketplace', ...headers },
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -222,25 +359,49 @@ function extractMarketplaceIndexRecords(payload: unknown): MarketplaceIndexRecor
         || readRecordString(record.Owner);
       const repo = readRecordString(record.Name)
         || readRecordString(record.name)
+        || readRecordString(record.display_name)
         || readRecordString(record.ModelName)
         || readRecordString(record.model_name);
       const repoId = readRecordString(record.repoId)
         || readRecordString(record.RepoId)
+        || readRecordString(record.id)
+        || readRecordString(record.model_id)
+        || readRecordString(record.modelId)
         || (owner && repo ? `${owner}/${repo}` : undefined);
-      if (!repoId || !/^[^/\s]+\/[^/\s]+$/.test(repoId) || !repoId.toLowerCase().includes('gguf')) return null;
+      const tags = normalizeTagList(record.Tags) ?? normalizeTagList(record.tags) ?? [];
+      if (!repoId || !/^[^/\s]+\/[^/\s]+$/.test(repoId) || !isGgufMarketplaceRecord(repoId, tags)) return null;
       return {
         repoId,
         downloads: readRecordNumber(record.Downloads) ?? readRecordNumber(record.downloads) ?? readRecordNumber(record.Likes),
         detailUrl: readRecordString(record.Url) || readRecordString(record.url),
         description: readRecordString(record.Description) || readRecordString(record.description),
         filePath: readRecordString(record.FilePath) || readRecordString(record.filePath),
-        tags: normalizeTagList(record.Tags) ?? normalizeTagList(record.tags),
+        tags,
         sizes: normalizeSizeList(record.sizes) ?? normalizeSizeList(record.Tags),
-        parameterCount: readRecordNumber(record.parameterCount) ?? readRecordNumber(record.ParameterCount),
+        parameterCount: readRecordNumber(record.parameterCount)
+          ?? readRecordNumber(record.ParameterCount)
+          ?? readRecordNumber(record.params),
       } satisfies MarketplaceIndexRecord;
     })
     .filter((record): record is NonNullable<typeof record> => record !== null);
   return dedupeIndexRecords(models);
+}
+
+function extractModelScopeOpenApiPage(payload: unknown): ModelScopeOpenApiPage {
+  const data = isRecord(payload) ? payload.data : undefined;
+  if (!isRecord(data)) {
+    return { records: extractMarketplaceIndexRecords(payload) };
+  }
+  const models = Array.isArray(data.models) ? data.models.filter(isRecord) : [];
+  return {
+    records: extractMarketplaceIndexRecords(models),
+    totalCount: readRecordNumber(data.total_count),
+  };
+}
+
+function isGgufMarketplaceRecord(repoId: string, tags: string[]): boolean {
+  return repoId.toLowerCase().includes('gguf')
+    || tags.some(tag => tag.toLowerCase().includes('gguf'));
 }
 
 function dedupeIndexRecords(records: MarketplaceIndexRecord[]): MarketplaceIndexRecord[] {
@@ -563,6 +724,14 @@ function decodeHtml(value: string): string {
 
 function resolveLimit(limit: number | undefined, fallback: number): number {
   return limit && limit > 0 ? limit : fallback;
+}
+
+function toMarketplaceWarning(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRateLimitError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('HTTP 429');
 }
 
 function extractRecords(payload: unknown): Record<string, unknown>[] {

@@ -5,7 +5,6 @@ import {
   ArrowTopRightOnSquareIcon,
   BeakerIcon,
   CheckCircleIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CpuChipIcon,
@@ -177,10 +176,8 @@ type RequestPreviewInput = {
   options: Record<string, unknown>;
 };
 
-const MARKETPLACE_MIN_PAGE_SIZE = 6;
-const MARKETPLACE_MAX_PAGE_SIZE = 24;
-const MARKETPLACE_CARD_MIN_HEIGHT = 236;
-const MARKETPLACE_FILTER_PANEL_HEIGHT = 160;
+const MARKETPLACE_PAGE_SIZE = 6;
+const MARKETPLACE_SEARCH_MAX_MODEL_COUNT = 3000;
 const CHAT_NEAR_BOTTOM_THRESHOLD = 96;
 const CHAT_HIDDEN_BELOW_THRESHOLD = 8;
 const ASSISTANT_SCROLL_TOP_OFFSET = 0;
@@ -520,8 +517,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
-  const [marketplaceTask, setMarketplaceTask] = useState<string>('all');
-  const [marketplaceSize, setMarketplaceSize] = useState<string>('all');
+  const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
   const [servicePopoverOpen, setServicePopoverOpen] = useState(false);
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
@@ -593,7 +589,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [clearInstallProgressDismissTimer],
   );
 
-  const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
+  const searchMarketplace = useCallback(async (
+    params: MarketplaceSearchParams,
+  ) => {
     const id = ++marketplaceSearchRef.current;
     setMarketplaceLoading(true);
     setMarketplaceError(null);
@@ -601,6 +599,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const result = await window.electron.marketplace.search(params);
       if (id === marketplaceSearchRef.current) {
         setMarketplaceModels(result.models);
+        setMarketplaceError(result.warning ?? null);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
@@ -614,6 +613,20 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       }
     }
   }, []);
+
+  const handleMarketplaceSearch = useCallback(() => {
+    const params = buildMarketplaceSearchParams({
+      query: marketplaceQuery,
+    });
+    if (!params) {
+      setMarketplaceHasSearched(false);
+      setMarketplaceModels([]);
+      setMarketplaceError(null);
+      return;
+    }
+    setMarketplaceHasSearched(true);
+    void searchMarketplace(params);
+  }, [marketplaceQuery, searchMarketplace]);
 
   const runningModelNames = useMemo(
     () => new Set(runningModels.map(model => model.name || model.model).filter(Boolean)),
@@ -779,12 +792,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         }
         if (isInstallTerminalPhase(progress.phase)) {
           void refreshLocalModels().catch(() => undefined);
-          void searchMarketplace({
-            query: marketplaceQuery.trim() || undefined,
-            task: marketplaceTask === 'all' ? undefined : (marketplaceTask as any),
-            size: marketplaceSize === 'all' ? undefined : (marketplaceSize as any),
-            limit: 120,
-          }).catch(() => undefined);
+          const params = buildMarketplaceSearchParams({
+            query: marketplaceQuery,
+          });
+          if (marketplaceHasSearched && params) {
+            void searchMarketplace(params).catch(() => undefined);
+          }
         }
       }),
     ];
@@ -875,18 +888,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const firstRunning = runnableModels[0]?.name;
     if (firstRunning) setSelectedModel(firstRunning);
   }, [runnableModels, selectedModel]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void searchMarketplace({
-        query: marketplaceQuery.trim() || undefined,
-        task: marketplaceTask === 'all' ? undefined : (marketplaceTask as any),
-        size: marketplaceSize === 'all' ? undefined : (marketplaceSize as any),
-        limit: 120,
-      });
-    }, 200);
-    return () => window.clearTimeout(timeout);
-  }, [marketplaceQuery, marketplaceTask, marketplaceSize, searchMarketplace]);
 
   const handlePrepare = () => {
     void runAction(async () => {
@@ -981,6 +982,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handlePull = () => {
     if (!normalizedPullName) return;
+    if (!isModelScopeRepoId(normalizedPullName)) {
+      showToast(
+        i18nService.t('localInferencePullInvalidRepo'),
+        LocalInferenceToastKind.Error,
+      );
+      return;
+    }
     setActivePullName(normalizedPullName);
     setPullProgress(current => ({
       ...current,
@@ -1342,27 +1350,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             <MarketplacePanel
               loading={loading}
               models={marketplaceModels}
+              hasSearched={marketplaceHasSearched}
               marketplaceLoading={marketplaceLoading}
               marketplaceError={marketplaceError}
               activePullName={activePullName}
               activePullProgress={activePullProgress}
               pulling={pulling}
               query={marketplaceQuery}
-              task={marketplaceTask}
-              size={marketplaceSize}
               installedModelPathMap={installedModelPathMap}
               installProgress={pullProgress}
               onQueryChange={setMarketplaceQuery}
-              onTaskChange={setMarketplaceTask}
-              onSizeChange={setMarketplaceSize}
-              onSearch={() =>
-                void searchMarketplace({
-                  query: marketplaceQuery.trim() || undefined,
-                  task: marketplaceTask === 'all' ? undefined : (marketplaceTask as any),
-                  size: marketplaceSize === 'all' ? undefined : (marketplaceSize as any),
-                  limit: 120,
-                })
-              }
+              onSearch={handleMarketplaceSearch}
               onInstall={handleMarketplaceInstall}
               onCancelPull={handleCancelPull}
             />
@@ -3729,9 +3727,17 @@ function Badge({
   );
 }
 
-function EmptyState({ title, action }: { title: string; action?: React.ReactNode }) {
+function EmptyState({
+  title,
+  action,
+  className = '',
+}: {
+  title: string;
+  action?: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center">
+    <div className={`flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center ${className}`.trim()}>
       <ServerStackIcon className="h-7 w-7 text-secondary" />
       <p className="text-sm font-medium text-secondary">{title}</p>
       {action}
@@ -4300,71 +4306,69 @@ function buildRequestPreview({
   return preview;
 }
 
+function buildMarketplaceSearchParams(input: {
+  query: string;
+  pageNumber?: number;
+}): MarketplaceSearchParams | null {
+  const query = input.query.trim();
+  if (!query) return null;
+  return {
+    query,
+    limit: MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
+    pageNumber: input.pageNumber,
+  };
+}
+
+function isModelScopeRepoId(value: string): boolean {
+  return /^[^/\s]+\/[^/\s]+$/.test(value.trim());
+}
+
 function MarketplacePanel({
   loading,
   models,
+  hasSearched,
   marketplaceLoading,
   marketplaceError,
   activePullName,
   activePullProgress,
   pulling,
   query,
-  task,
-  size,
   installedModelPathMap,
   installProgress,
   onQueryChange,
-  onTaskChange,
-  onSizeChange,
   onSearch,
   onInstall,
   onCancelPull,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
+  hasSearched: boolean;
   marketplaceLoading: boolean;
   marketplaceError: string | null;
   activePullName: string | null;
   activePullProgress?: LlamaCppInstallProgress;
   pulling: boolean;
   query: string;
-  task: string;
-  size: string;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
   onQueryChange: (v: string) => void;
-  onTaskChange: (v: string) => void;
-  onSizeChange: (v: string) => void;
   onSearch: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
   onCancelPull: () => void;
 }) {
   const [installingModel, setInstallingModel] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [pageSize, setPageSize] = useState(estimateMarketplacePageSize());
   const [page, setPage] = useState(1);
-  const hasActiveFilters = Boolean(query.trim()) || task !== 'all' || size !== 'all';
-  const featuredModels = useMemo(() => models.filter(model => model.isFeatured), [models]);
-  const pageCount = Math.max(1, Math.ceil(models.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(models.length / MARKETPLACE_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const pageStart = (currentPage - 1) * pageSize;
+  const pageStart = (currentPage - 1) * MARKETPLACE_PAGE_SIZE;
   const visibleModels = useMemo(
-    () => models.slice(pageStart, pageStart + pageSize),
-    [models, pageStart, pageSize],
+    () => models.slice(pageStart, pageStart + MARKETPLACE_PAGE_SIZE),
+    [models, pageStart],
   );
 
   useEffect(() => {
     setPage(1);
-  }, [models, query, task, size]);
-
-  useEffect(() => {
-    const updatePageSize = () => {
-      setPageSize(estimateMarketplacePageSize(window.innerWidth, window.innerHeight));
-    };
-    updatePageSize();
-    window.addEventListener('resize', updatePageSize);
-    return () => window.removeEventListener('resize', updatePageSize);
-  }, []);
+  }, [query]);
 
   useEffect(() => {
     if (page > pageCount) {
@@ -4380,139 +4384,53 @@ function MarketplacePanel({
       setInstallingModel(null);
     }
   };
+  const handleNextPage = async () => {
+    setPage(value => Math.min(pageCount, value + 1));
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
+      <div className={`${hasSearched ? 'flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between' : 'flex min-h-[420px] flex-col items-center justify-center gap-8'}`}>
+        <div className={`${hasSearched ? 'space-y-3' : 'w-full max-w-3xl space-y-3 text-center'}`}>
           <div>
-            <h2 className="text-base font-semibold text-foreground">
+            <h2 className={`${hasSearched ? 'text-base font-semibold text-foreground' : 'text-2xl font-semibold text-foreground'}`}>
               {i18nService.t('marketplaceTitle')}
             </h2>
-            <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(value => !value)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors ${
-                filtersOpen || hasActiveFilters
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-secondary hover:bg-surface-raised hover:text-foreground'
-              }`}
-            >
-              {i18nService.t('marketplaceFilterButton')}
-              <ChevronDownIcon
-                className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {task !== 'all' && (
-              <FilterKeywordChip
-                label={`${i18nService.t('marketplaceTaskFilterLabel')}: ${taskFilterLabel(task)}`}
-                onRemove={() => onTaskChange('all')}
-              />
-            )}
-            {size !== 'all' && (
-              <FilterKeywordChip
-                label={`${i18nService.t('marketplaceSizeFilterLabel')}: ${sizeFilterLabel(size)}`}
-                onRemove={() => onSizeChange('all')}
-              />
-            )}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={() => {
-                  onQueryChange('');
-                  onTaskChange('all');
-                  onSizeChange('all');
-                  setFiltersOpen(false);
-                }}
-                className="inline-flex h-8 items-center rounded-full border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
-              >
-                {i18nService.t('marketplaceFilterReset')}
-              </button>
+            {hasSearched && (
+              <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
             )}
           </div>
         </div>
         <form
-          className="w-full lg:max-w-xl"
+          className={`w-full ${hasSearched ? 'lg:max-w-xl' : 'max-w-4xl'}`}
           onSubmit={e => {
             e.preventDefault();
             onSearch();
           }}
         >
-          <div className="rounded-lg border border-border bg-surface p-3">
+          <div className={`${hasSearched ? 'rounded-lg border border-border bg-surface p-3' : 'bg-transparent p-0'}`}>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-secondary" />
+                <SearchIcon className={`${hasSearched ? 'left-2.5 h-3.5 w-3.5' : 'left-4 h-5 w-5'} pointer-events-none absolute top-1/2 -translate-y-1/2 text-secondary`} />
                 <input
                   value={query}
                   onChange={e => onQueryChange(e.target.value)}
                   placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-                  className="h-9 w-full rounded-md border border-border bg-surface-input pl-8 pr-2 text-xs text-foreground placeholder:text-secondary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className={`${hasSearched ? 'h-9 rounded-md pl-8 pr-2 text-xs' : 'h-16 rounded-2xl pl-12 pr-4 text-lg'} w-full border border-border bg-surface-input text-foreground placeholder:text-secondary focus:outline-none focus:ring-1 focus:ring-primary`}
                 />
               </div>
               <button
                 type="submit"
-                className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                disabled={marketplaceLoading}
+                className={`${hasSearched ? 'h-9 rounded-md px-3 text-xs' : 'h-16 rounded-2xl px-8 text-lg'} inline-flex items-center gap-1 bg-primary font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60`}
               >
+                {marketplaceLoading && <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />}
                 {i18nService.t('marketplaceSearch')}
               </button>
             </div>
-            <p className="mt-2 text-[11px] text-secondary">
-              {i18nService.t('marketplaceSearchHint')}
-            </p>
           </div>
         </form>
       </div>
-
-      {filtersOpen && (
-        <div className="rounded-lg border border-border bg-surface p-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end">
-            <div className="grid flex-1 gap-3 md:grid-cols-2">
-              <CompactFilterSelect
-                label={i18nService.t('marketplaceTaskFilterLabel')}
-                value={task}
-                onChange={onTaskChange}
-                options={[
-                  { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
-                  { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
-                  { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
-                  { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
-                  { value: 'embedding', label: i18nService.t('marketplaceFilterTaskEmbedding') },
-                  { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
-                ]}
-              />
-              <CompactFilterSelect
-                label={i18nService.t('marketplaceSizeFilterLabel')}
-                value={size}
-                onChange={onSizeChange}
-                options={[
-                  { value: 'all', label: i18nService.t('marketplaceFilterSizeAll') },
-                  { value: 'small', label: i18nService.t('marketplaceFilterSizeSmall') },
-                  { value: 'desktop', label: i18nService.t('marketplaceFilterSizeDesktop') },
-                  {
-                    value: 'workstation',
-                    label: i18nService.t('marketplaceFilterSizeWorkstation'),
-                  },
-                  { value: 'large', label: i18nService.t('marketplaceFilterSizeLarge') },
-                ]}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onQueryChange('');
-                onTaskChange('all');
-                onSizeChange('all');
-              }}
-              className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised md:min-w-20"
-            >
-              {i18nService.t('marketplaceFilterReset')}
-            </button>
-          </div>
-        </div>
-      )}
 
       {marketplaceError && (
         <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
@@ -4538,50 +4456,16 @@ function MarketplacePanel({
         </div>
       )}
 
-      {!hasActiveFilters && featuredModels.length > 0 && (
-        <section className="space-y-2">
-          <div className="flex items-center gap-2">
-            <SparklesIcon className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">
-              {i18nService.t('marketplaceFeaturedTitle')}
-            </h3>
-          </div>
-          <p className="text-xs text-secondary">
-            {i18nService.t('marketplaceFeaturedDescription')}
-          </p>
-        </section>
-      )}
-
-      {models.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-          <span>
-            {i18nService
-              .t('marketplaceResultSummary')
-              .replace('{shown}', String(visibleModels.length))
-              .replace('{total}', String(models.length))}
-          </span>
-          <div className="flex items-center gap-3">
-            <span>{i18nService.t('marketplaceDataSourceHint')}</span>
-            <span>
-              {i18nService
-                .t('marketplacePageSummary')
-                .replace('{page}', String(currentPage))
-                .replace('{total}', String(pageCount))}
-            </span>
-          </div>
-        </div>
-      )}
-
       {marketplaceLoading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-secondary">
+        <div className="flex min-h-[620px] items-center justify-center text-sm text-secondary">
           <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
           {i18nService.t('loading')}
         </div>
-      ) : models.length === 0 ? (
-        <EmptyState title={i18nService.t('marketplaceNoModels')} />
+      ) : !hasSearched ? null : models.length === 0 ? (
+        <EmptyState title={i18nService.t('marketplaceNoModels')} className="min-h-[620px]" />
       ) : (
-        <>
-          <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex min-h-[620px] flex-col">
+          <div className="grid content-start gap-3 md:grid-cols-2">
             {visibleModels.map(model => {
               const progress = installProgress[model.repoId];
               const installedModelName = model.installedPath
@@ -4592,11 +4476,11 @@ function MarketplacePanel({
               return (
                 <div
                   key={model.id}
-                  className="flex min-h-[200px] flex-col justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-surface-raised"
+                  className="flex h-[168px] min-w-0 flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-3 transition-colors hover:bg-surface-raised"
                 >
-                  <div>
+                  <div className="min-h-0 overflow-hidden">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{model.repoId}</h3>
+                      <h3 className="max-h-10 min-w-0 overflow-hidden break-all text-sm font-semibold leading-5 text-foreground">{model.repoId}</h3>
                       <span
                         className={`inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium ${
                           installed
@@ -4609,14 +4493,9 @@ function MarketplacePanel({
                       <span className="inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-medium text-secondary">
                         {capabilityLabel(model.capability)}
                       </span>
-                      {model.isFeatured && (
-                        <span className="inline-flex h-5 items-center rounded-md border border-primary/30 bg-primary/10 px-1.5 text-[11px] font-medium text-primary">
-                          {i18nService.t('marketplaceFeaturedBadge')}
-                        </span>
-                      )}
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-secondary">{model.description}</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <p className="mt-1.5 max-h-10 overflow-hidden text-xs leading-5 text-secondary">{model.description}</p>
+                    <div className="mt-2 flex max-h-5 flex-wrap gap-1.5 overflow-hidden">
                       {model.sizes.map(s => (
                         <span
                           key={s}
@@ -4634,26 +4513,8 @@ function MarketplacePanel({
                         </span>
                       ))}
                     </div>
-                    <div className="mt-3 space-y-1 text-[11px] text-secondary">
-                      <div>
-                        {i18nService.t('marketplaceRepoLabel')}:{' '}
-                        <span className="font-mono text-foreground">{model.repoId}</span>
-                      </div>
-                      {model.filePath && (
-                        <div>
-                          {i18nService.t('marketplaceRecommendedFileLabel')}:{' '}
-                          <span className="font-mono text-foreground">{model.filePath}</span>
-                        </div>
-                      )}
-                      {model.installedPath && (
-                        <div>
-                          {i18nService.t('marketplaceInstalledPathLabel')}:{' '}
-                          <span className="font-mono text-foreground">{model.installedPath}</span>
-                        </div>
-                      )}
-                    </div>
                     {progress && (
-                      <div className="mt-3 rounded-md bg-surface-raised px-2.5 py-2">
+                      <div className="mt-2 rounded-md bg-surface-raised px-2 py-1.5">
                         <div className="flex items-center justify-between gap-2 text-[11px] text-secondary">
                           <span>{formatPullProgress(progress)}</span>
                           {typeof progress.percent === 'number' && <span>{progress.percent}%</span>}
@@ -4662,7 +4523,7 @@ function MarketplacePanel({
                       </div>
                     )}
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-2">
+                  <div className="mt-3 flex items-center justify-between gap-2">
                     <span className="text-xs text-secondary">
                       {formatDownloadCount(model.downloads)}
                     </span>
@@ -4705,29 +4566,29 @@ function MarketplacePanel({
             })}
           </div>
           {pageCount > 1 && (
-            <div className="flex items-center justify-center gap-2">
+            <div className="mx-auto mt-auto flex items-center justify-center gap-3 pt-4">
               <button
                 type="button"
                 onClick={() => setPage(value => Math.max(1, value - 1))}
                 disabled={currentPage <= 1}
-                className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 min-w-20 items-center justify-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {i18nService.t('skillMarketplacePrevPage')}
               </button>
-              <span className="text-xs text-secondary">
-                {currentPage} / {pageCount}
+              <span className="inline-flex h-8 min-w-16 items-center justify-center text-sm text-secondary">
+                {currentPage}/{pageCount} {i18nService.t('marketplacePageUnit')}
               </span>
               <button
                 type="button"
-                onClick={() => setPage(value => Math.min(pageCount, value + 1))}
+                onClick={() => void handleNextPage()}
                 disabled={currentPage >= pageCount}
-                className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 min-w-20 items-center justify-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {i18nService.t('skillMarketplaceNextPage')}
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -4747,88 +4608,6 @@ function capabilityLabel(capability: MarketplaceModel['capability']): string {
     default:
       return i18nService.t('marketplaceFilterTaskChat');
   }
-}
-
-function taskFilterLabel(value: string): string {
-  switch (value) {
-    case 'chat':
-      return i18nService.t('marketplaceFilterTaskChat');
-    case 'reasoning':
-      return i18nService.t('marketplaceFilterTaskReasoning');
-    case 'code':
-      return i18nService.t('marketplaceFilterTaskCode');
-    case 'embedding':
-      return i18nService.t('marketplaceFilterTaskEmbedding');
-    case 'vision':
-      return i18nService.t('marketplaceFilterTaskVision');
-    default:
-      return i18nService.t('marketplaceFilterTaskAll');
-  }
-}
-
-function sizeFilterLabel(value: string): string {
-  switch (value) {
-    case 'small':
-      return i18nService.t('marketplaceFilterSizeSmall');
-    case 'desktop':
-      return i18nService.t('marketplaceFilterSizeDesktop');
-    case 'workstation':
-      return i18nService.t('marketplaceFilterSizeWorkstation');
-    case 'large':
-      return i18nService.t('marketplaceFilterSizeLarge');
-    default:
-      return i18nService.t('marketplaceFilterSizeAll');
-  }
-}
-
-function FilterKeywordChip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onRemove}
-      className="inline-flex h-8 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-3 text-xs text-primary transition-colors hover:bg-primary/15"
-    >
-      <span>{label}</span>
-      <XMarkIcon className="h-3.5 w-3.5" />
-    </button>
-  );
-}
-
-function CompactFilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-[11px] font-medium text-secondary">{label}</span>
-      <select
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        className="h-9 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-      >
-        {options.map(option => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function estimateMarketplacePageSize(width = 1280, height = 900): number {
-  const columns = width >= 768 ? 2 : 1;
-  const availableHeight = Math.max(320, height - MARKETPLACE_FILTER_PANEL_HEIGHT);
-  const rows = Math.max(1, Math.floor(availableHeight / MARKETPLACE_CARD_MIN_HEIGHT));
-  const pageSize = rows * columns;
-  return Math.max(MARKETPLACE_MIN_PAGE_SIZE, Math.min(MARKETPLACE_MAX_PAGE_SIZE, pageSize));
 }
 
 async function openExternalUrl(url: string): Promise<void> {
@@ -4867,30 +4646,11 @@ function SearchIcon({ className }: { className?: string }) {
   );
 }
 
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"
-      />
-    </svg>
-  );
-}
-
 export const __test__getServiceConfigFields = () =>
   SERVICE_CONFIG_FIELDS.map(field => ({ ...field }));
 export const __test__getInferenceOptionFields = () =>
   INFERENCE_OPTION_FIELDS.map(field => ({ ...field }));
-export const __test__estimateMarketplacePageSize = (width?: number, height?: number) =>
-  estimateMarketplacePageSize(width, height);
+export const __test__getMarketplacePageSize = () => MARKETPLACE_PAGE_SIZE;
 export const __test__buildAssistantMessage = (input: BuildAssistantMessageInput) =>
   buildAssistantMessage(input);
 export const __test__buildStreamingAssistantMessage = (
@@ -4902,6 +4662,10 @@ export const __test__formatMetricsSummary = (metrics: OllamaChatChunk) =>
   formatMetricsSummary(metrics);
 export const __test__buildRequestPreview = (input: RequestPreviewInput) =>
   buildRequestPreview(input);
+export const __test__buildMarketplaceSearchParams = (
+  input: Parameters<typeof buildMarketplaceSearchParams>[0],
+) => buildMarketplaceSearchParams(input);
+export const __test__isModelScopeRepoId = (value: string) => isModelScopeRepoId(value);
 export const __test__isScrollNearBottom = (input: Parameters<typeof isScrollNearBottom>[0]) =>
   isScrollNearBottom(input);
 export const __test__hasHiddenContentBelow = (input: Parameters<typeof hasHiddenContentBelow>[0]) =>

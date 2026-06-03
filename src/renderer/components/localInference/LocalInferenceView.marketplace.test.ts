@@ -1,22 +1,64 @@
 import { expect, test } from 'vitest';
 
-test('marketplace page sizing defaults stay within supported range', async () => {
+test('marketplace page size is fixed across viewport sizes', async () => {
   const module = await import('./LocalInferenceView');
-  const estimateMarketplacePageSize = (module as unknown as {
-    __test__estimateMarketplacePageSize?: (width?: number, height?: number) => number;
-  }).__test__estimateMarketplacePageSize;
+  const getMarketplacePageSize = (module as unknown as {
+    __test__getMarketplacePageSize?: () => number;
+  }).__test__getMarketplacePageSize;
 
-  expect(typeof estimateMarketplacePageSize).toBe('function');
-  if (!estimateMarketplacePageSize) return;
+  expect(typeof getMarketplacePageSize).toBe('function');
+  if (!getMarketplacePageSize) return;
 
-  const pageSize = estimateMarketplacePageSize();
-  expect(pageSize).toBeGreaterThanOrEqual(6);
-  expect(pageSize).toBeLessThanOrEqual(24);
+  expect(getMarketplacePageSize()).toBe(6);
+});
 
-  expect(estimateMarketplacePageSize(640, 720)).toBeGreaterThanOrEqual(6);
-  expect(estimateMarketplacePageSize(640, 720)).toBeLessThanOrEqual(pageSize);
-  expect(estimateMarketplacePageSize(1600, 1200)).toBeLessThanOrEqual(24);
-  expect(estimateMarketplacePageSize(1600, 1200)).toBeGreaterThanOrEqual(pageSize);
+test('marketplace search params load directly up to the app and openapi caps', async () => {
+  const module = await import('./LocalInferenceView');
+  const buildMarketplaceSearchParams = (module as unknown as {
+    __test__buildMarketplaceSearchParams?: (input: {
+      query: string;
+      pageNumber?: number;
+    }) => { query?: string; task?: string; size?: string; limit?: number; pageNumber?: number } | null;
+  }).__test__buildMarketplaceSearchParams;
+
+  expect(typeof buildMarketplaceSearchParams).toBe('function');
+  if (!buildMarketplaceSearchParams) return;
+
+  expect(buildMarketplaceSearchParams({
+    query: ' qwen ',
+  })).toEqual({ query: 'qwen', limit: 3000 });
+
+  expect(buildMarketplaceSearchParams({
+    query: ' qwen ',
+  })).toEqual({
+    query: 'qwen',
+    limit: 3000,
+  });
+
+  expect(buildMarketplaceSearchParams({
+    query: ' qwen ',
+    pageNumber: 4,
+  })).toEqual({ query: 'qwen', limit: 3000, pageNumber: 4 });
+
+  expect(buildMarketplaceSearchParams({
+    query: '',
+  })).toBeNull();
+});
+
+test('modelscope manual install requires owner repo id', async () => {
+  const module = await import('./LocalInferenceView');
+  const isModelScopeRepoId = (module as unknown as {
+    __test__isModelScopeRepoId?: (value: string) => boolean;
+  }).__test__isModelScopeRepoId;
+
+  expect(typeof isModelScopeRepoId).toBe('function');
+  if (!isModelScopeRepoId) return;
+
+  expect(isModelScopeRepoId('Qwen/Qwen3-8B-GGUF')).toBe(true);
+  expect(isModelScopeRepoId('  unsloth/Qwen3.5-0.8B-GGUF  ')).toBe(true);
+  expect(isModelScopeRepoId('1')).toBe(false);
+  expect(isModelScopeRepoId('Qwen/')).toBe(false);
+  expect(isModelScopeRepoId('/Qwen3-8B-GGUF')).toBe(false);
 });
 
 test('llama.cpp service config field metadata uses UI parameter keys without CLI prefixes', async () => {
