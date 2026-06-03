@@ -856,9 +856,25 @@ export class OpenClawEngineManager extends EventEmitter {
 
     // Inject node/npm/npx shims so gateway exec commands can use them.
     // The shims wrap Electron as a Node.js runtime via ELECTRON_RUN_AS_NODE=1.
+    //
+    // In dev mode (app.isPackaged === false), bundled npm is found under
+    // the project root via pnpm's hoisted node_modules layout.
+    //
+    // Always clean old shim files first so that switching between packaged
+    // and dev mode does not leave stale npm.cmd / npx.cmd in the shim dir.
+    const shimDir = path.join(app.getPath('userData'), 'cowork', 'bin');
+    try {
+      if (fs.existsSync(shimDir)) {
+        for (const file of ['npm.cmd', 'npm', 'npx.cmd', 'npx']) {
+          const fp = path.join(shimDir, file);
+          try { fs.unlinkSync(fp); } catch { /* may not exist */ }
+        }
+      }
+    } catch { /* ignore cleanup errors */ }
+
     const npmBinDir = app.isPackaged
       ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin')
-      : undefined;
+      : path.join(app.getAppPath(), 'node_modules', 'npm', 'bin');
     const nodeShimDir = ensureElectronNodeShim(electronNodeRuntimePath, npmBinDir);
     if (nodeShimDir) {
       const curPath = env.PATH || env.Path || '';
