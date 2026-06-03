@@ -41,10 +41,10 @@ import {
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
+import Modal from '../common/Modal';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import MarkdownContent from '../MarkdownContent';
-import Modal from '../common/Modal';
 import WindowTitleBar from '../window/WindowTitleBar';
 import {
   getRecommendedInferenceOptions,
@@ -820,11 +820,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     };
   }, [
     clearInstallProgressDismissTimer,
+    marketplaceHasSearched,
+    marketplaceQuery,
     refreshLocalModels,
     refreshRunningModels,
     refreshStatus,
     runAction,
     scheduleInstallProgressDismiss,
+    searchMarketplace,
   ]);
 
   const handleSaveServiceConfig = useCallback(
