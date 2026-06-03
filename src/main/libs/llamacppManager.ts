@@ -974,11 +974,9 @@ export function buildModelScopeFileUrl(
 ): string {
   const [owner, repo] = modelId.split('/');
   if (!owner || !repo) throw new Error('ModelScope model ID must be in owner/repo format.');
-  const params = new URLSearchParams({
-    FilePath: filePath,
-    Revision: revision,
-  });
-  return `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo?${params.toString()}`;
+  // ModelScope LFS files use the /resolve/ endpoint (302 → CDN), not /repo?
+  // which returns Code 10990101007 for LFS objects.
+  return `https://www.modelscope.cn/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/resolve/${encodeURIComponent(revision)}/${encodeURIComponent(filePath)}`;
 }
 
 async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): Promise<string[]> {
@@ -1224,10 +1222,7 @@ async function downloadFile(
     const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
     const response = await fetch(url, {
       signal,
-      headers: {
-        'User-Agent': 'RongxinAI/modelscope-gguf-installer',
-        ...(resumeFrom > 0 ? { Range: `bytes=${resumeFrom}-` } : {}),
-      },
+      ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
     });
     if (!response.ok || !response.body) {
       throw new Error(`Model download failed: HTTP ${response.status}`);
