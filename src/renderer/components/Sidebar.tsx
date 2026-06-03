@@ -161,12 +161,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelectAll = useCallback(() => {
     setSelectedIds(prev => {
-      if (prev.size === filteredSessions.length) {
+      if (prev.size === sessions.length) {
         return new Set();
       }
-      return new Set(filteredSessions.map(s => s.id));
+      return new Set(sessions.map(s => s.id));
     });
-  }, [filteredSessions]);
+  }, [sessions]);
 
   const handleBatchDeleteClick = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -385,7 +385,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <label className="flex items-center gap-2 cursor-pointer text-sm text-secondary">
             <input
               type="checkbox"
-              checked={selectedIds.size === filteredSessions.length && filteredSessions.length > 0}
+              checked={selectedIds.size === sessions.length && sessions.length > 0}
               onChange={handleSelectAll}
               className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
             />
