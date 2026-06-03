@@ -519,6 +519,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceModels, setMarketplaceModels] = useState<MarketplaceModel[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
+  const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
@@ -603,6 +604,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (id === marketplaceSearchRef.current) {
         setMarketplaceModels(result.models);
         setMarketplaceError(result.warning ?? null);
+        setMarketplaceTotalCount(result.totalCount ?? null);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
@@ -1356,6 +1358,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               hasSearched={marketplaceHasSearched}
               marketplaceLoading={marketplaceLoading}
               marketplaceError={marketplaceError}
+              marketplaceTotalCount={marketplaceTotalCount}
               activePullName={activePullName}
               activePullProgress={activePullProgress}
               pulling={pulling}
@@ -4332,6 +4335,7 @@ function MarketplacePanel({
   hasSearched,
   marketplaceLoading,
   marketplaceError,
+  marketplaceTotalCount,
   activePullName,
   activePullProgress,
   pulling,
@@ -4348,6 +4352,7 @@ function MarketplacePanel({
   hasSearched: boolean;
   marketplaceLoading: boolean;
   marketplaceError: string | null;
+  marketplaceTotalCount: number | null;
   activePullName: string | null;
   activePullProgress?: LlamaCppInstallProgress;
   pulling: boolean;
@@ -4492,7 +4497,29 @@ function MarketplacePanel({
         </form>
       </div>
 
-      {marketplaceError && (
+      {!marketplaceLoading && models.length > 0 && (
+        <div className={`rounded-md border px-3 py-1.5 text-xs ${
+          marketplaceError
+            ? 'border-yellow-400/40 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+            : savedToken
+              ? 'border-green-400/40 bg-green-500/10 text-green-600 dark:text-green-400'
+              : 'border-border bg-surface text-secondary'
+        }`}>
+          <span className="font-medium">
+            {marketplaceError
+              ? i18nService.t('marketplaceSearchStatusLegacy')
+              : savedToken
+                ? i18nService.t('marketplaceSearchStatusOpenApi')
+                : i18nService.t('marketplaceSearchStatusWarning')}
+          </span>
+          {marketplaceTotalCount != null && (
+            <span className="ml-3 opacity-70">
+              {i18nService.t('marketplaceResultCount').replace('{count}', String(marketplaceTotalCount))}
+            </span>
+          )}
+        </div>
+      )}
+      {marketplaceError && models.length === 0 && (
         <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
           {i18nService.t('marketplaceError')}: {marketplaceError}
         </div>
