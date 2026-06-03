@@ -1034,6 +1034,7 @@ export function extractModelScopeRepoFiles(payload: unknown): RepoFile[] {
       undefined;
     if (downloadUrl && result.length === 0) {
       console.log(`[LlamaCpp] found download URL via ${Object.keys(record).filter(k => /url/i.test(k)).join(', ')}`);
+      console.log(`[LlamaCpp] download URL: ${downloadUrl}`);
     }
     result.push({ path: filePath, downloadUrl });
   }
