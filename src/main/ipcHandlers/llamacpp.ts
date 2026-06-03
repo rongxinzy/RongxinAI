@@ -380,11 +380,10 @@ export function registerLlamaCppIpcHandlers(
     const normalizedModelId = modelId.trim();
     const controller = activeInstalls.get(normalizedModelId);
     if (!controller) return { success: true, cancelled: false };
-    broadcast(LlamaCppIpcChannel.InstallProgress, {
-      modelId: normalizedModelId,
-      modelName: normalizedModelId,
-      phase: 'cancelling',
-    });
+    // Let installModel's catch block broadcast the 'cancelled' phase
+    // on abort — no need to send 'cancelling' first, which would cause
+    // a double broadcast (cancelling → cancelled) and an extra
+    // terminal-phase callback in the renderer.
     controller.abort(new Error('Install cancelled'));
     return { success: true, cancelled: true };
   });

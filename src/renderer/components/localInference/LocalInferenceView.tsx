@@ -794,14 +794,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setPullProgress(current => ({ ...current, [name]: progress }));
         if (isInstallTerminalPhase(progress.phase)) {
           scheduleInstallProgressDismiss(name, progress.phase);
-        }
-        if (isInstallTerminalPhase(progress.phase)) {
           void refreshLocalModels().catch(() => undefined);
-          const params = buildMarketplaceSearchParams({
-            query: marketplaceQuery,
-          });
-          if (marketplaceHasSearched && params) {
-            void searchMarketplace(params).catch(() => undefined);
+          // Only re-search on successful install so the model grid
+          // reflects the updated installed status.  Failed / cancelled
+          // installs don't change the search results and would cause an
+          // unnecessary loading flash (setMarketplaceLoading → fetch →
+          // setMarketplaceModels → full grid re-render).
+          if (progress.phase === 'done') {
+            const params = buildMarketplaceSearchParams({ query: marketplaceQuery });
+            if (marketplaceHasSearched && params) {
+              void searchMarketplace(params).catch(() => undefined);
+            }
           }
         }
       }),
