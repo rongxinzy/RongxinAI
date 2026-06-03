@@ -932,6 +932,11 @@ function upsertIniSection(
   return [...lines.slice(0, start), ...rendered, ...lines.slice(end)].join('\n').trimEnd() + '\n';
 }
 
+type RepoFile = {
+  path: string;
+  downloadUrl?: string;
+};
+
 export async function resolveModelScopeInstallRequest(input: LlamaCppInstallModelInput): Promise<{
   filePath: string;
   downloadUrl?: string;
@@ -958,13 +963,13 @@ export async function resolveModelScopeInstallRequest(input: LlamaCppInstallMode
 
   const modelId = input.modelId.trim();
   const files = await fetchModelScopeRepoFiles(modelId, input.revision);
-  const ggufFile = chooseModelScopeInstallFile(files);
-  if (!ggufFile) {
+  const chosen = chooseModelScopeInstallFile(files);
+  if (!chosen) {
     throw new Error(
       `No GGUF files were found in ModelScope model ${modelId}. Use a GGUF repository or specify owner/repo::file.gguf.`,
     );
   }
-  return { filePath: ggufFile };
+  return { filePath: chosen.path, downloadUrl: chosen.downloadUrl };
 }
 
 export function buildModelScopeFileUrl(
@@ -981,7 +986,7 @@ export function buildModelScopeFileUrl(
   return `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo?${params.toString()}`;
 }
 
-async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): Promise<string[]> {
+async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): Promise<RepoFile[]> {
   const [owner, repo] = modelId.split('/');
   if (!owner || !repo) throw new Error('ModelScope model ID must be in owner/repo format.');
   const params = new URLSearchParams({
@@ -998,34 +1003,52 @@ async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): P
     throw new Error(`Failed to read ModelScope model files: HTTP ${response.status}`);
   }
   const payload = await response.json();
-  return extractModelScopeFilePaths(payload);
+  return extractModelScopeRepoFiles(payload);
 }
 
-export function extractModelScopeFilePaths(payload: unknown): string[] {
+export function extractModelScopeRepoFiles(payload: unknown): RepoFile[] {
   const records = extractRecords(payload);
-  const paths = records
-    .map(
-      record =>
-        readRecordString(record.Path) ||
-        readRecordString(record.path) ||
-        readRecordString(record.FilePath) ||
-        readRecordString(record.filePath) ||
-        readRecordString(record.Name) ||
-        readRecordString(record.name),
-    )
-    .filter((value): value is string => Boolean(value));
-  return [...new Set(paths)];
+  const seen = new Set<string>();
+  const result: RepoFile[] = [];
+  for (const record of records) {
+    const filePath =
+      readRecordString(record.Path) ||
+      readRecordString(record.path) ||
+      readRecordString(record.FilePath) ||
+      readRecordString(record.filePath) ||
+      readRecordString(record.Name) ||
+      readRecordString(record.name);
+    if (!filePath || seen.has(filePath)) continue;
+    seen.add(filePath);
+    const downloadUrl =
+      readRecordString(record.DownloadUrl) ||
+      readRecordString(record.downloadUrl) ||
+      readRecordString(record.Url) ||
+      readRecordString(record.url) ||
+      undefined;
+    result.push({ path: filePath, downloadUrl });
+  }
+  return result;
 }
 
-export function chooseModelScopeInstallFile(files: string[]): string | undefined {
-  const ggufFiles = files.filter(file => isGgufPath(file) && !/^mmproj/i.test(path.basename(file)));
+/** @deprecated use extractModelScopeRepoFiles instead */
+export function extractModelScopeFilePaths(payload: unknown): string[] {
+  return extractModelScopeRepoFiles(payload).map(f => f.path);
+}
+
+export function chooseModelScopeInstallFile(files: RepoFile[]): RepoFile | undefined {
+  const ggufFiles = files.filter(
+    f => isGgufPath(f.path) && !/^mmproj/i.test(path.basename(f.path)),
+  );
   if (ggufFiles.length === 0) return undefined;
   const preferred = ['q4_k_m', 'q5_k_m', 'q4_0', 'q8_0'];
   for (const quantization of preferred) {
-    const match = ggufFiles.find(file => path.basename(file).toLowerCase().includes(quantization));
+    const match = ggufFiles.find(f =>
+      path.basename(f.path).toLowerCase().includes(quantization),
+    );
     if (match) return match;
   }
-  return ggufFiles.sort((a, b) => a.localeCompare(b))[0];
+  return ggufFiles.sort((a, b) => a.path.localeCompare(b.path))[0];
 }
 
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
