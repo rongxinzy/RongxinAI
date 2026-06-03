@@ -8,12 +8,12 @@ const STORE_KEY = 'marketplace_modelscope_token';
 
 export function registerMarketplaceIpcHandlers(options: {
   getModelsDir: () => string;
-  getStore: () => { get: (key: string) => unknown; set: (key: string, value: unknown) => void };
+  getStore: () => { get: <T = unknown>(key: string) => T | undefined; set: (key: string, value: unknown) => void };
 }): void {
   // Build token pool: user-configured token (from store) has highest priority,
   // followed by env var / .env / resource file tokens.
   let tokenPool = createModelScopeTokenPool();
-  const userToken = options.getStore().get<string | null>(STORE_KEY);
+  const userToken = options.getStore().get<string>(STORE_KEY);
   if (userToken) {
     // Prepend user token to the pool — it will be tried first.
     const existingTokens = collectExistingTokens(tokenPool);
@@ -34,7 +34,7 @@ export function registerMarketplaceIpcHandlers(options: {
   });
 
   ipcMain.handle(MarketplaceIpcChannel.GetToken, () => {
-    return options.getStore().get<string | null>(STORE_KEY) ?? null;
+    return options.getStore().get<string>(STORE_KEY) ?? null;
   });
 
   ipcMain.handle(MarketplaceIpcChannel.SetToken, (_event, token: string) => {
