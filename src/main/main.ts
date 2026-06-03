@@ -6016,6 +6016,7 @@ if (!gotTheLock) {
     });
     registerMarketplaceIpcHandlers({
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
+      getStore,
     });
     // Inject auth getters for lobsterai-server provider routing
     // The getter proactively triggers a background token refresh when the

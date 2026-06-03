@@ -450,6 +450,8 @@ interface IElectronAPI {
   };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
+    getToken: () => Promise<string | null>;
+    setToken: (token: string) => Promise<void>;
   };
   triage: {
     getConfig: () => Promise<TriageConfig>;

@@ -16,8 +16,10 @@ export function createModelScopeTokenPool(options: {
   env?: NodeJS.ProcessEnv;
   cwd?: string;
   resourcesPath?: string;
+  extraTokens?: string[];
 } = {}): ModelScopeTokenPool {
   const tokens = uniqueTokens([
+    ...(options.extraTokens ?? []),
     ...parseEnvTokens(options.env ?? process.env),
     ...readDotEnvTokens(options.cwd ?? process.cwd()),
     ...readTokenResourceCandidates(options.cwd ?? process.cwd(), options.resourcesPath),

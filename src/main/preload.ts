@@ -195,6 +195,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
   marketplace: {
     search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
+    getToken: () => ipcRenderer.invoke(MarketplaceIpcChannel.GetToken),
+    setToken: (token: string) => ipcRenderer.invoke(MarketplaceIpcChannel.SetToken, token),
   },
 
   triage: {

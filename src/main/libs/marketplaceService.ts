@@ -70,6 +70,10 @@ export class MarketplaceService {
     private readonly options: MarketplaceServiceOptions = {},
   ) {}
 
+  setTokenGetter(getToken: () => string | null): void {
+    this.options.getModelScopeToken = getToken;
+  }
+
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
     try {
       const online = await this.searchOnline(params);

@@ -9,6 +9,8 @@ import {
   ChevronRightIcon,
   CpuChipIcon,
   ExclamationTriangleIcon,
+  EyeIcon,
+  EyeSlashIcon,
   InformationCircleIcon,
   PaperAirplaneIcon,
   PlayIcon,
@@ -42,6 +44,7 @@ import { i18nService } from '../../services/i18n';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import MarkdownContent from '../MarkdownContent';
+import Modal from '../common/Modal';
 import WindowTitleBar from '../window/WindowTitleBar';
 import {
   getRecommendedInferenceOptions,
@@ -4357,6 +4360,46 @@ function MarketplacePanel({
   onCancelPull: () => void;
 }) {
   const [installingModel, setInstallingModel] = useState<string | null>(null);
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenInputVisible, setTokenInputVisible] = useState(false);
+  const [savedToken, setSavedToken] = useState<string | null>(null);
+  const [tokenLoaded, setTokenLoaded] = useState(false);
+
+  // Load saved token on mount (for the badge) and when modal opens (for prefill).
+  useEffect(() => {
+    window.electron.marketplace.getToken().then(t => {
+      setSavedToken(t);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (tokenModalOpen && !tokenLoaded) {
+      window.electron.marketplace.getToken().then(t => {
+        setSavedToken(t);
+        setTokenInput(t ?? '');
+        setTokenLoaded(true);
+      }).catch(() => setTokenLoaded(true));
+    }
+    if (!tokenModalOpen) {
+      setTokenLoaded(false);
+      setTokenInputVisible(false);
+    }
+  }, [tokenModalOpen, tokenLoaded]);
+
+  const handleSaveToken = async () => {
+    const trimmed = tokenInput.trim();
+    await window.electron.marketplace.setToken(trimmed);
+    setSavedToken(trimmed || null);
+    setTokenModalOpen(false);
+  };
+
+  const handleClearToken = async () => {
+    setTokenInput('');
+    await window.electron.marketplace.setToken('');
+    setSavedToken(null);
+    setTokenModalOpen(false);
+  };
+
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(models.length / MARKETPLACE_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -4393,9 +4436,26 @@ function MarketplacePanel({
       <div className={`${hasSearched ? 'flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between' : 'flex min-h-[420px] flex-col items-center justify-center gap-8'}`}>
         <div className={`${hasSearched ? 'space-y-3' : 'w-full max-w-3xl space-y-3 text-center'}`}>
           <div>
-            <h2 className={`${hasSearched ? 'text-base font-semibold text-foreground' : 'text-2xl font-semibold text-foreground'}`}>
-              {i18nService.t('marketplaceTitle')}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className={`${hasSearched ? 'text-base font-semibold text-foreground' : 'text-2xl font-semibold text-foreground'}`}>
+                {i18nService.t('marketplaceTitle')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setTokenModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  savedToken
+                    ? 'border border-green-400/30 bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400'
+                    : 'border border-border bg-surface text-secondary hover:text-foreground hover:border-primary/40'
+                }`}
+                title={savedToken ? i18nService.t('marketplaceTokenConfigured') : i18nService.t('marketplaceTokenNotConfigured')}
+              >
+                <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+                {savedToken
+                  ? i18nService.t('marketplaceTokenConfigured')
+                  : i18nService.t('marketplaceTokenSettings')}
+              </button>
+            </div>
             {hasSearched && (
               <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
             )}
@@ -4590,6 +4650,91 @@ function MarketplacePanel({
           )}
         </div>
       )}
+
+      {/* Token config modal */}
+      <Modal
+        isOpen={tokenModalOpen}
+        onClose={() => setTokenModalOpen(false)}
+        overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+        className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-foreground">
+              {i18nService.t('marketplaceTokenSettingsTitle')}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setTokenModalOpen(false)}
+              className="rounded-md p-1 text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="text-sm text-secondary leading-relaxed">
+            {i18nService.t('marketplaceTokenSettingsDesc')}
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold tracking-wide text-secondary">
+              ModelScope API Token
+            </label>
+            <div className="relative">
+              <input
+                type={tokenInputVisible ? 'text' : 'password'}
+                value={tokenInput}
+                onChange={e => setTokenInput(e.target.value)}
+                placeholder={i18nService.t('marketplaceTokenPlaceholder')}
+                className="w-full rounded-xl bg-surface-inset px-3 py-2 pr-16 text-sm text-foreground placeholder:text-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <div className="absolute right-2 inset-y-0 flex items-center gap-1">
+                {tokenInput && (
+                  <button
+                    type="button"
+                    onClick={() => setTokenInput('')}
+                    className="rounded p-0.5 text-secondary hover:text-primary transition-colors"
+                    title={i18nService.t('marketplaceTokenClear')}
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setTokenInputVisible(v => !v)}
+                  className="rounded p-0.5 text-secondary hover:text-primary transition-colors"
+                >
+                  {tokenInputVisible ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={handleClearToken}
+              disabled={!savedToken}
+              className="rounded-lg px-3 py-2 text-xs font-medium text-secondary hover:text-red-500 border border-border hover:border-red-400/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {i18nService.t('marketplaceTokenClear')}
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTokenModalOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+              >
+                {i18nService.t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveToken()}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-white hover:bg-primary-hover transition-colors"
+              >
+                {i18nService.t('marketplaceTokenSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
