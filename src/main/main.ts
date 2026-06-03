@@ -1432,17 +1432,19 @@ const doSyncOpenClawConfig = async (
   if (!needsHardRestart) {
     console.log(`${D()} ──── NO RESTART, hot-reload only. reason=${options.reason}`);
 
-    // Push config via RPC for faster hot-reload than waiting for chokidar.
-    if (syncResult.changed && openClawRuntimeAdapter) {
-      try {
-        const rawConfig = fs.readFileSync(getOpenClawEngineManager().getConfigPath(), 'utf8');
-        if (rawConfig) {
-          openClawRuntimeAdapter.applyConfig(rawConfig, options.reason).catch((err) => {
-            console.warn(`${D()} config.apply RPC failed (non-fatal):`, (err as Error)?.message || err);
-          });
-        }
-      } catch { /* file may not exist yet */ }
-    }
+    // NOTE: We intentionally do NOT push config via the config.apply RPC here.
+    // The chokidar file watcher inside the gateway process picks up the new
+    // openclaw.json within ~200ms and applies a targeted hot-reload for
+    // skills/plugins/channels — the same outcome without the side effects.
+    //
+    // The config.apply RPC causes the gateway to resolve ${ENV_VAR}
+    // placeholders (provider apiKeys, gateway auth token, plugin secrets)
+    // into plaintext and write them back to openclaw.json.  Chokidar then
+    // detects the write-back as a SECOND file change, compares the resolved
+    // values against the in-memory config snapshot, and spuriously decides
+    // that gateway.auth.token / plugin secrets have changed — triggering an
+    // unnecessary 16-second hard restart for what should be a 200ms hot-reload
+    // (e.g. toggling a skill on/off).
 
     return {
       success: true,
