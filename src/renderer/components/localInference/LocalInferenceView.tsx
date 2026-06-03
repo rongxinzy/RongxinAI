@@ -3120,12 +3120,11 @@ function InferencePanel({
     if (nextHeight <= 0) return;
     setChatViewportHeight(current => (current === nextHeight ? current : nextHeight));
   }, []);
-  const measureLatestTurnTailSpacer = useCallback(() => {
+  const calculateLatestTurnTailSpacer = useCallback(() => {
     const container = chatScrollRef.current;
     const latestTurnStart = latestTurnStartRef.current;
     if (!container || !latestTurnStart || messages.length === 0) {
-      setLatestTurnTailSpacer(current => (current === 0 ? current : 0));
-      return;
+      return 0;
     }
     const effectiveScrollHeight = getEffectiveChatScrollHeight(
       container.scrollHeight,
@@ -3140,20 +3139,48 @@ function InferencePanel({
       effectiveScrollHeight,
       targetScrollTop,
     );
-    const nextSpacer = getLatestTurnTailSpacer(chatViewportHeight, contentHeightFromLatestTurn);
-    setLatestTurnTailSpacer(current => (current === nextSpacer ? current : nextSpacer));
+    return getLatestTurnTailSpacer(chatViewportHeight, contentHeightFromLatestTurn);
   }, [chatViewportHeight, latestTurnTailSpacer, messages.length]);
+  const applyLatestTurnTailSpacer = useCallback(() => {
+    const nextSpacer = calculateLatestTurnTailSpacer();
+    setLatestTurnTailSpacer(current => {
+      const stableSpacer = getStableLatestTurnTailSpacer({
+        currentSpacer: current,
+        nextSpacer,
+        sending,
+      });
+      return current === stableSpacer ? current : stableSpacer;
+    });
+  }, [calculateLatestTurnTailSpacer, sending]);
+  const ensureLatestTurnTailSpacerReady = useCallback(() => {
+    const nextSpacer = calculateLatestTurnTailSpacer();
+    const stableSpacer = getStableLatestTurnTailSpacer({
+      currentSpacer: latestTurnTailSpacer,
+      nextSpacer,
+      sending,
+    });
+    if (stableSpacer === latestTurnTailSpacer) return true;
+    setLatestTurnTailSpacer(stableSpacer);
+    return false;
+  }, [calculateLatestTurnTailSpacer, latestTurnTailSpacer, sending]);
 
   useEffect(() => {
     if (!sending) return;
     if (!pendingLatestTurnAlignRef.current) return;
     if (latestTurnScrollTargetIndexRef.current !== messages.length) return;
+    if (!ensureLatestTurnTailSpacerReady()) return;
     const frame = window.requestAnimationFrame(() => {
       scrollLatestTurnStartIntoView('auto');
       pendingLatestTurnAlignRef.current = false;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages.length, scrollLatestTurnStartIntoView, sending]);
+  }, [
+    ensureLatestTurnTailSpacerReady,
+    latestTurnTailSpacer,
+    messages.length,
+    scrollLatestTurnStartIntoView,
+    sending,
+  ]);
 
   useEffect(() => {
     syncScrollIndicators();
@@ -3161,20 +3188,21 @@ function InferencePanel({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      measureLatestTurnTailSpacer();
+      applyLatestTurnTailSpacer();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [measureLatestTurnTailSpacer, messages.length, sending, streamingText, streamingThinking]);
+  }, [applyLatestTurnTailSpacer, messages.length, sending, streamingText, streamingThinking]);
 
   useEffect(() => {
     if (!sending) return;
     if (pendingLatestTurnAlignRef.current) return;
     if (!lockLatestTurnAnchorRef.current) return;
+    if (!shouldLockLatestTurnAnchorDuringStream(streamingText)) return;
     const frame = window.requestAnimationFrame(() => {
       scrollLatestTurnStartIntoView('auto');
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [scrollLatestTurnStartIntoView, sending, streamingText, streamingThinking]);
+  }, [scrollLatestTurnStartIntoView, sending, streamingText]);
 
   useEffect(() => {
     if (!sending || pendingLatestTurnAlignRef.current || !autoFollowStreamRef.current) return;
@@ -4290,6 +4318,19 @@ function getEffectiveChatScrollHeight(scrollHeight: number, tailSpacer: number):
   return Math.max(0, scrollHeight - tailSpacer);
 }
 
+function getStableLatestTurnTailSpacer({
+  currentSpacer,
+  nextSpacer,
+  sending,
+}: {
+  currentSpacer: number;
+  nextSpacer: number;
+  sending: boolean;
+}): number {
+  if (!sending) return nextSpacer;
+  return Math.max(currentSpacer, nextSpacer);
+}
+
 function buildAssistantMessage({
   content,
   thinking,
@@ -4334,6 +4375,10 @@ function findLatestUserMessageIndex(messages: InferenceMessage[]): number {
     if (messages[index]?.role === 'user') return index;
   }
   return -1;
+}
+
+function shouldLockLatestTurnAnchorDuringStream(streamingText: string): boolean {
+  return Boolean(streamingText.trim());
 }
 
 function buildEffectiveSystemPrompt(
@@ -4887,6 +4932,11 @@ export const __test__getEffectiveChatScrollHeight = (scrollHeight: number, tailS
   getEffectiveChatScrollHeight(scrollHeight, tailSpacer);
 export const __test__findLatestUserMessageIndex = (messages: InferenceMessage[]) =>
   findLatestUserMessageIndex(messages);
+export const __test__shouldLockLatestTurnAnchorDuringStream = (streamingText: string) =>
+  shouldLockLatestTurnAnchorDuringStream(streamingText);
+export const __test__getStableLatestTurnTailSpacer = (
+  input: Parameters<typeof getStableLatestTurnTailSpacer>[0],
+) => getStableLatestTurnTailSpacer(input);
 export const __test__getLaunchContextLimitMessage = (input: {
   requestedContextLength?: number;
   trainedContextLength?: number;

@@ -518,6 +518,16 @@ test('composer height maps to safe chat padding and jump button offset', async (
   const findLatestUserMessageIndex = (module as unknown as {
     __test__findLatestUserMessageIndex?: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) => number;
   }).__test__findLatestUserMessageIndex;
+  const shouldLockLatestTurnAnchorDuringStream = (module as unknown as {
+    __test__shouldLockLatestTurnAnchorDuringStream?: (streamingText: string) => boolean;
+  }).__test__shouldLockLatestTurnAnchorDuringStream;
+  const getStableLatestTurnTailSpacer = (module as unknown as {
+    __test__getStableLatestTurnTailSpacer?: (input: {
+      currentSpacer: number;
+      nextSpacer: number;
+      sending: boolean;
+    }) => number;
+  }).__test__getStableLatestTurnTailSpacer;
 
   expect(typeof getChatBottomPadding).toBe('function');
   expect(typeof getJumpToBottomOffset).toBe('function');
@@ -525,12 +535,16 @@ test('composer height maps to safe chat padding and jump button offset', async (
   expect(typeof getLatestTurnTailSpacer).toBe('function');
   expect(typeof getEffectiveChatScrollHeight).toBe('function');
   expect(typeof findLatestUserMessageIndex).toBe('function');
+  expect(typeof shouldLockLatestTurnAnchorDuringStream).toBe('function');
+  expect(typeof getStableLatestTurnTailSpacer).toBe('function');
   if (!getChatBottomPadding) return;
   if (!getJumpToBottomOffset) return;
   if (!getLatestTurnContentHeight) return;
   if (!getLatestTurnTailSpacer) return;
   if (!getEffectiveChatScrollHeight) return;
   if (!findLatestUserMessageIndex) return;
+  if (!shouldLockLatestTurnAnchorDuringStream) return;
+  if (!getStableLatestTurnTailSpacer) return;
 
   expect(getChatBottomPadding(48)).toBe(120);
   expect(getChatBottomPadding(136)).toBe(156);
@@ -550,6 +564,23 @@ test('composer height maps to safe chat padding and jump button offset', async (
     { role: 'assistant', content: 'final' },
   ])).toBe(2);
   expect(findLatestUserMessageIndex([{ role: 'assistant', content: 'reply' }])).toBe(-1);
+  expect(shouldLockLatestTurnAnchorDuringStream('')).toBe(false);
+  expect(shouldLockLatestTurnAnchorDuringStream('final answer')).toBe(true);
+  expect(getStableLatestTurnTailSpacer({
+    currentSpacer: 480,
+    nextSpacer: 320,
+    sending: true,
+  })).toBe(480);
+  expect(getStableLatestTurnTailSpacer({
+    currentSpacer: 320,
+    nextSpacer: 480,
+    sending: true,
+  })).toBe(480);
+  expect(getStableLatestTurnTailSpacer({
+    currentSpacer: 480,
+    nextSpacer: 0,
+    sending: false,
+  })).toBe(0);
 });
 
 test('local inference transient notices auto-dismiss within five seconds', async () => {
