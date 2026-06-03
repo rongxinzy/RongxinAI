@@ -29,7 +29,7 @@ lint:
   stage: lint
   before_script:
     - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
-    - npm install --prefer-offline --no-audit
+    - npm install --prefer-offline --no-audit --ignore-scripts
   variables:
     GIT_DEPTH: 0
   script:
@@ -59,7 +59,9 @@ lint:
 
 build-renderer:
   stage: build
-  needs: [lint]
+  needs:
+    - job: lint
+      optional: true
   variables:
     NODE_OPTIONS: '--max-old-space-size=8192'
   script:
@@ -77,9 +79,11 @@ build-renderer:
 
 build-main:
   stage: build
-  needs: [lint]
+  needs:
+    - job: lint
+      optional: true
   script:
-    - npm run compile:electron
+    - npx --no-install tsc --project electron-tsconfig.json
     - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
     - test -n "$(find dist-electron -name "main.js" -o -name "preload.js")"
   artifacts:
