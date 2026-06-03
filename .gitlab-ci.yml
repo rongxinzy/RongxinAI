@@ -59,7 +59,9 @@ lint:
 
 build-renderer:
   stage: build
-  needs: [lint]
+  needs:
+    - job: lint
+      optional: true
   variables:
     NODE_OPTIONS: '--max-old-space-size=8192'
   script:
@@ -77,7 +79,9 @@ build-renderer:
 
 build-main:
   stage: build
-  needs: [lint]
+  needs:
+    - job: lint
+      optional: true
   script:
     - npm run compile:electron
     - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
