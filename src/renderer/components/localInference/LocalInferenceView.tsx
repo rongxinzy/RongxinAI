@@ -701,6 +701,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         });
         if (!result.success) return;
         await refreshLocalModels();
+        setMarketplaceModels(prev =>
+          prev.map(m => (m.repoId === name ? { ...m, installed: true } : m)),
+        );
         showToast(
           i18nService.t('marketplacePullDone').replace('{name}', name),
           LocalInferenceToastKind.Success,
@@ -795,16 +798,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         if (isInstallTerminalPhase(progress.phase)) {
           scheduleInstallProgressDismiss(name, progress.phase);
           void refreshLocalModels().catch(() => undefined);
-          // Only re-search on successful install so the model grid
-          // reflects the updated installed status.  Failed / cancelled
-          // installs don't change the search results and would cause an
-          // unnecessary loading flash (setMarketplaceLoading → fetch →
-          // setMarketplaceModels → full grid re-render).
           if (progress.phase === 'done') {
             const params = buildMarketplaceSearchParams({ query: marketplaceQuery });
             if (marketplaceHasSearched && params) {
               void searchMarketplace(params).catch(() => undefined);
             }
+            setMarketplaceModels(prev =>
+              prev.map(m => (m.repoId === name ? { ...m, installed: true } : m)),
+            );
           }
         }
       }),
@@ -1107,6 +1108,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       await window.electron.llamacpp.deleteModel(modelName);
       await refreshLocalModels();
       await refreshRunningModels();
+      setMarketplaceModels(prev =>
+        prev.map(m => {
+          const repoName = m.repoId.split('/').pop();
+          return repoName === modelName ? { ...m, installed: false } : m;
+        }),
+      );
       notifyLlamaCppRunningModelsChanged();
     });
   };
@@ -1312,6 +1319,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               loading={loading}
               localModels={localModels}
               runningModels={runningModels}
+              installProgress={pullProgress}
               onToggle={() => setServicePopoverOpen(current => !current)}
               onPrepare={handlePrepare}
               onStop={handleStop}
@@ -1365,16 +1373,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               marketplaceLoading={marketplaceLoading}
               marketplaceError={marketplaceError}
               marketplaceTotalCount={marketplaceTotalCount}
-              activePullName={activePullName}
-              activePullProgress={activePullProgress}
-              pulling={pulling}
               query={marketplaceQuery}
               installedModelPathMap={installedModelPathMap}
               installProgress={pullProgress}
               onQueryChange={setMarketplaceQuery}
               onSearch={handleMarketplaceSearch}
               onInstall={handleMarketplaceInstall}
-              onCancelPull={handleCancelPull}
             />
           ) : (
             <div className="min-h-[520px] flex-1">
@@ -1553,6 +1557,7 @@ function ServicePopover({
   loading,
   localModels,
   runningModels,
+  installProgress,
   onToggle,
   onPrepare,
   onStop,
@@ -1568,6 +1573,7 @@ function ServicePopover({
   loading: boolean;
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
+  installProgress: InstallProgressState;
   onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
@@ -1593,6 +1599,12 @@ function ServicePopover({
     status?.status === 'not-installed'
       ? i18nService.t('localInferenceInstall')
       : i18nService.t('localInferenceStart');
+  const [downloadsExpanded, setDownloadsExpanded] = useState(false);
+  const downloadEntries = useMemo(
+    () => Object.entries(installProgress).filter(([, p]) => isPullInProgress(p)),
+    [installProgress],
+  );
+  const downloadCount = downloadEntries.length;
   return (
     <div ref={containerRef} className="relative shrink-0 self-end sm:self-auto">
       <button
@@ -1633,7 +1645,7 @@ function ServicePopover({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className={`mt-3 grid gap-2 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
               <p className="text-[11px] text-secondary">
                 {i18nService.t('localInferenceTabModels')}
@@ -1644,7 +1656,48 @@ function ServicePopover({
               <p className="text-[11px] text-secondary">{i18nService.t('localInferenceLoaded')}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">{runningModels.length}</p>
             </div>
+            {downloadCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setDownloadsExpanded(v => !v)}
+                className="rounded-lg border border-border bg-surface/70 px-3 py-2 text-left transition-colors hover:bg-surface"
+              >
+                <p className="text-[11px] text-secondary">
+                  {i18nService.t('localInferenceActiveDownloads')}
+                </p>
+                <div className="mt-1 flex items-center gap-1">
+                  <p className="text-lg font-semibold text-foreground">{downloadCount}</p>
+                  <ChevronRightIcon className={`h-3.5 w-3.5 text-secondary transition-transform ${downloadsExpanded ? 'rotate-90' : ''}`} />
+                </div>
+              </button>
+            )}
           </div>
+
+          {downloadCount > 0 && downloadsExpanded && (
+            <div className="mt-2 space-y-2 border-t border-border pt-2">
+              {downloadEntries.map(([name, progress]) => (
+                <div
+                  key={name}
+                  className="rounded-lg border border-border bg-surface/70 px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-secondary">
+                    <span className="font-mono text-foreground text-[12px]">{name}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{formatPullProgress(progress)}</span>
+                      <button
+                        type="button"
+                        onClick={() => void window.electron.llamacpp.cancelInstall(name)}
+                        className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] text-secondary hover:bg-surface-raised hover:text-red-500"
+                      >
+                        <XMarkIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <InstallProgressBar progress={progress} className="mt-1" />
+                </div>
+              ))}
+            </div>
+          )}
 
           {running && !managedByApp && (
             <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
@@ -2130,8 +2183,8 @@ function ModelsPanel({
   localModels,
   runningModels,
   pullName,
-  activePullName,
-  activePullProgress,
+  activePullName: _activePullName,
+  activePullProgress: _activePullProgress,
   pulling,
   onPullNameChange,
   onPull,
@@ -2195,15 +2248,6 @@ function ModelsPanel({
             </button>
           )}
         </div>
-        {activePullName && activePullProgress && (
-          <div className="mt-3 rounded-md border border-border bg-surface-raised px-3 py-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-              <span className="font-mono text-foreground">{activePullName}</span>
-              <span>{formatPullProgress(activePullProgress)}</span>
-            </div>
-            <InstallProgressBar progress={activePullProgress} className="mt-2" />
-          </div>
-        )}
       </section>
 
       <section className="space-y-3">
@@ -4342,16 +4386,12 @@ function MarketplacePanel({
   marketplaceLoading,
   marketplaceError,
   marketplaceTotalCount,
-  activePullName,
-  activePullProgress,
-  pulling,
   query,
   installedModelPathMap,
   installProgress,
   onQueryChange,
   onSearch,
   onInstall,
-  onCancelPull,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -4359,25 +4399,20 @@ function MarketplacePanel({
   marketplaceLoading: boolean;
   marketplaceError: string | null;
   marketplaceTotalCount: number | null;
-  activePullName: string | null;
-  activePullProgress?: LlamaCppInstallProgress;
-  pulling: boolean;
   query: string;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
   onQueryChange: (v: string) => void;
   onSearch: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
-  onCancelPull: () => void;
 }) {
-  const [installingModel, setInstallingModel] = useState<string | null>(null);
+  const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenInputVisible, setTokenInputVisible] = useState(false);
   const [savedToken, setSavedToken] = useState<string | null>(null);
   const [tokenLoaded, setTokenLoaded] = useState(false);
 
-  // Load saved token on mount (for the badge) and when modal opens (for prefill).
   useEffect(() => {
     window.electron.marketplace.getToken().then(t => {
       setSavedToken(t);
@@ -4410,7 +4445,6 @@ function MarketplacePanel({
     setSavedToken(null);
     setTokenModalOpen(false);
   };
-
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(models.length / MARKETPLACE_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -4431,11 +4465,15 @@ function MarketplacePanel({
   }, [page, pageCount]);
 
   const handleInstall = async (model: MarketplaceModel) => {
-    setInstallingModel(model.id);
+    setInstallingModelIds(prev => new Set(prev).add(model.id));
     try {
       await onInstall(model);
     } finally {
-      setInstallingModel(null);
+      setInstallingModelIds(prev => {
+        const next = new Set(prev);
+        next.delete(model.id);
+        return next;
+      });
     }
   };
   const handleNextPage = async () => {
@@ -4537,24 +4575,6 @@ function MarketplacePanel({
         </div>
       )}
 
-      {activePullName && activePullProgress && (
-        <div className="rounded-lg border border-border bg-surface px-3 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-            <div className="min-w-0">
-              <span className="font-mono text-foreground">{activePullName}</span>
-              <span className="ml-2">{formatPullProgress(activePullProgress)}</span>
-            </div>
-            {pulling && (
-              <button type="button" onClick={onCancelPull} className={smallOutlineButtonClass}>
-                <StopIcon className="h-3.5 w-3.5" />
-                {i18nService.t('localInferenceCancelPull')}
-              </button>
-            )}
-          </div>
-          <InstallProgressBar progress={activePullProgress} className="mt-2" />
-        </div>
-      )}
-
       {marketplaceLoading ? (
         <div className="flex min-h-[620px] items-center justify-center text-sm text-secondary">
           <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
@@ -4571,7 +4591,7 @@ function MarketplacePanel({
                 ? installedModelPathMap.get(model.installedPath)
                 : undefined;
               const installed = model.installed || Boolean(installedModelName);
-              const installing = installingModel === model.id || isPullInProgress(progress);
+              const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
               return (
                 <div
                   key={model.id}
@@ -4640,8 +4660,7 @@ function MarketplacePanel({
                       {installed ? null : installing ? (
                         <button
                           type="button"
-                          onClick={onCancelPull}
-                          disabled={!pulling}
+                          onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
                           className={smallOutlineButtonClass}
                         >
                           <StopIcon className="h-3.5 w-3.5" />
