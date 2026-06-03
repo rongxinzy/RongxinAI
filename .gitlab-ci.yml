@@ -17,6 +17,7 @@ stages:
   - lint
   - build
   - test
+  - build-platforms
 
 variables:
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -117,3 +118,29 @@ test:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
+
+# ═══════════════════════════════════════════════════════
+# Stage 4: 平台打包（自托管 Runner）
+# ═══════════════════════════════════════════════════════
+
+build-windows:
+  stage: build-platforms
+  tags:
+    - windows
+  image: null
+  before_script: []
+  script:
+    - npm ci
+    - npm run setup:python-runtime
+    - npm run dist:win
+    - |
+      echo "Build output:"
+      dir release\*.exe
+  artifacts:
+    paths:
+      - release/*.exe
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
