@@ -29,7 +29,7 @@ lint:
   stage: lint
   before_script:
     - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
-    - npm install --prefer-offline --no-audit
+    - npm install --prefer-offline --no-audit --ignore-scripts
   variables:
     GIT_DEPTH: 0
   script:
