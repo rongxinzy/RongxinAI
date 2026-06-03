@@ -8,7 +8,6 @@ import {
   buildLlamaCppExecutableCandidates,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
-  extractModelScopeRepoFiles,
   isPathInside,
   LlamaCppManager,
   mergeLocalModels,
@@ -272,40 +271,20 @@ test('extractModelScopeFilePaths reads nested ModelScope repo file payloads', ()
   ]);
 });
 
-test('extractModelScopeRepoFiles extracts download URLs from ModelScope response', () => {
-  expect(extractModelScopeRepoFiles({
-    Data: {
-      Files: [
-        { Path: 'README.md' },
-        { Path: 'model-q4_k_m.gguf', DownloadUrl: 'https://oss.model-scope.cn/abc123.gguf' },
-        { Name: 'model-q8_0.gguf', Url: 'https://oss.model-scope.cn/def456.gguf' },
-      ],
-    },
-  })).toEqual([
-    { path: 'README.md', downloadUrl: undefined },
-    { path: 'model-q4_k_m.gguf', downloadUrl: 'https://oss.model-scope.cn/abc123.gguf' },
-    { path: 'model-q8_0.gguf', downloadUrl: 'https://oss.model-scope.cn/def456.gguf' },
-  ]);
-});
-
-function toRepoFile(p: string): { path: string; downloadUrl?: string } {
-  return { path: p };
-}
-
 test('chooseModelScopeInstallFile prefers a normal Q4_K_M GGUF model file', () => {
   expect(chooseModelScopeInstallFile([
-    toRepoFile('README.md'),
-    toRepoFile('mmproj-model-f16.gguf'),
-    toRepoFile('qwen3-8b-q8_0.gguf'),
-    toRepoFile('qwen3-8b-q4_k_m.gguf'),
-  ])).toEqual({ path: 'qwen3-8b-q4_k_m.gguf', downloadUrl: undefined });
+    'README.md',
+    'mmproj-model-f16.gguf',
+    'qwen3-8b-q8_0.gguf',
+    'qwen3-8b-q4_k_m.gguf',
+  ])).toBe('qwen3-8b-q4_k_m.gguf');
 });
 
 test('chooseModelScopeInstallFile rejects repositories without GGUF model files', () => {
   expect(chooseModelScopeInstallFile([
-    toRepoFile('config.json'),
-    toRepoFile('model.safetensors'),
-    toRepoFile('tokenizer.json'),
+    'config.json',
+    'model.safetensors',
+    'tokenizer.json',
   ])).toBeUndefined();
 });
 
