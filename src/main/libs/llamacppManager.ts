@@ -1023,18 +1023,9 @@ export function extractModelScopeRepoFiles(payload: unknown): RepoFile[] {
     const downloadUrl =
       readRecordString(record.DownloadUrl) ||
       readRecordString(record.downloadUrl) ||
-      readRecordString(record.download_url) ||
       readRecordString(record.Url) ||
       readRecordString(record.url) ||
-      readRecordString(record.FileUrl) ||
-      readRecordString(record.fileUrl) ||
-      readRecordString(record.OssUrl) ||
-      readRecordString(record.ossUrl) ||
-      readRecordString(record.oss_url) ||
       undefined;
-    if (downloadUrl && result.length === 0) {
-      console.log(`[LlamaCpp] found download URL via ${Object.keys(record).filter(k => /url/i.test(k)).join(', ')}`);
-    }
     result.push({ path: filePath, downloadUrl });
   }
   return result;
