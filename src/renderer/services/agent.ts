@@ -109,6 +109,13 @@ class AgentService {
             skillIds: agent.skillIds ?? [],
           },
         }));
+        // If the edited agent is the currently active one, sync skillIds
+        // to the runtime skill slice so new conversations pick up changes
+        // immediately (switchAgent handles this on explicit switch, but
+        // in-place editing without switching was missing the sync).
+        if (id === store.getState().agent.currentAgentId) {
+          store.dispatch(setActiveSkillIds(agent.skillIds ?? []));
+        }
         return agent;
       }
       return null;
