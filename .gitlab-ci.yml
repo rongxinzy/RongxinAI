@@ -83,7 +83,7 @@ build-main:
     - job: lint
       optional: true
   script:
-    - npm run compile:electron
+    - npx --no-install tsc --project electron-tsconfig.json
     - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
     - test -n "$(find dist-electron -name "main.js" -o -name "preload.js")"
   artifacts:
