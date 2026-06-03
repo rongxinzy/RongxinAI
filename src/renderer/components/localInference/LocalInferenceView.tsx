@@ -815,11 +815,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     };
   }, [
     clearInstallProgressDismissTimer,
+    marketplaceHasSearched,
+    marketplaceQuery,
     refreshLocalModels,
     refreshRunningModels,
     refreshStatus,
     runAction,
     scheduleInstallProgressDismiss,
+    searchMarketplace,
   ]);
 
   const handleSaveServiceConfig = useCallback(
