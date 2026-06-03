@@ -1224,7 +1224,10 @@ async function downloadFile(
     const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
     const response = await fetch(url, {
       signal,
-      ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
+      headers: {
+        'User-Agent': 'RongxinAI/modelscope-gguf-installer',
+        ...(resumeFrom > 0 ? { Range: `bytes=${resumeFrom}-` } : {}),
+      },
     });
     if (!response.ok || !response.body) {
       throw new Error(`Model download failed: HTTP ${response.status}`);
