@@ -127,6 +127,7 @@ export class MarketplaceService {
     if (searchResults && searchResults.length > 0) {
       return {
         models: annotateInstalledModels(filterMarketplaceModels(searchResults, params), installed),
+        totalCount: searchResults.length,
         warning: openApiWarning,
       };
     }
@@ -139,6 +140,7 @@ export class MarketplaceService {
     });
     return {
       models: annotateInstalledModels(filterMarketplaceModels(libraryResults, params), installed),
+      totalCount: libraryResults.length,
       warning: openApiWarning,
     };
   }
