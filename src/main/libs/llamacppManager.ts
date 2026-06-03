@@ -1032,9 +1032,12 @@ export function extractModelScopeRepoFiles(payload: unknown): RepoFile[] {
       readRecordString(record.ossUrl) ||
       readRecordString(record.oss_url) ||
       undefined;
-    if (downloadUrl && result.length === 0) {
-      console.log(`[LlamaCpp] found download URL via ${Object.keys(record).filter(k => /url/i.test(k)).join(', ')}`);
-      console.log(`[LlamaCpp] download URL: ${downloadUrl}`);
+    if (result.length === 0) {
+      if (downloadUrl) {
+        console.log(`[LlamaCpp] download URL: ${downloadUrl}`);
+      } else {
+        console.log(`[LlamaCpp] NO download URL found. Record keys:`, Object.keys(record).join(', '));
+      }
     }
     result.push({ path: filePath, downloadUrl });
   }
