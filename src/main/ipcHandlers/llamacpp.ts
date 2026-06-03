@@ -7,7 +7,6 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelUnloadResult,
-  LlamaCppRuntimeImportResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -15,13 +14,13 @@ import { getLlamaCppLaunchContextLimitViolation, LlamaCppIpcChannel } from '../.
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
-import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import {
-  buildLlamaCppRunningModelBinding,
   buildLlamaCppOpenClawAppConfig,
+  buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
 } from '../libs/llamacppOpenClawBinding';
+import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
