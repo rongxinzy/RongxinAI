@@ -88,6 +88,8 @@ function nowDefaults() {
   };
 }
 
+const TASK_NAME_MAX_LENGTH = 200;
+
 const DEFAULT_FORM_STATE: FormState = {
   name: '',
   description: '',
@@ -1246,7 +1248,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           <input
             type="text"
             value={form.name}
-            onChange={event => updateForm({ name: event.target.value })}
+            onChange={event => updateForm({ name: event.target.value.slice(0, TASK_NAME_MAX_LENGTH) })}
+            maxLength={TASK_NAME_MAX_LENGTH}
             className={inputClass}
             placeholder={i18nService.t('scheduledTasksFormNamePlaceholder')}
           />
