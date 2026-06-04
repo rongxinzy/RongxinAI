@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import {
   getRequiredVramRecoveryMiB,
   getTotalFreeVramMiB,
@@ -22,6 +23,8 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     threads: '8',
     batchSize: '256',
     ubatchSize: '64',
+    runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
     device: ' 0,1 ',
     mainGpu: '-1',
     splitMode: 'layer',
@@ -40,12 +43,21 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     threads: '8',
     batchSize: '256',
     ubatchSize: '64',
+    runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
     device: '0,1',
     splitMode: 'layer',
     tensorSplit: '3,2',
     reasoning: 'on',
     chatTemplate: 'chatml',
   });
+});
+
+test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,
+    runtimeCudaMajor: '11' as unknown as LlamaCppRuntimeCudaMajor,
+  })).toEqual({});
 });
 
 test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw model selection', () => {
