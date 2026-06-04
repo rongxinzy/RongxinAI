@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, execSync } from 'child_process';
 import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { app } from 'electron';
 import { EventEmitter } from 'events';
@@ -252,10 +252,11 @@ export class LlamaCppManager extends EventEmitter {
     const targetExecutable = path.join(targetBinDir, executableName);
 
     try {
-      // Stop the running process if it's managed by us
-      if (this.process && this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
-        await this.stop();
-      }
+      // Stop any llama.cpp process on the configured port, regardless of
+      // whether it was started by this app instance (this.process may be
+      // null after a restart even though the old process is still alive).
+      await this.stop();
+      await killByPort(this.getServiceConfig());
 
       // Clear existing runtime and copy the user's files
       fs.rmSync(currentRuntimeRoot, { recursive: true, force: true });
@@ -1294,4 +1295,36 @@ function parseContentRangeTotal(value: string | null): number | undefined {
   if (!match) return undefined;
   const total = Number(match[1]);
   return Number.isFinite(total) ? total : undefined;
+}
+
+/**
+ * Force-kill any process listening on the configured llama.cpp port.
+ * Used before importing a new runtime to ensure no stale server holds
+ * the port (this.process may be null after an app restart).
+ */
+async function killByPort(config: { port?: string }): Promise<void> {
+  const port = config.port || DEFAULT_PORT;
+  try {
+    if (process.platform === 'win32') {
+      const stdout = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf-8', timeout: 5000 });
+      const pids = new Set<string>();
+      for (const line of stdout.split(/\r?\n/)) {
+        const match = line.trim().match(/(\d+)\s*$/);
+        if (match && match[1] !== '0') pids.add(match[1]);
+      }
+      for (const pid of pids) {
+        try { execSync(`taskkill /F /PID ${pid}`, { timeout: 5000 }); } catch { /* ignore */ }
+      }
+    } else {
+      try {
+        const stdout = execSync(`lsof -ti :${port}`, { encoding: 'utf-8', timeout: 5000 });
+        const pids = new Set(stdout.trim().split(/\s+/).filter(Boolean));
+        for (const pid of pids) {
+          try { execSync(`kill -9 ${pid}`, { timeout: 5000 }); } catch { /* ignore */ }
+        }
+      } catch { /* ignore - lsof may fail if no process is on the port */ }
+    }
+  } catch {
+    // netstat/findstr(lsof may fail) — non-critical, the old process may already be gone
+  }
 }
