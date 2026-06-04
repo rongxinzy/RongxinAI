@@ -36,8 +36,6 @@ SKILLs/**/.server.log
 SKILLs/**/.server.pid
 SKILLs/**/.venv/
 
-package-lock.json
-
 nul
 .work.env
 modelscope.tokens.local.json
