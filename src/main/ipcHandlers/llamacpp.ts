@@ -10,7 +10,12 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import { getLlamaCppLaunchContextLimitViolation, LlamaCppIpcChannel } from '../../shared/llamacpp';
+import {
+  getLlamaCppLaunchContextLimitViolation,
+  LlamaCppIpcChannel,
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+} from '../../shared/llamacpp';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
@@ -198,6 +203,7 @@ export function registerLlamaCppIpcHandlers(
     return await manager.installRuntime();
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
+  ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
   ipcMain.handle(LlamaCppIpcChannel.ImportRuntime, async () => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
@@ -496,6 +502,8 @@ export function sanitizeLlamaCppServiceConfig(
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
   const customExecutablePath = config?.customExecutablePath?.trim();
+  const runtimeBackend = config?.runtimeBackend;
+  const runtimeCudaMajor = config?.runtimeCudaMajor;
   const modelsMax = normalizeIntegerString(config?.modelsMax);
   const modelsAutoload = config?.modelsAutoload as unknown;
   const timeout = normalizeIntegerString(config?.timeout);
@@ -518,6 +526,8 @@ export function sanitizeLlamaCppServiceConfig(
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
   if (customExecutablePath) next.customExecutablePath = customExecutablePath;
+  if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
+  if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
   if (modelsMax) next.modelsMax = modelsMax;
   if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
   if (modelsAutoload === 'true') next.modelsAutoload = true;
@@ -585,6 +595,20 @@ function isSplitMode(value: unknown): value is NonNullable<LlamaCppServiceConfig
 
 function isOnOffAuto(value: unknown): value is 'on' | 'off' | 'auto' {
   return value === 'on' || value === 'off' || value === 'auto';
+}
+
+function isRuntimeBackend(value: unknown): value is NonNullable<LlamaCppServiceConfig['runtimeBackend']> {
+  return (
+    value === LlamaCppRuntimeBackend.Auto ||
+    value === LlamaCppRuntimeBackend.Cpu ||
+    value === LlamaCppRuntimeBackend.Cuda
+  );
+}
+
+function isRuntimeCudaMajor(
+  value: unknown,
+): value is NonNullable<LlamaCppServiceConfig['runtimeCudaMajor']> {
+  return value === LlamaCppRuntimeCudaMajor.Cuda12;
 }
 
 function isReasoningFormat(

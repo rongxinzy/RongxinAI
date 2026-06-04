@@ -3,16 +3,22 @@ import os from 'os';
 import path from 'path';
 import { expect, test } from 'vitest';
 
+import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import {
-  buildLlamaServerArgs,
   buildLlamaCppExecutableCandidates,
+  buildLlamaCppServeEnv,
+  buildLlamaServerArgs,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
   isPathInside,
+  listLlamaCppRuntimeDevices,
   LlamaCppManager,
   mergeLocalModels,
   modelLaunchOptionsToPreset,
+  parseLlamaCppListDevicesOutput,
+  resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
+  selectLlamaCppRuntimeTarget,
 } from './llamacppManager';
 
 test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
@@ -178,6 +184,65 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
   ]);
 });
 
+test('selectLlamaCppRuntimeTarget chooses fixed CUDA 12 on Windows NVIDIA auto mode', () => {
+  expect(selectLlamaCppRuntimeTarget({
+    platform: 'win32',
+    arch: 'x64',
+    runtimeBackend: LlamaCppRuntimeBackend.Auto,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+    hasNvidiaGpu: true,
+  })).toEqual({
+    ok: true,
+    targetId: 'win-x64-cuda-12',
+  });
+});
+
+test('selectLlamaCppRuntimeTarget falls back to CPU on Windows auto mode without NVIDIA', () => {
+  expect(selectLlamaCppRuntimeTarget({
+    platform: 'win32',
+    arch: 'x64',
+    runtimeBackend: LlamaCppRuntimeBackend.Auto,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+    hasNvidiaGpu: false,
+  })).toEqual({
+    ok: true,
+    targetId: 'win-x64',
+  });
+});
+
+test('selectLlamaCppRuntimeTarget keeps CPU when explicitly requested on Windows', () => {
+  expect(selectLlamaCppRuntimeTarget({
+    platform: 'win32',
+    arch: 'x64',
+    runtimeBackend: LlamaCppRuntimeBackend.Cpu,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+    hasNvidiaGpu: true,
+  })).toEqual({
+    ok: true,
+    targetId: 'win-x64',
+  });
+});
+
+test('selectLlamaCppRuntimeTarget fails when CUDA is forced without NVIDIA', () => {
+  expect(selectLlamaCppRuntimeTarget({
+    platform: 'win32',
+    arch: 'x64',
+    runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+    hasNvidiaGpu: false,
+  })).toEqual({
+    ok: false,
+    error: 'CUDA runtime requires an NVIDIA GPU on Windows.',
+  });
+});
+
+test('resolveLlamaCppRuntimeTargetPreference defaults to auto CUDA 12 preferences', () => {
+  expect(resolveLlamaCppRuntimeTargetPreference({})).toEqual({
+    runtimeBackend: LlamaCppRuntimeBackend.Auto,
+    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+  });
+});
+
 test('buildLlamaServerArgs keeps advanced GPU routing settings as restart-only server flags', () => {
   expect(buildLlamaServerArgs({
     device: '0,1',
@@ -196,6 +261,69 @@ test('buildLlamaServerArgs keeps advanced GPU routing settings as restart-only s
     '--tensor-split',
     '3,2',
   ]));
+});
+
+test('buildLlamaCppServeEnv prepends the resolved runtime bin directory to PATH on Windows', () => {
+  expect(buildLlamaCppServeEnv(
+    { PATH: 'C:\\Windows\\System32' },
+    'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    'win32',
+  )).toEqual({
+    PATH: 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+  });
+});
+
+test('buildLlamaCppServeEnv does not duplicate PATH entries on Windows', () => {
+  expect(buildLlamaCppServeEnv(
+    {
+      PATH: 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+    },
+    'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    'win32',
+  )).toEqual({
+    PATH: 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+  });
+});
+
+test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
+  expect(parseLlamaCppListDevicesOutput([
+    'Available devices:',
+    '  CUDA0: NVIDIA GeForce RTX 4090 (24564 MiB, 0 MiB free)',
+    '  CUDA1: NVIDIA GeForce RTX 3090',
+    '  CPU: CPU',
+  ].join('\n'))).toEqual([
+    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+    { id: 'CPU', name: 'CPU', backend: 'cpu' },
+  ]);
+});
+
+test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', async () => {
+  const calls: Array<{ file: string; args: string[]; pathValue?: string }> = [];
+  const result = await listLlamaCppRuntimeDevices({
+    executablePath: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    platform: 'win32',
+    baseEnv: { PATH: 'C:\\Windows\\System32' },
+    runner: async (file, args, options) => {
+      calls.push({ file, args, pathValue: options.env?.PATH });
+      return {
+        stdout: 'CUDA0: NVIDIA GeForce RTX 4090\n',
+        stderr: '',
+      };
+    },
+  });
+
+  expect(calls).toEqual([{
+    file: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    args: ['--list-devices'],
+    pathValue: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+  }]);
+  expect(result).toEqual({
+    success: true,
+    executablePath: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    rawOutput: 'CUDA0: NVIDIA GeForce RTX 4090\n',
+    devices: [{ id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' }],
+  });
 });
 
 test('modelLaunchOptionsToPreset writes model startup parameters for models-preset.ini', () => {

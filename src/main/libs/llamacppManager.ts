@@ -13,13 +13,19 @@ import type {
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeBackend as LlamaCppRuntimeBackendType,
+  LlamaCppRuntimeCudaMajor as LlamaCppRuntimeCudaMajorType,
+  LlamaCppRuntimeDevice,
   LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
+  LlamaCppRuntimeListDevicesResult,
   LlamaCppRuntimeUninstallResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
+import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { LlamaCppClient } from './llamacppClient';
+import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
   copyDirectoryContents,
   createLlamaCppRuntimeInstallPlan,
@@ -29,6 +35,7 @@ import {
   resolveLlamaCppExecutableName,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
+import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_HOST = '127.0.0.1';
@@ -37,6 +44,17 @@ const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 
 type RequestOptions = { signal?: AbortSignal };
+type ExecFileRunner = (
+  file: string,
+  args: string[],
+  options: {
+    env: NodeJS.ProcessEnv;
+    encoding: 'utf8';
+    maxBuffer: number;
+    timeout: number;
+    windowsHide: boolean;
+  },
+) => Promise<{ stdout: string; stderr: string }>;
 
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
@@ -124,7 +142,7 @@ export class LlamaCppManager extends EventEmitter {
       {
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: buildLlamaCppServeEnv(process.env, this.getServiceConfig()),
+        env: buildLlamaCppServeEnv(process.env, this.executablePath, process.platform),
       },
     );
 
@@ -176,18 +194,40 @@ export class LlamaCppManager extends EventEmitter {
 
   async installRuntime(): Promise<LlamaCppRuntimeInstallResult> {
     const projectRoot = getProjectRoot();
-    const targetId = resolveLlamaCppRuntimeTargetId(process.platform, process.arch);
+    const config = this.getServiceConfig();
+    const targetSelection = await resolveLlamaCppRuntimeTargetSelection(config);
+    if (!targetSelection.ok) {
+      const error = 'error' in targetSelection ? targetSelection.error : 'Failed to resolve runtime target.';
+      const plan = { kind: 'needs-manual', message: error } as const;
+      this.setStatus({
+        status: 'not-installed',
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+        error,
+      });
+      return {
+        success: false,
+        plan,
+        error,
+      };
+    }
+    const targetId = targetSelection.targetId;
     if (!app.isPackaged && targetId) {
       await ensureLlamaCppRuntimeCurrent(projectRoot, targetId);
     }
 
-    const existingExecutablePath = await findLlamaCppExecutable(this.getServiceConfig());
+    const existingExecutablePath = normalizeExistingManagedRuntimePath({
+      executablePath: await findLlamaCppExecutable(config),
+      preferredTargetId: targetId,
+      runtimeRoot: getUserLlamaCppRuntimeRoot(),
+    });
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: process.platform,
       arch: process.arch,
       isPackaged: app.isPackaged,
       existingExecutablePath,
       userRuntimeRoot: getUserLlamaCppRuntimeRoot(),
+      preferredTargetId: targetId,
     });
     this.setStatus({
       status: this.status.status,
@@ -214,6 +254,24 @@ export class LlamaCppManager extends EventEmitter {
       });
     }
     return result;
+  }
+
+  async listRuntimeDevices(): Promise<LlamaCppRuntimeListDevicesResult> {
+    if (!this.executablePath) {
+      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
+    }
+    if (!this.executablePath) {
+      return {
+        success: false,
+        devices: [],
+        error: 'llama.cpp runtime is not installed.',
+      };
+    }
+    return await listLlamaCppRuntimeDevices({
+      executablePath: this.executablePath,
+      platform: process.platform,
+      baseEnv: process.env,
+    });
   }
 
   /**
@@ -684,9 +742,13 @@ export class LlamaCppManager extends EventEmitter {
       status: LlamaCppStatusSnapshot['status'];
     },
   ): void {
+    const executablePath = Object.prototype.hasOwnProperty.call(patch, 'executablePath')
+      ? patch.executablePath
+      : this.status.executablePath;
     this.status = {
       ...this.status,
       ...patch,
+      ...resolveLlamaCppRuntimeMetadata(executablePath),
       checkedAt: new Date().toISOString(),
     };
     this.emit('status', this.status);
@@ -813,11 +875,88 @@ function normalizePositiveInteger(value: string | undefined): number | undefined
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function buildLlamaCppServeEnv(
+export function buildLlamaCppServeEnv(
   baseEnv: NodeJS.ProcessEnv,
-  _config: LlamaCppServiceConfig,
+  executablePath: string,
+  platform: NodeJS.Platform = process.platform,
 ): NodeJS.ProcessEnv {
-  return { ...baseEnv };
+  const env = { ...baseEnv };
+  const runtimeBinDir = resolveExecutableDir(executablePath, platform);
+  if (!runtimeBinDir) return env;
+
+  if (platform === 'win32') {
+    prependEnvPathEntry(env, 'PATH', runtimeBinDir, platform);
+    return env;
+  }
+  if (platform === 'linux') {
+    prependEnvPathEntry(env, 'LD_LIBRARY_PATH', runtimeBinDir, platform);
+  }
+  return env;
+}
+
+export async function listLlamaCppRuntimeDevices(input: {
+  executablePath: string;
+  platform: NodeJS.Platform;
+  baseEnv?: NodeJS.ProcessEnv;
+  runner?: ExecFileRunner;
+}): Promise<LlamaCppRuntimeListDevicesResult> {
+  const runner = input.runner ?? (execFileAsync as ExecFileRunner);
+  const metadata = resolveLlamaCppRuntimeMetadata(input.executablePath);
+  try {
+    const { stdout, stderr } = await runner(input.executablePath, ['--list-devices'], {
+      env: buildLlamaCppServeEnv(input.baseEnv ?? process.env, input.executablePath, input.platform),
+      encoding: 'utf8',
+      maxBuffer: 256 * 1024,
+      timeout: 10_000,
+      windowsHide: true,
+    });
+    const rawOutput = [stdout, stderr].filter(Boolean).join(stderr ? '\n' : '');
+    return {
+      success: true,
+      executablePath: input.executablePath,
+      runtimeTargetId: metadata.runtimeTargetId,
+      rawOutput,
+      devices: parseLlamaCppListDevicesOutput(rawOutput),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      executablePath: input.executablePath,
+      runtimeTargetId: metadata.runtimeTargetId,
+      devices: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeDevice[] {
+  const devices: LlamaCppRuntimeDevice[] = [];
+  for (const line of output.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || /^available devices:?$/i.test(trimmed)) continue;
+    const match = trimmed.match(/^([A-Za-z]+[\w.-]*)\s*:\s*(.+)$/);
+    if (!match) continue;
+    const id = match[1].trim();
+    const rawName = match[2].replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const backend = inferLlamaCppDeviceBackend(id, rawName);
+    devices.push({
+      id,
+      name: rawName || id,
+      backend,
+    });
+  }
+  return devices;
+}
+
+function inferLlamaCppDeviceBackend(id: string, name: string): string {
+  const source = `${id} ${name}`.toLowerCase();
+  if (source.includes('cuda')) return 'cuda';
+  if (source.includes('metal')) return 'metal';
+  if (source.includes('vulkan')) return 'vulkan';
+  if (source.includes('rocm') || source.includes('hip')) return 'rocm';
+  if (source.includes('sycl')) return 'sycl';
+  if (source.includes('cpu')) return 'cpu';
+  return 'unknown';
 }
 
 export async function findLlamaCppExecutable(config: LlamaCppServiceConfig = {}): Promise<string | null> {
@@ -887,6 +1026,188 @@ export function buildLlamaCppExecutableCandidates(input: {
 
 function getUserLlamaCppRuntimeRoot(): string {
   return path.join(app.getPath('userData'), 'llamacpp-runtime');
+}
+
+export function resolveLlamaCppRuntimeTargetPreference(config: LlamaCppServiceConfig): {
+  runtimeBackend: LlamaCppRuntimeBackendType;
+  runtimeCudaMajor: LlamaCppRuntimeCudaMajorType;
+} {
+  return {
+    runtimeBackend: config.runtimeBackend ?? LlamaCppRuntimeBackend.Auto,
+    runtimeCudaMajor: config.runtimeCudaMajor ?? LlamaCppRuntimeCudaMajor.Cuda12,
+  };
+}
+
+export function selectLlamaCppRuntimeTarget(input: {
+  platform: NodeJS.Platform;
+  arch: string;
+  runtimeBackend: LlamaCppRuntimeBackendType;
+  runtimeCudaMajor: LlamaCppRuntimeCudaMajorType;
+  hasNvidiaGpu: boolean;
+}): { ok: true; targetId: string } | { ok: false; error: string } {
+  const baseTargetId = resolveLlamaCppRuntimeTargetId(input.platform, input.arch);
+  if (!baseTargetId) {
+    return {
+      ok: false,
+      error: `Unsupported platform for llama.cpp runtime: ${input.platform}/${input.arch}.`,
+    };
+  }
+
+  if (input.platform !== 'win32') {
+    return { ok: true, targetId: baseTargetId };
+  }
+
+  if (baseTargetId !== LlamaCppRuntimeTargetId.WinX64) {
+    if (input.runtimeBackend === LlamaCppRuntimeBackend.Cuda) {
+      return {
+        ok: false,
+        error: 'CUDA runtime is only supported on Windows x64.',
+      };
+    }
+    return { ok: true, targetId: baseTargetId };
+  }
+
+  if (input.runtimeBackend === LlamaCppRuntimeBackend.Cpu) {
+    return { ok: true, targetId: LlamaCppRuntimeTargetId.WinX64 };
+  }
+  if (input.runtimeBackend === LlamaCppRuntimeBackend.Cuda) {
+    if (!input.hasNvidiaGpu) {
+      return { ok: false, error: 'CUDA runtime requires an NVIDIA GPU on Windows.' };
+    }
+    return { ok: true, targetId: LlamaCppRuntimeTargetId.WinX64Cuda12 };
+  }
+
+  return {
+    ok: true,
+    targetId: input.hasNvidiaGpu
+      ? LlamaCppRuntimeTargetId.WinX64Cuda12
+      : LlamaCppRuntimeTargetId.WinX64,
+  };
+}
+
+async function resolveLlamaCppRuntimeTargetSelection(
+  config: LlamaCppServiceConfig,
+): Promise<{ ok: true; targetId: string } | { ok: false; error: string }> {
+  const preference = resolveLlamaCppRuntimeTargetPreference(config);
+  const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
+  return selectLlamaCppRuntimeTarget({
+    platform: process.platform,
+    arch: process.arch,
+    runtimeBackend: preference.runtimeBackend,
+    runtimeCudaMajor: preference.runtimeCudaMajor,
+    hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
+  });
+}
+
+function normalizeExistingManagedRuntimePath(input: {
+  executablePath: string | null;
+  preferredTargetId: string;
+  runtimeRoot: string;
+}): string | null {
+  if (!input.executablePath) return null;
+  const runtimeCurrentRoot = path.join(input.runtimeRoot, 'current');
+  if (!isPathInside(input.executablePath, runtimeCurrentRoot)) {
+    return input.executablePath;
+  }
+  const buildInfoPath = path.join(runtimeCurrentRoot, 'runtime-build-info.json');
+  try {
+    const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8')) as { target?: string };
+    return buildInfo.target?.trim() === input.preferredTargetId ? input.executablePath : null;
+  } catch {
+    return input.executablePath;
+  }
+}
+
+function resolveLlamaCppRuntimeMetadata(executablePath: string | undefined): Partial<LlamaCppStatusSnapshot> {
+  if (!executablePath) {
+    return {
+      runtimeTargetId: undefined,
+      runtimeBackend: undefined,
+      runtimeCudaMajor: undefined,
+      runtimeRoot: undefined,
+      deviceProbeAvailable: false,
+    };
+  }
+  const runtimeRoot = getManagedRuntimeRootForExecutable(executablePath);
+  const targetId = runtimeRoot ? readRuntimeTargetId(runtimeRoot) : undefined;
+  return {
+    ...(targetId ? { runtimeTargetId: targetId } : {}),
+    ...runtimeBackendFieldsFromTargetId(targetId),
+    ...(runtimeRoot ? { runtimeRoot } : {}),
+    deviceProbeAvailable: true,
+  };
+}
+
+function getManagedRuntimeRootForExecutable(executablePath: string): string | undefined {
+  const userRuntimeRoot = getUserLlamaCppRuntimeRoot();
+  const userCurrentRoot = path.join(userRuntimeRoot, 'current');
+  if (isPathInside(executablePath, userCurrentRoot)) {
+    return userCurrentRoot;
+  }
+
+  const cwdCurrentRoot = path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current');
+  if (isPathInside(executablePath, cwdCurrentRoot)) {
+    return cwdCurrentRoot;
+  }
+  return undefined;
+}
+
+function readRuntimeTargetId(runtimeRoot: string): string | undefined {
+  const buildInfoPath = path.join(runtimeRoot, 'runtime-build-info.json');
+  try {
+    const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8')) as {
+      target?: string;
+      targetId?: string;
+    };
+    return buildInfo.target?.trim() || buildInfo.targetId?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function runtimeBackendFieldsFromTargetId(
+  targetId: string | undefined,
+): Pick<Partial<LlamaCppStatusSnapshot>, 'runtimeBackend' | 'runtimeCudaMajor'> {
+  if (targetId === LlamaCppRuntimeTargetId.WinX64Cuda12) {
+    return {
+      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+    };
+  }
+  if (targetId?.includes('cuda')) {
+    return { runtimeBackend: LlamaCppRuntimeBackend.Cuda };
+  }
+  if (targetId) {
+    return { runtimeBackend: LlamaCppRuntimeBackend.Cpu };
+  }
+  return {};
+}
+
+function resolveExecutableDir(executablePath: string, platform: NodeJS.Platform): string {
+  const normalizedPath = executablePath.trim();
+  if (!normalizedPath) return '';
+  return platform === 'win32'
+    ? path.win32.dirname(normalizedPath)
+    : path.dirname(normalizedPath);
+}
+
+function prependEnvPathEntry(
+  env: NodeJS.ProcessEnv,
+  variableName: 'PATH' | 'LD_LIBRARY_PATH',
+  entry: string,
+  platform: NodeJS.Platform,
+): void {
+  const delimiter = platform === 'win32' ? ';' : ':';
+  const key = Object.keys(env).find(name => name.toUpperCase() === variableName) ?? variableName;
+  const currentValue = env[key]?.trim() ?? '';
+  const entries = currentValue
+    ? currentValue.split(delimiter).map(item => item.trim()).filter(Boolean)
+    : [];
+  if (entries.includes(entry)) {
+    env[key] = entries.join(delimiter);
+    return;
+  }
+  env[key] = [entry, ...entries].join(delimiter);
 }
 
 export function modelLaunchOptionsToPreset(
