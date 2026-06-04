@@ -37,21 +37,21 @@ describe('llamacpp runtime download script', () => {
 
     expect(resolveRuntimeReleaseTag(rootDir, {})).toBe('b9505');
     expect(resolveRuntimeDownloadSource('win-x64', { rootDir, env: {} })).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.zip',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
     );
     expect(resolveRuntimeDownloadSources('win-x64', { rootDir, env: {} })).toEqual([
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.zip',
-      'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.zip',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
     ]);
     expect(resolveRuntimeDownloadSource('win-x64-cuda-12', { rootDir, env: {} })).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.zip',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
     );
     expect(resolveRuntimeCompanionDownloadSources('win-x64-cuda-12', { rootDir, env: {} })).toEqual([
       {
-        assetName: 'cudart-llama-bin-win-cuda-12.4-x64.zip',
+        assetName: 'cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
         urls: [
-          'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.zip',
-          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.zip',
+          'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
+          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
         ],
       },
     ]);
@@ -85,13 +85,13 @@ describe('llamacpp runtime download script', () => {
 
   test('formats GitHub 404 failures with actionable guidance', () => {
     const rootDir = process.cwd();
-    const url = 'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.zip';
+    const url = 'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz';
 
     const message = formatDownloadFailureMessage(404, 'Not Found', url, 'win-x64', rootDir);
 
     expect(message).toContain('does not exist');
     expect(message).toContain('published upstream llama.cpp asset');
-    expect(message).toContain('llama-b9505-bin-win-cpu-x64.zip');
+    expect(message).toContain('llama-b9505-bin-win-cpu-x64.tar.gz');
     expect(message).toContain('npm run llamacpp:runtime:win-x64');
   });
 });
