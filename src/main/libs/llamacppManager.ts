@@ -1249,12 +1249,17 @@ async function downloadFile(
       (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
     const file = fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' });
     const reader = response.body.getReader();
+    const onAbort = () => {
+      void reader.cancel();
+    };
+    signal?.addEventListener('abort', onAbort);
     let completed = resumed ? resumeFrom : 0;
     try {
       if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
       while (true) {
         if (signal?.aborted) throw new Error('Install cancelled');
         const { value, done } = await reader.read();
+        if (signal?.aborted) throw new Error('Install cancelled');
         if (done) break;
         completed += value.byteLength;
         if (!file.write(Buffer.from(value))) {
@@ -1264,6 +1269,8 @@ async function downloadFile(
       }
       completedSuccessfully = true;
     } finally {
+      signal?.removeEventListener('abort', onAbort);
+      void reader.cancel();
       await new Promise<void>(resolve => file.end(resolve));
     }
     if (completedSuccessfully) {
