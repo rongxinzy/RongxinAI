@@ -8,16 +8,20 @@ const extractZip = require('extract-zip');
 const tar = require('tar');
 
 const DEFAULT_LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
-const DEFAULT_LLAMACPP_RUNTIME_RELEASE_TAG = 'b9244';
+const DEFAULT_LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
 const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL =
   'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download';
 const OfficialAssetByTarget = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
   'win-x64': 'llama-{tag}-bin-win-cpu-x64.zip',
+  'win-x64-cuda-12': 'llama-{tag}-bin-win-cuda-12.4-x64.zip',
   'win-arm64': 'llama-{tag}-bin-win-cpu-arm64.zip',
   'linux-x64': 'llama-{tag}-bin-ubuntu-x64.tar.gz',
   'linux-arm64': 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
+};
+const CompanionAssetsByTarget = {
+  'win-x64-cuda-12': ['cudart-llama-bin-win-cuda-12.4-x64.zip'],
 };
 
 function resolveHostTargetId() {
@@ -99,6 +103,19 @@ function resolveOfficialRuntimeAssetName(targetId, env = process.env) {
   return assetName.replace(/^llama-[^-]+-bin/, overridePrefix);
 }
 
+function resolveOfficialRuntimeCompanionAssetNames(targetId, env = process.env) {
+  const rootDir = path.resolve(__dirname, '..');
+  const releaseTag = resolveRuntimeReleaseTag(rootDir, env);
+  const packageJson = readPackageJson(rootDir);
+  const configuredTemplates = packageJson?.llamacpp?.runtimeCompanionAssets?.[targetId];
+  const templates = Array.isArray(configuredTemplates)
+    ? configuredTemplates
+    : CompanionAssetsByTarget[targetId] ?? [];
+  return templates
+    .filter((template) => typeof template === 'string' && template.trim())
+    .map((template) => template.trim().replace(/\{tag\}/g, releaseTag));
+}
+
 function resolveArchiveExtension(archiveName) {
   if (archiveName.endsWith('.tar.gz')) return '.tar.gz';
   if (archiveName.endsWith('.zip')) return '.zip';
@@ -113,6 +130,20 @@ function resolveRuntimeDownloadSources(targetId, options = {}) {
   const env = options.env ?? process.env;
   const rootDir = options.rootDir ?? path.resolve(__dirname, '..');
   const assetName = resolveOfficialRuntimeAssetName(targetId, env);
+  return resolveAssetDownloadSources(targetId, assetName, options);
+}
+
+function resolveRuntimeCompanionDownloadSources(targetId, options = {}) {
+  return resolveOfficialRuntimeCompanionAssetNames(targetId, options.env ?? process.env)
+    .map((assetName) => ({
+      assetName,
+      urls: resolveAssetDownloadSources(targetId, assetName, options),
+    }));
+}
+
+function resolveAssetDownloadSources(targetId, assetName, options = {}) {
+  const env = options.env ?? process.env;
+  const rootDir = options.rootDir ?? path.resolve(__dirname, '..');
 
   const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
   if (explicitUrl) {
@@ -139,11 +170,14 @@ function formatDownloadFailureMessage(status, statusText, url, targetId, rootDir
     const repo = resolveGitHubRepo();
     const releaseTag = resolveRuntimeReleaseTag(rootDir);
     const assetName = resolveOfficialRuntimeAssetName(targetId);
+    const acquisitionHint = targetId === 'win-x64-cuda-12'
+      ? 'Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or use npm run llamacpp:runtime:download:win-x64-cuda-12.'
+      : `Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or build locally with npm run llamacpp:runtime:${targetId}.`;
     return [
       `Download failed: HTTP ${status} ${statusText}.`,
       `${url} does not exist.`,
       `The default downloader expects the published upstream llama.cpp asset ${assetName} from ${repo}@${releaseTag}.`,
-      `Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or build locally with npm run llamacpp:runtime:${targetId}.`,
+      acquisitionHint,
     ].join(' ');
   }
 
@@ -265,12 +299,63 @@ function installNormalizedRuntime(options) {
   const targetBinDir = path.join(targetRuntimeDir, 'bin');
   fs.mkdirSync(targetBinDir, { recursive: true });
   copyDirectoryContents(executableDir, targetBinDir);
+  for (const companion of resolveRuntimeCompanionDownloadSources(targetId, { rootDir })) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-runtime-companion-'));
+    try {
+      const archivePath = path.join(tempDir, companion.assetName);
+      const extractDir = path.join(tempDir, 'extract');
+      downloadFileWithFallbackSync(companion.urls, archivePath, rootDir, targetId);
+      fs.mkdirSync(extractDir, { recursive: true });
+      extractArchiveSync(archivePath, extractDir);
+      copyDirectoryContents(findRuntimePayloadDirectory(extractDir), targetBinDir);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
   writeRuntimeBuildInfo(targetRuntimeDir, {
     target: targetId,
     version: resolveRuntimeReleaseTag(rootDir),
     sourceUrl,
     assetName,
   });
+}
+
+function downloadFileWithFallbackSync(urls, outputPath, rootDir, targetId) {
+  const result = spawnSync(process.execPath, [
+    __filename,
+    '--download-one',
+    JSON.stringify({ urls, outputPath, rootDir, targetId }),
+  ], {
+    cwd: path.resolve(__dirname, '..'),
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) {
+    throw new Error(`Failed to download companion runtime asset: ${path.basename(outputPath)}`);
+  }
+}
+
+function extractArchiveSync(archivePath, extractDir) {
+  const result = spawnSync(process.execPath, [
+    '-e',
+    [
+      "const extractZip=require('extract-zip');",
+      "const tar=require('tar');",
+      "const [archive,dir]=process.argv.slice(1);",
+      "(async()=>{",
+      "if(archive.endsWith('.zip')) await extractZip(archive,{dir});",
+      "else if(archive.endsWith('.tar.gz')) await tar.x({file:archive,cwd:dir});",
+      "else throw new Error('Unsupported archive '+archive);",
+      "})().catch(e=>{console.error(e.message);process.exit(1);});",
+    ].join(''),
+    archivePath,
+    extractDir,
+  ], {
+    cwd: path.resolve(__dirname, '..'),
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) {
+    throw new Error(`Failed to extract companion runtime asset: ${path.basename(archivePath)}`);
+  }
 }
 
 function copyDirectoryContents(sourceDir, targetDir) {
@@ -302,6 +387,24 @@ function findExecutablePath(rootDir, executableName) {
   return null;
 }
 
+function findRuntimePayloadDirectory(rootDir) {
+  const queue = [rootDir];
+  let fallback = null;
+  while (queue.length > 0) {
+    const currentDir = queue.shift();
+    if (!currentDir) continue;
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    if (entries.some((entry) => entry.isFile() && /\.(dll|so|dylib)$/i.test(entry.name))) {
+      if (path.basename(currentDir).toLowerCase() === 'bin') return currentDir;
+      fallback ||= currentDir;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) queue.push(path.join(currentDir, entry.name));
+    }
+  }
+  return fallback || rootDir;
+}
+
 function writeRuntimeBuildInfo(runtimeDir, details) {
   const buildInfo = {
     target: details.target,
@@ -331,10 +434,19 @@ function validateRuntimeTarget(runtimeDir, targetId) {
   }
 }
 
-main().catch((error) => {
-  console.error(`[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
-});
+if (require.main === module && process.argv[2] === '--download-one') {
+  const payload = JSON.parse(process.argv[3] || '{}');
+  downloadFileWithFallback(payload.urls, payload.outputPath, payload.rootDir, payload.targetId)
+    .catch((error) => {
+      console.error(`[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    });
+} else if (require.main === module) {
+  main().catch((error) => {
+    console.error(`[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  });
+}
 
 module.exports = {
   formatDownloadFailureMessage,
@@ -343,7 +455,9 @@ module.exports = {
   resolveGitHubRepo,
   resolveHostTargetId,
   resolveOfficialRuntimeAssetName,
+  resolveOfficialRuntimeCompanionAssetNames,
   resolveRuntimeDownloadSource,
   resolveRuntimeDownloadSources,
+  resolveRuntimeCompanionDownloadSources,
   resolveRuntimeReleaseTag,
 };

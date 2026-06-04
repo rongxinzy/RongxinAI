@@ -1,3 +1,5 @@
+import type { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from './constants';
+
 export type LlamaCppServerStatus =
   | 'unknown'
   | 'not-installed'
@@ -14,6 +16,11 @@ export type LlamaCppStatusSnapshot = {
   executablePath?: string;
   pid?: number;
   managedByApp?: boolean;
+  runtimeTargetId?: string;
+  runtimeBackend?: LlamaCppRuntimeBackend;
+  runtimeCudaMajor?: LlamaCppRuntimeCudaMajor;
+  runtimeRoot?: string;
+  deviceProbeAvailable?: boolean;
   error?: string;
   checkedAt: string;
 };
@@ -30,6 +37,11 @@ export type LlamaCppRuntimeInstallPlan =
     executablePath: string;
     url: string;
     fallbackUrls?: string[];
+    companionDownloads?: Array<{
+      assetName: string;
+      url: string;
+      fallbackUrls?: string[];
+    }>;
   }
   | {
     kind: 'needs-manual';
@@ -54,6 +66,21 @@ export type LlamaCppRuntimeUninstallResult = {
 export type LlamaCppRuntimeImportResult = {
   success: boolean;
   executablePath?: string;
+  error?: string;
+};
+
+export type LlamaCppRuntimeDevice = {
+  id: string;
+  name: string;
+  backend: string;
+};
+
+export type LlamaCppRuntimeListDevicesResult = {
+  success: boolean;
+  executablePath?: string;
+  runtimeTargetId?: string;
+  rawOutput?: string;
+  devices: LlamaCppRuntimeDevice[];
   error?: string;
 };
 
@@ -86,6 +113,8 @@ export type LlamaCppServiceConfig = {
   port?: string;
   modelsDir?: string;
   customExecutablePath?: string;
+  runtimeBackend?: LlamaCppRuntimeBackend;
+  runtimeCudaMajor?: LlamaCppRuntimeCudaMajor;
   modelsMax?: string;
   modelsAutoload?: boolean;
   timeout?: string;
