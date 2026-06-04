@@ -1624,7 +1624,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     sqliteAutoBackupEnabled: '启用自动备份与恢复',
     sqliteAutoBackupEnabledDescription: '开启后将自动备份数据，并在启动时尝试恢复损坏的数据',
     preventSleep: '防止休眠',
-    preventSleepDescription: '防止系统在应用运行时进入睡眠模式',
+    preventSleepDescription: '防止系统将应用进程挂起（无法阻止系统睡眠或关闭显示器）',
     skipMissedJobs: '跳过未执行任务',
     skipMissedJobsDescription: '启动时跳过离线期间未触发的定时任务，不补充执行（保存后生效）',
 
@@ -3683,7 +3683,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     sqliteAutoBackupEnabled: 'Enable Auto Backup and Recovery',
     sqliteAutoBackupEnabledDescription: 'When enabled, the app automatically backs up data and tries to restore corrupted data on startup',
     preventSleep: 'Prevent Sleep',
-    preventSleepDescription: 'Prevent the system from sleeping while the app is running',
+    preventSleepDescription: 'Prevent the system from suspending the app process (does not block system sleep or display off)',
     skipMissedJobs: 'Skip Missed Scheduled Jobs',
     skipMissedJobsDescription:
       'Skip jobs that were missed while the app was offline (applies after Save)',
