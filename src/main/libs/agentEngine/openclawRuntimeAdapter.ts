@@ -6,7 +6,7 @@ import * as path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
-import { formatCorrelationId } from '../logCorrelation';
+import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
 import type {
   CoworkExecutionMode,
   CoworkMessage,
@@ -18,6 +18,8 @@ import type {
 import { t } from '../../i18n';
 import { getCommandDangerLevel, isDeleteCommand } from '../commandSafety';
 import { setCoworkProxySessionId } from '../coworkOpenAICompatProxy';
+import { formatCorrelationId } from '../logCorrelation';
+import { parsePrimaryModelRef } from '../openclawAgentModels';
 import { extractOpenClawAssistantStreamText } from '../openclawAssistantText';
 import {
   buildManagedSessionKey,
@@ -31,9 +33,6 @@ import {
   OpenClawEngineManager,
   type OpenClawGatewayConnectionInfo,
 } from '../openclawEngineManager';
-import { parsePrimaryModelRef } from '../openclawAgentModels';
-import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
-import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
 import {
   extractGatewayHistoryEntries,
   extractGatewayMessageText,
@@ -47,6 +46,7 @@ import {
   AgentLifecyclePhase,
   type AgentLifecyclePhase as AgentLifecyclePhaseValue,
 } from './constants';
+import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -1822,7 +1822,48 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     this.stoppedSessions.delete(sessionId);
     this.manuallyStoppedSessions.delete(sessionId);
     if (this.activeTurns.has(sessionId)) {
-      throw new Error(`Session ${sessionId} is still running.`);
+      const staleTurn = this.activeTurns.get(sessionId)!;
+      console.warn(
+        '[OpenClawRuntime] runTurn: recovering stale active turn — renderer may have crashed',
+        `sessionId=${sessionId}`,
+        `staleRunId=${staleTurn.runId}`,
+        `staleElapsedMs=${Date.now() - staleTurn.startedAtMs}`,
+      );
+
+      // Mark stop-requested so handleChatAborted won't insert a spurious
+      // timeout hint message if a late chat.aborted event arrives later.
+      staleTurn.stopRequested = true;
+
+      // Fire-and-forget chat.abort to the gateway. If the gateway is
+      // unreachable the error is logged and we proceed with local cleanup.
+      if (this.gatewayClient) {
+        void this.gatewayClient
+          .request('chat.abort', {
+            sessionKey: staleTurn.sessionKey,
+            runId: staleTurn.runId,
+          })
+          .catch(() => {
+            // Gateway may be disconnected; proceed with local cleanup.
+          });
+      }
+
+      // Clean up the stale turn. This adds the old runIds to
+      // recentlyClosedRunIds (120 s TTL) so that any late-arriving
+      // gateway events (chat.delta / chat.final / chat.aborted / chat.error)
+      // for those runIds are dropped by isRecentlyClosedRunId() in
+      // handleChatEvent() before they reach activeTurns.get().
+      this.cleanupSessionTurn(sessionId);
+
+      // Resolve (not reject) the stale turn's pendingTurns promise.
+      // Rejecting would cause the old runTurn() call stack to enter its
+      // catch block and call cleanupSessionTurn again — which would
+      // corrupt the new turn that we are about to create.
+      this.resolveTurn(sessionId);
+
+      // Reset DB status so the renderer clears isStreaming.  The
+      // continuation of this method immediately sets status back to
+      // 'running' for the new turn (harmless idle → running flicker).
+      this.store.updateSession(sessionId, { status: 'idle' });
     }
 
     const session = this.store.getSession(sessionId);
