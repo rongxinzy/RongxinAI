@@ -1,0 +1,20 @@
+diff --git a/scripts/stage-bundled-plugin-runtime-deps.mjs b/scripts/stage-bundled-plugin-runtime-deps.mjs
+index 68b1abc..59791b5 100644
+--- a/scripts/stage-bundled-plugin-runtime-deps.mjs
++++ b/scripts/stage-bundled-plugin-runtime-deps.mjs
+@@ -367,6 +367,15 @@ function installPluginRuntimeDeps(params) {
+     ],
+   });
+   try {
++    // Strip workspace: protocol dependencies that npm cannot resolve (pnpm-only syntax)
++    for (const depGroup of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
++      if (!packageJson[depGroup]) continue;
++      for (const [name, spec] of Object.entries(packageJson[depGroup])) {
++        if (typeof spec === "string" && spec.startsWith("workspace:")) {
++          delete packageJson[depGroup][name];
++        }
++      }
++    }
+     writeJson(path.join(tempInstallDir, "package.json"), packageJson);
+     const result = spawnSync(npmRunner.command, npmRunner.args, {
+       cwd: tempInstallDir,
