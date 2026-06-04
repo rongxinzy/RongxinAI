@@ -158,6 +158,23 @@ function mapGatewayResultStatus(
 }
 
 /**
+ * Convert a UI filter status (TaskStatus) to the gateway's expected
+ * cron.runs status value (GatewayStatus).  The frontend sends `success`
+ * and `running` which the gateway rejects; the gateway only accepts
+ * `ok`, `error`, and `skipped`.
+ *
+ * `running` returns undefined because the gateway does not support
+ * filtering by in-progress runs — the filter is dropped and all statuses
+ * are returned.
+ */
+function toGatewayRunStatus(status: string): string | undefined {
+  if (status === TaskStatus.Success) return GatewayStatus.Ok;
+  if (status === TaskStatus.Error) return GatewayStatus.Error;
+  if (status === TaskStatus.Skipped) return GatewayStatus.Skipped;
+  return undefined;
+}
+
+/**
  * Returns true when a gateway error is exclusively a delivery failure —
  * the agent turn itself completed successfully but the gateway reports an
  * error because delivery was attempted and failed (or was not requested).
@@ -617,7 +634,7 @@ export class CronJobService {
       sortDir: 'desc',
       ...(filter?.startDate && { startMs: new Date(filter.startDate + 'T00:00:00').getTime() }),
       ...(filter?.endDate && { endMs: new Date(filter.endDate + 'T23:59:59').getTime() }),
-      ...(filter?.status && { status: filter.status }),
+      ...(filter?.status && { status: toGatewayRunStatus(filter.status) }),
     });
     return Array.isArray(result.entries) ? result.entries.map(mapGatewayRun) : [];
   }
@@ -645,7 +662,7 @@ export class CronJobService {
       sortDir: 'desc',
       ...(filter?.startDate && { startMs: new Date(filter.startDate + 'T00:00:00').getTime() }),
       ...(filter?.endDate && { endMs: new Date(filter.endDate + 'T23:59:59').getTime() }),
-      ...(filter?.status && { status: filter.status }),
+      ...(filter?.status && { status: toGatewayRunStatus(filter.status) }),
     });
     if (!Array.isArray(result.entries) || result.entries.length === 0) return [];
 
