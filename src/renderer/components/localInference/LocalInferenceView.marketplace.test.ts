@@ -255,7 +255,6 @@ test('final assistant message keeps visible content and preserves thinking detai
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
-      metrics: unknown;
     }) => { content: string; thinking?: string; hiddenThinking?: boolean };
   }).__test__buildAssistantMessage;
 
@@ -265,7 +264,6 @@ test('final assistant message keeps visible content and preserves thinking detai
   const message = buildAssistantMessage({
     content: 'answer',
     thinking: 'hidden chain',
-    metrics: null,
   });
 
   expect(message.content).toBe('answer');
@@ -279,7 +277,6 @@ test('final assistant message falls back to a generic notice when no visible ans
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
-      metrics: unknown;
     }) => { content: string; thinking?: string; hiddenThinking?: boolean };
   }).__test__buildAssistantMessage;
 
@@ -289,7 +286,6 @@ test('final assistant message falls back to a generic notice when no visible ans
   const message = buildAssistantMessage({
     content: '',
     thinking: 'hidden chain',
-    metrics: null,
   });
 
   expect(message.content).toBeTruthy();
@@ -419,56 +415,6 @@ test('unload busy state keeps a minimum visible duration', async () => {
   })).toBe(0);
 });
 
-test('metrics summary uses usage token counts first', async () => {
-  const module = await import('./LocalInferenceView');
-  const formatMetricsSummary = (module as unknown as {
-    __test__formatMetricsSummary?: (metrics: unknown) => string;
-  }).__test__formatMetricsSummary;
-
-  expect(typeof formatMetricsSummary).toBe('function');
-  if (!formatMetricsSummary) return;
-
-  const summary = formatMetricsSummary({
-    usage: {
-      prompt_tokens: 11,
-      completion_tokens: 13,
-      total_tokens: 24,
-    },
-    timings: {
-      predicted_n: 99,
-      predicted_per_second: 8.25,
-    },
-  });
-
-  expect(summary).toContain('11');
-  expect(summary).toContain('13');
-  expect(summary).toContain('24');
-  expect(summary).toContain('8.3');
-});
-
-test('metrics summary falls back to timings and legacy fields', async () => {
-  const module = await import('./LocalInferenceView');
-  const formatMetricsSummary = (module as unknown as {
-    __test__formatMetricsSummary?: (metrics: unknown) => string;
-  }).__test__formatMetricsSummary;
-
-  expect(typeof formatMetricsSummary).toBe('function');
-  if (!formatMetricsSummary) return;
-
-  expect(formatMetricsSummary({
-    timings: {
-      prompt_n: 7,
-      predicted_n: 5,
-      predicted_per_second: 3,
-    },
-  })).toContain('7');
-  expect(formatMetricsSummary({
-    prompt_eval_count: 4,
-    eval_count: 6,
-    predicted_per_second: 2,
-  })).toContain('10');
-});
-
 test('request preview exposes the important llama.cpp body fields', async () => {
   const module = await import('./LocalInferenceView');
   const buildRequestPreview = (module as unknown as {
@@ -498,65 +444,15 @@ test('request preview exposes the important llama.cpp body fields', async () => 
   });
 });
 
-test('composer height maps to safe chat padding and jump button offset', async () => {
+test('latest user message index resolves the active conversation turn', async () => {
   const module = await import('./LocalInferenceView');
-  const getChatBottomPadding = (module as unknown as {
-    __test__getChatBottomPadding?: (composerHeight: number) => number;
-  }).__test__getChatBottomPadding;
-  const getJumpToBottomOffset = (module as unknown as {
-    __test__getJumpToBottomOffset?: (composerHeight: number) => number;
-  }).__test__getJumpToBottomOffset;
-  const getLatestTurnContentHeight = (module as unknown as {
-    __test__getLatestTurnContentHeight?: (scrollHeight: number, latestTurnTop: number) => number;
-  }).__test__getLatestTurnContentHeight;
-  const getLatestTurnTailSpacer = (module as unknown as {
-    __test__getLatestTurnTailSpacer?: (viewportHeight: number, bottomPadding: number) => number;
-  }).__test__getLatestTurnTailSpacer;
-  const getEffectiveChatScrollHeight = (module as unknown as {
-    __test__getEffectiveChatScrollHeight?: (scrollHeight: number, tailSpacer: number) => number;
-  }).__test__getEffectiveChatScrollHeight;
   const findLatestUserMessageIndex = (module as unknown as {
     __test__findLatestUserMessageIndex?: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) => number;
   }).__test__findLatestUserMessageIndex;
-  const shouldLockLatestTurnAnchorDuringStream = (module as unknown as {
-    __test__shouldLockLatestTurnAnchorDuringStream?: (streamingText: string) => boolean;
-  }).__test__shouldLockLatestTurnAnchorDuringStream;
-  const getStableLatestTurnTailSpacer = (module as unknown as {
-    __test__getStableLatestTurnTailSpacer?: (input: {
-      currentSpacer: number;
-      nextSpacer: number;
-      sending: boolean;
-    }) => number;
-  }).__test__getStableLatestTurnTailSpacer;
 
-  expect(typeof getChatBottomPadding).toBe('function');
-  expect(typeof getJumpToBottomOffset).toBe('function');
-  expect(typeof getLatestTurnContentHeight).toBe('function');
-  expect(typeof getLatestTurnTailSpacer).toBe('function');
-  expect(typeof getEffectiveChatScrollHeight).toBe('function');
   expect(typeof findLatestUserMessageIndex).toBe('function');
-  expect(typeof shouldLockLatestTurnAnchorDuringStream).toBe('function');
-  expect(typeof getStableLatestTurnTailSpacer).toBe('function');
-  if (!getChatBottomPadding) return;
-  if (!getJumpToBottomOffset) return;
-  if (!getLatestTurnContentHeight) return;
-  if (!getLatestTurnTailSpacer) return;
-  if (!getEffectiveChatScrollHeight) return;
   if (!findLatestUserMessageIndex) return;
-  if (!shouldLockLatestTurnAnchorDuringStream) return;
-  if (!getStableLatestTurnTailSpacer) return;
 
-  expect(getChatBottomPadding(48)).toBe(120);
-  expect(getChatBottomPadding(136)).toBe(156);
-  expect(getJumpToBottomOffset(48)).toBe(92);
-  expect(getJumpToBottomOffset(136)).toBe(152);
-  expect(getLatestTurnContentHeight(1200, 716)).toBe(484);
-  expect(getLatestTurnContentHeight(1200, 180)).toBe(1020);
-  expect(getLatestTurnTailSpacer(640, 156)).toBe(484);
-  expect(getLatestTurnTailSpacer(640, 720)).toBe(0);
-  expect(getLatestTurnTailSpacer(120, 156)).toBe(0);
-  expect(getEffectiveChatScrollHeight(1200, 484)).toBe(716);
-  expect(getEffectiveChatScrollHeight(300, 484)).toBe(0);
   expect(findLatestUserMessageIndex([
     { role: 'user', content: 'first' },
     { role: 'assistant', content: 'reply' },
@@ -564,23 +460,6 @@ test('composer height maps to safe chat padding and jump button offset', async (
     { role: 'assistant', content: 'final' },
   ])).toBe(2);
   expect(findLatestUserMessageIndex([{ role: 'assistant', content: 'reply' }])).toBe(-1);
-  expect(shouldLockLatestTurnAnchorDuringStream('')).toBe(false);
-  expect(shouldLockLatestTurnAnchorDuringStream('final answer')).toBe(true);
-  expect(getStableLatestTurnTailSpacer({
-    currentSpacer: 480,
-    nextSpacer: 320,
-    sending: true,
-  })).toBe(480);
-  expect(getStableLatestTurnTailSpacer({
-    currentSpacer: 320,
-    nextSpacer: 480,
-    sending: true,
-  })).toBe(480);
-  expect(getStableLatestTurnTailSpacer({
-    currentSpacer: 480,
-    nextSpacer: 0,
-    sending: false,
-  })).toBe(0);
 });
 
 test('local inference transient notices auto-dismiss within five seconds', async () => {

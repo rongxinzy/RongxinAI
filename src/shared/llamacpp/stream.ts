@@ -10,7 +10,6 @@ export type LlamaCppStreamState = {
   toolCalls: LlamaCppToolCall[];
   done: boolean;
   phase: LlamaCppStreamPhase;
-  finalChunk: LlamaCppChatChunk | null;
   error: string | null;
 };
 
@@ -23,7 +22,6 @@ export function createLlamaCppStreamState(): LlamaCppStreamState {
     toolCalls: [],
     done: false,
     phase: 'waiting',
-    finalChunk: null,
     error: null,
   };
 }
@@ -37,7 +35,6 @@ export function reduceLlamaCppStreamChunk(
       ...state,
       done: true,
       phase: 'error',
-      finalChunk: chunk,
       error: chunk.error,
     };
   }
@@ -75,7 +72,6 @@ export function reduceLlamaCppStreamChunk(
     toolCalls,
     done: Boolean(chunk.done),
     phase,
-    finalChunk: resolveFinalChunk(state.finalChunk, chunk),
     error: null,
   };
 }
@@ -121,30 +117,3 @@ function joinThinking(officialThinking: string, legacyThinking: string): string 
   return `${officialThinking}\n${legacyThinking}`;
 }
 
-function resolveFinalChunk(current: LlamaCppChatChunk | null, next: LlamaCppChatChunk): LlamaCppChatChunk | null {
-  if (hasReliableMetrics(next)) return next;
-  if (!next.done) return current;
-  return current ?? next;
-}
-
-function hasReliableMetrics(chunk: LlamaCppChatChunk): boolean {
-  return isFiniteNumber(chunk.prompt_eval_count)
-    || isFiniteNumber(chunk.eval_count)
-    || isFiniteNumber(chunk.predicted_per_second)
-    || isFiniteNumber(readNestedNumber(chunk.usage, 'prompt_tokens'))
-    || isFiniteNumber(readNestedNumber(chunk.usage, 'completion_tokens'))
-    || isFiniteNumber(readNestedNumber(chunk.usage, 'total_tokens'))
-    || isFiniteNumber(readNestedNumber(chunk.timings, 'prompt_n'))
-    || isFiniteNumber(readNestedNumber(chunk.timings, 'predicted_n'))
-    || isFiniteNumber(readNestedNumber(chunk.timings, 'predicted_per_second'));
-}
-
-function readNestedNumber(source: unknown, key: string): number | undefined {
-  if (!source || typeof source !== 'object') return undefined;
-  const value = (source as Record<string, unknown>)[key];
-  return typeof value === 'number' ? value : undefined;
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
