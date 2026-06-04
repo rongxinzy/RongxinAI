@@ -59,6 +59,7 @@ const DEFAULT_LIMIT = 120;
 const LOCAL_LIMIT = 100;
 const MARKETPLACE_TIMEOUT_MS = 8000;
 const MODEL_SCOPE_OPENAPI_RATE_LIMIT_RETRIES = 2;
+const MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT = 2;
 const MODEL_SCOPE_OPENAPI_PAGE_SIZE = 50;
 const MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT = 60;
 const MODEL_SCOPE_OPENAPI_MODELS_URL = 'https://modelscope.cn/openapi/v1/models';
@@ -70,15 +71,20 @@ export class MarketplaceService {
     private readonly options: MarketplaceServiceOptions = {},
   ) {}
 
+  setTokenGetter(getToken: () => string | null): void {
+    this.options.getModelScopeToken = getToken;
+  }
+
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
     try {
       const online = await this.searchOnline(params);
+      const models = sortMarketplaceModels(
+        annotateInstalledModels(online.models, scanInstalledModels(this.getModelsDir())),
+        params,
+      ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT));
       return {
-        models: sortMarketplaceModels(
-          annotateInstalledModels(online.models, scanInstalledModels(this.getModelsDir())),
-          params,
-        ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT)),
-        totalCount: online.totalCount,
+        models,
+        totalCount: models.length,
         nextPageNumber: online.nextPageNumber,
         warning: online.warning,
       };
@@ -123,6 +129,7 @@ export class MarketplaceService {
     if (searchResults && searchResults.length > 0) {
       return {
         models: annotateInstalledModels(filterMarketplaceModels(searchResults, params), installed),
+        totalCount: searchResults.length,
         warning: openApiWarning,
       };
     }
@@ -135,6 +142,7 @@ export class MarketplaceService {
     });
     return {
       models: annotateInstalledModels(filterMarketplaceModels(libraryResults, params), installed),
+      totalCount: libraryResults.length,
       warning: openApiWarning,
     };
   }
@@ -154,16 +162,26 @@ export class MarketplaceService {
     for (let offset = 0; offset < maxPages; offset += 1) {
       const page = startPage + offset;
       if (page > MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT) break;
-      const payload = await this.fetchModelScopeOpenApiPage(
-        buildModelScopeOpenApiModelsUrl(params.query?.trim() ?? '', page),
-        token,
-      ).catch((error): null => {
-        if (models.length > 0) {
-          console.warn(`[Marketplace] ModelScope OpenAPI page ${page} failed after receiving ${models.length} model(s):`, error);
-          return null;
+      let payload: unknown = null;
+      let pageError: unknown;
+      for (let retry = 0; retry <= MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT; retry += 1) {
+        try {
+          payload = await this.fetchModelScopeOpenApiPage(
+            buildModelScopeOpenApiModelsUrl(params.query?.trim() ?? '', page),
+            token,
+          );
+          break;
+        } catch (error) {
+          pageError = error;
+          if (models.length === 0 && retry === MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT) {
+            throw error;
+          }
         }
-        throw error;
-      });
+      }
+      if (!payload && models.length > 0) {
+        console.warn(`[Marketplace] ModelScope OpenAPI page ${page} failed after ${MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT + 1} attempts (${models.length} models so far):`, String(pageError));
+        break;
+      }
       if (!payload) break;
       const pageResult = extractModelScopeOpenApiPage(payload);
       const records = pageResult.records;
@@ -726,8 +744,15 @@ function resolveLimit(limit: number | undefined, fallback: number): number {
   return limit && limit > 0 ? limit : fallback;
 }
 
+/** Prefix for OpenAPI auth failures — renderer uses this to show "invalid token". */
+const OPENAPI_AUTH_ERROR_PREFIX = 'AUTH_ERROR:';
+
 function toMarketplaceWarning(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/\bHTTP 40[13]\b/.test(raw)) {
+    return `${OPENAPI_AUTH_ERROR_PREFIX}${raw}`;
+  }
+  return raw;
 }
 
 function isRateLimitError(error: unknown): boolean {

@@ -9,6 +9,8 @@ import {
   ChevronRightIcon,
   CpuChipIcon,
   ExclamationTriangleIcon,
+  EyeIcon,
+  EyeSlashIcon,
   InformationCircleIcon,
   PaperAirplaneIcon,
   PlayIcon,
@@ -39,6 +41,7 @@ import {
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
+import Modal from '../common/Modal';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import MarkdownContent from '../MarkdownContent';
@@ -516,6 +519,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceModels, setMarketplaceModels] = useState<MarketplaceModel[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
+  const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
@@ -600,6 +604,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (id === marketplaceSearchRef.current) {
         setMarketplaceModels(result.models);
         setMarketplaceError(result.warning ?? null);
+        setMarketplaceTotalCount(result.totalCount ?? null);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
@@ -696,6 +701,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         });
         if (!result.success) return;
         await refreshLocalModels();
+        setMarketplaceModels(prev =>
+          prev.map(m => (m.repoId === name ? { ...m, installed: true } : m)),
+        );
         showToast(
           i18nService.t('marketplacePullDone').replace('{name}', name),
           LocalInferenceToastKind.Success,
@@ -789,14 +797,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setPullProgress(current => ({ ...current, [name]: progress }));
         if (isInstallTerminalPhase(progress.phase)) {
           scheduleInstallProgressDismiss(name, progress.phase);
-        }
-        if (isInstallTerminalPhase(progress.phase)) {
           void refreshLocalModels().catch(() => undefined);
-          const params = buildMarketplaceSearchParams({
-            query: marketplaceQuery,
-          });
-          if (marketplaceHasSearched && params) {
-            void searchMarketplace(params).catch(() => undefined);
+          if (progress.phase === 'done') {
+            const params = buildMarketplaceSearchParams({ query: marketplaceQuery });
+            if (marketplaceHasSearched && params) {
+              void searchMarketplace(params).catch(() => undefined);
+            }
+            setMarketplaceModels(prev =>
+              prev.map(m => (m.repoId === name ? { ...m, installed: true } : m)),
+            );
           }
         }
       }),
@@ -1099,6 +1108,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       await window.electron.llamacpp.deleteModel(modelName);
       await refreshLocalModels();
       await refreshRunningModels();
+      setMarketplaceModels(prev =>
+        prev.map(m => {
+          const repoName = m.repoId.split('/').pop();
+          return repoName === modelName ? { ...m, installed: false } : m;
+        }),
+      );
       notifyLlamaCppRunningModelsChanged();
     });
   };
@@ -1304,6 +1319,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               loading={loading}
               localModels={localModels}
               runningModels={runningModels}
+              installProgress={pullProgress}
               onToggle={() => setServicePopoverOpen(current => !current)}
               onPrepare={handlePrepare}
               onStop={handleStop}
@@ -1356,16 +1372,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               hasSearched={marketplaceHasSearched}
               marketplaceLoading={marketplaceLoading}
               marketplaceError={marketplaceError}
-              activePullName={activePullName}
-              activePullProgress={activePullProgress}
-              pulling={pulling}
+              marketplaceTotalCount={marketplaceTotalCount}
               query={marketplaceQuery}
               installedModelPathMap={installedModelPathMap}
               installProgress={pullProgress}
               onQueryChange={setMarketplaceQuery}
               onSearch={handleMarketplaceSearch}
               onInstall={handleMarketplaceInstall}
-              onCancelPull={handleCancelPull}
             />
           ) : (
             <div className="min-h-[520px] flex-1">
@@ -1544,6 +1557,7 @@ function ServicePopover({
   loading,
   localModels,
   runningModels,
+  installProgress,
   onToggle,
   onPrepare,
   onStop,
@@ -1559,6 +1573,7 @@ function ServicePopover({
   loading: boolean;
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
+  installProgress: InstallProgressState;
   onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
@@ -1584,6 +1599,12 @@ function ServicePopover({
     status?.status === 'not-installed'
       ? i18nService.t('localInferenceInstall')
       : i18nService.t('localInferenceStart');
+  const [downloadsExpanded, setDownloadsExpanded] = useState(false);
+  const downloadEntries = useMemo(
+    () => Object.entries(installProgress).filter(([, p]) => isPullInProgress(p)),
+    [installProgress],
+  );
+  const downloadCount = downloadEntries.length;
   return (
     <div ref={containerRef} className="relative shrink-0 self-end sm:self-auto">
       <button
@@ -1624,7 +1645,7 @@ function ServicePopover({
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className={`mt-3 grid gap-2 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
               <p className="text-[11px] text-secondary">
                 {i18nService.t('localInferenceTabModels')}
@@ -1635,7 +1656,48 @@ function ServicePopover({
               <p className="text-[11px] text-secondary">{i18nService.t('localInferenceLoaded')}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">{runningModels.length}</p>
             </div>
+            {downloadCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setDownloadsExpanded(v => !v)}
+                className="rounded-lg border border-border bg-surface/70 px-3 py-2 text-left transition-colors hover:bg-surface"
+              >
+                <p className="text-[11px] text-secondary">
+                  {i18nService.t('localInferenceActiveDownloads')}
+                </p>
+                <div className="mt-1 flex items-center gap-1">
+                  <p className="text-lg font-semibold text-foreground">{downloadCount}</p>
+                  <ChevronRightIcon className={`h-3.5 w-3.5 text-secondary transition-transform ${downloadsExpanded ? 'rotate-90' : ''}`} />
+                </div>
+              </button>
+            )}
           </div>
+
+          {downloadCount > 0 && downloadsExpanded && (
+            <div className="mt-2 space-y-2 border-t border-border pt-2">
+              {downloadEntries.map(([name, progress]) => (
+                <div
+                  key={name}
+                  className="rounded-lg border border-border bg-surface/70 px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-secondary">
+                    <span className="font-mono text-foreground text-[12px]">{name}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{formatPullProgress(progress)}</span>
+                      <button
+                        type="button"
+                        onClick={() => void window.electron.llamacpp.cancelInstall(name)}
+                        className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] text-secondary hover:bg-surface-raised hover:text-red-500"
+                      >
+                        <XMarkIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <InstallProgressBar progress={progress} className="mt-1" />
+                </div>
+              ))}
+            </div>
+          )}
 
           {running && !managedByApp && (
             <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
@@ -2121,8 +2183,8 @@ function ModelsPanel({
   localModels,
   runningModels,
   pullName,
-  activePullName,
-  activePullProgress,
+  activePullName: _activePullName,
+  activePullProgress: _activePullProgress,
   pulling,
   onPullNameChange,
   onPull,
@@ -2186,15 +2248,6 @@ function ModelsPanel({
             </button>
           )}
         </div>
-        {activePullName && activePullProgress && (
-          <div className="mt-3 rounded-md border border-border bg-surface-raised px-3 py-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-              <span className="font-mono text-foreground">{activePullName}</span>
-              <span>{formatPullProgress(activePullProgress)}</span>
-            </div>
-            <InstallProgressBar progress={activePullProgress} className="mt-2" />
-          </div>
-        )}
       </section>
 
       <section className="space-y-3">
@@ -4377,34 +4430,66 @@ function MarketplacePanel({
   hasSearched,
   marketplaceLoading,
   marketplaceError,
-  activePullName,
-  activePullProgress,
-  pulling,
+  marketplaceTotalCount,
   query,
   installedModelPathMap,
   installProgress,
   onQueryChange,
   onSearch,
   onInstall,
-  onCancelPull,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
   hasSearched: boolean;
   marketplaceLoading: boolean;
   marketplaceError: string | null;
-  activePullName: string | null;
-  activePullProgress?: LlamaCppInstallProgress;
-  pulling: boolean;
+  marketplaceTotalCount: number | null;
   query: string;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
   onQueryChange: (v: string) => void;
   onSearch: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
-  onCancelPull: () => void;
 }) {
-  const [installingModel, setInstallingModel] = useState<string | null>(null);
+  const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenInputVisible, setTokenInputVisible] = useState(false);
+  const [savedToken, setSavedToken] = useState<string | null>(null);
+  const [tokenLoaded, setTokenLoaded] = useState(false);
+
+  useEffect(() => {
+    window.electron.marketplace.getToken().then(t => {
+      setSavedToken(t);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (tokenModalOpen && !tokenLoaded) {
+      window.electron.marketplace.getToken().then(t => {
+        setSavedToken(t);
+        setTokenInput(t ?? '');
+        setTokenLoaded(true);
+      }).catch(() => setTokenLoaded(true));
+    }
+    if (!tokenModalOpen) {
+      setTokenLoaded(false);
+      setTokenInputVisible(false);
+    }
+  }, [tokenModalOpen, tokenLoaded]);
+
+  const handleSaveToken = async () => {
+    const trimmed = tokenInput.trim();
+    await window.electron.marketplace.setToken(trimmed);
+    setSavedToken(trimmed || null);
+    setTokenModalOpen(false);
+  };
+
+  const handleClearToken = async () => {
+    setTokenInput('');
+    await window.electron.marketplace.setToken('');
+    setSavedToken(null);
+    setTokenModalOpen(false);
+  };
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(models.length / MARKETPLACE_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -4425,11 +4510,15 @@ function MarketplacePanel({
   }, [page, pageCount]);
 
   const handleInstall = async (model: MarketplaceModel) => {
-    setInstallingModel(model.id);
+    setInstallingModelIds(prev => new Set(prev).add(model.id));
     try {
       await onInstall(model);
     } finally {
-      setInstallingModel(null);
+      setInstallingModelIds(prev => {
+        const next = new Set(prev);
+        next.delete(model.id);
+        return next;
+      });
     }
   };
   const handleNextPage = async () => {
@@ -4441,9 +4530,26 @@ function MarketplacePanel({
       <div className={`${hasSearched ? 'flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between' : 'flex min-h-[420px] flex-col items-center justify-center gap-8'}`}>
         <div className={`${hasSearched ? 'space-y-3' : 'w-full max-w-3xl space-y-3 text-center'}`}>
           <div>
-            <h2 className={`${hasSearched ? 'text-base font-semibold text-foreground' : 'text-2xl font-semibold text-foreground'}`}>
-              {i18nService.t('marketplaceTitle')}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className={`${hasSearched ? 'text-base font-semibold text-foreground' : 'text-2xl font-semibold text-foreground'}`}>
+                {i18nService.t('marketplaceTitle')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setTokenModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  savedToken
+                    ? 'border border-green-400/30 bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400'
+                    : 'border border-border bg-surface text-secondary hover:text-foreground hover:border-primary/40'
+                }`}
+                title={savedToken ? i18nService.t('marketplaceTokenConfigured') : i18nService.t('marketplaceTokenNotConfigured')}
+              >
+                <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+                {savedToken
+                  ? i18nService.t('marketplaceTokenConfigured')
+                  : i18nService.t('marketplaceTokenSettings')}
+              </button>
+            </div>
             {hasSearched && (
               <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
             )}
@@ -4480,27 +4586,37 @@ function MarketplacePanel({
         </form>
       </div>
 
-      {marketplaceError && (
+      {(() => {
+        const isAuthError = marketplaceError?.startsWith('AUTH_ERROR:');
+        const statusClass = isAuthError
+          ? 'border-yellow-400/40 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+          : marketplaceError
+            ? 'border-yellow-400/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
+            : savedToken
+              ? 'border-green-400/40 bg-green-500/10 text-green-600 dark:text-green-400'
+              : 'border-border bg-surface text-secondary';
+        const statusText = isAuthError
+          ? i18nService.t('marketplaceSearchStatusTokenInvalid')
+          : marketplaceError
+            ? i18nService.t('marketplaceSearchStatusLegacy')
+            : savedToken
+              ? i18nService.t('marketplaceSearchStatusOpenApi')
+              : i18nService.t('marketplaceSearchStatusWarning');
+        const count = marketplaceTotalCount ?? models.length;
+        return (
+          !marketplaceLoading && models.length > 0 && (
+            <div className={`rounded-md border px-3 py-1.5 text-xs ${statusClass}`}>
+              <span className="font-medium">{statusText}</span>
+              <span className="ml-3 opacity-70">
+                {i18nService.t('marketplaceResultCount').replace('{count}', String(count))}
+              </span>
+            </div>
+          )
+        );
+      })()}
+      {marketplaceError && models.length === 0 && (
         <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
           {i18nService.t('marketplaceError')}: {marketplaceError}
-        </div>
-      )}
-
-      {activePullName && activePullProgress && (
-        <div className="rounded-lg border border-border bg-surface px-3 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-            <div className="min-w-0">
-              <span className="font-mono text-foreground">{activePullName}</span>
-              <span className="ml-2">{formatPullProgress(activePullProgress)}</span>
-            </div>
-            {pulling && (
-              <button type="button" onClick={onCancelPull} className={smallOutlineButtonClass}>
-                <StopIcon className="h-3.5 w-3.5" />
-                {i18nService.t('localInferenceCancelPull')}
-              </button>
-            )}
-          </div>
-          <InstallProgressBar progress={activePullProgress} className="mt-2" />
         </div>
       )}
 
@@ -4520,7 +4636,7 @@ function MarketplacePanel({
                 ? installedModelPathMap.get(model.installedPath)
                 : undefined;
               const installed = model.installed || Boolean(installedModelName);
-              const installing = installingModel === model.id || isPullInProgress(progress);
+              const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
               return (
                 <div
                   key={model.id}
@@ -4589,8 +4705,7 @@ function MarketplacePanel({
                       {installed ? null : installing ? (
                         <button
                           type="button"
-                          onClick={onCancelPull}
-                          disabled={!pulling}
+                          onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
                           className={smallOutlineButtonClass}
                         >
                           <StopIcon className="h-3.5 w-3.5" />
@@ -4638,6 +4753,91 @@ function MarketplacePanel({
           )}
         </div>
       )}
+
+      {/* Token config modal */}
+      <Modal
+        isOpen={tokenModalOpen}
+        onClose={() => setTokenModalOpen(false)}
+        overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+        className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-foreground">
+              {i18nService.t('marketplaceTokenSettingsTitle')}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setTokenModalOpen(false)}
+              className="rounded-md p-1 text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="text-sm text-secondary leading-relaxed">
+            {i18nService.t('marketplaceTokenSettingsDesc')}
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold tracking-wide text-secondary">
+              ModelScope API Token
+            </label>
+            <div className="relative">
+              <input
+                type={tokenInputVisible ? 'text' : 'password'}
+                value={tokenInput}
+                onChange={e => setTokenInput(e.target.value)}
+                placeholder={i18nService.t('marketplaceTokenPlaceholder')}
+                className="w-full rounded-xl bg-surface-inset px-3 py-2 pr-16 text-sm text-foreground placeholder:text-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <div className="absolute right-2 inset-y-0 flex items-center gap-1">
+                {tokenInput && (
+                  <button
+                    type="button"
+                    onClick={() => setTokenInput('')}
+                    className="rounded p-0.5 text-secondary hover:text-primary transition-colors"
+                    title={i18nService.t('marketplaceTokenClear')}
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setTokenInputVisible(v => !v)}
+                  className="rounded p-0.5 text-secondary hover:text-primary transition-colors"
+                >
+                  {tokenInputVisible ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={handleClearToken}
+              disabled={!savedToken}
+              className="rounded-lg px-3 py-2 text-xs font-medium text-secondary hover:text-red-500 border border-border hover:border-red-400/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {i18nService.t('marketplaceTokenClear')}
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTokenModalOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+              >
+                {i18nService.t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveToken()}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-white hover:bg-primary-hover transition-colors"
+              >
+                {i18nService.t('marketplaceTokenSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

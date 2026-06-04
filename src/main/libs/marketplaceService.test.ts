@@ -317,7 +317,7 @@ test('MarketplaceService returns OpenAPI total count and next page number for pa
 
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(result.models).toHaveLength(50);
-  expect(result.totalCount).toBe(1800);
+  expect(result.totalCount).toBe(50);
   expect(result.nextPageNumber).toBe(5);
 });
 
@@ -396,7 +396,7 @@ test('MarketplaceService returns partial OpenAPI results when a later page fails
   });
   const result = await service.search({ query: '0.8', limit: 100 });
 
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock).toHaveBeenCalledTimes(4); // page 1 (1) + page 2 (1+2 retries)
   expect(result.models).toHaveLength(50);
   expect(result.models[0]?.repoId).toBe('owner/partial-1-GGUF');
 });
@@ -521,6 +521,6 @@ test('MarketplaceService falls back to legacy search when ModelScope OpenAPI aut
   });
   const result = await service.search({ query: 'qwen2.5', limit: 5 });
 
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock).toHaveBeenCalledTimes(4); // 3 OpenAPI attempts + 1 legacy fallback
   expect(result.models.some(model => model.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF')).toBe(true);
 });

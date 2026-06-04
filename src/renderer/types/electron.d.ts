@@ -20,7 +20,6 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
-import type { TriageConfig } from '../../shared/triage';
 import type {
   OllamaCancelPullResult,
   OllamaChatChunk,
@@ -33,6 +32,7 @@ import type {
   OllamaServiceConfig,
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
+import type { TriageConfig } from '../../shared/triage';
 import type { AppConfig } from '../config';
 import type { Agent } from './agent';
 interface ApiResponse {
@@ -450,6 +450,8 @@ interface IElectronAPI {
   };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
+    getToken: () => Promise<string | null>;
+    setToken: (token: string) => Promise<void>;
   };
   triage: {
     getConfig: () => Promise<TriageConfig>;
