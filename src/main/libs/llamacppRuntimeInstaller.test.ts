@@ -5,9 +5,9 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import {
   createLlamaCppRuntimeInstallPlan,
-  resolveLlamaCppRuntimeDownloadUrls,
   ensureLlamaCppRuntimeCurrent,
   resolveLlamaCppRuntimeDownloadUrl,
+  resolveLlamaCppRuntimeDownloadUrls,
   resolveLlamaCppRuntimeExecutablePath,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';

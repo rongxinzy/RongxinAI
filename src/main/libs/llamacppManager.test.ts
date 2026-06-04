@@ -3,23 +3,23 @@ import os from 'os';
 import path from 'path';
 import { expect, test } from 'vitest';
 
+import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import {
+  buildLlamaCppExecutableCandidates,
   buildLlamaCppServeEnv,
   buildLlamaServerArgs,
-  buildLlamaCppExecutableCandidates,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
   isPathInside,
   listLlamaCppRuntimeDevices,
-  parseLlamaCppListDevicesOutput,
-  resolveLlamaCppRuntimeTargetPreference,
-  selectLlamaCppRuntimeTarget,
   LlamaCppManager,
   mergeLocalModels,
   modelLaunchOptionsToPreset,
+  parseLlamaCppListDevicesOutput,
+  resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
+  selectLlamaCppRuntimeTarget,
 } from './llamacppManager';
-import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 
 test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
   expect(buildLlamaCppExecutableCandidates({
