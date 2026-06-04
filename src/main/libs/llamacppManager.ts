@@ -13,18 +13,19 @@ import type {
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeBackend as LlamaCppRuntimeBackendType,
+  LlamaCppRuntimeCudaMajor as LlamaCppRuntimeCudaMajorType,
+  LlamaCppRuntimeDevice,
   LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
-  LlamaCppRuntimeDevice,
   LlamaCppRuntimeUninstallResult,
-  LlamaCppRuntimeBackend as LlamaCppRuntimeBackendType,
-  LlamaCppRuntimeCudaMajor as LlamaCppRuntimeCudaMajorType,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { LlamaCppClient } from './llamacppClient';
+import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
   copyDirectoryContents,
   createLlamaCppRuntimeInstallPlan,
@@ -34,7 +35,6 @@ import {
   resolveLlamaCppExecutableName,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
-import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 
 const execFileAsync = promisify(execFile);
