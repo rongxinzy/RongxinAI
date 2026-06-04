@@ -6,7 +6,7 @@ import * as path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
-import { formatCorrelationId } from '../logCorrelation';
+import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
 import type {
   CoworkExecutionMode,
   CoworkMessage,
@@ -18,6 +18,8 @@ import type {
 import { t } from '../../i18n';
 import { getCommandDangerLevel, isDeleteCommand } from '../commandSafety';
 import { setCoworkProxySessionId } from '../coworkOpenAICompatProxy';
+import { formatCorrelationId } from '../logCorrelation';
+import { parsePrimaryModelRef } from '../openclawAgentModels';
 import { extractOpenClawAssistantStreamText } from '../openclawAssistantText';
 import {
   buildManagedSessionKey,
@@ -31,9 +33,6 @@ import {
   OpenClawEngineManager,
   type OpenClawGatewayConnectionInfo,
 } from '../openclawEngineManager';
-import { parsePrimaryModelRef } from '../openclawAgentModels';
-import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
-import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
 import {
   extractGatewayHistoryEntries,
   extractGatewayMessageText,
@@ -47,6 +46,7 @@ import {
   AgentLifecyclePhase,
   type AgentLifecyclePhase as AgentLifecyclePhaseValue,
 } from './constants';
+import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
