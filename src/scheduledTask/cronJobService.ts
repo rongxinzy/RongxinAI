@@ -16,6 +16,9 @@ import {
   ScheduleKind,
   TaskStatus,
 } from './constants';
+
+/** Maximum length for a scheduled task name, enforced at both UI and API. */
+const TASK_NAME_MAX_LENGTH = 200;
 import type {
   Schedule,
   ScheduledTask,
@@ -498,7 +501,7 @@ export class CronJobService {
       JSON.stringify(gatewayDelivery),
     );
     const job = await client.request<GatewayJob>('cron.add', {
-      name: input.name,
+      name: (input.name || '').slice(0, TASK_NAME_MAX_LENGTH),
       description: input.description || undefined,
       enabled: input.enabled,
       schedule: toGatewaySchedule(input.schedule),
@@ -535,7 +538,7 @@ export class CronJobService {
     const client = await this.client();
     const patch: Record<string, unknown> = {};
 
-    if (input.name !== undefined) patch.name = input.name;
+    if (input.name !== undefined) patch.name = (input.name || '').slice(0, TASK_NAME_MAX_LENGTH);
     if (input.description !== undefined) {
       patch.description = input.description || undefined;
     }
