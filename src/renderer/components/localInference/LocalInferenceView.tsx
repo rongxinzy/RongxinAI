@@ -181,6 +181,7 @@ const MARKETPLACE_SEARCH_MAX_MODEL_COUNT = 3000;
 const CHAT_NEAR_BOTTOM_THRESHOLD = 96;
 const CHAT_HIDDEN_BELOW_THRESHOLD = 8;
 const ASSISTANT_SCROLL_TOP_OFFSET = 0;
+const CHAT_MANUAL_SCROLL_OVERRIDE_MS = 1200;
 const LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_PROGRESS_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS = 500;
@@ -2979,6 +2980,7 @@ function InferencePanel({
   const pendingLatestTurnAlignRef = useRef(false);
   const lockLatestTurnAnchorRef = useRef(false);
   const autoFollowStreamRef = useRef(true);
+  const manualScrollOverrideUntilRef = useRef(0);
   const streamFollowFrameRef = useRef<number | null>(null);
   const programmaticScrollRef = useRef<{ mode: 'align' | 'bottom'; until: number } | null>(null);
   const composingRef = useRef(false);
@@ -3019,6 +3021,8 @@ function InferencePanel({
   );
   const stopStreamAutoFollow = useCallback(() => {
     autoFollowStreamRef.current = false;
+    manualScrollOverrideUntilRef.current =
+      window.performance.now() + CHAT_MANUAL_SCROLL_OVERRIDE_MS;
     if (streamFollowFrameRef.current !== null) {
       window.cancelAnimationFrame(streamFollowFrameRef.current);
       streamFollowFrameRef.current = null;
@@ -3042,11 +3046,14 @@ function InferencePanel({
       window.performance.now() <= programmaticScrollRef.current.until
         ? programmaticScrollRef.current
         : null;
+    const manualOverrideActive =
+      window.performance.now() <= manualScrollOverrideUntilRef.current;
     if (!activeProgrammaticScroll) {
       programmaticScrollRef.current = null;
-      autoFollowStreamRef.current = nearBottom;
+      autoFollowStreamRef.current = manualOverrideActive ? false : nearBottom;
     } else if (activeProgrammaticScroll.mode === 'bottom') {
       autoFollowStreamRef.current = true;
+      manualScrollOverrideUntilRef.current = 0;
       setShowJumpToBottom(false);
       return;
     } else {
@@ -3059,6 +3066,7 @@ function InferencePanel({
     pendingLatestTurnAlignRef.current = true;
     lockLatestTurnAnchorRef.current = true;
     autoFollowStreamRef.current = true;
+    manualScrollOverrideUntilRef.current = 0;
     onSend();
   };
   const scrollToBottom = useCallback(
@@ -3069,6 +3077,7 @@ function InferencePanel({
       pendingLatestTurnAlignRef.current = false;
       lockLatestTurnAnchorRef.current = false;
       autoFollowStreamRef.current = true;
+      manualScrollOverrideUntilRef.current = 0;
       element.scrollTo({
         top: Math.max(0, element.scrollHeight - element.clientHeight),
         behavior,
@@ -3088,6 +3097,7 @@ function InferencePanel({
       });
       markProgrammaticScroll('align', behavior);
       autoFollowStreamRef.current = false;
+      manualScrollOverrideUntilRef.current = 0;
       container.scrollTo({ top, behavior });
     },
     [markProgrammaticScroll],
@@ -3142,6 +3152,7 @@ function InferencePanel({
     latestTurnScrollTargetIndexRef.current = null;
     lockLatestTurnAnchorRef.current = false;
     autoFollowStreamRef.current = true;
+    manualScrollOverrideUntilRef.current = 0;
     programmaticScrollRef.current = null;
   }, [sending]);
 
