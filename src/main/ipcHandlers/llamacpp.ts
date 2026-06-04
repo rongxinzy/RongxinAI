@@ -33,7 +33,7 @@ const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return reason === 'llamacpp-model-visibility-refresh';
+  return reason === 'llamacpp-set-openclaw-model' || reason === 'llamacpp-model-stopped';
 }
 
 export function getTotalFreeVramMiB(snapshot: NvidiaSmiSnapshot | null | undefined): number | null {
@@ -177,7 +177,7 @@ export function registerLlamaCppIpcHandlers(
   manager.on('status', status => {
     sendStatus(status);
     if (status.status === 'running') {
-      void refreshRunningModelBindings();
+      void refreshRunningModelBindings('llamacpp-model-launched');
       return;
     }
     if (
@@ -186,7 +186,7 @@ export function registerLlamaCppIpcHandlers(
       status.status === 'not-installed' ||
       status.status === 'installed'
     ) {
-      void refreshRunningModelBindings();
+      void refreshRunningModelBindings('llamacpp-model-stopped');
     }
   });
   manager.on('install-progress', sendProgress);
@@ -446,10 +446,11 @@ export function registerLlamaCppIpcHandlers(
         return null;
       }
     })();
-    await refreshRunningModelBindings();
+    await refreshRunningModelBindings('llamacpp-set-openclaw-model');
     const syncResult = await options.syncOpenClawConfig({
       reason: 'llamacpp-local-model-selected',
-      restartGatewayIfRunning: false,
+      restartGatewayIfRunning: true,
+      forceGatewayRestartIfRunning: true,
     });
     return {
       success: syncResult.success,
