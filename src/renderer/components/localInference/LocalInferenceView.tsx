@@ -22,7 +22,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
-  LlamaCppChatChunk as OllamaChatChunk,
   LlamaCppChatPayload as OllamaChatPayload,
   LlamaCppInstallProgress,
   LlamaCppModel as OllamaModel,
@@ -59,7 +58,6 @@ type InferenceMessage = {
   thinking?: string;
   hiddenThinking?: boolean;
   waiting?: boolean;
-  metrics?: OllamaChatChunk | null;
 };
 
 type LaunchFormState = {
@@ -168,7 +166,6 @@ type InstallProgressState = Record<string, LlamaCppInstallProgress>;
 type BuildAssistantMessageInput = {
   content: string;
   thinking: string;
-  metrics: OllamaChatChunk | null;
 };
 type RequestPreviewInput = {
   model: string;
@@ -181,10 +178,7 @@ const MARKETPLACE_SEARCH_MAX_MODEL_COUNT = 3000;
 const CHAT_NEAR_BOTTOM_THRESHOLD = 96;
 const CHAT_HIDDEN_BELOW_THRESHOLD = 8;
 const ASSISTANT_SCROLL_TOP_OFFSET = 0;
-const CHAT_COMPOSER_MIN_PADDING = 120;
-const CHAT_COMPOSER_PADDING_GAP = 20;
-const CHAT_JUMP_TO_BOTTOM_MIN_OFFSET = 92;
-const CHAT_JUMP_TO_BOTTOM_GAP = 16;
+const CHAT_MANUAL_SCROLL_OVERRIDE_MS = 1200;
 const LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_PROGRESS_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS = 500;
@@ -1182,7 +1176,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const assistantMessage = buildAssistantMessage({
         content: streamState.content,
         thinking: streamState.thinking,
-        metrics: streamState.finalChunk,
       });
       setMessages([...nextHistory, assistantMessage]);
       messagesRef.current = [...nextHistory, assistantMessage];
@@ -1195,7 +1188,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           const assistantMessage = buildAssistantMessage({
             content: streamState.content,
             thinking: streamState.thinking,
-            metrics: streamState.finalChunk,
           });
           setMessages([...nextHistory, assistantMessage]);
           messagesRef.current = [...nextHistory, assistantMessage];
@@ -2930,20 +2922,17 @@ function InferencePanel({
 }) {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
   const latestTurnStartRef = useRef<HTMLDivElement>(null);
   const latestTurnScrollTargetIndexRef = useRef<number | null>(null);
   const pendingLatestTurnAlignRef = useRef(false);
   const lockLatestTurnAnchorRef = useRef(false);
-  const userDetachedFromBottomRef = useRef(false);
   const autoFollowStreamRef = useRef(true);
+  const manualScrollOverrideUntilRef = useRef(0);
+  const streamFollowFrameRef = useRef<number | null>(null);
   const programmaticScrollRef = useRef<{ mode: 'align' | 'bottom'; until: number } | null>(null);
   const composingRef = useRef(false);
   const [configCollapsed, setConfigCollapsed] = useState(false);
   const [configPage, setConfigPage] = useState<InferenceOptionGroup>('basic');
-  const [composerHeight, setComposerHeight] = useState(CHAT_COMPOSER_MIN_PADDING);
-  const [chatViewportHeight, setChatViewportHeight] = useState(0);
-  const [latestTurnTailSpacer, setLatestTurnTailSpacer] = useState(0);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const requestPreview = useMemo(
     () =>
@@ -2967,8 +2956,6 @@ function InferencePanel({
     });
   };
   const visibleOptionFields = INFERENCE_OPTION_FIELDS.filter(field => field.group === configPage);
-  const chatBottomPadding = getChatBottomPadding(composerHeight);
-  const jumpToBottomOffset = getJumpToBottomOffset(composerHeight);
   const markProgrammaticScroll = useCallback(
     (mode: 'align' | 'bottom', behavior: ScrollBehavior) => {
       const duration = behavior === 'smooth' ? 400 : 120;
@@ -2979,46 +2966,54 @@ function InferencePanel({
     },
     [],
   );
+  const stopStreamAutoFollow = useCallback(() => {
+    autoFollowStreamRef.current = false;
+    manualScrollOverrideUntilRef.current =
+      window.performance.now() + CHAT_MANUAL_SCROLL_OVERRIDE_MS;
+    if (streamFollowFrameRef.current !== null) {
+      window.cancelAnimationFrame(streamFollowFrameRef.current);
+      streamFollowFrameRef.current = null;
+    }
+  }, []);
   const syncScrollIndicators = useCallback(() => {
     const element = chatScrollRef.current;
     if (!element) return;
-    const effectiveScrollHeight = getEffectiveChatScrollHeight(
-      element.scrollHeight,
-      latestTurnTailSpacer,
-    );
-    const nearBottom = isScrollNearBottom({
-      scrollTop: element.scrollTop,
-      clientHeight: element.clientHeight,
-      scrollHeight: effectiveScrollHeight,
-    });
     const hiddenBelow = hasHiddenContentBelow({
       scrollTop: element.scrollTop,
       clientHeight: element.clientHeight,
-      scrollHeight: effectiveScrollHeight,
+      scrollHeight: element.scrollHeight,
+    });
+    const nearBottom = isScrollNearBottom({
+      scrollTop: element.scrollTop,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
     });
     const activeProgrammaticScroll =
       programmaticScrollRef.current &&
       window.performance.now() <= programmaticScrollRef.current.until
         ? programmaticScrollRef.current
         : null;
+    const manualOverrideActive =
+      window.performance.now() <= manualScrollOverrideUntilRef.current;
     if (!activeProgrammaticScroll) {
       programmaticScrollRef.current = null;
-      userDetachedFromBottomRef.current = !nearBottom;
-      autoFollowStreamRef.current = lockLatestTurnAnchorRef.current ? false : nearBottom;
+      autoFollowStreamRef.current = manualOverrideActive ? false : nearBottom;
     } else if (activeProgrammaticScroll.mode === 'bottom') {
-      userDetachedFromBottomRef.current = false;
       autoFollowStreamRef.current = true;
+      manualScrollOverrideUntilRef.current = 0;
+      setShowJumpToBottom(false);
+      return;
     } else {
       autoFollowStreamRef.current = false;
     }
     setShowJumpToBottom(hiddenBelow);
-  }, [latestTurnTailSpacer]);
+  }, []);
   const submitPrompt = () => {
     latestTurnScrollTargetIndexRef.current = getNewAssistantScrollTargetIndex(messages.length);
     pendingLatestTurnAlignRef.current = true;
     lockLatestTurnAnchorRef.current = true;
-    userDetachedFromBottomRef.current = false;
-    autoFollowStreamRef.current = false;
+    autoFollowStreamRef.current = true;
+    manualScrollOverrideUntilRef.current = 0;
     onSend();
   };
   const scrollToBottom = useCallback(
@@ -3028,18 +3023,14 @@ function InferencePanel({
       markProgrammaticScroll('bottom', behavior);
       pendingLatestTurnAlignRef.current = false;
       lockLatestTurnAnchorRef.current = false;
-      userDetachedFromBottomRef.current = false;
       autoFollowStreamRef.current = true;
+      manualScrollOverrideUntilRef.current = 0;
       element.scrollTo({
-        top: Math.max(
-          0,
-          getEffectiveChatScrollHeight(element.scrollHeight, latestTurnTailSpacer) -
-            element.clientHeight,
-        ),
+        top: Math.max(0, element.scrollHeight - element.clientHeight),
         behavior,
       });
     },
-    [latestTurnTailSpacer, markProgrammaticScroll],
+    [markProgrammaticScroll],
   );
   const scrollLatestTurnStartIntoView = useCallback(
     (behavior: ScrollBehavior = 'auto') => {
@@ -3053,111 +3044,45 @@ function InferencePanel({
       });
       markProgrammaticScroll('align', behavior);
       autoFollowStreamRef.current = false;
+      manualScrollOverrideUntilRef.current = 0;
       container.scrollTo({ top, behavior });
     },
     [markProgrammaticScroll],
   );
-  const measureComposerHeight = useCallback(() => {
-    const nextHeight = composerRef.current?.offsetHeight ?? 0;
-    if (nextHeight <= 0) return;
-    setComposerHeight(current => (current === nextHeight ? current : nextHeight));
-  }, []);
-  const measureChatViewportHeight = useCallback(() => {
-    const nextHeight = chatScrollRef.current?.clientHeight ?? 0;
-    if (nextHeight <= 0) return;
-    setChatViewportHeight(current => (current === nextHeight ? current : nextHeight));
-  }, []);
-  const calculateLatestTurnTailSpacer = useCallback(() => {
-    const container = chatScrollRef.current;
-    const latestTurnStart = latestTurnStartRef.current;
-    if (!container || !latestTurnStart || messages.length === 0) {
-      return 0;
-    }
-    const effectiveScrollHeight = getEffectiveChatScrollHeight(
-      container.scrollHeight,
-      latestTurnTailSpacer,
-    );
-    const targetScrollTop = getAssistantScrollTop({
-      containerScrollTop: container.scrollTop,
-      containerTop: container.getBoundingClientRect().top,
-      targetTop: latestTurnStart.getBoundingClientRect().top,
-    });
-    const contentHeightFromLatestTurn = getLatestTurnContentHeight(
-      effectiveScrollHeight,
-      targetScrollTop,
-    );
-    return getLatestTurnTailSpacer(chatViewportHeight, contentHeightFromLatestTurn);
-  }, [chatViewportHeight, latestTurnTailSpacer, messages.length]);
-  const applyLatestTurnTailSpacer = useCallback(() => {
-    const nextSpacer = calculateLatestTurnTailSpacer();
-    setLatestTurnTailSpacer(current => {
-      const stableSpacer = getStableLatestTurnTailSpacer({
-        currentSpacer: current,
-        nextSpacer,
-        sending,
-      });
-      return current === stableSpacer ? current : stableSpacer;
-    });
-  }, [calculateLatestTurnTailSpacer, sending]);
-  const ensureLatestTurnTailSpacerReady = useCallback(() => {
-    const nextSpacer = calculateLatestTurnTailSpacer();
-    const stableSpacer = getStableLatestTurnTailSpacer({
-      currentSpacer: latestTurnTailSpacer,
-      nextSpacer,
-      sending,
-    });
-    if (stableSpacer === latestTurnTailSpacer) return true;
-    setLatestTurnTailSpacer(stableSpacer);
-    return false;
-  }, [calculateLatestTurnTailSpacer, latestTurnTailSpacer, sending]);
-
   useEffect(() => {
     if (!sending) return;
     if (!pendingLatestTurnAlignRef.current) return;
     if (latestTurnScrollTargetIndexRef.current !== messages.length) return;
-    if (!ensureLatestTurnTailSpacerReady()) return;
     const frame = window.requestAnimationFrame(() => {
       scrollLatestTurnStartIntoView('auto');
       pendingLatestTurnAlignRef.current = false;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [
-    ensureLatestTurnTailSpacerReady,
-    latestTurnTailSpacer,
-    messages.length,
-    scrollLatestTurnStartIntoView,
-    sending,
-  ]);
+  }, [messages.length, scrollLatestTurnStartIntoView, sending]);
 
   useEffect(() => {
     syncScrollIndicators();
   }, [messages.length, sending, streamingText, streamingThinking, syncScrollIndicators]);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      applyLatestTurnTailSpacer();
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [applyLatestTurnTailSpacer, messages.length, sending, streamingText, streamingThinking]);
-
-  useEffect(() => {
-    if (!sending) return;
-    if (pendingLatestTurnAlignRef.current) return;
-    if (!lockLatestTurnAnchorRef.current) return;
-    if (!shouldLockLatestTurnAnchorDuringStream(streamingText)) return;
-    const frame = window.requestAnimationFrame(() => {
-      scrollLatestTurnStartIntoView('auto');
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [scrollLatestTurnStartIntoView, sending, streamingText]);
-
-  useEffect(() => {
     if (!sending || pendingLatestTurnAlignRef.current || !autoFollowStreamRef.current) return;
-    const frame = window.requestAnimationFrame(() => {
-      scrollToBottom('auto');
+    if (streamFollowFrameRef.current !== null) {
+      window.cancelAnimationFrame(streamFollowFrameRef.current);
+    }
+    streamFollowFrameRef.current = window.requestAnimationFrame(() => {
+      streamFollowFrameRef.current = null;
+      const element = chatScrollRef.current;
+      if (!element) return;
+      element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+      syncScrollIndicators();
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages.length, scrollToBottom, sending, streamingText, streamingThinking]);
+    return () => {
+      if (streamFollowFrameRef.current !== null) {
+        window.cancelAnimationFrame(streamFollowFrameRef.current);
+        streamFollowFrameRef.current = null;
+      }
+    };
+  }, [sending, streamingText, streamingThinking, syncScrollIndicators]);
 
   useEffect(() => {
     if (sending) return;
@@ -3173,44 +3098,10 @@ function InferencePanel({
     pendingLatestTurnAlignRef.current = false;
     latestTurnScrollTargetIndexRef.current = null;
     lockLatestTurnAnchorRef.current = false;
+    autoFollowStreamRef.current = true;
+    manualScrollOverrideUntilRef.current = 0;
     programmaticScrollRef.current = null;
   }, [sending]);
-
-  useEffect(() => {
-    measureComposerHeight();
-    const composerElement = composerRef.current;
-    if (!composerElement) return;
-    const resizeObserver =
-      typeof window.ResizeObserver !== 'undefined'
-        ? new window.ResizeObserver(() => {
-            measureComposerHeight();
-          })
-        : null;
-    resizeObserver?.observe(composerElement);
-    window.addEventListener('resize', measureComposerHeight);
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', measureComposerHeight);
-    };
-  }, [measureComposerHeight]);
-
-  useEffect(() => {
-    measureChatViewportHeight();
-    const chatElement = chatScrollRef.current;
-    if (!chatElement) return;
-    const resizeObserver =
-      typeof window.ResizeObserver !== 'undefined'
-        ? new window.ResizeObserver(() => {
-            measureChatViewportHeight();
-          })
-        : null;
-    resizeObserver?.observe(chatElement);
-    window.addEventListener('resize', measureChatViewportHeight);
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', measureChatViewportHeight);
-    };
-  }, [measureChatViewportHeight]);
 
   useEffect(() => {
     if (sending || cancelling || !selectedModel) return;
@@ -3372,12 +3263,17 @@ function InferencePanel({
           </div>
           <div
             ref={chatScrollRef}
-            className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto px-4 pt-0 [scrollbar-gutter:stable_both-edges]"
+            className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-0 [scrollbar-gutter:stable_both-edges]"
+            onWheelCapture={event => {
+              if (sending && event.deltaY < 0) {
+                stopStreamAutoFollow();
+              }
+            }}
             onScroll={syncScrollIndicators}
             style={{
-              paddingBottom: `${chatBottomPadding}px`,
               scrollbarWidth: 'thin',
               scrollbarColor: 'var(--lobster-scroll-thumb) transparent',
+              overflowAnchor: 'none',
             }}
           >
             {messages.length === 0 && !sending && (
@@ -3393,7 +3289,7 @@ function InferencePanel({
                 </div>
               </div>
             )}
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+            <div className="mx-auto flex w-full max-w-[768px] flex-col gap-5 px-2 pb-12 pt-4 select-text sm:px-6">
               {messages.map((message, index) => {
                 const isLatestTurnStart =
                   message.role === 'user' &&
@@ -3401,13 +3297,17 @@ function InferencePanel({
                     ? index === messages.length - 1
                     : index === findLatestUserMessageIndex(messages));
                 return (
-                  <div key={index} ref={isLatestTurnStart ? latestTurnStartRef : undefined}>
+                  <div
+                    key={index}
+                    ref={isLatestTurnStart ? latestTurnStartRef : undefined}
+                    data-message-index={index}
+                  >
                     <ChatBubble message={message} />
                   </div>
                 );
               })}
               {sending && (
-                <div>
+                <div data-message-index={messages.length}>
                   <ChatBubble
                     message={buildStreamingAssistantMessage({
                       content: streamingText,
@@ -3417,19 +3317,11 @@ function InferencePanel({
                   />
                 </div>
               )}
-              {latestTurnTailSpacer > 0 && (
-                <div
-                  aria-hidden="true"
-                  className="shrink-0"
-                  style={{ height: latestTurnTailSpacer }}
-                />
-              )}
             </div>
           </div>
           {showJumpToBottom && (
             <div
-              className="pointer-events-none absolute inset-x-0 flex justify-center px-4"
-              style={{ bottom: `${jumpToBottomOffset}px` }}
+              className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center px-4"
             >
               <button
                 type="button"
@@ -3442,7 +3334,7 @@ function InferencePanel({
               </button>
             </div>
           )}
-          <div ref={composerRef} className="absolute inset-x-0 bottom-0 px-4 pb-4">
+          <div className="sticky bottom-0 z-20 flex-shrink-0 px-4 pb-4 pt-2">
             <div className="mx-auto max-w-[44rem] rounded-[20px] border border-border bg-surface-overlay p-1.5 shadow-card backdrop-blur">
               <textarea
                 ref={promptRef}
@@ -3524,17 +3416,15 @@ function ChatBubble({
         {!isUser && hasThinking && (
           <details
             className="mb-3 rounded-2xl border border-border-subtle bg-surface-raised/55 px-3 py-2 text-sm text-foreground/90"
-            open={streaming && !hasVisibleContent}
+            open={streaming && !hasVisibleContent ? true : undefined}
           >
             <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
               {thinkingSummary}
             </summary>
-            <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-secondary">
-              {message.thinking}
-              {streaming && !hasVisibleContent && (
-                <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
-              )}
-            </div>
+            <ThinkingContent
+              content={message.thinking ?? ''}
+              streaming={streaming && !hasVisibleContent}
+            />
           </details>
         )}
         {message.waiting && <WaitingDots />}
@@ -3546,10 +3436,68 @@ function ChatBubble({
         {streaming && !message.waiting && hasVisibleContent && (
           <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
         )}
-        {hasMetricsSummary(message.metrics) && (
-          <p className="mt-2 text-xs text-secondary">{formatMetricsSummary(message.metrics)}</p>
+      </div>
+    </div>
+  );
+}
+
+function ThinkingContent({
+  content,
+  streaming,
+}: {
+  content: string;
+  streaming: boolean;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const wrapper = wrapperRef.current;
+      const element = contentRef.current;
+      if (!wrapper || !element) return;
+      if (!streaming) {
+        element.style.transform = 'translateY(0)';
+        setHasOverflow(element.scrollHeight > wrapper.clientHeight);
+        return;
+      }
+      const wrapperHeight = wrapper.clientHeight;
+      const contentHeight = element.scrollHeight;
+      if (contentHeight > wrapperHeight) {
+        element.style.transform = `translateY(-${contentHeight - wrapperHeight}px)`;
+        setHasOverflow(true);
+      } else {
+        element.style.transform = 'translateY(0)';
+        setHasOverflow(false);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [content, streaming]);
+
+  return (
+    <div
+      ref={wrapperRef}
+      className={`relative mt-2 max-h-48 rounded-xl ${
+        streaming
+          ? 'overflow-hidden'
+          : 'overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      }`}
+    >
+      <div
+        ref={contentRef}
+        className={`whitespace-pre-wrap break-words pr-1 text-sm leading-7 text-secondary ${
+          streaming ? 'transition-transform duration-200' : ''
+        }`}
+      >
+        {content}
+        {streaming && (
+          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
         )}
       </div>
+      {streaming && hasOverflow && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-surface-raised/95 to-transparent" />
+      )}
     </div>
   );
 }
@@ -4155,53 +4103,6 @@ function formatDate(value: string): string {
   return date.toLocaleString();
 }
 
-function formatMetricsSummary(metrics: OllamaChatChunk): string {
-  const promptTokens =
-    readMetricNumber(metrics.usage, 'prompt_tokens') ??
-    readMetricNumber(metrics.timings, 'prompt_n') ??
-    metrics.prompt_eval_count;
-  const completionTokens =
-    readMetricNumber(metrics.usage, 'completion_tokens') ??
-    readMetricNumber(metrics.timings, 'predicted_n') ??
-    metrics.eval_count;
-  const totalTokens =
-    readMetricNumber(metrics.usage, 'total_tokens') ??
-    (promptTokens !== undefined && completionTokens !== undefined
-      ? promptTokens + completionTokens
-      : undefined);
-  const speedValue =
-    readMetricNumber(metrics.timings, 'predicted_per_second') ?? metrics.predicted_per_second;
-  const speed = speedValue !== undefined ? speedValue.toFixed(1) : '-';
-  return i18nService
-    .t('localInferenceMetrics')
-    .replace('{prompt}', promptTokens === undefined ? '-' : String(promptTokens))
-    .replace('{completion}', completionTokens === undefined ? '-' : String(completionTokens))
-    .replace('{total}', totalTokens === undefined ? '-' : String(totalTokens))
-    .replace('{speed}', speed);
-}
-
-function hasMetricsSummary(
-  metrics: OllamaChatChunk | null | undefined,
-): metrics is OllamaChatChunk {
-  if (!metrics) return false;
-  return (
-    readMetricNumber(metrics.usage, 'completion_tokens') !== undefined ||
-    readMetricNumber(metrics.usage, 'prompt_tokens') !== undefined ||
-    readMetricNumber(metrics.usage, 'total_tokens') !== undefined ||
-    readMetricNumber(metrics.timings, 'predicted_n') !== undefined ||
-    readMetricNumber(metrics.timings, 'predicted_per_second') !== undefined ||
-    metrics.prompt_eval_count !== undefined ||
-    metrics.eval_count !== undefined ||
-    metrics.predicted_per_second !== undefined
-  );
-}
-
-function readMetricNumber(source: unknown, key: string): number | undefined {
-  if (!source || typeof source !== 'object') return undefined;
-  const value = (source as Record<string, unknown>)[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
 function isScrollNearBottom({
   scrollTop,
   clientHeight,
@@ -4244,44 +4145,9 @@ function getAssistantScrollTop({
   return Math.max(0, containerScrollTop + (targetTop - containerTop) - offset);
 }
 
-function getChatBottomPadding(composerHeight: number): number {
-  return Math.max(CHAT_COMPOSER_MIN_PADDING, composerHeight + CHAT_COMPOSER_PADDING_GAP);
-}
-
-function getJumpToBottomOffset(composerHeight: number): number {
-  return Math.max(CHAT_JUMP_TO_BOTTOM_MIN_OFFSET, composerHeight + CHAT_JUMP_TO_BOTTOM_GAP);
-}
-
-function getLatestTurnContentHeight(scrollHeight: number, latestTurnTop: number): number {
-  return Math.max(0, scrollHeight - latestTurnTop);
-}
-
-function getLatestTurnTailSpacer(viewportHeight: number, latestTurnContentHeight: number): number {
-  if (viewportHeight <= 0) return 0;
-  return Math.max(0, viewportHeight - latestTurnContentHeight);
-}
-
-function getEffectiveChatScrollHeight(scrollHeight: number, tailSpacer: number): number {
-  return Math.max(0, scrollHeight - tailSpacer);
-}
-
-function getStableLatestTurnTailSpacer({
-  currentSpacer,
-  nextSpacer,
-  sending,
-}: {
-  currentSpacer: number;
-  nextSpacer: number;
-  sending: boolean;
-}): number {
-  if (!sending) return nextSpacer;
-  return Math.max(currentSpacer, nextSpacer);
-}
-
 function buildAssistantMessage({
   content,
   thinking,
-  metrics,
 }: BuildAssistantMessageInput): InferenceMessage {
   const visibleContent = content.trim()
     ? content
@@ -4292,7 +4158,6 @@ function buildAssistantMessage({
     role: 'assistant',
     content: visibleContent,
     ...(thinking.trim() ? { thinking } : {}),
-    metrics,
   };
 }
 
@@ -4322,10 +4187,6 @@ function findLatestUserMessageIndex(messages: InferenceMessage[]): number {
     if (messages[index]?.role === 'user') return index;
   }
   return -1;
-}
-
-function shouldLockLatestTurnAnchorDuringStream(streamingText: string): boolean {
-  return Boolean(streamingText.trim());
 }
 
 function buildEffectiveSystemPrompt(
@@ -4706,8 +4567,6 @@ export const __test__buildStreamingAssistantMessage = (
 ) => buildStreamingAssistantMessage(input);
 export const __test__getNewAssistantScrollTargetIndex = (historyLength: number) =>
   getNewAssistantScrollTargetIndex(historyLength);
-export const __test__formatMetricsSummary = (metrics: OllamaChatChunk) =>
-  formatMetricsSummary(metrics);
 export const __test__buildRequestPreview = (input: RequestPreviewInput) =>
   buildRequestPreview(input);
 export const __test__buildMarketplaceSearchParams = (
@@ -4720,23 +4579,8 @@ export const __test__hasHiddenContentBelow = (input: Parameters<typeof hasHidden
   hasHiddenContentBelow(input);
 export const __test__getAssistantScrollTop = (input: Parameters<typeof getAssistantScrollTop>[0]) =>
   getAssistantScrollTop(input);
-export const __test__getChatBottomPadding = (composerHeight: number) =>
-  getChatBottomPadding(composerHeight);
-export const __test__getJumpToBottomOffset = (composerHeight: number) =>
-  getJumpToBottomOffset(composerHeight);
-export const __test__getLatestTurnContentHeight = (scrollHeight: number, latestTurnTop: number) =>
-  getLatestTurnContentHeight(scrollHeight, latestTurnTop);
-export const __test__getLatestTurnTailSpacer = (viewportHeight: number, bottomPadding: number) =>
-  getLatestTurnTailSpacer(viewportHeight, bottomPadding);
-export const __test__getEffectiveChatScrollHeight = (scrollHeight: number, tailSpacer: number) =>
-  getEffectiveChatScrollHeight(scrollHeight, tailSpacer);
 export const __test__findLatestUserMessageIndex = (messages: InferenceMessage[]) =>
   findLatestUserMessageIndex(messages);
-export const __test__shouldLockLatestTurnAnchorDuringStream = (streamingText: string) =>
-  shouldLockLatestTurnAnchorDuringStream(streamingText);
-export const __test__getStableLatestTurnTailSpacer = (
-  input: Parameters<typeof getStableLatestTurnTailSpacer>[0],
-) => getStableLatestTurnTailSpacer(input);
 export const __test__getLaunchContextLimitMessage = (input: {
   requestedContextLength?: number;
   trainedContextLength?: number;
