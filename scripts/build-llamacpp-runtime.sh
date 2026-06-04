@@ -7,6 +7,12 @@ if [[ -z "${TARGET_ID}" ]]; then
   exit 1
 fi
 
+if [[ "${TARGET_ID}" == "win-x64-cuda-12" ]]; then
+  echo "[build-llamacpp-runtime] win-x64-cuda-12 only supports prebuilt downloads." >&2
+  echo "[build-llamacpp-runtime] Run npm run llamacpp:runtime:download:win-x64-cuda-12 instead." >&2
+  exit 1
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${LLAMACPP_SRC:-/Users/whz/Desktop/rongx/llama.cpp}"
 RUNTIME_DIR="${ROOT_DIR}/vendor/llamacpp-runtime/${TARGET_ID}"
