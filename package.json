@@ -40,14 +40,20 @@
   },
   "llamacpp": {
     "runtimeRepo": "https://github.com/ggml-org/llama.cpp.git",
-    "runtimeReleaseTag": "b9244",
+    "runtimeReleaseTag": "b9505",
     "runtimeAssets": {
       "mac-arm64": "llama-{tag}-bin-macos-arm64.tar.gz",
       "mac-x64": "llama-{tag}-bin-macos-x64.tar.gz",
       "win-x64": "llama-{tag}-bin-win-cpu-x64.zip",
+      "win-x64-cuda-12": "llama-{tag}-bin-win-cuda-12.4-x64.zip",
       "win-arm64": "llama-{tag}-bin-win-cpu-arm64.zip",
       "linux-x64": "llama-{tag}-bin-ubuntu-x64.tar.gz",
       "linux-arm64": "llama-{tag}-bin-ubuntu-arm64.tar.gz"
+    },
+    "runtimeCompanionAssets": {
+      "win-x64-cuda-12": [
+        "cudart-llama-bin-win-cuda-12.4-x64.zip"
+      ]
     }
   },
   "main": "dist-electron/main.js",
@@ -111,8 +117,10 @@
     "llamacpp:runtime:download:mac-arm64": "node scripts/download-llamacpp-runtime.cjs mac-arm64",
     "llamacpp:runtime:download:mac-x64": "node scripts/download-llamacpp-runtime.cjs mac-x64",
     "llamacpp:runtime:download:win-x64": "node scripts/download-llamacpp-runtime.cjs win-x64",
+    "llamacpp:runtime:download:win-x64-cuda-12": "node scripts/download-llamacpp-runtime.cjs win-x64-cuda-12",
     "llamacpp:runtime:download:linux-x64": "node scripts/download-llamacpp-runtime.cjs linux-x64",
     "llamacpp:runtime:download:linux-arm64": "node scripts/download-llamacpp-runtime.cjs linux-arm64",
+    "llamacpp:runtime:mirror:gitee": "node scripts/mirror-llamacpp-runtime-gitee.cjs",
     "llamacpp:runtime:mac-arm64": "node scripts/run-build-llamacpp-runtime.cjs mac-arm64 && node scripts/sync-llamacpp-runtime-current.cjs mac-arm64",
     "llamacpp:runtime:mac-x64": "node scripts/run-build-llamacpp-runtime.cjs mac-x64 && node scripts/sync-llamacpp-runtime-current.cjs mac-x64",
     "llamacpp:runtime:win-x64": "node scripts/run-build-llamacpp-runtime.cjs win-x64 && node scripts/sync-llamacpp-runtime-current.cjs win-x64",

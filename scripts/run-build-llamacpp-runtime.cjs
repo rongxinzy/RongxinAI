@@ -45,6 +45,12 @@ if (!targetId) {
   console.error('[run-build-llamacpp-runtime] Missing target id.');
   process.exit(1);
 }
+if (targetId === 'win-x64-cuda-12') {
+  console.error(
+    '[run-build-llamacpp-runtime] win-x64-cuda-12 only supports prebuilt downloads. Run npm run llamacpp:runtime:download:win-x64-cuda-12 instead.',
+  );
+  process.exit(1);
+}
 
 const rootDir = path.resolve(__dirname, '..');
 const bashExecutable = resolveBashExecutable(rootDir);
