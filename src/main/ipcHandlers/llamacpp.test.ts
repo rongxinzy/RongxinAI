@@ -54,7 +54,10 @@ test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw m
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-running')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-not-running')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-deleted')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(false);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(false);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-stopped')).toBe(true);
 });
 
 test('computes total free VRAM from nvidia-smi snapshots', () => {
