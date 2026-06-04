@@ -90,9 +90,42 @@ describe('llamacpp runtime installer planning', () => {
       targetId: 'win-x64',
       runtimeRoot,
       executablePath: path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe'),
-      url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.zip',
       fallbackUrls: [
-        'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
+        'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.zip',
+      ],
+      companionDownloads: [],
+    });
+  });
+
+  test('plans the fixed CUDA 12 runtime when preferred target id is set', () => {
+    const runtimeRoot = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming', 'RongxinAI', 'llamacpp-runtime');
+    const plan = createLlamaCppRuntimeInstallPlan({
+      platform: 'win32',
+      arch: 'x64',
+      isPackaged: true,
+      existingExecutablePath: null,
+      userRuntimeRoot: runtimeRoot,
+      preferredTargetId: 'win-x64-cuda-12',
+    });
+
+    expect(plan).toEqual({
+      kind: 'download',
+      targetId: 'win-x64-cuda-12',
+      runtimeRoot,
+      executablePath: path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe'),
+      url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.zip',
+      fallbackUrls: [
+        'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.zip',
+      ],
+      companionDownloads: [
+        {
+          assetName: 'cudart-llama-bin-win-cuda-12.4-x64.zip',
+          url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.zip',
+          fallbackUrls: [
+            'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.zip',
+          ],
+        },
       ],
     });
   });
@@ -106,12 +139,15 @@ describe('llamacpp runtime installer planning', () => {
 
   test('resolves official runtime download URLs for packaged installs', () => {
     expect(resolveLlamaCppRuntimeDownloadUrl('mac-arm64')).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-macos-arm64.tar.gz',
     );
     expect(resolveLlamaCppRuntimeDownloadUrls('mac-arm64')).toEqual([
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
-      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-macos-arm64.tar.gz',
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-macos-arm64.tar.gz',
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-macos-arm64.tar.gz',
     ]);
+    expect(resolveLlamaCppRuntimeDownloadUrl('win-x64-cuda-12')).toBe(
+      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.zip',
+    );
   });
 
   test('repairs current runtime when a target runtime already exists', async () => {
