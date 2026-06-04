@@ -21,8 +21,8 @@ import {
   FeishuInstallIpc,
   GitHubCopilotIpc,
   HardwareIpc,
-  ImIpc,
   ImInstanceIpc,
+  ImIpc,
   LogIpc,
   McpIpc,
   NetworkIpc,
@@ -36,9 +36,9 @@ import {
 } from '../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
-import { TriageIpcChannel } from '../shared/triage';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
+import { TriageIpcChannel } from '../shared/triage';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 
@@ -195,6 +195,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
   marketplace: {
     search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
+    getToken: () => ipcRenderer.invoke(MarketplaceIpcChannel.GetToken),
+    setToken: (token: string) => ipcRenderer.invoke(MarketplaceIpcChannel.SetToken, token),
   },
 
   triage: {

@@ -974,11 +974,9 @@ export function buildModelScopeFileUrl(
 ): string {
   const [owner, repo] = modelId.split('/');
   if (!owner || !repo) throw new Error('ModelScope model ID must be in owner/repo format.');
-  const params = new URLSearchParams({
-    FilePath: filePath,
-    Revision: revision,
-  });
-  return `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo?${params.toString()}`;
+  // ModelScope LFS files use the /resolve/ endpoint (302 → CDN), not /repo?
+  // which returns Code 10990101007 for LFS objects.
+  return `https://www.modelscope.cn/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/resolve/${encodeURIComponent(revision)}/${encodeURIComponent(filePath)}`;
 }
 
 async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): Promise<string[]> {
@@ -988,12 +986,19 @@ async function fetchModelScopeRepoFiles(modelId: string, revision = 'master'): P
     Revision: revision,
     Recursive: 'true',
   });
-  const response = await fetch(
-    `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo/files?${params.toString()}`,
-    {
-      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-installer' },
-    },
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo/files?${params.toString()}`,
+      {
+        headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-installer' },
+      },
+    );
+  } catch {
+    throw new Error(
+      'Unable to connect to ModelScope. Please check your network connection or proxy settings.',
+    );
+  }
   if (!response.ok) {
     throw new Error(`Failed to read ModelScope model files: HTTP ${response.status}`);
   }
@@ -1222,10 +1227,17 @@ async function downloadFile(
   let completedSuccessfully = false;
   try {
     const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
-    const response = await fetch(url, {
-      signal,
-      ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal,
+        ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
+      });
+    } catch {
+    throw new Error(
+      'Model download failed due to network error. Please check your network connection or proxy settings.',
+    );
+    }
     if (!response.ok || !response.body) {
       throw new Error(`Model download failed: HTTP ${response.status}`);
     }

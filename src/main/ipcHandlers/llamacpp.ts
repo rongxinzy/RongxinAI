@@ -7,7 +7,6 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelUnloadResult,
-  LlamaCppRuntimeImportResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -15,13 +14,13 @@ import { getLlamaCppLaunchContextLimitViolation, LlamaCppIpcChannel } from '../.
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager } from '../libs/llamacppManager';
-import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import {
-  buildLlamaCppRunningModelBinding,
   buildLlamaCppOpenClawAppConfig,
+  buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
 } from '../libs/llamacppOpenClawBinding';
+import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
@@ -381,11 +380,10 @@ export function registerLlamaCppIpcHandlers(
     const normalizedModelId = modelId.trim();
     const controller = activeInstalls.get(normalizedModelId);
     if (!controller) return { success: true, cancelled: false };
-    broadcast(LlamaCppIpcChannel.InstallProgress, {
-      modelId: normalizedModelId,
-      modelName: normalizedModelId,
-      phase: 'cancelling',
-    });
+    // Let installModel's catch block broadcast the 'cancelled' phase
+    // on abort — no need to send 'cancelling' first, which would cause
+    // a double broadcast (cancelling → cancelled) and an extra
+    // terminal-phase callback in the renderer.
     controller.abort(new Error('Install cancelled'));
     return { success: true, cancelled: true };
   });
