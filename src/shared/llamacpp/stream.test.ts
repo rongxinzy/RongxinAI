@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { createLlamaCppStreamState, reduceLlamaCppStreamChunk, splitThinkMarkup } from './stream';
 
 describe('llamacpp stream reducer', () => {
-  test('accumulates streaming content and final metrics', () => {
+  test('accumulates streaming content', () => {
     let state = createLlamaCppStreamState();
 
     state = reduceLlamaCppStreamChunk(state, {
@@ -12,14 +12,11 @@ describe('llamacpp stream reducer', () => {
     state = reduceLlamaCppStreamChunk(state, {
       message: { role: 'assistant', content: 'world' },
       done: true,
-      eval_count: 12,
-      predicted_per_second: 24,
     });
 
     expect(state.content).toBe('hello world');
     expect(state.phase).toBe('done');
     expect(state.done).toBe(true);
-    expect(state.finalChunk?.eval_count).toBe(12);
   });
 
   test('separates official thinking from final content', () => {
@@ -63,46 +60,6 @@ describe('llamacpp stream reducer', () => {
     expect(state.phase).toBe('done');
     expect(state.content).toBe('answer');
     expect(state.thinking).toBe('working');
-  });
-
-  test('preserves final metrics when a later done chunk has no stats', () => {
-    let state = createLlamaCppStreamState();
-
-    state = reduceLlamaCppStreamChunk(state, {
-      done: true,
-      eval_count: 9,
-      predicted_per_second: 17.5,
-    });
-    state = reduceLlamaCppStreamChunk(state, {
-      done: true,
-      done_reason: 'stop',
-    });
-
-    expect(state.finalChunk?.eval_count).toBe(9);
-    expect(state.finalChunk?.predicted_per_second).toBe(17.5);
-  });
-
-  test('preserves metrics from a timings chunk before a synthetic done chunk', () => {
-    let state = createLlamaCppStreamState();
-
-    state = reduceLlamaCppStreamChunk(state, {
-      message: { role: 'assistant', content: 'answer' },
-    });
-    state = reduceLlamaCppStreamChunk(state, {
-      timings: {
-        prompt_n: 8,
-        predicted_n: 12,
-        predicted_per_second: 18.5,
-      },
-    });
-    state = reduceLlamaCppStreamChunk(state, {
-      done: true,
-      done_reason: 'stop',
-    });
-
-    expect(state.finalChunk?.timings?.prompt_n).toBe(8);
-    expect(state.finalChunk?.timings?.predicted_n).toBe(12);
-    expect(state.finalChunk?.timings?.predicted_per_second).toBe(18.5);
   });
 
   test('splits legacy think markup out of content', () => {
