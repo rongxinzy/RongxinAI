@@ -918,6 +918,7 @@ export type OpenClawConfigSyncResult = {
   bindingsChanged?: boolean;
   mcpBridgeConfigChanged?: boolean;
   cronConfigChanged?: boolean;
+  channelsConfigChanged?: boolean;
 };
 
 const buildStreamingModeConfig = (
@@ -1952,6 +1953,21 @@ export class OpenClawConfigSync {
       /* ignore parse errors */
     }
 
+    // Detect channels config changes (email, weixin, dingtalk, etc.).
+    // The gateway reads channel configs only at startup, so they require a hard restart.
+    let channelsConfigChanged = false;
+    try {
+      const currentObj2 = currentContent ? JSON.parse(currentContent) : {};
+      const nextObj2 = JSON.parse(nextContent);
+      channelsConfigChanged =
+        JSON.stringify(currentObj2.channels ?? null) !== JSON.stringify(nextObj2.channels ?? null);
+      if (channelsConfigChanged) {
+        console.log(`${gwDiagTs()} channels config CHANGED, will request gateway restart`);
+      }
+    } catch {
+      /* ignore parse errors */
+    }
+
     if (configChanged) {
       // Diagnostic: diff gateway and plugins sections to identify what triggers OpenClaw restart
       try {
@@ -2045,6 +2061,7 @@ export class OpenClawConfigSync {
       ...(bindingsChanged ? { bindingsChanged } : {}),
       ...(mcpBridgeConfigChanged ? { mcpBridgeConfigChanged } : {}),
       ...(cronConfigChanged ? { cronConfigChanged } : {}),
+      ...(channelsConfigChanged ? { channelsConfigChanged } : {}),
       ...(agentsMdWarning ? { agentsMdWarning } : {}),
     };
   }
