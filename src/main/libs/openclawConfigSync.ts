@@ -917,6 +917,7 @@ export type OpenClawConfigSyncResult = {
   agentsMdWarning?: string;
   bindingsChanged?: boolean;
   mcpBridgeConfigChanged?: boolean;
+  cronConfigChanged?: boolean;
 };
 
 const buildStreamingModeConfig = (
@@ -1936,6 +1937,21 @@ export class OpenClawConfigSync {
       /* ignore parse errors */
     }
 
+    // Detect cron config changes (skipMissedJobs, maxConcurrentRuns, sessionRetention).
+    // The gateway reads these only at startup, so they require a hard restart.
+    let cronConfigChanged = false;
+    try {
+      const currentObj = currentContent ? JSON.parse(currentContent) : {};
+      const nextObj = JSON.parse(nextContent);
+      cronConfigChanged =
+        JSON.stringify(currentObj.cron ?? null) !== JSON.stringify(nextObj.cron ?? null);
+      if (cronConfigChanged) {
+        console.log(`${gwDiagTs()} cron config CHANGED, will request gateway restart`);
+      }
+    } catch {
+      /* ignore parse errors */
+    }
+
     if (configChanged) {
       // Diagnostic: diff gateway and plugins sections to identify what triggers OpenClaw restart
       try {
@@ -2028,6 +2044,7 @@ export class OpenClawConfigSync {
       configPath,
       ...(bindingsChanged ? { bindingsChanged } : {}),
       ...(mcpBridgeConfigChanged ? { mcpBridgeConfigChanged } : {}),
+      ...(cronConfigChanged ? { cronConfigChanged } : {}),
       ...(agentsMdWarning ? { agentsMdWarning } : {}),
     };
   }

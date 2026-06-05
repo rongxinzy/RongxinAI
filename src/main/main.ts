@@ -1425,9 +1425,10 @@ const doSyncOpenClawConfig = async (
   // (restartGateway=true).  On Windows, the gateway cannot restart itself
   // in-process (no SIGUSR1), so a full kill+spawn is the only reliable path.
   const mcpBridgeForceRestart = !!syncResult.mcpBridgeConfigChanged;
-  const needsHardRestart = secretEnvVarsChanged || syncResult.bindingsChanged || mcpBridgeForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
+  const cronForceRestart = !!syncResult.cronConfigChanged;
+  const needsHardRestart = secretEnvVarsChanged || syncResult.bindingsChanged || mcpBridgeForceRestart || cronForceRestart || (syncResult.changed && options.restartGatewayIfRunning);
 
-  console.log(`${D()} needsHardRestart=${needsHardRestart} (envChanged=${secretEnvVarsChanged} bindingsChanged=${!!syncResult.bindingsChanged} mcpBridgeChanged=${mcpBridgeForceRestart} configChanged=${syncResult.changed} restartFlag=${!!options.restartGatewayIfRunning})`);
+  console.log(`${D()} needsHardRestart=${needsHardRestart} (envChanged=${secretEnvVarsChanged} bindingsChanged=${!!syncResult.bindingsChanged} mcpBridgeChanged=${mcpBridgeForceRestart} cronChanged=${cronForceRestart} configChanged=${syncResult.changed} restartFlag=${!!options.restartGatewayIfRunning})`);
 
   if (!needsHardRestart) {
     console.log(`${D()} ──── NO RESTART, hot-reload only. reason=${options.reason}`);
