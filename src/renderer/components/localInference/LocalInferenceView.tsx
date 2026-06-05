@@ -24,6 +24,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
+  LlamaCppBackendInfo,
+  LlamaCppBackendRef,
   LlamaCppChatChunk as OllamaChatChunk,
   LlamaCppChatPayload as OllamaChatPayload,
   LlamaCppInstallProgress,
@@ -96,7 +98,6 @@ type LaunchRequest = {
 type OllamaServiceConfigFormState = {
   host: string;
   port: string;
-  customExecutablePath: string;
   device: string;
   modelsMax: string;
   modelsAutoload: string;
@@ -206,16 +207,6 @@ const smallOutlineButtonClass =
 const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
-  {
-    key: 'customExecutablePath',
-    labelKey: 'localInferenceServiceConfigExecutablePathLabel',
-    paramName: 'llama-server',
-    group: 'advanced',
-    type: 'input',
-    placeholderKey: 'localInferenceServiceConfigExecutablePathPlaceholder',
-    hintKey: 'localInferenceServiceConfigExecutablePathHint',
-    restartRequired: true,
-  },
   {
     key: 'modelsMax',
     labelKey: 'localInferenceServiceConfigModelsMaxLabel',
@@ -523,8 +514,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
   const [servicePopoverOpen, setServicePopoverOpen] = useState(false);
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
+  const [backendConfigDialogOpen, setBackendConfigDialogOpen] = useState(false);
   const [importGuideOpen, setImportGuideOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
+  const [backendList, setBackendList] = useState<LlamaCppBackendInfo[]>([]);
+  const [backendSelection, setBackendSelection] = useState<LlamaCppBackendRef | undefined>();
+  const [recommendedBackend, setRecommendedBackend] = useState<LlamaCppBackendRef | undefined>();
+  const [backendDevices, setBackendDevices] = useState<string | null>(null);
+  const [backendError, setBackendError] = useState<string | null>(null);
   const marketplaceSearchRef = useRef<number>(0);
   const toastTimerRef = useRef<number | null>(null);
   const installProgressDismissTimersRef = useRef<Record<string, number>>({});
@@ -661,6 +658,31 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const models = await window.electron.llamacpp.listRunningModels();
     setRunningModels(models);
     return models;
+  }, []);
+
+  const refreshBackends = useCallback(async () => {
+    try {
+      const result = await window.electron.llamacpp.listBackends();
+      if (!result.success) {
+        setBackendList([]);
+        setBackendSelection(undefined);
+        setRecommendedBackend(undefined);
+        setBackendError(mapBackendErrorMessage(result.error));
+        return result;
+      }
+      setBackendList(result.backends);
+      setBackendSelection(result.selection);
+      setRecommendedBackend(result.recommended);
+      setBackendError(result.backends.length === 0 ? i18nService.t('localInferenceBackendListEmpty') : null);
+      return result;
+    } catch (error) {
+      setBackendList([]);
+      setBackendSelection(undefined);
+      setRecommendedBackend(undefined);
+      const message = error instanceof Error ? error.message : String(error);
+      setBackendError(mapBackendErrorMessage(message));
+      return { success: false, backends: [], error: message };
+    }
   }, []);
 
   const waitForUnloadSettle = useCallback(
@@ -818,6 +840,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       const nextServiceConfig = await loadOllamaServiceConfig();
       setServiceConfig(nextServiceConfig);
+      await refreshBackends();
       const nextStatus = await refreshStatus();
       if (nextStatus.status === 'running') {
         await refreshLocalModels();
@@ -832,6 +855,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     marketplaceHasSearched,
     marketplaceQuery,
     refreshLocalModels,
+    refreshBackends,
     refreshRunningModels,
     refreshStatus,
     runAction,
@@ -961,13 +985,42 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         i18nService.t('localInferenceImportRuntimeSuccess'),
         LocalInferenceToastKind.Success,
       );
+      await refreshBackends();
       await refreshStatus();
     });
   };
 
-  const handleUninstallRuntime = () => {
+  const handleSelectBackend = (versionBackend: string) => {
+    const backend = backendList.find(item => item.versionBackend === versionBackend);
+    if (!backend) return;
+    setBackendSelection(backend);
+  };
+
+  const handleInstallSelectedBackend = () => {
     void runAction(async () => {
-      const result = await window.electron.llamacpp.uninstallRuntime();
+      const target = backendSelection ?? recommendedBackend;
+      const result = target
+        ? await window.electron.llamacpp.installBackend(target)
+        : await window.electron.llamacpp.install();
+      if (!result.success) {
+        showToast(
+          result.error || i18nService.t('localInferenceRuntimeMissing'),
+          LocalInferenceToastKind.Error,
+        );
+        return;
+      }
+      showToast(i18nService.t('localInferenceRuntimeReady'), LocalInferenceToastKind.Success);
+      await refreshBackends();
+      await refreshStatus();
+    });
+  };
+
+  const handleUninstallSelectedBackend = () => {
+    void runAction(async () => {
+      const target = backendSelection;
+      const result = target
+        ? await window.electron.llamacpp.uninstallBackend(target)
+        : await window.electron.llamacpp.uninstallRuntime();
       if (!result.success) {
         showToast(
           result.error || i18nService.t('localInferenceRuntimeUninstallFailed'),
@@ -975,25 +1028,31 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         );
         return;
       }
-
-      if (result.deleted) {
-        showToast(
-          i18nService.t('localInferenceRuntimeUninstalled'),
-          LocalInferenceToastKind.Success,
-        );
-      } else {
-        showToast(
-          i18nService.t('localInferenceRuntimeNotInstalled'),
-          LocalInferenceToastKind.Info,
-        );
-      }
-      if (result.status.status === 'running') {
-        await refreshLocalModels();
-        await refreshRunningModels();
-      } else {
-        setRunningModels([]);
-      }
+      showToast(
+        result.deleted
+          ? i18nService.t('localInferenceRuntimeUninstalled')
+          : i18nService.t('localInferenceRuntimeNotInstalled'),
+        result.deleted ? LocalInferenceToastKind.Success : LocalInferenceToastKind.Info,
+      );
+      await refreshBackends();
       await refreshStatus();
+    });
+  };
+
+  const handleCheckRuntimeDevices = () => {
+    void runAction(async () => {
+      const result = await window.electron.llamacpp.listRuntimeDevices();
+      if (!result.success) {
+        const message = result.error || i18nService.t('localInferenceBackendDeviceCheckFailed');
+        setBackendDevices(message);
+        showToast(message, LocalInferenceToastKind.Error);
+        return;
+      }
+      const summary = result.devices.length > 0
+        ? result.devices.map(device => `${device.id}: ${device.name}`).join('\n')
+        : result.rawOutput || i18nService.t('localInferenceBackendNoDevices');
+      setBackendDevices(summary);
+      showToast(i18nService.t('localInferenceBackendDeviceCheckDone'), LocalInferenceToastKind.Success);
     });
   };
 
@@ -1354,8 +1413,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onPrepare={handlePrepare}
               onStop={handleStop}
               onImportRuntime={handleImportRuntime}
-              onUninstallRuntime={handleUninstallRuntime}
               onOpenImportGuide={() => setImportGuideOpen(true)}
+              onOpenBackendConfig={() => {
+                setServicePopoverOpen(false);
+                setBackendConfigDialogOpen(true);
+                void refreshBackends().catch(() => undefined);
+              }}
               onOpenServiceConfig={() => {
                 setServicePopoverOpen(false);
                 setServiceConfigDialogOpen(true);
@@ -1363,6 +1426,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onRefresh={() =>
                 void runAction(async () => {
                   const nextStatus = await refreshStatus();
+                  await refreshBackends();
                   if (nextStatus.status === 'running') {
                     await refreshLocalModels();
                     await refreshRunningModels();
@@ -1456,6 +1520,27 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           config={serviceConfig}
           onClose={() => setServiceConfigDialogOpen(false)}
           onSave={handleSaveServiceConfig}
+        />
+      )}
+      {backendConfigDialogOpen && (
+        <LlamaCppBackendConfigDialog
+          loading={loading}
+          running={isRunning}
+          backends={backendList}
+          selectedBackend={backendSelection}
+          recommendedBackend={recommendedBackend}
+          backendDevices={backendDevices}
+          backendError={backendError}
+          onClose={() => setBackendConfigDialogOpen(false)}
+          onBackendChange={handleSelectBackend}
+          onInstallBackend={handleInstallSelectedBackend}
+          onUninstallBackend={handleUninstallSelectedBackend}
+          onImportRuntime={handleImportRuntime}
+          onCheckDevices={handleCheckRuntimeDevices}
+          onRefresh={() => void runAction(async () => {
+            await refreshBackends();
+            await refreshStatus();
+          })}
         />
       )}
       {importGuideOpen && (
@@ -1592,8 +1677,8 @@ function ServicePopover({
   onPrepare,
   onStop,
   onImportRuntime,
-  onUninstallRuntime,
   onOpenImportGuide,
+  onOpenBackendConfig,
   onOpenServiceConfig,
   onRefresh,
 }: {
@@ -1608,8 +1693,8 @@ function ServicePopover({
   onPrepare: () => void;
   onStop: () => void;
   onImportRuntime: () => void;
-  onUninstallRuntime: () => void;
   onOpenImportGuide: () => void;
+  onOpenBackendConfig: () => void;
   onOpenServiceConfig: () => void;
   onRefresh: () => void;
 }) {
@@ -1620,11 +1705,6 @@ function ServicePopover({
     status?.status === 'not-installed' ||
     status?.status === 'installed' ||
     status?.status === 'stopped';
-  const canUninstallRuntime =
-    !running &&
-    status?.status !== undefined &&
-    status.status !== 'unknown' &&
-    status.status !== 'not-installed';
   const actionLabel =
     status?.status === 'not-installed'
       ? i18nService.t('localInferenceInstall')
@@ -1747,6 +1827,15 @@ function ServicePopover({
             </button>
             <button
               type="button"
+              onClick={onOpenBackendConfig}
+              disabled={loading}
+              className={smallOutlineButtonClass}
+            >
+              <CpuChipIcon className="h-3.5 w-3.5" />
+              {i18nService.t('localInferenceBackendConfigTitle')}
+            </button>
+            <button
+              type="button"
               onClick={onOpenServiceConfig}
               disabled={loading}
               className={smallOutlineButtonClass}
@@ -1799,22 +1888,258 @@ function ServicePopover({
                 {i18nService.t('localInferenceStop')}
               </button>
             ) : null}
-            {canUninstallRuntime ? (
-              <button
-                type="button"
-                onClick={onUninstallRuntime}
-                disabled={loading}
-                className={smallDangerButtonClass}
-              >
-                <TrashIcon className="h-3.5 w-3.5" />
-                {i18nService.t('localInferenceRuntimeUninstall')}
-              </button>
-            ) : null}
           </div>
         </div>
       )}
     </div>
   );
+}
+
+function LlamaCppBackendConfigDialog({
+  loading,
+  running,
+  backends,
+  selectedBackend,
+  recommendedBackend,
+  backendDevices,
+  backendError,
+  onClose,
+  onBackendChange,
+  onInstallBackend,
+  onUninstallBackend,
+  onImportRuntime,
+  onCheckDevices,
+  onRefresh,
+}: {
+  loading: boolean;
+  running: boolean;
+  backends: LlamaCppBackendInfo[];
+  selectedBackend?: LlamaCppBackendRef;
+  recommendedBackend?: LlamaCppBackendRef;
+  backendDevices: string | null;
+  backendError: string | null;
+  onClose: () => void;
+  onBackendChange: (versionBackend: string) => void;
+  onInstallBackend: () => void;
+  onUninstallBackend: () => void;
+  onImportRuntime: () => void;
+  onCheckDevices: () => void;
+  onRefresh: () => void;
+}) {
+  const backendVersions = useMemo(
+    () => Array.from(new Set(backends.map(backend => backend.version))),
+    [backends],
+  );
+  const selectedVersion = selectedBackend?.version ?? recommendedBackend?.version ?? backendVersions[0] ?? '';
+  const backendOptions = useMemo(
+    () => backends.filter(backend => backend.version === selectedVersion),
+    [backends, selectedVersion],
+  );
+  const selectedVersionBackend =
+    selectedBackend?.versionBackend ??
+    recommendedBackend?.versionBackend ??
+    backendOptions[0]?.versionBackend ??
+    '';
+  const selectedBackendInfo = backends.find(backend => backend.versionBackend === selectedVersionBackend);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-foreground">
+              {i18nService.t('localInferenceBackendConfigTitle')}
+            </h3>
+            <p className="mt-1 text-sm text-secondary">
+              {i18nService.t('localInferenceBackendConfigDescription')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            aria-label={i18nService.t('close')}
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-4 py-3">
+          <section className="rounded-xl border border-border bg-surface/40 px-3 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">
+                  {i18nService.t('localInferenceBackendManager')}
+                </h4>
+                <p className="mt-1 text-xs text-secondary">
+                  {selectedBackendInfo?.installed
+                    ? i18nService.t('localInferenceBackendInstalled')
+                    : i18nService.t('localInferenceBackendNotInstalled')}
+                </p>
+              </div>
+              {recommendedBackend ? (
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                  {i18nService.t('localInferenceBackendRecommended')
+                    .replace('{backend}', recommendedBackend.backend)}
+                </span>
+              ) : null}
+            </div>
+
+            {backendError ? (
+              <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                {backendError}
+              </p>
+            ) : null}
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="flex items-baseline gap-2">
+                  <span className="text-sm font-semibold text-foreground">
+                    {i18nService.t('localInferenceBackendVersion')}
+                  </span>
+                  <code className="text-[11px] text-secondary">version</code>
+                </span>
+                <select
+                  value={selectedVersion}
+                  onChange={event => {
+                    const next = backends.find(backend =>
+                      backend.version === event.target.value &&
+                      backend.versionBackend === recommendedBackend?.versionBackend,
+                    ) ?? backends.find(backend => backend.version === event.target.value);
+                    if (next) onBackendChange(next.versionBackend);
+                  }}
+                  disabled={loading || backendVersions.length === 0}
+                  className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+                >
+                  {backendVersions.map(version => (
+                    <option key={version} value={version}>{version}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="flex items-baseline gap-2">
+                  <span className="text-sm font-semibold text-foreground">
+                    {i18nService.t('localInferenceBackendName')}
+                  </span>
+                  <code className="text-[11px] text-secondary">backend</code>
+                </span>
+                <select
+                  value={selectedVersionBackend}
+                  onChange={event => onBackendChange(event.target.value)}
+                  disabled={loading || backendOptions.length === 0}
+                  className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+                >
+                  {backendOptions.map(backend => (
+                    <option key={backend.versionBackend} value={backend.versionBackend}>
+                      {backend.backend}{backend.installed ? ' ✓' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] text-secondary">
+                  {i18nService.t('localInferenceBackendCurrent')}
+                </p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {selectedBackend?.versionBackend ?? i18nService.t('localInferenceBackendNone')}
+                </p>
+                <p className="mt-1 text-[11px] text-secondary">
+                  {selectedBackendInfo
+                    ? i18nService.t(
+                      selectedBackendInfo.source === 'local'
+                        ? 'localInferenceBackendSourceLocal'
+                        : 'localInferenceBackendSourceRemote',
+                    )
+                    : i18nService.t('localInferenceBackendNone')}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] text-secondary">
+                  {i18nService.t('localInferenceBackendRecommendedLabel')}
+                </p>
+                <p className="mt-1 font-mono text-sm text-foreground">
+                  {recommendedBackend?.versionBackend ?? i18nService.t('localInferenceBackendNone')}
+                </p>
+              </div>
+            </div>
+
+            {backendDevices ? (
+              <pre className="mt-4 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-background px-3 py-2 text-xs text-secondary">
+                {backendDevices}
+              </pre>
+            ) : null}
+            {running ? (
+              <p className="mt-4 text-xs text-secondary">
+                {i18nService.t('localInferenceBackendRunningHint')}
+              </p>
+            ) : null}
+          </section>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:flex-wrap sm:justify-end">
+          <button type="button" onClick={onRefresh} disabled={loading} className={smallOutlineButtonClass}>
+            <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            {i18nService.t('refresh')}
+          </button>
+          <button
+            type="button"
+            onClick={onImportRuntime}
+            disabled={loading}
+            className={smallOutlineButtonClass}
+            title={i18nService.t('localInferenceImportRuntimeTooltip')}
+          >
+            <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+            {i18nService.t('localInferenceImportRuntime')}
+          </button>
+          <button
+            type="button"
+            onClick={onCheckDevices}
+            disabled={loading || !selectedBackendInfo?.installed}
+            className={smallOutlineButtonClass}
+          >
+            <CpuChipIcon className="h-3.5 w-3.5" />
+            {i18nService.t('localInferenceBackendCheckDevices')}
+          </button>
+          <button
+            type="button"
+            onClick={onUninstallBackend}
+            disabled={loading || !selectedBackendInfo?.installed}
+            className={smallDangerButtonClass}
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+            {i18nService.t('localInferenceRuntimeUninstall')}
+          </button>
+          <button
+            type="button"
+            onClick={onInstallBackend}
+            disabled={loading || backends.length === 0}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            {selectedBackendInfo?.installed
+              ? i18nService.t('localInferenceBackendSwitch')
+              : i18nService.t('localInferenceInstall')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function mapBackendErrorMessage(message: string | undefined): string {
+  if (!message) return i18nService.t('localInferenceBackendListFailed');
+  if (message.includes('No handler registered') && message.includes('llamacpp:backends:list')) {
+    return i18nService.t('localInferenceBackendHandlerMissing');
+  }
+  return message;
 }
 
 function OllamaServiceConfigDialog({
@@ -1877,7 +2202,6 @@ function OllamaServiceConfigDialog({
     const result = await onSave({
       host: form.host,
       port: form.port,
-      customExecutablePath: form.customExecutablePath,
       device: form.device,
       modelsMax: form.modelsMax,
       ...(form.modelsAutoload ? { modelsAutoload: form.modelsAutoload === 'true' } : {}),
@@ -3959,7 +4283,6 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
   return {
     host: config.host ?? '',
     port: config.port ?? '',
-    customExecutablePath: config.customExecutablePath ?? '',
     device: config.device ?? '',
     modelsMax: config.modelsMax ?? '',
     modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),

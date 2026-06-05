@@ -30,10 +30,8 @@ test('buildLlamaCppExecutableCandidates orders managed and explicit runtime path
     cwd: 'C:/work/RongxinAI',
     userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime',
     envPath: 'C:/custom/env/llama-server.exe',
-    configuredExecutablePath: 'C:/custom/ui/llama-server.exe',
-  }).slice(0, 5)).toEqual([
+  }).slice(0, 4)).toEqual([
     'C:/custom/env/llama-server.exe',
-    'C:/custom/ui/llama-server.exe',
     'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/bin/llama-server.exe',
     'C:/App/resources/llamacpp/llama-server.exe',
     'C:/App/resources/llamacpp/bin/llama-server.exe',

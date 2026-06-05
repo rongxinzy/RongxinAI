@@ -1,7 +1,7 @@
 import path from 'node:path';
 
-import { ProviderName } from '../../shared/providers';
 import { isDesignedAgentAvatarIcon } from '../../shared/agent/avatar';
+import { ProviderName } from '../../shared/providers';
 import type { Agent } from '../coworkStore';
 
 type BuildManagedAgentEntriesInput = {

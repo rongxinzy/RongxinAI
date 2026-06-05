@@ -32,25 +32,25 @@ const {
 };
 
 describe('llamacpp runtime download script', () => {
-  test('defaults to the configured Gitee asset with GitHub fallback', () => {
+  test('defaults to the configured Cloudflare asset with GitHub fallback', () => {
     const rootDir = process.cwd();
 
     expect(resolveRuntimeReleaseTag(rootDir, {})).toBe('b9505');
     expect(resolveRuntimeDownloadSource('win-x64', { rootDir, env: {} })).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
     );
     expect(resolveRuntimeDownloadSources('win-x64', { rootDir, env: {} })).toEqual([
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
       'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
     ]);
     expect(resolveRuntimeDownloadSource('win-x64-cuda-12', { rootDir, env: {} })).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
     );
     expect(resolveRuntimeCompanionDownloadSources('win-x64-cuda-12', { rootDir, env: {} })).toEqual([
       {
         assetName: 'cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
         urls: [
-          'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
+          'https://rongxinai.krli.org/llamacpp/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
           'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
         ],
       },
@@ -67,7 +67,7 @@ describe('llamacpp runtime download script', () => {
         env: { LLAMACPP_RUNTIME_RELEASE_TAG: 'b9243' },
       }),
     ).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9243/llama-b9243-bin-ubuntu-arm64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9243/llama-b9243-bin-ubuntu-arm64.tar.gz',
     );
   });
 

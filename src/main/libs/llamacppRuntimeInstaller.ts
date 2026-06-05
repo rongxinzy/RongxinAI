@@ -13,7 +13,7 @@ import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 const LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
 const LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL =
-  'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download';
+  'https://rongxinai.krli.org/llamacpp';
 const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
   [LlamaCppRuntimeTargetId.MacArm64]: 'llama-{tag}-bin-macos-arm64.tar.gz',
   [LlamaCppRuntimeTargetId.MacX64]: 'llama-{tag}-bin-macos-x64.tar.gz',

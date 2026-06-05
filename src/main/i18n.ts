@@ -61,8 +61,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppUnloadVramRecoveryPending: '模型已从 llama.cpp 运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
     llamacppUnloadConfirmationPending: '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
     llamacppLaunchContextExceedsTrainingLimit: '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
-    localInferenceImportRuntimeDialogTitle: '选择 llama.cpp 运行时目录',
-    localInferenceImportRuntimeDialogMessage: '请选择包含 {name} 可执行文件的目录。该目录中的所有文件将被复制到 RongxinAI 管理的运行时目录中。',
+    localInferenceImportRuntimeDialogTitle: '选择 llama.cpp backend',
+    localInferenceImportRuntimeDialogMessage: '请选择 llama.cpp backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录。RongxinAI 会校验平台和 backend 类型后导入。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
     // IM error replies (differentiated by error kind)
@@ -328,8 +328,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppUnloadVramRecoveryPending: 'The model has been removed from the llama.cpp running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
     llamacppUnloadConfirmationPending: 'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
     llamacppLaunchContextExceedsTrainingLimit: 'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
-    localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Runtime Directory',
-    localInferenceImportRuntimeDialogMessage: 'Select the directory containing the {name} executable. All files in this directory will be copied into the RongxinAI-managed runtime directory.',
+    localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Backend',
+    localInferenceImportRuntimeDialogMessage: 'Select a llama.cpp backend archive (zip or tar.gz), or a fully extracted backend directory. RongxinAI will validate the platform and backend type before importing it.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',

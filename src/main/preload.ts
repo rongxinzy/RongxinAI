@@ -151,6 +151,14 @@ contextBridge.exposeInMainWorld('electron', {
     install: () => ipcRenderer.invoke(LlamaCppIpcChannel.Install),
     uninstallRuntime: () => ipcRenderer.invoke(LlamaCppIpcChannel.UninstallRuntime),
     listRuntimeDevices: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListRuntimeDevices),
+    listBackends: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListBackends),
+    getBackendSelection: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetBackendSelection),
+    setBackendSelection: (input: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.SetBackendSelection, input),
+    installBackend: (input?: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.InstallBackend, input),
+    uninstallBackend: (input?: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.UninstallBackend, input),
     importRuntime: () => ipcRenderer.invoke(LlamaCppIpcChannel.ImportRuntime),
     start: () => ipcRenderer.invoke(LlamaCppIpcChannel.Start),
     stop: () => ipcRenderer.invoke(LlamaCppIpcChannel.Stop),

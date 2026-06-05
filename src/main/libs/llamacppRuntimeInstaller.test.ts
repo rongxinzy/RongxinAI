@@ -90,7 +90,7 @@ describe('llamacpp runtime installer planning', () => {
       targetId: 'win-x64',
       runtimeRoot,
       executablePath: path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe'),
-      url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
+      url: 'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
       fallbackUrls: [
         'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
       ],
@@ -114,14 +114,14 @@ describe('llamacpp runtime installer planning', () => {
       targetId: 'win-x64-cuda-12',
       runtimeRoot,
       executablePath: path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe'),
-      url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
+      url: 'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
       fallbackUrls: [
         'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
       ],
       companionDownloads: [
         {
           assetName: 'cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
-          url: 'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
+          url: 'https://rongxinai.krli.org/llamacpp/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
           fallbackUrls: [
             'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
           ],
@@ -139,14 +139,14 @@ describe('llamacpp runtime installer planning', () => {
 
   test('resolves official runtime download URLs for packaged installs', () => {
     expect(resolveLlamaCppRuntimeDownloadUrl('mac-arm64')).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-macos-arm64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-macos-arm64.tar.gz',
     );
     expect(resolveLlamaCppRuntimeDownloadUrls('mac-arm64')).toEqual([
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-macos-arm64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-macos-arm64.tar.gz',
       'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-macos-arm64.tar.gz',
     ]);
     expect(resolveLlamaCppRuntimeDownloadUrl('win-x64-cuda-12')).toBe(
-      'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
     );
   });
 
