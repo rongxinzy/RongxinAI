@@ -4,7 +4,7 @@ import {
   CheckCircleIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -272,14 +272,25 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     };
   }, [selectedSkill, selectedMarketplaceSkill]);
 
+  // Map marketplace skill ID → name so installed skills use the same
+  // display name as the marketplace listing.
+  const marketplaceNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    marketplaceSkills.forEach(s => map.set(s.id, s.name));
+    return map;
+  }, [marketplaceSkills]);
+
+  const resolveSkillName = useCallback((id: string, fallback: string): string =>
+    marketplaceNameMap.get(id) || fallback, [marketplaceNameMap]);
+
   const filteredSkills = useMemo(() => {
     const query = skillSearchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
     return skills.filter(skill => {
-      const matchesSearch = skill.name.toLowerCase().includes(query)
+      const matchesSearch = resolveSkillName(skill.id, skill.name).toLowerCase().includes(query)
         || skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description).toLowerCase().includes(query);
       return matchesSearch;
     });
-  }, [skills, skillSearchQuery]);
+  }, [skills, skillSearchQuery, resolveSkillName]);
 
   const filteredMarketplaceSkills = useMemo(() => {
     const query = skillSearchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -836,7 +847,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                     <PuzzleIcon className="h-4 w-4 text-secondary" />
                   </div>
                   <span className="text-sm font-medium text-foreground truncate">
-                    {skill.name}
+                    {resolveSkillName(skill.id, skill.name)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -960,7 +971,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                       <PuzzleIcon className="h-4 w-4 text-secondary" />
                     </div>
                     <span className="text-sm font-medium text-foreground truncate">
-                      {skill.name}
+                      {resolveSkillName(skill.id, skill.name)}
                     </span>
                   </div>
                   <div className="flex-shrink-0">
