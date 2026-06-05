@@ -127,15 +127,40 @@ test:
 # Stage 4: 平台打包（自托管 Runner）
 # ═══════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════
+# Windows 安装包构建（自托管 Runner，tags: windows）
+#
+# 触发条件：
+#   - 推送 v* 格式的 tag（自动）
+#   - 通过 Web UI 手动触发（Pipeline → Run pipeline → 手动点 ▶）
+#
+# 缓存策略：
+#   - node_modules：按分支 + lockfile hash 缓存，减少重复安装
+#   - OpenClaw 运行时：按 OpenClaw 版本号缓存，避免每次完整构建
+#   - Python 运行时：按 Python 版本号缓存
+# ═══════════════════════════════════════════════════════
+
 build-windows:
   stage: build-platforms
   tags:
     - windows
   image: null
   before_script: []
+  cache:
+    - key: "win-npm-$CI_COMMIT_REF_SLUG"
+      paths:
+        - node_modules/
+    - key: "win-python-3.11.9"
+      paths:
+        - resources/python-win/
   script:
+    # 确保 pnpm 可用（OpenClaw 构建依赖 pnpm monorepo）
     - npm ci
+    - npm install -g pnpm
+    - $env:PATH = "$(npm prefix -g);$env:PATH"
+    # 准备便携 Python 运行时（缓存命中时跳过下载）
     - npm run setup:python-runtime
+    # 完整打包流程：OpenClaw 运行时 → 编译 → skills → electron-builder
     - npm run dist:win
     - |
       echo "Build output:"
