@@ -10,6 +10,7 @@ export type LlamaCppStreamState = {
   toolCalls: LlamaCppToolCall[];
   done: boolean;
   phase: LlamaCppStreamPhase;
+  finalChunk: LlamaCppChatChunk | null;
   error: string | null;
 };
 
@@ -22,6 +23,7 @@ export function createLlamaCppStreamState(): LlamaCppStreamState {
     toolCalls: [],
     done: false,
     phase: 'waiting',
+    finalChunk: null,
     error: null,
   };
 }
@@ -35,6 +37,7 @@ export function reduceLlamaCppStreamChunk(
       ...state,
       done: true,
       phase: 'error',
+      finalChunk: chunk,
       error: chunk.error,
     };
   }
@@ -64,6 +67,8 @@ export function reduceLlamaCppStreamChunk(
     phase = 'done';
   }
 
+  const finalChunk = resolveFinalChunk(state.finalChunk, chunk);
+
   return {
     rawContent,
     officialThinking,
@@ -72,6 +77,7 @@ export function reduceLlamaCppStreamChunk(
     toolCalls,
     done: Boolean(chunk.done),
     phase,
+    finalChunk,
     error: null,
   };
 }
@@ -105,6 +111,37 @@ export function splitThinkMarkup(value: string): { thinking: string; content: st
   return { thinking, content };
 }
 
+function resolveFinalChunk(
+  current: LlamaCppChatChunk | null,
+  next: LlamaCppChatChunk,
+): LlamaCppChatChunk | null {
+  if (hasMetrics(next)) return next;
+  if (!next.done) return current;
+  return current ?? next;
+}
+
+function hasMetrics(chunk: LlamaCppChatChunk): boolean {
+  return isFiniteNumber(chunk.prompt_eval_count)
+    || isFiniteNumber(chunk.eval_count)
+    || isFiniteNumber(chunk.predicted_per_second)
+    || isFiniteNumber(readNestedNumber(chunk.usage, 'prompt_tokens'))
+    || isFiniteNumber(readNestedNumber(chunk.usage, 'completion_tokens'))
+    || isFiniteNumber(readNestedNumber(chunk.usage, 'total_tokens'))
+    || isFiniteNumber(readNestedNumber(chunk.timings, 'prompt_n'))
+    || isFiniteNumber(readNestedNumber(chunk.timings, 'predicted_n'))
+    || isFiniteNumber(readNestedNumber(chunk.timings, 'predicted_per_second'));
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function readNestedNumber(source: unknown, key: string): number | undefined {
+  if (!source || typeof source !== 'object') return undefined;
+  const value = (source as Record<string, unknown>)[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
 function readStringField(message: unknown, key: string): string {
   if (!message || typeof message !== 'object') return '';
   const value = (message as Record<string, unknown>)[key];
@@ -116,4 +153,3 @@ function joinThinking(officialThinking: string, legacyThinking: string): string 
   if (!legacyThinking) return officialThinking;
   return `${officialThinking}\n${legacyThinking}`;
 }
-
