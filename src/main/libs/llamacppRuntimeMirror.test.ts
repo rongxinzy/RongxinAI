@@ -95,18 +95,18 @@ describe('llamacpp runtime Gitee mirror script', () => {
       {
         targetId: 'win-x64-cuda-12',
         role: 'runtime',
-        assetName: 'llama-b9505-bin-win-cuda-12.4-x64.zip',
+        assetName: 'llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
         upstreamUrl:
-          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.zip',
-        localPath: '/tmp/llamacpp-mirror/llama-b9505-bin-win-cuda-12.4-x64.zip',
+          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
+        localPath: '/tmp/llamacpp-mirror/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
       },
       {
         targetId: 'win-x64-cuda-12',
         role: 'companion',
-        assetName: 'cudart-llama-bin-win-cuda-12.4-x64.zip',
+        assetName: 'cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
         upstreamUrl:
-          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.zip',
-        localPath: '/tmp/llamacpp-mirror/cudart-llama-bin-win-cuda-12.4-x64.zip',
+          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
+        localPath: '/tmp/llamacpp-mirror/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
       },
     ]);
   });

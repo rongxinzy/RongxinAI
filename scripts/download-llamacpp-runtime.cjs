@@ -14,14 +14,14 @@ const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL =
 const OfficialAssetByTarget = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
-  'win-x64': 'llama-{tag}-bin-win-cpu-x64.zip',
-  'win-x64-cuda-12': 'llama-{tag}-bin-win-cuda-12.4-x64.zip',
-  'win-arm64': 'llama-{tag}-bin-win-cpu-arm64.zip',
+  'win-x64': 'llama-{tag}-bin-win-cpu-x64.tar.gz',
+  'win-x64-cuda-12': 'llama-{tag}-bin-win-cuda-12.4-x64.tar.gz',
+  'win-arm64': 'llama-{tag}-bin-win-cpu-arm64.tar.gz',
   'linux-x64': 'llama-{tag}-bin-ubuntu-x64.tar.gz',
   'linux-arm64': 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
 };
 const CompanionAssetsByTarget = {
-  'win-x64-cuda-12': ['cudart-llama-bin-win-cuda-12.4-x64.zip'],
+  'win-x64-cuda-12': ['cudart-llama-bin-win-cuda-12.4-x64.tar.gz'],
 };
 
 function resolveHostTargetId() {
@@ -118,7 +118,6 @@ function resolveOfficialRuntimeCompanionAssetNames(targetId, env = process.env) 
 
 function resolveArchiveExtension(archiveName) {
   if (archiveName.endsWith('.tar.gz')) return '.tar.gz';
-  if (archiveName.endsWith('.zip')) return '.zip';
   throw new Error(`Unsupported runtime archive format: ${archiveName}`);
 }
 
@@ -342,7 +341,7 @@ function extractArchiveSync(archivePath, extractDir) {
       "const tar=require('tar');",
       "const [archive,dir]=process.argv.slice(1);",
       "(async()=>{",
-      "if(archive.endsWith('.zip')) await extractZip(archive,{dir});",
+      "if(archive.endsWith('.tar.gz')) await extractZip(archive,{dir});",
       "else if(archive.endsWith('.tar.gz')) await tar.x({file:archive,cwd:dir});",
       "else throw new Error('Unsupported archive '+archive);",
       "})().catch(e=>{console.error(e.message);process.exit(1);});",

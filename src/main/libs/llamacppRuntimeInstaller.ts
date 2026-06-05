@@ -17,14 +17,14 @@ const LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL =
 const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
   [LlamaCppRuntimeTargetId.MacArm64]: 'llama-{tag}-bin-macos-arm64.tar.gz',
   [LlamaCppRuntimeTargetId.MacX64]: 'llama-{tag}-bin-macos-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.WinX64]: 'llama-{tag}-bin-win-cpu-x64.zip',
-  [LlamaCppRuntimeTargetId.WinX64Cuda12]: 'llama-{tag}-bin-win-cuda-12.4-x64.zip',
-  [LlamaCppRuntimeTargetId.WinArm64]: 'llama-{tag}-bin-win-cpu-arm64.zip',
+  [LlamaCppRuntimeTargetId.WinX64]: 'llama-{tag}-bin-win-cpu-x64.tar.gz',
+  [LlamaCppRuntimeTargetId.WinX64Cuda12]: 'llama-{tag}-bin-win-cuda-12.4-x64.tar.gz',
+  [LlamaCppRuntimeTargetId.WinArm64]: 'llama-{tag}-bin-win-cpu-arm64.tar.gz',
   [LlamaCppRuntimeTargetId.LinuxX64]: 'llama-{tag}-bin-ubuntu-x64.tar.gz',
   [LlamaCppRuntimeTargetId.LinuxArm64]: 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
 };
 const LLAMACPP_RUNTIME_COMPANION_ASSETS: Record<string, string[]> = {
-  [LlamaCppRuntimeTargetId.WinX64Cuda12]: ['cudart-llama-bin-win-cuda-12.4-x64.zip'],
+  [LlamaCppRuntimeTargetId.WinX64Cuda12]: ['cudart-llama-bin-win-cuda-12.4-x64.tar.gz'],
 };
 
 export type LlamaCppRuntimeInstallContext = {
@@ -312,7 +312,7 @@ async function downloadFile(url: string, outputPath: string, fallbackUrls: strin
 }
 
 async function extractArchive(archivePath: string, extractDir: string): Promise<void> {
-  if (archivePath.endsWith('.zip')) {
+  if (archivePath.endsWith('.tar.gz')) {
     await extractZip(archivePath, { dir: extractDir });
     return;
   }
