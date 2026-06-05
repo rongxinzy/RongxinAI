@@ -204,17 +204,42 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
+  ipcMain.handle(LlamaCppIpcChannel.ListBackends, async () => manager.listBackends());
+  ipcMain.handle(LlamaCppIpcChannel.GetBackendSelection, async () => manager.getBackendSelection());
+  ipcMain.handle(LlamaCppIpcChannel.SetBackendSelection, async (_event, input: unknown) => {
+    const ref = sanitizeLlamaCppBackendRef(input);
+    if (!ref) {
+      return {
+        success: false,
+        plan: { kind: 'needs-manual', message: 'Invalid llama.cpp backend selection.' },
+        error: 'Invalid llama.cpp backend selection.',
+      };
+    }
+    return await manager.setBackendSelection(ref);
+  });
+  ipcMain.handle(LlamaCppIpcChannel.InstallBackend, async (_event, input: unknown) => {
+    const ref = sanitizeLlamaCppBackendRef(input);
+    if (!ref) return await manager.installRuntime();
+    return await manager.setBackendSelection(ref);
+  });
+  ipcMain.handle(LlamaCppIpcChannel.UninstallBackend, async (_event, input: unknown) => {
+    const ref = sanitizeLlamaCppBackendRef(input);
+    if (!ref) return await manager.uninstallRuntime();
+    return await manager.uninstallBackend(ref);
+  });
   ipcMain.handle(LlamaCppIpcChannel.ImportRuntime, async () => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
       return { success: false, error: '没有活动窗口' };
     }
 
-    const executableName = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
     const result = await dialog.showOpenDialog(win, {
       title: t('localInferenceImportRuntimeDialogTitle'),
-      message: t('localInferenceImportRuntimeDialogMessage').replace('{name}', executableName),
-      properties: ['openDirectory'],
+      message: t('localInferenceImportRuntimeDialogMessage'),
+      properties: ['openFile', 'openDirectory'],
+      filters: [
+        { name: 'llama.cpp backend archives', extensions: ['zip', 'gz'] },
+      ],
     });
 
     if (result.canceled || result.filePaths.length === 0) {
@@ -501,7 +526,7 @@ export function sanitizeLlamaCppServiceConfig(
   const host = config?.host?.trim();
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
-  const customExecutablePath = config?.customExecutablePath?.trim();
+  const runtimeVersion = config?.runtimeVersion?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
   const modelsMax = normalizeIntegerString(config?.modelsMax);
@@ -525,7 +550,7 @@ export function sanitizeLlamaCppServiceConfig(
   if (host) next.host = host;
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
-  if (customExecutablePath) next.customExecutablePath = customExecutablePath;
+  if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion)) next.runtimeVersion = runtimeVersion;
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
   if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
   if (modelsMax) next.modelsMax = modelsMax;
@@ -565,6 +590,27 @@ export function sanitizeLlamaCppServiceConfig(
   if (typeof config?.noMmap === 'boolean') next.noMmap = config.noMmap;
   if (typeof config?.mlock === 'boolean') next.mlock = config.mlock;
   return next;
+}
+
+function sanitizeLlamaCppBackendRef(input: unknown): { version: string; backend: string; versionBackend: string } | null {
+  if (!input || typeof input !== 'object') return null;
+  const candidate = input as { version?: unknown; backend?: unknown; versionBackend?: unknown };
+  let version = typeof candidate.version === 'string' ? candidate.version.trim() : '';
+  let backend = typeof candidate.backend === 'string' ? candidate.backend.trim() : '';
+  const versionBackend = typeof candidate.versionBackend === 'string' ? candidate.versionBackend.trim() : '';
+  if ((!version || !backend) && versionBackend.includes('/')) {
+    const [parsedVersion, parsedBackend] = versionBackend.split('/');
+    version = parsedVersion?.trim() ?? '';
+    backend = parsedBackend?.trim() ?? '';
+  }
+  if (!isSafeLlamaCppBackendSegment(version) || !isSafeLlamaCppBackendSegment(backend)) {
+    return null;
+  }
+  return { version, backend, versionBackend: `${version}/${backend}` };
+}
+
+function isSafeLlamaCppBackendSegment(value: string): boolean {
+  return /^[A-Za-z0-9._-]+$/.test(value) && !value.includes('..');
 }
 
 function normalizeIntegerString(value: string | undefined): string | undefined {

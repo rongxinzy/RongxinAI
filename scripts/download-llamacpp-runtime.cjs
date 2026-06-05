@@ -10,7 +10,7 @@ const tar = require('tar');
 const DEFAULT_LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const DEFAULT_LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
 const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL =
-  'https://gitee.com/wanghaozhe1106/llama.cpp-runtime/releases/download';
+  'https://rongxinai.krli.org/llamacpp';
 const OfficialAssetByTarget = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',

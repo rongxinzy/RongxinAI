@@ -22,6 +22,11 @@ export const LlamaCppIpcChannel = {
   SetOpenClawModel: 'llamacpp:set-openclaw-model',
   ImportRuntime: 'llamacpp:import-runtime',
   ListRuntimeDevices: 'llamacpp:runtime:list-devices',
+  ListBackends: 'llamacpp:backends:list',
+  GetBackendSelection: 'llamacpp:backends:selection:get',
+  SetBackendSelection: 'llamacpp:backends:selection:set',
+  InstallBackend: 'llamacpp:backends:install',
+  UninstallBackend: 'llamacpp:backends:uninstall',
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
   ChatStreamChunk: 'llamacpp:chat-stream-chunk',
@@ -40,6 +45,7 @@ export type LlamaCppRuntimeBackend =
 
 export const LlamaCppRuntimeCudaMajor = {
   Cuda12: '12',
+  Cuda13: '13',
 } as const;
 
 export type LlamaCppRuntimeCudaMajor =

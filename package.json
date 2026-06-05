@@ -120,7 +120,6 @@
     "llamacpp:runtime:download:win-x64-cuda-12": "node scripts/download-llamacpp-runtime.cjs win-x64-cuda-12",
     "llamacpp:runtime:download:linux-x64": "node scripts/download-llamacpp-runtime.cjs linux-x64",
     "llamacpp:runtime:download:linux-arm64": "node scripts/download-llamacpp-runtime.cjs linux-arm64",
-    "llamacpp:runtime:mirror:gitee": "node scripts/mirror-llamacpp-runtime-gitee.cjs",
     "llamacpp:runtime:mac-arm64": "node scripts/run-build-llamacpp-runtime.cjs mac-arm64 && node scripts/sync-llamacpp-runtime-current.cjs mac-arm64",
     "llamacpp:runtime:mac-x64": "node scripts/run-build-llamacpp-runtime.cjs mac-x64 && node scripts/sync-llamacpp-runtime-current.cjs mac-x64",
     "llamacpp:runtime:win-x64": "node scripts/run-build-llamacpp-runtime.cjs win-x64 && node scripts/sync-llamacpp-runtime-current.cjs win-x64",

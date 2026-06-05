@@ -1,6 +1,6 @@
+import type { LlamaCppRunningModel } from '../../shared/llamacpp';
 import type { ProviderConfig } from '../../shared/providers';
 import { ApiFormat, ProviderName } from '../../shared/providers';
-import type { LlamaCppRunningModel } from '../../shared/llamacpp';
 
 const LLAMACPP_MIN_OPENCLAW_MAX_TOKENS = 512;
 const LLAMACPP_MAX_OPENCLAW_MAX_TOKENS = 4096;

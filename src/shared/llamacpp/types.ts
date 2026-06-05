@@ -16,6 +16,11 @@ export type LlamaCppStatusSnapshot = {
   executablePath?: string;
   pid?: number;
   managedByApp?: boolean;
+  runtimeVersion?: string;
+  runtimeBackendId?: string;
+  versionBackend?: string;
+  recommendedVersionBackend?: string;
+  runtimeSource?: string;
   runtimeTargetId?: string;
   runtimeBackend?: LlamaCppRuntimeBackend;
   runtimeCudaMajor?: LlamaCppRuntimeCudaMajor;
@@ -23,6 +28,78 @@ export type LlamaCppStatusSnapshot = {
   deviceProbeAvailable?: boolean;
   error?: string;
   checkedAt: string;
+};
+
+export type LlamaCppBackendAccelerator =
+  | 'cpu'
+  | 'cuda'
+  | 'metal'
+  | 'vulkan'
+  | 'hip'
+  | 'openvino'
+  | 'sycl'
+  | 'unknown';
+
+export type LlamaCppBackendRef = {
+  version: string;
+  backend: string;
+  versionBackend: string;
+};
+
+export type LlamaCppBackendArchivePart = {
+  assetName: string;
+  url?: string;
+  sha256?: string;
+  size?: number;
+};
+
+export type LlamaCppBackendManifestEntry = {
+  version: string;
+  backend: string;
+  platform: NodeJS.Platform | 'windows' | 'macos';
+  arch: string;
+  accelerator: LlamaCppBackendAccelerator;
+  cudaMajor?: LlamaCppRuntimeCudaMajor;
+  archive?: {
+    assetName: string;
+    url?: string;
+    sha256?: string;
+    size?: number;
+    parts?: LlamaCppBackendArchivePart[];
+  };
+  companions?: Array<{
+    assetName: string;
+    url?: string;
+    sha256?: string;
+    size?: number;
+    parts?: LlamaCppBackendArchivePart[];
+  }>;
+};
+
+export type LlamaCppBackendManifest = {
+  schemaVersion: 1;
+  defaultVersion?: string;
+  releaseBaseUrl?: string;
+  backends: LlamaCppBackendManifestEntry[];
+};
+
+export type LlamaCppBackendInfo = LlamaCppBackendRef & {
+  platform: string;
+  arch: string;
+  accelerator: LlamaCppBackendAccelerator;
+  cudaMajor?: LlamaCppRuntimeCudaMajor;
+  installed: boolean;
+  recommended: boolean;
+  current: boolean;
+  source: 'manifest' | 'local';
+};
+
+export type LlamaCppBackendListResult = {
+  success: boolean;
+  backends: LlamaCppBackendInfo[];
+  selection?: LlamaCppBackendRef;
+  recommended?: LlamaCppBackendRef;
+  error?: string;
 };
 
 export type LlamaCppRuntimeInstallPlan =
@@ -52,6 +129,7 @@ export type LlamaCppRuntimeInstallResult = {
   success: boolean;
   plan: LlamaCppRuntimeInstallPlan;
   executablePath?: string;
+  backend?: LlamaCppBackendRef;
   error?: string;
 };
 
@@ -60,12 +138,14 @@ export type LlamaCppRuntimeUninstallResult = {
   deleted: boolean;
   runtimeRoot: string;
   status: LlamaCppStatusSnapshot;
+  backend?: LlamaCppBackendRef;
   error?: string;
 };
 
 export type LlamaCppRuntimeImportResult = {
   success: boolean;
   executablePath?: string;
+  backend?: LlamaCppBackendRef;
   error?: string;
 };
 
@@ -112,7 +192,7 @@ export type LlamaCppServiceConfig = {
   host?: string;
   port?: string;
   modelsDir?: string;
-  customExecutablePath?: string;
+  runtimeVersion?: string;
   runtimeBackend?: LlamaCppRuntimeBackend;
   runtimeCudaMajor?: LlamaCppRuntimeCudaMajor;
   modelsMax?: string;

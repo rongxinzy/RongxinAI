@@ -16,6 +16,7 @@ __pycache__/
 .codebuddy/
 .work/
 .idea/
+.pycache
 vendor/openclaw-runtime/
 vendor/openclaw-plugins/
 
@@ -61,3 +62,4 @@ specs/
 docs/
 localdocs/
 docker/
+llamacpp-oss-tools/
