@@ -24,6 +24,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
+  LlamaCppChatChunk as OllamaChatChunk,
   LlamaCppChatPayload as OllamaChatPayload,
   LlamaCppInstallProgress,
   LlamaCppModel as OllamaModel,
@@ -61,6 +62,7 @@ type InferenceMessage = {
   thinking?: string;
   hiddenThinking?: boolean;
   waiting?: boolean;
+  metrics?: OllamaChatChunk | null;
 };
 
 type LaunchFormState = {
@@ -169,6 +171,7 @@ type InstallProgressState = Record<string, LlamaCppInstallProgress>;
 type BuildAssistantMessageInput = {
   content: string;
   thinking: string;
+  metrics?: OllamaChatChunk | null;
 };
 type RequestPreviewInput = {
   model: string;
@@ -187,6 +190,7 @@ const LOCAL_INFERENCE_PROGRESS_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS = 500;
 const LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS = 3_000;
 const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
+const OPENCLAW_MIN_CTX = 32000;
 const DIRECT_ANSWER_SYSTEM_HINT = [
   'Answer as quickly and directly as possible.',
   'Skip unnecessary drafts, long internal monologues, and unrelated exploration.',
@@ -1114,6 +1118,27 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleSetOpenClawModel = (modelName: string) => {
     if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
+
+    const runningModel = runningModels.find(
+      m => m.name === modelName || m.model === modelName,
+    );
+    const ctxLength =
+      runningModel?.runtime_context_length ??
+      runningModel?.context_length ??
+      runningModel?.trained_context_length ??
+      runningModel?.details?.context_length;
+
+    if (ctxLength != null && ctxLength < OPENCLAW_MIN_CTX) {
+      showToast(
+        i18nService
+          .t('localInferenceSetOpenClawCtxTooSmall')
+          .replace('{ctx}', String(ctxLength))
+          .replace('{min}', String(OPENCLAW_MIN_CTX)),
+        LocalInferenceToastKind.Info,
+      );
+      return;
+    }
+
     void runAction(async () => {
       const result = await window.electron.llamacpp.setOpenClawModel(modelName);
       if (!result.success)
@@ -1170,6 +1195,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       },
     );
 
+    const streamStartTime = Date.now();
+
     try {
       const payload: OllamaChatPayload = {
         model: selectedModel,
@@ -1188,9 +1215,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       };
       await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
+      const metrics = computeStreamMetrics(streamState.finalChunk, streamStartTime);
       const assistantMessage = buildAssistantMessage({
         content: streamState.content,
         thinking: streamState.thinking,
+        metrics,
       });
       setMessages([...nextHistory, assistantMessage]);
       messagesRef.current = [...nextHistory, assistantMessage];
@@ -1200,9 +1229,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (sendError instanceof Error && sendError.message.includes('Generation cancelled')) {
         showToast(i18nService.t('localInferenceGenerationCancelled'));
         if (streamState.content || streamState.thinking) {
+          const metrics = computeStreamMetrics(streamState.finalChunk, streamStartTime);
           const assistantMessage = buildAssistantMessage({
             content: streamState.content,
             thinking: streamState.thinking,
+            metrics,
           });
           setMessages([...nextHistory, assistantMessage]);
           messagesRef.current = [...nextHistory, assistantMessage];
@@ -2487,9 +2518,11 @@ function LaunchModelDialog({
     }
 
     const next = suggestLaunchOptions(model, snapshot, navigator.hardwareConcurrency);
+    const bounds = getModelContextWindowRange(resolveModelParameterCount(model));
+    const clampedCtx = Math.min(Math.max(next.numCtx, bounds.min), bounds.max);
     setForm(current => ({
       ...current,
-      numCtx: String(next.numCtx),
+      numCtx: String(clampedCtx),
       accelerationMode: next.numGpu === undefined ? 'auto' : 'custom',
       customGpuLayers: next.numGpu === undefined ? '' : String(next.numGpu),
       numThread: String(next.numThread),
@@ -2502,10 +2535,18 @@ function LaunchModelDialog({
     gpuPreset: form.gpuPreset,
     customGpuDevices: form.customGpuDevices,
   });
+  const trainedCtxLength = model.trained_context_length ?? model.details?.context_length;
   const launchContextLimitViolation = getLaunchContextLimitViolation({
     requestedContextLength: parseOptionalInteger(form.numCtx),
-    trainedContextLength: model.trained_context_length ?? model.details?.context_length,
+    trainedContextLength: trainedCtxLength,
   });
+  const contextBounds = useMemo(() => {
+    const bounds = getModelContextWindowRange(resolveModelParameterCount(model));
+    if (trainedCtxLength && trainedCtxLength > 0) {
+      bounds.max = Math.min(bounds.max, trainedCtxLength);
+    }
+    return bounds;
+  }, [model, trainedCtxLength]);
   const servicePatch = resolveLaunchServiceConfig(form.gpuPreset, form.customGpuDevices);
   const gpuPresetChangesService =
     servicePatch !== null && hasServiceConfigPatchChanged(serviceConfig, servicePatch);
@@ -2655,8 +2696,9 @@ function LaunchModelDialog({
               <LaunchInput
                 label={i18nService.t('localInferenceLaunchNumCtx')}
                 value={form.numCtx}
-                min={512}
-                step={512}
+                min={contextBounds.min}
+                max={contextBounds.max}
+                step={contextBounds.step}
                 hint={i18nService.t('localInferenceLaunchNumCtxHint')}
                 onChange={value => updateForm('numCtx', value)}
               />
@@ -2779,6 +2821,7 @@ function LaunchInput({
   value,
   hint,
   min,
+  max,
   step,
   placeholder,
   onChange,
@@ -2787,20 +2830,30 @@ function LaunchInput({
   value: string;
   hint: string;
   min?: number;
+  max?: number;
   step?: number;
   placeholder?: string;
   onChange: (value: string) => void;
 }) {
+  const clamp = () => {
+    if (max === undefined) return;
+    const parsed = parseOptionalInteger(value);
+    if (parsed === undefined) return;
+    if (parsed > max) onChange(String(max));
+  };
+
   return (
     <label className="space-y-2">
       <span className="text-sm font-semibold text-foreground">{label}</span>
       <input
         type="number"
         min={min}
+        max={max}
         step={step}
         value={value}
         placeholder={placeholder}
         onChange={event => onChange(event.target.value)}
+        onBlur={clamp}
         className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60"
       />
       <p className="text-xs text-secondary">{hint}</p>
@@ -3411,7 +3464,6 @@ function InferencePanel({
                     submitPrompt();
                   }
                 }}
-                disabled={sending}
                 className="min-h-14 w-full resize-none rounded-2xl border-0 bg-transparent px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-secondary"
                 placeholder={i18nService.t('localInferencePromptPlaceholder')}
               />
@@ -3488,6 +3540,11 @@ function ChatBubble({
         ) : null}
         {streaming && !message.waiting && hasVisibleContent && (
           <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
+        )}
+        {!isUser && message.metrics && (
+          <p className="mt-2 text-xs text-secondary">
+            {formatMetricsSummary(message.metrics)}
+          </p>
         )}
       </div>
     </div>
@@ -4028,6 +4085,16 @@ function resolveModelParameterCount(model: OllamaModel): number {
   return match[2].toLowerCase() === 'b' ? amount * 1_000_000_000 : amount * 1_000_000;
 }
 
+type ContextWindowBounds = { min: number; max: number; step: number };
+
+function getModelContextWindowRange(params: number): ContextWindowBounds {
+  if (params <= 1_500_000_000) return { min: 512, max: 32768, step: 512 };
+  if (params <= 4_000_000_000) return { min: 1024, max: 65536, step: 1024 };
+  if (params <= 8_000_000_000) return { min: 2048, max: 131072, step: 2048 };
+  if (params <= 14_000_000_000) return { min: 2048, max: 131072, step: 4096 };
+  return { min: 4096, max: 131072, step: 4096 };
+}
+
 function isPullInProgress(progress?: Record<string, unknown>): boolean {
   if (!progress) return false;
   const status = readProgressStatus(progress);
@@ -4198,9 +4265,30 @@ function getAssistantScrollTop({
   return Math.max(0, containerScrollTop + (targetTop - containerTop) - offset);
 }
 
+function computeStreamMetrics(
+  finalChunk: OllamaChatChunk | null,
+  streamStartTime: number,
+): OllamaChatChunk | null {
+  if (!finalChunk) return null;
+  if (finalChunk.predicted_per_second != null) return finalChunk;
+  const elapsed = Math.max(0.001, (Date.now() - streamStartTime) / 1000);
+  const evalCount = finalChunk.eval_count;
+  if (evalCount != null) return { ...finalChunk, predicted_per_second: evalCount / elapsed };
+  const rawLen = finalChunk.message?.content?.length ?? 0;
+  if (rawLen > 0) return { ...finalChunk, predicted_per_second: Math.round(rawLen / 3) / elapsed };
+  return finalChunk;
+}
+
+function formatMetricsSummary(metrics: OllamaChatChunk): string {
+  const speedValue = metrics.predicted_per_second;
+  const speed = speedValue != null ? speedValue.toFixed(1) : '-';
+  return i18nService.t('localInferenceMetricsSpeed').replace('{speed}', speed);
+}
+
 function buildAssistantMessage({
   content,
   thinking,
+  metrics,
 }: BuildAssistantMessageInput): InferenceMessage {
   const visibleContent = content.trim()
     ? content
@@ -4211,6 +4299,7 @@ function buildAssistantMessage({
     role: 'assistant',
     content: visibleContent,
     ...(thinking.trim() ? { thinking } : {}),
+    metrics,
   };
 }
 
