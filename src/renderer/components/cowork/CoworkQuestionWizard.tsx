@@ -25,7 +25,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
   permission,
   onRespond,
 }) => {
-  const toolInput = permission.toolInput ?? {};
+  const toolInput = useMemo(() => permission.toolInput ?? {}, [permission.toolInput]);
 
   const questions = useMemo<QuestionItem[]>(() => {
     if (permission.toolName !== 'AskUserQuestion') return [];

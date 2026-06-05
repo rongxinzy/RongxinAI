@@ -122,6 +122,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
     setShowConfirmDelete(false);
   };
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   const handleTogglePin = (e: React.MouseEvent) => {
     e.stopPropagation();
     onTogglePin(!session.pinned);
@@ -221,8 +222,10 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
 
   useEffect(() => {
     if (!isRenaming) return;
+
     requestAnimationFrame(() => {
       renameInputRef.current?.focus();
+  /* eslint-enable react-hooks/exhaustive-deps */
       renameInputRef.current?.select();
     });
   }, [isRenaming]);

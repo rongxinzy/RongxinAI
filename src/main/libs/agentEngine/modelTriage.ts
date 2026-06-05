@@ -184,7 +184,7 @@ const TRIAGE_CLASSIFIER_PROMPT = `Classify the following user message into exact
 
 Reply with only one word: light, standard, or heavy.`;
 
-interface LocalClassificationResponse {
+interface _LocalClassificationResponse {
   category: 'light' | 'standard' | 'heavy' | null;
   error?: string;
 }

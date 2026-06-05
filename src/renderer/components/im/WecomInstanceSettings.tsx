@@ -54,10 +54,12 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
   const [nameValue, setNameValue] = useState(instance.instanceName);
 
   // Sync nameValue when instance changes
+  /* eslint-disable react-hooks/exhaustive-deps */
   React.useEffect(() => {
     setNameValue(instance.instanceName);
     setEditingName(false);
   }, [instance.instanceId]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const handleNameBlur = () => {
     setEditingName(false);

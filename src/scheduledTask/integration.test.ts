@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { expect,test } from 'vitest';
 
 import {
-BindingKind, DeliveryChannel,
+BindingKind,
   DeliveryMode,   OriginKind, PayloadKind,
 ScheduleKind, } from './constants';
 import { makeModel,makeTask } from './fixtures';

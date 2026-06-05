@@ -36,19 +36,13 @@ import {
   readCurrentBackendRef,
   recommendLlamaCppBackend,
   syncCurrentBackend,
-  toBackendRef,
   uninstallLlamaCppBackend,
-  updateLlamaCppBackend,
 } from './llamacppBackendManager';
 import { LlamaCppClient } from './llamacppClient';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
-  copyDirectoryContents,
   createLlamaCppRuntimeInstallPlan,
-  ensureLlamaCppRuntimeCurrent,
   executeLlamaCppRuntimeInstallPlan,
-  getProjectRoot,
-  resolveLlamaCppExecutableName,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
 import { getNvidiaSmiSnapshot } from './nvidiaSmi';
@@ -1028,7 +1022,7 @@ function inferLlamaCppDeviceBackend(id: string, name: string): string {
   return 'unknown';
 }
 
-export async function findLlamaCppExecutable(config: LlamaCppServiceConfig = {}): Promise<string | null> {
+export async function findLlamaCppExecutable(_config: LlamaCppServiceConfig = {}): Promise<string | null> {
   for (const candidate of buildLlamaCppExecutableCandidates({
     platform: process.platform,
     isPackaged: app.isPackaged,
@@ -1058,7 +1052,7 @@ export async function findLlamaCppExecutable(config: LlamaCppServiceConfig = {})
   }
 }
 
-async function findExternalLlamaCppExecutable(config: LlamaCppServiceConfig = {}): Promise<string | null> {
+async function findExternalLlamaCppExecutable(_config: LlamaCppServiceConfig = {}): Promise<string | null> {
   for (const candidate of buildLlamaCppExecutableCandidates({
     platform: process.platform,
     isPackaged: app.isPackaged,
@@ -1168,39 +1162,6 @@ export function selectLlamaCppRuntimeTarget(input: {
   };
 }
 
-async function resolveLlamaCppRuntimeTargetSelection(
-  config: LlamaCppServiceConfig,
-): Promise<{ ok: true; targetId: string } | { ok: false; error: string }> {
-  const preference = resolveLlamaCppRuntimeTargetPreference(config);
-  const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
-  return selectLlamaCppRuntimeTarget({
-    platform: process.platform,
-    arch: process.arch,
-    runtimeBackend: preference.runtimeBackend,
-    runtimeCudaMajor: preference.runtimeCudaMajor,
-    hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
-  });
-}
-
-function normalizeExistingManagedRuntimePath(input: {
-  executablePath: string | null;
-  preferredTargetId: string;
-  runtimeRoot: string;
-}): string | null {
-  if (!input.executablePath) return null;
-  const runtimeCurrentRoot = path.join(input.runtimeRoot, 'current');
-  if (!isPathInside(input.executablePath, runtimeCurrentRoot)) {
-    return input.executablePath;
-  }
-  const buildInfoPath = path.join(runtimeCurrentRoot, 'runtime-build-info.json');
-  try {
-    const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8')) as { target?: string };
-    return buildInfo.target?.trim() === input.preferredTargetId ? input.executablePath : null;
-  } catch {
-    return input.executablePath;
-  }
-}
-
 function resolveLlamaCppRuntimeMetadata(executablePath: string | undefined): Partial<LlamaCppStatusSnapshot> {
   if (!executablePath) {
     return {
@@ -1240,10 +1201,6 @@ function getManagedRuntimeRootForExecutable(executablePath: string): string | un
     return cwdCurrentRoot;
   }
   return undefined;
-}
-
-function readRuntimeTargetId(runtimeRoot: string): string | undefined {
-  return readRuntimeBuildMetadata(runtimeRoot)?.target;
 }
 
 function readRuntimeBuildMetadata(runtimeRoot: string): {

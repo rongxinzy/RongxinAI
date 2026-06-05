@@ -22,7 +22,6 @@ import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
   copyDirectoryContents,
   resolveLlamaCppExecutableName,
-  resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
 
 const DEFAULT_RUNTIME_VERSION = 'b9518';

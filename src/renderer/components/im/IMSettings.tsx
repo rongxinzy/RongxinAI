@@ -368,7 +368,7 @@ const IMSettings: React.FC = () => {
         // Not connected — keep QR visible with reconnect overlay.
         setWeixinQrStatus('expired');
       }
-    } catch (err) {
+    } catch {
       if (weixinTimerRef.current) { clearTimeout(weixinTimerRef.current); weixinTimerRef.current = null; }
       if (!isMountedRef.current) return;
       setWeixinQrStatus('expired');

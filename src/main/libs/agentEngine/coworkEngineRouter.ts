@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events';
 
-import type { CoworkError } from '../../../common/coworkError';
 import { makeCoworkError } from '../../../common/coworkError';
 import { CoworkErrorKind } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
