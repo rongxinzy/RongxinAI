@@ -683,6 +683,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleMarketplaceInstall = useCallback(
     async (model: MarketplaceModel) => {
+      if (pulling) {
+        showToast(
+          i18nService.t('marketplaceInstallAlreadyInProgress'),
+          LocalInferenceToastKind.Info,
+        );
+        return;
+      }
       const name = model.repoId;
       clearInstallProgressDismissTimer(name);
       setActivePullName(name);
@@ -713,7 +720,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         );
       }
     },
-    [clearInstallProgressDismissTimer, dismissToast, refreshLocalModels, showToast],
+    [clearInstallProgressDismissTimer, dismissToast, pulling, refreshLocalModels, showToast],
   );
 
   const runAction = useCallback(
