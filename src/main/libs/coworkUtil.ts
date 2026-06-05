@@ -518,17 +518,19 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         try { chmodSync(npxSh, 0o755); } catch { /* ignore */ }
         coworkLog('INFO', 'resolveNodeShim', `Created npx bash shim: ${npxSh} -> ${npxCliJsPosix}`);
 
-        // npx.cmd for Windows — uses %LOBSTERAI_NPM_BIN_DIR% env var to avoid
-        // hardcoding paths that may contain non-ASCII chars (breaks GBK cmd.exe).
+        // npx.cmd for Windows — hardcode the absolute npmBinDir path so the
+        // shim works without LOBSTERAI_NPM_BIN_DIR env var (e.g. dev mode).
         if (process.platform === 'win32') {
           const npxCmd = join(shimDir, 'npx.cmd');
+          // normalise backslashes; cmd.exe accepts forward slashes for paths
+          const npxCliJsArg = npxCliJs.replace(/\\/g, '/');
           const npxCmdContent = [
             '@echo off',
-            '"%~dp0node.cmd" "%LOBSTERAI_NPM_BIN_DIR%\\npx-cli.js" %*',
+            `"%~dp0node.cmd" "${npxCliJsArg}" %*`,
             '',
           ].join('\r\n');
           writeFileSync(npxCmd, npxCmdContent, 'utf8');
-          coworkLog('INFO', 'resolveNodeShim', `Created npx.cmd shim: ${npxCmd} (using env var LOBSTERAI_NPM_BIN_DIR)`);
+          coworkLog('INFO', 'resolveNodeShim', `Created npx.cmd shim: ${npxCmd} -> ${npxCliJsArg}`);
         }
       } else {
         coworkLog('WARN', 'resolveNodeShim', `npx-cli.js not found at: ${npxCliJs}`);
@@ -547,17 +549,19 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         try { chmodSync(npmSh, 0o755); } catch { /* ignore */ }
         coworkLog('INFO', 'resolveNodeShim', `Created npm bash shim: ${npmSh} -> ${npmCliJsPosix}`);
 
-        // npm.cmd for Windows — uses %LOBSTERAI_NPM_BIN_DIR% env var to avoid
-        // hardcoding paths that may contain non-ASCII chars (breaks GBK cmd.exe).
+        // npm.cmd for Windows — hardcode the absolute npmBinDir path so the
+        // shim works without LOBSTERAI_NPM_BIN_DIR env var (e.g. dev mode).
         if (process.platform === 'win32') {
           const npmCmd = join(shimDir, 'npm.cmd');
+          // normalise backslashes; cmd.exe accepts forward slashes for paths
+          const npmCliJsArg = npmCliJs.replace(/\\/g, '/');
           const npmCmdContent = [
             '@echo off',
-            '"%~dp0node.cmd" "%LOBSTERAI_NPM_BIN_DIR%\\npm-cli.js" %*',
+            `"%~dp0node.cmd" "${npmCliJsArg}" %*`,
             '',
           ].join('\r\n');
           writeFileSync(npmCmd, npmCmdContent, 'utf8');
-          coworkLog('INFO', 'resolveNodeShim', `Created npm.cmd shim: ${npmCmd} (using env var LOBSTERAI_NPM_BIN_DIR)`);
+          coworkLog('INFO', 'resolveNodeShim', `Created npm.cmd shim: ${npmCmd} -> ${npmCliJsArg}`);
         }
       } else {
         coworkLog('WARN', 'resolveNodeShim', `npm-cli.js not found at: ${npmCliJs}`);

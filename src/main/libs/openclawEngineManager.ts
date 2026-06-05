@@ -7,6 +7,7 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 
+import { t } from '../i18n';
 import { ensureElectronNodeShim, getElectronNodeRuntimePath, getSkillsRoot } from './coworkUtil';
 import {
   formatGatewayLogDateKey,
@@ -17,7 +18,6 @@ import {
 } from './gatewayLogRotation';
 import { getCodexHomeDir } from './openaiCodexAuth';
 import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
-import { t } from '../i18n';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 
 const gwDiagTs = (): string => {
@@ -442,12 +442,11 @@ export class OpenClawEngineManager extends EventEmitter {
       });
 
       const done = (exitCode: number | null) => {
-        const elapsed = Date.now();
         this.warmupProcess = null;
         console.log(`[OpenClaw] cache warmup finished (exitCode=${exitCode})`);
         this.cleanupWarmingLock();
         // Remove the temp launcher on success.
-        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch {}
+        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch { /* ignore cleanup errors */ }
         resolve();
       };
 
@@ -463,7 +462,7 @@ export class OpenClawEngineManager extends EventEmitter {
       setTimeout(() => {
         if (this.warmupProcess === child) {
           console.warn('[OpenClaw] cache warmup timed out after 120s, killing');
-          try { child.kill(); } catch {}
+          try { child.kill(); } catch { /* process already exited */ }
           this.warmupProcess = null;
           this.cleanupWarmingLock();
           resolve();
@@ -856,9 +855,25 @@ export class OpenClawEngineManager extends EventEmitter {
 
     // Inject node/npm/npx shims so gateway exec commands can use them.
     // The shims wrap Electron as a Node.js runtime via ELECTRON_RUN_AS_NODE=1.
+    //
+    // In dev mode (app.isPackaged === false), bundled npm is found under
+    // the project root via pnpm's hoisted node_modules layout.
+    //
+    // Always clean old shim files first so that switching between packaged
+    // and dev mode does not leave stale npm.cmd / npx.cmd in the shim dir.
+    const shimDir = path.join(app.getPath('userData'), 'cowork', 'bin');
+    try {
+      if (fs.existsSync(shimDir)) {
+        for (const file of ['npm.cmd', 'npm', 'npx.cmd', 'npx']) {
+          const fp = path.join(shimDir, file);
+          try { fs.unlinkSync(fp); } catch { /* may not exist */ }
+        }
+      }
+    } catch { /* ignore cleanup errors */ }
+
     const npmBinDir = app.isPackaged
       ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin')
-      : undefined;
+      : path.join(app.getAppPath(), 'node_modules', 'npm', 'bin');
     const nodeShimDir = ensureElectronNodeShim(electronNodeRuntimePath, npmBinDir);
     if (nodeShimDir) {
       const curPath = env.PATH || env.Path || '';
