@@ -7,6 +7,7 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 
+import { t } from '../i18n';
 import { ensureElectronNodeShim, getElectronNodeRuntimePath, getSkillsRoot } from './coworkUtil';
 import {
   formatGatewayLogDateKey,
@@ -17,7 +18,6 @@ import {
 } from './gatewayLogRotation';
 import { getCodexHomeDir } from './openaiCodexAuth';
 import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
-import { t } from '../i18n';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 
 const gwDiagTs = (): string => {
@@ -442,12 +442,11 @@ export class OpenClawEngineManager extends EventEmitter {
       });
 
       const done = (exitCode: number | null) => {
-        const elapsed = Date.now();
         this.warmupProcess = null;
         console.log(`[OpenClaw] cache warmup finished (exitCode=${exitCode})`);
         this.cleanupWarmingLock();
         // Remove the temp launcher on success.
-        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch {}
+        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch { /* ignore cleanup errors */ }
         resolve();
       };
 
@@ -463,7 +462,7 @@ export class OpenClawEngineManager extends EventEmitter {
       setTimeout(() => {
         if (this.warmupProcess === child) {
           console.warn('[OpenClaw] cache warmup timed out after 120s, killing');
-          try { child.kill(); } catch {}
+          try { child.kill(); } catch { /* process already exited */ }
           this.warmupProcess = null;
           this.cleanupWarmingLock();
           resolve();
