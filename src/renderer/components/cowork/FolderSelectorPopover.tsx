@@ -9,36 +9,6 @@ import ClockIcon from '../icons/ClockIcon';
 import FolderIcon from '../icons/FolderIcon';
 import FolderPlusIcon from '../icons/FolderPlusIcon';
 
-// Custom tooltip for folder paths
-interface PathTooltipProps {
-  path: string;
-  anchorRect: DOMRect | null;
-  visible: boolean;
-}
-
-const PathTooltip: React.FC<PathTooltipProps> = ({ path, anchorRect, visible }) => {
-  if (!visible || !anchorRect) return null;
-
-  // Position tooltip above the item, centered
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: anchorRect.top - 8,
-    left: anchorRect.left + anchorRect.width / 2,
-    transform: 'translate(-50%, -100%)',
-    maxWidth: '400px',
-    zIndex: 10002,
-  };
-
-  return (
-    <div
-      style={style}
-      className="px-3.5 py-2.5 text-[13px] leading-relaxed rounded-xl shadow-xl bg-background text-foreground border-border border break-all pointer-events-none"
-    >
-      {path}
-    </div>
-  );
-};
-
 interface FolderSelectorPopoverProps {
   isOpen: boolean;
   onClose: () => void;
@@ -62,17 +32,10 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   const [recentFolders, setRecentFolders] = useState<string[]>([]);
   const [showRecentSubmenu, setShowRecentSubmenu] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [submenuPosition, setSubmenuPosition] = useState({ top: 0, left: 0 });
-  const [tooltipState, setTooltipState] = useState<{
-    visible: boolean;
-    path: string;
-    rect: DOMRect | null;
-  }>({ visible: false, path: '', rect: null });
   const [portalStyle, setPortalStyle] = useState<React.CSSProperties>({});
   const popoverRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const recentFoldersRef = useRef<HTMLDivElement>(null);
-  const tooltipTimerRef = useRef<NodeJS.Timeout | null>(null);
   const submenuCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const updatePortalPosition = useCallback(() => {
@@ -101,9 +64,6 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (tooltipTimerRef.current) {
-        clearTimeout(tooltipTimerRef.current);
-      }
       if (submenuCloseTimerRef.current) {
         clearTimeout(submenuCloseTimerRef.current);
       }
@@ -134,12 +94,6 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
       loadRecentFolders();
     } else {
       setShowRecentSubmenu(false);
-      // Clear tooltip and submenu timer when popover closes
-      setTooltipState({ visible: false, path: '', rect: null });
-      if (tooltipTimerRef.current) {
-        clearTimeout(tooltipTimerRef.current);
-        tooltipTimerRef.current = null;
-      }
       if (submenuCloseTimerRef.current) {
         clearTimeout(submenuCloseTimerRef.current);
         submenuCloseTimerRef.current = null;
@@ -192,17 +146,6 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  // Calculate submenu position relative to the Recent Folders button
-  useEffect(() => {
-    if (showRecentSubmenu && recentFoldersRef.current) {
-      const rect = recentFoldersRef.current.getBoundingClientRect();
-      setSubmenuPosition({
-        top: rect.top,
-        left: rect.right + 4, // 4px gap
-      });
-    }
-  }, [showRecentSubmenu]);
-
   const isWindowsDriveRoot = (dirPath: string): boolean => {
     if (window.electron.platform !== 'win32') return false;
     return /^[a-zA-Z]:[/\\]?$/.test(dirPath.trim());
@@ -232,30 +175,6 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
     onSelectFolder(path);
     onClose();
   };
-
-  const handleFolderMouseEnter = useCallback((path: string, event: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    // Clear any existing timer
-    if (tooltipTimerRef.current) {
-      clearTimeout(tooltipTimerRef.current);
-    }
-    // Show tooltip after a short delay
-    tooltipTimerRef.current = setTimeout(() => {
-      setTooltipState({
-        visible: true,
-        path: getCompactFolderName(path, 120) || i18nService.t('noFolderSelected'),
-        rect,
-      });
-    }, 300);
-  }, []);
-
-  const handleFolderMouseLeave = useCallback(() => {
-    if (tooltipTimerRef.current) {
-      clearTimeout(tooltipTimerRef.current);
-      tooltipTimerRef.current = null;
-    }
-    setTooltipState({ visible: false, path: '', rect: null });
-  }, []);
 
   const truncatePath = (path: string, maxLength = 40): string => {
     if (!path) return i18nService.t('noFolderSelected');
@@ -287,8 +206,8 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
       {/* Main popover */}
       <div
         ref={popoverRef}
-        style={portal ? portalStyle : undefined}
         className={`${portal ? '' : 'absolute bottom-full left-0 mb-2'} w-56 rounded-lg border border-border bg-surface shadow-lg z-50`}
+        style={portal ? portalStyle : undefined}
       >
         {/* Add Folder option */}
         <button
@@ -315,49 +234,39 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
             </div>
             <ChevronRightIcon className="h-3 w-3 text-secondary" />
           </button>
-        </div>
-      </div>
 
-      {/* Recent folders submenu - rendered as a portal-like fixed element */}
-      {showRecentSubmenu && (
-        <div
-          ref={submenuRef}
-          className="fixed w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg z-[10001]"
-          style={{ top: submenuPosition.top, left: submenuPosition.left }}
-          onMouseEnter={handleSubmenuMouseEnter}
-          onMouseLeave={handleSubmenuMouseLeave}
-        >
-          {isLoading ? (
-            <div className="px-3 py-2.5 text-sm text-secondary">
-              {i18nService.t('loading')}
+          {/* Recent folders submenu */}
+          {showRecentSubmenu && (
+            <div
+              ref={submenuRef}
+              className="absolute left-full top-0 w-56 max-h-[7rem] overflow-y-auto rounded-lg border border-border bg-surface shadow-lg z-[99999]"
+              onMouseEnter={handleSubmenuMouseEnter}
+              onMouseLeave={handleSubmenuMouseLeave}
+            >
+              {isLoading ? (
+                <div className="px-3 py-2.5 text-sm text-secondary">
+                  {i18nService.t('loading')}
+                </div>
+              ) : recentFolders.length === 0 ? (
+                <div className="px-3 py-2.5 text-sm text-secondary">
+                  {i18nService.t('noRecentFolders')}
+                </div>
+              ) : (
+                recentFolders.map((folder, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSelectRecentFolder(folder)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-raised transition-colors text-left first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    <FolderIcon className="h-4 w-4 flex-shrink-0 text-secondary" />
+                    <span className="truncate">{truncatePath(folder)}</span>
+                  </button>
+                ))
+              )}
             </div>
-          ) : recentFolders.length === 0 ? (
-            <div className="px-3 py-2.5 text-sm text-secondary">
-              {i18nService.t('noRecentFolders')}
-            </div>
-          ) : (
-            recentFolders.map((folder, index) => (
-              <button
-                key={index}
-                onClick={() => handleSelectRecentFolder(folder)}
-                onMouseEnter={(e) => handleFolderMouseEnter(folder, e)}
-                onMouseLeave={handleFolderMouseLeave}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-raised transition-colors text-left first:rounded-t-lg last:rounded-b-lg"
-              >
-                <FolderIcon className="h-4 w-4 flex-shrink-0 text-secondary" />
-                <span className="truncate">{truncatePath(folder)}</span>
-              </button>
-            ))
           )}
         </div>
-      )}
-
-      {/* Path tooltip */}
-      <PathTooltip
-        path={tooltipState.path}
-        anchorRect={tooltipState.rect}
-        visible={tooltipState.visible}
-      />
+      </div>
     </>
   );
 
