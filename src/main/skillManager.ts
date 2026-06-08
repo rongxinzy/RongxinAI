@@ -603,6 +603,31 @@ const runCommand = (
   });
 });
 
+const runCommandCapture = (
+  command: string,
+  args: string[],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string }> => new Promise((resolve, reject) => {
+  const child = spawn(command, args, {
+    cwd: options?.cwd,
+    env: options?.env,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+  child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+  child.on('error', error => reject(error));
+  child.on('close', code => {
+    if (code === 0) {
+      resolve({ stdout, stderr });
+      return;
+    }
+    reject(new Error(stderr.trim() || `Command failed with exit code ${code}`));
+  });
+});
+
 type SkillScriptRunResult = {
   success: boolean;
   exitCode: number | null;
@@ -2002,11 +2027,57 @@ export class SkillManager {
         }
 
         if (!downloaded) {
-          const cloneArgs = ['clone', '--depth', '1'];
-          if (normalized.ref) cloneArgs.push('--branch', normalized.ref);
-          cloneArgs.push(normalized.repoUrl, clonePath);
           const gitRuntime = resolveGitCommand();
-          await runCommand(gitRuntime.command, cloneArgs, { env: gitRuntime.env });
+          // For upgrades, prefer the installed skill's git remote URL over the
+          // marketplace URL — the latter may trigger HTTP redirects (e.g. ClawHub
+          // moving a skill from /skills/{slug} to /{user}/{slug}) that git cannot
+          // safely follow.  The installed repo's .git/config already points at the
+          // correct, working remote.
+          let cloneUrl = normalized.repoUrl;
+          if (fs.existsSync(path.join(existingSkillDir, '.git'))) {
+            try {
+              const { stdout } = await runCommandCapture(gitRuntime.command, ['remote', 'get-url', 'origin'], {
+                cwd: existingSkillDir,
+                env: gitRuntime.env,
+              });
+              const remoteUrl = stdout.trim();
+              if (remoteUrl) {
+                cloneUrl = remoteUrl;
+              }
+            } catch {
+              // Keep the original URL as fallback
+            }
+          }
+
+          try {
+            const cloneArgs = ['clone', '--depth', '1'];
+            if (normalized.ref) cloneArgs.push('--branch', normalized.ref);
+            cloneArgs.push(cloneUrl, clonePath);
+            await runCommand(gitRuntime.command, cloneArgs, { env: gitRuntime.env });
+          } catch (cloneErr: unknown) {
+            const cloneMsg = cloneErr instanceof Error ? cloneErr.message : String(cloneErr);
+            // If clone fails with a redirect error, fall back to fetching inside the
+            // existing repo — its on-disk remote URL may survive a redirect that a
+            // fresh clone cannot handle.
+            if (/unable to update url base from redirection/i.test(cloneMsg) || /redirect/i.test(cloneMsg)) {
+              console.log(`[SkillManager] clone redirect fallback, fetching in existing repo for "${skillId}"`);
+              const fetchArgs = ['fetch', '--depth', '1', 'origin'];
+              if (normalized.ref) fetchArgs.push(normalized.ref);
+              await runCommand(gitRuntime.command, fetchArgs, {
+                cwd: existingSkillDir,
+                env: gitRuntime.env,
+              });
+              await runCommand(gitRuntime.command, ['checkout', 'FETCH_HEAD'], {
+                cwd: existingSkillDir,
+                env: gitRuntime.env,
+              });
+              // Copy the updated existing dir to the temp clone path so the rest
+              // of the upgrade flow (security scan, atomic replace) works unchanged.
+              cpRecursiveSync(existingSkillDir, clonePath);
+            } else {
+              throw cloneErr;
+            }
+          }
         }
 
         if (normalized.sourceSubpath) {
