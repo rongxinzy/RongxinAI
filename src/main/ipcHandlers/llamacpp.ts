@@ -31,6 +31,21 @@ import type { SqliteStore } from '../sqliteStore';
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
 const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {};
+const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
+  modelsMax: '0',
+  timeout: '600',
+  threadsHttp: '4',
+  cacheReuse: '0',
+  cacheRam: '8192',
+  ctxSize: '4096',
+  parallel: '1',
+  batchSize: '2048',
+  ubatchSize: '512',
+  gpuLayers: 'auto',
+  threads: '-1',
+  threadsBatch: '-1',
+  mainGpu: '0',
+} as const;
 const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
 const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
 const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
@@ -504,22 +519,74 @@ export function sanitizeLlamaCppServiceConfig(
   const customExecutablePath = config?.customExecutablePath?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
-  const modelsMax = normalizeIntegerString(config?.modelsMax);
+  const modelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
+    min: 0,
+    max: 256,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax,
+  });
   const modelsAutoload = config?.modelsAutoload as unknown;
-  const timeout = normalizeIntegerString(config?.timeout);
-  const threadsHttp = normalizeSignedIntegerString(config?.threadsHttp);
-  const cacheReuse = normalizeIntegerString(config?.cacheReuse);
-  const cacheRam = normalizeSignedIntegerString(config?.cacheRam);
+  const timeout = normalizeIntegerStringWithDefault(config?.timeout, {
+    min: 1,
+    max: 86_400,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.timeout,
+  });
+  const threadsHttp = normalizeSignedIntegerStringWithDefault(config?.threadsHttp, {
+    min: 1,
+    max: 512,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threadsHttp,
+  });
+  const cacheReuse = normalizeIntegerStringWithDefault(config?.cacheReuse, {
+    min: 0,
+    max: 65_536,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.cacheReuse,
+  });
+  const cacheRam = normalizeSignedIntegerStringWithDefault(config?.cacheRam, {
+    min: 0,
+    max: 1_048_576,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.cacheRam,
+  });
   const ctxCheckpoints = normalizeIntegerString(config?.ctxCheckpoints);
   const checkpointEveryNt = normalizeSignedIntegerString(config?.checkpointEveryNt);
-  const ctxSize = normalizeIntegerString(config?.ctxSize);
-  const parallel = normalizeSignedIntegerString(config?.parallel);
-  const batchSize = normalizeIntegerString(config?.batchSize);
-  const ubatchSize = normalizeIntegerString(config?.ubatchSize);
-  const gpuLayers = normalizeGpuLayersString(config?.gpuLayers);
-  const threads = normalizeSignedIntegerString(config?.threads);
-  const threadsBatch = normalizeSignedIntegerString(config?.threadsBatch);
-  const mainGpu = normalizeIntegerString(config?.mainGpu);
+  const ctxSize = normalizeIntegerStringWithDefault(config?.ctxSize, {
+    min: 128,
+    max: 1_048_576,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.ctxSize,
+  });
+  const parallel = normalizeSignedIntegerStringWithDefault(config?.parallel, {
+    min: 0,
+    max: 256,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.parallel,
+  });
+  const batchSize = normalizeIntegerStringWithDefault(config?.batchSize, {
+    min: 1,
+    max: 65_536,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.batchSize,
+  });
+  const ubatchSize = normalizeIntegerStringWithDefault(config?.ubatchSize, {
+    min: 1,
+    max: 65_536,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.ubatchSize,
+  });
+  const gpuLayers = normalizeGpuLayersStringWithDefault(config?.gpuLayers, {
+    min: 0,
+    max: 4_096,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.gpuLayers,
+  });
+  const threads = normalizeSignedIntegerStringWithDefault(config?.threads, {
+    min: -1,
+    max: 512,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threads,
+  });
+  const threadsBatch = normalizeSignedIntegerStringWithDefault(config?.threadsBatch, {
+    min: -1,
+    max: 512,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threadsBatch,
+  });
+  const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, {
+    min: 0,
+    max: 64,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
+  });
   const reasoningBudget = normalizeSignedIntegerString(config?.reasoningBudget);
 
   if (host) next.host = host;
@@ -574,11 +641,35 @@ function normalizeIntegerString(value: string | undefined): string | undefined {
   return trimmed;
 }
 
+function normalizeIntegerStringWithDefault(
+  value: string | undefined,
+  range: { min: number; max: number; defaultValue: string },
+): string | undefined {
+  const normalized = normalizeIntegerString(value);
+  if (!normalized) return undefined;
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed)) return range.defaultValue;
+  if (parsed < range.min || parsed > range.max) return range.defaultValue;
+  return normalized;
+}
+
 function normalizeSignedIntegerString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
   if (!/^-?\d+$/.test(trimmed)) return undefined;
   return trimmed;
+}
+
+function normalizeSignedIntegerStringWithDefault(
+  value: string | undefined,
+  range: { min: number; max: number; defaultValue: string },
+): string | undefined {
+  const normalized = normalizeSignedIntegerString(value);
+  if (!normalized) return undefined;
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed)) return range.defaultValue;
+  if (parsed < range.min || parsed > range.max) return range.defaultValue;
+  return normalized;
 }
 
 function normalizeGpuLayersString(value: string | undefined): string | undefined {
@@ -587,6 +678,19 @@ function normalizeGpuLayersString(value: string | undefined): string | undefined
   if (trimmed === 'auto' || trimmed === 'all') return trimmed;
   if (!/^-?\d+$/.test(trimmed)) return undefined;
   return trimmed;
+}
+
+function normalizeGpuLayersStringWithDefault(
+  value: string | undefined,
+  range: { min: number; max: number; defaultValue: string },
+): string | undefined {
+  const normalized = normalizeGpuLayersString(value);
+  if (!normalized) return undefined;
+  if (normalized === 'auto' || normalized === 'all') return normalized;
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed)) return range.defaultValue;
+  if (parsed < range.min || parsed > range.max) return range.defaultValue;
+  return normalized;
 }
 
 function isSplitMode(value: unknown): value is NonNullable<LlamaCppServiceConfig['splitMode']> {
