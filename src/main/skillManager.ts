@@ -2005,6 +2005,12 @@ export class SkillManager {
       let localSource: string;
       if (isRemoteZipUrl(downloadUrl)) {
         localSource = await downloadZipUrl(downloadUrl, tempRoot);
+      } else if (parseClawhubUrl(downloadUrl)) {
+        const clawhubParsed = parseClawhubUrl(downloadUrl)!;
+        console.log(`[SkillManager] upgrade detected ClawHub URL, skill="${clawhubParsed.name}"`);
+        const env = buildSkillEnv();
+        await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
+        localSource = tempRoot;
       } else {
         const normalized = this.normalizeGitSource(downloadUrl);
         if (!normalized) {
