@@ -151,6 +151,7 @@ type InferenceOptionGroup = 'basic' | 'advanced';
 type SaveServiceConfigResult = {
   success: boolean;
   error?: string;
+  sanitizedFields?: string[];
 };
 
 const LocalInferenceToastKind = {
@@ -870,13 +871,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       try {
         const saved = await saveOllamaServiceConfig(config);
         setServiceConfig(saved);
+        const sanitizedFields = getSanitizedServiceConfigFields(config, saved);
         showToast(
-          status?.status === 'running'
-            ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
-            : i18nService.t('localInferenceServiceConfigSaved'),
+          sanitizedFields.length > 0
+            ? i18nService
+              .t('localInferenceServiceConfigSanitizedNotice')
+              .replace('{fields}', sanitizedFields.join('、'))
+            : status?.status === 'running'
+              ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
+              : i18nService.t('localInferenceServiceConfigSaved'),
           LocalInferenceToastKind.Success,
         );
-        return { success: true };
+        return { success: true, sanitizedFields };
       } catch (saveError) {
         const message = saveError instanceof Error ? saveError.message : String(saveError);
         return { success: false, error: message };
@@ -4208,9 +4214,9 @@ function resolveLaunchServiceConfig(
     case 'service-default':
       return null;
     case 'single-auto':
-      return { device: '', splitMode: 'none' };
+      return { device: 'CUDA0', splitMode: 'none' };
     case 'dual-gpu':
-      return { device: '', splitMode: 'layer' };
+      return { device: 'CUDA0,CUDA1', splitMode: 'layer' };
     case 'custom': {
       const normalized = normalizeGpuDeviceList(customGpuDevices);
       return normalized ? { device: normalized, splitMode: 'none' } : null;
@@ -4235,7 +4241,13 @@ function normalizeGpuDeviceList(value: string): string {
   return value
     .split(',')
     .map(part => part.trim())
-    .filter(part => /^[A-Za-z0-9_.:-]+$/.test(part) && !/^\d+$/.test(part))
+    .map(part => {
+      if (/^\d+$/.test(part)) {
+        return `CUDA${part}`;
+      }
+      return /^[A-Za-z0-9_.:-]+$/.test(part) ? part : '';
+    })
+    .filter(Boolean)
     .join(',');
 }
 
@@ -4281,6 +4293,35 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
     mlock: config.mlock === undefined ? '' : String(config.mlock),
     jinja: config.jinja ?? '',
   };
+}
+
+function getSanitizedServiceConfigFields(
+  input: OllamaServiceConfig,
+  saved: OllamaServiceConfig,
+): string[] {
+  const fields: Array<{ key: keyof OllamaServiceConfig; label: string }> = [
+    { key: 'modelsMax', label: i18nService.t('localInferenceServiceConfigModelsMaxLabel') },
+    { key: 'timeout', label: i18nService.t('localInferenceServiceConfigTimeoutLabel') },
+    { key: 'threadsHttp', label: i18nService.t('localInferenceServiceConfigThreadsHttpLabel') },
+    { key: 'cacheReuse', label: i18nService.t('localInferenceServiceConfigCacheReuseLabel') },
+    { key: 'cacheRam', label: i18nService.t('localInferenceServiceConfigCacheRamLabel') },
+    { key: 'ctxSize', label: i18nService.t('localInferenceServiceConfigCtxSizeLabel') },
+    { key: 'parallel', label: i18nService.t('localInferenceServiceConfigParallelLabel') },
+    { key: 'batchSize', label: i18nService.t('localInferenceServiceConfigBatchSizeLabel') },
+    { key: 'ubatchSize', label: i18nService.t('localInferenceServiceConfigUbatchSizeLabel') },
+    { key: 'gpuLayers', label: i18nService.t('localInferenceServiceConfigGpuLayersLabel') },
+    { key: 'threads', label: i18nService.t('localInferenceServiceConfigThreadsLabel') },
+    { key: 'threadsBatch', label: i18nService.t('localInferenceServiceConfigThreadsBatchLabel') },
+    { key: 'mainGpu', label: i18nService.t('localInferenceServiceConfigMainGpuLabel') },
+  ];
+  return fields
+    .filter(({ key }) => {
+      const original = input[key];
+      if (typeof original !== 'string' || !original.trim()) return false;
+      const next = saved[key];
+      return typeof next !== 'string' || next.trim() !== original.trim();
+    })
+    .map(({ label }) => label);
 }
 
 async function loadOllamaServiceConfig(): Promise<OllamaServiceConfig> {
@@ -5205,6 +5246,14 @@ export const __test__buildRequestPreview = (input: RequestPreviewInput) =>
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);
+export const __test__resolveLaunchServiceConfig = (
+  preset: string,
+  customGpuDevices: string,
+) => resolveLaunchServiceConfig(preset, customGpuDevices);
+export const __test__formatLaunchGpuPresetSummary = (
+  preset: string,
+  customGpuDevices: string,
+) => formatLaunchGpuPresetSummary(preset, customGpuDevices);
 export const __test__isModelScopeRepoId = (value: string) => isModelScopeRepoId(value);
 export const __test__isScrollNearBottom = (input: Parameters<typeof isScrollNearBottom>[0]) =>
   isScrollNearBottom(input);

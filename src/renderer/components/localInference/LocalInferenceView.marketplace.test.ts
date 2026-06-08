@@ -92,6 +92,40 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
   expect(keys).not.toContain('reasoningBudget');
 });
 
+test('launch gpu presets pin explicit devices for dual-gpu workstations', async () => {
+  const module = await import('./LocalInferenceView');
+  const resolveLaunchServiceConfig = (module as unknown as {
+    __test__resolveLaunchServiceConfig?: (
+      preset: string,
+      customGpuDevices: string,
+    ) => { device?: string; splitMode?: string } | null;
+  }).__test__resolveLaunchServiceConfig;
+  const formatLaunchGpuPresetSummary = (module as unknown as {
+    __test__formatLaunchGpuPresetSummary?: (preset: string, customGpuDevices: string) => string;
+  }).__test__formatLaunchGpuPresetSummary;
+
+  expect(typeof resolveLaunchServiceConfig).toBe('function');
+  expect(typeof formatLaunchGpuPresetSummary).toBe('function');
+  if (!resolveLaunchServiceConfig) return;
+  if (!formatLaunchGpuPresetSummary) return;
+
+  expect(resolveLaunchServiceConfig('service-default', '')).toBeNull();
+  expect(resolveLaunchServiceConfig('single-auto', '')).toEqual({
+    device: 'CUDA0',
+    splitMode: 'none',
+  });
+  expect(resolveLaunchServiceConfig('dual-gpu', '')).toEqual({
+    device: 'CUDA0,CUDA1',
+    splitMode: 'layer',
+  });
+  expect(resolveLaunchServiceConfig('custom', '0,1')).toEqual({
+    device: 'CUDA0,CUDA1',
+    splitMode: 'none',
+  });
+  expect(resolveLaunchServiceConfig('custom', 'bad input')).toBeNull();
+  expect(formatLaunchGpuPresetSummary('dual-gpu', '')).toContain('CUDA0,CUDA1');
+});
+
 test('llama.cpp inference option metadata uses OpenAI-compatible request parameter keys', async () => {
   const module = await import('./LocalInferenceView');
   const getInferenceOptionFields = (module as unknown as {

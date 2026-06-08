@@ -535,20 +535,20 @@ export function sanitizeLlamaCppServiceConfig(
   const runtimeCudaMajor = config?.runtimeCudaMajor;
   const modelsMax = normalizeModelsMaxString(config?.modelsMax);
   const modelsAutoload = config?.modelsAutoload as unknown;
-  const timeout = normalizeIntegerString(config?.timeout);
-  const threadsHttp = normalizeSignedIntegerString(config?.threadsHttp);
-  const cacheReuse = normalizeIntegerString(config?.cacheReuse);
-  const cacheRam = normalizeSignedIntegerString(config?.cacheRam);
+  const timeout = normalizeIntegerStringWithDefault(config?.timeout, { min: 0, max: 86400, defaultValue: '600' });
+  const threadsHttp = normalizeIntegerStringWithDefault(config?.threadsHttp, { min: 0, max: 256, defaultValue: '4' });
+  const cacheReuse = normalizeIntegerStringWithDefault(config?.cacheReuse, { min: 0, max: 256, defaultValue: '0' });
+  const cacheRam = normalizeIntegerStringWithDefault(config?.cacheRam, { min: 0, max: 1048576, defaultValue: '8192' });
   const ctxCheckpoints = normalizeIntegerString(config?.ctxCheckpoints);
   const checkpointEveryNt = normalizeSignedIntegerString(config?.checkpointEveryNt);
-  const ctxSize = normalizeIntegerString(config?.ctxSize);
-  const parallel = normalizeSignedIntegerString(config?.parallel);
-  const batchSize = normalizeIntegerString(config?.batchSize);
-  const ubatchSize = normalizeIntegerString(config?.ubatchSize);
+  const ctxSize = normalizeIntegerStringWithDefault(config?.ctxSize, { min: 0, max: 1048576, defaultValue: '4096' });
+  const parallel = normalizeIntegerStringWithDefault(config?.parallel, { min: 0, max: 256, defaultValue: '1' });
+  const batchSize = normalizeIntegerStringWithDefault(config?.batchSize, { min: 0, max: 1048576, defaultValue: '2048' });
+  const ubatchSize = normalizeIntegerStringWithDefault(config?.ubatchSize, { min: 0, max: 1048576, defaultValue: '512' });
   const gpuLayers = normalizeGpuLayersString(config?.gpuLayers);
-  const threads = normalizeSignedIntegerString(config?.threads);
-  const threadsBatch = normalizeSignedIntegerString(config?.threadsBatch);
-  const mainGpu = normalizeIntegerString(config?.mainGpu);
+  const threads = normalizeSignedIntegerStringWithDefault(config?.threads, { min: -1, max: 1024, defaultValue: '-1' });
+  const threadsBatch = normalizeSignedIntegerStringWithDefault(config?.threadsBatch, { min: -1, max: 1024, defaultValue: '-1' });
+  const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, { min: 0, max: 256, defaultValue: '0' });
   const reasoningBudget = normalizeSignedIntegerString(config?.reasoningBudget);
 
   if (host) next.host = host;
@@ -624,10 +624,36 @@ function normalizeIntegerString(value: string | undefined): string | undefined {
   return trimmed;
 }
 
+function normalizeIntegerStringWithDefault(
+  value: string | undefined,
+  options: { min: number; max: number; defaultValue: string },
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  if (n < options.min || n > options.max) return options.defaultValue;
+  return trimmed;
+}
+
+function normalizeSignedIntegerStringWithDefault(
+  value: string | undefined,
+  options: { min: number; max: number; defaultValue: string },
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (!/^-?\d+$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  if (n < options.min || n > options.max) return options.defaultValue;
+  return trimmed;
+}
+
 function normalizeModelsMaxString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return '0';
   if (!/^\d+$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  if (n < 0 || n > 256) return '0';
   return trimmed;
 }
 
@@ -643,6 +669,8 @@ function normalizeGpuLayersString(value: string | undefined): string | undefined
   if (!trimmed) return undefined;
   if (trimmed === 'auto' || trimmed === 'all') return trimmed;
   if (!/^-?\d+$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  if (n < -1 || n > 1024) return 'auto';
   return trimmed;
 }
 
