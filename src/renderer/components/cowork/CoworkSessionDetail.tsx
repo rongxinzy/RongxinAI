@@ -1787,19 +1787,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   useLayoutEffect(() => {
     updateArtifactPanelMaxWidth();
     const container = contentRowRef.current;
-    window.addEventListener('resize', updateArtifactPanelMaxWidth);
-
-    if (typeof ResizeObserver === 'undefined' || !container) {
-      return () => {
-        window.removeEventListener('resize', updateArtifactPanelMaxWidth);
-      };
-    }
 
     const resizeObserver = new ResizeObserver(updateArtifactPanelMaxWidth);
-    resizeObserver.observe(container);
+    if (container) {
+      resizeObserver.observe(container);
+    }
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', updateArtifactPanelMaxWidth);
     };
   }, [currentSession?.id, updateArtifactPanelMaxWidth]);
 
