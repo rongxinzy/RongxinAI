@@ -57,7 +57,17 @@ test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () =>
   expect(sanitizeLlamaCppServiceConfig({
     runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,
     runtimeCudaMajor: '11' as unknown as LlamaCppRuntimeCudaMajor,
-  })).toEqual({});
+  })).toEqual({
+    modelsMax: '0',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimited router slots', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    modelsMax: '',
+  })).toEqual({
+    modelsMax: '0',
+  });
 });
 
 test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw model selection', () => {

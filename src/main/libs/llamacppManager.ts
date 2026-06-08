@@ -317,6 +317,13 @@ export class LlamaCppManager extends EventEmitter {
       hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
       manifest,
       switchCurrent: false,
+      onProgress: progress => {
+        this.emit('install-progress', {
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          ...progress,
+        } satisfies LlamaCppInstallProgress);
+      },
     });
 
     if (result.success && result.executablePath) {
@@ -475,6 +482,13 @@ export class LlamaCppManager extends EventEmitter {
             arch: process.arch,
             hasNvidiaGpu,
             switchCurrent: false,
+            onProgress: progress => {
+              this.emit('install-progress', {
+                modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+                modelName: ref.versionBackend,
+                ...progress,
+              } satisfies LlamaCppInstallProgress);
+            },
           });
         })();
     if (result.success && result.executablePath) {
