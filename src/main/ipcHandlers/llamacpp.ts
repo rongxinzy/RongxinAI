@@ -533,7 +533,7 @@ export function sanitizeLlamaCppServiceConfig(
   const runtimeVersion = config?.runtimeVersion?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
-  const modelsMax = normalizeIntegerString(config?.modelsMax);
+  const modelsMax = normalizeModelsMaxString(config?.modelsMax);
   const modelsAutoload = config?.modelsAutoload as unknown;
   const timeout = normalizeIntegerString(config?.timeout);
   const threadsHttp = normalizeSignedIntegerString(config?.threadsHttp);
@@ -620,6 +620,13 @@ function isSafeLlamaCppBackendSegment(value: string): boolean {
 function normalizeIntegerString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+function normalizeModelsMaxString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return '0';
   if (!/^\d+$/.test(trimmed)) return undefined;
   return trimmed;
 }
