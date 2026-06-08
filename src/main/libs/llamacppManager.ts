@@ -51,6 +51,7 @@ import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 const execFileAsync = promisify(execFile);
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = '8080';
+const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 600_000;
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
@@ -140,6 +141,31 @@ export class LlamaCppManager extends EventEmitter {
     return path.join(app.getPath('userData'), 'llamacpp', 'models-preset.ini');
   }
 
+  getConnectionAndLoadTimeoutMs(): number {
+    const configuredSeconds = normalizePositiveInteger(this.getServiceConfig().timeout);
+    if (!configuredSeconds) return DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS;
+    return configuredSeconds * 1000;
+  }
+
+  private async resolveRuntimeServiceConfig(): Promise<LlamaCppServiceConfig> {
+    const config = this.getServiceConfig();
+    const requestedDevice = config.device?.trim();
+    if (!requestedDevice) return config;
+
+    try {
+      const runtimeDevices = await this.listRuntimeDevices();
+      if (!runtimeDevices.success || runtimeDevices.devices.length === 0) {
+        return config;
+      }
+      return {
+        ...config,
+        device: resolveLlamaCppDeviceSelection(requestedDevice, runtimeDevices.devices),
+      };
+    } catch {
+      return config;
+    }
+  }
+
   async detect(): Promise<LlamaCppStatusSnapshot> {
     const client = new LlamaCppClient(this.getBaseUrl());
     try {
@@ -183,10 +209,11 @@ export class LlamaCppManager extends EventEmitter {
       fs.writeFileSync(this.getPresetPath(), 'version = 1\n\n', 'utf-8');
     }
 
+    const runtimeConfig = await this.resolveRuntimeServiceConfig();
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
     this.process = spawn(
       this.executablePath,
-      buildLlamaServerArgs(this.getServiceConfig(), this.getModelsDir(), this.getPresetPath()),
+      buildLlamaServerArgs(runtimeConfig, this.getModelsDir(), this.getPresetPath()),
       {
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -236,7 +263,7 @@ export class LlamaCppManager extends EventEmitter {
       });
     });
 
-    await this.waitUntilHealthy(30_000);
+    await this.waitUntilHealthy(this.getConnectionAndLoadTimeoutMs());
     return this.status;
   }
 
@@ -734,7 +761,9 @@ export class LlamaCppManager extends EventEmitter {
     if (this.status.status !== 'running') {
       await this.detect();
     }
-    return new LlamaCppClient(this.getBaseUrl());
+    return new LlamaCppClient(this.getBaseUrl(), {
+      loadTimeoutMs: this.getConnectionAndLoadTimeoutMs(),
+    });
   }
 
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
@@ -1232,6 +1261,29 @@ export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeD
     });
   }
   return devices;
+}
+
+export function resolveLlamaCppDeviceSelection(
+  rawValue: string,
+  devices: LlamaCppRuntimeDevice[],
+): string {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return trimmed;
+  const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (!parts.every(part => /^\d+$/.test(part))) {
+    return parts.every(part => devices.some(device => device.id === part || device.name === part))
+      ? parts.join(',')
+      : '';
+  }
+
+  const resolved = parts.map(part => {
+    const index = Number.parseInt(part, 10);
+    const device = devices[index];
+    return device?.id;
+  });
+  if (resolved.some(part => !part)) return '';
+  return resolved.join(',');
 }
 
 function inferLlamaCppDeviceBackend(id: string, name: string): string {

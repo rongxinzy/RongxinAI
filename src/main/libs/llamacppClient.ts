@@ -9,6 +9,9 @@ import type {
 
 type StreamCallback<T> = (chunk: T) => void;
 type RequestOptions = { signal?: AbortSignal };
+type LlamaCppClientOptions = {
+  loadTimeoutMs?: number;
+};
 
 type LlamaCppRouterModel = {
   id?: string;
@@ -65,9 +68,11 @@ type OpenAIChatCompletionChunk = {
 export class LlamaCppClient {
   private readonly baseUrl: string;
   private readonly lastLoadRuntimeContextByModel = new Map<string, number>();
+  private readonly loadTimeoutMs?: number;
 
-  constructor(baseUrl = 'http://127.0.0.1:8080') {
+  constructor(baseUrl = 'http://127.0.0.1:8080', options: LlamaCppClientOptions = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.loadTimeoutMs = options.loadTimeoutMs;
   }
 
   async health(timeoutMs = 300): Promise<{ status?: string }> {
@@ -82,7 +87,7 @@ export class LlamaCppClient {
   async listModels(): Promise<LlamaCppModel[]> {
     const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models?reload=1', {
       method: 'GET',
-      timeoutMs: 30_000,
+      timeoutMs: this.loadTimeoutMs ?? 30_000,
     });
     return (payload.data ?? []).map(model =>
       toLlamaCppModel(
@@ -112,7 +117,7 @@ export class LlamaCppClient {
     const modelName = input.model.trim();
     await this.requestJson('/models/load', {
       method: 'POST',
-      timeoutMs: 300_000,
+      timeoutMs: this.loadTimeoutMs ?? 300_000,
       body: JSON.stringify({ model: input.model }),
     });
     if (typeof input.options?.ctxSize === 'number' && input.options.ctxSize > 0) {
@@ -179,7 +184,7 @@ export class LlamaCppClient {
   private async listModelsWithTimeout(timeoutMs: number): Promise<LlamaCppModel[]> {
     const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models', {
       method: 'GET',
-      timeoutMs,
+      timeoutMs: timeoutMs || this.loadTimeoutMs || 30_000,
     });
     return (payload.data ?? []).map(model =>
       toLlamaCppModel(
