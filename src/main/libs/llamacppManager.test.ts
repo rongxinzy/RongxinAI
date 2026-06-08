@@ -16,6 +16,7 @@ import {
   mergeLocalModels,
   modelLaunchOptionsToPreset,
   parseLlamaCppListDevicesOutput,
+  resolveLlamaCppDeviceSelection,
   resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
   selectLlamaCppRuntimeTarget,
@@ -184,6 +185,14 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
   ]);
 });
 
+test('uses the configured timeout for connection and load operations', () => {
+  const manager = new LlamaCppManager(() => ({
+    timeout: '900',
+  }));
+
+  expect(manager.getConnectionAndLoadTimeoutMs()).toBe(900_000);
+});
+
 test('selectLlamaCppRuntimeTarget chooses fixed CUDA 12 on Windows NVIDIA auto mode', () => {
   expect(selectLlamaCppRuntimeTarget({
     platform: 'win32',
@@ -296,6 +305,35 @@ test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
     { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
     { id: 'CPU', name: 'CPU', backend: 'cpu' },
   ]);
+});
+
+test('resolveLlamaCppDeviceSelection maps numeric indexes to llama.cpp device ids', () => {
+  expect(resolveLlamaCppDeviceSelection('0,1', [
+    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+    { id: 'CPU', name: 'CPU', backend: 'cpu' },
+  ])).toBe('CUDA0,CUDA1');
+});
+
+test('resolveLlamaCppDeviceSelection preserves explicit llama.cpp device ids', () => {
+  expect(resolveLlamaCppDeviceSelection('CUDA0,CUDA1', [
+    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+  ])).toBe('CUDA0,CUDA1');
+});
+
+test('resolveLlamaCppDeviceSelection falls back to the default visible-device behavior when an index cannot be resolved', () => {
+  expect(resolveLlamaCppDeviceSelection('0,4', [
+    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+  ])).toBe('');
+});
+
+test('resolveLlamaCppDeviceSelection falls back to the default visible-device behavior for invalid free-form values', () => {
+  expect(resolveLlamaCppDeviceSelection('bad-input', [
+    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+  ])).toBe('');
 });
 
 test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', async () => {
