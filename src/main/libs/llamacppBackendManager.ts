@@ -129,13 +129,46 @@ async function fetchVersionedManifestIndex(
   const manifests = await Promise.all(versions.map(async (version) => {
     const versionManifestUrl = `${baseUrl}/${version}/manifest.json`;
     const versionManifest = await fetchManifestFromUrl(versionManifestUrl);
-    return versionManifest;
+    return {
+      version,
+      manifest: versionManifest,
+    };
   }));
   return {
     schemaVersion: 1,
-    defaultVersion: rootManifest.defaultVersion || manifests[0]?.defaultVersion || versions[0],
+    defaultVersion: rootManifest.defaultVersion || manifests[0]?.manifest.defaultVersion || versions[0],
     releaseBaseUrl: baseUrl,
-    backends: manifests.flatMap(manifest => manifest.backends),
+    backends: manifests.flatMap(({ version, manifest }) =>
+      manifest.backends.map(entry => injectVersionedArchiveUrls(entry, manifest, version, baseUrl))
+    ),
+  };
+}
+
+function injectVersionedArchiveUrls(
+  entry: LlamaCppBackendManifestEntry,
+  manifest: LlamaCppBackendManifest,
+  version: string,
+  baseUrl: string,
+): LlamaCppBackendManifestEntry {
+  const releaseBaseUrl = (manifest.releaseBaseUrl || `${baseUrl}/${version}`).replace(/\/$/, '');
+  return {
+    ...entry,
+    archive: injectArchiveUrls(entry.archive, releaseBaseUrl),
+    companions: entry.companions?.map(companion => injectArchiveUrls(companion, releaseBaseUrl)),
+  };
+}
+
+function injectArchiveUrls<T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] }>(
+  archive: T,
+  releaseBaseUrl: string,
+): T {
+  return {
+    ...archive,
+    url: archive.url || `${releaseBaseUrl}/${archive.assetName}`,
+    parts: archive.parts?.map(part => ({
+      ...part,
+      url: part.url || `${releaseBaseUrl}/${part.assetName}`,
+    })),
   };
 }
 

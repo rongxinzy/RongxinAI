@@ -417,7 +417,7 @@ interface IElectronAPI {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
-    listRuntimeDevices: () => Promise<LlamaCppRuntimeListDevicesResult>;
+    listRuntimeDevices: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeListDevicesResult>;
     listBackends: () => Promise<import('../../shared/llamacpp').LlamaCppBackendListResult>;
     getBackendSelection: () => Promise<import('../../shared/llamacpp').LlamaCppBackendRef | undefined>;
     setBackendSelection: (input: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;

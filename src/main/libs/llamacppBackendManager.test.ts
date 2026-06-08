@@ -222,6 +222,12 @@ describe('llamacpp backend manager', () => {
         'b9518/win-x64-cuda-13',
         'b9244/win-x64-cuda-12',
       ]);
+      expect(manifest.backends[0]?.archive.url).toBe(
+        'https://example.com/llamacpp/b9518/llama-b9518-bin-win-cuda-13.3-x64.zip',
+      );
+      expect(manifest.backends[1]?.archive.url).toBe(
+        'https://example.com/llamacpp/b9244/llama-b9244-bin-win-cuda-12.4-x64.zip',
+      );
     } finally {
       global.fetch = originalFetch;
     }
