@@ -849,7 +849,7 @@ export class LlamaCppManager extends EventEmitter {
       await downloadFile(
         url,
         targetPath,
-        (completed, total) => {
+        (completed, total, speed) => {
           onProgress?.({
             phase: 'downloading-progress',
             modelId,
@@ -857,6 +857,7 @@ export class LlamaCppManager extends EventEmitter {
             completed,
             total,
             percent: total ? Math.round((completed / total) * 100) : undefined,
+            speed,
             targetPath,
           });
         },
@@ -877,7 +878,7 @@ export class LlamaCppManager extends EventEmitter {
         await downloadFile(
           mmprojUrl,
           mmprojTargetPath,
-          (completed, total) => {
+          (completed, total, speed) => {
             onProgress?.({
               phase: 'downloading-progress',
               modelId,
@@ -885,6 +886,7 @@ export class LlamaCppManager extends EventEmitter {
               completed,
               total,
               percent: total ? Math.round((completed / total) * 100) : undefined,
+              speed,
               targetPath: mmprojTargetPath,
             });
           },
@@ -1821,7 +1823,7 @@ function resolveModelScopeTargetPath(modelDir: string, filePath: string): string
 async function downloadFile(
   url: string,
   targetPath: string,
-  onProgress: (completed: number, total?: number) => void,
+  onProgress: (completed: number, total?: number, speed?: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
   const tempPath = `${targetPath}.download`;
@@ -1855,18 +1857,31 @@ async function downloadFile(
     };
     signal?.addEventListener('abort', onAbort);
     let completed = resumed ? resumeFrom : 0;
+    let speedWindowBytes = 0;
+    let speedWindowStartedAt = Date.now();
+    const emitProgress = () => {
+      const now = Date.now();
+      const elapsedMs = Math.max(1, now - speedWindowStartedAt);
+      const speed = speedWindowBytes > 0 ? (speedWindowBytes / elapsedMs) * 1000 : undefined;
+      onProgress(completed, Number.isFinite(total) ? total : undefined, speed);
+      if (speedWindowBytes > 0 || elapsedMs >= 1000) {
+        speedWindowBytes = 0;
+        speedWindowStartedAt = now;
+      }
+    };
     try {
-      if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
+      if (completed > 0) emitProgress();
       while (true) {
         if (signal?.aborted) throw new Error('Install cancelled');
         const { value, done } = await reader.read();
         if (signal?.aborted) throw new Error('Install cancelled');
         if (done) break;
         completed += value.byteLength;
+        speedWindowBytes += value.byteLength;
         if (!file.write(Buffer.from(value))) {
           await new Promise<void>(resolve => file.once('drain', resolve));
         }
-        onProgress(completed, Number.isFinite(total) ? total : undefined);
+        emitProgress();
       }
       completedSuccessfully = true;
     } finally {
