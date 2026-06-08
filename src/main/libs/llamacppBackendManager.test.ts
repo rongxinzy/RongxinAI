@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   buildFallbackManifest,
   fetchLlamaCppBackendManifest,
+  getLlamaCppBackendCompatibilityError,
   getLlamaCppBackendDir,
   getLlamaCppCurrentBackendDir,
   getLlamaCppCurrentExecutablePath,
@@ -231,6 +232,42 @@ describe('llamacpp backend manager', () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  test('rejects a locally installed backend when platform or architecture does not match', async () => {
+    const runtimeRoot = createRuntimeRoot();
+    const ref = toBackendRef('b9518', 'win-arm64');
+    const backendDir = getLlamaCppBackendDir(runtimeRoot, ref);
+    fs.mkdirSync(path.join(backendDir, 'bin'), { recursive: true });
+    fs.writeFileSync(
+      path.join(backendDir, 'runtime-build-info.json'),
+      JSON.stringify({
+        version: ref.version,
+        backend: ref.backend,
+        target: ref.backend,
+        source: 'local',
+        platform: 'win32',
+        arch: 'arm64',
+        accelerator: 'cpu',
+      }, null, 2),
+      'utf8',
+    );
+
+    const error = await getLlamaCppBackendCompatibilityError({
+      runtimeRoot,
+      ref,
+      platform: 'darwin',
+      arch: 'arm64',
+      hasNvidiaGpu: false,
+      manifest: {
+        schemaVersion: 1,
+        defaultVersion: 'b9518',
+        releaseBaseUrl: 'https://example.com/llamacpp',
+        backends: [],
+      },
+    });
+
+    expect(error).toBe('Backend win-arm64 does not match current platform darwin.');
   });
 
   test('lists installed backend and current selection', async () => {

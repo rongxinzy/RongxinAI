@@ -32,9 +32,9 @@ test('buildLlamaCppExecutableCandidates orders managed and explicit runtime path
     envPath: 'C:/custom/env/llama-server.exe',
   }).slice(0, 4)).toEqual([
     'C:/custom/env/llama-server.exe',
+    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/build/bin/llama-server.exe',
     'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/bin/llama-server.exe',
-    'C:/App/resources/llamacpp/llama-server.exe',
-    'C:/App/resources/llamacpp/bin/llama-server.exe',
+    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/llama-server.exe',
   ]);
 });
 
@@ -50,6 +50,7 @@ test('buildLlamaCppExecutableCandidates only includes dev vendor and system path
 
   expect(candidates).toEqual(expect.arrayContaining([
     '/repo/vendor/llamacpp-runtime/current/llama-server',
+    '/repo/vendor/llamacpp-runtime/current/build/bin/llama-server',
     '/repo/vendor/llamacpp-runtime/current/bin/llama-server',
     '/opt/homebrew/bin/llama-server',
   ]));

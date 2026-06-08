@@ -28,6 +28,7 @@ import type { LlamaCppBackendRef } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import {
   fetchLlamaCppBackendManifest,
+  getLlamaCppBackendCompatibilityError,
   getLlamaCppBackendExecutablePath,
   getLlamaCppCurrentExecutablePath,
   importLlamaCppBackendPath,
@@ -52,6 +53,7 @@ const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = '8080';
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
+const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 
 type RequestOptions = { signal?: AbortSignal };
 type ExecFileRunner = (
@@ -229,6 +231,11 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async installRuntime(): Promise<LlamaCppRuntimeInstallResult> {
+    this.emit('install-progress', {
+      phase: 'starting',
+      modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+      modelName: 'llama.cpp runtime',
+    } satisfies LlamaCppInstallProgress);
     const config = this.getServiceConfig();
     const externalExecutablePath = await findExternalLlamaCppExecutable(config);
     if (externalExecutablePath) {
@@ -247,6 +254,12 @@ export class LlamaCppManager extends EventEmitter {
         managedByApp: false,
         error: result.error,
       });
+      this.emit('install-progress', {
+        phase: result.success ? 'done' : 'failed',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: 'llama.cpp runtime',
+        ...(result.success ? { percent: 100 } : { error: result.error }),
+      } satisfies LlamaCppInstallProgress);
       return result;
     }
 
@@ -280,6 +293,11 @@ export class LlamaCppManager extends EventEmitter {
       managedByApp: false,
       error: undefined,
     });
+    this.emit('install-progress', {
+      phase: 'downloading',
+      modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+      modelName: ref.versionBackend,
+    } satisfies LlamaCppInstallProgress);
 
     const result = await installLlamaCppBackend({
       runtimeRoot,
@@ -288,15 +306,66 @@ export class LlamaCppManager extends EventEmitter {
       arch: process.arch,
       hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
       manifest,
+      switchCurrent: false,
     });
 
     if (result.success && result.executablePath) {
-      this.executablePath = result.executablePath;
+      if (backendRequiresDeviceValidation(ref)) {
+        const deviceResult = await this.listRuntimeDevices(ref);
+        if (!deviceResult.success) {
+          this.setStatus({
+            status: 'not-installed',
+            executablePath: undefined,
+            managedByApp: false,
+            error: deviceResult.error || 'Backend device validation failed.',
+          });
+          this.emit('install-progress', {
+            phase: 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: deviceResult.error || 'Backend device validation failed.',
+          } satisfies LlamaCppInstallProgress);
+          return {
+            ...result,
+            success: false,
+            error: deviceResult.error || 'Backend device validation failed.',
+          };
+        }
+        const validationError = validateBackendDevices(ref, deviceResult.devices);
+        if (validationError) {
+          this.setStatus({
+            status: 'not-installed',
+            executablePath: undefined,
+            managedByApp: false,
+            error: validationError,
+          });
+          this.emit('install-progress', {
+            phase: 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: validationError,
+          } satisfies LlamaCppInstallProgress);
+          return {
+            ...result,
+            success: false,
+            error: validationError,
+          };
+        }
+      }
+      syncCurrentBackend(runtimeRoot, ref);
+      const currentExecutablePath = getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform);
+      this.executablePath = currentExecutablePath;
       this.setStatus({
         status: 'installed',
-        executablePath: result.executablePath,
+        executablePath: currentExecutablePath,
         managedByApp: false,
       });
+      this.emit('install-progress', {
+        phase: 'done',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+        percent: 100,
+      } satisfies LlamaCppInstallProgress);
     } else {
       this.setStatus({
         status: 'not-installed',
@@ -304,6 +373,12 @@ export class LlamaCppManager extends EventEmitter {
         managedByApp: false,
         error: result.error,
       });
+      this.emit('install-progress', {
+        phase: 'failed',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+        error: 'error' in result ? result.error : undefined,
+      } satisfies LlamaCppInstallProgress);
     }
     return result;
   }
@@ -335,33 +410,73 @@ export class LlamaCppManager extends EventEmitter {
   async setBackendSelection(ref: LlamaCppBackendRef): Promise<LlamaCppRuntimeInstallResult> {
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     const installedExecutablePath = getLlamaCppBackendExecutablePath(runtimeRoot, ref, process.platform);
+    const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
+    const hasNvidiaGpu = Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0);
+    this.emit('install-progress', {
+      phase: 'starting',
+      modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+      modelName: ref.versionBackend,
+    } satisfies LlamaCppInstallProgress);
+    const compatibilityError = await getLlamaCppBackendCompatibilityError({
+      runtimeRoot,
+      ref,
+      platform: process.platform,
+      arch: process.arch,
+      hasNvidiaGpu,
+    });
+    if (compatibilityError) {
+      this.emit('install-progress', {
+        phase: 'failed',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+        error: compatibilityError,
+      } satisfies LlamaCppInstallProgress);
+      return {
+        success: false,
+        error: compatibilityError,
+        plan: {
+          kind: 'needs-manual',
+          message: compatibilityError,
+        },
+      };
+    }
     const result = fs.existsSync(installedExecutablePath)
       ? (() => {
-          syncCurrentBackend(runtimeRoot, ref);
           return {
             success: true,
             backend: ref,
-            executablePath: getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform),
+            executablePath: installedExecutablePath,
             plan: {
               kind: 'ready' as const,
-              executablePath: getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform),
+              executablePath: installedExecutablePath,
             },
           };
         })()
       : await (async () => {
-          const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
+          this.emit('install-progress', {
+            phase: 'downloading',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+          } satisfies LlamaCppInstallProgress);
           return await installLlamaCppBackend({
             runtimeRoot,
             ref,
             platform: process.platform,
             arch: process.arch,
-            hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
+            hasNvidiaGpu,
+            switchCurrent: false,
           });
         })();
     if (result.success && result.executablePath) {
       if (backendRequiresDeviceValidation(ref)) {
         const deviceResult = await this.listRuntimeDevices(ref);
         if (!deviceResult.success) {
+          this.emit('install-progress', {
+            phase: 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: deviceResult.error || 'Backend device validation failed.',
+          } satisfies LlamaCppInstallProgress);
           return {
             ...result,
             success: false,
@@ -370,6 +485,12 @@ export class LlamaCppManager extends EventEmitter {
         }
         const validationError = validateBackendDevices(ref, deviceResult.devices);
         if (validationError) {
+          this.emit('install-progress', {
+            phase: 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: validationError,
+          } satisfies LlamaCppInstallProgress);
           return {
             ...result,
             success: false,
@@ -377,12 +498,27 @@ export class LlamaCppManager extends EventEmitter {
           };
         }
       }
-      this.executablePath = result.executablePath;
+      syncCurrentBackend(runtimeRoot, ref);
+      const currentExecutablePath = getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform);
+      this.executablePath = currentExecutablePath;
       this.setStatus({
         status: 'installed',
-        executablePath: result.executablePath,
+        executablePath: currentExecutablePath,
         managedByApp: false,
       });
+      this.emit('install-progress', {
+        phase: 'done',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+        percent: 100,
+      } satisfies LlamaCppInstallProgress);
+    } else {
+      this.emit('install-progress', {
+        phase: 'failed',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+        error: 'error' in result ? result.error : undefined,
+      } satisfies LlamaCppInstallProgress);
     }
     return result;
   }
@@ -405,6 +541,15 @@ export class LlamaCppManager extends EventEmitter {
         success: false,
         devices: [],
         error: 'llama.cpp runtime is not installed.',
+      };
+    }
+    if (!fs.existsSync(executablePath)) {
+      return {
+        success: false,
+        executablePath,
+        backend: ref,
+        devices: [],
+        error: `llama.cpp executable does not exist: ${executablePath}`,
       };
     }
     const result = await listLlamaCppRuntimeDevices({
@@ -1135,7 +1280,9 @@ export function buildLlamaCppExecutableCandidates(input: {
   const extension = input.platform === 'win32' ? '.exe' : '';
   const candidates = [
     input.envPath?.trim(),
+    path.join(input.userRuntimeRoot, 'current', 'build', 'bin', `llama-server${extension}`),
     path.join(input.userRuntimeRoot, 'current', 'bin', `llama-server${extension}`),
+    path.join(input.userRuntimeRoot, 'current', `llama-server${extension}`),
     path.join(input.resourceRoot, 'llamacpp', `llama-server${extension}`),
     path.join(input.resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
   ];
@@ -1143,8 +1290,10 @@ export function buildLlamaCppExecutableCandidates(input: {
   if (!input.isPackaged) {
     candidates.push(
       path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
+      path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'build', 'bin', `llama-server${extension}`),
       path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
       path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
+      path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'build', 'bin', `llama-server${extension}`),
       path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
       '/opt/homebrew/bin/llama-server',
       '/usr/local/bin/llama-server',
