@@ -3902,9 +3902,9 @@ function resolveLaunchServiceConfig(
     case 'service-default':
       return null;
     case 'single-auto':
-      return { device: '', splitMode: 'none' };
+      return { device: 'CUDA0', splitMode: 'none' };
     case 'dual-gpu':
-      return { device: '', splitMode: 'layer' };
+      return { device: 'CUDA0,CUDA1', splitMode: 'layer' };
     case 'custom': {
       const normalized = normalizeGpuDeviceList(customGpuDevices);
       return normalized ? { device: normalized, splitMode: 'none' } : null;
@@ -3929,7 +3929,13 @@ function normalizeGpuDeviceList(value: string): string {
   return value
     .split(',')
     .map(part => part.trim())
-    .filter(part => /^[A-Za-z0-9_.:-]+$/.test(part) && !/^\d+$/.test(part))
+    .map(part => {
+      if (/^\d+$/.test(part)) {
+        return `CUDA${part}`;
+      }
+      return /^[A-Za-z0-9_.:-]+$/.test(part) ? part : '';
+    })
+    .filter(Boolean)
     .join(',');
 }
 
@@ -4861,6 +4867,14 @@ export const __test__buildRequestPreview = (input: RequestPreviewInput) =>
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);
+export const __test__resolveLaunchServiceConfig = (
+  preset: string,
+  customGpuDevices: string,
+) => resolveLaunchServiceConfig(preset, customGpuDevices);
+export const __test__formatLaunchGpuPresetSummary = (
+  preset: string,
+  customGpuDevices: string,
+) => formatLaunchGpuPresetSummary(preset, customGpuDevices);
 export const __test__isModelScopeRepoId = (value: string) => isModelScopeRepoId(value);
 export const __test__isScrollNearBottom = (input: Parameters<typeof isScrollNearBottom>[0]) =>
   isScrollNearBottom(input);
