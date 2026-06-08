@@ -1,8 +1,8 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { ZipFile } from 'yazl';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { ZipFile } from 'yazl';
 
 import {
   buildFallbackManifest,
