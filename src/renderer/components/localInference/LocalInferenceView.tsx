@@ -1709,6 +1709,7 @@ function ServicePopover({
             <button
               type="button"
               onClick={onRefresh}
+              disabled={loading}
               className={smallOutlineButtonClass}
             >
               <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -1717,6 +1718,7 @@ function ServicePopover({
             <button
               type="button"
               onClick={onOpenBackendConfig}
+              disabled={loading}
               className={smallOutlineButtonClass}
             >
               <CpuChipIcon className="h-3.5 w-3.5" />
@@ -1725,6 +1727,7 @@ function ServicePopover({
             <button
               type="button"
               onClick={onOpenServiceConfig}
+              disabled={loading}
               className={smallOutlineButtonClass}
             >
               <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
@@ -1884,25 +1887,12 @@ function LlamaCppBackendConfigDialog({
 
             {runtimeInstallProgress ? (
               <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2">
-                {(() => {
-                  const summary = formatInstallProgressSummary(runtimeInstallProgress);
-                  return (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[11px] font-medium text-foreground">
-                          {runtimeInstallProgress.modelName || i18nService.t('localInferenceInstall')}
-                        </span>
-                        <span className="shrink-0 text-[11px] text-secondary">{summary.primary}</span>
-                      </div>
-                      {summary.phase ? (
-                        <p className="mt-1 text-[11px] text-secondary">{summary.phase}</p>
-                      ) : null}
-                      {summary.error ? (
-                        <p className="mt-1 text-[11px] text-destructive">{summary.error}</p>
-                      ) : null}
-                    </>
-                  );
-                })()}
+                <div className="flex items-center justify-between gap-2 text-[11px] text-secondary">
+                  <span className="font-medium text-foreground">
+                    {runtimeInstallProgress.modelName || i18nService.t('localInferenceInstall')}
+                  </span>
+                  <span>{formatPullProgress(runtimeInstallProgress)}</span>
+                </div>
                 <InstallProgressBar progress={runtimeInstallProgress} className="mt-2" />
               </div>
             ) : null}
@@ -4346,47 +4336,16 @@ function isPullInProgress(progress?: Record<string, unknown>): boolean {
 }
 
 function formatPullProgress(progress: Record<string, unknown>): string {
-  const summary = formatInstallProgressSummary(progress);
-  return summary.primary || summary.phase || i18nService.t('loading');
-}
-
-function formatInstallProgressSummary(progress: Record<string, unknown>): {
-  primary: string;
-  phase?: string;
-  error?: string;
-} {
   const status = readProgressStatus(progress);
   const error = typeof progress.error === 'string' ? progress.error : '';
   const completed = typeof progress.completed === 'number' ? progress.completed : undefined;
   const total = typeof progress.total === 'number' ? progress.total : undefined;
   const percent = typeof progress.percent === 'number' ? progress.percent : undefined;
-  const speed = typeof progress.speed === 'number' ? progress.speed : undefined;
-  const phase = humanizeInstallPhase(status);
-
-  if (error) {
-    return {
-      primary: phase || i18nService.t('marketplaceInstallFailed'),
-      phase,
-      error,
-    };
-  }
-
+  if (error) return `${status || 'error'}: ${error}`;
   if (completed !== undefined && total !== undefined && total > 0) {
-    const parts = [
-      percent !== undefined ? `${percent}%` : undefined,
-      `${formatBytes(completed)} / ${formatBytes(total)}`,
-      speed && speed > 0 ? `${formatBytes(speed)}/s` : undefined,
-    ].filter(Boolean);
-    return {
-      primary: parts.join(' · '),
-      phase,
-    };
+    return `${humanizeInstallPhase(status)} · ${percent !== undefined ? `${percent}% · ` : ''}${formatBytes(completed)} / ${formatBytes(total)}`;
   }
-
-  return {
-    primary: phase || i18nService.t('loading'),
-    phase,
-  };
+  return humanizeInstallPhase(status) || i18nService.t('loading');
 }
 
 function readProgressStatus(progress: Record<string, unknown>): string {
@@ -4411,7 +4370,6 @@ function normalizeInstallProgress(
     percent: typeof chunk.percent === 'number' ? chunk.percent : undefined,
     completed: typeof chunk.completed === 'number' ? chunk.completed : undefined,
     total: typeof chunk.total === 'number' ? chunk.total : undefined,
-    speed: typeof chunk.speed === 'number' ? chunk.speed : undefined,
     targetPath: typeof chunk.targetPath === 'string' ? chunk.targetPath : undefined,
     error: typeof chunk.error === 'string' ? chunk.error : undefined,
   };
@@ -4433,13 +4391,10 @@ function humanizeInstallPhase(phase: string): string {
   switch (phase) {
     case 'starting':
       return i18nService.t('marketplaceInstallStarting');
-    case 'detecting':
-      return i18nService.t('localInferenceInstallVerifying');
     case 'downloading':
-    case 'downloading-progress':
       return i18nService.t('marketplaceInstallPulling');
-    case 'installing':
-      return i18nService.t('localInferenceInstallExtracting');
+    case 'downloading-progress':
+      return i18nService.t('marketplaceInstallProgress');
     case 'cancelling':
       return i18nService.t('marketplaceCancelling');
     case 'cancelled':
