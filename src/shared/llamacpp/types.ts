@@ -185,6 +185,7 @@ export type LlamaCppInstallProgress = {
   percent?: number;
   completed?: number;
   total?: number;
+  speed?: number;
   targetPath?: string;
   error?: string;
 };

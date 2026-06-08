@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { ZipFile } from 'yazl';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
@@ -12,6 +13,7 @@ import {
   getLlamaCppCurrentExecutablePath,
   importLlamaCppBackendArchive,
   importLlamaCppBackendPath,
+  installLlamaCppBackend,
   listLlamaCppBackends,
   readCurrentBackendRef,
   recommendLlamaCppBackend,
@@ -50,6 +52,20 @@ function writeInstalledBackend(runtimeRoot: string, version: string, backend: st
     }, null, 2),
     'utf8',
   );
+}
+
+async function createBackendZipArchive(zipPath: string, entries: Array<{ name: string; content: string }>): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const zip = new ZipFile();
+    for (const entry of entries) {
+      zip.addBuffer(Buffer.from(entry.content, 'utf8'), entry.name);
+    }
+    zip.end();
+    zip.outputStream
+      .pipe(fs.createWriteStream(zipPath))
+      .on('close', resolve)
+      .on('error', reject);
+  });
 }
 
 describe('llamacpp backend manager', () => {
@@ -418,5 +434,85 @@ describe('llamacpp backend manager', () => {
     expect(result.backend?.versionBackend).toBe('b9518/mac-arm64');
     expect(readCurrentBackendRef(runtimeRoot)?.versionBackend).toBe('b9518/mac-arm64');
     expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'darwin'))).toBe(true);
+  });
+
+  test('reports real download progress for backend installation', async () => {
+    const runtimeRoot = createRuntimeRoot();
+    const ref = toBackendRef('b9518', 'win-x64');
+    const manifest = {
+      schemaVersion: 1 as const,
+      defaultVersion: 'b9518',
+      releaseBaseUrl: 'https://example.com/llamacpp/b9518',
+      backends: [
+        {
+          version: 'b9518',
+          backend: 'win-x64',
+          platform: 'win32' as const,
+          arch: 'x64',
+          accelerator: 'cpu' as const,
+          archive: { assetName: 'llama-b9518-bin-win-cpu-x64.zip' },
+        },
+      ],
+    };
+
+    const archivePath = path.join(runtimeRoot, 'llama-b9518-bin-win-cpu-x64.zip');
+    await createBackendZipArchive(archivePath, [
+      { name: 'build/bin/llama-server.exe', content: 'binary' },
+      { name: 'build/bin/ggml.dll', content: 'dll' },
+    ]);
+    const archiveBytes = fs.readFileSync(archivePath);
+    fs.rmSync(archivePath, { force: true });
+
+    const originalFetch = global.fetch;
+    const originalDateNow = Date.now;
+    const progressEvents: any[] = [];
+    let now = 1_000;
+
+    try {
+      Date.now = () => now;
+      global.fetch = vi.fn(async () => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const halfway = Math.max(1, Math.floor(archiveBytes.length / 2));
+            controller.enqueue(archiveBytes.subarray(0, halfway));
+            now += 500;
+            controller.enqueue(archiveBytes.subarray(halfway));
+            now += 500;
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: { 'content-length': String(archiveBytes.length) },
+        });
+      }) as typeof fetch;
+
+      const result = await installLlamaCppBackend({
+        runtimeRoot,
+        ref,
+        platform: 'win32',
+        arch: 'x64',
+        hasNvidiaGpu: false,
+        manifest,
+        onProgress: progress => {
+          progressEvents.push(progress);
+        },
+      });
+
+      expect(result.success).toBe(true);
+      const downloadEvents = progressEvents.filter(
+        progress => progress.phase === 'downloading-progress',
+      );
+      expect(downloadEvents.length).toBeGreaterThan(0);
+      expect(downloadEvents.some(progress => typeof progress.completed === 'number' && progress.completed > 0)).toBe(true);
+      expect(downloadEvents.some(progress => typeof progress.total === 'number' && progress.total === archiveBytes.length)).toBe(true);
+      expect(downloadEvents.some(progress => typeof progress.speed === 'number' && progress.speed > 0)).toBe(true);
+      expect(progressEvents.some(progress => progress.phase === 'installing')).toBe(true);
+      expect(progressEvents.some(progress => progress.phase === 'detecting')).toBe(true);
+      expect(progressEvents.some(progress => progress.phase === 'done')).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+      Date.now = originalDateNow;
+    }
   });
 });

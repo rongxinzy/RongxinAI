@@ -1805,6 +1805,7 @@ function LlamaCppBackendConfigDialog({
   onCheckDevices: () => void;
   onRefresh: () => void;
 }) {
+  const [importHelpOpen, setImportHelpOpen] = useState(false);
   const currentPlatform = window.electron.platform;
   const backendVersions = useMemo(
     () => Array.from(new Set(backends.map(backend => backend.version))),
@@ -1887,12 +1888,25 @@ function LlamaCppBackendConfigDialog({
 
             {runtimeInstallProgress ? (
               <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2">
-                <div className="flex items-center justify-between gap-2 text-[11px] text-secondary">
-                  <span className="font-medium text-foreground">
-                    {runtimeInstallProgress.modelName || i18nService.t('localInferenceInstall')}
-                  </span>
-                  <span>{formatPullProgress(runtimeInstallProgress)}</span>
-                </div>
+                {(() => {
+                  const summary = formatInstallProgressSummary(runtimeInstallProgress);
+                  return (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-[11px] font-medium text-foreground">
+                          {runtimeInstallProgress.modelName || i18nService.t('localInferenceInstall')}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-secondary">{summary.primary}</span>
+                      </div>
+                      {summary.phase ? (
+                        <p className="mt-1 text-[11px] text-secondary">{summary.phase}</p>
+                      ) : null}
+                      {summary.error ? (
+                        <p className="mt-1 text-[11px] text-destructive">{summary.error}</p>
+                      ) : null}
+                    </>
+                  );
+                })()}
                 <InstallProgressBar progress={runtimeInstallProgress} className="mt-2" />
               </div>
             ) : null}
@@ -2005,6 +2019,15 @@ function LlamaCppBackendConfigDialog({
           </button>
           <button
             type="button"
+            onClick={() => setImportHelpOpen(true)}
+            className={smallOutlineButtonClass}
+            aria-label={i18nService.t('localInferenceImportGuideTitle')}
+            title={i18nService.t('localInferenceImportGuideTitle')}
+          >
+            <InformationCircleIcon className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={onCheckDevices}
             disabled={loading || !selectedBackendInfo?.installed}
             className={smallOutlineButtonClass}
@@ -2034,6 +2057,54 @@ function LlamaCppBackendConfigDialog({
           </button>
         </div>
       </div>
+      <Modal isOpen={importHelpOpen} onClose={() => setImportHelpOpen(false)}>
+        <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+            <div className="min-w-0">
+              <h4 className="text-lg font-semibold text-foreground">
+                {i18nService.t('localInferenceImportGuideTitle')}
+              </h4>
+              <p className="mt-1 text-sm text-secondary">
+                {i18nService.t('localInferenceImportGuideInlineDescription')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setImportHelpOpen(false)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              aria-label={i18nService.t('close')}
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="space-y-3 px-5 py-4 text-sm leading-6 text-secondary">
+            <p>{i18nService.t('localInferenceImportGuideInlineStepArchive')}</p>
+            <p className="break-all rounded-lg bg-surface/50 px-3 py-2 text-xs text-foreground">
+              {i18nService.t('localInferenceImportGuideInlineReleaseUrl')}
+            </p>
+            <div className="space-y-1.5">
+              <p>{i18nService.t('localInferenceImportGuideInlineStepExtracted')}</p>
+              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinX64Cpu')}</p>
+              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinArm64Cpu')}</p>
+              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinX64Nvidia')}</p>
+              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinX64Vulkan')}</p>
+              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformMacArm64')}</p>
+              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformMacX64')}</p>
+            </div>
+            <p>{i18nService.t('localInferenceImportGuideInlineStepReject')}</p>
+            <p>{i18nService.t('localInferenceImportGuideInlineStepResult')}</p>
+          </div>
+          <div className="flex justify-end border-t border-border px-5 py-4">
+            <button
+              type="button"
+              onClick={() => setImportHelpOpen(false)}
+              className={smallOutlineButtonClass.replace('h-9', 'h-10').replace('text-sm', 'text-sm')}
+            >
+              {i18nService.t('localInferenceImportGuideClose')}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -4336,16 +4407,47 @@ function isPullInProgress(progress?: Record<string, unknown>): boolean {
 }
 
 function formatPullProgress(progress: Record<string, unknown>): string {
+  const summary = formatInstallProgressSummary(progress);
+  return summary.primary || summary.phase || i18nService.t('loading');
+}
+
+function formatInstallProgressSummary(progress: Record<string, unknown>): {
+  primary: string;
+  phase?: string;
+  error?: string;
+} {
   const status = readProgressStatus(progress);
   const error = typeof progress.error === 'string' ? progress.error : '';
   const completed = typeof progress.completed === 'number' ? progress.completed : undefined;
   const total = typeof progress.total === 'number' ? progress.total : undefined;
   const percent = typeof progress.percent === 'number' ? progress.percent : undefined;
-  if (error) return `${status || 'error'}: ${error}`;
-  if (completed !== undefined && total !== undefined && total > 0) {
-    return `${humanizeInstallPhase(status)} · ${percent !== undefined ? `${percent}% · ` : ''}${formatBytes(completed)} / ${formatBytes(total)}`;
+  const speed = typeof progress.speed === 'number' ? progress.speed : undefined;
+  const phase = humanizeInstallPhase(status);
+
+  if (error) {
+    return {
+      primary: phase || i18nService.t('marketplaceInstallFailed'),
+      phase,
+      error,
+    };
   }
-  return humanizeInstallPhase(status) || i18nService.t('loading');
+
+  if (completed !== undefined && total !== undefined && total > 0) {
+    const parts = [
+      percent !== undefined ? `${percent}%` : undefined,
+      `${formatBytes(completed)} / ${formatBytes(total)}`,
+      speed && speed > 0 ? `${formatBytes(speed)}/s` : undefined,
+    ].filter(Boolean);
+    return {
+      primary: parts.join(' · '),
+      phase,
+    };
+  }
+
+  return {
+    primary: phase || i18nService.t('loading'),
+    phase,
+  };
 }
 
 function readProgressStatus(progress: Record<string, unknown>): string {
@@ -4370,6 +4472,7 @@ function normalizeInstallProgress(
     percent: typeof chunk.percent === 'number' ? chunk.percent : undefined,
     completed: typeof chunk.completed === 'number' ? chunk.completed : undefined,
     total: typeof chunk.total === 'number' ? chunk.total : undefined,
+    speed: typeof chunk.speed === 'number' ? chunk.speed : undefined,
     targetPath: typeof chunk.targetPath === 'string' ? chunk.targetPath : undefined,
     error: typeof chunk.error === 'string' ? chunk.error : undefined,
   };
@@ -4391,10 +4494,13 @@ function humanizeInstallPhase(phase: string): string {
   switch (phase) {
     case 'starting':
       return i18nService.t('marketplaceInstallStarting');
+    case 'detecting':
+      return i18nService.t('localInferenceInstallVerifying');
     case 'downloading':
-      return i18nService.t('marketplaceInstallPulling');
     case 'downloading-progress':
-      return i18nService.t('marketplaceInstallProgress');
+      return i18nService.t('marketplaceInstallPulling');
+    case 'installing':
+      return i18nService.t('localInferenceInstallExtracting');
     case 'cancelling':
       return i18nService.t('marketplaceCancelling');
     case 'cancelled':
