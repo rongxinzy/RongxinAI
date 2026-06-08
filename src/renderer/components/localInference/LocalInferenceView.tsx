@@ -1041,7 +1041,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handleCheckRuntimeDevices = () => {
     void runAction(async () => {
-      const result = await window.electron.llamacpp.listRuntimeDevices();
+      const target = backendSelection ?? recommendedBackend;
+      const result = await window.electron.llamacpp.listRuntimeDevices(target);
       if (!result.success) {
         const message = result.error || i18nService.t('localInferenceBackendDeviceCheckFailed');
         setBackendDevices(message);

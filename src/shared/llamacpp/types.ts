@@ -159,6 +159,7 @@ export type LlamaCppRuntimeListDevicesResult = {
   success: boolean;
   executablePath?: string;
   runtimeTargetId?: string;
+  backend?: LlamaCppBackendRef;
   rawOutput?: string;
   devices: LlamaCppRuntimeDevice[];
   error?: string;

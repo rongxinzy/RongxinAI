@@ -66,6 +66,32 @@ type ExecFileRunner = (
   },
 ) => Promise<{ stdout: string; stderr: string }>;
 
+function backendRequiresDeviceValidation(ref: LlamaCppBackendRef): boolean {
+  return ref.backend.includes('cuda') || ref.backend.includes('vulkan') || ref.backend.includes('hip');
+}
+
+function validateBackendDevices(
+  ref: LlamaCppBackendRef,
+  devices: LlamaCppRuntimeDevice[],
+): string | undefined {
+  if (ref.backend.includes('cuda')) {
+    return devices.some(device => device.backend === 'cuda')
+      ? undefined
+      : 'The selected CUDA backend did not detect any CUDA devices.';
+  }
+  if (ref.backend.includes('vulkan')) {
+    return devices.some(device => device.backend === 'vulkan')
+      ? undefined
+      : 'The selected Vulkan backend did not detect any Vulkan devices.';
+  }
+  if (ref.backend.includes('hip')) {
+    return devices.some(device => device.backend === 'rocm')
+      ? undefined
+      : 'The selected HIP backend did not detect any HIP/ROCm devices.';
+  }
+  return undefined;
+}
+
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
   private process: ChildProcessWithoutNullStreams | null = null;
@@ -333,6 +359,24 @@ export class LlamaCppManager extends EventEmitter {
           });
         })();
     if (result.success && result.executablePath) {
+      if (backendRequiresDeviceValidation(ref)) {
+        const deviceResult = await this.listRuntimeDevices(ref);
+        if (!deviceResult.success) {
+          return {
+            ...result,
+            success: false,
+            error: deviceResult.error || 'Backend device validation failed.',
+          };
+        }
+        const validationError = validateBackendDevices(ref, deviceResult.devices);
+        if (validationError) {
+          return {
+            ...result,
+            success: false,
+            error: validationError,
+          };
+        }
+      }
       this.executablePath = result.executablePath;
       this.setStatus({
         status: 'installed',
@@ -343,22 +387,32 @@ export class LlamaCppManager extends EventEmitter {
     return result;
   }
 
-  async listRuntimeDevices(): Promise<LlamaCppRuntimeListDevicesResult> {
-    if (!this.executablePath) {
-      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
+  async listRuntimeDevices(ref?: LlamaCppBackendRef): Promise<LlamaCppRuntimeListDevicesResult> {
+    let executablePath = this.executablePath;
+    if (ref) {
+      executablePath = getLlamaCppBackendExecutablePath(
+        getUserLlamaCppRuntimeRoot(),
+        ref,
+        process.platform,
+      );
     }
-    if (!this.executablePath) {
+    if (!executablePath) {
+      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
+      executablePath = this.executablePath;
+    }
+    if (!executablePath) {
       return {
         success: false,
         devices: [],
         error: 'llama.cpp runtime is not installed.',
       };
     }
-    return await listLlamaCppRuntimeDevices({
-      executablePath: this.executablePath,
+    const result = await listLlamaCppRuntimeDevices({
+      executablePath,
       platform: process.platform,
       baseEnv: process.env,
     });
+    return ref ? { ...result, backend: ref } : result;
   }
 
   async importRuntime(sourcePath: string): Promise<LlamaCppRuntimeImportResult> {

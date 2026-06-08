@@ -203,7 +203,10 @@ export function registerLlamaCppIpcHandlers(
     return await manager.installRuntime();
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
-  ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
+  ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
+    const ref = sanitizeLlamaCppBackendRef(input);
+    return await manager.listRuntimeDevices(ref ?? undefined);
+  });
   ipcMain.handle(LlamaCppIpcChannel.ListBackends, async () => manager.listBackends());
   ipcMain.handle(LlamaCppIpcChannel.GetBackendSelection, async () => manager.getBackendSelection());
   ipcMain.handle(LlamaCppIpcChannel.SetBackendSelection, async (_event, input: unknown) => {
