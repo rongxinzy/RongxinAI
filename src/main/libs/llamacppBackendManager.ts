@@ -286,6 +286,34 @@ export async function listLlamaCppBackends(input: {
   };
 }
 
+export async function getLlamaCppBackendCompatibilityError(input: {
+  runtimeRoot: string;
+  ref: LlamaCppBackendRef;
+  platform: NodeJS.Platform;
+  arch: string;
+  hasNvidiaGpu: boolean;
+  manifest?: LlamaCppBackendManifest;
+}): Promise<string | undefined> {
+  const manifest = input.manifest ?? await fetchLlamaCppBackendManifest();
+  const manifestEntry = findManifestEntry(manifest, input.ref);
+  if (manifestEntry) {
+    return validateBackendForMachine(manifestEntry, input.platform, input.arch, input.hasNvidiaGpu);
+  }
+
+  const buildInfo = readBackendBuildInfo(getLlamaCppBackendDir(input.runtimeRoot, input.ref));
+  if (!buildInfo) return undefined;
+
+  return validateBackendForMachine({
+    version: input.ref.version,
+    backend: input.ref.backend,
+    platform: normalizePlatform(String(buildInfo.platform ?? input.platform)),
+    arch: normalizeArch(String(buildInfo.arch ?? input.arch)),
+    accelerator: (buildInfo.accelerator as LlamaCppBackendManifestEntry['accelerator'] | undefined) ?? inferBackendAccelerator(input.ref.backend),
+    cudaMajor: buildInfo.cudaMajor as LlamaCppBackendManifestEntry['cudaMajor'] | undefined,
+    archive: { assetName: '' },
+  }, input.platform, input.arch, input.hasNvidiaGpu);
+}
+
 export function recommendLlamaCppBackend(input: {
   manifest: LlamaCppBackendManifest;
   platform: NodeJS.Platform;
@@ -569,6 +597,26 @@ export async function importLlamaCppBackendPath(input: {
       arch: input.arch,
       hasNvidiaGpu: input.hasNvidiaGpu,
     });
+  }
+  if (!isSupportedBackendArchivePath(input.sourcePath)) {
+    const resolvedSourceDir = resolveImportDirectoryFromSelectedFile(
+      input.sourcePath,
+      input.platform,
+      input.arch,
+    );
+    if (resolvedSourceDir) {
+      return await importLlamaCppBackendDirectory({
+        runtimeRoot: input.runtimeRoot,
+        sourceDir: resolvedSourceDir,
+        platform: input.platform,
+        arch: input.arch,
+        hasNvidiaGpu: input.hasNvidiaGpu,
+      });
+    }
+    return {
+      success: false,
+      error: '所选文件不是有效的 llama.cpp backend 压缩包。请选择官方 zip/tar.gz 主包，或进入已解压目录后选择其中任意文件。',
+    };
   }
   return await importLlamaCppBackendArchive({
     runtimeRoot: input.runtimeRoot,
@@ -854,6 +902,37 @@ async function extractArchive(archivePath: string, extractDir: string): Promise<
     return;
   }
   throw new Error(`Unsupported llama.cpp backend archive format: ${archivePath}`);
+}
+
+function isSupportedBackendArchivePath(sourcePath: string): boolean {
+  return sourcePath.endsWith('.zip') || sourcePath.endsWith('.tar.gz');
+}
+
+function resolveImportDirectoryFromSelectedFile(
+  selectedFilePath: string,
+  platform: NodeJS.Platform,
+  arch: string,
+): string | undefined {
+  const executableName = resolveLlamaCppExecutableName(platform);
+  let currentDir = path.dirname(selectedFilePath);
+  for (let depth = 0; depth < 4; depth += 1) {
+    const executablePath = findExecutablePath(currentDir, executableName);
+    if (executablePath) {
+      const metadata = inferBackendDirectoryMetadata({
+        sourceDir: currentDir,
+        executablePath,
+        platform,
+        arch,
+      });
+      if (metadata) {
+        return currentDir;
+      }
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) break;
+    currentDir = parentDir;
+  }
+  return undefined;
 }
 
 function findExecutablePath(rootDir: string, executableName: string): string | null {

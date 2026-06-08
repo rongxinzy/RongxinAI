@@ -239,9 +239,10 @@ export function registerLlamaCppIpcHandlers(
     const result = await dialog.showOpenDialog(win, {
       title: t('localInferenceImportRuntimeDialogTitle'),
       message: t('localInferenceImportRuntimeDialogMessage'),
-      properties: ['openFile', 'openDirectory'],
+      properties: ['openFile'],
       filters: [
         { name: 'llama.cpp backend archives', extensions: ['zip', 'gz'] },
+        { name: 'All files', extensions: ['*'] },
       ],
     });
 
