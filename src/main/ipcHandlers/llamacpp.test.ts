@@ -53,6 +53,38 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
   });
 });
 
+test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit defaults', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    modelsMax: '9999999',
+    timeout: '9999999',
+    threadsHttp: '9999999',
+    ctxSize: '9999999',
+    parallel: '9999999',
+    batchSize: '9999999',
+    ubatchSize: '9999999',
+    gpuLayers: '9999999',
+    threads: '9999999',
+    threadsBatch: '9999999',
+    mainGpu: '9999999',
+    cacheReuse: '9999999',
+    cacheRam: '9999999',
+  })).toEqual({
+    modelsMax: '0',
+    timeout: '600',
+    threadsHttp: '4',
+    cacheReuse: '0',
+    cacheRam: '8192',
+    ctxSize: '4096',
+    parallel: '1',
+    batchSize: '2048',
+    ubatchSize: '512',
+    gpuLayers: 'auto',
+    threads: '-1',
+    threadsBatch: '-1',
+    mainGpu: '0',
+  });
+});
+
 test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () => {
   expect(sanitizeLlamaCppServiceConfig({
     runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,

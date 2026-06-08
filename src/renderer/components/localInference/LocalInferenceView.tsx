@@ -151,6 +151,7 @@ type InferenceOptionGroup = 'basic' | 'advanced';
 type SaveServiceConfigResult = {
   success: boolean;
   error?: string;
+  sanitizedFields?: string[];
 };
 
 const LocalInferenceToastKind = {
@@ -870,13 +871,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       try {
         const saved = await saveOllamaServiceConfig(config);
         setServiceConfig(saved);
+        const sanitizedFields = getSanitizedServiceConfigFields(config, saved);
         showToast(
-          status?.status === 'running'
-            ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
-            : i18nService.t('localInferenceServiceConfigSaved'),
+          sanitizedFields.length > 0
+            ? i18nService
+              .t('localInferenceServiceConfigSanitizedNotice')
+              .replace('{fields}', sanitizedFields.join('、'))
+            : status?.status === 'running'
+              ? i18nService.t('localInferenceServiceConfigSavedRestartRequired')
+              : i18nService.t('localInferenceServiceConfigSaved'),
           LocalInferenceToastKind.Success,
         );
-        return { success: true };
+        return { success: true, sanitizedFields };
       } catch (saveError) {
         const message = saveError instanceof Error ? saveError.message : String(saveError);
         return { success: false, error: message };
@@ -4287,6 +4293,35 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
     mlock: config.mlock === undefined ? '' : String(config.mlock),
     jinja: config.jinja ?? '',
   };
+}
+
+function getSanitizedServiceConfigFields(
+  input: LlamaCppServiceConfig,
+  saved: LlamaCppServiceConfig,
+): string[] {
+  const fields: Array<{ key: keyof LlamaCppServiceConfig; label: string }> = [
+    { key: 'modelsMax', label: i18nService.t('localInferenceServiceConfigModelsMaxLabel') },
+    { key: 'timeout', label: i18nService.t('localInferenceServiceConfigTimeoutLabel') },
+    { key: 'threadsHttp', label: i18nService.t('localInferenceServiceConfigThreadsHttpLabel') },
+    { key: 'cacheReuse', label: i18nService.t('localInferenceServiceConfigCacheReuseLabel') },
+    { key: 'cacheRam', label: i18nService.t('localInferenceServiceConfigCacheRamLabel') },
+    { key: 'ctxSize', label: i18nService.t('localInferenceServiceConfigCtxSizeLabel') },
+    { key: 'parallel', label: i18nService.t('localInferenceServiceConfigParallelLabel') },
+    { key: 'batchSize', label: i18nService.t('localInferenceServiceConfigBatchSizeLabel') },
+    { key: 'ubatchSize', label: i18nService.t('localInferenceServiceConfigUbatchSizeLabel') },
+    { key: 'gpuLayers', label: i18nService.t('localInferenceServiceConfigGpuLayersLabel') },
+    { key: 'threads', label: i18nService.t('localInferenceServiceConfigThreadsLabel') },
+    { key: 'threadsBatch', label: i18nService.t('localInferenceServiceConfigThreadsBatchLabel') },
+    { key: 'mainGpu', label: i18nService.t('localInferenceServiceConfigMainGpuLabel') },
+  ];
+  return fields
+    .filter(({ key }) => {
+      const original = input[key];
+      if (typeof original !== 'string' || !original.trim()) return false;
+      const next = saved[key];
+      return typeof next !== 'string' || next.trim() !== original.trim();
+    })
+    .map(({ label }) => label);
 }
 
 async function loadOllamaServiceConfig(): Promise<OllamaServiceConfig> {
