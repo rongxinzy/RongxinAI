@@ -628,6 +628,8 @@ function normalizeModelsMaxString(value: string | undefined): string | undefined
   const trimmed = value?.trim();
   if (!trimmed) return '0';
   if (!/^\d+$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  if (n < 0 || n > 256) return '0';
   return trimmed;
 }
 

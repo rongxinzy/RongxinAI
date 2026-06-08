@@ -4296,10 +4296,10 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
 }
 
 function getSanitizedServiceConfigFields(
-  input: LlamaCppServiceConfig,
-  saved: LlamaCppServiceConfig,
+  input: OllamaServiceConfig,
+  saved: OllamaServiceConfig,
 ): string[] {
-  const fields: Array<{ key: keyof LlamaCppServiceConfig; label: string }> = [
+  const fields: Array<{ key: keyof OllamaServiceConfig; label: string }> = [
     { key: 'modelsMax', label: i18nService.t('localInferenceServiceConfigModelsMaxLabel') },
     { key: 'timeout', label: i18nService.t('localInferenceServiceConfigTimeoutLabel') },
     { key: 'threadsHttp', label: i18nService.t('localInferenceServiceConfigThreadsHttpLabel') },
