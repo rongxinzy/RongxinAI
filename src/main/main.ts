@@ -2835,8 +2835,34 @@ if (!gotTheLock) {
     return getSkillManager().getSkillConfig(skillId);
   });
 
-  ipcMain.handle('skills:setConfig', (_event, skillId: string, config: Record<string, string>) => {
-    return getSkillManager().setSkillConfig(skillId, config);
+  ipcMain.handle('skills:setConfig', async (_event, skillId: string, config: Record<string, string>) => {
+    const result = getSkillManager().setSkillConfig(skillId, config);
+    // When email skill config changes, sync IM store email accounts and trigger
+    // gateway restart so the new credentials take effect. The skill .env is the
+    // authoritative data source for email credentials at runtime, but the
+    // IM store's email config is what sync() serializes into openclaw.json.
+    if (skillId === 'imap-smtp-email' && result.success) {
+      try {
+        const email = config.IMAP_USER || '';
+        const transport = email ? 'ws' : 'imap';
+        const instanceConfig: Partial<import('./im/types').EmailInstanceConfig> = {
+          enabled: true,
+          email,
+          password: config.IMAP_PASS || undefined,
+          apiKey: config.IMAP_PASS || undefined,
+          transport: transport as 'ws' | 'imap',
+          imapHost: config.IMAP_HOST || undefined,
+          imapPort: parseInt(config.IMAP_PORT || '0', 10) || undefined,
+          smtpHost: config.SMTP_HOST || undefined,
+          smtpPort: parseInt(config.SMTP_PORT || '0', 10) || undefined,
+        };
+        getIMGatewayManager().getIMStore().setEmailInstanceConfig('email-1', instanceConfig);
+        scheduleImConfigSync();
+      } catch (err) {
+        console.error('[skills:setConfig] Failed to sync email config to IM store:', err);
+      }
+    }
+    return result;
   });
 
   ipcMain.handle('skills:testEmailConnectivity', async (
@@ -4114,13 +4140,19 @@ if (!gotTheLock) {
 
       const nextConfig = getCoworkStore().getConfig();
 
+      // Any non-undefined normalized field means the user changed a config value
+      // that affects the generated openclaw.json. Only model config changes
+      // trigger secret-env-var changes (and thus a hard restart automatically),
+      // so pass restartGatewayIfRunning=true for all cowork config changes.
       const shouldSyncOpenClawConfig = normalizedExecutionMode !== undefined
         || normalizedAgentEngine !== undefined
+        || normalizedSkipMissedJobs !== undefined
         || normalizedConfig.workingDirectory !== undefined
         || Object.values(normalizedEmbedding).some(v => v !== undefined);
       if (shouldSyncOpenClawConfig) {
         const syncResult = await syncOpenClawConfig({
           reason: 'cowork-config-change',
+          restartGatewayIfRunning: true,
         });
         if (!syncResult.success && nextConfig.agentEngine === 'openclaw') {
           return {
@@ -4239,8 +4271,10 @@ if (!gotTheLock) {
   const doImConfigSync = async () => {
     imConfigSyncRunning = true;
     try {
+      console.log('[IM] doImConfigSync: calling syncOpenClawConfig with restartGatewayIfRunning=true');
       await syncOpenClawConfig({
         reason: 'im-config-change',
+        restartGatewayIfRunning: true,
       });
       // After config sync, ensure the runtime adapter's WebSocket client
       // is connected so channel events are received.
