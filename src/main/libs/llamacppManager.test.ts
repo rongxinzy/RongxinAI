@@ -289,10 +289,12 @@ test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
     'Available devices:',
     '  CUDA0: NVIDIA GeForce RTX 4090 (24564 MiB, 0 MiB free)',
     '  CUDA1: NVIDIA GeForce RTX 3090',
+    '  GPU0: Adreno X1-85 (OpenCL)',
     '  CPU: CPU',
   ].join('\n'))).toEqual([
     { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
     { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+    { id: 'GPU0', name: 'Adreno X1-85', backend: 'opencl' },
     { id: 'CPU', name: 'CPU', backend: 'cpu' },
   ]);
 });

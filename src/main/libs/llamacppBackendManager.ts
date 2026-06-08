@@ -360,12 +360,15 @@ function selectBackendByPriority(
       return compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13')
         ?? compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12')
         ?? compatible.find(entry => entry.accelerator === 'vulkan')
-        ?? compatible.find(entry => entry.accelerator === 'hip')
         ?? compatible.find(entry => entry.accelerator === 'cpu');
     }
     return compatible.find(entry => entry.accelerator === 'vulkan')
-      ?? compatible.find(entry => entry.accelerator === 'hip')
       ?? compatible.find(entry => entry.accelerator === 'cpu');
+  }
+  if (input.platform === 'win32' && input.arch === 'arm64') {
+    return compatible.find(entry => entry.backend === LlamaCppRuntimeTargetId.WinArm64)
+      ?? compatible.find(entry => entry.accelerator === 'cpu')
+      ?? compatible[0];
   }
   return compatible.find(entry => entry.accelerator === 'metal')
     ?? compatible.find(entry => entry.accelerator === 'cuda')
@@ -787,6 +790,14 @@ function validateBackendForMachine(
   }
   if (entry.accelerator === 'cuda' && !hasNvidiaGpu) {
     return 'CUDA backend requires an NVIDIA GPU.';
+  }
+  if (entry.backend === 'win-x64-hip') {
+    return 'HIP backend requires a Windows x64 machine with AMD HIP/ROCm support. RongxinAI will validate device availability after installation.';
+  }
+  if (entry.backend === 'win-arm64-opencl-adreno') {
+    if (normalizePlatform(platform) !== 'win32' || normalizeArch(arch) !== 'arm64') {
+      return 'OpenCL Adreno backend only supports Windows ARM64 devices.';
+    }
   }
   return undefined;
 }

@@ -69,7 +69,10 @@ type ExecFileRunner = (
 ) => Promise<{ stdout: string; stderr: string }>;
 
 function backendRequiresDeviceValidation(ref: LlamaCppBackendRef): boolean {
-  return ref.backend.includes('cuda') || ref.backend.includes('vulkan') || ref.backend.includes('hip');
+  return ref.backend.includes('cuda')
+    || ref.backend.includes('vulkan')
+    || ref.backend.includes('hip')
+    || ref.backend.includes('opencl-adreno');
 }
 
 function validateBackendDevices(
@@ -90,6 +93,13 @@ function validateBackendDevices(
     return devices.some(device => device.backend === 'rocm')
       ? undefined
       : 'The selected HIP backend did not detect any HIP/ROCm devices.';
+  }
+  if (ref.backend.includes('opencl-adreno')) {
+    return devices.some(device =>
+      device.backend === 'opencl' || /adreno/i.test(device.name) || /adreno/i.test(device.id)
+    )
+      ? undefined
+      : 'The selected OpenCL Adreno backend did not detect any Adreno/OpenCL devices.';
   }
   return undefined;
 }
@@ -1215,6 +1225,7 @@ function inferLlamaCppDeviceBackend(id: string, name: string): string {
   if (source.includes('cuda')) return 'cuda';
   if (source.includes('metal')) return 'metal';
   if (source.includes('vulkan')) return 'vulkan';
+  if (source.includes('opencl') || source.includes('adreno')) return 'opencl';
   if (source.includes('rocm') || source.includes('hip')) return 'rocm';
   if (source.includes('sycl')) return 'sycl';
   if (source.includes('cpu')) return 'cpu';

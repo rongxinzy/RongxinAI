@@ -153,6 +153,76 @@ describe('llamacpp backend manager', () => {
     expect(ref?.versionBackend).toBe('b9518/win-x64-vulkan');
   });
 
+  test('does not auto-recommend HIP for Windows x64 without NVIDIA when CPU is available', () => {
+    const manifest = {
+      schemaVersion: 1 as const,
+      defaultVersion: 'b9518',
+      backends: [
+        {
+          version: 'b9518',
+          backend: 'win-x64-hip',
+          platform: 'win32' as const,
+          arch: 'x64',
+          accelerator: 'hip' as const,
+          archive: { assetName: 'llama-b9518-bin-win-hip-radeon-x64.tar.gz' },
+        },
+        {
+          version: 'b9518',
+          backend: 'win-x64',
+          platform: 'win32' as const,
+          arch: 'x64',
+          accelerator: 'cpu' as const,
+          archive: { assetName: 'llama-b9518-bin-win-cpu-x64.tar.gz' },
+        },
+      ],
+    };
+
+    const ref = recommendLlamaCppBackend({
+      manifest,
+      platform: 'win32',
+      arch: 'x64',
+      hasNvidiaGpu: false,
+      config: {},
+    });
+
+    expect(ref?.versionBackend).toBe('b9518/win-x64');
+  });
+
+  test('does not auto-recommend Adreno for Windows ARM64 when generic CPU backend is available', () => {
+    const manifest = {
+      schemaVersion: 1 as const,
+      defaultVersion: 'b9518',
+      backends: [
+        {
+          version: 'b9518',
+          backend: 'win-arm64-opencl-adreno',
+          platform: 'win32' as const,
+          arch: 'arm64',
+          accelerator: 'cpu' as const,
+          archive: { assetName: 'llama-b9518-bin-win-opencl-adreno-arm64.tar.gz' },
+        },
+        {
+          version: 'b9518',
+          backend: 'win-arm64',
+          platform: 'win32' as const,
+          arch: 'arm64',
+          accelerator: 'cpu' as const,
+          archive: { assetName: 'llama-b9518-bin-win-cpu-arm64.tar.gz' },
+        },
+      ],
+    };
+
+    const ref = recommendLlamaCppBackend({
+      manifest,
+      platform: 'win32',
+      arch: 'arm64',
+      hasNvidiaGpu: false,
+      config: {},
+    });
+
+    expect(ref?.versionBackend).toBe('b9518/win-arm64');
+  });
+
   test('reads a root manifest and aggregates version manifests', async () => {
     const originalFetch = global.fetch;
     const responses = new Map<string, any>([
