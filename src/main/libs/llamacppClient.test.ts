@@ -217,6 +217,33 @@ describe('LlamaCppClient', () => {
       ],
     });
   });
+
+  test('uses the configured load timeout for router model discovery and model load calls', async () => {
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/models/load')) {
+        return jsonResponse({});
+      }
+      return jsonResponse({
+        data: [{
+          id: 'qwen3:8b',
+          path: '/models/qwen3.gguf',
+          meta: { size: 123, n_params: 8_000_000_000, n_ctx_train: 32768 },
+          status: { value: 'loaded', args: ['--ctx-size', '4096'] },
+        }],
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new LlamaCppClient('http://127.0.0.1:8080/', {
+      loadTimeoutMs: 123_000,
+    });
+
+    await client.listModels();
+    await client.loadModel({ model: 'qwen3:8b' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 123_000);
+  });
 });
 
 function jsonResponse(payload: unknown): Response {
