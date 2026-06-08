@@ -1410,6 +1410,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               localModels={localModels}
               runningModels={runningModels}
               installProgress={pullProgress}
+              hasAvailableBackends={backendList.length > 0}
               onToggle={() => setServicePopoverOpen(current => !current)}
               onPrepare={handlePrepare}
               onStop={handleStop}
@@ -1555,6 +1556,7 @@ function ServicePopover({
   localModels,
   runningModels,
   installProgress,
+  hasAvailableBackends,
   onToggle,
   onPrepare,
   onStop,
@@ -1569,6 +1571,7 @@ function ServicePopover({
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
   installProgress: InstallProgressState;
+  hasAvailableBackends: boolean;
   onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
@@ -1579,14 +1582,12 @@ function ServicePopover({
   const running = status?.status === 'running';
   const managedByApp = Boolean(status?.managedByApp);
   const displayStatus = status?.status === 'installed' ? 'stopped' : (status?.status ?? 'unknown');
-  const canPrepare =
-    status?.status === 'not-installed' ||
+  const hasCurrentBackend =
     status?.status === 'installed' ||
-    status?.status === 'stopped';
-  const actionLabel =
-    status?.status === 'not-installed'
-      ? i18nService.t('localInferenceInstall')
-      : i18nService.t('localInferenceStart');
+    status?.status === 'stopped' ||
+    status?.status === 'running';
+  const canPrepare = hasCurrentBackend;
+  const actionLabel = i18nService.t('localInferenceStart');
   const [downloadsExpanded, setDownloadsExpanded] = useState(false);
   const downloadEntries = useMemo(
     () =>
@@ -1696,6 +1697,14 @@ function ServicePopover({
             </p>
           )}
 
+          {!running && !hasCurrentBackend && (
+            <p className="mt-3 rounded-lg border border-border bg-background px-3 py-2 text-xs text-secondary">
+              {hasAvailableBackends
+                ? i18nService.t('localInferenceServiceNeedsBackendSwitch')
+                : i18nService.t('localInferenceServiceNeedsBackendInstall')}
+            </p>
+          )}
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -1730,6 +1739,16 @@ function ServicePopover({
                 onClick={onPrepare}
                 disabled={loading}
                 className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+              >
+                <PlayIcon className="h-3.5 w-3.5" />
+                {actionLabel}
+              </button>
+            )}
+            {!running && !canPrepare && (
+              <button
+                type="button"
+                disabled
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white opacity-60"
               >
                 <PlayIcon className="h-3.5 w-3.5" />
                 {actionLabel}
