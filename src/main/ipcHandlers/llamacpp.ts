@@ -18,7 +18,7 @@ import {
 } from '../../shared/llamacpp';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import { LlamaCppManager } from '../libs/llamacppManager';
+import { LlamaCppManager, resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
 import {
   buildLlamaCppOpenClawAppConfig,
   buildLlamaCppRunningModelBinding,
@@ -53,7 +53,7 @@ const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return reason === 'llamacpp-model-stopped';
+  return reason === 'llamacpp-model-stopped' || reason === 'llamacpp-set-openclaw-model';
 }
 
 export function getTotalFreeVramMiB(snapshot: NvidiaSmiSnapshot | null | undefined): number | null {
@@ -247,7 +247,10 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(
     LlamaCppIpcChannel.SetServiceConfig,
     async (_event, config: LlamaCppServiceConfig) => {
-      const sanitized = sanitizeLlamaCppServiceConfig(config);
+      const sanitized = sanitizeLlamaCppServiceConfig(
+        config,
+        await manager.listRuntimeDevices().catch((): null => null),
+      );
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       return sanitized;
     },
@@ -511,6 +514,10 @@ function migrateLegacyServiceConfig(store: SqliteStore): void {
 
 export function sanitizeLlamaCppServiceConfig(
   config: LlamaCppServiceConfig | undefined,
+  runtimeDevices?: {
+    success: boolean;
+    devices?: Array<{ id?: string; name?: string }>;
+  } | null,
 ): LlamaCppServiceConfig {
   const next: LlamaCppServiceConfig = {};
   const host = config?.host?.trim();
@@ -582,10 +589,16 @@ export function sanitizeLlamaCppServiceConfig(
     max: 512,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threadsBatch,
   });
+  const device = normalizeVisibleDevices(config?.device, runtimeDevices);
+  const splitMode = isSplitMode(config?.splitMode) ? config.splitMode : undefined;
   const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, {
     min: 0,
     max: 64,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
+  });
+  const tensorSplit = normalizeTensorSplit(config?.tensorSplit, {
+    splitMode,
+    runtimeDevices,
   });
   const reasoningBudget = normalizeSignedIntegerString(config?.reasoningBudget);
 
@@ -613,10 +626,10 @@ export function sanitizeLlamaCppServiceConfig(
   if (gpuLayers) next.gpuLayers = gpuLayers;
   if (threads) next.threads = threads;
   if (threadsBatch) next.threadsBatch = threadsBatch;
-  if (config?.device?.trim()) next.device = config.device.trim();
+  if (device) next.device = device;
   if (mainGpu) next.mainGpu = mainGpu;
-  if (isSplitMode(config?.splitMode)) next.splitMode = config.splitMode;
-  if (config?.tensorSplit?.trim()) next.tensorSplit = config.tensorSplit.trim();
+  if (splitMode) next.splitMode = splitMode;
+  if (tensorSplit) next.tensorSplit = tensorSplit;
   if (isOnOffAuto(config?.flashAttn)) next.flashAttn = config.flashAttn;
   if (isOnOffAuto(config?.jinja)) next.jinja = config.jinja;
   if (isOnOffAuto(config?.reasoning)) next.reasoning = config.reasoning;
@@ -645,6 +658,8 @@ function normalizeIntegerStringWithDefault(
   value: string | undefined,
   range: { min: number; max: number; defaultValue: string },
 ): string | undefined {
+  const trimmed = value?.trim();
+  if (trimmed === '' && range.min === 0) return range.defaultValue;
   const normalized = normalizeIntegerString(value);
   if (!normalized) return undefined;
   const parsed = Number.parseInt(normalized, 10);
@@ -691,6 +706,101 @@ function normalizeGpuLayersStringWithDefault(
   if (!Number.isFinite(parsed)) return range.defaultValue;
   if (parsed < range.min || parsed > range.max) return range.defaultValue;
   return normalized;
+}
+
+function normalizeVisibleDevices(
+  value: string | undefined,
+  runtimeDevices?: {
+    success: boolean;
+    devices?: Array<{ id?: string; name?: string; backend?: string }>;
+  } | null,
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
+    const tokens = trimmed
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean);
+    if (tokens.length === 0) return undefined;
+
+    const normalizedTokens = tokens.map(token => /^[A-Za-z0-9_.:-]+$/.test(token) ? token : '');
+    if (normalizedTokens.some(token => !token)) {
+      return undefined;
+    }
+    return normalizedTokens.join(',');
+  }
+
+  const runtimeDeviceList = runtimeDevices.devices.flatMap(device => {
+    if (
+      typeof device.id !== 'string' ||
+      device.id.trim().length === 0
+    ) {
+      return [];
+    }
+    return [{
+      id: device.id.trim(),
+      name:
+        typeof device.name === 'string' && device.name.trim().length > 0
+          ? device.name.trim()
+          : device.id.trim(),
+      backend:
+        typeof device.backend === 'string' && device.backend.trim().length > 0
+          ? device.backend.trim()
+          : 'unknown',
+    }];
+  });
+  if (runtimeDeviceList.length === 0) {
+    return undefined;
+  }
+
+  const resolved = resolveLlamaCppDeviceSelection(trimmed, runtimeDeviceList);
+  return resolved || undefined;
+}
+
+function normalizeTensorSplit(
+  value: string | undefined,
+  options?: {
+    splitMode?: NonNullable<LlamaCppServiceConfig['splitMode']>;
+    runtimeDevices?: {
+      success: boolean;
+      devices?: Array<{ id?: string; name?: string }>;
+    } | null;
+  },
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (options?.splitMode !== 'tensor') return undefined;
+
+  const parts = trimmed
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return undefined;
+
+  const normalizedParts: string[] = [];
+  for (const part of parts) {
+    if (!/^\d+(?:\.\d+)?$/.test(part)) {
+      return undefined;
+    }
+    const parsed = Number(part);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1024) {
+      return undefined;
+    }
+    normalizedParts.push(Number.isInteger(parsed) ? String(parsed) : String(parsed));
+  }
+
+  if (
+    options?.runtimeDevices?.success &&
+    Array.isArray(options.runtimeDevices.devices) &&
+    options.runtimeDevices.devices.length > 0 &&
+    normalizedParts.length > options.runtimeDevices.devices.length
+  ) {
+    return undefined;
+  }
+
+  return normalizedParts.join(',');
 }
 
 function isSplitMode(value: unknown): value is NonNullable<LlamaCppServiceConfig['splitMode']> {
