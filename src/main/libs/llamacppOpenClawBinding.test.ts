@@ -39,14 +39,14 @@ test('buildLlamaCppRunningModelBinding uses runtime context length for OpenClaw 
     name: 'qwen-local',
     details: { context_length: 32768 },
     trained_context_length: 32768,
-    runtime_context_length: 4096,
+    runtime_context_length: 32768,
   })).toEqual({
     id: 'qwen-local',
     name: 'qwen-local',
     supportsImage: false,
-    contextWindow: 4096,
-    contextTokens: 4096,
-    maxTokens: 1024,
+    contextWindow: 32768,
+    contextTokens: 32768,
+    maxTokens: 4096,
   });
 });
 
@@ -63,4 +63,21 @@ test('buildLlamaCppRunningModelBinding returns null when runtime context length 
     details: { context_length: 32768 },
     trained_context_length: 32768,
   })).toBeNull();
+});
+
+test('buildLlamaCppRunningModelBinding returns null when context below OpenClaw minimum', () => {
+  expect(buildLlamaCppRunningModelBinding({
+    name: 'qwen-local',
+    runtime_context_length: 4096,
+  })).toBeNull();
+
+  expect(buildLlamaCppRunningModelBinding({
+    name: 'qwen-local',
+    runtime_context_length: 31999,
+  })).toBeNull();
+
+  expect(buildLlamaCppRunningModelBinding({
+    name: 'qwen-local',
+    runtime_context_length: 32000,
+  })).not.toBeNull();
 });
