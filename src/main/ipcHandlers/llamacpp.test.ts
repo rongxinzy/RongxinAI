@@ -45,7 +45,7 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     ubatchSize: '64',
     runtimeBackend: LlamaCppRuntimeBackend.Cuda,
     runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
-    device: 'CUDA0,CUDA1',
+    device: '0,1',
     splitMode: 'layer',
     reasoning: 'on',
     chatTemplate: 'chatml',
@@ -154,6 +154,40 @@ test('sanitizeLlamaCppServiceConfig normalizes numeric device indexes to CUDA de
     },
   )).toEqual({
     device: 'CUDA0,CUDA1',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig maps numeric device indexes to runtime devices on non-CUDA backends', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'METAL0', name: 'Apple GPU', backend: 'metal' },
+        { id: 'CPU', name: 'CPU', backend: 'cpu' },
+      ],
+    },
+  )).toEqual({
+    device: 'METAL0',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig preserves explicit runtime device ids on non-CUDA backends', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: 'METAL0',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'METAL0', name: 'Apple GPU', backend: 'metal' },
+        { id: 'CPU', name: 'CPU', backend: 'cpu' },
+      ],
+    },
+  )).toEqual({
+    device: 'METAL0',
   });
 });
 

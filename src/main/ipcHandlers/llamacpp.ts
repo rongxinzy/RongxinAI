@@ -18,7 +18,7 @@ import {
 } from '../../shared/llamacpp';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import { LlamaCppManager } from '../libs/llamacppManager';
+import { LlamaCppManager, resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
 import {
   buildLlamaCppOpenClawAppConfig,
   buildLlamaCppRunningModelBinding,
@@ -712,48 +712,51 @@ function normalizeVisibleDevices(
   value: string | undefined,
   runtimeDevices?: {
     success: boolean;
-    devices?: Array<{ id?: string; name?: string }>;
+    devices?: Array<{ id?: string; name?: string; backend?: string }>;
   } | null,
 ): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
 
-  const tokens = trimmed
-    .split(',')
-    .map(part => part.trim())
-    .filter(Boolean);
-  if (tokens.length === 0) return undefined;
-
-  const normalizedTokens = tokens.map(token => {
-    if (/^\d+$/.test(token)) {
-      return `CUDA${token}`;
-    }
-    return /^[A-Za-z0-9_.:-]+$/.test(token) ? token : '';
-  });
-
-  if (normalizedTokens.some(token => !token)) {
-    return undefined;
-  }
-
   if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
+    const tokens = trimmed
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean);
+    if (tokens.length === 0) return undefined;
+
+    const normalizedTokens = tokens.map(token => /^[A-Za-z0-9_.:-]+$/.test(token) ? token : '');
+    if (normalizedTokens.some(token => !token)) {
+      return undefined;
+    }
     return normalizedTokens.join(',');
   }
 
-  const available = new Set(
-    runtimeDevices.devices.flatMap(device => {
-      const values = [device.id, device.name]
-        .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
-        .map(part => part.trim());
-      return values;
-    }),
-  );
-
-  const allValid = normalizedTokens.every(token => available.has(token));
-  if (!allValid) {
+  const runtimeDeviceList = runtimeDevices.devices.flatMap(device => {
+    if (
+      typeof device.id !== 'string' ||
+      device.id.trim().length === 0
+    ) {
+      return [];
+    }
+    return [{
+      id: device.id.trim(),
+      name:
+        typeof device.name === 'string' && device.name.trim().length > 0
+          ? device.name.trim()
+          : device.id.trim(),
+      backend:
+        typeof device.backend === 'string' && device.backend.trim().length > 0
+          ? device.backend.trim()
+          : 'unknown',
+    }];
+  });
+  if (runtimeDeviceList.length === 0) {
     return undefined;
   }
 
-  return normalizedTokens.join(',');
+  const resolved = resolveLlamaCppDeviceSelection(trimmed, runtimeDeviceList);
+  return resolved || undefined;
 }
 
 function normalizeTensorSplit(

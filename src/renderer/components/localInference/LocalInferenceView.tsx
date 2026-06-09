@@ -2544,6 +2544,41 @@ function LaunchModelDialog({
   const servicePatch = resolveLaunchServiceConfig(form.gpuPreset, form.customGpuDevices);
   const gpuPresetChangesService =
     servicePatch !== null && hasServiceConfigPatchChanged(serviceConfig, servicePatch);
+  const normalizeContextInput = useCallback(
+    (value: string) =>
+      normalizeLaunchContextValue(value, contextBounds, {
+        fallbackValue: parseOptionalInteger(serviceConfig.ctxSize) ?? 4096,
+      }),
+    [contextBounds, serviceConfig.ctxSize],
+  );
+  const normalizeGpuLayersInput = useCallback(
+    (value: string) =>
+      normalizeLaunchPositiveIntegerValue(value, {
+        min: 0,
+        max: 4096,
+        fallbackValue: parseOptionalInteger(serviceConfig.gpuLayers) ?? 0,
+      }),
+    [serviceConfig.gpuLayers],
+  );
+  const normalizeThreadsInput = useCallback(
+    (value: string) =>
+      normalizeLaunchPositiveIntegerValue(value, {
+        min: 1,
+        max: 512,
+        fallbackValue: Math.max(1, Math.min(Math.max(2, Math.floor(navigator.hardwareConcurrency || 4)) - 2, 16)),
+      }),
+    [],
+  );
+  const normalizeBatchInput = useCallback(
+    (value: string) =>
+      normalizeLaunchPositiveIntegerValue(value, {
+        min: 1,
+        max: 65536,
+        step: 32,
+        fallbackValue: parseOptionalInteger(serviceConfig.batchSize) ?? 256,
+      }),
+    [serviceConfig.batchSize],
+  );
 
   return (
     <div
@@ -2695,6 +2730,12 @@ function LaunchModelDialog({
                 step={contextBounds.step}
                 hint={i18nService.t('localInferenceLaunchNumCtxHint')}
                 onChange={value => updateForm('numCtx', value)}
+                onBlurValue={() => {
+                  const normalized = normalizeContextInput(form.numCtx);
+                  if (normalized !== form.numCtx) {
+                    updateForm('numCtx', normalized);
+                  }
+                }}
               />
               <LaunchChoiceSelect
                 label={i18nService.t('localInferenceLaunchAcceleration')}
@@ -2715,9 +2756,16 @@ function LaunchModelDialog({
                   label={i18nService.t('localInferenceLaunchNumGpu')}
                   value={form.customGpuLayers}
                   min={0}
+                  max={4096}
                   placeholder={i18nService.t('localInferenceLaunchDefault')}
                   hint={i18nService.t('localInferenceLaunchNumGpuHint')}
                   onChange={value => updateForm('customGpuLayers', value)}
+                  onBlurValue={() => {
+                    const normalized = normalizeGpuLayersInput(form.customGpuLayers);
+                    if (normalized !== form.customGpuLayers) {
+                      updateForm('customGpuLayers', normalized);
+                    }
+                  }}
                 />
               )}
             </div>
@@ -2751,18 +2799,32 @@ function LaunchModelDialog({
                 label={i18nService.t('localInferenceLaunchNumThread')}
                 value={form.numThread}
                 min={1}
+                max={512}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
                 hint={i18nService.t('localInferenceLaunchNumThreadHint')}
                 onChange={value => updateForm('numThread', value)}
+                onBlurValue={() => {
+                  const normalized = normalizeThreadsInput(form.numThread);
+                  if (normalized !== form.numThread) {
+                    updateForm('numThread', normalized);
+                  }
+                }}
               />
               <LaunchInput
                 label={i18nService.t('localInferenceLaunchNumBatch')}
                 value={form.numBatch}
                 min={1}
+                max={65536}
                 step={32}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
                 hint={i18nService.t('localInferenceLaunchNumBatchHint')}
                 onChange={value => updateForm('numBatch', value)}
+                onBlurValue={() => {
+                  const normalized = normalizeBatchInput(form.numBatch);
+                  if (normalized !== form.numBatch) {
+                    updateForm('numBatch', normalized);
+                  }
+                }}
               />
               <LaunchSelect
                 label={i18nService.t('localInferenceLaunchUseMmap')}
@@ -2819,6 +2881,7 @@ function LaunchInput({
   step,
   placeholder,
   onChange,
+  onBlurValue,
 }: {
   label: string;
   value: string;
@@ -2828,12 +2891,20 @@ function LaunchInput({
   step?: number;
   placeholder?: string;
   onChange: (value: string) => void;
+  onBlurValue?: () => void;
 }) {
   const clamp = () => {
-    if (max === undefined) return;
-    const parsed = parseOptionalInteger(value);
-    if (parsed === undefined) return;
-    if (parsed > max) onChange(String(max));
+    if (max !== undefined || min !== undefined) {
+      const parsed = parseOptionalInteger(value);
+      if (parsed !== undefined) {
+        if (max !== undefined && parsed > max) {
+          onChange(String(max));
+        } else if (min !== undefined && parsed < min) {
+          onChange(String(min));
+        }
+      }
+    }
+    onBlurValue?.();
   };
 
   return (
@@ -4123,6 +4194,47 @@ function getModelContextWindowRange(params: number): ContextWindowBounds {
   if (params <= 8_000_000_000) return { min: 2048, max: 131072, step: 2048 };
   if (params <= 14_000_000_000) return { min: 2048, max: 131072, step: 4096 };
   return { min: 4096, max: 131072, step: 4096 };
+}
+
+function normalizeLaunchContextValue(
+  value: string,
+  bounds: ContextWindowBounds,
+  options?: { fallbackValue?: number },
+): string {
+  const fallbackBase = options?.fallbackValue ?? 4096;
+  const fallbackClamped = Math.min(Math.max(fallbackBase, bounds.min), bounds.max);
+  const fallbackAligned =
+    bounds.min + Math.floor((fallbackClamped - bounds.min) / bounds.step) * bounds.step;
+  const parsed = parseOptionalInteger(value);
+  if (parsed === undefined) {
+    return String(fallbackAligned);
+  }
+
+  const clamped = Math.min(Math.max(parsed, bounds.min), bounds.max);
+  const aligned = bounds.min + Math.floor((clamped - bounds.min) / bounds.step) * bounds.step;
+  return String(aligned);
+}
+
+function normalizeLaunchPositiveIntegerValue(
+  value: string,
+  options: {
+    min: number;
+    max: number;
+    fallbackValue: number;
+    step?: number;
+  },
+): string {
+  const parsed = parseOptionalInteger(value);
+  const base =
+    parsed === undefined
+      ? options.fallbackValue
+      : Math.min(Math.max(parsed, options.min), options.max);
+  let normalized = Math.min(Math.max(base, options.min), options.max);
+  if (options.step && options.step > 1) {
+    normalized = options.min + Math.floor((normalized - options.min) / options.step) * options.step;
+  }
+  normalized = Math.min(Math.max(normalized, options.min), options.max);
+  return String(normalized);
 }
 
 function isPullInProgress(progress?: Record<string, unknown>): boolean {
