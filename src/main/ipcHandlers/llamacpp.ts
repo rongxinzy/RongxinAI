@@ -53,7 +53,7 @@ const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return reason === 'llamacpp-model-stopped';
+  return reason === 'llamacpp-model-stopped' || reason === 'llamacpp-set-openclaw-model';
 }
 
 export function getTotalFreeVramMiB(snapshot: NvidiaSmiSnapshot | null | undefined): number | null {

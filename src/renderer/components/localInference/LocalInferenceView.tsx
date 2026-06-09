@@ -2547,7 +2547,7 @@ function LaunchModelDialog({
   const normalizeContextInput = useCallback(
     (value: string) =>
       normalizeLaunchContextValue(value, contextBounds, {
-        fallbackValue: parseOptionalInteger(serviceConfig.ctxSize) ?? 4096,
+        fallbackValue: parseOptionalInteger(serviceConfig.ctxSize ?? '') ?? 4096,
       }),
     [contextBounds, serviceConfig.ctxSize],
   );
@@ -2556,7 +2556,7 @@ function LaunchModelDialog({
       normalizeLaunchPositiveIntegerValue(value, {
         min: 0,
         max: 4096,
-        fallbackValue: parseOptionalInteger(serviceConfig.gpuLayers) ?? 0,
+        fallbackValue: parseOptionalInteger(serviceConfig.gpuLayers ?? '') ?? 0,
       }),
     [serviceConfig.gpuLayers],
   );
@@ -2575,7 +2575,7 @@ function LaunchModelDialog({
         min: 1,
         max: 65536,
         step: 32,
-        fallbackValue: parseOptionalInteger(serviceConfig.batchSize) ?? 256,
+        fallbackValue: parseOptionalInteger(serviceConfig.batchSize ?? '') ?? 256,
       }),
     [serviceConfig.batchSize],
   );
