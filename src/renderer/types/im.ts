@@ -372,6 +372,7 @@ export interface EmailInstanceConfig {
   imapPort?: number;
   smtpHost?: string;
   smtpPort?: number;
+  smtpSecure?: boolean;
   allowFrom?: string[];
   replyMode?: 'immediate' | 'accumulated' | 'complete';
   replyTo?: 'sender' | 'all';

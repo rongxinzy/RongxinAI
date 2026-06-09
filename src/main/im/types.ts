@@ -377,6 +377,7 @@ export interface EmailInstanceConfig {
   imapPort?: number;
   smtpHost?: string;
   smtpPort?: number;
+  smtpSecure?: boolean;
 
   // Security & policy
   allowFrom?: string[]; // Whitelist: ["user@example.com", "*.trusted.com"]
