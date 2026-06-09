@@ -5,6 +5,7 @@ import { ApiFormat, ProviderName } from '../../shared/providers';
 const LLAMACPP_MIN_OPENCLAW_MAX_TOKENS = 512;
 const LLAMACPP_MAX_OPENCLAW_MAX_TOKENS = 4096;
 const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
+const LLAMACPP_OPENCLAW_MIN_CTX = 32000;
 
 export type LlamaCppOpenClawAppConfig = {
   model?: {
@@ -122,7 +123,7 @@ export function buildLlamaCppRunningModelBinding(
   maxTokens: number;
 } | null {
   const modelName = model.name?.trim() || model.model?.trim() || model.id?.trim() || '';
-  if (!modelName || !model.runtime_context_length || model.runtime_context_length <= 0) {
+  if (!modelName || !model.runtime_context_length || model.runtime_context_length < LLAMACPP_OPENCLAW_MIN_CTX) {
     return null;
   }
   const runtimeContextLength = model.runtime_context_length;
