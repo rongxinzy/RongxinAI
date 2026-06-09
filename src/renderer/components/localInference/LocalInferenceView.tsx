@@ -96,7 +96,6 @@ type LaunchRequest = {
 type OllamaServiceConfigFormState = {
   host: string;
   port: string;
-  customExecutablePath: string;
   device: string;
   modelsMax: string;
   modelsAutoload: string;
@@ -207,16 +206,6 @@ const smallOutlineButtonClass =
 const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
-  {
-    key: 'customExecutablePath',
-    labelKey: 'localInferenceServiceConfigExecutablePathLabel',
-    paramName: 'llama-server',
-    group: 'advanced',
-    type: 'input',
-    placeholderKey: 'localInferenceServiceConfigExecutablePathPlaceholder',
-    hintKey: 'localInferenceServiceConfigExecutablePathHint',
-    restartRequired: true,
-  },
   {
     key: 'modelsMax',
     labelKey: 'localInferenceServiceConfigModelsMaxLabel',
@@ -1876,7 +1865,6 @@ function OllamaServiceConfigDialog({
     const result = await onSave({
       host: form.host,
       port: form.port,
-      customExecutablePath: form.customExecutablePath,
       device: form.device,
       modelsMax: form.modelsMax,
       ...(form.modelsAutoload ? { modelsAutoload: form.modelsAutoload === 'true' } : {}),
@@ -1898,7 +1886,7 @@ function OllamaServiceConfigDialog({
       mainGpu: form.mainGpu,
       tensorSplit: form.tensorSplit,
       ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
-      ...(form.mlock ? { mlock: form.mlock === 'true' } : {}),
+      mlock: form.mlock === 'true',
       ...(form.jinja ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> } : {}),
       ...(form.splitMode
         ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> }
@@ -3964,7 +3952,6 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
   return {
     host: config.host ?? '',
     port: config.port ?? '',
-    customExecutablePath: config.customExecutablePath ?? '',
     device: config.device ?? '',
     modelsMax: config.modelsMax ?? '',
     modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),
@@ -3985,7 +3972,7 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
     flashAttn: config.flashAttn ?? '',
     mainGpu: config.mainGpu ?? '',
     mmap: config.noMmap === undefined ? '' : String(!config.noMmap),
-    mlock: config.mlock === undefined ? '' : String(config.mlock),
+    mlock: String(config.mlock === true),
     jinja: config.jinja ?? '',
   };
 }
@@ -3995,6 +3982,7 @@ function getSanitizedServiceConfigFields(
   saved: OllamaServiceConfig,
 ): string[] {
   const fields: Array<{ key: keyof OllamaServiceConfig; label: string }> = [
+    { key: 'device', label: i18nService.t('localInferenceServiceConfigDeviceLabel') },
     { key: 'modelsMax', label: i18nService.t('localInferenceServiceConfigModelsMaxLabel') },
     { key: 'timeout', label: i18nService.t('localInferenceServiceConfigTimeoutLabel') },
     { key: 'threadsHttp', label: i18nService.t('localInferenceServiceConfigThreadsHttpLabel') },
@@ -4008,6 +3996,7 @@ function getSanitizedServiceConfigFields(
     { key: 'threads', label: i18nService.t('localInferenceServiceConfigThreadsLabel') },
     { key: 'threadsBatch', label: i18nService.t('localInferenceServiceConfigThreadsBatchLabel') },
     { key: 'mainGpu', label: i18nService.t('localInferenceServiceConfigMainGpuLabel') },
+    { key: 'tensorSplit', label: i18nService.t('localInferenceServiceConfigTensorSplitLabel') },
   ];
   return fields
     .filter(({ key }) => {
