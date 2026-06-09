@@ -53,12 +53,19 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   }));
 }
 
+const LLAMACPP_OPENCLAW_MIN_CTX = 32000;
+
 export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]): Model[] {
   const models: Model[] = [];
 
   runningModels.forEach((model) => {
     const name = model.name?.trim() || model.model?.trim() || model.id?.trim() || '';
     if (!name) {
+      return;
+    }
+
+    const ctxLength = model.runtime_context_length;
+    if (ctxLength != null && ctxLength < LLAMACPP_OPENCLAW_MIN_CTX) {
       return;
     }
 

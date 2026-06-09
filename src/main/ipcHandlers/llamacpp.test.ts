@@ -102,7 +102,7 @@ test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimi
   });
 });
 
-test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw model selection', () => {
+test('shouldSyncOpenClawAfterRunningModelRefresh only syncs on model stop', () => {
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-loaded')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-unloaded')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-running')).toBe(false);
@@ -110,7 +110,7 @@ test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw m
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-deleted')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-stopped')).toBe(true);
 });
 
