@@ -2844,17 +2844,16 @@ if (!gotTheLock) {
     if (skillId === 'imap-smtp-email' && result.success) {
       try {
         const email = config.IMAP_USER || '';
-        const transport = email ? 'ws' : 'imap';
         const instanceConfig: Partial<import('./im/types').EmailInstanceConfig> = {
           enabled: true,
           email,
           password: config.IMAP_PASS || undefined,
-          apiKey: config.IMAP_PASS || undefined,
-          transport: transport as 'ws' | 'imap',
+          transport: 'imap',
           imapHost: config.IMAP_HOST || undefined,
           imapPort: parseInt(config.IMAP_PORT || '0', 10) || undefined,
           smtpHost: config.SMTP_HOST || undefined,
           smtpPort: parseInt(config.SMTP_PORT || '0', 10) || undefined,
+          smtpSecure: config.SMTP_SECURE === 'true' ? true : config.SMTP_SECURE === 'false' ? false : undefined,
         };
         getIMGatewayManager().getIMStore().setEmailInstanceConfig('email-1', instanceConfig);
         scheduleImConfigSync();
