@@ -365,8 +365,8 @@ export function registerLlamaCppIpcHandlers(
     async (_event, input: LlamaCppInstallModelInput) => {
       const modelId = input.modelId.trim();
       if (!modelId) throw new Error('Model ID is required');
-      if (activeInstalls.has(modelId)) {
-        throw new Error(`Model install already in progress: ${modelId}`);
+      if (activeInstalls.size > 0) {
+        throw new Error('Another model install is already in progress');
       }
       const controller = new AbortController();
       activeInstalls.set(modelId, controller);
