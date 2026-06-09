@@ -49,6 +49,7 @@ lint:
       else
         echo "No TypeScript files changed, skipping lint"
       fi
+    - cp -r node_modules /opt/ci-cache/node_modules 2>/dev/null || true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
