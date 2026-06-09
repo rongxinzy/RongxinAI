@@ -484,8 +484,6 @@ export function registerLlamaCppIpcHandlers(
     await refreshRunningModelBindings('llamacpp-set-openclaw-model');
     const syncResult = await options.syncOpenClawConfig({
       reason: 'llamacpp-local-model-selected',
-      restartGatewayIfRunning: true,
-      forceGatewayRestartIfRunning: true,
     });
     return {
       success: syncResult.success,
