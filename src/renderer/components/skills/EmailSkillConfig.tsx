@@ -78,8 +78,8 @@ const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     imapHost: 'imap.qq.com',
     imapPort: '993',
     smtpHost: 'smtp.qq.com',
-    smtpPort: '587',
-    smtpSecure: 'false',
+    smtpPort: '465',
+    smtpSecure: 'true',
     hint: 'emailHintQQ',
   },
   custom: {
