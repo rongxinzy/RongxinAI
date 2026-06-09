@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain } from 'electron';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
+  LlamaCppChatChunk,
   LlamaCppChatPayload,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
@@ -425,15 +426,17 @@ export function registerLlamaCppIpcHandlers(
       const controller = new AbortController();
       activeChats.set(requestId, controller);
       const client = await manager.client();
+      let lastChunk: LlamaCppChatChunk | null = null;
       try {
         await client.chat(
           { ...payload, stream: true },
           chunk => {
+            lastChunk = chunk;
             broadcast(LlamaCppIpcChannel.ChatStreamChunk, { requestId, chunk });
           },
           { signal: controller.signal },
         );
-        return { success: true };
+        return { success: true, finalChunk: lastChunk };
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) {
           throw new Error('Generation cancelled', { cause: error });

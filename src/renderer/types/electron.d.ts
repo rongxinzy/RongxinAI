@@ -436,7 +436,10 @@ interface IElectronAPI {
     pullModel: (name: string) => Promise<{ success: boolean }>;
     cancelPull: (name: string) => Promise<LlamaCppCancelInstallResult>;
     chat: (payload: LlamaCppChatPayload) => Promise<LlamaCppChatChunk>;
-    chatStream: (requestId: string, payload: LlamaCppChatPayload) => Promise<{ success: boolean }>;
+    chatStream: (
+      requestId: string,
+      payload: LlamaCppChatPayload,
+    ) => Promise<{ success: boolean; finalChunk?: LlamaCppChatChunk | null }>;
     cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
     setOpenClawModel: (modelName: string) => Promise<{
       success: boolean;
