@@ -1286,9 +1286,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         ],
         options: normalizeOptions(options),
       };
-      await window.electron.llamacpp.chatStream(requestId, payload);
+      const streamResult = await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
-      const metrics = computeStreamMetrics(streamState.finalChunk, streamStartTime);
+      if (streamResult.finalChunk) {
+        streamState = reduceOllamaStreamChunk(streamState, streamResult.finalChunk);
+      }
+      const metrics = computeStreamMetrics(streamState.finalChunk, streamStartTime, streamState.content);
       const assistantMessage = buildAssistantMessage({
         content: streamState.content,
         thinking: streamState.thinking,
@@ -1302,7 +1305,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (sendError instanceof Error && sendError.message.includes('Generation cancelled')) {
         showToast(i18nService.t('localInferenceGenerationCancelled'));
         if (streamState.content || streamState.thinking) {
-          const metrics = computeStreamMetrics(streamState.finalChunk, streamStartTime);
+          const metrics = computeStreamMetrics(
+            streamState.finalChunk,
+            streamStartTime,
+            streamState.content,
+          );
           const assistantMessage = buildAssistantMessage({
             content: streamState.content,
             thinking: streamState.thinking,
@@ -4650,16 +4657,36 @@ function getAssistantScrollTop({
   return Math.max(0, containerScrollTop + (targetTop - containerTop) - offset);
 }
 
+function readNestedNumber(source: unknown, key: string): number | undefined {
+  if (!source || typeof source !== 'object') return undefined;
+  const value = (source as Record<string, unknown>)[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function computeStreamMetrics(
   finalChunk: OllamaChatChunk | null,
   streamStartTime: number,
+  accumulatedContent: string,
 ): OllamaChatChunk | null {
   if (!finalChunk) return null;
   if (finalChunk.predicted_per_second != null) return finalChunk;
+
+  const timingsSpeed = readNestedNumber(finalChunk.timings, 'predicted_per_second');
+  if (timingsSpeed != null) return { ...finalChunk, predicted_per_second: timingsSpeed };
+
   const elapsed = Math.max(0.001, (Date.now() - streamStartTime) / 1000);
   const evalCount = finalChunk.eval_count;
   if (evalCount != null) return { ...finalChunk, predicted_per_second: evalCount / elapsed };
-  const rawLen = finalChunk.message?.content?.length ?? 0;
+
+  const completionTokens = readNestedNumber(finalChunk.usage, 'completion_tokens')
+    ?? readNestedNumber(finalChunk.timings, 'predicted_n');
+  if (completionTokens != null) {
+    return { ...finalChunk, predicted_per_second: completionTokens / elapsed };
+  }
+
+  const rawLen = accumulatedContent.length > 0
+    ? accumulatedContent.length
+    : (finalChunk.message?.content?.length ?? 0);
   if (rawLen > 0) return { ...finalChunk, predicted_per_second: Math.round(rawLen / 3) / elapsed };
   return finalChunk;
 }
