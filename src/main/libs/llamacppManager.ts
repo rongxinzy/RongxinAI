@@ -46,6 +46,7 @@ import {
   executeLlamaCppRuntimeInstallPlan,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
+import { MarketplaceService } from './marketplaceService';
 import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 
 const execFileAsync = promisify(execFile);
@@ -110,13 +111,18 @@ export class LlamaCppManager extends EventEmitter {
   private process: ChildProcessWithoutNullStreams | null = null;
   private runtimeContextLengthByModel = new Map<string, number>();
   private startupStderr = '';
+  private readonly marketplaceService: MarketplaceService;
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
   };
 
-  constructor(private readonly getServiceConfig: () => LlamaCppServiceConfig = () => ({})) {
+  constructor(
+    private readonly getServiceConfig: () => LlamaCppServiceConfig = () => ({}),
+    marketplaceService?: MarketplaceService,
+  ) {
     super();
+    this.marketplaceService = marketplaceService ?? new MarketplaceService(() => this.getModelsDir());
   }
 
   getStatus(): LlamaCppStatusSnapshot {
@@ -849,18 +855,65 @@ export class LlamaCppManager extends EventEmitter {
     const modelId = input.modelId.trim();
     if (!modelId) throw new Error('Model ID is required');
     onProgress?.({ phase: 'starting', modelId, modelName: input.displayName ?? modelId });
-    const resolved = await resolveModelScopeInstallRequest(input);
-    const filePath = resolved.filePath;
-
-    const url = resolved.downloadUrl || buildModelScopeFileUrl(modelId, filePath, input.revision);
     const safeModelDir = path.join(
       this.getModelsDir(),
       'modelscope',
       ...modelId.split('/').map(sanitizePathSegment),
     );
     fs.mkdirSync(safeModelDir, { recursive: true });
+    let request = await this.prefillInstallInputFromMarketplace(input);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.installModelOnce(request, safeModelDir, onProgress, options);
+      } catch (error) {
+        lastError = error;
+        if (attempt > 0 || !isModelDownloadNotFoundError(error)) {
+          throw error;
+        }
+        const refreshed = await this.refreshInstallInputFromMarketplace(request);
+        if (!refreshed || isSameInstallRequest(request, refreshed)) {
+          throw error;
+        }
+        request = refreshed;
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private async prefillInstallInputFromMarketplace(
+    input: LlamaCppInstallModelInput,
+  ): Promise<LlamaCppInstallModelInput> {
+    if (input.downloadUrl?.trim() || input.filePath?.trim()) {
+      return input;
+    }
+    const model = await this.marketplaceService
+      .resolveModel(input.modelId.trim())
+      .catch((): null => null);
+    const filePath = model?.filePath?.trim();
+    if (!filePath || !isGgufPath(filePath)) {
+      return input;
+    }
+    return {
+      ...input,
+      filePath,
+    };
+  }
+
+  private async installModelOnce(
+    input: LlamaCppInstallModelInput,
+    safeModelDir: string,
+    onProgress?: (progress: LlamaCppInstallProgress) => void,
+    options: RequestOptions = {},
+  ): Promise<LlamaCppModel> {
+    const modelId = input.modelId.trim();
+    const resolved = await resolveModelScopeInstallRequest(input);
+    const filePath = resolved.filePath;
+    const url = resolved.downloadUrl || buildModelScopeFileUrl(modelId, filePath, input.revision);
     const targetPath = resolveModelScopeTargetPath(safeModelDir, filePath);
     const installedThisAttempt = new Set<string>();
+
     if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
       onProgress?.({
         phase: 'done',
@@ -870,16 +923,7 @@ export class LlamaCppManager extends EventEmitter {
         targetPath,
       });
       await this.refreshModelsAfterInstall();
-      return {
-        name: resolveInstalledModelName(this.getModelsDir(), targetPath),
-        id: resolveInstalledModelName(this.getModelsDir(), targetPath),
-        model: resolveInstalledModelName(this.getModelsDir(), targetPath),
-        path: targetPath,
-        size: fs.statSync(targetPath).size,
-        source: 'modelscope',
-        status: 'unloaded',
-        details: { format: 'gguf' },
-      };
+      return buildInstalledModelRecord(this.getModelsDir(), targetPath);
     }
 
     onProgress?.({
@@ -888,6 +932,7 @@ export class LlamaCppManager extends EventEmitter {
       modelName: input.displayName ?? modelId,
       targetPath,
     });
+
     try {
       await downloadFile(
         url,
@@ -949,16 +994,42 @@ export class LlamaCppManager extends EventEmitter {
       targetPath,
     });
     await this.refreshModelsAfterInstall();
+    return buildInstalledModelRecord(this.getModelsDir(), targetPath);
+  }
+
+  private async refreshInstallInputFromMarketplace(
+    input: LlamaCppInstallModelInput,
+  ): Promise<LlamaCppInstallModelInput | null> {
+    if (input.downloadUrl?.trim()) return null;
+
+    const repoFiles = await fetchModelScopeRepoFiles(input.modelId.trim(), input.revision).catch(
+      (): null => null,
+    );
+    if (repoFiles && repoFiles.length > 0) {
+      const filePath = chooseModelScopeInstallFile(repoFiles);
+      if (!filePath) {
+        return null;
+      }
+      return {
+        ...input,
+        filePath,
+        mmprojFilePath: input.mmprojFilePath?.trim()
+          ? chooseModelScopeMmprojFile(repoFiles)
+          : input.mmprojFilePath,
+      };
+    }
+
+    const model = await this.marketplaceService
+      .resolveModel(input.modelId.trim())
+      .catch((): null => null);
+    const filePath = model?.filePath?.trim();
+    if (!filePath || !isGgufPath(filePath)) {
+      return null;
+    }
 
     return {
-      name: resolveInstalledModelName(this.getModelsDir(), targetPath),
-      id: resolveInstalledModelName(this.getModelsDir(), targetPath),
-      model: resolveInstalledModelName(this.getModelsDir(), targetPath),
-      path: targetPath,
-      size: fs.statSync(targetPath).size,
-      source: 'modelscope',
-      status: 'unloaded',
-      details: { format: 'gguf' },
+      ...input,
+      filePath,
     };
   }
 
@@ -1620,6 +1691,20 @@ export async function resolveModelScopeInstallRequest(input: LlamaCppInstallMode
     if (!isGgufPath(explicitFilePath)) {
       throw new Error('Only GGUF model files can be installed for llama.cpp.');
     }
+    const modelId = input.modelId.trim();
+    try {
+      const files = await fetchModelScopeRepoFiles(modelId, input.revision);
+      const matchedFile = resolveExplicitModelScopeInstallFile(files, explicitFilePath);
+      if (matchedFile) {
+        return { filePath: matchedFile };
+      }
+      const ggufFile = chooseModelScopeInstallFile(files);
+      if (ggufFile) {
+        return { filePath: ggufFile };
+      }
+    } catch {
+      // Keep the explicit file path as the fallback when repo metadata is unavailable.
+    }
     return { filePath: explicitFilePath };
   }
 
@@ -1632,6 +1717,18 @@ export async function resolveModelScopeInstallRequest(input: LlamaCppInstallMode
     );
   }
   return { filePath: ggufFile };
+}
+
+function resolveExplicitModelScopeInstallFile(
+  files: string[],
+  explicitFilePath: string,
+): string | undefined {
+  const normalizedExplicit = normalizeModelScopeFilePath(explicitFilePath);
+  const exactMatch = files.find(file => normalizeModelScopeFilePath(file) === normalizedExplicit);
+  if (exactMatch) return exactMatch;
+
+  const explicitBaseName = path.basename(normalizedExplicit);
+  return files.find(file => path.basename(normalizeModelScopeFilePath(file)) === explicitBaseName);
 }
 
 export function buildModelScopeFileUrl(
@@ -1698,6 +1795,13 @@ export function chooseModelScopeInstallFile(files: string[]): string | undefined
     if (match) return match;
   }
   return ggufFiles.sort((a, b) => a.localeCompare(b))[0];
+}
+
+export function chooseModelScopeMmprojFile(files: string[]): string | undefined {
+  const mmprojFiles = files.filter(file => /^mmproj/i.test(path.basename(file)) && isGgufPath(file));
+  if (mmprojFiles.length === 0) return undefined;
+  const preferred = mmprojFiles.find(file => /f16/i.test(path.basename(file)));
+  return preferred ?? mmprojFiles.sort((a, b) => a.localeCompare(b))[0];
 }
 
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
@@ -1839,6 +1943,10 @@ function isGgufPath(value: string): boolean {
   return pathname.toLowerCase().endsWith('.gguf');
 }
 
+function normalizeModelScopeFilePath(value: string): string {
+  return value.trim().replace(/\\/g, '/').toLowerCase();
+}
+
 function removeEmptyParentDirs(startDir: string, stopDir: string): void {
   let currentDir = path.resolve(startDir);
   const resolvedStopDir = path.resolve(stopDir);
@@ -1882,6 +1990,33 @@ function resolveModelScopeTargetPath(modelDir: string, filePath: string): string
   const targetDir = path.join(modelDir, ...segments);
   fs.mkdirSync(targetDir, { recursive: true });
   return path.join(targetDir, normalizedFileName);
+}
+
+function buildInstalledModelRecord(modelsDir: string, targetPath: string): LlamaCppModel {
+  const modelName = resolveInstalledModelName(modelsDir, targetPath);
+  return {
+    name: modelName,
+    id: modelName,
+    model: modelName,
+    path: targetPath,
+    size: fs.statSync(targetPath).size,
+    source: 'modelscope',
+    status: 'unloaded',
+    details: { format: 'gguf' },
+  };
+}
+
+function isModelDownloadNotFoundError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('Model download failed: HTTP 404');
+}
+
+function isSameInstallRequest(
+  previous: LlamaCppInstallModelInput,
+  next: LlamaCppInstallModelInput,
+): boolean {
+  return (previous.filePath?.trim() ?? '') === (next.filePath?.trim() ?? '')
+    && (previous.mmprojFilePath?.trim() ?? '') === (next.mmprojFilePath?.trim() ?? '')
+    && (previous.downloadUrl?.trim() ?? '') === (next.downloadUrl?.trim() ?? '');
 }
 
 async function downloadFile(
