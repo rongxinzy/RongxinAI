@@ -309,6 +309,7 @@ function toOpenAIChatPayload(
       ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     })),
     stream,
+    ...(payload.chat_template_kwargs ? { chat_template_kwargs: payload.chat_template_kwargs } : {}),
     ...toOpenAIChatOptions(options),
   };
 }

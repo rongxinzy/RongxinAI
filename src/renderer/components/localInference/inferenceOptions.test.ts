@@ -16,7 +16,7 @@ test('normalizes inference options for llama.cpp requests', () => {
     stop: '###, END',
     min_p: 0.1,
     presence_penalty: 0.4,
-    direct_answer_mode: 'enabled',
+    reasoning_preference: 'high',
     cache_prompt: 'disabled',
   });
 
@@ -31,8 +31,10 @@ test('normalizes inference options for llama.cpp requests', () => {
     cache_prompt: false,
     seed: 42,
     stop: ['###', 'END'],
+    chat_template_kwargs: {
+      enable_thinking: true,
+    },
   }));
-  expect(normalized).not.toHaveProperty('chat_template_kwargs');
 });
 
 test('loading inference options ignores deprecated thinking-specific settings', () => {
@@ -56,14 +58,14 @@ test('loading inference options ignores deprecated thinking-specific settings', 
     reasoning_format: 'none',
     thinking_forced_open: 'disabled',
     thinking_budget_tokens: 0,
-    direct_answer_mode: 'enabled',
+    reasoning_preference: 'high',
   }));
 
   const loaded = loadInferenceOptions();
-  expect(loaded.direct_answer_mode).toBe('enabled');
+  expect(loaded.reasoning_preference).toBe('high');
   expect(loaded).toEqual(expect.objectContaining({
     ...DEFAULT_INFERENCE_OPTIONS,
-    direct_answer_mode: 'enabled',
+    reasoning_preference: 'high',
   }));
   expect(loaded).not.toHaveProperty('reasoning_format');
   expect(loaded).not.toHaveProperty('thinking_forced_open');

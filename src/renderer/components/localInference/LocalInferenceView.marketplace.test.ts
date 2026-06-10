@@ -169,12 +169,12 @@ test('llama.cpp inference option metadata uses OpenAI-compatible request paramet
   const advancedKeys = fields.filter((field) => field.group === 'advanced').map((field) => field.key);
 
   expect(paramNames).toContain('max_tokens');
-  expect(paramNames).toContain('app.system_hint.direct_answer_only');
+  expect(paramNames).toContain('reasoning');
   expect(paramNames).not.toContain('num_predict');
   expect(paramNames.every((paramName) => !paramName.startsWith('--'))).toBe(true);
   expect(basicKeys).toEqual([
     'num_predict',
-    'direct_answer_mode',
+    'reasoning_preference',
     'temperature',
     'top_p',
   ]);
@@ -196,7 +196,7 @@ test('streaming assistant display shows waiting dots until content or thinking a
     __test__buildStreamingAssistantMessage?: (input: {
       content: string;
       thinking: string;
-    }) => { content: string; thinking?: string; waiting?: boolean; hiddenThinking?: boolean };
+    }) => { content: string; thinking?: string; waiting?: boolean; createdAt: number };
   }).__test__buildStreamingAssistantMessage;
 
   expect(typeof buildStreamingAssistantMessage).toBe('function');
@@ -317,7 +317,7 @@ test('final assistant message keeps visible content and preserves thinking detai
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
-    }) => { content: string; thinking?: string; hiddenThinking?: boolean };
+    }) => { content: string; thinking?: string; createdAt: number; reasoningDurationSeconds?: number };
   }).__test__buildAssistantMessage;
 
   expect(typeof buildAssistantMessage).toBe('function');
@@ -330,7 +330,7 @@ test('final assistant message keeps visible content and preserves thinking detai
 
   expect(message.content).toBe('answer');
   expect(message.thinking).toBe('hidden chain');
-  expect(message.hiddenThinking).toBeUndefined();
+  expect(message.createdAt).toBeTypeOf('number');
 });
 
 test('final assistant message falls back to a generic notice when no visible answer exists', async () => {
@@ -339,7 +339,7 @@ test('final assistant message falls back to a generic notice when no visible ans
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
-    }) => { content: string; thinking?: string; hiddenThinking?: boolean };
+    }) => { content: string; thinking?: string; createdAt: number; reasoningDurationSeconds?: number };
   }).__test__buildAssistantMessage;
 
   expect(typeof buildAssistantMessage).toBe('function');
@@ -353,7 +353,7 @@ test('final assistant message falls back to a generic notice when no visible ans
   expect(message.content).toBeTruthy();
   expect(message.content).not.toContain('hidden chain');
   expect(message.thinking).toBe('hidden chain');
-  expect(message.hiddenThinking).toBeUndefined();
+  expect(message.createdAt).toBeTypeOf('number');
 });
 
 test('launch dialog flags ctx-size values that exceed the trained context limit', async () => {

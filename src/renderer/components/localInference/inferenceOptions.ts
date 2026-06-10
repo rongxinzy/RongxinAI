@@ -8,7 +8,7 @@ export type InferenceOptions = {
   stop: string;
   min_p: number;
   presence_penalty: number;
-  direct_answer_mode: 'disabled' | 'enabled';
+  reasoning_preference: 'low' | 'auto' | 'high';
   cache_prompt: 'auto' | 'enabled' | 'disabled';
 };
 
@@ -22,7 +22,7 @@ export const DEFAULT_INFERENCE_OPTIONS: InferenceOptions = {
   stop: '',
   min_p: 0.05,
   presence_penalty: 0,
-  direct_answer_mode: 'disabled',
+  reasoning_preference: 'auto',
   cache_prompt: 'auto',
 };
 
@@ -36,7 +36,7 @@ const QWEN35_08B_INFERENCE_OPTIONS: InferenceOptions = {
   stop: '',
   min_p: 0.05,
   presence_penalty: 0.6,
-  direct_answer_mode: 'disabled',
+  reasoning_preference: 'auto',
   cache_prompt: 'auto',
 };
 
@@ -55,6 +55,12 @@ export function normalizeOptions(options: InferenceOptions): Record<string, unkn
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean);
+  const enableThinking =
+    options.reasoning_preference === 'low'
+      ? false
+      : options.reasoning_preference === 'high'
+        ? true
+        : undefined;
   return {
     temperature: options.temperature,
     top_p: options.top_p,
@@ -63,6 +69,9 @@ export function normalizeOptions(options: InferenceOptions): Record<string, unkn
     repeat_penalty: options.repeat_penalty,
     min_p: options.min_p,
     presence_penalty: options.presence_penalty,
+    ...(enableThinking !== undefined
+      ? { chat_template_kwargs: { enable_thinking: enableThinking } }
+      : {}),
     ...(options.cache_prompt === 'enabled' ? { cache_prompt: true } : {}),
     ...(options.cache_prompt === 'disabled' ? { cache_prompt: false } : {}),
     ...(options.seed >= 0 ? { seed: options.seed } : {}),
@@ -80,7 +89,7 @@ export function areInferenceOptionsEqual(left: InferenceOptions, right: Inferenc
     && left.stop === right.stop
     && left.min_p === right.min_p
     && left.presence_penalty === right.presence_penalty
-    && left.direct_answer_mode === right.direct_answer_mode
+    && left.reasoning_preference === right.reasoning_preference
     && left.cache_prompt === right.cache_prompt;
 }
 
@@ -126,10 +135,12 @@ function sanitizeInferenceOptions(options: Record<string, unknown>): InferenceOp
       typeof options.presence_penalty === 'number'
         ? options.presence_penalty
         : DEFAULT_INFERENCE_OPTIONS.presence_penalty,
-    direct_answer_mode:
-      options.direct_answer_mode === 'enabled' || options.direct_answer_mode === 'disabled'
-        ? options.direct_answer_mode
-        : DEFAULT_INFERENCE_OPTIONS.direct_answer_mode,
+    reasoning_preference:
+      options.reasoning_preference === 'low'
+      || options.reasoning_preference === 'auto'
+      || options.reasoning_preference === 'high'
+        ? options.reasoning_preference
+        : DEFAULT_INFERENCE_OPTIONS.reasoning_preference,
     cache_prompt:
       options.cache_prompt === 'auto'
       || options.cache_prompt === 'enabled'
