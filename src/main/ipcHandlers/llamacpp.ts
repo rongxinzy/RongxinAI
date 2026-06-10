@@ -13,9 +13,12 @@ import type {
 } from '../../shared/llamacpp';
 import {
   getLlamaCppLaunchContextLimitViolation,
+  LLAMACPP_GPU_LAYERS_MAX,
+  LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppIpcChannel,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
+  LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
@@ -521,6 +524,18 @@ export function sanitizeLlamaCppServiceConfig(
   } | null,
 ): LlamaCppServiceConfig {
   const next: LlamaCppServiceConfig = {};
+  const modelsMaxRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ModelsMax];
+  const timeoutRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Timeout];
+  const threadsHttpRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsHttp];
+  const cacheReuseRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CacheReuse];
+  const cacheRamRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CacheRam];
+  const ctxSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
+  const parallelRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Parallel];
+  const batchSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.BatchSize];
+  const ubatchSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.UbatchSize];
+  const threadsRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Threads];
+  const threadsBatchRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsBatch];
+  const mainGpuRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.MainGpu];
   const host = config?.host?.trim();
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
@@ -528,73 +543,73 @@ export function sanitizeLlamaCppServiceConfig(
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
   const modelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
-    min: 0,
-    max: 256,
+    min: modelsMaxRange.min,
+    max: modelsMaxRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax,
   });
   const modelsAutoload = config?.modelsAutoload as unknown;
   const timeout = normalizeIntegerStringWithDefault(config?.timeout, {
-    min: 1,
-    max: 86_400,
+    min: timeoutRange.min,
+    max: timeoutRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.timeout,
   });
   const threadsHttp = normalizeSignedIntegerStringWithDefault(config?.threadsHttp, {
-    min: 1,
-    max: 512,
+    min: threadsHttpRange.min,
+    max: threadsHttpRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threadsHttp,
   });
   const cacheReuse = normalizeIntegerStringWithDefault(config?.cacheReuse, {
-    min: 0,
-    max: 65_536,
+    min: cacheReuseRange.min,
+    max: cacheReuseRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.cacheReuse,
   });
   const cacheRam = normalizeSignedIntegerStringWithDefault(config?.cacheRam, {
-    min: 0,
-    max: 1_048_576,
+    min: cacheRamRange.min,
+    max: cacheRamRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.cacheRam,
   });
   const ctxCheckpoints = normalizeIntegerString(config?.ctxCheckpoints);
   const checkpointEveryNt = normalizeSignedIntegerString(config?.checkpointEveryNt);
   const ctxSize = normalizeIntegerStringWithDefault(config?.ctxSize, {
-    min: 128,
-    max: 1_048_576,
+    min: ctxSizeRange.min,
+    max: ctxSizeRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.ctxSize,
   });
   const parallel = normalizeSignedIntegerStringWithDefault(config?.parallel, {
-    min: 0,
-    max: 256,
+    min: parallelRange.min,
+    max: parallelRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.parallel,
   });
   const batchSize = normalizeIntegerStringWithDefault(config?.batchSize, {
-    min: 1,
-    max: 65_536,
+    min: batchSizeRange.min,
+    max: batchSizeRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.batchSize,
   });
   const ubatchSize = normalizeIntegerStringWithDefault(config?.ubatchSize, {
-    min: 1,
-    max: 65_536,
+    min: ubatchSizeRange.min,
+    max: ubatchSizeRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.ubatchSize,
   });
   const gpuLayers = normalizeGpuLayersStringWithDefault(config?.gpuLayers, {
     min: 0,
-    max: 4_096,
+    max: LLAMACPP_GPU_LAYERS_MAX,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.gpuLayers,
   });
   const threads = normalizeSignedIntegerStringWithDefault(config?.threads, {
-    min: -1,
-    max: 512,
+    min: threadsRange.min,
+    max: threadsRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threads,
   });
   const threadsBatch = normalizeSignedIntegerStringWithDefault(config?.threadsBatch, {
-    min: -1,
-    max: 512,
+    min: threadsBatchRange.min,
+    max: threadsBatchRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threadsBatch,
   });
   const device = normalizeVisibleDevices(config?.device, runtimeDevices);
   const splitMode = isSplitMode(config?.splitMode) ? config.splitMode : undefined;
   const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, {
-    min: 0,
-    max: 64,
+    min: mainGpuRange.min,
+    max: mainGpuRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
   });
   const tensorSplit = normalizeTensorSplit(config?.tensorSplit, {

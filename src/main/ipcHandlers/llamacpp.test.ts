@@ -91,11 +91,24 @@ test('sanitizeLlamaCppServiceConfig drops invalid tensor split values', () => {
 
   expect(sanitizeLlamaCppServiceConfig({
     splitMode: 'tensor',
+    tensorSplit: '按张量拆分',
+  })).toEqual({
+    splitMode: 'tensor',
+  });
+
+  expect(sanitizeLlamaCppServiceConfig({
+    splitMode: 'tensor',
     tensorSplit: '3,2',
   })).toEqual({
     splitMode: 'tensor',
     tensorSplit: '3,2',
   });
+});
+
+test('sanitizeLlamaCppServiceConfig drops invalid structured device values', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    device: '显卡0',
+  })).toEqual({});
 });
 
 test('sanitizeLlamaCppServiceConfig drops tensor split when split mode is not tensor', () => {
