@@ -43,9 +43,11 @@ export const LlamaCppStructuredServiceFieldErrorCode = {
   IntegerRange: 'integer-range',
   DeviceFormat: 'device-format',
   DeviceUnavailable: 'device-unavailable',
+  DeviceDetectionFailed: 'device-detection-failed',
   DeviceOutOfRange: 'device-out-of-range',
   GpuLayersFormat: 'gpu-layers-format',
   MainGpuUnavailable: 'main-gpu-unavailable',
+  MainGpuDetectionFailed: 'main-gpu-detection-failed',
   MainGpuOutOfRange: 'main-gpu-out-of-range',
   TensorSplitFormat: 'tensor-split-format',
   TensorSplitRequiresMode: 'tensor-split-requires-mode',
@@ -68,6 +70,16 @@ type StructuredConfigInput =
       devices?: Array<{ id?: string; name?: string; backend?: string }>;
     } | null;
   };
+
+export const LlamaCppGpuDetectionState = {
+  Unknown: 'unknown',
+  Available: 'available',
+  Unavailable: 'unavailable',
+  DetectionFailed: 'detection-failed',
+} as const;
+
+export type LlamaCppGpuDetectionState =
+  typeof LlamaCppGpuDetectionState[keyof typeof LlamaCppGpuDetectionState];
 
 export const LLAMACPP_STRUCTURED_INTEGER_RANGES = {
   [LlamaCppStructuredServiceFieldKey.ModelsMax]: { min: 0, max: 256 },
@@ -192,14 +204,31 @@ export function getLlamaCppAcceleratorDevices(
   });
 }
 
+export function getLlamaCppGpuDetectionState(
+  runtimeDevices?: {
+    success: boolean;
+    devices?: Array<{ id?: string; name?: string; backend?: string }>;
+  } | null,
+): LlamaCppGpuDetectionState {
+  if (runtimeDevices == null) return LlamaCppGpuDetectionState.Unknown;
+  if (!runtimeDevices.success) return LlamaCppGpuDetectionState.DetectionFailed;
+  return getLlamaCppAcceleratorDevices(runtimeDevices).length > 0
+    ? LlamaCppGpuDetectionState.Available
+    : LlamaCppGpuDetectionState.Unavailable;
+}
+
 function validateIndexedDeviceField(
   value: string | undefined,
   runtimeDevices?: StructuredConfigInput['runtimeDevices'],
 ): LlamaCppStructuredServiceFieldError | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
+  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
+  if (gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed) {
+    return { code: LlamaCppStructuredServiceFieldErrorCode.DeviceDetectionFailed };
+  }
+  if (gpuDetectionState === LlamaCppGpuDetectionState.Unknown) return null;
   const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
-  if (!runtimeDevices?.success) return null;
   if (acceleratorDevices.length === 0) {
     return { code: LlamaCppStructuredServiceFieldErrorCode.DeviceUnavailable };
   }
@@ -221,8 +250,12 @@ function validateMainGpuField(
   const trimmed = value?.trim();
   if (!trimmed) return null;
   if (!/^\d+$/.test(trimmed)) return null;
+  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
+  if (gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed) {
+    return { code: LlamaCppStructuredServiceFieldErrorCode.MainGpuDetectionFailed };
+  }
+  if (gpuDetectionState === LlamaCppGpuDetectionState.Unknown) return null;
   const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
-  if (!runtimeDevices?.success) return null;
   if (acceleratorDevices.length === 0) {
     return { code: LlamaCppStructuredServiceFieldErrorCode.MainGpuUnavailable };
   }

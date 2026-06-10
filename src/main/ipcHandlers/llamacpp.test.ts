@@ -193,6 +193,19 @@ test('sanitizeLlamaCppServiceConfig drops gpu selectors when runtime exposes onl
   )).toEqual({});
 });
 
+test('sanitizeLlamaCppServiceConfig drops gpu selectors when runtime device detection fails', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0,1',
+      mainGpu: '1',
+    },
+    {
+      success: false,
+      devices: [],
+    },
+  )).toEqual({});
+});
+
 test('sanitizeLlamaCppServiceConfig drops gpu selectors when indexes exceed accelerator count', () => {
   expect(sanitizeLlamaCppServiceConfig(
     {

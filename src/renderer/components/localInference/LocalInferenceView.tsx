@@ -40,8 +40,9 @@ import type {
 } from '../../../shared/llamacpp';
 import {
   createLlamaCppStreamState as createOllamaStreamState,
-  getLlamaCppAcceleratorDevices,
+  getLlamaCppGpuDetectionState,
   getLlamaCppLaunchContextLimitViolation,
+  LlamaCppGpuDetectionState,
   type LlamaCppStructuredServiceFieldError,
   type LlamaCppStructuredServiceFieldKey,
   reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
@@ -2255,8 +2256,9 @@ function OllamaServiceConfigDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [runtimeDevices, setRuntimeDevices] = useState<LlamaCppRuntimeListDevicesResult | null>(null);
-  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
-  const gpuConfigUnavailable = runtimeDevices?.success === true && acceleratorDevices.length === 0;
+  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
+  const gpuConfigUnavailable = gpuDetectionState !== LlamaCppGpuDetectionState.Unknown
+    && gpuDetectionState !== LlamaCppGpuDetectionState.Available;
   const structuredValidation = validateLlamaCppStructuredServiceConfig({
     modelsMax: form.modelsMax,
     device: form.device,
@@ -2288,7 +2290,13 @@ function OllamaServiceConfigDialog({
         if (!cancelled) setRuntimeDevices(result);
       })
       .catch(() => {
-        if (!cancelled) setRuntimeDevices(null);
+        if (!cancelled) {
+          setRuntimeDevices({
+            success: false,
+            devices: [],
+            error: 'failed to list llama.cpp runtime devices',
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -2305,7 +2313,7 @@ function OllamaServiceConfigDialog({
       : (field.placeholder ?? '');
     const label = i18nService.t(field.labelKey);
     const hint = gpuConfigUnavailable && (field.key === 'device' || field.key === 'mainGpu')
-      ? i18nService.t('localInferenceServiceConfigGpuUnavailableHint')
+      ? getGpuConfigHint(gpuDetectionState)
       : i18nService.t(field.hintKey);
     const fieldError = getStructuredServiceConfigFieldErrorMessage(
       field.key,
@@ -4754,8 +4762,9 @@ function serviceConfigToForm(
   config: OllamaServiceConfig,
   runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
 ): OllamaServiceConfigFormState {
-  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
-  const gpuSelectorsAvailable = runtimeDevices?.success !== true || acceleratorDevices.length > 0;
+  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
+  const gpuSelectorsAvailable = gpuDetectionState === LlamaCppGpuDetectionState.Unknown
+    || gpuDetectionState === LlamaCppGpuDetectionState.Available;
   return {
     host: config.host ?? '',
     port: config.port ?? '',
@@ -4798,7 +4807,11 @@ function normalizeServiceConfigDeviceForForm(
 ): string {
   const trimmed = value?.trim();
   if (!trimmed) return '';
-  if (runtimeDevices?.success === true && getLlamaCppAcceleratorDevices(runtimeDevices).length === 0) {
+  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
+  if (
+    gpuDetectionState === LlamaCppGpuDetectionState.Unavailable ||
+    gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed
+  ) {
     return '';
   }
   if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmed)) return trimmed;
@@ -4830,6 +4843,8 @@ function getStructuredServiceConfigFieldErrorMessage(
       return i18nService.t('localInferenceServiceConfigFieldErrorDeviceFormat');
     case 'device-unavailable':
       return i18nService.t('localInferenceServiceConfigFieldErrorDeviceUnavailable');
+    case 'device-detection-failed':
+      return i18nService.t('localInferenceServiceConfigFieldErrorDeviceDetectionFailed');
     case 'device-out-of-range':
       return i18nService
         .t('localInferenceServiceConfigFieldErrorDeviceOutOfRange')
@@ -4839,6 +4854,8 @@ function getStructuredServiceConfigFieldErrorMessage(
       return i18nService.t('localInferenceServiceConfigFieldErrorGpuLayersFormat');
     case 'main-gpu-unavailable':
       return i18nService.t('localInferenceServiceConfigFieldErrorMainGpuUnavailable');
+    case 'main-gpu-detection-failed':
+      return i18nService.t('localInferenceServiceConfigFieldErrorMainGpuDetectionFailed');
     case 'main-gpu-out-of-range':
       return i18nService
         .t('localInferenceServiceConfigFieldErrorMainGpuOutOfRange')
@@ -4850,6 +4867,17 @@ function getStructuredServiceConfigFieldErrorMessage(
       return i18nService.t('localInferenceServiceConfigFieldErrorTensorSplitRequiresMode');
     default:
       return undefined;
+  }
+}
+
+function getGpuConfigHint(gpuDetectionState: LlamaCppGpuDetectionState): string {
+  switch (gpuDetectionState) {
+    case LlamaCppGpuDetectionState.DetectionFailed:
+      return i18nService.t('localInferenceServiceConfigGpuDetectionFailedHint');
+    case LlamaCppGpuDetectionState.Unavailable:
+      return i18nService.t('localInferenceServiceConfigGpuUnavailableHint');
+    default:
+      return i18nService.t('localInferenceServiceConfigGpuUnavailableHint');
   }
 }
 
