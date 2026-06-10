@@ -107,6 +107,36 @@ export class MarketplaceService {
     ).slice(0, resolveLimit(params.limit, LOCAL_LIMIT));
   }
 
+  async resolveModel(repoId: string): Promise<MarketplaceModel | null> {
+    const normalizedRepoId = repoId.trim();
+    if (!normalizedRepoId) return null;
+
+    try {
+      const openApiResults = await this.fetchModelScopeOpenApi({
+        query: normalizedRepoId,
+        limit: DEFAULT_LIMIT,
+      });
+      const openApiMatch = openApiResults.models.find((model) => model.repoId === normalizedRepoId);
+      if (openApiMatch) return openApiMatch;
+    } catch {
+      // Fall through to the legacy JSON API lookup below.
+    }
+
+    try {
+      const searchResults = await this.fetchModelScopeSearchApi({
+        query: normalizedRepoId,
+        limit: DEFAULT_LIMIT,
+      });
+      const exactMatch = searchResults.find((model) => model.repoId === normalizedRepoId);
+      if (exactMatch) return exactMatch;
+    } catch {
+      // Fall through to curated metadata lookup below.
+    }
+
+    return this.searchLocal({ query: normalizedRepoId, limit: DEFAULT_LIMIT })
+      .find((model) => model.repoId === normalizedRepoId) ?? null;
+  }
+
   private async searchOnline(params: MarketplaceSearchParams): Promise<OnlineSearchResult> {
     const installed = scanInstalledModels(this.getModelsDir());
     let openApiWarning: string | undefined;
@@ -134,17 +164,10 @@ export class MarketplaceService {
       };
     }
 
-    const libraryResults = await this.fetchModelScopeLibrary(params).catch((error): MarketplaceModel[] => {
-      if (openApiWarning) {
-        throw new Error(openApiWarning);
-      }
-      throw error;
-    });
-    return {
-      models: annotateInstalledModels(filterMarketplaceModels(libraryResults, params), installed),
-      totalCount: libraryResults.length,
-      warning: openApiWarning,
-    };
+    if (openApiWarning) {
+      throw new Error(openApiWarning);
+    }
+    throw new Error('ModelScope legacy search returned no GGUF repositories');
   }
 
   private async fetchModelScopeOpenApi(params: MarketplaceSearchParams): Promise<OnlineSearchResult> {
@@ -234,14 +257,6 @@ export class MarketplaceService {
     return models.slice(0, DEFAULT_LIMIT);
   }
 
-  private async fetchModelScopeLibrary(params: MarketplaceSearchParams): Promise<MarketplaceModel[]> {
-    const html = await fetchTextWithTimeout(buildModelScopeLibraryUrl(params.query?.trim() ?? ''));
-    const repoIds = parseModelScopeGgufLibraryHtml(html);
-    if (repoIds.length === 0) {
-      throw new Error('ModelScope GGUF library page structure changed');
-    }
-    return repoIds.map((repoId) => toMarketplaceModelFromRecord({ repoId }));
-  }
 }
 
 function toMarketplaceModel(
@@ -327,13 +342,6 @@ function resolveOpenApiPageCount(limit: number | undefined): number {
   );
 }
 
-function buildModelScopeLibraryUrl(query: string): string {
-  const params = new URLSearchParams();
-  params.set('other', 'gguf');
-  if (query) params.set('search', query);
-  return `https://www.modelscope.cn/models?${params.toString()}`;
-}
-
 async function fetchJsonWithTimeout(url: string, headers: Record<string, string> = {}): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MARKETPLACE_TIMEOUT_MS);
@@ -346,23 +354,6 @@ async function fetchJsonWithTimeout(url: string, headers: Record<string, string>
       throw new Error(`ModelScope marketplace API failed: HTTP ${response.status}`);
     }
     return await response.json();
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function fetchTextWithTimeout(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), MARKETPLACE_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-marketplace' },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(`ModelScope marketplace page failed: HTTP ${response.status}`);
-    }
-    return await response.text();
   } finally {
     clearTimeout(timeout);
   }
@@ -438,19 +429,6 @@ function dedupeIndexRecords(records: MarketplaceIndexRecord[]): MarketplaceIndex
     });
   }
   return Array.from(merged.values());
-}
-
-function parseModelScopeGgufLibraryHtml(html: string): string[] {
-  const repoIds = new Set<string>();
-  const pattern = /href="\/models\/([^"/?#]+\/[^"/?#]+)"/gi;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(html)) !== null) {
-    const repoId = decodeHtml(match[1]).trim();
-    if (repoId.toLowerCase().includes('gguf')) {
-      repoIds.add(repoId);
-    }
-  }
-  return Array.from(repoIds);
 }
 
 function mergeMarketplaceModels(
@@ -717,29 +695,6 @@ function unique<T>(items: T[]): T[] {
   return [...new Set(items.filter(Boolean as unknown as (item: T) => boolean))];
 }
 
-function decodeHtml(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&',
-    apos: '\'',
-    gt: '>',
-    lt: '<',
-    nbsp: ' ',
-    quot: '"',
-  };
-  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, token: string) => {
-    const normalized = token.toLowerCase();
-    if (normalized.startsWith('#x')) {
-      const cp = Number.parseInt(normalized.slice(2), 16);
-      return Number.isFinite(cp) ? String.fromCodePoint(cp) : entity;
-    }
-    if (normalized.startsWith('#')) {
-      const cp = Number.parseInt(normalized.slice(1), 10);
-      return Number.isFinite(cp) ? String.fromCodePoint(cp) : entity;
-    }
-    return named[normalized] ?? entity;
-  });
-}
-
 function resolveLimit(limit: number | undefined, fallback: number): number {
   return limit && limit > 0 ? limit : fallback;
 }
@@ -815,5 +770,4 @@ function normalizeSizeList(value: unknown): string[] | undefined {
   return undefined;
 }
 
-export const __test__parseModelScopeGgufLibraryHtml = parseModelScopeGgufLibraryHtml;
 export const __test__mergeMarketplaceModels = mergeMarketplaceModels;
