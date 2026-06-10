@@ -177,6 +177,13 @@ type LocalInferenceInlineError =
       requestedTokens: number | null;
       availableTokens: number | null;
     };
+type LocalInferenceSessionState = {
+  activeTab: LocalInferenceTab;
+  selectedModel: string;
+  systemPrompt: string;
+  prompt: string;
+  messages: InferenceMessage[];
+};
 
 type InstallProgressState = Record<string, LlamaCppInstallProgress>;
 type BuildAssistantMessageInput = {
@@ -204,6 +211,7 @@ const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
 const LOCAL_INFERENCE_MIN_SPEED_SAMPLE_SECONDS = 0.05;
 const LOCAL_INFERENCE_MAX_SPEED_FOR_TINY_COMPLETION = 200;
 const LOCAL_INFERENCE_MAX_SPEED_FOR_SMALL_COMPLETION = 2000;
+const LOCAL_INFERENCE_SESSION_STORAGE_KEY = 'lobsterai:llamacpp-inference-session';
 const OPENCLAW_MIN_CTX = 32000;
 const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const DIRECT_ANSWER_SYSTEM_HINT = [
@@ -500,8 +508,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
+  const restoredSessionRef = useRef<LocalInferenceSessionState | null>(null);
+  if (restoredSessionRef.current === null) {
+    restoredSessionRef.current = readLocalInferenceSessionState();
+  }
+  const restoredSession = restoredSessionRef.current;
   const isMac = window.electron.platform === 'darwin';
-  const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
+  const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
+    restoredSession?.activeTab ?? 'inference',
+  );
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
@@ -511,18 +526,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [pullName, setPullName] = useState('');
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
-  const [selectedModel, setSelectedModel] = useState('');
-  const [systemPrompt, setSystemPrompt] = useState('');
-  const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState(restoredSession?.selectedModel ?? '');
+  const [systemPrompt, setSystemPrompt] = useState(restoredSession?.systemPrompt ?? '');
+  const [prompt, setPrompt] = useState(restoredSession?.prompt ?? '');
   const [options, setOptions] = useState<InferenceOptions>(() => loadInferenceOptions());
-  const [messages, setMessages] = useState<InferenceMessage[]>([]);
+  const [messages, setMessages] = useState<InferenceMessage[]>(restoredSession?.messages ?? []);
   const [inferenceInlineError, setInferenceInlineError] = useState<LocalInferenceInlineError | null>(null);
   const [streamingText, setStreamingText] = useState('');
   const [streamingThinking, setStreamingThinking] = useState('');
   const [sending, setSending] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const activeRequestIdRef = useRef<string | null>(null);
-  const messagesRef = useRef<InferenceMessage[]>([]);
+  const messagesRef = useRef<InferenceMessage[]>(restoredSession?.messages ?? []);
   const conversationVersionRef = useRef(0);
   const isRunning = status?.status === 'running';
   const normalizedPullName = pullName.trim();
@@ -792,6 +807,28 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     messagesRef.current = messages;
   }, [messages]);
 
+  const sessionSaveTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (sessionSaveTimerRef.current !== null) {
+      window.clearTimeout(sessionSaveTimerRef.current);
+    }
+    sessionSaveTimerRef.current = window.setTimeout(() => {
+      sessionSaveTimerRef.current = null;
+      writeLocalInferenceSessionState({
+        activeTab,
+        selectedModel,
+        systemPrompt,
+        prompt,
+        messages,
+      });
+    }, 500);
+    return () => {
+      if (sessionSaveTimerRef.current !== null) {
+        window.clearTimeout(sessionSaveTimerRef.current);
+      }
+    };
+  }, [activeTab, messages, prompt, selectedModel, systemPrompt]);
+
   useEffect(() => {
     if (!toast?.autoDismiss) return;
     toastTimerRef.current = window.setTimeout(() => {
@@ -956,9 +993,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, [isRunning, refreshRunningModels]);
 
   useEffect(() => {
-    if (selectedModel) return;
+    if (
+      selectedModel &&
+      runnableModels.some(model => model.name === selectedModel || model.model === selectedModel)
+    ) {
+      return;
+    }
     const firstRunning = runnableModels[0]?.name;
-    if (firstRunning) setSelectedModel(firstRunning);
+    if (firstRunning && firstRunning !== selectedModel) {
+      setSelectedModel(firstRunning);
+    }
   }, [runnableModels, selectedModel]);
 
   const handlePrepare = () => {
@@ -4439,6 +4483,48 @@ function useI18nLanguage(): ReturnType<typeof i18nService.getLanguage> {
   }, []);
 
   return language;
+}
+
+function readLocalInferenceSessionState(): LocalInferenceSessionState | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_INFERENCE_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalInferenceSessionState> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      activeTab: isLocalInferenceTab(parsed.activeTab) ? parsed.activeTab : 'inference',
+      selectedModel: typeof parsed.selectedModel === 'string' ? parsed.selectedModel : '',
+      systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
+      prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
+      messages: Array.isArray(parsed.messages)
+        ? parsed.messages.filter(isInferenceMessage)
+        : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalInferenceSessionState(state: LocalInferenceSessionState): void {
+  try {
+    localStorage.setItem(LOCAL_INFERENCE_SESSION_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures and keep the live session usable.
+  }
+}
+
+function isLocalInferenceTab(value: unknown): value is LocalInferenceTab {
+  return value === 'inference' || value === 'models' || value === 'marketplace';
+}
+
+function isInferenceMessage(value: unknown): value is InferenceMessage {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<InferenceMessage>;
+  return (
+    (candidate.role === 'user' || candidate.role === 'assistant') &&
+    typeof candidate.content === 'string' &&
+    typeof candidate.createdAt === 'number'
+  );
 }
 
 function Badge({
