@@ -43,6 +43,34 @@ test('marketplace search params load directly up to the app and openapi caps', a
   expect(buildMarketplaceSearchParams({
     query: '',
   })).toBeNull();
+
+  expect(buildMarketplaceSearchParams({
+    query: ' / ',
+  })).toBeNull();
+});
+
+test('marketplace only keeps installable models in the visible list', async () => {
+  const module = await import('./LocalInferenceView');
+  const getInstallableMarketplaceModels = (module as unknown as {
+    __test__getInstallableMarketplaceModels?: (
+      models: Array<{ id: string; repoId: string; installed: boolean; installedPath?: string }>,
+      installedModelPathMap: Map<string, string>,
+    ) => Array<{ id: string }>;
+  }).__test__getInstallableMarketplaceModels;
+
+  expect(typeof getInstallableMarketplaceModels).toBe('function');
+  if (!getInstallableMarketplaceModels) return;
+
+  expect(
+    getInstallableMarketplaceModels(
+      [
+        { id: 'a', repoId: 'Qwen/A-GGUF', installed: false },
+        { id: 'b', repoId: 'Qwen/B-GGUF', installed: true },
+        { id: 'c', repoId: 'Qwen/C-GGUF', installed: false, installedPath: '/models/Qwen/C.gguf' },
+      ],
+      new Map([['/models/Qwen/C.gguf', 'C']]),
+    ).map(model => model.id),
+  ).toEqual(['a']);
 });
 
 test('modelscope manual install requires owner repo id', async () => {

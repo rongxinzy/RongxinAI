@@ -4781,7 +4781,7 @@ function buildMarketplaceSearchParams(input: {
   pageNumber?: number;
 }): MarketplaceSearchParams | null {
   const query = input.query.trim();
-  if (!query) return null;
+  if (!isMarketplaceSearchQuery(query)) return null;
   return {
     query,
     limit: MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
@@ -4789,8 +4789,24 @@ function buildMarketplaceSearchParams(input: {
   };
 }
 
+function isMarketplaceSearchQuery(value: string): boolean {
+  return /[\p{L}\p{N}]/u.test(value.trim());
+}
+
 function isModelScopeRepoId(value: string): boolean {
   return /^[^/\s]+\/[^/\s]+$/.test(value.trim());
+}
+
+function getInstallableMarketplaceModels(
+  models: MarketplaceModel[],
+  installedModelPathMap: Map<string, string>,
+): MarketplaceModel[] {
+  return models.filter((model) => {
+    const installedModelName = model.installedPath
+      ? installedModelPathMap.get(model.installedPath)
+      : undefined;
+    return !model.installed && !installedModelName;
+  });
 }
 
 function MarketplacePanel({
@@ -4860,12 +4876,16 @@ function MarketplacePanel({
     setTokenModalOpen(false);
   };
   const [page, setPage] = useState(1);
-  const pageCount = Math.max(1, Math.ceil(models.length / MARKETPLACE_PAGE_SIZE));
+  const installableModels = useMemo(
+    () => getInstallableMarketplaceModels(models, installedModelPathMap),
+    [installedModelPathMap, models],
+  );
+  const pageCount = Math.max(1, Math.ceil(installableModels.length / MARKETPLACE_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * MARKETPLACE_PAGE_SIZE;
   const visibleModels = useMemo(
-    () => models.slice(pageStart, pageStart + MARKETPLACE_PAGE_SIZE),
-    [models, pageStart],
+    () => installableModels.slice(pageStart, pageStart + MARKETPLACE_PAGE_SIZE),
+    [installableModels, pageStart],
   );
 
   useEffect(() => {
@@ -4971,9 +4991,11 @@ function MarketplacePanel({
             : savedToken
               ? i18nService.t('marketplaceSearchStatusOpenApi')
               : i18nService.t('marketplaceSearchStatusWarning');
-        const count = marketplaceTotalCount ?? models.length;
+        const count = marketplaceTotalCount == null
+          ? installableModels.length
+          : Math.min(marketplaceTotalCount, installableModels.length);
         return (
-          !marketplaceLoading && models.length > 0 && (
+          !marketplaceLoading && installableModels.length > 0 && (
             <div className={`rounded-md border px-3 py-1.5 text-xs ${statusClass}`}>
               <span className="font-medium">{statusText}</span>
               <span className="ml-3 opacity-70">
@@ -4994,17 +5016,13 @@ function MarketplacePanel({
           <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
           {i18nService.t('loading')}
         </div>
-      ) : !hasSearched ? null : models.length === 0 ? (
+      ) : !hasSearched ? null : installableModels.length === 0 ? (
         <EmptyState title={i18nService.t('marketplaceNoModels')} className="min-h-[620px]" />
       ) : (
         <div className="flex min-h-[620px] flex-col">
           <div className="grid content-start gap-3 md:grid-cols-2">
             {visibleModels.map(model => {
               const progress = installProgress[model.repoId];
-              const installedModelName = model.installedPath
-                ? installedModelPathMap.get(model.installedPath)
-                : undefined;
-              const installed = model.installed || Boolean(installedModelName);
               const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
               return (
                 <div
@@ -5015,13 +5033,9 @@ function MarketplacePanel({
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="max-h-10 min-w-0 overflow-hidden break-all text-sm font-semibold leading-5 text-foreground">{model.repoId}</h3>
                       <span
-                        className={`inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium ${
-                          installed
-                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                            : 'bg-surface-raised text-secondary'
-                        }`}
+                        className="inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] font-medium text-secondary"
                       >
-                        {installed ? i18nService.t('marketplaceInstalled') : model.recommendedTag}
+                        {model.recommendedTag}
                       </span>
                       <span className="inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-medium text-secondary">
                         {capabilityLabel(model.capability)}
@@ -5071,7 +5085,7 @@ function MarketplacePanel({
                           {i18nService.t('marketplaceOpenModelScope')}
                         </button>
                       )}
-                      {installed ? null : installing ? (
+                      {installing ? (
                         <button
                           type="button"
                           onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
@@ -5280,6 +5294,10 @@ export const __test__buildRequestPreview = (input: RequestPreviewInput) =>
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);
+export const __test__getInstallableMarketplaceModels = (
+  models: MarketplaceModel[],
+  installedModelPathMap: Map<string, string>,
+) => getInstallableMarketplaceModels(models, installedModelPathMap);
 export const __test__resolveLaunchServiceConfig = (
   preset: string,
   customGpuDevices: string,
