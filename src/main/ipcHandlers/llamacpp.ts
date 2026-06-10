@@ -8,6 +8,7 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelUnloadResult,
+  LlamaCppRuntimeListDevicesResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -254,7 +255,7 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(
     LlamaCppIpcChannel.SetServiceConfig,
     async (_event, config: LlamaCppServiceConfig) => {
-      const runtimeDevices = await manager.listRuntimeDevices().catch(() => ({
+      const runtimeDevices = await manager.listRuntimeDevices().catch((): LlamaCppRuntimeListDevicesResult => ({
           success: false,
           devices: [],
           error: 'failed to list llama.cpp runtime devices',
