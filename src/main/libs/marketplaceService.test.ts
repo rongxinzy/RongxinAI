@@ -47,23 +47,6 @@ test('MarketplaceService searchLocal defaults to returning at most 100 models', 
   expect(result.length).toBeLessThanOrEqual(100);
 });
 
-test('MarketplaceService GGUF library parser does not stop at 50 items', async () => {
-  const module = await import('./marketplaceService');
-  const parseModelScopeGgufLibraryHtml = (module as unknown as {
-    __test__parseModelScopeGgufLibraryHtml?: (html: string) => string[];
-  }).__test__parseModelScopeGgufLibraryHtml;
-
-  expect(typeof parseModelScopeGgufLibraryHtml).toBe('function');
-  if (!parseModelScopeGgufLibraryHtml) return;
-
-  const html = Array.from({ length: 120 }, (_, index) =>
-    `<a href="/models/owner/model-${index + 1}-GGUF">model ${index + 1}</a>`,
-  ).join('\n');
-
-  const result = parseModelScopeGgufLibraryHtml(html);
-  expect(result).toHaveLength(120);
-});
-
 test('MarketplaceService merges online and curated results without duplicates', async () => {
   const module = await import('./marketplaceService');
   const mergeMarketplaceModels = (module as unknown as {
@@ -466,7 +449,7 @@ test('MarketplaceService retries OpenAPI rate limits with the next token', async
   ]);
 });
 
-test('MarketplaceService reports OpenAPI failure instead of library page parser fallback failure', async () => {
+test('MarketplaceService falls back to curated models when online search sources fail', async () => {
   const fetchMock = vi.fn(async (url: string) => {
     if (url.includes('/openapi/v1/models')) {
       return new Response('server error', { status: 503 });
@@ -477,21 +460,19 @@ test('MarketplaceService reports OpenAPI failure instead of library page parser 
         headers: { 'content-type': 'application/json' },
       });
     }
-    return new Response('<html>changed</html>', {
-      status: 200,
-      headers: { 'content-type': 'text/html' },
-    });
+    throw new Error('HTML fallback should not be used');
   });
   vi.stubGlobal('fetch', fetchMock);
 
   const service = new MarketplaceService(() => createTempDir(), {
     getModelScopeToken: () => 'test-token',
   });
-  const result = await service.search({ query: '0.8', limit: 5 });
+  const result = await service.search({ query: 'qwen2.5', limit: 5 });
 
-  expect(result.models).toHaveLength(0);
+  expect(fetchMock).toHaveBeenCalledTimes(4);
+  expect(result.models.length).toBeGreaterThan(0);
   expect(result.warning).toContain('HTTP 503');
-  expect(result.warning).not.toContain('library page structure changed');
+  expect(result.models.some((model) => model.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF')).toBe(true);
 });
 
 test('MarketplaceService falls back to legacy search when ModelScope OpenAPI authentication fails', async () => {
@@ -523,4 +504,34 @@ test('MarketplaceService falls back to legacy search when ModelScope OpenAPI aut
 
   expect(fetchMock).toHaveBeenCalledTimes(4); // 3 OpenAPI attempts + 1 legacy fallback
   expect(result.models.some(model => model.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF')).toBe(true);
+});
+
+test('MarketplaceService resolveModel returns an exact legacy API match', async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url.includes('/openapi/v1/models')) {
+      return new Response('unauthorized', { status: 401 });
+    }
+    return new Response(JSON.stringify({
+      Data: {
+        Models: [
+          {
+            Path: 'Qwen',
+            Name: 'Qwen2.5-7B-Instruct-GGUF',
+            Description: 'legacy GGUF model',
+            Downloads: 456,
+            FilePath: 'Qwen2.5-7B-Instruct-Q4_K_M.gguf',
+          },
+        ],
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => 'expired-token',
+  });
+  const result = await service.resolveModel('Qwen/Qwen2.5-7B-Instruct-GGUF');
+
+  expect(result?.repoId).toBe('Qwen/Qwen2.5-7B-Instruct-GGUF');
+  expect(result?.filePath).toBe('Qwen2.5-7B-Instruct-Q4_K_M.gguf');
 });
