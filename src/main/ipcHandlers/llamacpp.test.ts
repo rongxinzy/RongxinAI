@@ -187,6 +187,50 @@ test('sanitizeLlamaCppServiceConfig maps numeric device indexes to runtime devic
   });
 });
 
+test('sanitizeLlamaCppServiceConfig drops gpu selectors when runtime exposes only cpu', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0',
+      mainGpu: '0',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'CPU', name: 'CPU', backend: 'cpu' },
+      ],
+    },
+  )).toEqual({});
+});
+
+test('sanitizeLlamaCppServiceConfig drops gpu selectors when runtime device detection fails', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0,1',
+      mainGpu: '1',
+    },
+    {
+      success: false,
+      devices: [],
+    },
+  )).toEqual({});
+});
+
+test('sanitizeLlamaCppServiceConfig drops gpu selectors when indexes exceed accelerator count', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0,2',
+      mainGpu: '2',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'CUDA0', name: 'GPU 0', backend: 'cuda' },
+        { id: 'CUDA1', name: 'GPU 1', backend: 'cuda' },
+      ],
+    },
+  )).toEqual({});
+});
+
 test('sanitizeLlamaCppServiceConfig preserves explicit runtime device ids on non-CUDA backends', () => {
   expect(sanitizeLlamaCppServiceConfig(
     {
