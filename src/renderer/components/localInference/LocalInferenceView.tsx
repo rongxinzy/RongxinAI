@@ -207,6 +207,12 @@ const smallOutlineButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
+const serviceActionButtonClass =
+  'inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/80 px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
+const serviceDangerButtonClass =
+  'inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300';
+const serviceRefreshButtonClass =
+  'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface/70 text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50';
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   {
     key: 'modelsMax',
@@ -1628,7 +1634,7 @@ function ServicePopover({
         <StatusBadge status={displayStatus} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-background/95 p-3 shadow-2xl backdrop-blur">
+        <div className="absolute right-0 top-full z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border bg-background/95 p-4 shadow-2xl backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1648,16 +1654,26 @@ function ServicePopover({
                   .replace('{running}', String(runningModels.length))}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              className={serviceRefreshButtonClass}
+              aria-label={i18nService.t('refresh')}
+              title={i18nService.t('refresh')}
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
-          <div className={`mt-3 grid gap-2 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
+          <div className={`mt-4 grid gap-3 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div className="rounded-xl border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] text-secondary">
                 {i18nService.t('localInferenceTabModels')}
               </p>
               <p className="mt-1 text-lg font-semibold text-foreground">{localModels.length}</p>
             </div>
-            <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
+            <div className="rounded-xl border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] text-secondary">{i18nService.t('localInferenceLoaded')}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">{runningModels.length}</p>
             </div>
@@ -1665,7 +1681,7 @@ function ServicePopover({
               <button
                 type="button"
                 onClick={() => setDownloadsExpanded(v => !v)}
-                className="rounded-lg border border-border bg-surface/70 px-3 py-2 text-left transition-colors hover:bg-surface"
+                className="rounded-xl border border-border bg-surface/70 px-4 py-3 text-left transition-colors hover:bg-surface"
               >
                 <p className="text-[11px] text-secondary">
                   {i18nService.t('localInferenceActiveDownloads')}
@@ -1718,42 +1734,33 @@ function ServicePopover({
             </p>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className={smallOutlineButtonClass}
-            >
-              <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              {i18nService.t('refresh')}
-            </button>
-            <button
-              type="button"
-              onClick={onOpenBackendConfig}
-              disabled={loading}
-              className={smallOutlineButtonClass}
-            >
-              <CpuChipIcon className="h-3.5 w-3.5" />
-              {i18nService.t('localInferenceBackendConfigTitle')}
-            </button>
-            <button
-              type="button"
-              onClick={onOpenServiceConfig}
-              disabled={loading}
-              className={smallOutlineButtonClass}
-            >
-              <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
-              {i18nService.t('localInferenceServiceConfigTitle')}
-            </button>
+          <div className="mt-4 space-y-2.5">
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={onOpenBackendConfig}
+                disabled={loading}
+                className={serviceActionButtonClass}
+              >
+                {i18nService.t('localInferenceBackendConfigTitle')}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenServiceConfig}
+                disabled={loading}
+                className={serviceActionButtonClass}
+              >
+                {i18nService.t('localInferenceServiceConfigTitle')}
+              </button>
+            </div>
             {!running && canPrepare && (
               <button
                 type="button"
                 onClick={onPrepare}
                 disabled={loading}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <PlayIcon className="h-3.5 w-3.5" />
+                <PlayIcon className="h-4 w-4" />
                 {actionLabel}
               </button>
             )}
@@ -1761,9 +1768,9 @@ function ServicePopover({
               <button
                 type="button"
                 disabled
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white opacity-60"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-medium text-white opacity-60"
               >
-                <PlayIcon className="h-3.5 w-3.5" />
+                <PlayIcon className="h-4 w-4" />
                 {actionLabel}
               </button>
             )}
@@ -1772,9 +1779,9 @@ function ServicePopover({
                 type="button"
                 onClick={onStop}
                 disabled={loading}
-                className={smallOutlineButtonClass}
+                className={serviceDangerButtonClass}
               >
-                <StopIcon className="h-3.5 w-3.5" />
+                <StopIcon className="h-4 w-4" />
                 {i18nService.t('localInferenceStop')}
               </button>
             ) : null}
