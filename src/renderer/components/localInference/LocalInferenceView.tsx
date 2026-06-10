@@ -471,6 +471,8 @@ interface LocalInferenceViewProps {
   updateBadge?: React.ReactNode;
 }
 
+let cachedStatus: OllamaStatusSnapshot | null = null;
+
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -479,7 +481,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 }) => {
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
-  const [status, setStatus] = useState<OllamaStatusSnapshot | null>(null);
+  const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -637,6 +639,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const refreshStatus = useCallback(async () => {
     const nextStatus = await window.electron.llamacpp.status();
+    cachedStatus = nextStatus;
     setStatus(nextStatus);
     return nextStatus;
   }, []);
@@ -783,7 +786,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   useEffect(() => {
     const unsubscribers = [
-      window.electron.llamacpp.onStatusChanged(setStatus),
+      window.electron.llamacpp.onStatusChanged((s) => { cachedStatus = s; setStatus(s); }),
       window.electron.llamacpp.onPullProgress(({ name, chunk }) => {
         const progress = normalizeInstallProgress(name, chunk);
         if (!isInstallTerminalPhase(progress.phase)) {
