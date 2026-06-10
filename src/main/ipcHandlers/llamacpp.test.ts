@@ -47,7 +47,6 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
     device: '0,1',
     splitMode: 'layer',
-    tensorSplit: '3,2',
     reasoning: 'on',
     chatTemplate: 'chatml',
   });
@@ -85,13 +84,56 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
   });
 });
 
+test('sanitizeLlamaCppServiceConfig drops invalid tensor split values', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    tensorSplit: '9999',
+  })).toEqual({});
+
+  expect(sanitizeLlamaCppServiceConfig({
+    splitMode: 'tensor',
+    tensorSplit: '按张量拆分',
+  })).toEqual({
+    splitMode: 'tensor',
+  });
+
+  expect(sanitizeLlamaCppServiceConfig({
+    splitMode: 'tensor',
+    tensorSplit: '3,2',
+  })).toEqual({
+    splitMode: 'tensor',
+    tensorSplit: '3,2',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig drops invalid structured device values', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    device: '显卡0',
+  })).toEqual({});
+});
+
+test('sanitizeLlamaCppServiceConfig drops tensor split when split mode is not tensor', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    splitMode: 'layer',
+    tensorSplit: '3,2',
+  })).toEqual({
+    splitMode: 'layer',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig drops tensor split when it exceeds available device count', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    splitMode: 'tensor',
+    tensorSplit: '3,2,1',
+  })).toEqual({
+    splitMode: 'tensor',
+    tensorSplit: '3,2,1',
+  });
+});
 test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () => {
   expect(sanitizeLlamaCppServiceConfig({
     runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,
     runtimeCudaMajor: '11' as unknown as LlamaCppRuntimeCudaMajor,
-  })).toEqual({
-    modelsMax: '0',
-  });
+  })).toEqual({});
 });
 
 test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimited router slots', () => {

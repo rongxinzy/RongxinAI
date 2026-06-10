@@ -34,13 +34,17 @@ import type {
   LlamaCppModel as OllamaModel,
   LlamaCppModelLaunchInput as OllamaModelLaunchInput,
   LlamaCppRunningModel as OllamaRunningModel,
+  LlamaCppRuntimeListDevicesResult,
   LlamaCppServiceConfig as OllamaServiceConfig,
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
 import {
   createLlamaCppStreamState as createOllamaStreamState,
   getLlamaCppLaunchContextLimitViolation,
+  type LlamaCppStructuredServiceFieldError,
+  type LlamaCppStructuredServiceFieldKey,
   reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
+  validateLlamaCppStructuredServiceConfig,
 } from '../../../shared/llamacpp';
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
@@ -2249,12 +2253,46 @@ function OllamaServiceConfigDialog({
   const [form, setForm] = useState<OllamaServiceConfigFormState>(() => serviceConfigToForm(config));
   const [saveError, setSaveError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [runtimeDevices, setRuntimeDevices] = useState<LlamaCppRuntimeListDevicesResult | null>(null);
+  const structuredValidation = validateLlamaCppStructuredServiceConfig({
+    modelsMax: form.modelsMax,
+    device: form.device,
+    parallel: form.parallel,
+    timeout: form.timeout,
+    threadsHttp: form.threadsHttp,
+    cacheReuse: form.cacheReuse,
+    cacheRam: form.cacheRam,
+    ctxSize: form.ctxSize,
+    tensorSplit: form.tensorSplit,
+    splitMode: form.splitMode,
+    mainGpu: form.mainGpu,
+    batchSize: form.batchSize,
+    ubatchSize: form.ubatchSize,
+    threads: form.threads,
+    threadsBatch: form.threadsBatch,
+    gpuLayers: form.gpuLayers,
+  });
 
   useEffect(() => {
-    setForm(serviceConfigToForm(config));
-  }, [config]);
+    setForm(serviceConfigToForm(config, runtimeDevices));
+  }, [config, runtimeDevices]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.electron.llamacpp.listRuntimeDevices()
+      .then(result => {
+        if (!cancelled) setRuntimeDevices(result);
+      })
+      .catch(() => {
+        if (!cancelled) setRuntimeDevices(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateForm = (key: keyof OllamaServiceConfigFormState, value: string) => {
+    setSaveError(null);
     setForm(current => ({ ...current, [key]: value }));
   };
   const renderField = (field: ServiceConfigField) => {
@@ -2263,6 +2301,10 @@ function OllamaServiceConfigDialog({
       : (field.placeholder ?? '');
     const label = i18nService.t(field.labelKey);
     const hint = i18nService.t(field.hintKey);
+    const fieldError = getStructuredServiceConfigFieldErrorMessage(
+      field.key,
+      structuredValidation.fieldErrors,
+    );
     return field.type === 'select' ? (
       <ServiceConfigSelect
         key={field.key}
@@ -2281,6 +2323,7 @@ function OllamaServiceConfigDialog({
         value={form[field.key]}
         placeholder={placeholder}
         hint={hint}
+        error={fieldError}
         onChange={value => updateForm(field.key, value)}
       />
     );
@@ -2288,6 +2331,10 @@ function OllamaServiceConfigDialog({
 
   const save = async () => {
     setSaveError(null);
+    if (structuredValidation.hasErrors) {
+      setSaveError(i18nService.t('localInferenceServiceConfigValidationFixErrors'));
+      return;
+    }
     const result = await onSave({
       host: form.host,
       port: form.port,
@@ -2428,7 +2475,7 @@ function OllamaServiceConfigDialog({
           <button
             type="button"
             onClick={() => void save()}
-            disabled={loading}
+            disabled={loading || structuredValidation.hasErrors}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {i18nService.t('save')}
@@ -2500,6 +2547,7 @@ function ServiceConfigInput({
   value,
   placeholder,
   hint,
+  error,
   onChange,
 }: {
   label: string;
@@ -2507,6 +2555,7 @@ function ServiceConfigInput({
   value: string;
   placeholder: string;
   hint: string;
+  error?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -2519,9 +2568,10 @@ function ServiceConfigInput({
         value={value}
         placeholder={placeholder}
         onChange={event => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60"
+        className={`h-10 w-full rounded-lg bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60 ${error ? 'border border-red-500/70 focus:border-red-500' : 'border border-border'}`}
       />
       <p className="text-xs text-secondary">{hint}</p>
+      {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </label>
   );
 }
@@ -4685,11 +4735,14 @@ function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string):
   return `${devices} · ${patch.splitMode ?? i18nService.t('localInferenceLaunchDefault')}`;
 }
 
-function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFormState {
+function serviceConfigToForm(
+  config: OllamaServiceConfig,
+  runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
+): OllamaServiceConfigFormState {
   return {
     host: config.host ?? '',
     port: config.port ?? '',
-    device: config.device ?? '',
+    device: normalizeServiceConfigDeviceForForm(config.device, runtimeDevices),
     modelsMax: config.modelsMax ?? '',
     modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),
     parallel: config.parallel ?? '',
@@ -4712,6 +4765,50 @@ function serviceConfigToForm(config: OllamaServiceConfig): OllamaServiceConfigFo
     mlock: config.mlock === undefined ? '' : String(config.mlock),
     jinja: config.jinja ?? '',
   };
+}
+
+function normalizeServiceConfigDeviceForForm(
+  value: string | undefined,
+  runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
+): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return '';
+  if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmed)) return trimmed;
+  if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
+    return trimmed;
+  }
+  const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0) return '';
+  const indexes = parts.map(part =>
+    runtimeDevices.devices.findIndex(device => device.id === part || device.name === part),
+  );
+  if (indexes.some(index => index < 0)) return trimmed;
+  return indexes.join(',');
+}
+
+function getStructuredServiceConfigFieldErrorMessage(
+  key: keyof OllamaServiceConfigFormState,
+  fieldErrors: Partial<Record<LlamaCppStructuredServiceFieldKey, LlamaCppStructuredServiceFieldError>>,
+): string | undefined {
+  const fieldError = fieldErrors[key as LlamaCppStructuredServiceFieldKey];
+  if (!fieldError) return undefined;
+  switch (fieldError.code) {
+    case 'integer-range':
+      return i18nService
+        .t('localInferenceServiceConfigFieldErrorIntegerRange')
+        .replace('{min}', String(fieldError.min ?? ''))
+        .replace('{max}', String(fieldError.max ?? ''));
+    case 'device-format':
+      return i18nService.t('localInferenceServiceConfigFieldErrorDeviceFormat');
+    case 'gpu-layers-format':
+      return i18nService.t('localInferenceServiceConfigFieldErrorGpuLayersFormat');
+    case 'tensor-split-format':
+      return i18nService.t('localInferenceServiceConfigFieldErrorTensorSplitFormat');
+    case 'tensor-split-requires-mode':
+      return i18nService.t('localInferenceServiceConfigFieldErrorTensorSplitRequiresMode');
+    default:
+      return undefined;
+  }
 }
 
 function getSanitizedServiceConfigFields(
