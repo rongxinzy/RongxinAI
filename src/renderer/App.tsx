@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference'>('cowork');
+  const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -241,6 +242,12 @@ const App: React.FC = () => {
     });
     return removeListener;
   }, []);
+
+  useEffect(() => {
+    if (mainView === 'localInference') {
+      setHasMountedLocalInference(true);
+    }
+  }, [mainView]);
 
   // Network status monitoring
   useEffect(() => {
@@ -710,6 +717,16 @@ const handleConfirmUpdate = useCallback(async () => {
         <div className={`flex-1 min-w-0 py-1.5 pr-1.5 transition-[padding] duration-200 ease-out ${isSidebarCollapsed ? 'pl-1.5' : ''}`}>
           <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden [contain:layout_style_paint]">
             <EngineStartupOverlay />
+            {hasMountedLocalInference && (
+              <div className={mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'}>
+                <LocalInferenceView
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  onToggleSidebar={handleToggleSidebar}
+                  onNewChat={handleNewChat}
+                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                />
+              </div>
+            )}
             {mainView === 'skills' ? (
               <SkillsView
                 isSidebarCollapsed={isSidebarCollapsed}
@@ -733,14 +750,7 @@ const handleConfirmUpdate = useCallback(async () => {
                 onNewChat={handleNewChat}
                 updateBadge={isSidebarCollapsed ? updateBadge : null}
               />
-            ) : mainView === 'localInference' ? (
-              <LocalInferenceView
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={handleToggleSidebar}
-                onNewChat={handleNewChat}
-                updateBadge={isSidebarCollapsed ? updateBadge : null}
-              />
-            ) : (
+            ) : mainView === 'localInference' ? null : (
               <CoworkView
                 onRequestAppSettings={handleShowSettings}
                 onShowSkills={handleShowSkills}
