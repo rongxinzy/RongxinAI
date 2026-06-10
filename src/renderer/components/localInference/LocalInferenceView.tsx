@@ -7,6 +7,7 @@ import {
   CheckCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClipboardDocumentIcon,
   CpuChipIcon,
   ExclamationTriangleIcon,
   EyeIcon,
@@ -61,9 +62,10 @@ type InferenceMessage = {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
-  hiddenThinking?: boolean;
   waiting?: boolean;
   metrics?: OllamaChatChunk | null;
+  createdAt: number;
+  reasoningDurationSeconds?: number;
 };
 
 type LaunchFormState = {
@@ -372,12 +374,12 @@ const INFERENCE_OPTION_FIELDS: InferenceOptionField[] = [
     hintKey: 'localInferenceOptionMaxTokensHint',
   },
   {
-    key: 'direct_answer_mode',
-    labelKey: 'localInferenceOptionDirectAnswerModeLabel',
-    paramName: 'app.system_hint.direct_answer_only',
+    key: 'reasoning_preference',
+    labelKey: 'localInferenceReasoningPreferenceLabel',
+    paramName: 'reasoning',
     group: 'basic',
     type: 'select',
-    hintKey: 'localInferenceOptionDirectAnswerModeHint',
+    hintKey: 'localInferenceReasoningPreferenceHint',
     showParamName: false,
   },
   {
@@ -1241,10 +1243,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const sendPrompt = async () => {
     if (!selectedModel || !selectedRunningModel || !prompt.trim()) return;
     const userMessage = prompt.trim();
+    const createdAt = Date.now();
     const baseHistory = messagesRef.current;
     const nextHistory: InferenceMessage[] = [
       ...baseHistory,
-      { role: 'user', content: userMessage },
+      { role: 'user', content: userMessage, createdAt },
     ];
     setMessages(nextHistory);
     messagesRef.current = nextHistory;
@@ -1261,10 +1264,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const isCurrentRequest = () =>
       activeRequestIdRef.current === requestId &&
       conversationVersionRef.current === conversationVersion;
-    const effectiveSystemPrompt = buildEffectiveSystemPrompt(
-      systemPrompt,
-      options.direct_answer_mode === 'enabled',
-    );
+    const effectiveSystemPrompt = buildEffectiveSystemPrompt(systemPrompt);
 
     let streamState = createOllamaStreamState();
     const unsubscribe = window.electron.llamacpp.onChatStreamChunk(
@@ -1280,6 +1280,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const streamStartTime = Date.now();
 
     try {
+      const normalizedOptions = normalizeOptions(options);
       const payload: OllamaChatPayload = {
         model: selectedModel,
         stream: true,
@@ -1293,7 +1294,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           })),
           { role: 'user', content: userMessage },
         ],
-        options: normalizeOptions(options),
+        options: Object.fromEntries(
+          Object.entries(normalizedOptions).filter(([key]) => key !== 'chat_template_kwargs'),
+        ),
+        ...(typeof normalizedOptions.chat_template_kwargs === 'object'
+          && normalizedOptions.chat_template_kwargs
+          ? {
+              chat_template_kwargs: normalizedOptions.chat_template_kwargs as {
+                enable_thinking: boolean;
+              },
+            }
+          : {}),
       };
       const streamResult = await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
@@ -3369,18 +3380,6 @@ function InferencePanel({
   const [configCollapsed, setConfigCollapsed] = useState(false);
   const [configPage, setConfigPage] = useState<InferenceOptionGroup>('basic');
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
-  const requestPreview = useMemo(
-    () =>
-      buildRequestPreview({
-        model: selectedModel,
-        systemPrompt: buildEffectiveSystemPrompt(
-          systemPrompt,
-          options.direct_answer_mode === 'enabled',
-        ),
-        options: normalizeOptions(options),
-      }),
-    [options, selectedModel, systemPrompt],
-  );
   const updateOption = (
     key: keyof InferenceOptions,
     value: InferenceOptions[keyof InferenceOptions],
@@ -3661,16 +3660,6 @@ function InferencePanel({
                     />
                   ))}
                 </div>
-                {configPage === 'advanced' && (
-                  <details className="rounded-xl border border-border-subtle bg-surface-raised/40 px-3 py-2.5 text-xs text-secondary">
-                    <summary className="cursor-pointer select-none text-foreground">
-                      {i18nService.t('localInferenceRequestPreview')}
-                    </summary>
-                    <pre className="mt-2 max-h-52 overflow-auto rounded-lg border border-border-subtle bg-background px-2.5 py-2 font-mono text-[11px] leading-4 text-foreground">
-                      {JSON.stringify(requestPreview, null, 2)}
-                    </pre>
-                  </details>
-                )}
               </div>
               <div className="shrink-0 border-t border-border-subtle p-4">
                 <button
@@ -3834,50 +3823,144 @@ function ChatBubble({
   const isUser = message.role === 'user';
   const hasThinking = Boolean(message.thinking?.trim());
   const hasVisibleContent = Boolean(message.content.trim());
-  const thinkingSummary =
-    streaming && !hasVisibleContent
-      ? i18nService.t('localInferenceThinkingInProgress')
-      : i18nService.t('localInferenceThinking');
+  const [reasoningOpen, setReasoningOpen] = useState(streaming);
+
+  useEffect(() => {
+    if (streaming) {
+      setReasoningOpen(true);
+      return;
+    }
+    if (hasThinking && hasVisibleContent) {
+      setReasoningOpen(false);
+    }
+  }, [hasThinking, hasVisibleContent, streaming]);
+
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`text-sm leading-7 ${
-          isUser
-            ? 'w-fit max-w-[86%] rounded-2xl border border-border-subtle bg-surface-raised px-4 py-2.5 text-foreground'
-            : 'w-full text-foreground'
-        }`}
-      >
-        {!isUser && hasThinking && (
-          <details
-            className="mb-3 rounded-2xl border border-border-subtle bg-surface-raised/55 px-3 py-2 text-sm text-foreground/90"
-            open={streaming && !hasVisibleContent ? true : undefined}
-          >
-            <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
-              {thinkingSummary}
-            </summary>
-            <ThinkingContent
-              content={message.thinking ?? ''}
-              streaming={streaming && !hasVisibleContent}
-            />
-          </details>
-        )}
-        {message.waiting && <WaitingDots />}
+    <article className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={isUser ? 'max-w-[86%]' : 'w-full'}>
         {isUser ? (
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
-        ) : message.content.trim() ? (
-          <MarkdownContent content={message.content} />
-        ) : null}
-        {streaming && !message.waiting && hasVisibleContent && (
-          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
+          <div className="flex justify-end">
+            <div className="w-fit rounded-2xl bg-primary px-4 py-2.5 text-sm leading-7 text-primary-foreground shadow-sm">
+              <div className="whitespace-pre-wrap break-words">{message.content}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm leading-7 text-foreground">
+            {hasThinking && (
+              <ReasoningPanel
+                content={message.thinking ?? ''}
+                isOpen={reasoningOpen}
+                isStreaming={streaming && !hasVisibleContent}
+                durationSeconds={message.reasoningDurationSeconds}
+                onToggle={() => setReasoningOpen(current => !current)}
+              />
+            )}
+            {message.waiting && <WaitingDots />}
+            {message.content.trim() ? (
+              <div className="mt-1">
+                <MarkdownContent content={message.content} />
+                {streaming && !message.waiting && hasVisibleContent && (
+                  <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
+                )}
+              </div>
+            ) : null}
+          </div>
         )}
-        {!isUser && message.metrics && (
-          <p className="mt-2 text-xs text-secondary">
-            {formatMetricsSummary(message.metrics)}
-          </p>
-        )}
+        <MessageMetaRow message={message} isUser={isUser} />
       </div>
+    </article>
+  );
+}
+
+function ReasoningPanel({
+  content,
+  isOpen,
+  isStreaming,
+  durationSeconds,
+  onToggle,
+}: {
+  content: string;
+  isOpen: boolean;
+  isStreaming: boolean;
+  durationSeconds?: number;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-2 text-left text-sm text-secondary transition-colors hover:text-foreground [&>span:first-child]:hidden"
+      >
+        <span className="text-base leading-none">✧</span>
+        <ThinkingStatusText
+          isStreaming={isStreaming}
+          durationSeconds={durationSeconds}
+        />
+        <ChevronRightIcon className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+      {isOpen && (
+        <ThinkingContent content={content} streaming={isStreaming} />
+      )}
     </div>
   );
+}
+
+function MessageMetaRow({
+  message,
+  isUser,
+}: {
+  message: InferenceMessage;
+  isUser: boolean;
+}) {
+  const handleCopy = useCallback(async () => {
+    const segments = [message.content.trim(), message.thinking?.trim() ?? ''].filter(Boolean);
+    await navigator.clipboard.writeText(segments.join('\n\n'));
+  }, [message.content, message.thinking]);
+
+  return (
+    <div
+      className={`mt-2 flex flex-wrap items-center gap-3 text-xs text-secondary ${
+        isUser ? 'justify-end' : 'justify-start'
+      }`}
+    >
+      <span>{formatMessageTimestamp(message.createdAt)}</span>
+      <button
+        type="button"
+        onClick={() => void handleCopy()}
+        className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+        title={i18nService.t('copy')}
+      >
+        <ClipboardDocumentIcon className="h-4 w-4" />
+      </button>
+      {!isUser && message.metrics && (
+        <span>{formatMetricsSummary(message.metrics)}</span>
+      )}
+    </div>
+  );
+}
+
+function ThinkingStatusText({
+  isStreaming,
+  durationSeconds,
+}: {
+  isStreaming: boolean;
+  durationSeconds?: number;
+}) {
+  if (isStreaming) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm text-secondary">
+        <span>{i18nService.t('localInferenceThinkingInProgress')}</span>
+        <span className="flex items-center gap-1 pt-px">
+          <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
+          <span className="h-1 w-1 rounded-full bg-current animate-pulse [animation-delay:150ms]" />
+          <span className="h-1 w-1 rounded-full bg-current animate-pulse [animation-delay:300ms]" />
+        </span>
+      </span>
+    );
+  }
+
+  return <span>{formatThoughtDuration(durationSeconds)}</span>;
 }
 
 function ThinkingContent({
@@ -3917,7 +4000,7 @@ function ThinkingContent({
   return (
     <div
       ref={wrapperRef}
-      className={`relative mt-2 max-h-48 rounded-xl ${
+      className={`relative ml-2 mt-2 max-h-48 rounded-xl border-l-2 border-dotted border-border-subtle pl-4 ${
         streaming
           ? 'overflow-hidden'
           : 'overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
@@ -3925,7 +4008,7 @@ function ThinkingContent({
     >
       <div
         ref={contentRef}
-        className={`whitespace-pre-wrap break-words pr-1 text-sm leading-7 text-secondary ${
+        className={`whitespace-pre-wrap break-words pr-1 text-sm leading-7 text-secondary/85 ${
           streaming ? 'transition-transform duration-200' : ''
         }`}
       >
@@ -3989,11 +4072,11 @@ function InferenceOptionControl({
   }
   if (field.type === 'select') {
     const selectOptions = getInferenceOptionSelectOptions(field.key);
-    if (field.key === 'direct_answer_mode') {
+    if (field.key === 'reasoning_preference') {
       return (
         <div className="space-y-1.5">
           <OptionLabel label={label} paramName={showParamName ? field.paramName : undefined} />
-          <div className="grid grid-cols-2 rounded-xl border border-border bg-surface-input p-1">
+          <div className="grid grid-cols-3 rounded-xl border border-border bg-surface-input p-1">
             {selectOptions.map(option => {
               const selected = String(value) === option.value;
               return (
@@ -4014,7 +4097,6 @@ function InferenceOptionControl({
               );
             })}
           </div>
-          <p className="text-[11px] leading-4 text-secondary">{hint}</p>
         </div>
       );
     }
@@ -4109,10 +4191,11 @@ function getInferenceOptionSelectOptions(
   key: keyof InferenceOptions,
 ): Array<{ value: string; label: string }> {
   switch (key) {
-    case 'direct_answer_mode':
+    case 'reasoning_preference':
       return [
-        { value: 'disabled', label: i18nService.t('localInferenceDirectAnswerModeStandard') },
-        { value: 'enabled', label: i18nService.t('localInferenceDirectAnswerModeReducedThinking') },
+        { value: 'low', label: i18nService.t('localInferenceReasoningPreferenceLow') },
+        { value: 'auto', label: i18nService.t('localInferenceReasoningPreferenceAuto') },
+        { value: 'high', label: i18nService.t('localInferenceReasoningPreferenceHigh') },
       ];
     case 'cache_prompt':
       return [
@@ -4704,7 +4787,38 @@ function computeStreamMetrics(
 function formatMetricsSummary(metrics: OllamaChatChunk): string {
   const speedValue = metrics.predicted_per_second;
   const speed = speedValue != null ? speedValue.toFixed(1) : '-';
-  return i18nService.t('localInferenceMetricsSpeed').replace('{speed}', speed);
+  const completionTokens = readNestedNumber(metrics.usage, 'completion_tokens')
+    ?? readNestedNumber(metrics.timings, 'predicted_n')
+    ?? metrics.eval_count;
+  const speedLabel = i18nService.t('localInferenceMetricsSpeed').replace('{speed}', speed);
+  return completionTokens != null
+    ? `${speedLabel} (${Math.round(completionTokens)} tokens)`
+    : speedLabel;
+}
+
+function estimateReasoningDurationSeconds(metrics: OllamaChatChunk): number | undefined {
+  const predictedMs = readNestedNumber(metrics.timings, 'predicted_ms');
+  if (predictedMs == null) return undefined;
+  return Math.max(1, Math.round(predictedMs / 1000));
+}
+
+function formatThoughtDuration(durationSeconds?: number): string {
+  if (!durationSeconds || durationSeconds <= 0) {
+    return i18nService.t('localInferenceThinking');
+  }
+  return i18nService
+    .t('localInferenceThoughtForSeconds')
+    .replace('{seconds}', String(durationSeconds));
+}
+
+function formatMessageTimestamp(createdAt: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(createdAt);
 }
 
 function buildAssistantMessage({
@@ -4722,6 +4836,10 @@ function buildAssistantMessage({
     content: visibleContent,
     ...(thinking.trim() ? { thinking } : {}),
     metrics,
+    createdAt: Date.now(),
+    ...(thinking.trim() && metrics
+      ? { reasoningDurationSeconds: estimateReasoningDurationSeconds(metrics) }
+      : {}),
   };
 }
 
@@ -4739,6 +4857,7 @@ function buildStreamingAssistantMessage({
     content,
     ...(hasThinking ? { thinking } : {}),
     waiting: !hasContent && !hasThinking,
+    createdAt: Date.now(),
   };
 }
 
@@ -4753,13 +4872,10 @@ function findLatestUserMessageIndex(messages: InferenceMessage[]): number {
   return -1;
 }
 
-function buildEffectiveSystemPrompt(
-  systemPrompt: string,
-  directAnswerModeEnabled: boolean,
-): string {
+function buildEffectiveSystemPrompt(systemPrompt: string): string {
+  void DIRECT_ANSWER_SYSTEM_HINT;
   const trimmed = systemPrompt.trim();
-  if (!directAnswerModeEnabled) return trimmed;
-  return [trimmed, DIRECT_ANSWER_SYSTEM_HINT].filter(Boolean).join('\n\n');
+  return trimmed;
 }
 
 function buildRequestPreview({
