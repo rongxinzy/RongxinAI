@@ -321,6 +321,9 @@ export type LlamaCppChatPayload = {
   messages: LlamaCppChatMessage[];
   stream?: boolean;
   options?: Record<string, unknown>;
+  chat_template_kwargs?: {
+    enable_thinking: boolean;
+  };
 };
 
 export type LlamaCppToolCall = {
