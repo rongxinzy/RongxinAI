@@ -645,18 +645,11 @@ export function sanitizeLlamaCppServiceConfig(
   });
   const device = normalizeVisibleDevices(config?.device);
   const splitMode = isSplitMode(config?.splitMode) ? config.splitMode : undefined;
-  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
-  const mainGpu = runtimeDevices
-    ? (
-      runtimeDevices.success
-        ? normalizeMainGpuAgainstRuntimeDevices(config?.mainGpu, acceleratorDevices)
-        : undefined
-    )
-    : normalizeIntegerStringWithDefault(config?.mainGpu, {
-      min: mainGpuRange.min,
-      max: mainGpuRange.max,
-      defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
-    });
+  const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, {
+    min: mainGpuRange.min,
+    max: mainGpuRange.max,
+    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
+  });
   const tensorSplit = normalizeTensorSplit(config?.tensorSplit, {
     splitMode,
   });
@@ -828,20 +821,6 @@ function normalizeVisibleDevices(
     return normalizedTokens.join(',');
   }
   return undefined;
-}
-
-function normalizeMainGpuAgainstRuntimeDevices(
-  value: string | undefined,
-  acceleratorDevices: Array<{ id: string }>,
-): string | undefined {
-  const normalized = normalizeIntegerString(value);
-  if (!normalized) return undefined;
-  if (acceleratorDevices.length === 0) return undefined;
-  const parsed = Number.parseInt(normalized, 10);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed >= acceleratorDevices.length) {
-    return undefined;
-  }
-  return normalized;
 }
 
 function normalizeTensorSplit(

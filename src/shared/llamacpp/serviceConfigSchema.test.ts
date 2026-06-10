@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 
 import {
+  getLlamaCppGpuDetectionState,
   LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS,
   LlamaCppGpuDetectionState,
-  getLlamaCppGpuDetectionState,
   validateLlamaCppStructuredServiceConfig,
 } from './serviceConfigSchema';
 
