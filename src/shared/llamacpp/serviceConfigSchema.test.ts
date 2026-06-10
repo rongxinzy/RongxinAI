@@ -34,12 +34,20 @@ test('validateLlamaCppStructuredServiceConfig accepts valid structured values', 
     ctxSize: '4096',
     tensorSplit: '3,2',
     splitMode: 'tensor',
-    mainGpu: '256',
+    mainGpu: '2',
     batchSize: '2048',
     ubatchSize: '512',
     threads: '-1',
     threadsBatch: '8',
     gpuLayers: 'auto',
+    runtimeDevices: {
+      success: true,
+      devices: [
+        { id: 'CUDA0', name: 'NVIDIA 0', backend: 'cuda' },
+        { id: 'CUDA1', name: 'NVIDIA 1', backend: 'cuda' },
+        { id: 'CUDA2', name: 'NVIDIA 2', backend: 'cuda' },
+      ],
+    },
   });
 
   expect(result.hasErrors).toBe(false);
@@ -54,6 +62,39 @@ test('validateLlamaCppStructuredServiceConfig accepts only numeric device indexe
   expect(validateLlamaCppStructuredServiceConfig({
     device: 'CUDA0,CUDA1',
   }).fieldErrors.device?.code).toBe('device-format');
+});
+
+test('validateLlamaCppStructuredServiceConfig rejects device and mainGpu indexes outside detected accelerators', () => {
+  const result = validateLlamaCppStructuredServiceConfig({
+    device: '0,2',
+    mainGpu: '2',
+    runtimeDevices: {
+      success: true,
+      devices: [
+        { id: 'CUDA0', name: 'GPU 0', backend: 'cuda' },
+        { id: 'CUDA1', name: 'GPU 1', backend: 'cuda' },
+      ],
+    },
+  });
+
+  expect(result.fieldErrors.device?.code).toBe('device-out-of-range');
+  expect(result.fieldErrors.mainGpu?.code).toBe('main-gpu-out-of-range');
+});
+
+test('validateLlamaCppStructuredServiceConfig marks gpu selectors unavailable when runtime has only cpu', () => {
+  const result = validateLlamaCppStructuredServiceConfig({
+    device: '0',
+    mainGpu: '0',
+    runtimeDevices: {
+      success: true,
+      devices: [
+        { id: 'CPU', name: 'CPU', backend: 'cpu' },
+      ],
+    },
+  });
+
+  expect(result.fieldErrors.device?.code).toBe('device-unavailable');
+  expect(result.fieldErrors.mainGpu?.code).toBe('main-gpu-unavailable');
 });
 
 test('validateLlamaCppStructuredServiceConfig requires tensor split mode for tensorSplit', () => {

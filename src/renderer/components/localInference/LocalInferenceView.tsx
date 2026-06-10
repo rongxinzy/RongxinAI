@@ -40,6 +40,7 @@ import type {
 } from '../../../shared/llamacpp';
 import {
   createLlamaCppStreamState as createOllamaStreamState,
+  getLlamaCppAcceleratorDevices,
   getLlamaCppLaunchContextLimitViolation,
   type LlamaCppStructuredServiceFieldError,
   type LlamaCppStructuredServiceFieldKey,
@@ -2254,6 +2255,8 @@ function OllamaServiceConfigDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [runtimeDevices, setRuntimeDevices] = useState<LlamaCppRuntimeListDevicesResult | null>(null);
+  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
+  const gpuConfigUnavailable = runtimeDevices?.success === true && acceleratorDevices.length === 0;
   const structuredValidation = validateLlamaCppStructuredServiceConfig({
     modelsMax: form.modelsMax,
     device: form.device,
@@ -2271,6 +2274,7 @@ function OllamaServiceConfigDialog({
     threads: form.threads,
     threadsBatch: form.threadsBatch,
     gpuLayers: form.gpuLayers,
+    runtimeDevices,
   });
 
   useEffect(() => {
@@ -2300,11 +2304,14 @@ function OllamaServiceConfigDialog({
       ? i18nService.t(field.placeholderKey)
       : (field.placeholder ?? '');
     const label = i18nService.t(field.labelKey);
-    const hint = i18nService.t(field.hintKey);
+    const hint = gpuConfigUnavailable && (field.key === 'device' || field.key === 'mainGpu')
+      ? i18nService.t('localInferenceServiceConfigGpuUnavailableHint')
+      : i18nService.t(field.hintKey);
     const fieldError = getStructuredServiceConfigFieldErrorMessage(
       field.key,
       structuredValidation.fieldErrors,
     );
+    const disabled = loading || isGpuIndexedFieldDisabled(field.key, gpuConfigUnavailable);
     return field.type === 'select' ? (
       <ServiceConfigSelect
         key={field.key}
@@ -2312,6 +2319,7 @@ function OllamaServiceConfigDialog({
         paramName={field.paramName}
         value={form[field.key]}
         hint={hint}
+        disabled={disabled}
         onChange={value => updateForm(field.key, value)}
         options={getServiceConfigSelectOptions(field.key)}
       />
@@ -2324,6 +2332,7 @@ function OllamaServiceConfigDialog({
         placeholder={placeholder}
         hint={hint}
         error={fieldError}
+        disabled={disabled}
         onChange={value => updateForm(field.key, value)}
       />
     );
@@ -2548,6 +2557,7 @@ function ServiceConfigInput({
   placeholder,
   hint,
   error,
+  disabled,
   onChange,
 }: {
   label: string;
@@ -2556,6 +2566,7 @@ function ServiceConfigInput({
   placeholder: string;
   hint: string;
   error?: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -2567,8 +2578,9 @@ function ServiceConfigInput({
       <input
         value={value}
         placeholder={placeholder}
+        disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className={`h-10 w-full rounded-lg bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60 ${error ? 'border border-red-500/70 focus:border-red-500' : 'border border-border'}`}
+        className={`h-10 w-full rounded-lg bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border border-red-500/70 focus:border-red-500' : 'border border-border'}`}
       />
       <p className="text-xs text-secondary">{hint}</p>
       {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
@@ -2581,6 +2593,7 @@ function ServiceConfigSelect({
   paramName,
   value,
   hint,
+  disabled,
   options,
   onChange,
 }: {
@@ -2588,6 +2601,7 @@ function ServiceConfigSelect({
   paramName: string;
   value: string;
   hint: string;
+  disabled?: boolean;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
@@ -2599,8 +2613,9 @@ function ServiceConfigSelect({
       </span>
       <select
         value={value}
+        disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
         {options.map(option => (
@@ -4739,6 +4754,8 @@ function serviceConfigToForm(
   config: OllamaServiceConfig,
   runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
 ): OllamaServiceConfigFormState {
+  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
+  const gpuSelectorsAvailable = runtimeDevices?.success !== true || acceleratorDevices.length > 0;
   return {
     host: config.host ?? '',
     port: config.port ?? '',
@@ -4760,11 +4777,19 @@ function serviceConfigToForm(
     cacheReuse: config.cacheReuse ?? '',
     cacheRam: config.cacheRam ?? '',
     flashAttn: config.flashAttn ?? '',
-    mainGpu: config.mainGpu ?? '',
+    mainGpu: gpuSelectorsAvailable ? (config.mainGpu ?? '') : '',
     mmap: config.noMmap === undefined ? '' : String(!config.noMmap),
     mlock: config.mlock === undefined ? '' : String(config.mlock),
     jinja: config.jinja ?? '',
   };
+}
+
+function isGpuIndexedFieldDisabled(
+  key: keyof OllamaServiceConfigFormState,
+  gpuConfigUnavailable: boolean,
+): boolean {
+  if (!gpuConfigUnavailable) return false;
+  return key === 'device' || key === 'mainGpu';
 }
 
 function normalizeServiceConfigDeviceForForm(
@@ -4773,6 +4798,9 @@ function normalizeServiceConfigDeviceForForm(
 ): string {
   const trimmed = value?.trim();
   if (!trimmed) return '';
+  if (runtimeDevices?.success === true && getLlamaCppAcceleratorDevices(runtimeDevices).length === 0) {
+    return '';
+  }
   if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmed)) return trimmed;
   if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
     return trimmed;
@@ -4800,8 +4828,22 @@ function getStructuredServiceConfigFieldErrorMessage(
         .replace('{max}', String(fieldError.max ?? ''));
     case 'device-format':
       return i18nService.t('localInferenceServiceConfigFieldErrorDeviceFormat');
+    case 'device-unavailable':
+      return i18nService.t('localInferenceServiceConfigFieldErrorDeviceUnavailable');
+    case 'device-out-of-range':
+      return i18nService
+        .t('localInferenceServiceConfigFieldErrorDeviceOutOfRange')
+        .replace('{min}', String(fieldError.min ?? ''))
+        .replace('{max}', String(fieldError.max ?? ''));
     case 'gpu-layers-format':
       return i18nService.t('localInferenceServiceConfigFieldErrorGpuLayersFormat');
+    case 'main-gpu-unavailable':
+      return i18nService.t('localInferenceServiceConfigFieldErrorMainGpuUnavailable');
+    case 'main-gpu-out-of-range':
+      return i18nService
+        .t('localInferenceServiceConfigFieldErrorMainGpuOutOfRange')
+        .replace('{min}', String(fieldError.min ?? ''))
+        .replace('{max}', String(fieldError.max ?? ''));
     case 'tensor-split-format':
       return i18nService.t('localInferenceServiceConfigFieldErrorTensorSplitFormat');
     case 'tensor-split-requires-mode':

@@ -12,6 +12,7 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
+  getLlamaCppAcceleratorDevices,
   getLlamaCppLaunchContextLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
@@ -630,11 +631,14 @@ export function sanitizeLlamaCppServiceConfig(
   });
   const device = normalizeVisibleDevices(config?.device);
   const splitMode = isSplitMode(config?.splitMode) ? config.splitMode : undefined;
-  const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, {
-    min: mainGpuRange.min,
-    max: mainGpuRange.max,
-    defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
-  });
+  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
+  const mainGpu = runtimeDevices?.success
+    ? normalizeMainGpuAgainstRuntimeDevices(config?.mainGpu, acceleratorDevices)
+    : normalizeIntegerStringWithDefault(config?.mainGpu, {
+      min: mainGpuRange.min,
+      max: mainGpuRange.max,
+      defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.mainGpu,
+    });
   const tensorSplit = normalizeTensorSplit(config?.tensorSplit, {
     splitMode,
   });
@@ -777,6 +781,17 @@ function normalizeVisibleDevices(
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
 
+  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices).map(device => ({
+    id: device.id,
+    name: device.name ?? device.id,
+    backend: device.backend ?? 'unknown',
+  }));
+
+  if (acceleratorDevices.length > 0) {
+    const resolved = resolveLlamaCppDeviceSelection(trimmed, acceleratorDevices);
+    return resolved || undefined;
+  }
+
   if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
     const tokens = trimmed
       .split(',')
@@ -790,32 +805,21 @@ function normalizeVisibleDevices(
     }
     return normalizedTokens.join(',');
   }
+  return undefined;
+}
 
-  const runtimeDeviceList = runtimeDevices.devices.flatMap(device => {
-    if (
-      typeof device.id !== 'string' ||
-      device.id.trim().length === 0
-    ) {
-      return [];
-    }
-    return [{
-      id: device.id.trim(),
-      name:
-        typeof device.name === 'string' && device.name.trim().length > 0
-          ? device.name.trim()
-          : device.id.trim(),
-      backend:
-        typeof device.backend === 'string' && device.backend.trim().length > 0
-          ? device.backend.trim()
-          : 'unknown',
-    }];
-  });
-  if (runtimeDeviceList.length === 0) {
+function normalizeMainGpuAgainstRuntimeDevices(
+  value: string | undefined,
+  acceleratorDevices: Array<{ id: string }>,
+): string | undefined {
+  const normalized = normalizeIntegerString(value);
+  if (!normalized) return undefined;
+  if (acceleratorDevices.length === 0) return undefined;
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed >= acceleratorDevices.length) {
     return undefined;
   }
-
-  const resolved = resolveLlamaCppDeviceSelection(trimmed, runtimeDeviceList);
-  return resolved || undefined;
+  return normalized;
 }
 
 function normalizeTensorSplit(
