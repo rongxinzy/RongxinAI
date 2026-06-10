@@ -13,9 +13,11 @@ import type {
 } from '../../shared/llamacpp';
 import {
   getLlamaCppAcceleratorDevices,
+  getLlamaCppGpuDetectionState,
   getLlamaCppLaunchContextLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
+  LlamaCppGpuDetectionState,
   LlamaCppIpcChannel,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
@@ -252,10 +254,18 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(
     LlamaCppIpcChannel.SetServiceConfig,
     async (_event, config: LlamaCppServiceConfig) => {
-      const sanitized = sanitizeLlamaCppServiceConfig(
-        config,
-        await manager.listRuntimeDevices().catch((): null => null),
-      );
+      const runtimeDevices = await manager.listRuntimeDevices().catch(() => ({
+          success: false,
+          devices: [],
+          error: 'failed to list llama.cpp runtime devices',
+        }));
+      if (
+        (config.device?.trim() || config.mainGpu?.trim())
+        && getLlamaCppGpuDetectionState(runtimeDevices) === LlamaCppGpuDetectionState.DetectionFailed
+      ) {
+        console.warn('[LlamaCpp] gpu selector settings were dropped because runtime device detection failed');
+      }
+      const sanitized = sanitizeLlamaCppServiceConfig(config, runtimeDevices);
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       return sanitized;
     },
@@ -609,8 +619,12 @@ export function sanitizeLlamaCppServiceConfig(
   const device = normalizeVisibleDevices(config?.device, runtimeDevices);
   const splitMode = isSplitMode(config?.splitMode) ? config.splitMode : undefined;
   const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices);
-  const mainGpu = runtimeDevices?.success
-    ? normalizeMainGpuAgainstRuntimeDevices(config?.mainGpu, acceleratorDevices)
+  const mainGpu = runtimeDevices
+    ? (
+      runtimeDevices.success
+        ? normalizeMainGpuAgainstRuntimeDevices(config?.mainGpu, acceleratorDevices)
+        : undefined
+    )
     : normalizeIntegerStringWithDefault(config?.mainGpu, {
       min: mainGpuRange.min,
       max: mainGpuRange.max,
@@ -747,6 +761,10 @@ function normalizeVisibleDevices(
   if (acceleratorDevices.length > 0) {
     const resolved = resolveLlamaCppDeviceSelection(trimmed, acceleratorDevices);
     return resolved || undefined;
+  }
+
+  if (runtimeDevices && !runtimeDevices.success) {
+    return undefined;
   }
 
   if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {

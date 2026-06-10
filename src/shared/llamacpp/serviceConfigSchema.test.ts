@@ -2,6 +2,8 @@ import { expect, test } from 'vitest';
 
 import {
   LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS,
+  LlamaCppGpuDetectionState,
+  getLlamaCppGpuDetectionState,
   validateLlamaCppStructuredServiceConfig,
 } from './serviceConfigSchema';
 
@@ -95,6 +97,36 @@ test('validateLlamaCppStructuredServiceConfig marks gpu selectors unavailable wh
 
   expect(result.fieldErrors.device?.code).toBe('device-unavailable');
   expect(result.fieldErrors.mainGpu?.code).toBe('main-gpu-unavailable');
+});
+
+test('validateLlamaCppStructuredServiceConfig marks gpu selectors unavailable when runtime device detection fails', () => {
+  const result = validateLlamaCppStructuredServiceConfig({
+    device: '0,1',
+    mainGpu: '1',
+    runtimeDevices: {
+      success: false,
+      devices: [],
+    },
+  });
+
+  expect(result.fieldErrors.device?.code).toBe('device-detection-failed');
+  expect(result.fieldErrors.mainGpu?.code).toBe('main-gpu-detection-failed');
+});
+
+test('getLlamaCppGpuDetectionState distinguishes available, unavailable, failed, and unknown states', () => {
+  expect(getLlamaCppGpuDetectionState(null)).toBe(LlamaCppGpuDetectionState.Unknown);
+  expect(getLlamaCppGpuDetectionState({
+    success: false,
+    devices: [],
+  })).toBe(LlamaCppGpuDetectionState.DetectionFailed);
+  expect(getLlamaCppGpuDetectionState({
+    success: true,
+    devices: [{ id: 'CPU', name: 'CPU', backend: 'cpu' }],
+  })).toBe(LlamaCppGpuDetectionState.Unavailable);
+  expect(getLlamaCppGpuDetectionState({
+    success: true,
+    devices: [{ id: 'CUDA0', name: 'GPU 0', backend: 'cuda' }],
+  })).toBe(LlamaCppGpuDetectionState.Available);
 });
 
 test('validateLlamaCppStructuredServiceConfig requires tensor split mode for tensorSplit', () => {
