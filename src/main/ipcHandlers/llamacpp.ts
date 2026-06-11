@@ -22,7 +22,11 @@ import {
 } from '../../shared/llamacpp';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import { LlamaCppManager, resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
+import {
+  filterLlamaCppServiceConfigByRuntimeCapabilities,
+  LlamaCppManager,
+  resolveLlamaCppDeviceSelection,
+} from '../libs/llamacppManager';
 import {
   buildLlamaCppOpenClawAppConfig,
   buildLlamaCppRunningModelBinding,
@@ -39,7 +43,7 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   modelsMax: '0',
   timeout: '600',
   threadsHttp: '4',
-  cacheReuse: '0',
+  cacheReuse: '256',
   cacheRam: '8192',
   ctxSize: '4096',
   parallel: '1',
@@ -223,6 +227,9 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
+  ipcMain.handle(LlamaCppIpcChannel.GetRuntimeCapabilities, async () =>
+    manager.getRuntimeCapabilities(),
+  );
   ipcMain.handle(LlamaCppIpcChannel.ImportRuntime, async () => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
@@ -251,9 +258,14 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(
     LlamaCppIpcChannel.SetServiceConfig,
     async (_event, config: LlamaCppServiceConfig) => {
-      const sanitized = sanitizeLlamaCppServiceConfig(
-        config,
-        await manager.listRuntimeDevices().catch((): null => null),
+      const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
+      const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
+      const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
+        sanitizeLlamaCppServiceConfig(
+          config,
+          runtimeDevices,
+        ),
+        runtimeCapabilities,
       );
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       return sanitized;

@@ -100,12 +100,12 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
 
   const fields = getServiceConfigFields();
   const keys = fields.map((field) => field.key);
-  const basicKeys = fields.filter((field) => field.group === 'basic').map((field) => field.key);
+  const serviceKeys = fields.filter((field) => field.group === 'service').map((field) => field.key);
 
   expect(fields.length).toBeGreaterThan(0);
   expect(fields.map((field) => field.paramName)).toContain('parallel');
   expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
-  expect(basicKeys).toEqual(['modelsMax', 'modelsAutoload', 'device', 'timeout']);
+  expect(serviceKeys).toEqual(['modelsMax', 'modelsAutoload', 'timeout']);
   expect(keys).not.toContain('host');
   expect(keys).not.toContain('port');
   expect(keys).not.toContain('ctxSize');

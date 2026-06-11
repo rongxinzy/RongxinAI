@@ -11,11 +11,13 @@ import {
   buildLlamaServerArgs,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
+  filterLlamaCppServiceConfigByRuntimeCapabilities,
   isPathInside,
   listLlamaCppRuntimeDevices,
   LlamaCppManager,
   mergeLocalModels,
   modelLaunchOptionsToPreset,
+  parseLlamaCppHelpFlags,
   parseLlamaCppListDevicesOutput,
   resolveLlamaCppDeviceSelection,
   resolveLlamaCppRuntimeTargetPreference,
@@ -274,6 +276,42 @@ test('buildLlamaServerArgs keeps advanced GPU routing settings as restart-only s
   ]));
 });
 
+test('filterLlamaCppServiceConfigByRuntimeCapabilities drops unsupported and hidden runtime fields', () => {
+  expect(filterLlamaCppServiceConfigByRuntimeCapabilities(
+    {
+      device: 'CUDA0',
+      splitMode: 'layer',
+      tensorSplit: '3,2',
+      mainGpu: '0',
+      flashAttn: 'auto',
+      cachePrompt: false,
+      cacheReuse: '256',
+      cacheRam: '4096',
+    },
+    {
+      success: true,
+      flags: [],
+      deviceProbeSucceeded: true,
+      devices: [{ id: 'METAL0', name: 'Apple GPU', backend: 'metal' }],
+      backendKinds: ['metal'],
+      gpuDeviceCount: 1,
+      supports: {
+        device: true,
+        splitMode: false,
+        tensorSplit: false,
+        mainGpu: false,
+        flashAttn: true,
+        cachePrompt: true,
+        cacheReuse: true,
+        cacheRam: true,
+      },
+    },
+  )).toEqual({
+    flashAttn: 'auto',
+    cachePrompt: false,
+  });
+});
+
 test('buildLlamaCppServeEnv prepends the resolved runtime bin directory to PATH on Windows', () => {
   expect(buildLlamaCppServeEnv(
     { PATH: 'C:\\Windows\\System32' },
@@ -306,6 +344,20 @@ test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
     { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
     { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
     { id: 'CPU', name: 'CPU', backend: 'cpu' },
+  ]);
+});
+
+test('parseLlamaCppHelpFlags extracts normalized long flags from help output', () => {
+  expect(parseLlamaCppHelpFlags([
+    'Usage: llama-server [options]',
+    '  --models-max N           maximum concurrently loaded models',
+    '  --flash-attn {on,off,auto}',
+    '  --no-jinja, --jinja      toggle jinja support',
+  ].join('\n'))).toEqual([
+    '--flash-attn',
+    '--jinja',
+    '--models-max',
+    '--no-jinja',
   ]);
 });
 

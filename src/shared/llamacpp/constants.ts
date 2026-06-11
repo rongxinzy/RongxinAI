@@ -22,6 +22,7 @@ export const LlamaCppIpcChannel = {
   SetOpenClawModel: 'llamacpp:set-openclaw-model',
   ImportRuntime: 'llamacpp:import-runtime',
   ListRuntimeDevices: 'llamacpp:runtime:list-devices',
+  GetRuntimeCapabilities: 'llamacpp:runtime:get-capabilities',
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
   ChatStreamChunk: 'llamacpp:chat-stream-chunk',
@@ -44,3 +45,24 @@ export const LlamaCppRuntimeCudaMajor = {
 
 export type LlamaCppRuntimeCudaMajor =
   typeof LlamaCppRuntimeCudaMajor[keyof typeof LlamaCppRuntimeCudaMajor];
+
+export const LlamaCppServiceConfigFieldKey = {
+  ModelsMax: 'modelsMax',
+  ModelsAutoload: 'modelsAutoload',
+  Timeout: 'timeout',
+  ThreadsHttp: 'threadsHttp',
+  Parallel: 'parallel',
+  CachePrompt: 'cachePrompt',
+  CacheReuse: 'cacheReuse',
+  CacheRam: 'cacheRam',
+  Device: 'device',
+  SplitMode: 'splitMode',
+  TensorSplit: 'tensorSplit',
+  MainGpu: 'mainGpu',
+  FlashAttn: 'flashAttn',
+  Jinja: 'jinja',
+  Mlock: 'mlock',
+} as const;
+
+export type LlamaCppServiceConfigFieldKey =
+  typeof LlamaCppServiceConfigFieldKey[keyof typeof LlamaCppServiceConfigFieldKey];
