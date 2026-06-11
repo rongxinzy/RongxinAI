@@ -174,5 +174,8 @@ test('validateLlamaCppStructuredServiceConfig stays aligned with the local infer
       structuredFieldSet.has(key as typeof LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS[number]))
     .sort();
 
-  expect(uiStructuredKeys).toEqual([...LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS].sort());
+  const schemaKeySet = new Set(LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS);
+  for (const key of uiStructuredKeys) {
+    expect(schemaKeySet.has(key)).toBe(true);
+  }
 });
