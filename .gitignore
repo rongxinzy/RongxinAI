@@ -61,3 +61,8 @@ specs/
 docs/
 localdocs/
 docker/
+<<<<<<< Updated upstream
+=======
+llamacpp-oss-tools/
+tmp-*.json
+>>>>>>> Stashed changes
