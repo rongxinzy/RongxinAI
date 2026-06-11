@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import {
+  getLlamaCppLoadedModelLimitViolation,
   getRequiredVramRecoveryMiB,
   getTotalFreeVramMiB,
   hasRecoveredVram,
@@ -251,6 +252,31 @@ test('sanitizeLlamaCppServiceConfig clears invalid visible devices back to defau
       ],
     },
   )).toEqual({});
+});
+
+test('getLlamaCppLoadedModelLimitViolation blocks loading a third model when modelsMax is two', () => {
+  expect(getLlamaCppLoadedModelLimitViolation({
+    modelsMax: '2',
+    runningModels: [
+      { name: 'Qwen3-0.6B-GGUF' },
+      { name: 'Qwen3-1.7B-GGUF' },
+    ],
+    targetModelName: 'Qwen3-4B-GGUF',
+  })).toEqual({
+    limit: 2,
+    next: 3,
+  });
+});
+
+test('getLlamaCppLoadedModelLimitViolation allows reloading an already running model', () => {
+  expect(getLlamaCppLoadedModelLimitViolation({
+    modelsMax: '2',
+    runningModels: [
+      { name: 'Qwen3-0.6B-GGUF' },
+      { name: 'Qwen3-1.7B-GGUF' },
+    ],
+    targetModelName: 'Qwen3-1.7B-GGUF',
+  })).toBeNull();
 });
 
 test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw model selection', () => {

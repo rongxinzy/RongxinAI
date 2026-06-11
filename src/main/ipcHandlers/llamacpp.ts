@@ -13,6 +13,7 @@ import type {
 } from '../../shared/llamacpp';
 import {
   getLlamaCppLaunchContextLimitViolation,
+  getLlamaCppModelsMaxLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppIpcChannel,
@@ -62,6 +63,24 @@ const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
   return reason === 'llamacpp-model-stopped' || reason === 'llamacpp-set-openclaw-model';
+}
+
+export function getLlamaCppLoadedModelLimitViolation(input: {
+  modelsMax: string | undefined;
+  runningModels: Array<{ name?: string; model?: string }>;
+  targetModelName: string;
+}): { limit: number; next: number } | null {
+  return getLlamaCppModelsMaxLimitViolation({
+    modelsMax: input.modelsMax,
+    targetModelName: input.targetModelName,
+    runningModelNames: Array.from(
+      new Set(
+        input.runningModels
+          .map(model => (model.name || model.model || '').trim())
+          .filter(Boolean),
+      ),
+    ),
+  });
 }
 
 export function getTotalFreeVramMiB(snapshot: NvidiaSmiSnapshot | null | undefined): number | null {
@@ -307,6 +326,18 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
+    const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
+      modelsMax: getLlamaCppServiceConfig(options.getStore()).modelsMax,
+      runningModels: await manager.listRunningModels(),
+      targetModelName: modelName,
+    });
+    if (loadLimitViolation) {
+      throw new Error(
+        t('llamacppLoadModelLimitReached')
+          .replace('{limit}', String(loadLimitViolation.limit))
+          .replace('{next}', String(loadLimitViolation.next)),
+      );
+    }
     const localModels = await manager.listLocalModels();
     const targetModel = localModels.find(
       model => model.name === modelName || model.id === modelName,
