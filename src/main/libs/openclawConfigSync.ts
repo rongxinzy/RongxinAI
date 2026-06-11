@@ -1812,7 +1812,6 @@ export class OpenClawConfigSync {
             if (inst.imapPort) accountConfig.imapPort = inst.imapPort;
             if (inst.smtpHost) accountConfig.smtpHost = inst.smtpHost;
             if (inst.smtpPort) accountConfig.smtpPort = inst.smtpPort;
-            if (inst.smtpSecure !== undefined) accountConfig.smtpSecure = inst.smtpSecure;
           }
 
           // WebSocket mode configuration
