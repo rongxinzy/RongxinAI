@@ -1790,24 +1790,28 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
       if (mcpServerManager) {
         await mcpServerManager.stopServers();
       }
+      // Reset the start promise so the dedup inside startMcpBridge does not
+      // return a stale promise whose closure still captures the old enabled
+      // server list (e.g. from a concurrent bootstrap or gateway-restart
+      // cycle that calls startMcpBridge in the background).
+      mcpBridgeStartPromise = null;
 
       // 2. Re-discover tools from the new set of enabled servers
       const bridgeConfig = await startMcpBridge();
       const toolCount = bridgeConfig?.tools.length ?? 0;
       console.log(`[McpBridge] refresh: ${toolCount} tools discovered`);
 
-      // 3. Sync openclaw.json — the gateway will hard-restart when the
-      // mcp-bridge callbackUrl or tools change, ensuring the gateway picks
-      // up the new config (it pins a snapshot at startup).
-      const syncResult = await syncOpenClawConfig({
-        reason: 'mcp-server-changed',
-      });
-      if (!syncResult.success) {
-        console.error('[McpBridge] refresh: config sync failed:', syncResult.error);
-        return { tools: toolCount, error: syncResult.error };
-      }
+      // 3. Sync openclaw.json and restart the gateway in the background.
+      //    The gateway pins its config snapshot at startup so a restart is
+      //    required to pick up the new mcp-bridge callbackUrl/tools.  We
+      //    fire-and-forget here so the renderer gets immediate feedback
+      //    (the tools are already discovered and the bridge is running)
+      //    instead of blocking on the full gateway startup (~90+ seconds).
+      syncOpenClawConfig({ reason: 'mcp-server-changed' })
+        .then(r => { if (!r.success) console.error('[McpBridge] background config sync failed:', r.error); })
+        .catch(err => console.error('[McpBridge] background config sync error:', err));
 
-      console.log(`[McpBridge] refresh complete: ${toolCount} tools, configChanged=${syncResult.changed}, mcpBridgeChanged=${!!syncResult.mcpBridgeConfigChanged}`);
+      console.log(`[McpBridge] refresh complete: ${toolCount} tools discovered, gateway restart in background`);
       return { tools: toolCount };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
