@@ -35,11 +35,13 @@ test('buildLlamaCppExecutableCandidates orders managed and explicit runtime path
     cwd: 'C:/work/RongxinAI',
     userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime',
     envPath: 'C:/custom/env/llama-server.exe',
-  }).slice(0, 4)).toEqual([
+    configuredExecutablePath: 'C:/custom/ui/llama-server.exe',
+  }).slice(0, 5)).toEqual([
     'C:/custom/env/llama-server.exe',
-    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/build/bin/llama-server.exe',
+    'C:/custom/ui/llama-server.exe',
     'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/bin/llama-server.exe',
-    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/llama-server.exe',
+    'C:/App/resources/llamacpp/llama-server.exe',
+    'C:/App/resources/llamacpp/bin/llama-server.exe',
   ]);
 });
 
@@ -55,7 +57,6 @@ test('buildLlamaCppExecutableCandidates only includes dev vendor and system path
 
   expect(candidates).toEqual(expect.arrayContaining([
     '/repo/vendor/llamacpp-runtime/current/llama-server',
-    '/repo/vendor/llamacpp-runtime/current/build/bin/llama-server',
     '/repo/vendor/llamacpp-runtime/current/bin/llama-server',
     '/opt/homebrew/bin/llama-server',
   ]));
@@ -338,12 +339,10 @@ test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
     'Available devices:',
     '  CUDA0: NVIDIA GeForce RTX 4090 (24564 MiB, 0 MiB free)',
     '  CUDA1: NVIDIA GeForce RTX 3090',
-    '  GPU0: Adreno X1-85 (OpenCL)',
     '  CPU: CPU',
   ].join('\n'))).toEqual([
     { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
     { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
-    { id: 'GPU0', name: 'Adreno X1-85', backend: 'opencl' },
     { id: 'CPU', name: 'CPU', backend: 'cpu' },
   ]);
 });

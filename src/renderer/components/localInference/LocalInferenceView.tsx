@@ -5,11 +5,8 @@ import {
   ArrowTopRightOnSquareIcon,
   BeakerIcon,
   CheckCircleIcon,
-  CheckIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ClipboardDocumentIcon,
   CpuChipIcon,
   ExclamationTriangleIcon,
   EyeIcon,
@@ -17,6 +14,7 @@ import {
   InformationCircleIcon,
   PaperAirplaneIcon,
   PlayIcon,
+  QuestionMarkCircleIcon,
   ServerStackIcon,
   StopIcon,
   TrashIcon,
@@ -26,25 +24,22 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NvidiaSmiSnapshot } from '../../../shared/hardware';
 import type {
-  LlamaCppBackendInfo,
-  LlamaCppBackendRef,
   LlamaCppChatChunk as OllamaChatChunk,
   LlamaCppChatPayload as OllamaChatPayload,
   LlamaCppInstallProgress,
   LlamaCppModel as OllamaModel,
   LlamaCppModelLaunchInput as OllamaModelLaunchInput,
   LlamaCppRunningModel as OllamaRunningModel,
-  LlamaCppRuntimeListDevicesResult,
+  LlamaCppRuntimeCapabilities,
+  LlamaCppRuntimeDevice,
   LlamaCppServiceConfig as OllamaServiceConfig,
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
 import {
   createLlamaCppStreamState as createOllamaStreamState,
-  getLlamaCppAcceleratorDevices,
-  getLlamaCppGpuDetectionState,
   getLlamaCppLaunchContextLimitViolation,
   getLlamaCppModelsMaxLimitViolation,
-  LlamaCppGpuDetectionState,
+  LlamaCppServiceConfigFieldKey as ServiceConfigCapabilityKey,
   type LlamaCppStructuredServiceFieldError,
   type LlamaCppStructuredServiceFieldKey,
   reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
@@ -72,10 +67,9 @@ type InferenceMessage = {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
+  hiddenThinking?: boolean;
   waiting?: boolean;
   metrics?: OllamaChatChunk | null;
-  createdAt: number;
-  reasoningDurationSeconds?: number;
 };
 
 type LaunchFormState = {
@@ -136,6 +130,7 @@ type OllamaServiceConfigFormState = {
 type ServiceConfigGroup = 'service' | 'cache' | 'gpu' | 'compat' | 'request';
 type ServiceConfigField = {
   key: keyof OllamaServiceConfigFormState;
+  capabilityKey: typeof ServiceConfigCapabilityKey[keyof typeof ServiceConfigCapabilityKey];
   labelKey: string;
   paramName: string;
   group: ServiceConfigGroup;
@@ -144,6 +139,17 @@ type ServiceConfigField = {
   placeholderKey?: string;
   hintKey: string;
   restartRequired: boolean;
+};
+
+type ServiceConfigGroupDefinition = {
+  key: ServiceConfigGroup;
+  titleKey: string;
+  descriptionKey: string;
+};
+type ServiceConfigFieldState = {
+  visible: boolean;
+  disabled: boolean;
+  disabledReason?: string;
 };
 
 type InferenceOptionField = {
@@ -179,19 +185,6 @@ type LocalInferenceToast = {
   message: string;
   autoDismiss: boolean;
 };
-type LocalInferenceInlineError =
-  | {
-      kind: 'context-overflow';
-      requestedTokens: number | null;
-      availableTokens: number | null;
-    };
-type LocalInferenceSessionState = {
-  activeTab: LocalInferenceTab;
-  selectedModel: string;
-  systemPrompt: string;
-  prompt: string;
-  messages: InferenceMessage[];
-};
 
 type InstallProgressState = Record<string, LlamaCppInstallProgress>;
 type BuildAssistantMessageInput = {
@@ -216,12 +209,7 @@ const LOCAL_INFERENCE_PROGRESS_DISMISS_MS = 5_000;
 const LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS = 500;
 const LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS = 3_000;
 const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
-const LOCAL_INFERENCE_MIN_SPEED_SAMPLE_SECONDS = 0.05;
-const LOCAL_INFERENCE_MAX_SPEED_FOR_TINY_COMPLETION = 200;
-const LOCAL_INFERENCE_MAX_SPEED_FOR_SMALL_COMPLETION = 2000;
-const LOCAL_INFERENCE_SESSION_STORAGE_KEY = 'lobsterai:llamacpp-inference-session';
 const OPENCLAW_MIN_CTX = 32000;
-const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const DIRECT_ANSWER_SYSTEM_HINT = [
   'Answer as quickly and directly as possible.',
   'Skip unnecessary drafts, long internal monologues, and unrelated exploration.',
@@ -236,17 +224,7 @@ const smallOutlineButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
-const serviceActionButtonClass =
-  'inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/80 px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
-const serviceDangerButtonClass =
-  'inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300';
-const serviceRefreshButtonClass =
-  'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface/70 text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50';
-const SERVICE_CONFIG_GROUPS: Array<{
-  key: ServiceConfigGroup;
-  titleKey: string;
-  descriptionKey: string;
-}> = [
+const SERVICE_CONFIG_GROUPS: ServiceConfigGroupDefinition[] = [
   {
     key: 'service',
     titleKey: 'localInferenceServiceConfigGroupService',
@@ -276,6 +254,7 @@ const SERVICE_CONFIG_GROUPS: Array<{
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   {
     key: 'modelsMax',
+    capabilityKey: ServiceConfigCapabilityKey.ModelsMax,
     labelKey: 'localInferenceServiceConfigModelsMaxLabel',
     paramName: 'models-max',
     group: 'service',
@@ -286,6 +265,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'modelsAutoload',
+    capabilityKey: ServiceConfigCapabilityKey.ModelsAutoload,
     labelKey: 'localInferenceServiceConfigModelsAutoloadLabel',
     paramName: 'models-autoload',
     group: 'service',
@@ -294,17 +274,8 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
-    key: 'device',
-    labelKey: 'localInferenceServiceConfigDeviceLabel',
-    paramName: 'device',
-    group: 'gpu',
-    type: 'input',
-    placeholderKey: 'localInferenceLaunchDefault',
-    hintKey: 'localInferenceServiceConfigDeviceHint',
-    restartRequired: true,
-  },
-  {
     key: 'parallel',
+    capabilityKey: ServiceConfigCapabilityKey.Parallel,
     labelKey: 'localInferenceServiceConfigParallelLabel',
     paramName: 'parallel',
     group: 'request',
@@ -314,17 +285,8 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
-    key: 'timeout',
-    labelKey: 'localInferenceServiceConfigTimeoutLabel',
-    paramName: 'timeout',
-    group: 'service',
-    type: 'input',
-    placeholder: '600',
-    hintKey: 'localInferenceServiceConfigTimeoutHint',
-    restartRequired: true,
-  },
-  {
     key: 'threadsHttp',
+    capabilityKey: ServiceConfigCapabilityKey.ThreadsHttp,
     labelKey: 'localInferenceServiceConfigThreadsHttpLabel',
     paramName: 'threads-http',
     group: 'request',
@@ -334,7 +296,19 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
+    key: 'timeout',
+    capabilityKey: ServiceConfigCapabilityKey.Timeout,
+    labelKey: 'localInferenceServiceConfigTimeoutLabel',
+    paramName: 'timeout',
+    group: 'service',
+    type: 'input',
+    placeholder: '600',
+    hintKey: 'localInferenceServiceConfigTimeoutHint',
+    restartRequired: true,
+  },
+  {
     key: 'cachePrompt',
+    capabilityKey: ServiceConfigCapabilityKey.CachePrompt,
     labelKey: 'localInferenceServiceConfigCachePromptLabel',
     paramName: 'cache-prompt',
     group: 'cache',
@@ -344,6 +318,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'cacheReuse',
+    capabilityKey: ServiceConfigCapabilityKey.CacheReuse,
     labelKey: 'localInferenceServiceConfigCacheReuseLabel',
     paramName: 'cache-reuse',
     group: 'cache',
@@ -354,6 +329,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'cacheRam',
+    capabilityKey: ServiceConfigCapabilityKey.CacheRam,
     labelKey: 'localInferenceServiceConfigCacheRamLabel',
     paramName: 'cache-ram',
     group: 'cache',
@@ -364,6 +340,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'jinja',
+    capabilityKey: ServiceConfigCapabilityKey.Jinja,
     labelKey: 'localInferenceServiceConfigJinjaLabel',
     paramName: 'jinja',
     group: 'compat',
@@ -373,6 +350,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'splitMode',
+    capabilityKey: ServiceConfigCapabilityKey.SplitMode,
     labelKey: 'localInferenceServiceConfigSplitModeLabel',
     paramName: 'split-mode',
     group: 'gpu',
@@ -382,6 +360,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'tensorSplit',
+    capabilityKey: ServiceConfigCapabilityKey.TensorSplit,
     labelKey: 'localInferenceServiceConfigTensorSplitLabel',
     paramName: 'tensor-split',
     group: 'gpu',
@@ -391,7 +370,19 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
+    key: 'device',
+    capabilityKey: ServiceConfigCapabilityKey.Device,
+    labelKey: 'localInferenceServiceConfigDeviceLabel',
+    paramName: 'device',
+    group: 'gpu',
+    type: 'input',
+    placeholderKey: 'localInferenceLaunchDefault',
+    hintKey: 'localInferenceServiceConfigDeviceHint',
+    restartRequired: true,
+  },
+  {
     key: 'mainGpu',
+    capabilityKey: ServiceConfigCapabilityKey.MainGpu,
     labelKey: 'localInferenceServiceConfigMainGpuLabel',
     paramName: 'main-gpu',
     group: 'gpu',
@@ -402,6 +393,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'flashAttn',
+    capabilityKey: ServiceConfigCapabilityKey.FlashAttn,
     labelKey: 'localInferenceServiceConfigFlashAttnLabel',
     paramName: 'flash-attn',
     group: 'gpu',
@@ -411,6 +403,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'mlock',
+    capabilityKey: ServiceConfigCapabilityKey.Mlock,
     labelKey: 'localInferenceServiceConfigMlockLabel',
     paramName: 'mlock',
     group: 'compat',
@@ -432,12 +425,12 @@ const INFERENCE_OPTION_FIELDS: InferenceOptionField[] = [
     hintKey: 'localInferenceOptionMaxTokensHint',
   },
   {
-    key: 'reasoning_preference',
-    labelKey: 'localInferenceReasoningPreferenceLabel',
-    paramName: 'reasoning',
+    key: 'direct_answer_mode',
+    labelKey: 'localInferenceOptionDirectAnswerModeLabel',
+    paramName: 'app.system_hint.direct_answer_only',
     group: 'basic',
     type: 'select',
-    hintKey: 'localInferenceReasoningPreferenceHint',
+    hintKey: 'localInferenceOptionDirectAnswerModeHint',
     showParamName: false,
   },
   {
@@ -547,15 +540,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const restoredSessionRef = useRef<LocalInferenceSessionState | null>(null);
-  if (restoredSessionRef.current === null) {
-    restoredSessionRef.current = readLocalInferenceSessionState();
-  }
-  const restoredSession = restoredSessionRef.current;
   const isMac = window.electron.platform === 'darwin';
-  const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
-    restoredSession?.activeTab ?? 'inference',
-  );
+  const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
@@ -565,23 +551,21 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [pullName, setPullName] = useState('');
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
-  const [selectedModel, setSelectedModel] = useState(restoredSession?.selectedModel ?? '');
-  const [systemPrompt, setSystemPrompt] = useState(restoredSession?.systemPrompt ?? '');
-  const [prompt, setPrompt] = useState(restoredSession?.prompt ?? '');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [options, setOptions] = useState<InferenceOptions>(() => loadInferenceOptions());
-  const [messages, setMessages] = useState<InferenceMessage[]>(restoredSession?.messages ?? []);
-  const [inferenceInlineError, setInferenceInlineError] = useState<LocalInferenceInlineError | null>(null);
+  const [messages, setMessages] = useState<InferenceMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
   const [streamingThinking, setStreamingThinking] = useState('');
   const [sending, setSending] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const activeRequestIdRef = useRef<string | null>(null);
-  const messagesRef = useRef<InferenceMessage[]>(restoredSession?.messages ?? []);
+  const messagesRef = useRef<InferenceMessage[]>([]);
   const conversationVersionRef = useRef(0);
   const isRunning = status?.status === 'running';
   const normalizedPullName = pullName.trim();
   const activePullProgress = activePullName ? pullProgress[activePullName] : undefined;
-  const runtimeInstallProgress = pullProgress[LLAMACPP_RUNTIME_PROGRESS_KEY];
   const pulling = isPullInProgress(activePullProgress);
   const [marketplaceModels, setMarketplaceModels] = useState<MarketplaceModel[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
@@ -592,14 +576,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
   const [servicePopoverOpen, setServicePopoverOpen] = useState(false);
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
-  const [backendConfigDialogOpen, setBackendConfigDialogOpen] = useState(false);
+  const [importGuideOpen, setImportGuideOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
-  const [backendList, setBackendList] = useState<LlamaCppBackendInfo[]>([]);
-  const [backendSelection, setBackendSelection] = useState<LlamaCppBackendRef | undefined>();
-  const [recommendedBackend, setRecommendedBackend] = useState<LlamaCppBackendRef | undefined>();
-  const [backendDevices, setBackendDevices] = useState<string | null>(null);
-  const [backendError, setBackendError] = useState<string | null>(null);
-  useI18nLanguage();
   const marketplaceSearchRef = useRef<number>(0);
   const toastTimerRef = useRef<number | null>(null);
   const installProgressDismissTimersRef = useRef<Record<string, number>>({});
@@ -739,31 +717,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return models;
   }, []);
 
-  const refreshBackends = useCallback(async () => {
-    try {
-      const result = await window.electron.llamacpp.listBackends();
-      if (!result.success) {
-        setBackendList([]);
-        setBackendSelection(undefined);
-        setRecommendedBackend(undefined);
-        setBackendError(mapBackendErrorMessage(result.error));
-        return result;
-      }
-      setBackendList(result.backends);
-      setBackendSelection(result.selection);
-      setRecommendedBackend(result.recommended);
-      setBackendError(result.backends.length === 0 ? i18nService.t('localInferenceBackendListEmpty') : null);
-      return result;
-    } catch (error) {
-      setBackendList([]);
-      setBackendSelection(undefined);
-      setRecommendedBackend(undefined);
-      const message = error instanceof Error ? error.message : String(error);
-      setBackendError(mapBackendErrorMessage(message));
-      return { success: false, backends: [], error: message };
-    }
-  }, []);
-
   const waitForUnloadSettle = useCallback(
     async (modelName: string) => {
       const deadline = Date.now() + LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS;
@@ -846,28 +799,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     messagesRef.current = messages;
   }, [messages]);
 
-  const sessionSaveTimerRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (sessionSaveTimerRef.current !== null) {
-      window.clearTimeout(sessionSaveTimerRef.current);
-    }
-    sessionSaveTimerRef.current = window.setTimeout(() => {
-      sessionSaveTimerRef.current = null;
-      writeLocalInferenceSessionState({
-        activeTab,
-        selectedModel,
-        systemPrompt,
-        prompt,
-        messages,
-      });
-    }, 500);
-    return () => {
-      if (sessionSaveTimerRef.current !== null) {
-        window.clearTimeout(sessionSaveTimerRef.current);
-      }
-    };
-  }, [activeTab, messages, prompt, selectedModel, systemPrompt]);
-
   useEffect(() => {
     if (!toast?.autoDismiss) return;
     toastTimerRef.current = window.setTimeout(() => {
@@ -941,7 +872,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       const nextServiceConfig = await loadOllamaServiceConfig();
       setServiceConfig(nextServiceConfig);
-      await refreshBackends();
       const nextStatus = await refreshStatus();
       if (nextStatus.status === 'running') {
         await refreshLocalModels();
@@ -956,7 +886,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     marketplaceHasSearched,
     marketplaceQuery,
     refreshLocalModels,
-    refreshBackends,
     refreshRunningModels,
     refreshStatus,
     runAction,
@@ -1002,7 +931,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     activeRequestIdRef.current = null;
     messagesRef.current = [];
     setMessages([]);
-    setInferenceInlineError(null);
     setStreamingText('');
     setStreamingThinking('');
     setPrompt('');
@@ -1032,16 +960,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, [isRunning, refreshRunningModels]);
 
   useEffect(() => {
-    if (
-      selectedModel &&
-      runnableModels.some(model => model.name === selectedModel || model.model === selectedModel)
-    ) {
-      return;
-    }
+    if (selectedModel) return;
     const firstRunning = runnableModels[0]?.name;
-    if (firstRunning && firstRunning !== selectedModel) {
-      setSelectedModel(firstRunning);
-    }
+    if (firstRunning) setSelectedModel(firstRunning);
   }, [runnableModels, selectedModel]);
 
   const handlePrepare = () => {
@@ -1099,42 +1020,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         i18nService.t('localInferenceImportRuntimeSuccess'),
         LocalInferenceToastKind.Success,
       );
-      await refreshBackends();
       await refreshStatus();
     });
   };
 
-  const handleSelectBackend = (versionBackend: string) => {
-    const backend = backendList.find(item => item.versionBackend === versionBackend);
-    if (!backend) return;
-    setBackendSelection(backend);
-  };
-
-  const handleInstallSelectedBackend = () => {
+  const handleUninstallRuntime = () => {
     void runAction(async () => {
-      const target = backendSelection ?? recommendedBackend;
-      const result = target
-        ? await window.electron.llamacpp.installBackend(target)
-        : await window.electron.llamacpp.install();
-      if (!result.success) {
-        showToast(
-          result.error || i18nService.t('localInferenceRuntimeMissing'),
-          LocalInferenceToastKind.Error,
-        );
-        return;
-      }
-      showToast(i18nService.t('localInferenceRuntimeReady'), LocalInferenceToastKind.Success);
-      await refreshBackends();
-      await refreshStatus();
-    });
-  };
-
-  const handleUninstallSelectedBackend = () => {
-    void runAction(async () => {
-      const target = backendSelection;
-      const result = target
-        ? await window.electron.llamacpp.uninstallBackend(target)
-        : await window.electron.llamacpp.uninstallRuntime();
+      const result = await window.electron.llamacpp.uninstallRuntime();
       if (!result.success) {
         showToast(
           result.error || i18nService.t('localInferenceRuntimeUninstallFailed'),
@@ -1142,32 +1034,25 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         );
         return;
       }
-      showToast(
-        result.deleted
-          ? i18nService.t('localInferenceRuntimeUninstalled')
-          : i18nService.t('localInferenceRuntimeNotInstalled'),
-        result.deleted ? LocalInferenceToastKind.Success : LocalInferenceToastKind.Info,
-      );
-      await refreshBackends();
-      await refreshStatus();
-    });
-  };
 
-  const handleCheckRuntimeDevices = () => {
-    void runAction(async () => {
-      const target = backendSelection ?? recommendedBackend;
-      const result = await window.electron.llamacpp.listRuntimeDevices(target);
-      if (!result.success) {
-        const message = result.error || i18nService.t('localInferenceBackendDeviceCheckFailed');
-        setBackendDevices(message);
-        showToast(message, LocalInferenceToastKind.Error);
-        return;
+      if (result.deleted) {
+        showToast(
+          i18nService.t('localInferenceRuntimeUninstalled'),
+          LocalInferenceToastKind.Success,
+        );
+      } else {
+        showToast(
+          i18nService.t('localInferenceRuntimeNotInstalled'),
+          LocalInferenceToastKind.Info,
+        );
       }
-      const summary = result.devices.length > 0
-        ? result.devices.map(device => `${device.id}: ${device.name}`).join('\n')
-        : result.rawOutput || i18nService.t('localInferenceBackendNoDevices');
-      setBackendDevices(summary);
-      showToast(i18nService.t('localInferenceBackendDeviceCheckDone'), LocalInferenceToastKind.Success);
+      if (result.status.status === 'running') {
+        await refreshLocalModels();
+        await refreshRunningModels();
+      } else {
+        setRunningModels([]);
+      }
+      await refreshStatus();
     });
   };
 
@@ -1358,25 +1243,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     showToast(i18nService.t('localInferencePresetSaved'), LocalInferenceToastKind.Success);
   };
 
-  const handleIncreaseContextSize = useCallback(() => {
-    const currentModel =
-      localModels.find(model => model.name === selectedModel) ??
-      localModels.find(model => model.path === selectedModel);
-    if (currentModel) {
-      setLaunchTarget(currentModel);
-      return;
-    }
-    setActiveTab('models');
-  }, [localModels, selectedModel]);
-
   const sendPrompt = async () => {
     if (!selectedModel || !selectedRunningModel || !prompt.trim()) return;
     const userMessage = prompt.trim();
-    const createdAt = Date.now();
     const baseHistory = messagesRef.current;
     const nextHistory: InferenceMessage[] = [
       ...baseHistory,
-      { role: 'user', content: userMessage, createdAt },
+      { role: 'user', content: userMessage },
     ];
     setMessages(nextHistory);
     messagesRef.current = nextHistory;
@@ -1385,7 +1258,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setStreamingThinking('');
     setSending(true);
     setCancelling(false);
-    setInferenceInlineError(null);
     dismissToast();
     const requestId =
       globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1394,7 +1266,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const isCurrentRequest = () =>
       activeRequestIdRef.current === requestId &&
       conversationVersionRef.current === conversationVersion;
-    const effectiveSystemPrompt = buildEffectiveSystemPrompt(systemPrompt);
+    const effectiveSystemPrompt = buildEffectiveSystemPrompt(
+      systemPrompt,
+      options.direct_answer_mode === 'enabled',
+    );
 
     let streamState = createOllamaStreamState();
     const unsubscribe = window.electron.llamacpp.onChatStreamChunk(
@@ -1410,7 +1285,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const streamStartTime = Date.now();
 
     try {
-      const normalizedOptions = normalizeOptions(options);
       const payload: OllamaChatPayload = {
         model: selectedModel,
         stream: true,
@@ -1424,17 +1298,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           })),
           { role: 'user', content: userMessage },
         ],
-        options: Object.fromEntries(
-          Object.entries(normalizedOptions).filter(([key]) => key !== 'chat_template_kwargs'),
-        ),
-        ...(typeof normalizedOptions.chat_template_kwargs === 'object'
-          && normalizedOptions.chat_template_kwargs
-          ? {
-              chat_template_kwargs: normalizedOptions.chat_template_kwargs as {
-                enable_thinking: boolean;
-              },
-            }
-          : {}),
+        options: normalizeOptions(options),
       };
       const streamResult = await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
@@ -1447,7 +1311,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         thinking: streamState.thinking,
         metrics,
       });
-      setInferenceInlineError(null);
       setMessages([...nextHistory, assistantMessage]);
       messagesRef.current = [...nextHistory, assistantMessage];
       await refreshRunningModels().catch(() => undefined);
@@ -1470,20 +1333,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           messagesRef.current = [...nextHistory, assistantMessage];
         }
       } else {
-        const inlineError = resolveLocalInferenceInlineError(sendError);
-        if (inlineError) {
-          setMessages(nextHistory);
-          messagesRef.current = nextHistory;
-          setInferenceInlineError(inlineError);
-        } else {
-          setInferenceInlineError(null);
-          setMessages(baseHistory);
-          messagesRef.current = baseHistory;
-          showToast(
-            sendError instanceof Error ? sendError.message : String(sendError),
-            LocalInferenceToastKind.Error,
-          );
-        }
+        setMessages(baseHistory);
+        messagesRef.current = baseHistory;
+        showToast(
+          sendError instanceof Error ? sendError.message : String(sendError),
+          LocalInferenceToastKind.Error,
+        );
       }
     } finally {
       unsubscribe();
@@ -1582,15 +1437,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               localModels={localModels}
               runningModels={runningModels}
               installProgress={pullProgress}
-              hasAvailableBackends={backendList.length > 0}
               onToggle={() => setServicePopoverOpen(current => !current)}
               onPrepare={handlePrepare}
               onStop={handleStop}
-              onOpenBackendConfig={() => {
-                setServicePopoverOpen(false);
-                setBackendConfigDialogOpen(true);
-                void refreshBackends().catch(() => undefined);
-              }}
+              onImportRuntime={handleImportRuntime}
+              onUninstallRuntime={handleUninstallRuntime}
+              onOpenImportGuide={() => setImportGuideOpen(true)}
               onOpenServiceConfig={() => {
                 setServicePopoverOpen(false);
                 setServiceConfigDialogOpen(true);
@@ -1598,7 +1450,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onRefresh={() =>
                 void runAction(async () => {
                   const nextStatus = await refreshStatus();
-                  await refreshBackends();
                   if (nextStatus.status === 'running') {
                     await refreshLocalModels();
                     await refreshRunningModels();
@@ -1652,12 +1503,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 isRunning={isRunning}
                 loading={loading}
                 selectedModel={selectedModel}
+                selectedRunningModel={selectedRunningModel}
                 runnableModels={runnableModels}
                 systemPrompt={systemPrompt}
                 prompt={prompt}
                 options={options}
                 messages={messages}
-                inlineError={inferenceInlineError}
                 streamingText={streamingText}
                 streamingThinking={streamingThinking}
                 sending={sending}
@@ -1669,7 +1520,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 onSavePreset={handleSavePreset}
                 onSend={() => void sendPrompt()}
                 onStop={() => void stopGeneration()}
-                onIncreaseContextSize={handleIncreaseContextSize}
                 onOpenModels={() => setActiveTab('models')}
               />
             </div>
@@ -1695,31 +1545,127 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onSave={handleSaveServiceConfig}
         />
       )}
-      {backendConfigDialogOpen && (
-        <LlamaCppBackendConfigDialog
-          loading={loading}
-          running={isRunning}
-          backends={backendList}
-          selectedBackend={backendSelection}
-          recommendedBackend={recommendedBackend}
-          backendDevices={backendDevices}
-          backendError={backendError}
-          runtimeInstallProgress={runtimeInstallProgress}
-          onClose={() => setBackendConfigDialogOpen(false)}
-          onBackendChange={handleSelectBackend}
-          onInstallBackend={handleInstallSelectedBackend}
-          onUninstallBackend={handleUninstallSelectedBackend}
-          onImportRuntime={handleImportRuntime}
-          onCheckDevices={handleCheckRuntimeDevices}
-          onRefresh={() => void runAction(async () => {
-            await refreshBackends();
-            await refreshStatus();
-          })}
-        />
+      {importGuideOpen && (
+        <ImportGuideDialog onClose={() => setImportGuideOpen(false)} />
       )}
     </div>
   );
 };
+
+function ImportGuideDialog({ onClose }: { onClose: () => void }) {
+  const platform = window.electron.platform as string;
+  const isWin = platform === 'win32';
+  const isMac = platform === 'darwin';
+
+  const executable = isWin ? 'llama-server.exe' : 'llama-server';
+
+  const filesKey = isWin
+    ? 'localInferenceImportGuideFilesWin'
+    : isMac
+      ? 'localInferenceImportGuideFilesMac'
+      : 'localInferenceImportGuideFilesLinux';
+
+  const noteKey = isWin
+    ? 'localInferenceImportGuideStep1WinNote'
+    : isMac
+      ? 'localInferenceImportGuideStep1MacNote'
+      : 'localInferenceImportGuideStep1LinuxNote';
+
+  const openUrl = useCallback(() => {
+    const url = i18nService.t('localInferenceImportGuideStep1Url');
+    window.electron.shell.openExternal(url).catch(() => undefined);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-foreground">
+              {i18nService.t('localInferenceImportGuideTitle')}
+            </h3>
+            <p className="mt-1 text-sm text-secondary">
+              {i18nService.t('localInferenceImportGuideDescription')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            aria-label={i18nService.t('close')}
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-4 py-4">
+          {/* OS info */}
+          <div className="rounded-lg border border-border bg-surface/60 px-3 py-2.5 mb-4">
+            <p className="text-xs font-medium text-foreground">
+              {isWin ? 'Windows' : isMac ? 'macOS' : 'Linux'}
+            </p>
+            <p className="mt-1 text-xs text-secondary">
+              {i18nService.t(filesKey)} ({executable})
+            </p>
+          </div>
+
+          {/* Steps */}
+          <ol className="space-y-4 text-sm">
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">1</span>
+              <div className="min-w-0">
+                <p className="text-foreground">
+                  {i18nService.t('localInferenceImportGuideStep1')}
+                </p>
+                <button
+                  type="button"
+                  onClick={openUrl}
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  {i18nService.t('localInferenceImportGuideStep1LinkLabel')}
+                  <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+                </button>
+                <p className="mt-1 text-xs text-secondary">
+                  {i18nService.t(noteKey)}
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">2</span>
+              <p className="text-foreground pt-0.5">
+                {i18nService.t('localInferenceImportGuideStep2')}
+              </p>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">3</span>
+              <p className="text-foreground pt-0.5">
+                {i18nService.t('localInferenceImportGuideStep3')}
+              </p>
+            </li>
+          </ol>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          >
+            {i18nService.t('localInferenceImportGuideClose')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ServicePopover({
   containerRef,
@@ -1729,11 +1675,12 @@ function ServicePopover({
   localModels,
   runningModels,
   installProgress,
-  hasAvailableBackends,
   onToggle,
   onPrepare,
   onStop,
-  onOpenBackendConfig,
+  onImportRuntime,
+  onUninstallRuntime,
+  onOpenImportGuide,
   onOpenServiceConfig,
   onRefresh,
 }: {
@@ -1744,29 +1691,34 @@ function ServicePopover({
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
   installProgress: InstallProgressState;
-  hasAvailableBackends: boolean;
   onToggle: () => void;
   onPrepare: () => void;
   onStop: () => void;
-  onOpenBackendConfig: () => void;
+  onImportRuntime: () => void;
+  onUninstallRuntime: () => void;
+  onOpenImportGuide: () => void;
   onOpenServiceConfig: () => void;
   onRefresh: () => void;
 }) {
   const running = status?.status === 'running';
   const managedByApp = Boolean(status?.managedByApp);
   const displayStatus = status?.status === 'installed' ? 'stopped' : (status?.status ?? 'unknown');
-  const hasCurrentBackend =
+  const canPrepare =
+    status?.status === 'not-installed' ||
     status?.status === 'installed' ||
-    status?.status === 'stopped' ||
-    status?.status === 'running';
-  const canPrepare = hasCurrentBackend;
-  const actionLabel = i18nService.t('localInferenceStart');
+    status?.status === 'stopped';
+  const canUninstallRuntime =
+    !running &&
+    status?.status !== undefined &&
+    status.status !== 'unknown' &&
+    status.status !== 'not-installed';
+  const actionLabel =
+    status?.status === 'not-installed'
+      ? i18nService.t('localInferenceInstall')
+      : i18nService.t('localInferenceStart');
   const [downloadsExpanded, setDownloadsExpanded] = useState(false);
   const downloadEntries = useMemo(
-    () =>
-      Object.entries(installProgress).filter(
-        ([name, p]) => name !== LLAMACPP_RUNTIME_PROGRESS_KEY && isPullInProgress(p),
-      ),
+    () => Object.entries(installProgress).filter(([, p]) => isPullInProgress(p)),
     [installProgress],
   );
   const downloadCount = downloadEntries.length;
@@ -1788,7 +1740,7 @@ function ServicePopover({
         <StatusBadge status={displayStatus} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-border bg-background/95 p-4 shadow-2xl backdrop-blur">
+        <div className="absolute right-0 top-full z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-background/95 p-3 shadow-2xl backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1808,26 +1760,16 @@ function ServicePopover({
                   .replace('{running}', String(runningModels.length))}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className={serviceRefreshButtonClass}
-              aria-label={i18nService.t('refresh')}
-              title={i18nService.t('refresh')}
-            >
-              <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
           </div>
 
-          <div className={`mt-4 grid gap-3 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <div className="rounded-xl border border-border bg-surface/70 px-4 py-3">
+          <div className={`mt-3 grid gap-2 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
               <p className="text-[11px] text-secondary">
                 {i18nService.t('localInferenceTabModels')}
               </p>
               <p className="mt-1 text-lg font-semibold text-foreground">{localModels.length}</p>
             </div>
-            <div className="rounded-xl border border-border bg-surface/70 px-4 py-3">
+            <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
               <p className="text-[11px] text-secondary">{i18nService.t('localInferenceLoaded')}</p>
               <p className="mt-1 text-lg font-semibold text-foreground">{runningModels.length}</p>
             </div>
@@ -1835,7 +1777,7 @@ function ServicePopover({
               <button
                 type="button"
                 onClick={() => setDownloadsExpanded(v => !v)}
-                className="rounded-xl border border-border bg-surface/70 px-4 py-3 text-left transition-colors hover:bg-surface"
+                className="rounded-lg border border-border bg-surface/70 px-3 py-2 text-left transition-colors hover:bg-surface"
               >
                 <p className="text-[11px] text-secondary">
                   {i18nService.t('localInferenceActiveDownloads')}
@@ -1880,63 +1822,79 @@ function ServicePopover({
             </p>
           )}
 
-          {!running && !hasCurrentBackend && (
-            <p className="mt-3 rounded-lg border border-border bg-background px-3 py-2 text-xs text-secondary">
-              {hasAvailableBackends
-                ? i18nService.t('localInferenceServiceNeedsBackendSwitch')
-                : i18nService.t('localInferenceServiceNeedsBackendInstall')}
-            </p>
-          )}
-
-          <div className="mt-4 space-y-2.5">
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={onOpenBackendConfig}
-                disabled={loading}
-                className={serviceActionButtonClass}
-              >
-                {i18nService.t('localInferenceBackendConfigTitle')}
-              </button>
-              <button
-                type="button"
-                onClick={onOpenServiceConfig}
-                disabled={loading}
-                className={serviceActionButtonClass}
-              >
-                {i18nService.t('localInferenceServiceConfigTitle')}
-              </button>
-            </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              className={smallOutlineButtonClass}
+            >
+              <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              {i18nService.t('refresh')}
+            </button>
+            <button
+              type="button"
+              onClick={onOpenServiceConfig}
+              disabled={loading}
+              className={smallOutlineButtonClass}
+            >
+              <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+              {i18nService.t('localInferenceServiceConfigTitle')}
+            </button>
             {!running && canPrepare && (
               <button
                 type="button"
                 onClick={onPrepare}
                 disabled={loading}
-                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
               >
-                <PlayIcon className="h-4 w-4" />
+                <PlayIcon className="h-3.5 w-3.5" />
                 {actionLabel}
               </button>
             )}
-            {!running && !canPrepare && (
-              <button
-                type="button"
-                disabled
-                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-medium text-white opacity-60"
-              >
-                <PlayIcon className="h-4 w-4" />
-                {actionLabel}
-              </button>
+            {!running && status?.status === 'not-installed' && (
+              <>
+                <button
+                  type="button"
+                  onClick={onImportRuntime}
+                  disabled={loading}
+                  className={smallOutlineButtonClass}
+                  title={i18nService.t('localInferenceImportRuntimeTooltip')}
+                >
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                  {i18nService.t('localInferenceImportRuntime')}
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenImportGuide}
+                  disabled={loading}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                  title={i18nService.t('localInferenceImportGuideTitle')}
+                >
+                  <QuestionMarkCircleIcon className="h-4 w-4" />
+                </button>
+              </>
             )}
             {running && managedByApp ? (
               <button
                 type="button"
                 onClick={onStop}
                 disabled={loading}
-                className={serviceDangerButtonClass}
+                className={smallOutlineButtonClass}
               >
-                <StopIcon className="h-4 w-4" />
+                <StopIcon className="h-3.5 w-3.5" />
                 {i18nService.t('localInferenceStop')}
+              </button>
+            ) : null}
+            {canUninstallRuntime ? (
+              <button
+                type="button"
+                onClick={onUninstallRuntime}
+                disabled={loading}
+                className={smallDangerButtonClass}
+              >
+                <TrashIcon className="h-3.5 w-3.5" />
+                {i18nService.t('localInferenceRuntimeUninstall')}
               </button>
             ) : null}
           </div>
@@ -1944,351 +1902,6 @@ function ServicePopover({
       )}
     </div>
   );
-}
-
-function LlamaCppBackendConfigDialog({
-  loading,
-  running,
-  backends,
-  selectedBackend,
-  recommendedBackend,
-  backendDevices,
-  backendError,
-  runtimeInstallProgress,
-  onClose,
-  onBackendChange,
-  onInstallBackend,
-  onUninstallBackend,
-  onImportRuntime,
-  onCheckDevices,
-  onRefresh,
-}: {
-  loading: boolean;
-  running: boolean;
-  backends: LlamaCppBackendInfo[];
-  selectedBackend?: LlamaCppBackendRef;
-  recommendedBackend?: LlamaCppBackendRef;
-  backendDevices: string | null;
-  backendError: string | null;
-  runtimeInstallProgress?: LlamaCppInstallProgress;
-  onClose: () => void;
-  onBackendChange: (versionBackend: string) => void;
-  onInstallBackend: () => void;
-  onUninstallBackend: () => void;
-  onImportRuntime: () => void;
-  onCheckDevices: () => void;
-  onRefresh: () => void;
-}) {
-  const [importHelpOpen, setImportHelpOpen] = useState(false);
-  const currentPlatform = window.electron.platform;
-  const backendVersions = useMemo(
-    () => Array.from(new Set(backends.map(backend => backend.version))),
-    [backends],
-  );
-  const selectedVersion = selectedBackend?.version ?? recommendedBackend?.version ?? backendVersions[0] ?? '';
-  const backendOptions = useMemo(
-    () => backends.filter(backend => backend.version === selectedVersion),
-    [backends, selectedVersion],
-  );
-  const selectedVersionBackend =
-    selectedBackend?.versionBackend ??
-    recommendedBackend?.versionBackend ??
-    backendOptions[0]?.versionBackend ??
-    '';
-  const selectedBackendInfo = backends.find(backend => backend.versionBackend === selectedVersionBackend);
-  const recommendedDescription = recommendedBackend
-    ? i18nService
-      .t('localInferenceBackendRecommendedReason')
-      .replace('{backend}', recommendedBackend.backend)
-    : backends.length > 0
-      ? i18nService
-        .t('localInferenceBackendRecommendedUnavailable')
-        .replace('{platform}', currentPlatform)
-      : i18nService.t('localInferenceBackendListEmpty');
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
-          <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-foreground">
-              {i18nService.t('localInferenceBackendConfigTitle')}
-            </h3>
-            <p className="mt-1 text-sm text-secondary">
-              {i18nService.t('localInferenceBackendConfigDescription')}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-            aria-label={i18nService.t('close')}
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto px-4 py-3">
-          <section className="rounded-xl border border-border bg-surface/40 px-3 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  {i18nService.t('localInferenceBackendManager')}
-                </h4>
-                <p className="mt-1 text-xs text-secondary">
-                  {selectedBackendInfo?.installed
-                    ? i18nService.t('localInferenceBackendInstalled')
-                    : i18nService.t('localInferenceBackendNotInstalled')}
-                </p>
-              </div>
-              {recommendedBackend ? (
-                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                  {i18nService.t('localInferenceBackendRecommended')
-                    .replace('{backend}', recommendedBackend.backend)}
-                </span>
-              ) : null}
-            </div>
-
-            {backendError ? (
-              <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                {backendError}
-              </p>
-            ) : null}
-
-            {runtimeInstallProgress ? (
-              <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2">
-                {(() => {
-                  const summary = formatInstallProgressSummary(runtimeInstallProgress);
-                  return (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[11px] font-medium text-foreground">
-                          {runtimeInstallProgress.modelName || i18nService.t('localInferenceInstall')}
-                        </span>
-                        <span className="shrink-0 text-[11px] text-secondary">{summary.primary}</span>
-                      </div>
-                      {summary.phase ? (
-                        <p className="mt-1 text-[11px] text-secondary">{summary.phase}</p>
-                      ) : null}
-                      {summary.error ? (
-                        <p className="mt-1 text-[11px] text-destructive">{summary.error}</p>
-                      ) : null}
-                    </>
-                  );
-                })()}
-                <InstallProgressBar progress={runtimeInstallProgress} className="mt-2" />
-              </div>
-            ) : null}
-
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="flex items-baseline gap-2">
-                  <span className="text-sm font-semibold text-foreground">
-                    {i18nService.t('localInferenceBackendVersion')}
-                  </span>
-                  <code className="text-[11px] text-secondary">version</code>
-                </span>
-                <select
-                  value={selectedVersion}
-                  onChange={event => {
-                    const next = backends.find(backend =>
-                      backend.version === event.target.value &&
-                      backend.versionBackend === recommendedBackend?.versionBackend,
-                    ) ?? backends.find(backend => backend.version === event.target.value);
-                    if (next) onBackendChange(next.versionBackend);
-                  }}
-                  disabled={loading || backendVersions.length === 0}
-                  className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-                >
-                  {backendVersions.map(version => (
-                    <option key={version} value={version}>{version}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-2">
-                <span className="flex items-baseline gap-2">
-                  <span className="text-sm font-semibold text-foreground">
-                    {i18nService.t('localInferenceBackendName')}
-                  </span>
-                  <code className="text-[11px] text-secondary">backend</code>
-                </span>
-                <select
-                  value={selectedVersionBackend}
-                  onChange={event => onBackendChange(event.target.value)}
-                  disabled={loading || backendOptions.length === 0}
-                  className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-                >
-                  {backendOptions.map(backend => (
-                    <option key={backend.versionBackend} value={backend.versionBackend}>
-                      {backend.backend}{backend.installed ? ' ✓' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-border bg-background px-3 py-2">
-                <p className="text-[11px] text-secondary">
-                  {i18nService.t('localInferenceBackendCurrent')}
-                </p>
-                <p className="mt-1 font-mono text-sm text-foreground">
-                  {selectedBackend?.versionBackend ?? i18nService.t('localInferenceBackendNone')}
-                </p>
-                <p className="mt-1 text-[11px] text-secondary">
-                  {selectedBackendInfo
-                    ? i18nService.t(
-                      selectedBackendInfo.source === 'local'
-                        ? 'localInferenceBackendSourceLocal'
-                        : 'localInferenceBackendSourceRemote',
-                    )
-                    : i18nService.t('localInferenceBackendNone')}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-background px-3 py-2">
-                <p className="text-[11px] text-secondary">
-                  {i18nService.t('localInferenceBackendRecommendedLabel')}
-                </p>
-                <p className="mt-1 font-mono text-sm text-foreground">
-                  {recommendedBackend?.versionBackend ?? i18nService.t('localInferenceBackendNone')}
-                </p>
-                <p className="mt-1 text-[11px] text-secondary">
-                  {recommendedDescription}
-                </p>
-              </div>
-            </div>
-
-            {backendDevices ? (
-              <pre className="mt-4 max-h-36 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-background px-3 py-2 text-xs text-secondary">
-                {backendDevices}
-              </pre>
-            ) : null}
-            {running ? (
-              <p className="mt-4 text-xs text-secondary">
-                {i18nService.t('localInferenceBackendRunningHint')}
-              </p>
-            ) : null}
-          </section>
-        </div>
-
-        <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:flex-wrap sm:justify-end">
-          <button type="button" onClick={onRefresh} disabled={loading} className={smallOutlineButtonClass}>
-            <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            {i18nService.t('refresh')}
-          </button>
-          <button
-            type="button"
-            onClick={onImportRuntime}
-            disabled={loading}
-            className={smallOutlineButtonClass}
-            title={i18nService.t('localInferenceImportRuntimeTooltip')}
-          >
-            <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-            {i18nService.t('localInferenceImportRuntime')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setImportHelpOpen(true)}
-            className={smallOutlineButtonClass}
-            aria-label={i18nService.t('localInferenceImportGuideTitle')}
-            title={i18nService.t('localInferenceImportGuideTitle')}
-          >
-            <InformationCircleIcon className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onCheckDevices}
-            disabled={loading || !selectedBackendInfo?.installed}
-            className={smallOutlineButtonClass}
-          >
-            <CpuChipIcon className="h-3.5 w-3.5" />
-            {i18nService.t('localInferenceBackendCheckDevices')}
-          </button>
-          <button
-            type="button"
-            onClick={onUninstallBackend}
-            disabled={loading || !selectedBackendInfo?.installed}
-            className={smallDangerButtonClass}
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-            {i18nService.t('localInferenceRuntimeUninstall')}
-          </button>
-          <button
-            type="button"
-            onClick={onInstallBackend}
-            disabled={loading || backends.length === 0}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-          >
-            <ArrowDownTrayIcon className="h-4 w-4" />
-            {selectedBackendInfo?.installed
-              ? i18nService.t('localInferenceBackendSwitch')
-              : i18nService.t('localInferenceInstall')}
-          </button>
-        </div>
-      </div>
-      <Modal isOpen={importHelpOpen} onClose={() => setImportHelpOpen(false)}>
-        <div className="w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl">
-          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-            <div className="min-w-0">
-              <h4 className="text-lg font-semibold text-foreground">
-                {i18nService.t('localInferenceImportGuideTitle')}
-              </h4>
-              <p className="mt-1 text-sm text-secondary">
-                {i18nService.t('localInferenceImportGuideInlineDescription')}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setImportHelpOpen(false)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-              aria-label={i18nService.t('close')}
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="space-y-3 px-5 py-4 text-sm leading-6 text-secondary">
-            <p>{i18nService.t('localInferenceImportGuideInlineStepArchive')}</p>
-            <p className="break-all rounded-lg bg-surface/50 px-3 py-2 text-xs text-foreground">
-              {i18nService.t('localInferenceImportGuideInlineReleaseUrl')}
-            </p>
-            <div className="space-y-1.5">
-              <p>{i18nService.t('localInferenceImportGuideInlineStepExtracted')}</p>
-              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinX64Cpu')}</p>
-              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinArm64Cpu')}</p>
-              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinX64Nvidia')}</p>
-              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformWinX64Vulkan')}</p>
-              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformMacArm64')}</p>
-              <p className="pl-3">{i18nService.t('localInferenceImportGuideInlinePlatformMacX64')}</p>
-            </div>
-            <p>{i18nService.t('localInferenceImportGuideInlineStepReject')}</p>
-            <p>{i18nService.t('localInferenceImportGuideInlineStepResult')}</p>
-          </div>
-          <div className="flex justify-end border-t border-border px-5 py-4">
-            <button
-              type="button"
-              onClick={() => setImportHelpOpen(false)}
-              className={smallOutlineButtonClass.replace('h-9', 'h-10').replace('text-sm', 'text-sm')}
-            >
-              {i18nService.t('localInferenceImportGuideClose')}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
-}
-
-function mapBackendErrorMessage(message: string | undefined): string {
-  if (!message) return i18nService.t('localInferenceBackendListFailed');
-  if (message.includes('No handler registered') && message.includes('llamacpp:backends:list')) {
-    return i18nService.t('localInferenceBackendHandlerMissing');
-  }
-  return message;
 }
 
 function OllamaServiceConfigDialog({
@@ -2308,87 +1921,102 @@ function OllamaServiceConfigDialog({
 }) {
   const [form, setForm] = useState<OllamaServiceConfigFormState>(() => serviceConfigToForm(config));
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [runtimeDevices, setRuntimeDevices] = useState<LlamaCppRuntimeListDevicesResult | null>(null);
-  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
-  const gpuConfigUnavailable = gpuDetectionState !== LlamaCppGpuDetectionState.Unknown
-    && gpuDetectionState !== LlamaCppGpuDetectionState.Available;
-  const acceleratorDevices = useMemo(
-    () => getLlamaCppAcceleratorDevices(runtimeDevices),
-    [runtimeDevices],
+  const [runtimeCapabilities, setRuntimeCapabilities] = useState<LlamaCppRuntimeCapabilities | null>(null);
+  const fieldStates = useMemo(
+    () =>
+      Object.fromEntries(
+        SERVICE_CONFIG_FIELDS.map(field => [
+          field.key,
+          getServiceConfigFieldState(field.key, form, runtimeCapabilities),
+        ]),
+      ) as Record<keyof OllamaServiceConfigFormState, ServiceConfigFieldState>,
+    [form, runtimeCapabilities],
+  );
+  const isFieldApplicable = useCallback(
+    (key: keyof OllamaServiceConfigFormState) => {
+      const fieldState = fieldStates[key];
+      return Boolean(fieldState?.visible && !fieldState.disabled);
+    },
+    [fieldStates],
+  );
+  const deviceFieldRuntimeError = getServiceConfigDeviceRuntimeError(
+    form.device,
+    runtimeCapabilities,
+    isFieldApplicable('device'),
   );
   const structuredValidation = validateLlamaCppStructuredServiceConfig({
     modelsMax: form.modelsMax,
-    device: form.device,
+    device: isFieldApplicable('device') ? form.device : '',
     parallel: form.parallel,
     timeout: form.timeout,
     threadsHttp: form.threadsHttp,
-    cacheReuse: form.cacheReuse,
-    cacheRam: form.cacheRam,
+    cacheReuse: isFieldApplicable('cacheReuse') ? form.cacheReuse : '',
+    cacheRam: isFieldApplicable('cacheRam') ? form.cacheRam : '',
     ctxSize: form.ctxSize,
-    tensorSplit: form.tensorSplit,
+    tensorSplit: isFieldApplicable('tensorSplit') ? form.tensorSplit : '',
     splitMode: form.splitMode,
-    mainGpu: form.mainGpu,
+    mainGpu: isFieldApplicable('mainGpu') ? form.mainGpu : '',
     batchSize: form.batchSize,
     ubatchSize: form.ubatchSize,
     threads: form.threads,
     threadsBatch: form.threadsBatch,
     gpuLayers: form.gpuLayers,
-    runtimeDevices,
   });
 
   useEffect(() => {
-    setForm(serviceConfigToForm(config, runtimeDevices));
-  }, [config, runtimeDevices]);
+    setForm(serviceConfigToForm(config, runtimeCapabilities?.devices));
+  }, [config, runtimeCapabilities]);
 
   useEffect(() => {
     let cancelled = false;
-    void window.electron.llamacpp.listRuntimeDevices()
+    void window.electron.llamacpp.getRuntimeCapabilities()
       .then(result => {
-        if (!cancelled) setRuntimeDevices(result);
+        if (!cancelled) setRuntimeCapabilities(result);
       })
       .catch(() => {
-        if (!cancelled) {
-          setRuntimeDevices({
-            success: false,
-            devices: [],
-            error: 'failed to list llama.cpp runtime devices',
-          });
-        }
+        if (!cancelled) setRuntimeCapabilities(null);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const visibleFields = useMemo(
+    () => SERVICE_CONFIG_FIELDS.filter(field => fieldStates[field.key]?.visible),
+    [fieldStates],
+  );
+  const visibleGroups = useMemo(
+    () =>
+      SERVICE_CONFIG_GROUPS.map(group => ({
+        ...group,
+        fields: visibleFields.filter(field => field.group === group.key),
+      })).filter(group => group.fields.length > 0),
+    [visibleFields],
+  );
+  const gpuFieldsHidden = useMemo(
+    () =>
+      !visibleFields.some(field => field.group === 'gpu') &&
+      SERVICE_CONFIG_FIELDS.some(field => field.group === 'gpu'),
+    [visibleFields],
+  );
+
   const updateForm = (key: keyof OllamaServiceConfigFormState, value: string) => {
     setSaveError(null);
     setForm(current => ({ ...current, [key]: value }));
   };
-  const getFieldState = (field: ServiceConfigField) =>
-    getServiceConfigFieldState(field.key, {
-      acceleratorDeviceCount: acceleratorDevices.length,
-      gpuDetectionState,
-      cachePromptValue: form.cachePrompt,
-    });
   const renderField = (field: ServiceConfigField) => {
-    const fieldState = getFieldState(field);
-    if (!fieldState.visible) return null;
+    const fieldState = fieldStates[field.key];
     const placeholder = field.placeholderKey
       ? i18nService.t(field.placeholderKey)
       : (field.placeholder ?? '');
     const label = i18nService.t(field.labelKey);
-    const hint = fieldState.hint ?? (
-      gpuConfigUnavailable && (field.key === 'device' || field.key === 'mainGpu')
-        ? getGpuConfigHint(gpuDetectionState)
-        : i18nService.t(field.hintKey)
-    );
-    const fieldError = getStructuredServiceConfigFieldErrorMessage(
-      field.key,
-      structuredValidation.fieldErrors,
-    );
-    const disabled = loading
-      || fieldState.disabled
-      || isGpuIndexedFieldDisabled(field.key, gpuConfigUnavailable);
+    const hint = i18nService.t(field.hintKey);
+    const fieldError = field.key === 'device'
+      ? deviceFieldRuntimeError
+      : getStructuredServiceConfigFieldErrorMessage(
+        field.key,
+        structuredValidation.fieldErrors,
+      );
     return field.type === 'select' ? (
       <ServiceConfigSelect
         key={field.key}
@@ -2396,7 +2024,8 @@ function OllamaServiceConfigDialog({
         paramName={field.paramName}
         value={form[field.key]}
         hint={hint}
-        disabled={disabled}
+        disabled={fieldState.disabled}
+        disabledReason={fieldState.disabledReason}
         onChange={value => updateForm(field.key, value)}
         options={getServiceConfigSelectOptions(field.key)}
       />
@@ -2409,7 +2038,8 @@ function OllamaServiceConfigDialog({
         placeholder={placeholder}
         hint={hint}
         error={fieldError}
-        disabled={disabled}
+        disabled={fieldState.disabled}
+        disabledReason={fieldState.disabledReason}
         onChange={value => updateForm(field.key, value)}
       />
     );
@@ -2417,19 +2047,46 @@ function OllamaServiceConfigDialog({
 
   const save = async () => {
     setSaveError(null);
-    if (structuredValidation.hasErrors) {
+    if (structuredValidation.hasErrors || deviceFieldRuntimeError) {
       setSaveError(i18nService.t('localInferenceServiceConfigValidationFixErrors'));
       return;
     }
-    const nextConfig: OllamaServiceConfig = { ...config };
-    applyServiceConfigScalar(nextConfig, 'host', form.host);
-    applyServiceConfigScalar(nextConfig, 'port', form.port);
-    for (const field of SERVICE_CONFIG_FIELDS) {
-      const fieldState = getFieldState(field);
-      if (!fieldState.visible || fieldState.omitOnSave) continue;
-      applyServiceConfigFieldToPayload(nextConfig, field.key, form[field.key], fieldState);
-    }
-    const result = await onSave(nextConfig);
+    const result = await onSave({
+      host: form.host,
+      port: form.port,
+      ...(isFieldApplicable('device') ? { device: form.device } : {}),
+      ...(isFieldApplicable('modelsMax') ? { modelsMax: form.modelsMax } : {}),
+      ...(isFieldApplicable('modelsAutoload') && form.modelsAutoload
+        ? { modelsAutoload: form.modelsAutoload === 'true' }
+        : {}),
+      ...(isFieldApplicable('parallel') ? { parallel: form.parallel } : {}),
+      ctxSize: form.ctxSize,
+      gpuLayers: form.gpuLayers,
+      batchSize: form.batchSize,
+      ubatchSize: form.ubatchSize,
+      threads: form.threads,
+      threadsBatch: form.threadsBatch,
+      ...(isFieldApplicable('timeout') ? { timeout: form.timeout } : {}),
+      ...(isFieldApplicable('threadsHttp') ? { threadsHttp: form.threadsHttp } : {}),
+      ...(isFieldApplicable('cacheReuse') ? { cacheReuse: form.cacheReuse } : {}),
+      ...(isFieldApplicable('cacheRam') ? { cacheRam: form.cacheRam } : {}),
+      ...(isFieldApplicable('cachePrompt') && form.cachePrompt
+        ? { cachePrompt: form.cachePrompt === 'true' }
+        : {}),
+      ...(isFieldApplicable('flashAttn') && form.flashAttn
+        ? { flashAttn: form.flashAttn as NonNullable<OllamaServiceConfig['flashAttn']> }
+        : {}),
+      ...(isFieldApplicable('mainGpu') ? { mainGpu: form.mainGpu } : {}),
+      ...(isFieldApplicable('tensorSplit') ? { tensorSplit: form.tensorSplit } : {}),
+      ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
+      ...(isFieldApplicable('mlock') ? { mlock: form.mlock === 'true' } : {}),
+      ...(isFieldApplicable('jinja') && form.jinja
+        ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> }
+        : {}),
+      ...(isFieldApplicable('splitMode') && form.splitMode
+        ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> }
+        : {}),
+    });
     if (result.success) {
       onClose();
     } else {
@@ -2476,50 +2133,32 @@ function OllamaServiceConfigDialog({
                 {saveError}
               </p>
             )}
+            {gpuFieldsHidden && (
+              <p className="mb-4 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-700 dark:text-sky-300">
+                {i18nService.t('localInferenceServiceConfigGpuHiddenHint')}
+              </p>
+            )}
             <div className="space-y-5">
-              <div className="flex items-center justify-end gap-3 border-b border-border/70 pb-2">
-                <span className="text-[11px] text-secondary">
-                  {i18nService.t('localInferenceServiceConfigRestartRequired')}
-                </span>
-              </div>
-              {SERVICE_CONFIG_GROUPS.map(group => {
-                const visibleFields = SERVICE_CONFIG_FIELDS
-                  .filter(field => field.group === group.key)
-                  .filter(field => getFieldState(field).visible);
-                if (visibleFields.length === 0) {
-                  if (group.key !== 'gpu') return null;
-                  return (
-                    <div key={group.key} className="space-y-2">
-                      <div>
-                        <h4 className="text-sm font-semibold text-foreground">
-                          {i18nService.t(group.titleKey)}
-                        </h4>
-                        <p className="mt-1 text-xs text-secondary">
-                          {i18nService.t(group.descriptionKey)}
-                        </p>
-                      </div>
-                      <p className="rounded-md border border-border/70 bg-surface/40 px-3 py-2 text-xs text-secondary">
-                        {i18nService.t('localInferenceServiceConfigGpuHiddenHint')}
-                      </p>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={group.key} className="space-y-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground">
+              {visibleGroups.map(group => (
+                <div key={group.key} className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-2">
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">
                         {i18nService.t(group.titleKey)}
-                      </h4>
-                      <p className="mt-1 text-xs text-secondary">
+                      </span>
+                      <span className="mt-1 block text-xs text-secondary">
                         {i18nService.t(group.descriptionKey)}
-                      </p>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {visibleFields.map(renderField)}
-                    </div>
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-secondary">
+                      {i18nService.t('localInferenceServiceConfigRestartRequired')}
+                    </span>
                   </div>
-                );
-              })}
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {group.fields.map(renderField)}
+                  </div>
+                </div>
+              ))}
             </div>
             <p className="mt-4 text-xs text-secondary">
               {running && !managedByApp
@@ -2543,7 +2182,7 @@ function OllamaServiceConfigDialog({
           <button
             type="button"
             onClick={() => void save()}
-            disabled={loading || structuredValidation.hasErrors}
+            disabled={loading || structuredValidation.hasErrors || Boolean(deviceFieldRuntimeError)}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {i18nService.t('save')}
@@ -2616,7 +2255,8 @@ function ServiceConfigInput({
   placeholder,
   hint,
   error,
-  disabled,
+  disabled = false,
+  disabledReason,
   onChange,
 }: {
   label: string;
@@ -2626,23 +2266,24 @@ function ServiceConfigInput({
   hint: string;
   error?: string;
   disabled?: boolean;
+  disabledReason?: string;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-2">
+    <label className={`space-y-2 ${disabled ? 'opacity-60' : ''}`}>
       <span className="flex items-baseline gap-2">
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <code className="text-[11px] text-secondary">{paramName}</code>
       </span>
       <input
+        disabled={disabled}
         value={value}
         placeholder={placeholder}
-        disabled={disabled}
         onChange={event => onChange(event.target.value)}
-        className={`h-10 w-full rounded-lg bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border border-red-500/70 focus:border-red-500' : 'border border-border'}`}
+        className={`h-10 w-full rounded-lg px-3 font-mono text-sm outline-none transition-colors placeholder:text-secondary disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-raised disabled:text-secondary ${error ? 'border border-red-500/70 bg-surface-input text-foreground focus:border-red-500' : 'border border-border bg-surface-input text-foreground focus:border-primary/60'}`}
       />
-      <p className="text-xs text-secondary">{hint}</p>
-      {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
+      <p className="text-xs text-secondary">{disabled && disabledReason ? disabledReason : hint}</p>
+      {!disabled && error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </label>
   );
 }
@@ -2652,29 +2293,31 @@ function ServiceConfigSelect({
   paramName,
   value,
   hint,
-  disabled,
   options,
+  disabled = false,
+  disabledReason,
   onChange,
 }: {
   label: string;
   paramName: string;
   value: string;
   hint: string;
-  disabled?: boolean;
   options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
+  disabledReason?: string;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-2">
+    <label className={`space-y-2 ${disabled ? 'opacity-60' : ''}`}>
       <span className="flex items-baseline gap-2">
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <code className="text-[11px] text-secondary">{paramName}</code>
       </span>
       <select
-        value={value}
         disabled={disabled}
+        value={value}
         onChange={event => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:cursor-not-allowed disabled:bg-surface-raised disabled:text-secondary"
       >
         <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
         {options.map(option => (
@@ -2683,149 +2326,9 @@ function ServiceConfigSelect({
           </option>
         ))}
       </select>
-      <p className="text-xs text-secondary">{hint}</p>
+      <p className="text-xs text-secondary">{disabled && disabledReason ? disabledReason : hint}</p>
     </label>
   );
-}
-
-function getServiceConfigFieldState(
-  key: keyof OllamaServiceConfigFormState,
-  options: {
-    acceleratorDeviceCount: number;
-    gpuDetectionState: LlamaCppGpuDetectionState;
-    cachePromptValue: string;
-  },
-): {
-  visible: boolean;
-  disabled: boolean;
-  omitOnSave?: boolean;
-  hint?: string;
-} {
-  const { acceleratorDeviceCount, gpuDetectionState, cachePromptValue } = options;
-  const cachePromptEnabled = cachePromptValue === 'true';
-  if (key === 'cacheReuse' || key === 'cacheRam') {
-    return {
-      visible: true,
-      disabled: !cachePromptEnabled,
-      omitOnSave: !cachePromptEnabled,
-    };
-  }
-  if (key === 'flashAttn') {
-    return {
-      visible: gpuDetectionState !== LlamaCppGpuDetectionState.Unavailable,
-      disabled: false,
-    };
-  }
-  if (key === 'device' || key === 'splitMode' || key === 'tensorSplit' || key === 'mainGpu') {
-    if (gpuDetectionState === LlamaCppGpuDetectionState.Unavailable) {
-      return { visible: false, disabled: true, omitOnSave: true };
-    }
-    if (acceleratorDeviceCount <= 1 && gpuDetectionState !== LlamaCppGpuDetectionState.Unknown) {
-      return { visible: false, disabled: true, omitOnSave: true };
-    }
-    return {
-      visible: true,
-      disabled: gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed,
-      omitOnSave: gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed,
-      hint: gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed
-        ? getGpuConfigHint(gpuDetectionState)
-        : undefined,
-    };
-  }
-  return { visible: true, disabled: false };
-}
-
-function applyServiceConfigFieldToPayload(
-  target: OllamaServiceConfig,
-  key: keyof OllamaServiceConfigFormState,
-  value: string,
-  fieldState: {
-    disabled: boolean;
-  },
-): void {
-  if (fieldState.disabled) return;
-  switch (key) {
-    case 'modelsMax':
-    case 'parallel':
-    case 'timeout':
-    case 'threadsHttp':
-    case 'cacheReuse':
-    case 'cacheRam':
-    case 'device':
-    case 'mainGpu':
-    case 'tensorSplit':
-      applyServiceConfigScalar(target, key, value);
-      return;
-    case 'modelsAutoload':
-      if (value) {
-        target.modelsAutoload = value === 'true';
-      } else {
-        delete target.modelsAutoload;
-      }
-      return;
-    case 'cachePrompt':
-      if (value) {
-        target.cachePrompt = value === 'true';
-      } else {
-        delete target.cachePrompt;
-      }
-      return;
-    case 'flashAttn':
-      if (value) {
-        target.flashAttn = value as NonNullable<OllamaServiceConfig['flashAttn']>;
-      } else {
-        delete target.flashAttn;
-      }
-      return;
-    case 'mlock':
-      if (value) {
-        target.mlock = value === 'true';
-      } else {
-        delete target.mlock;
-      }
-      return;
-    case 'jinja':
-      if (value) {
-        target.jinja = value as NonNullable<OllamaServiceConfig['jinja']>;
-      } else {
-        delete target.jinja;
-      }
-      return;
-    case 'splitMode':
-      if (value) {
-        target.splitMode = value as NonNullable<OllamaServiceConfig['splitMode']>;
-      } else {
-        delete target.splitMode;
-      }
-      return;
-    default:
-      return;
-  }
-}
-
-function applyServiceConfigScalar<
-  K extends
-    | 'host'
-    | 'port'
-    | 'modelsMax'
-    | 'parallel'
-    | 'timeout'
-    | 'threadsHttp'
-    | 'cacheReuse'
-    | 'cacheRam'
-    | 'device'
-    | 'mainGpu'
-    | 'tensorSplit',
->(
-  target: OllamaServiceConfig,
-  key: K,
-  value: string,
-): void {
-  if (value) {
-    target[key] = value;
-  } else {
-    delete target[key];
-  }
 }
 
 function getServiceConfigSelectOptions(
@@ -3234,6 +2737,41 @@ function LaunchModelDialog({
   const servicePatch = resolveLaunchServiceConfig(form.gpuPreset, form.customGpuDevices);
   const gpuPresetChangesService =
     servicePatch !== null && hasServiceConfigPatchChanged(serviceConfig, servicePatch);
+  const normalizeContextInput = useCallback(
+    (value: string) =>
+      normalizeLaunchContextValue(value, contextBounds, {
+        fallbackValue: parseOptionalInteger(serviceConfig.ctxSize ?? '') ?? 4096,
+      }),
+    [contextBounds, serviceConfig.ctxSize],
+  );
+  const normalizeGpuLayersInput = useCallback(
+    (value: string) =>
+      normalizeLaunchPositiveIntegerValue(value, {
+        min: 0,
+        max: 4096,
+        fallbackValue: parseOptionalInteger(serviceConfig.gpuLayers ?? '') ?? 0,
+      }),
+    [serviceConfig.gpuLayers],
+  );
+  const normalizeThreadsInput = useCallback(
+    (value: string) =>
+      normalizeLaunchPositiveIntegerValue(value, {
+        min: 1,
+        max: 512,
+        fallbackValue: Math.max(1, Math.min(Math.max(2, Math.floor(navigator.hardwareConcurrency || 4)) - 2, 16)),
+      }),
+    [],
+  );
+  const normalizeBatchInput = useCallback(
+    (value: string) =>
+      normalizeLaunchPositiveIntegerValue(value, {
+        min: 1,
+        max: 65536,
+        step: 32,
+        fallbackValue: parseOptionalInteger(serviceConfig.batchSize ?? '') ?? 256,
+      }),
+    [serviceConfig.batchSize],
+  );
 
   return (
     <div
@@ -3385,6 +2923,12 @@ function LaunchModelDialog({
                 step={contextBounds.step}
                 hint={i18nService.t('localInferenceLaunchNumCtxHint')}
                 onChange={value => updateForm('numCtx', value)}
+                onBlurValue={() => {
+                  const normalized = normalizeContextInput(form.numCtx);
+                  if (normalized !== form.numCtx) {
+                    updateForm('numCtx', normalized);
+                  }
+                }}
               />
               <LaunchChoiceSelect
                 label={i18nService.t('localInferenceLaunchAcceleration')}
@@ -3405,9 +2949,16 @@ function LaunchModelDialog({
                   label={i18nService.t('localInferenceLaunchNumGpu')}
                   value={form.customGpuLayers}
                   min={0}
+                  max={4096}
                   placeholder={i18nService.t('localInferenceLaunchDefault')}
                   hint={i18nService.t('localInferenceLaunchNumGpuHint')}
                   onChange={value => updateForm('customGpuLayers', value)}
+                  onBlurValue={() => {
+                    const normalized = normalizeGpuLayersInput(form.customGpuLayers);
+                    if (normalized !== form.customGpuLayers) {
+                      updateForm('customGpuLayers', normalized);
+                    }
+                  }}
                 />
               )}
             </div>
@@ -3441,18 +2992,32 @@ function LaunchModelDialog({
                 label={i18nService.t('localInferenceLaunchNumThread')}
                 value={form.numThread}
                 min={1}
+                max={512}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
                 hint={i18nService.t('localInferenceLaunchNumThreadHint')}
                 onChange={value => updateForm('numThread', value)}
+                onBlurValue={() => {
+                  const normalized = normalizeThreadsInput(form.numThread);
+                  if (normalized !== form.numThread) {
+                    updateForm('numThread', normalized);
+                  }
+                }}
               />
               <LaunchInput
                 label={i18nService.t('localInferenceLaunchNumBatch')}
                 value={form.numBatch}
                 min={1}
+                max={65536}
                 step={32}
                 placeholder={i18nService.t('localInferenceLaunchDefault')}
                 hint={i18nService.t('localInferenceLaunchNumBatchHint')}
                 onChange={value => updateForm('numBatch', value)}
+                onBlurValue={() => {
+                  const normalized = normalizeBatchInput(form.numBatch);
+                  if (normalized !== form.numBatch) {
+                    updateForm('numBatch', normalized);
+                  }
+                }}
               />
               <LaunchSelect
                 label={i18nService.t('localInferenceLaunchUseMmap')}
@@ -3509,6 +3074,7 @@ function LaunchInput({
   step,
   placeholder,
   onChange,
+  onBlurValue,
 }: {
   label: string;
   value: string;
@@ -3518,12 +3084,20 @@ function LaunchInput({
   step?: number;
   placeholder?: string;
   onChange: (value: string) => void;
+  onBlurValue?: () => void;
 }) {
   const clamp = () => {
-    if (max === undefined) return;
-    const parsed = parseOptionalInteger(value);
-    if (parsed === undefined) return;
-    if (parsed > max) onChange(String(max));
+    if (max !== undefined || min !== undefined) {
+      const parsed = parseOptionalInteger(value);
+      if (parsed !== undefined) {
+        if (max !== undefined && parsed > max) {
+          onChange(String(max));
+        } else if (min !== undefined && parsed < min) {
+          onChange(String(min));
+        }
+      }
+    }
+    onBlurValue?.();
   };
 
   return (
@@ -3675,7 +3249,6 @@ function InferencePanel({
   prompt,
   options,
   messages,
-  inlineError,
   streamingText,
   streamingThinking,
   sending,
@@ -3687,18 +3260,17 @@ function InferencePanel({
   onSavePreset,
   onSend,
   onStop,
-  onIncreaseContextSize,
   onOpenModels,
 }: {
   isRunning: boolean;
   loading: boolean;
   selectedModel: string;
+  selectedRunningModel?: OllamaRunningModel;
   runnableModels: OllamaModel[];
   systemPrompt: string;
   prompt: string;
   options: InferenceOptions;
   messages: InferenceMessage[];
-  inlineError: LocalInferenceInlineError | null;
   streamingText: string;
   streamingThinking: string;
   sending: boolean;
@@ -3710,10 +3282,8 @@ function InferencePanel({
   onSavePreset: () => void;
   onSend: () => void;
   onStop: () => void;
-  onIncreaseContextSize: () => void;
   onOpenModels: () => void;
 }) {
-  useI18nLanguage();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const latestTurnStartRef = useRef<HTMLDivElement>(null);
@@ -3725,21 +3295,20 @@ function InferencePanel({
   const streamFollowFrameRef = useRef<number | null>(null);
   const programmaticScrollRef = useRef<{ mode: 'align' | 'bottom'; until: number } | null>(null);
   const composingRef = useRef(false);
-  const reasoningMenuRef = useRef<HTMLDivElement>(null);
-  const [configCollapsed, setConfigCollapsed] = useState(true);
-  const [configPage, setConfigPage] = useState<'common' | 'advanced'>('common');
-  const [reasoningMenuOpen, setReasoningMenuOpen] = useState(false);
+  const [configCollapsed, setConfigCollapsed] = useState(false);
+  const [configPage, setConfigPage] = useState<InferenceOptionGroup>('basic');
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
-  const commonOptionFields = useMemo(
+  const requestPreview = useMemo(
     () =>
-      INFERENCE_OPTION_FIELDS.filter(
-        field => field.group === 'basic' && field.key !== 'reasoning_preference',
-      ),
-    [],
-  );
-  const advancedOptionFields = useMemo(
-    () => INFERENCE_OPTION_FIELDS.filter(field => field.group === 'advanced'),
-    [],
+      buildRequestPreview({
+        model: selectedModel,
+        systemPrompt: buildEffectiveSystemPrompt(
+          systemPrompt,
+          options.direct_answer_mode === 'enabled',
+        ),
+        options: normalizeOptions(options),
+      }),
+    [options, selectedModel, systemPrompt],
   );
   const updateOption = (
     key: keyof InferenceOptions,
@@ -3750,17 +3319,7 @@ function InferencePanel({
       [key]: value,
     });
   };
-  const reasoningOptions: Array<{
-    value: InferenceOptions['reasoning_preference'];
-    label: string;
-  }> = [
-    { value: 'auto', label: i18nService.t('localInferenceReasoningPreferenceAuto') },
-    { value: 'high', label: i18nService.t('localInferenceReasoningPreferenceHigh') },
-    { value: 'low', label: i18nService.t('localInferenceReasoningPreferenceLow') },
-  ];
-  const currentReasoningOption =
-    reasoningOptions.find(option => option.value === options.reasoning_preference) ??
-    reasoningOptions[0];
+  const visibleOptionFields = INFERENCE_OPTION_FIELDS.filter(field => field.group === configPage);
   const markProgrammaticScroll = useCallback(
     (mode: 'align' | 'bottom', behavior: ScrollBehavior) => {
       const duration = behavior === 'smooth' ? 400 : 120;
@@ -3916,26 +3475,6 @@ function InferencePanel({
     return () => window.cancelAnimationFrame(frame);
   }, [cancelling, selectedModel, sending]);
 
-  useEffect(() => {
-    if (!reasoningMenuOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!reasoningMenuRef.current?.contains(event.target as Node)) {
-        setReasoningMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setReasoningMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [reasoningMenuOpen]);
-
   if (!isRunning || runnableModels.length === 0) {
     return (
       <EmptyState
@@ -3956,21 +3495,33 @@ function InferencePanel({
   }
 
   return (
-    <div className="h-full min-h-0 overflow-hidden bg-background">
+    <div className="h-full min-h-0 rounded-[24px] border border-border bg-surface shadow-card overflow-hidden">
       <div
-        className={`grid h-full min-h-0 ${configCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[300px_minmax(0,1fr)]'}`}
+        className={`grid h-full min-h-0 ${configCollapsed ? 'lg:grid-cols-[56px_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'}`}
       >
         <aside
-          className={`${configCollapsed ? 'hidden' : 'min-h-0 overflow-hidden border-r border-border-subtle bg-surface'}`}
+          className={`min-h-0 overflow-hidden bg-surface ${configCollapsed ? 'border-r border-border-subtle' : 'border-r border-border-subtle'}`}
         >
-          {configCollapsed ? null : (
+          {configCollapsed ? (
+            <div className="flex h-full flex-col items-center gap-3 py-4">
+              <button
+                type="button"
+                onClick={() => setConfigCollapsed(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                aria-label={i18nService.t('localInferenceConfigExpand')}
+                title={i18nService.t('localInferenceConfigExpand')}
+              >
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
             <div className="flex h-full min-h-0 flex-col">
               <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-4">
-                <div className="space-y-0.5">
+                <div>
                   <h2 className="text-sm font-semibold text-foreground">
                     {i18nService.t('localInferenceConfigTitle')}
                   </h2>
-                  <p className="text-[11px] text-secondary">{selectedModel}</p>
+                  <p className="mt-0.5 text-[11px] text-secondary">{selectedModel}</p>
                 </div>
                 <button
                   type="button"
@@ -3982,27 +3533,8 @@ function InferencePanel({
                   <ChevronLeftIcon className="h-4 w-4" />
                 </button>
               </div>
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
-                <section className="space-y-3">
-                  <div className="grid grid-cols-2 rounded-xl border border-border-subtle bg-surface-raised/40 p-1">
-                    {([
-                      { key: 'common', label: i18nService.t('localInferenceCommonParams') },
-                      { key: 'advanced', label: i18nService.t('localInferenceMoreParams') },
-                    ] as const).map(item => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => setConfigPage(item.key)}
-                        className={`h-9 rounded-lg px-2 text-sm transition-colors ${
-                          configPage === item.key
-                            ? 'bg-surface text-foreground shadow-sm'
-                            : 'text-secondary hover:text-foreground'
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                <div>
                   <label className="mb-1.5 block text-xs font-medium text-secondary">
                     {i18nService.t('localInferenceModel')}
                   </label>
@@ -4017,39 +3549,63 @@ function InferencePanel({
                       </option>
                     ))}
                   </select>
-                  <div className="space-y-3">
-                    {(configPage === 'common' ? commonOptionFields : advancedOptionFields).map(field => (
-                      <InferenceOptionControl
-                        key={field.key}
-                        field={field}
-                        value={options[field.key]}
-                        onChange={value => updateOption(field.key, value)}
-                      />
-                    ))}
-                  </div>
-                </section>
-
-                {configPage === 'common' && (
-                  <section className="space-y-3">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-medium text-foreground">
-                      {i18nService.t('localInferenceSystemPrompt')}
-                    </h3>
-                    <p className="text-[11px] text-secondary">{i18nService.t('localInferenceSystemPromptHint')}</p>
-                  </div>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-secondary">
+                    {i18nService.t('localInferenceSystemPrompt')}
+                  </label>
                   <textarea
                     value={systemPrompt}
                     onChange={event => onSystemPromptChange(event.target.value)}
-                    className="min-h-28 w-full resize-y rounded-2xl border border-border bg-surface-input px-3 py-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+                    className="min-h-24 w-full resize-y rounded-xl border border-border bg-surface-input px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
                   />
-                  </section>
+                </div>
+                <div className="grid grid-cols-2 rounded-xl border border-border-subtle bg-surface-raised/60 p-1">
+                  {(['basic', 'advanced'] as InferenceOptionGroup[]).map(page => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setConfigPage(page)}
+                      className={`h-8 rounded-lg px-2 text-xs transition-colors ${
+                        configPage === page
+                          ? 'bg-surface text-foreground shadow-sm'
+                          : 'text-secondary hover:text-foreground'
+                      }`}
+                    >
+                      {i18nService.t(
+                        page === 'basic'
+                          ? 'localInferenceConfigBasic'
+                          : 'localInferenceConfigAdvanced',
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  {visibleOptionFields.map(field => (
+                    <InferenceOptionControl
+                      key={field.key}
+                      field={field}
+                      value={options[field.key]}
+                      onChange={value => updateOption(field.key, value)}
+                    />
+                  ))}
+                </div>
+                {configPage === 'advanced' && (
+                  <details className="rounded-xl border border-border-subtle bg-surface-raised/40 px-3 py-2.5 text-xs text-secondary">
+                    <summary className="cursor-pointer select-none text-foreground">
+                      {i18nService.t('localInferenceRequestPreview')}
+                    </summary>
+                    <pre className="mt-2 max-h-52 overflow-auto rounded-lg border border-border-subtle bg-background px-2.5 py-2 font-mono text-[11px] leading-4 text-foreground">
+                      {JSON.stringify(requestPreview, null, 2)}
+                    </pre>
+                  </details>
                 )}
               </div>
               <div className="shrink-0 border-t border-border-subtle p-4">
                 <button
                   type="button"
                   onClick={onSavePreset}
-                  className="h-10 w-full rounded-2xl bg-primary text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+                  className="h-9 w-full rounded-xl bg-primary text-sm font-medium text-white transition-colors hover:bg-primary-hover"
                 >
                   {i18nService.t('localInferenceSavePreset')}
                 </button>
@@ -4059,32 +3615,19 @@ function InferencePanel({
         </aside>
 
         <main className="relative flex min-h-0 flex-col overflow-hidden bg-background">
-          {configCollapsed && (
-            <button
-              type="button"
-              onClick={() => setConfigCollapsed(false)}
-              className="absolute left-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border-subtle bg-surface-raised/85 text-secondary shadow-sm transition-colors hover:bg-surface-raised hover:text-foreground"
-              aria-label={i18nService.t('localInferenceConfigExpand')}
-              title={i18nService.t('localInferenceConfigExpand')}
-            >
-              <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
-            </button>
-          )}
-          <div className={`shrink-0 border-b border-border-subtle px-6 py-4 ${configCollapsed ? 'pl-20' : ''}`}>
-            <div className="flex items-center justify-between gap-4">
+          <div className="shrink-0 flex items-center justify-between border-b border-border-subtle px-5 py-4">
+            <div className="min-w-0 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-surface-raised text-secondary">
+                <CpuChipIcon className="h-4 w-4" />
+              </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-base font-medium text-foreground">{selectedModel}</h2>
-                    <p className="text-xs text-secondary">{i18nService.t('localInferenceTitle')}</p>
-                  </div>
-                </div>
+                <h2 className="truncate text-sm font-medium text-foreground">{selectedModel}</h2>
               </div>
             </div>
           </div>
           <div
             ref={chatScrollRef}
-            className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-0 [scrollbar-gutter:stable_both-edges]"
+            className="local-inference-chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-0 [scrollbar-gutter:stable_both-edges]"
             onWheelCapture={event => {
               if (sending && event.deltaY < 0) {
                 stopStreamAutoFollow();
@@ -4098,21 +3641,19 @@ function InferencePanel({
             }}
           >
             {messages.length === 0 && !sending && (
-              <div className="flex min-h-full flex-col items-center justify-center px-6 py-12 text-center">
-                <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-5">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-surface-raised text-secondary">
-                    <CpuChipIcon className="h-8 w-8" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xl font-medium text-foreground">
-                      {i18nService.t('localInferenceEmptyChat')}
-                    </p>
-                    <p className="text-sm text-secondary">{selectedModel}</p>
-                  </div>
+              <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border-subtle bg-surface-raised text-secondary">
+                  <CpuChipIcon className="h-8 w-8" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {i18nService.t('localInferenceEmptyChat')}
+                  </p>
+                  <p className="text-xs text-secondary">{selectedModel}</p>
                 </div>
               </div>
             )}
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 pb-28 pt-8 select-text">
+            <div className="mx-auto flex w-full max-w-[768px] flex-col gap-5 px-2 pb-12 pt-4 select-text sm:px-6">
               {messages.map((message, index) => {
                 const isLatestTurnStart =
                   message.role === 'user' &&
@@ -4140,17 +3681,11 @@ function InferencePanel({
                   />
                 </div>
               )}
-              {inlineError && (
-                <InferenceInlineErrorCard
-                  error={inlineError}
-                  onIncreaseContextSize={onIncreaseContextSize}
-                />
-              )}
             </div>
           </div>
           {showJumpToBottom && (
             <div
-              className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-4"
+              className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center px-4"
             >
               <button
                 type="button"
@@ -4163,8 +3698,8 @@ function InferencePanel({
               </button>
             </div>
           )}
-          <div className="sticky bottom-0 z-20 flex-shrink-0 px-6 pb-6 pt-3">
-            <div className="mx-auto w-full max-w-5xl rounded-[28px] border border-border bg-surface-overlay/95 p-2 shadow-card backdrop-blur">
+          <div className="sticky bottom-0 z-20 flex-shrink-0 px-4 pb-4 pt-2">
+            <div className="mx-auto max-w-[44rem] rounded-[20px] border border-border bg-surface-overlay p-1.5 shadow-card backdrop-blur">
               <textarea
                 ref={promptRef}
                 value={prompt}
@@ -4187,67 +3722,16 @@ function InferencePanel({
                     submitPrompt();
                   }
                 }}
-                className="min-h-20 w-full resize-none rounded-3xl border-0 bg-transparent px-4 py-3 text-sm text-foreground outline-none placeholder:text-secondary"
+                className="min-h-14 w-full resize-none rounded-2xl border-0 bg-transparent px-3 py-1.5 text-sm text-foreground outline-none placeholder:text-secondary"
                 placeholder={i18nService.t('localInferencePromptPlaceholder')}
               />
-              <div className="flex items-center justify-between gap-3 px-2 pb-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <div
-                    ref={reasoningMenuRef}
-                    className="relative flex min-w-0 items-center"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setReasoningMenuOpen(current => !current)}
-                      className="inline-flex min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-xs text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-                      aria-haspopup="menu"
-                      aria-expanded={reasoningMenuOpen}
-                    >
-                      <span className="truncate">
-                        {i18nService.t('localInferenceReasoningPreferenceLabel')}:
-                        {' '}
-                        {currentReasoningOption.label}
-                      </span>
-                      <ChevronDownIcon
-                        className={`h-3.5 w-3.5 shrink-0 transition-transform ${reasoningMenuOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                    {reasoningMenuOpen && (
-                      <div className="absolute bottom-full left-0 z-30 mb-2 w-44 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-popover">
-                        {reasoningOptions.map(option => {
-                          const selected = option.value === options.reasoning_preference;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => {
-                                updateOption('reasoning_preference', option.value);
-                                setReasoningMenuOpen(false);
-                              }}
-                              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
-                                selected
-                                  ? 'bg-surface-raised text-foreground'
-                                  : 'text-secondary hover:bg-surface-raised hover:text-foreground'
-                              }`}
-                              role="menuitemradio"
-                              aria-checked={selected}
-                            >
-                              <span>{option.label}</span>
-                              <CheckIcon
-                                className={`h-4 w-4 ${selected ? 'opacity-100' : 'opacity-0'}`}
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div className="flex items-center justify-between gap-2 px-1 pb-1">
+                <div className="min-w-0" />
                 <button
                   type="button"
                   onClick={sending ? onStop : submitPrompt}
                   disabled={!selectedModel || cancelling || (!prompt.trim() && !sending)}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-40"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-hover disabled:opacity-40"
                   aria-label={
                     sending
                       ? i18nService.t('localInferenceStopGeneration')
@@ -4279,144 +3763,50 @@ function ChatBubble({
   const isUser = message.role === 'user';
   const hasThinking = Boolean(message.thinking?.trim());
   const hasVisibleContent = Boolean(message.content.trim());
-  const [reasoningOpen, setReasoningOpen] = useState(streaming);
-
-  useEffect(() => {
-    if (streaming) {
-      setReasoningOpen(true);
-      return;
-    }
-    if (hasThinking && hasVisibleContent) {
-      setReasoningOpen(false);
-    }
-  }, [hasThinking, hasVisibleContent, streaming]);
-
+  const thinkingSummary =
+    streaming && !hasVisibleContent
+      ? i18nService.t('localInferenceThinkingInProgress')
+      : i18nService.t('localInferenceThinking');
   return (
-    <article className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={isUser ? 'max-w-[86%]' : 'w-full'}>
-        {isUser ? (
-          <div className="flex justify-end">
-            <div className="w-fit rounded-2xl bg-primary px-4 py-2.5 text-sm leading-7 text-primary-foreground shadow-sm">
-              <div className="whitespace-pre-wrap break-words">{message.content}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-sm leading-7 text-foreground">
-            {hasThinking && (
-              <ReasoningPanel
-                content={message.thinking ?? ''}
-                isOpen={reasoningOpen}
-                isStreaming={streaming && !hasVisibleContent}
-                durationSeconds={message.reasoningDurationSeconds}
-                onToggle={() => setReasoningOpen(current => !current)}
-              />
-            )}
-            {message.waiting && <WaitingDots />}
-            {message.content.trim() ? (
-              <div className="mt-1">
-                <MarkdownContent content={message.content} />
-                {streaming && !message.waiting && hasVisibleContent && (
-                  <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
-                )}
-              </div>
-            ) : null}
-          </div>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`text-sm leading-7 ${
+          isUser
+            ? 'w-fit max-w-[86%] rounded-2xl border border-border-subtle bg-surface-raised px-4 py-2.5 text-foreground'
+            : 'w-full text-foreground'
+        }`}
+      >
+        {!isUser && hasThinking && (
+          <details
+            className="mb-3 rounded-2xl border border-border-subtle bg-surface-raised/55 px-3 py-2 text-sm text-foreground/90"
+            open={streaming && !hasVisibleContent ? true : undefined}
+          >
+            <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+              {thinkingSummary}
+            </summary>
+            <ThinkingContent
+              content={message.thinking ?? ''}
+              streaming={streaming && !hasVisibleContent}
+            />
+          </details>
         )}
-        <MessageMetaRow message={message} isUser={isUser} />
+        {message.waiting && <WaitingDots />}
+        {isUser ? (
+          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        ) : message.content.trim() ? (
+          <MarkdownContent content={message.content} />
+        ) : null}
+        {streaming && !message.waiting && hasVisibleContent && (
+          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/45 align-text-bottom" />
+        )}
+        {!isUser && message.metrics && (
+          <p className="mt-2 text-xs text-secondary">
+            {formatMetricsSummary(message.metrics)}
+          </p>
+        )}
       </div>
-    </article>
-  );
-}
-
-function ReasoningPanel({
-  content,
-  isOpen,
-  isStreaming,
-  durationSeconds,
-  onToggle,
-}: {
-  content: string;
-  isOpen: boolean;
-  isStreaming: boolean;
-  durationSeconds?: number;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="mb-3">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex items-center gap-2 text-left text-sm text-secondary transition-colors hover:text-foreground [&>span:first-child]:hidden"
-      >
-        <span className="text-base leading-none">✧</span>
-        <ThinkingStatusText
-          isStreaming={isStreaming}
-          durationSeconds={durationSeconds}
-        />
-        <ChevronRightIcon className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-      </button>
-      {isOpen && (
-        <ThinkingContent content={content} streaming={isStreaming} />
-      )}
     </div>
   );
-}
-
-function MessageMetaRow({
-  message,
-  isUser,
-}: {
-  message: InferenceMessage;
-  isUser: boolean;
-}) {
-  const handleCopy = useCallback(async () => {
-    const segments = [message.content.trim(), message.thinking?.trim() ?? ''].filter(Boolean);
-    await navigator.clipboard.writeText(segments.join('\n\n'));
-  }, [message.content, message.thinking]);
-
-  return (
-    <div
-      className={`mt-2 flex flex-wrap items-center gap-3 text-xs text-secondary ${
-        isUser ? 'justify-end' : 'justify-start'
-      }`}
-    >
-      <span>{formatMessageTimestamp(message.createdAt)}</span>
-      <button
-        type="button"
-        onClick={() => void handleCopy()}
-        className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
-        title={i18nService.t('copy')}
-      >
-        <ClipboardDocumentIcon className="h-4 w-4" />
-      </button>
-      {!isUser && message.metrics && (
-        <span>{formatMetricsSummary(message.metrics)}</span>
-      )}
-    </div>
-  );
-}
-
-function ThinkingStatusText({
-  isStreaming,
-  durationSeconds,
-}: {
-  isStreaming: boolean;
-  durationSeconds?: number;
-}) {
-  if (isStreaming) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm text-secondary">
-        <span>{i18nService.t('localInferenceThinkingInProgress')}</span>
-        <span className="flex items-center gap-1 pt-px">
-          <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
-          <span className="h-1 w-1 rounded-full bg-current animate-pulse [animation-delay:150ms]" />
-          <span className="h-1 w-1 rounded-full bg-current animate-pulse [animation-delay:300ms]" />
-        </span>
-      </span>
-    );
-  }
-
-  return <span>{formatThoughtDuration(durationSeconds)}</span>;
 }
 
 function ThinkingContent({
@@ -4456,7 +3846,7 @@ function ThinkingContent({
   return (
     <div
       ref={wrapperRef}
-      className={`relative ml-2 mt-2 max-h-48 rounded-xl border-l-2 border-dotted border-border-subtle pl-4 ${
+      className={`relative mt-2 max-h-48 rounded-xl ${
         streaming
           ? 'overflow-hidden'
           : 'overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
@@ -4464,7 +3854,7 @@ function ThinkingContent({
     >
       <div
         ref={contentRef}
-        className={`whitespace-pre-wrap break-words pr-1 text-sm leading-7 text-secondary/85 ${
+        className={`whitespace-pre-wrap break-words pr-1 text-sm leading-7 text-secondary ${
           streaming ? 'transition-transform duration-200' : ''
         }`}
       >
@@ -4493,55 +3883,6 @@ function WaitingDots() {
           style={{ animationDelay: `${index * 120}ms` }}
         />
       ))}
-    </div>
-  );
-}
-
-function InferenceInlineErrorCard({
-  error,
-  onIncreaseContextSize,
-}: {
-  error: LocalInferenceInlineError;
-  onIncreaseContextSize: () => void;
-}) {
-  const detail =
-    error.kind === 'context-overflow' &&
-    error.requestedTokens != null &&
-    error.availableTokens != null
-      ? i18nService
-        .t('localInferenceContextOverflowDetails')
-        .replace('{requested}', error.requestedTokens.toLocaleString())
-        .replace('{available}', error.availableTokens.toLocaleString())
-      : null;
-
-  return (
-    <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-5 py-4 text-left shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500/12 text-red-500">
-          <ExclamationTriangleIcon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="space-y-1">
-            <p className="text-base font-semibold text-red-400">
-              {i18nService.t('localInferenceContextOverflowTitle')}
-            </p>
-            <p className="text-sm text-red-100/75">
-              {i18nService.t('localInferenceContextOverflowDescription')}
-            </p>
-            {detail ? (
-              <p className="text-xs text-red-100/60">{detail}</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onIncreaseContextSize}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-red-400/25 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10"
-          >
-            <ExclamationTriangleIcon className="h-4 w-4" />
-            {i18nService.t('localInferenceContextOverflowAction')}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -4577,11 +3918,11 @@ function InferenceOptionControl({
   }
   if (field.type === 'select') {
     const selectOptions = getInferenceOptionSelectOptions(field.key);
-    if (field.key === 'reasoning_preference') {
+    if (field.key === 'direct_answer_mode') {
       return (
         <div className="space-y-1.5">
           <OptionLabel label={label} paramName={showParamName ? field.paramName : undefined} />
-          <div className="grid grid-cols-3 rounded-xl border border-border bg-surface-input p-1">
+          <div className="grid grid-cols-2 rounded-xl border border-border bg-surface-input p-1">
             {selectOptions.map(option => {
               const selected = String(value) === option.value;
               return (
@@ -4602,6 +3943,7 @@ function InferenceOptionControl({
               );
             })}
           </div>
+          <p className="text-[11px] leading-4 text-secondary">{hint}</p>
         </div>
       );
     }
@@ -4696,11 +4038,10 @@ function getInferenceOptionSelectOptions(
   key: keyof InferenceOptions,
 ): Array<{ value: string; label: string }> {
   switch (key) {
-    case 'reasoning_preference':
+    case 'direct_answer_mode':
       return [
-        { value: 'low', label: i18nService.t('localInferenceReasoningPreferenceLow') },
-        { value: 'auto', label: i18nService.t('localInferenceReasoningPreferenceAuto') },
-        { value: 'high', label: i18nService.t('localInferenceReasoningPreferenceHigh') },
+        { value: 'disabled', label: i18nService.t('localInferenceDirectAnswerModeStandard') },
+        { value: 'enabled', label: i18nService.t('localInferenceDirectAnswerModeReducedThinking') },
       ];
     case 'cache_prompt':
       return [
@@ -4711,84 +4052,6 @@ function getInferenceOptionSelectOptions(
     default:
       return [];
   }
-}
-
-function resolveLocalInferenceInlineError(error: unknown): LocalInferenceInlineError | null {
-  const message = error instanceof Error ? error.message : String(error);
-  if (!isContextOverflowErrorMessage(message)) {
-    return null;
-  }
-  const match = message.match(
-    /request\s*\((\d+)\s*tokens\)\s*exceeds the available context size\s*\((\d+)\s*tokens\)/i,
-  );
-  return {
-    kind: 'context-overflow',
-    requestedTokens: match ? Number.parseInt(match[1], 10) : null,
-    availableTokens: match ? Number.parseInt(match[2], 10) : null,
-  };
-}
-
-function isContextOverflowErrorMessage(message: string): boolean {
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes('exceed_context_size_error') ||
-    normalized.includes('ran out of context size') ||
-    (normalized.includes('available context size') && normalized.includes('exceeds'))
-  );
-}
-
-function useI18nLanguage(): ReturnType<typeof i18nService.getLanguage> {
-  const [language, setLanguage] = useState(i18nService.getLanguage());
-
-  useEffect(() => {
-    return i18nService.subscribe(() => {
-      setLanguage(i18nService.getLanguage());
-    });
-  }, []);
-
-  return language;
-}
-
-function readLocalInferenceSessionState(): LocalInferenceSessionState | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_INFERENCE_SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<LocalInferenceSessionState> | null;
-    if (!parsed || typeof parsed !== 'object') return null;
-    return {
-      activeTab: isLocalInferenceTab(parsed.activeTab) ? parsed.activeTab : 'inference',
-      selectedModel: typeof parsed.selectedModel === 'string' ? parsed.selectedModel : '',
-      systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
-      prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
-      messages: Array.isArray(parsed.messages)
-        ? parsed.messages.filter(isInferenceMessage)
-        : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalInferenceSessionState(state: LocalInferenceSessionState): void {
-  try {
-    localStorage.setItem(LOCAL_INFERENCE_SESSION_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Ignore storage failures and keep the live session usable.
-  }
-}
-
-function isLocalInferenceTab(value: unknown): value is LocalInferenceTab {
-  return value === 'inference' || value === 'models' || value === 'marketplace';
-}
-
-function isInferenceMessage(value: unknown): value is InferenceMessage {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<InferenceMessage>;
-  return (
-    (candidate.role === 'user' || candidate.role === 'assistant') &&
-    typeof candidate.content === 'string' &&
-    typeof candidate.createdAt === 'number'
-  );
 }
 
 function Badge({
@@ -4949,13 +4212,69 @@ function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string):
   return `${devices} · ${patch.splitMode ?? i18nService.t('localInferenceLaunchDefault')}`;
 }
 
+function getServiceConfigFieldState(
+  key: keyof OllamaServiceConfigFormState,
+  form: OllamaServiceConfigFormState,
+  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
+): ServiceConfigFieldState {
+  const field = SERVICE_CONFIG_FIELDS.find(candidate => candidate.key === key);
+  if (!field) {
+    return { visible: false, disabled: false };
+  }
+  const support = runtimeCapabilities?.supports[field.capabilityKey];
+  if (support === false) {
+    return { visible: false, disabled: false };
+  }
+  const gpuDeviceCount = runtimeCapabilities?.gpuDeviceCount ?? 0;
+  if (field.key === 'tensorSplit') {
+    if (gpuDeviceCount <= 1) {
+      return { visible: false, disabled: false };
+    }
+    return {
+      visible: true,
+      disabled: form.splitMode !== 'tensor',
+      disabledReason:
+        form.splitMode !== 'tensor'
+          ? i18nService.t('localInferenceServiceConfigTensorSplitDisabledHint')
+          : undefined,
+    };
+  }
+  if (field.key === 'mainGpu') {
+    if (gpuDeviceCount <= 1) {
+      return { visible: false, disabled: false };
+    }
+    const disabled = form.splitMode === 'layer' || form.splitMode === 'tensor';
+    return {
+      visible: true,
+      disabled,
+      disabledReason: disabled
+        ? i18nService.t('localInferenceServiceConfigMainGpuDisabledHint')
+        : undefined,
+    };
+  }
+  if (field.key === 'device' || field.key === 'splitMode') {
+    if (gpuDeviceCount <= 1) {
+      return { visible: false, disabled: false };
+    }
+    return { visible: true, disabled: false };
+  }
+  if (field.key === 'cacheReuse' || field.key === 'cacheRam') {
+    const disabled = form.cachePrompt === 'false';
+    return {
+      visible: true,
+      disabled,
+      disabledReason: disabled
+        ? i18nService.t('localInferenceServiceConfigPromptCacheDependentHint')
+        : undefined,
+    };
+  }
+  return { visible: true, disabled: false };
+}
+
 function serviceConfigToForm(
   config: OllamaServiceConfig,
-  runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
+  runtimeDevices?: LlamaCppRuntimeDevice[] | null,
 ): OllamaServiceConfigFormState {
-  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
-  const gpuSelectorsAvailable = gpuDetectionState === LlamaCppGpuDetectionState.Unknown
-    || gpuDetectionState === LlamaCppGpuDetectionState.Available;
   return {
     host: config.host ?? '',
     port: config.port ?? '',
@@ -4977,42 +4296,27 @@ function serviceConfigToForm(
     cacheReuse: config.cacheReuse ?? '',
     cacheRam: config.cacheRam ?? '',
     flashAttn: config.flashAttn ?? '',
-    mainGpu: gpuSelectorsAvailable ? (config.mainGpu ?? '') : '',
+    mainGpu: config.mainGpu ?? '',
     mmap: config.noMmap === undefined ? '' : String(!config.noMmap),
-    mlock: config.mlock === undefined ? '' : String(config.mlock),
+    mlock: String(config.mlock === true),
     jinja: config.jinja ?? '',
   };
 }
 
-function isGpuIndexedFieldDisabled(
-  key: keyof OllamaServiceConfigFormState,
-  gpuConfigUnavailable: boolean,
-): boolean {
-  if (!gpuConfigUnavailable) return false;
-  return key === 'device' || key === 'mainGpu';
-}
-
 function normalizeServiceConfigDeviceForForm(
   value: string | undefined,
-  runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
+  runtimeDevices?: LlamaCppRuntimeDevice[] | null,
 ): string {
   const trimmed = value?.trim();
   if (!trimmed) return '';
-  const gpuDetectionState = getLlamaCppGpuDetectionState(runtimeDevices);
-  if (
-    gpuDetectionState === LlamaCppGpuDetectionState.Unavailable ||
-    gpuDetectionState === LlamaCppGpuDetectionState.DetectionFailed
-  ) {
-    return '';
-  }
   if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmed)) return trimmed;
-  if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
+  if (!Array.isArray(runtimeDevices) || runtimeDevices.length === 0) {
     return trimmed;
   }
   const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
   if (parts.length === 0) return '';
   const indexes = parts.map(part =>
-    runtimeDevices.devices.findIndex(device => device.id === part || device.name === part),
+    runtimeDevices.findIndex(device => device.id === part || device.name === part),
   );
   if (indexes.some(index => index < 0)) return trimmed;
   return indexes.join(',');
@@ -5032,26 +4336,8 @@ function getStructuredServiceConfigFieldErrorMessage(
         .replace('{max}', String(fieldError.max ?? ''));
     case 'device-format':
       return i18nService.t('localInferenceServiceConfigFieldErrorDeviceFormat');
-    case 'device-unavailable':
-      return i18nService.t('localInferenceServiceConfigFieldErrorDeviceUnavailable');
-    case 'device-detection-failed':
-      return i18nService.t('localInferenceServiceConfigFieldErrorDeviceDetectionFailed');
-    case 'device-out-of-range':
-      return i18nService
-        .t('localInferenceServiceConfigFieldErrorDeviceOutOfRange')
-        .replace('{min}', String(fieldError.min ?? ''))
-        .replace('{max}', String(fieldError.max ?? ''));
     case 'gpu-layers-format':
       return i18nService.t('localInferenceServiceConfigFieldErrorGpuLayersFormat');
-    case 'main-gpu-unavailable':
-      return i18nService.t('localInferenceServiceConfigFieldErrorMainGpuUnavailable');
-    case 'main-gpu-detection-failed':
-      return i18nService.t('localInferenceServiceConfigFieldErrorMainGpuDetectionFailed');
-    case 'main-gpu-out-of-range':
-      return i18nService
-        .t('localInferenceServiceConfigFieldErrorMainGpuOutOfRange')
-        .replace('{min}', String(fieldError.min ?? ''))
-        .replace('{max}', String(fieldError.max ?? ''));
     case 'tensor-split-format':
       return i18nService.t('localInferenceServiceConfigFieldErrorTensorSplitFormat');
     case 'tensor-split-requires-mode':
@@ -5061,15 +4347,30 @@ function getStructuredServiceConfigFieldErrorMessage(
   }
 }
 
-function getGpuConfigHint(gpuDetectionState: LlamaCppGpuDetectionState): string {
-  switch (gpuDetectionState) {
-    case LlamaCppGpuDetectionState.DetectionFailed:
-      return i18nService.t('localInferenceServiceConfigGpuDetectionFailedHint');
-    case LlamaCppGpuDetectionState.Unavailable:
-      return i18nService.t('localInferenceServiceConfigGpuUnavailableHint');
-    default:
-      return i18nService.t('localInferenceServiceConfigGpuUnavailableHint');
+function getServiceConfigDeviceRuntimeError(
+  value: string,
+  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
+  applicable: boolean,
+): string | undefined {
+  if (!applicable) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (!runtimeCapabilities?.deviceProbeSucceeded || runtimeCapabilities.devices.length === 0) {
+    return undefined;
   }
+  const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0 || !parts.every(part => /^\d+$/.test(part))) {
+    return undefined;
+  }
+  const maxIndex = runtimeCapabilities.devices.length - 1;
+  const hasOutOfRangeIndex = parts.some((part) => {
+    const index = Number.parseInt(part, 10);
+    return !Number.isFinite(index) || index < 0 || index > maxIndex;
+  });
+  if (!hasOutOfRangeIndex) return undefined;
+  return i18nService
+    .t('localInferenceServiceConfigFieldErrorDeviceIndexRange')
+    .replace('{max}', String(maxIndex));
 }
 
 function getSanitizedServiceConfigFields(
@@ -5077,6 +4378,7 @@ function getSanitizedServiceConfigFields(
   saved: OllamaServiceConfig,
 ): string[] {
   const fields: Array<{ key: keyof OllamaServiceConfig; label: string }> = [
+    { key: 'device', label: i18nService.t('localInferenceServiceConfigDeviceLabel') },
     { key: 'modelsMax', label: i18nService.t('localInferenceServiceConfigModelsMaxLabel') },
     { key: 'timeout', label: i18nService.t('localInferenceServiceConfigTimeoutLabel') },
     { key: 'threadsHttp', label: i18nService.t('localInferenceServiceConfigThreadsHttpLabel') },
@@ -5090,6 +4392,7 @@ function getSanitizedServiceConfigFields(
     { key: 'threads', label: i18nService.t('localInferenceServiceConfigThreadsLabel') },
     { key: 'threadsBatch', label: i18nService.t('localInferenceServiceConfigThreadsBatchLabel') },
     { key: 'mainGpu', label: i18nService.t('localInferenceServiceConfigMainGpuLabel') },
+    { key: 'tensorSplit', label: i18nService.t('localInferenceServiceConfigTensorSplitLabel') },
   ];
   return fields
     .filter(({ key }) => {
@@ -5218,6 +4521,47 @@ function getModelContextWindowRange(params: number): ContextWindowBounds {
   return { min: 4096, max: 131072, step: 4096 };
 }
 
+function normalizeLaunchContextValue(
+  value: string,
+  bounds: ContextWindowBounds,
+  options?: { fallbackValue?: number },
+): string {
+  const fallbackBase = options?.fallbackValue ?? 4096;
+  const fallbackClamped = Math.min(Math.max(fallbackBase, bounds.min), bounds.max);
+  const fallbackAligned =
+    bounds.min + Math.floor((fallbackClamped - bounds.min) / bounds.step) * bounds.step;
+  const parsed = parseOptionalInteger(value);
+  if (parsed === undefined) {
+    return String(fallbackAligned);
+  }
+
+  const clamped = Math.min(Math.max(parsed, bounds.min), bounds.max);
+  const aligned = bounds.min + Math.floor((clamped - bounds.min) / bounds.step) * bounds.step;
+  return String(aligned);
+}
+
+function normalizeLaunchPositiveIntegerValue(
+  value: string,
+  options: {
+    min: number;
+    max: number;
+    fallbackValue: number;
+    step?: number;
+  },
+): string {
+  const parsed = parseOptionalInteger(value);
+  const base =
+    parsed === undefined
+      ? options.fallbackValue
+      : Math.min(Math.max(parsed, options.min), options.max);
+  let normalized = Math.min(Math.max(base, options.min), options.max);
+  if (options.step && options.step > 1) {
+    normalized = options.min + Math.floor((normalized - options.min) / options.step) * options.step;
+  }
+  normalized = Math.min(Math.max(normalized, options.min), options.max);
+  return String(normalized);
+}
+
 function isPullInProgress(progress?: Record<string, unknown>): boolean {
   if (!progress) return false;
   const status = readProgressStatus(progress);
@@ -5225,47 +4569,16 @@ function isPullInProgress(progress?: Record<string, unknown>): boolean {
 }
 
 function formatPullProgress(progress: Record<string, unknown>): string {
-  const summary = formatInstallProgressSummary(progress);
-  return summary.primary || summary.phase || i18nService.t('loading');
-}
-
-function formatInstallProgressSummary(progress: Record<string, unknown>): {
-  primary: string;
-  phase?: string;
-  error?: string;
-} {
   const status = readProgressStatus(progress);
   const error = typeof progress.error === 'string' ? progress.error : '';
   const completed = typeof progress.completed === 'number' ? progress.completed : undefined;
   const total = typeof progress.total === 'number' ? progress.total : undefined;
   const percent = typeof progress.percent === 'number' ? progress.percent : undefined;
-  const speed = typeof progress.speed === 'number' ? progress.speed : undefined;
-  const phase = humanizeInstallPhase(status);
-
-  if (error) {
-    return {
-      primary: phase || i18nService.t('marketplaceInstallFailed'),
-      phase,
-      error,
-    };
-  }
-
+  if (error) return `${status || 'error'}: ${error}`;
   if (completed !== undefined && total !== undefined && total > 0) {
-    const parts = [
-      percent !== undefined ? `${percent}%` : undefined,
-      `${formatBytes(completed)} / ${formatBytes(total)}`,
-      speed && speed > 0 ? `${formatBytes(speed)}/s` : undefined,
-    ].filter(Boolean);
-    return {
-      primary: parts.join(' · '),
-      phase,
-    };
+    return `${humanizeInstallPhase(status)} · ${percent !== undefined ? `${percent}% · ` : ''}${formatBytes(completed)} / ${formatBytes(total)}`;
   }
-
-  return {
-    primary: phase || i18nService.t('loading'),
-    phase,
-  };
+  return humanizeInstallPhase(status) || i18nService.t('loading');
 }
 
 function readProgressStatus(progress: Record<string, unknown>): string {
@@ -5290,7 +4603,6 @@ function normalizeInstallProgress(
     percent: typeof chunk.percent === 'number' ? chunk.percent : undefined,
     completed: typeof chunk.completed === 'number' ? chunk.completed : undefined,
     total: typeof chunk.total === 'number' ? chunk.total : undefined,
-    speed: typeof chunk.speed === 'number' ? chunk.speed : undefined,
     targetPath: typeof chunk.targetPath === 'string' ? chunk.targetPath : undefined,
     error: typeof chunk.error === 'string' ? chunk.error : undefined,
   };
@@ -5312,13 +4624,10 @@ function humanizeInstallPhase(phase: string): string {
   switch (phase) {
     case 'starting':
       return i18nService.t('marketplaceInstallStarting');
-    case 'detecting':
-      return i18nService.t('localInferenceInstallVerifying');
     case 'downloading':
-    case 'downloading-progress':
       return i18nService.t('marketplaceInstallPulling');
-    case 'installing':
-      return i18nService.t('localInferenceInstallExtracting');
+    case 'downloading-progress':
+      return i18nService.t('marketplaceInstallProgress');
     case 'cancelling':
       return i18nService.t('marketplaceCancelling');
     case 'cancelled':
@@ -5345,10 +4654,6 @@ function progressBarPercent(progress?: LlamaCppInstallProgress): number {
     return Math.max(0, Math.min(100, Math.round((progress.completed / progress.total) * 100)));
   }
   if (progress.phase === 'done') return 100;
-  if (progress.phase === 'starting') return 10;
-  if (progress.phase === 'downloading') return 35;
-  if (progress.phase === 'installing') return 80;
-  if (progress.phase === 'failed' || progress.phase === 'cancelled') return 100;
   return 0;
 }
 
@@ -5439,28 +4744,20 @@ function computeStreamMetrics(
   accumulatedContent: string,
 ): OllamaChatChunk | null {
   if (!finalChunk) return null;
+  if (finalChunk.predicted_per_second != null) return finalChunk;
+
+  const timingsSpeed = readNestedNumber(finalChunk.timings, 'predicted_per_second');
+  if (timingsSpeed != null) return { ...finalChunk, predicted_per_second: timingsSpeed };
+
+  const elapsed = Math.max(0.001, (Date.now() - streamStartTime) / 1000);
   const evalCount = finalChunk.eval_count;
-  const completionTokens = readNestedNumber(finalChunk.usage, 'completion_tokens')
-    ?? readNestedNumber(finalChunk.timings, 'predicted_n')
-    ?? evalCount;
-  const rawElapsed = readNestedNumber(finalChunk.timings, 'predicted_ms') != null
-    ? readNestedNumber(finalChunk.timings, 'predicted_ms')! / 1000
-    : (Date.now() - streamStartTime) / 1000;
-  const elapsed = Math.max(LOCAL_INFERENCE_MIN_SPEED_SAMPLE_SECONDS, rawElapsed);
-  const estimatedSpeed = completionTokens != null ? completionTokens / elapsed : null;
-
-  const reportedSpeed =
-    finalChunk.predicted_per_second ?? readNestedNumber(finalChunk.timings, 'predicted_per_second');
-  const sanitizedReportedSpeed = sanitizePredictedPerSecond({
-    reportedSpeed,
-    completionTokens,
-    estimatedSpeed,
-  });
-  if (sanitizedReportedSpeed != null) {
-    return { ...finalChunk, predicted_per_second: sanitizedReportedSpeed };
-  }
-
   if (evalCount != null) return { ...finalChunk, predicted_per_second: evalCount / elapsed };
+
+  const completionTokens = readNestedNumber(finalChunk.usage, 'completion_tokens')
+    ?? readNestedNumber(finalChunk.timings, 'predicted_n');
+  if (completionTokens != null) {
+    return { ...finalChunk, predicted_per_second: completionTokens / elapsed };
+  }
 
   const rawLen = accumulatedContent.length > 0
     ? accumulatedContent.length
@@ -5469,63 +4766,10 @@ function computeStreamMetrics(
   return finalChunk;
 }
 
-function sanitizePredictedPerSecond(input: {
-  reportedSpeed: number | null | undefined;
-  completionTokens: number | null | undefined;
-  estimatedSpeed: number | null;
-}): number | null {
-  const { reportedSpeed, completionTokens, estimatedSpeed } = input;
-  if (reportedSpeed == null || !Number.isFinite(reportedSpeed) || reportedSpeed <= 0) {
-    return estimatedSpeed;
-  }
-  if (completionTokens != null && completionTokens <= 2) {
-    return reportedSpeed > LOCAL_INFERENCE_MAX_SPEED_FOR_TINY_COMPLETION
-      ? estimatedSpeed
-      : reportedSpeed;
-  }
-  if (completionTokens != null && completionTokens <= 8) {
-    return reportedSpeed > LOCAL_INFERENCE_MAX_SPEED_FOR_SMALL_COMPLETION
-      ? estimatedSpeed
-      : reportedSpeed;
-  }
-  return reportedSpeed;
-}
-
 function formatMetricsSummary(metrics: OllamaChatChunk): string {
   const speedValue = metrics.predicted_per_second;
   const speed = speedValue != null ? speedValue.toFixed(1) : '-';
-  const completionTokens = readNestedNumber(metrics.usage, 'completion_tokens')
-    ?? readNestedNumber(metrics.timings, 'predicted_n')
-    ?? metrics.eval_count;
-  const speedLabel = i18nService.t('localInferenceMetricsSpeed').replace('{speed}', speed);
-  return completionTokens != null
-    ? `${speedLabel} (${Math.round(completionTokens)} tokens)`
-    : speedLabel;
-}
-
-function estimateReasoningDurationSeconds(metrics: OllamaChatChunk): number | undefined {
-  const predictedMs = readNestedNumber(metrics.timings, 'predicted_ms');
-  if (predictedMs == null) return undefined;
-  return Math.max(1, Math.round(predictedMs / 1000));
-}
-
-function formatThoughtDuration(durationSeconds?: number): string {
-  if (!durationSeconds || durationSeconds <= 0) {
-    return i18nService.t('localInferenceThinking');
-  }
-  return i18nService
-    .t('localInferenceThoughtForSeconds')
-    .replace('{seconds}', String(durationSeconds));
-}
-
-function formatMessageTimestamp(createdAt: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(createdAt);
+  return i18nService.t('localInferenceMetricsSpeed').replace('{speed}', speed);
 }
 
 function buildAssistantMessage({
@@ -5543,10 +4787,6 @@ function buildAssistantMessage({
     content: visibleContent,
     ...(thinking.trim() ? { thinking } : {}),
     metrics,
-    createdAt: Date.now(),
-    ...(thinking.trim() && metrics
-      ? { reasoningDurationSeconds: estimateReasoningDurationSeconds(metrics) }
-      : {}),
   };
 }
 
@@ -5564,7 +4804,6 @@ function buildStreamingAssistantMessage({
     content,
     ...(hasThinking ? { thinking } : {}),
     waiting: !hasContent && !hasThinking,
-    createdAt: Date.now(),
   };
 }
 
@@ -5579,10 +4818,13 @@ function findLatestUserMessageIndex(messages: InferenceMessage[]): number {
   return -1;
 }
 
-function buildEffectiveSystemPrompt(systemPrompt: string): string {
-  void DIRECT_ANSWER_SYSTEM_HINT;
+function buildEffectiveSystemPrompt(
+  systemPrompt: string,
+  directAnswerModeEnabled: boolean,
+): string {
   const trimmed = systemPrompt.trim();
-  return trimmed;
+  if (!directAnswerModeEnabled) return trimmed;
+  return [trimmed, DIRECT_ANSWER_SYSTEM_HINT].filter(Boolean).join('\n\n');
 }
 
 function buildRequestPreview({

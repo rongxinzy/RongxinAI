@@ -100,22 +100,12 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
 
   const fields = getServiceConfigFields();
   const keys = fields.map((field) => field.key);
-  const groups = Array.from(new Set(fields.map((field) => field.group))).sort();
   const serviceKeys = fields.filter((field) => field.group === 'service').map((field) => field.key);
-  const cacheKeys = fields.filter((field) => field.group === 'cache').map((field) => field.key);
-  const gpuKeys = fields.filter((field) => field.group === 'gpu').map((field) => field.key);
-  const compatKeys = fields.filter((field) => field.group === 'compat').map((field) => field.key);
-  const requestKeys = fields.filter((field) => field.group === 'request').map((field) => field.key);
 
   expect(fields.length).toBeGreaterThan(0);
   expect(fields.map((field) => field.paramName)).toContain('parallel');
   expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
-  expect(groups).toEqual(['cache', 'compat', 'gpu', 'request', 'service']);
   expect(serviceKeys).toEqual(['modelsMax', 'modelsAutoload', 'timeout']);
-  expect(cacheKeys).toEqual(['cachePrompt', 'cacheReuse', 'cacheRam']);
-  expect(gpuKeys).toEqual(['device', 'splitMode', 'tensorSplit', 'mainGpu', 'flashAttn']);
-  expect(compatKeys).toEqual(['jinja', 'mlock']);
-  expect(requestKeys).toEqual(['parallel', 'threadsHttp']);
   expect(keys).not.toContain('host');
   expect(keys).not.toContain('port');
   expect(keys).not.toContain('ctxSize');
@@ -179,12 +169,12 @@ test('llama.cpp inference option metadata uses OpenAI-compatible request paramet
   const advancedKeys = fields.filter((field) => field.group === 'advanced').map((field) => field.key);
 
   expect(paramNames).toContain('max_tokens');
-  expect(paramNames).toContain('reasoning');
+  expect(paramNames).toContain('app.system_hint.direct_answer_only');
   expect(paramNames).not.toContain('num_predict');
   expect(paramNames.every((paramName) => !paramName.startsWith('--'))).toBe(true);
   expect(basicKeys).toEqual([
     'num_predict',
-    'reasoning_preference',
+    'direct_answer_mode',
     'temperature',
     'top_p',
   ]);
@@ -206,7 +196,7 @@ test('streaming assistant display shows waiting dots until content or thinking a
     __test__buildStreamingAssistantMessage?: (input: {
       content: string;
       thinking: string;
-    }) => { content: string; thinking?: string; waiting?: boolean; createdAt: number };
+    }) => { content: string; thinking?: string; waiting?: boolean; hiddenThinking?: boolean };
   }).__test__buildStreamingAssistantMessage;
 
   expect(typeof buildStreamingAssistantMessage).toBe('function');
@@ -327,7 +317,7 @@ test('final assistant message keeps visible content and preserves thinking detai
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
-    }) => { content: string; thinking?: string; createdAt: number; reasoningDurationSeconds?: number };
+    }) => { content: string; thinking?: string; hiddenThinking?: boolean };
   }).__test__buildAssistantMessage;
 
   expect(typeof buildAssistantMessage).toBe('function');
@@ -340,7 +330,7 @@ test('final assistant message keeps visible content and preserves thinking detai
 
   expect(message.content).toBe('answer');
   expect(message.thinking).toBe('hidden chain');
-  expect(message.createdAt).toBeTypeOf('number');
+  expect(message.hiddenThinking).toBeUndefined();
 });
 
 test('final assistant message falls back to a generic notice when no visible answer exists', async () => {
@@ -349,7 +339,7 @@ test('final assistant message falls back to a generic notice when no visible ans
     __test__buildAssistantMessage?: (input: {
       content: string;
       thinking: string;
-    }) => { content: string; thinking?: string; createdAt: number; reasoningDurationSeconds?: number };
+    }) => { content: string; thinking?: string; hiddenThinking?: boolean };
   }).__test__buildAssistantMessage;
 
   expect(typeof buildAssistantMessage).toBe('function');
@@ -363,7 +353,7 @@ test('final assistant message falls back to a generic notice when no visible ans
   expect(message.content).toBeTruthy();
   expect(message.content).not.toContain('hidden chain');
   expect(message.thinking).toBe('hidden chain');
-  expect(message.createdAt).toBeTypeOf('number');
+  expect(message.hiddenThinking).toBeUndefined();
 });
 
 test('launch dialog flags ctx-size values that exceed the trained context limit', async () => {

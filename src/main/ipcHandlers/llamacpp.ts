@@ -12,7 +12,6 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
-  getLlamaCppAcceleratorDevices,
   getLlamaCppLaunchContextLimitViolation,
   getLlamaCppModelsMaxLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
@@ -41,12 +40,6 @@ import type { SqliteStore } from '../sqliteStore';
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
 const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {};
-const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
-const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
-const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
-const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
-const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
-
 const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   modelsMax: '0',
   timeout: '600',
@@ -62,9 +55,14 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   threadsBatch: '-1',
   mainGpu: '0',
 } as const;
+const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
+const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
+const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
+const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
+const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return reason === 'llamacpp-model-stopped';
+  return reason === 'llamacpp-model-stopped' || reason === 'llamacpp-set-openclaw-model';
 }
 
 export function getLlamaCppLoadedModelLimitViolation(input: {
@@ -247,33 +245,7 @@ export function registerLlamaCppIpcHandlers(
     return await manager.installRuntime();
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
-  ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    return await manager.listRuntimeDevices(ref ?? undefined);
-  });
-  ipcMain.handle(LlamaCppIpcChannel.ListBackends, async () => manager.listBackends());
-  ipcMain.handle(LlamaCppIpcChannel.GetBackendSelection, async () => manager.getBackendSelection());
-  ipcMain.handle(LlamaCppIpcChannel.SetBackendSelection, async (_event, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) {
-      return {
-        success: false,
-        plan: { kind: 'needs-manual', message: 'Invalid llama.cpp backend selection.' },
-        error: 'Invalid llama.cpp backend selection.',
-      };
-    }
-    return await manager.setBackendSelection(ref);
-  });
-  ipcMain.handle(LlamaCppIpcChannel.InstallBackend, async (_event, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) return await manager.installRuntime();
-    return await manager.setBackendSelection(ref);
-  });
-  ipcMain.handle(LlamaCppIpcChannel.UninstallBackend, async (_event, input: unknown) => {
-    const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) return await manager.uninstallRuntime();
-    return await manager.uninstallBackend(ref);
-  });
+  ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
   ipcMain.handle(LlamaCppIpcChannel.GetRuntimeCapabilities, async () =>
     manager.getRuntimeCapabilities(),
   );
@@ -283,14 +255,11 @@ export function registerLlamaCppIpcHandlers(
       return { success: false, error: '没有活动窗口' };
     }
 
+    const executableName = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
     const result = await dialog.showOpenDialog(win, {
       title: t('localInferenceImportRuntimeDialogTitle'),
-      message: t('localInferenceImportRuntimeDialogMessage'),
-      properties: ['openFile'],
-      filters: [
-        { name: 'llama.cpp backend archives', extensions: ['zip', 'gz'] },
-        { name: 'All files', extensions: ['*'] },
-      ],
+      message: t('localInferenceImportRuntimeDialogMessage').replace('{name}', executableName),
+      properties: ['openDirectory'],
     });
 
     if (result.canceled || result.filePaths.length === 0) {
@@ -614,7 +583,7 @@ export function sanitizeLlamaCppServiceConfig(
   const host = config?.host?.trim();
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
-  const runtimeVersion = config?.runtimeVersion?.trim();
+  const customExecutablePath = config?.customExecutablePath?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
   const modelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
@@ -696,7 +665,7 @@ export function sanitizeLlamaCppServiceConfig(
   if (host) next.host = host;
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
-  if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion)) next.runtimeVersion = runtimeVersion;
+  if (customExecutablePath) next.customExecutablePath = customExecutablePath;
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
   if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
   if (modelsMax) next.modelsMax = modelsMax;
@@ -736,27 +705,6 @@ export function sanitizeLlamaCppServiceConfig(
   if (typeof config?.noMmap === 'boolean') next.noMmap = config.noMmap;
   if (typeof config?.mlock === 'boolean') next.mlock = config.mlock;
   return next;
-}
-
-function sanitizeLlamaCppBackendRef(input: unknown): { version: string; backend: string; versionBackend: string } | null {
-  if (!input || typeof input !== 'object') return null;
-  const candidate = input as { version?: unknown; backend?: unknown; versionBackend?: unknown };
-  let version = typeof candidate.version === 'string' ? candidate.version.trim() : '';
-  let backend = typeof candidate.backend === 'string' ? candidate.backend.trim() : '';
-  const versionBackend = typeof candidate.versionBackend === 'string' ? candidate.versionBackend.trim() : '';
-  if ((!version || !backend) && versionBackend.includes('/')) {
-    const [parsedVersion, parsedBackend] = versionBackend.split('/');
-    version = parsedVersion?.trim() ?? '';
-    backend = parsedBackend?.trim() ?? '';
-  }
-  if (!isSafeLlamaCppBackendSegment(version) || !isSafeLlamaCppBackendSegment(backend)) {
-    return null;
-  }
-  return { version, backend, versionBackend: `${version}/${backend}` };
-}
-
-function isSafeLlamaCppBackendSegment(value: string): boolean {
-  return /^[A-Za-z0-9._-]+$/.test(value) && !value.includes('..');
 }
 
 function normalizeIntegerString(value: string | undefined): string | undefined {
@@ -835,21 +783,6 @@ function normalizeVisibleDevices(
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
 
-  const acceleratorDevices = getLlamaCppAcceleratorDevices(runtimeDevices).map(device => ({
-    id: device.id,
-    name: device.name ?? device.id,
-    backend: device.backend ?? 'unknown',
-  }));
-
-  if (acceleratorDevices.length > 0) {
-    const resolved = resolveLlamaCppDeviceSelection(trimmed, acceleratorDevices);
-    return resolved || undefined;
-  }
-
-  if (runtimeDevices && !runtimeDevices.success) {
-    return undefined;
-  }
-
   if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
     const tokens = trimmed
       .split(',')
@@ -863,7 +796,32 @@ function normalizeVisibleDevices(
     }
     return normalizedTokens.join(',');
   }
-  return undefined;
+
+  const runtimeDeviceList = runtimeDevices.devices.flatMap(device => {
+    if (
+      typeof device.id !== 'string' ||
+      device.id.trim().length === 0
+    ) {
+      return [];
+    }
+    return [{
+      id: device.id.trim(),
+      name:
+        typeof device.name === 'string' && device.name.trim().length > 0
+          ? device.name.trim()
+          : device.id.trim(),
+      backend:
+        typeof device.backend === 'string' && device.backend.trim().length > 0
+          ? device.backend.trim()
+          : 'unknown',
+    }];
+  });
+  if (runtimeDeviceList.length === 0) {
+    return undefined;
+  }
+
+  const resolved = resolveLlamaCppDeviceSelection(trimmed, runtimeDeviceList);
+  return resolved || undefined;
 }
 
 function normalizeTensorSplit(
