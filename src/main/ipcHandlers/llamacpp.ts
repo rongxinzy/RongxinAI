@@ -676,8 +676,9 @@ function normalizeIntegerStringWithDefault(
 ): string | undefined {
   const trimmed = value?.trim();
   if (trimmed === '' && range.min === 0) return range.defaultValue;
+  if (!trimmed) return undefined;
   const normalized = normalizeIntegerString(value);
-  if (!normalized) return undefined;
+  if (!normalized) return range.defaultValue;
   const parsed = Number.parseInt(normalized, 10);
   if (!Number.isFinite(parsed)) return range.defaultValue;
   if (parsed < range.min || parsed > range.max) return range.defaultValue;
@@ -695,8 +696,10 @@ function normalizeSignedIntegerStringWithDefault(
   value: string | undefined,
   range: { min: number; max: number; defaultValue: string },
 ): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
   const normalized = normalizeSignedIntegerString(value);
-  if (!normalized) return undefined;
+  if (!normalized) return range.defaultValue;
   const parsed = Number.parseInt(normalized, 10);
   if (!Number.isFinite(parsed)) return range.defaultValue;
   if (parsed < range.min || parsed > range.max) return range.defaultValue;
@@ -715,8 +718,10 @@ function normalizeGpuLayersStringWithDefault(
   value: string | undefined,
   range: { min: number; max: number; defaultValue: string },
 ): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
   const normalized = normalizeGpuLayersString(value);
-  if (!normalized) return undefined;
+  if (!normalized) return range.defaultValue;
   if (normalized === 'auto' || normalized === 'all') return normalized;
   const parsed = Number.parseInt(normalized, 10);
   if (!Number.isFinite(parsed)) return range.defaultValue;

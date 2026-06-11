@@ -10,7 +10,7 @@ import {
   waitForLlamaCppModelUnloadConfirmation,
 } from './llamacpp';
 
-test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric and enum values', () => {
+test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malformed structured numbers', () => {
   expect(sanitizeLlamaCppServiceConfig({
     host: ' 0.0.0.0 ',
     port: 'not-a-port',
@@ -39,6 +39,7 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     modelsMax: '2',
     modelsAutoload: true,
     ctxSize: '8192',
+    parallel: '1',
     gpuLayers: 'all',
     threads: '8',
     batchSize: '256',
@@ -46,9 +47,42 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and drops invalid numeric
     runtimeBackend: LlamaCppRuntimeBackend.Cuda,
     runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
     device: '0,1',
+    mainGpu: '0',
     splitMode: 'layer',
     reasoning: 'on',
     chatTemplate: 'chatml',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to explicit defaults', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    modelsMax: 'abc',
+    timeout: '1.5',
+    threadsHttp: 'auto',
+    cacheReuse: 'one',
+    cacheRam: '8g',
+    ctxSize: '4k',
+    parallel: 'two',
+    batchSize: 'NaN',
+    ubatchSize: '--',
+    gpuLayers: 'gpu',
+    threads: 'fast',
+    threadsBatch: 'many',
+    mainGpu: 'main',
+  })).toEqual({
+    modelsMax: '0',
+    timeout: '600',
+    threadsHttp: '4',
+    cacheReuse: '0',
+    cacheRam: '8192',
+    ctxSize: '4096',
+    parallel: '1',
+    batchSize: '2048',
+    ubatchSize: '512',
+    gpuLayers: 'auto',
+    threads: '-1',
+    threadsBatch: '-1',
+    mainGpu: '0',
   });
 });
 

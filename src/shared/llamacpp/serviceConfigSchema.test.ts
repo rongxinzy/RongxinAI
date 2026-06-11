@@ -84,3 +84,25 @@ test('validateLlamaCppStructuredServiceConfig keeps field coverage aligned with 
     'gpuLayers',
   ]);
 });
+
+test('validateLlamaCppStructuredServiceConfig stays aligned with the local inference service config UI', async () => {
+  const module = await import('../../renderer/components/localInference/LocalInferenceView');
+  const getServiceConfigFields = (module as unknown as {
+    __test__getServiceConfigFields?: () => Array<{ key: string }>;
+  }).__test__getServiceConfigFields;
+
+  expect(typeof getServiceConfigFields).toBe('function');
+  if (!getServiceConfigFields) return;
+
+  const structuredFieldSet = new Set(LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS);
+  const uiStructuredKeys = getServiceConfigFields()
+    .map(field => field.key)
+    .filter((key): key is typeof LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS[number] =>
+      structuredFieldSet.has(key as typeof LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS[number]))
+    .sort();
+
+  const schemaKeySet = new Set(LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS);
+  for (const key of uiStructuredKeys) {
+    expect(schemaKeySet.has(key)).toBe(true);
+  }
+});
