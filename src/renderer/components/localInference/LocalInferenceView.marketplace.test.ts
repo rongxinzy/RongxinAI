@@ -100,12 +100,22 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
 
   const fields = getServiceConfigFields();
   const keys = fields.map((field) => field.key);
-  const basicKeys = fields.filter((field) => field.group === 'basic').map((field) => field.key);
+  const groups = Array.from(new Set(fields.map((field) => field.group))).sort();
+  const serviceKeys = fields.filter((field) => field.group === 'service').map((field) => field.key);
+  const cacheKeys = fields.filter((field) => field.group === 'cache').map((field) => field.key);
+  const gpuKeys = fields.filter((field) => field.group === 'gpu').map((field) => field.key);
+  const compatKeys = fields.filter((field) => field.group === 'compat').map((field) => field.key);
+  const requestKeys = fields.filter((field) => field.group === 'request').map((field) => field.key);
 
   expect(fields.length).toBeGreaterThan(0);
   expect(fields.map((field) => field.paramName)).toContain('parallel');
   expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
-  expect(basicKeys).toEqual(['modelsMax', 'modelsAutoload', 'device', 'timeout']);
+  expect(groups).toEqual(['cache', 'compat', 'gpu', 'request', 'service']);
+  expect(serviceKeys).toEqual(['modelsMax', 'modelsAutoload', 'timeout']);
+  expect(cacheKeys).toEqual(['cachePrompt', 'cacheReuse', 'cacheRam']);
+  expect(gpuKeys).toEqual(['device', 'splitMode', 'tensorSplit', 'mainGpu', 'flashAttn']);
+  expect(compatKeys).toEqual(['jinja', 'mlock']);
+  expect(requestKeys).toEqual(['parallel', 'threadsHttp']);
   expect(keys).not.toContain('host');
   expect(keys).not.toContain('port');
   expect(keys).not.toContain('ctxSize');

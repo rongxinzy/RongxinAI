@@ -13,12 +13,10 @@ import type {
 } from '../../shared/llamacpp';
 import {
   getLlamaCppAcceleratorDevices,
-  getLlamaCppGpuDetectionState,
   getLlamaCppLaunchContextLimitViolation,
   getLlamaCppModelsMaxLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
-  LlamaCppGpuDetectionState,
   LlamaCppIpcChannel,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
@@ -307,22 +305,19 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
     getLlamaCppServiceConfig(options.getStore()),
   );
-  ipcMain.handle(
-    LlamaCppIpcChannel.SetServiceConfig,
-    async (_event, config: LlamaCppServiceConfig) => {
-      const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
-      if (
-        (config.device?.trim() || config.mainGpu?.trim())
-        && runtimeDevices
-        && getLlamaCppGpuDetectionState(runtimeDevices) === LlamaCppGpuDetectionState.DetectionFailed
-      ) {
-        console.warn('[LlamaCpp] gpu selector settings were dropped because runtime device detection failed');
-      }
-      const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
-      const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
-        sanitizeLlamaCppServiceConfig(config),
-        runtimeCapabilities,
-      );
+    ipcMain.handle(
+      LlamaCppIpcChannel.SetServiceConfig,
+      async (_event, config: LlamaCppServiceConfig) => {
+        const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
+        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
+        const runtimeDevicesForSanitize = runtimeDevices?.success ? runtimeDevices : null;
+        const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
+          sanitizeLlamaCppServiceConfig(
+            config,
+            runtimeDevicesForSanitize,
+          ),
+          runtimeCapabilities,
+        );
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       return sanitized;
     },
@@ -598,6 +593,10 @@ function migrateLegacyServiceConfig(store: SqliteStore): void {
 
 export function sanitizeLlamaCppServiceConfig(
   config: LlamaCppServiceConfig | undefined,
+  runtimeDevices?: {
+    success: boolean;
+    devices?: Array<{ id?: string; name?: string }>;
+  } | null,
 ): LlamaCppServiceConfig {
   const next: LlamaCppServiceConfig = {};
   const modelsMaxRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ModelsMax];
@@ -681,7 +680,7 @@ export function sanitizeLlamaCppServiceConfig(
     max: threadsBatchRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.threadsBatch,
   });
-  const device = normalizeVisibleDevices(config?.device);
+  const device = normalizeVisibleDevices(config?.device, runtimeDevices);
   const splitMode = isSplitMode(config?.splitMode) ? config.splitMode : undefined;
   const mainGpu = normalizeIntegerStringWithDefault(config?.mainGpu, {
     min: mainGpuRange.min,
@@ -690,6 +689,7 @@ export function sanitizeLlamaCppServiceConfig(
   });
   const tensorSplit = normalizeTensorSplit(config?.tensorSplit, {
     splitMode,
+    runtimeDevices,
   });
   const reasoningBudget = normalizeSignedIntegerString(config?.reasoningBudget);
 
