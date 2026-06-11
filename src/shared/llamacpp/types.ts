@@ -1,4 +1,8 @@
-import type { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from './constants';
+import type {
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+  LlamaCppServiceConfigFieldKey,
+} from './constants';
 
 export type LlamaCppServerStatus =
   | 'unknown'
@@ -162,6 +166,20 @@ export type LlamaCppRuntimeListDevicesResult = {
   backend?: LlamaCppBackendRef;
   rawOutput?: string;
   devices: LlamaCppRuntimeDevice[];
+  error?: string;
+};
+
+export type LlamaCppRuntimeCapabilities = {
+  success: boolean;
+  executablePath?: string;
+  version?: string;
+  runtimeTargetId?: string;
+  flags: string[];
+  deviceProbeSucceeded: boolean;
+  devices: LlamaCppRuntimeDevice[];
+  backendKinds: string[];
+  gpuDeviceCount: number;
+  supports: Partial<Record<LlamaCppServiceConfigFieldKey, boolean>>;
   error?: string;
 };
 
