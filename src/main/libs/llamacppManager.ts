@@ -15,6 +15,7 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
   LlamaCppRuntimeBackend as LlamaCppRuntimeBackendType,
+  LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeCudaMajor as LlamaCppRuntimeCudaMajorType,
   LlamaCppRuntimeDevice,
   LlamaCppRuntimeImportResult,
@@ -25,7 +26,11 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
-import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
+import {
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+  LlamaCppServiceConfigFieldKey,
+} from '../../shared/llamacpp';
 import {
   fetchLlamaCppBackendManifest,
   getLlamaCppBackendCompatibilityError,
@@ -56,6 +61,7 @@ const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 600_000;
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
+const LLAMACPP_HELP_PROBE_TIMEOUT_MS = 10_000;
 
 type RequestOptions = { signal?: AbortSignal };
 type ExecFileRunner = (
@@ -216,10 +222,15 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     const runtimeConfig = await this.resolveRuntimeServiceConfig();
+    const runtimeCapabilities = await this.getRuntimeCapabilities().catch(() => null);
+    const filteredRuntimeConfig = filterLlamaCppServiceConfigByRuntimeCapabilities(
+      runtimeConfig,
+      runtimeCapabilities,
+    );
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
     this.process = spawn(
       this.executablePath,
-      buildLlamaServerArgs(runtimeConfig, this.getModelsDir(), this.getPresetPath()),
+      buildLlamaServerArgs(filteredRuntimeConfig, this.getModelsDir(), this.getPresetPath()),
       {
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -617,7 +628,76 @@ export class LlamaCppManager extends EventEmitter {
     return ref ? { ...result, backend: ref } : result;
   }
 
-  async importRuntime(sourcePath: string): Promise<LlamaCppRuntimeImportResult> {
+  async getRuntimeCapabilities(): Promise<LlamaCppRuntimeCapabilities> {
+    if (!this.executablePath) {
+      this.executablePath = await findLlamaCppExecutable(this.getServiceConfig());
+    }
+    if (!this.executablePath) {
+      return {
+        success: false,
+        flags: [],
+        deviceProbeSucceeded: false,
+        devices: [],
+        backendKinds: [],
+        gpuDeviceCount: 0,
+        supports: {},
+        error: 'llama.cpp runtime is not installed.',
+      };
+    }
+
+    const [helpFlagsResult, devicesResult] = await Promise.all([
+      listLlamaCppRuntimeHelpFlags({
+        executablePath: this.executablePath,
+        platform: process.platform,
+        baseEnv: process.env,
+      }),
+      this.listRuntimeDevices(),
+    ]);
+
+    const devices = devicesResult.success ? devicesResult.devices : [];
+    const backendKinds = Array.from(new Set(devices.map(device => device.backend).filter(Boolean)));
+    const gpuDeviceCount = devices.filter(device => isGpuLikeRuntimeDevice(device)).length;
+    return {
+      success: helpFlagsResult.success || devicesResult.success,
+      executablePath: this.executablePath,
+      version: this.status.version,
+      runtimeTargetId: devicesResult.runtimeTargetId,
+      flags: helpFlagsResult.flags,
+      deviceProbeSucceeded: devicesResult.success,
+      devices,
+      backendKinds,
+      gpuDeviceCount,
+      supports: buildLlamaCppServiceConfigFieldSupport({
+        helpProbeSucceeded: helpFlagsResult.success,
+        flags: helpFlagsResult.flags,
+        devices,
+        runtimeBackend: this.status.runtimeBackend,
+      }),
+      ...(helpFlagsResult.success
+        ? {}
+        : { error: helpFlagsResult.error ?? devicesResult.error ?? 'Failed to probe runtime.' }),
+    };
+  }
+
+  /**
+   * Import a user-provided llama.cpp runtime from a local directory.
+   * Copies all files from the directory containing llama-server into
+   * <runtimeRoot>/current/bin/, matching the existing auto-download
+   * copy strategy. Platform differences (DLLs, dylibs, .so) are handled
+   * automatically by copying the full directory.
+   */
+  async importRuntime(sourceDir: string): Promise<LlamaCppRuntimeImportResult> {
+    const executableName = resolveLlamaCppExecutableName(process.platform);
+    const sourceExecutable = path.join(sourceDir, executableName);
+
+    if (!fs.existsSync(sourceExecutable)) {
+      return {
+        success: false,
+        error: `未在所选目录中找到 ${executableName}。请选择包含 ${executableName} 的目录。`,
+      };
+    }
+
+    // Verify the executable is actually runnable
     try {
       await this.stop();
       const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
@@ -1248,6 +1328,56 @@ export function buildLlamaServerArgs(
   return args;
 }
 
+export function filterLlamaCppServiceConfigByRuntimeCapabilities(
+  config: LlamaCppServiceConfig,
+  runtimeCapabilities: LlamaCppRuntimeCapabilities | null | undefined,
+): LlamaCppServiceConfig {
+  if (!runtimeCapabilities) return config;
+
+  const next: LlamaCppServiceConfig = { ...config };
+  const supports = runtimeCapabilities.supports ?? {};
+  const clearWhenUnsupported = (
+    key: keyof LlamaCppServiceConfig,
+    supportKey: LlamaCppServiceConfigFieldKey,
+  ) => {
+    if (supports[supportKey] === false) {
+      delete next[key];
+    }
+  };
+
+  clearWhenUnsupported('modelsMax', LlamaCppServiceConfigFieldKey.ModelsMax);
+  clearWhenUnsupported('modelsAutoload', LlamaCppServiceConfigFieldKey.ModelsAutoload);
+  clearWhenUnsupported('timeout', LlamaCppServiceConfigFieldKey.Timeout);
+  clearWhenUnsupported('threadsHttp', LlamaCppServiceConfigFieldKey.ThreadsHttp);
+  clearWhenUnsupported('parallel', LlamaCppServiceConfigFieldKey.Parallel);
+  clearWhenUnsupported('cachePrompt', LlamaCppServiceConfigFieldKey.CachePrompt);
+  clearWhenUnsupported('cacheReuse', LlamaCppServiceConfigFieldKey.CacheReuse);
+  clearWhenUnsupported('cacheRam', LlamaCppServiceConfigFieldKey.CacheRam);
+  clearWhenUnsupported('device', LlamaCppServiceConfigFieldKey.Device);
+  clearWhenUnsupported('splitMode', LlamaCppServiceConfigFieldKey.SplitMode);
+  clearWhenUnsupported('tensorSplit', LlamaCppServiceConfigFieldKey.TensorSplit);
+  clearWhenUnsupported('mainGpu', LlamaCppServiceConfigFieldKey.MainGpu);
+  clearWhenUnsupported('flashAttn', LlamaCppServiceConfigFieldKey.FlashAttn);
+  clearWhenUnsupported('jinja', LlamaCppServiceConfigFieldKey.Jinja);
+  clearWhenUnsupported('mlock', LlamaCppServiceConfigFieldKey.Mlock);
+
+  if (next.cachePrompt === false) {
+    delete next.cacheReuse;
+    delete next.cacheRam;
+  }
+  if (next.splitMode !== 'tensor') {
+    delete next.tensorSplit;
+  }
+  if (runtimeCapabilities.deviceProbeSucceeded && runtimeCapabilities.gpuDeviceCount <= 1) {
+    delete next.device;
+    delete next.splitMode;
+    delete next.tensorSplit;
+    delete next.mainGpu;
+  }
+
+  return next;
+}
+
 function appendArg(args: string[], name: string, value: string | undefined): void {
   const trimmed = value?.trim();
   if (!trimmed) return;
@@ -1278,6 +1408,51 @@ export function buildLlamaCppServeEnv(
     prependEnvPathEntry(env, 'LD_LIBRARY_PATH', runtimeBinDir, platform);
   }
   return env;
+}
+
+export async function listLlamaCppRuntimeHelpFlags(input: {
+  executablePath: string;
+  platform: NodeJS.Platform;
+  baseEnv?: NodeJS.ProcessEnv;
+  runner?: ExecFileRunner;
+}): Promise<{
+  success: boolean;
+  flags: string[];
+  rawOutput?: string;
+  error?: string;
+}> {
+  const runner = input.runner ?? (execFileAsync as ExecFileRunner);
+  try {
+    const { stdout, stderr } = await runner(input.executablePath, ['--help'], {
+      env: buildLlamaCppServeEnv(input.baseEnv ?? process.env, input.executablePath, input.platform),
+      encoding: 'utf8',
+      maxBuffer: 512 * 1024,
+      timeout: LLAMACPP_HELP_PROBE_TIMEOUT_MS,
+      windowsHide: true,
+    });
+    const rawOutput = [stdout, stderr].filter(Boolean).join(stderr ? '\n' : '');
+    return {
+      success: true,
+      flags: parseLlamaCppHelpFlags(rawOutput),
+      rawOutput,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      flags: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export function parseLlamaCppHelpFlags(output: string): string[] {
+  const flags = new Set<string>();
+  for (const line of output.split(/\r?\n/)) {
+    const matches = line.match(/--[a-z0-9][a-z0-9-]*/gi);
+    if (!matches) continue;
+    matches.forEach(flag => flags.add(flag.toLowerCase()));
+  }
+  return Array.from(flags).sort();
 }
 
 export async function listLlamaCppRuntimeDevices(input: {
@@ -1367,6 +1542,49 @@ function inferLlamaCppDeviceBackend(id: string, name: string): string {
   if (source.includes('sycl')) return 'sycl';
   if (source.includes('cpu')) return 'cpu';
   return 'unknown';
+}
+
+function isGpuLikeRuntimeDevice(device: LlamaCppRuntimeDevice): boolean {
+  return device.backend !== 'cpu' && device.backend !== 'unknown';
+}
+
+function buildLlamaCppServiceConfigFieldSupport(input: {
+  helpProbeSucceeded: boolean;
+  flags: string[];
+  devices: LlamaCppRuntimeDevice[];
+  runtimeBackend?: LlamaCppRuntimeBackendType;
+}): Partial<Record<LlamaCppServiceConfigFieldKey, boolean>> {
+  const flags = new Set(input.flags.map(flag => flag.toLowerCase()));
+  const gpuDevices = input.devices.filter(device => isGpuLikeRuntimeDevice(device));
+  const hasGpu = gpuDevices.length > 0 || input.runtimeBackend === LlamaCppRuntimeBackend.Cuda;
+  const hasMultiGpu = gpuDevices.length > 1;
+  const hasFlag = (...names: string[]) => names.some(name => flags.has(name.toLowerCase()));
+  const unknownHelpSupport = !input.helpProbeSucceeded;
+
+  return {
+    [LlamaCppServiceConfigFieldKey.ModelsMax]: unknownHelpSupport || hasFlag('--models-max'),
+    [LlamaCppServiceConfigFieldKey.ModelsAutoload]:
+      unknownHelpSupport || hasFlag('--models-autoload', '--no-models-autoload'),
+    [LlamaCppServiceConfigFieldKey.Timeout]: unknownHelpSupport || hasFlag('--timeout'),
+    [LlamaCppServiceConfigFieldKey.ThreadsHttp]: unknownHelpSupport || hasFlag('--threads-http'),
+    [LlamaCppServiceConfigFieldKey.Parallel]: unknownHelpSupport || hasFlag('--parallel'),
+    [LlamaCppServiceConfigFieldKey.CachePrompt]:
+      unknownHelpSupport || hasFlag('--cache-prompt', '--no-cache-prompt'),
+    [LlamaCppServiceConfigFieldKey.CacheReuse]: unknownHelpSupport || hasFlag('--cache-reuse'),
+    [LlamaCppServiceConfigFieldKey.CacheRam]: unknownHelpSupport || hasFlag('--cache-ram'),
+    [LlamaCppServiceConfigFieldKey.Device]:
+      hasGpu && (unknownHelpSupport || hasFlag('--device')),
+    [LlamaCppServiceConfigFieldKey.SplitMode]:
+      hasMultiGpu && (unknownHelpSupport || hasFlag('--split-mode')),
+    [LlamaCppServiceConfigFieldKey.TensorSplit]:
+      hasMultiGpu && (unknownHelpSupport || hasFlag('--tensor-split')),
+    [LlamaCppServiceConfigFieldKey.MainGpu]:
+      hasMultiGpu && (unknownHelpSupport || hasFlag('--main-gpu')),
+    [LlamaCppServiceConfigFieldKey.FlashAttn]:
+      hasGpu && (unknownHelpSupport || hasFlag('--flash-attn')),
+    [LlamaCppServiceConfigFieldKey.Jinja]: unknownHelpSupport || hasFlag('--jinja', '--no-jinja'),
+    [LlamaCppServiceConfigFieldKey.Mlock]: unknownHelpSupport || hasFlag('--mlock'),
+  };
 }
 
 export async function findLlamaCppExecutable(_config: LlamaCppServiceConfig = {}): Promise<string | null> {
