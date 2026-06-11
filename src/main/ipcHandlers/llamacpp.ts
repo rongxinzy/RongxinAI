@@ -274,18 +274,19 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
     getLlamaCppServiceConfig(options.getStore()),
   );
-  ipcMain.handle(
-    LlamaCppIpcChannel.SetServiceConfig,
-    async (_event, config: LlamaCppServiceConfig) => {
-      const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
-      const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
-      const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
-        sanitizeLlamaCppServiceConfig(
-          config,
-          runtimeDevices,
-        ),
-        runtimeCapabilities,
-      );
+    ipcMain.handle(
+      LlamaCppIpcChannel.SetServiceConfig,
+      async (_event, config: LlamaCppServiceConfig) => {
+        const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
+        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
+        const runtimeDevicesForSanitize = runtimeDevices?.success ? runtimeDevices : null;
+        const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
+          sanitizeLlamaCppServiceConfig(
+            config,
+            runtimeDevicesForSanitize,
+          ),
+          runtimeCapabilities,
+        );
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       return sanitized;
     },
