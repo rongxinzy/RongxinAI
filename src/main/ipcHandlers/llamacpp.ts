@@ -301,7 +301,7 @@ export function registerLlamaCppIpcHandlers(
       }
       const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
       const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
-        sanitizeLlamaCppServiceConfig(config, runtimeDevices),
+        sanitizeLlamaCppServiceConfig(config),
         runtimeCapabilities,
       );
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);

@@ -49,6 +49,7 @@ import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
   createLlamaCppRuntimeInstallPlan,
   executeLlamaCppRuntimeInstallPlan,
+  resolveLlamaCppExecutableName,
   resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
 import { MarketplaceService } from './marketplaceService';
@@ -703,7 +704,7 @@ export class LlamaCppManager extends EventEmitter {
       const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
       const result = await importLlamaCppBackendPath({
         runtimeRoot: getUserLlamaCppRuntimeRoot(),
-        sourcePath,
+        sourcePath: sourceDir,
         platform: process.platform,
         arch: process.arch,
         hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
