@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import {
+  getLlamaCppLoadedModelLimitViolation,
   getRequiredVramRecoveryMiB,
   getTotalFreeVramMiB,
   hasRecoveredVram,
@@ -176,6 +177,97 @@ test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimi
   })).toEqual({
     modelsMax: '0',
   });
+});
+
+test('sanitizeLlamaCppServiceConfig normalizes numeric device indexes to CUDA device ids', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0,1',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090' },
+        { id: 'CUDA1', name: 'NVIDIA GeForce RTX 4080' },
+      ],
+    },
+  )).toEqual({
+    device: 'CUDA0,CUDA1',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig maps numeric device indexes to runtime devices on non-CUDA backends', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'METAL0', name: 'Apple GPU', backend: 'metal' },
+        { id: 'CPU', name: 'CPU', backend: 'cpu' },
+      ],
+    },
+  )).toEqual({
+    device: 'METAL0',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig preserves explicit runtime device ids on non-CUDA backends', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: 'METAL0',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'METAL0', name: 'Apple GPU', backend: 'metal' },
+        { id: 'CPU', name: 'CPU', backend: 'cpu' },
+      ],
+    },
+  )).toEqual({
+    device: 'METAL0',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig clears invalid visible devices back to default visibility', () => {
+  expect(sanitizeLlamaCppServiceConfig(
+    {
+      device: '0,3',
+    },
+    {
+      success: true,
+      devices: [
+        { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090' },
+        { id: 'CUDA1', name: 'NVIDIA GeForce RTX 4080' },
+      ],
+    },
+  )).toEqual({});
+});
+
+test('getLlamaCppLoadedModelLimitViolation blocks loading a third model when modelsMax is two', () => {
+  expect(getLlamaCppLoadedModelLimitViolation({
+    modelsMax: '2',
+    runningModels: [
+      { name: 'Qwen3-0.6B-GGUF' },
+      { name: 'Qwen3-1.7B-GGUF' },
+    ],
+    targetModelName: 'Qwen3-4B-GGUF',
+  })).toEqual({
+    limit: 2,
+    next: 3,
+  });
+});
+
+test('getLlamaCppLoadedModelLimitViolation allows reloading an already running model', () => {
+  expect(getLlamaCppLoadedModelLimitViolation({
+    modelsMax: '2',
+    runningModels: [
+      { name: 'Qwen3-0.6B-GGUF' },
+      { name: 'Qwen3-1.7B-GGUF' },
+    ],
+    targetModelName: 'Qwen3-1.7B-GGUF',
+  })).toBeNull();
 });
 
 test('shouldSyncOpenClawAfterRunningModelRefresh only syncs on model stop', () => {
