@@ -1,4 +1,5 @@
 import { type ChildProcess,spawn } from 'child_process';
+import { CronExpressionParser } from 'cron-parser';
 import crypto from 'crypto';
 import { app, type UtilityProcess,utilityProcess } from 'electron';
 import { EventEmitter } from 'events';
@@ -178,6 +179,75 @@ function isFileReadable(filePath: string): boolean {
   }
 };
 
+interface CronJobSnapshot {
+  id: string;
+  /** Job name from the cron store — used for display in skipped run log entries. */
+  name: string;
+  enabled: boolean;
+  lastRunAtMs: number | null;
+  nextRunAtMs: number | null;
+  /** Timestamp (epoch ms) when the job is actively running, or null if idle. */
+  runningAtMs: number | null;
+  /** Schedule definition from the cron store — used to enumerate all missed run boundaries. */
+  schedule: CronJobSnapshotSchedule | null;
+}
+
+interface CronJobSnapshotSchedule {
+  kind: string;
+  expr?: string;
+  everyMs?: number;
+  tz?: string;
+  anchorMs?: number;
+}
+
+/** Maximum number of skipped run log entries to write per job per restart (prevents floods). */
+const MAX_SKIPPED_ENTRIES_PER_JOB = 20;
+
+/**
+ * Enumerate all schedule boundary timestamps between firstMissedAtMs (inclusive)
+ * and untilMs (exclusive).  Returns at most MAX_SKIPPED_ENTRIES_PER_JOB entries.
+ *
+ * For "every" schedules the calculation is simple arithmetic stepping.
+ * For "cron" schedules we use cron-parser to find each successive matching time.
+ * For "at" (one-shot) or unknown kinds we return only the first missed boundary.
+ */
+function enumerateMissedCycleBoundaries(
+  schedule: CronJobSnapshotSchedule,
+  firstMissedAtMs: number,
+  untilMs: number,
+): number[] {
+  const result: number[] = [firstMissedAtMs];
+
+  if (schedule.kind === 'every' && typeof schedule.everyMs === 'number' && schedule.everyMs > 0) {
+    const { everyMs } = schedule;
+    const limit = Math.min(
+      MAX_SKIPPED_ENTRIES_PER_JOB,
+      // Ceiling: avoid iterating billions of steps for micro-sized intervals.
+      Math.floor((untilMs - firstMissedAtMs) / everyMs) + 1,
+    );
+    for (let i = 1; i < limit; i++) {
+      const t = firstMissedAtMs + i * everyMs;
+      if (t >= untilMs) break;
+      result.push(t);
+    }
+  } else if (schedule.kind === 'cron' && typeof schedule.expr === 'string') {
+    try {
+      const opts: { currentDate: Date; tz?: string } = { currentDate: new Date(firstMissedAtMs + 1) };
+      if (schedule.tz) opts.tz = schedule.tz;
+      const interval = CronExpressionParser.parse(schedule.expr, opts);
+      while (interval.hasNext() && result.length < MAX_SKIPPED_ENTRIES_PER_JOB) {
+        const t = interval.next().getTime();
+        if (t >= untilMs) break;
+        result.push(t);
+      }
+    } catch {
+      // cron-parser failed (invalid expr, bad tz, etc.) — fall back to just the first boundary.
+    }
+  }
+
+  return result;
+}
+
 export class OpenClawEngineManager extends EventEmitter {
   private readonly baseDir: string;
   private readonly logsDir: string;
@@ -198,6 +268,8 @@ export class OpenClawEngineManager extends EventEmitter {
   private secretEnvVars: Record<string, string> = {};
   private gatewaySpawnedAt: number | null = null;
   private gatewayLogPrunedDateKey: string | null = null;
+  /** Snapshot of cron jobs taken just before forking the gateway, used to detect missed jobs with skipMissedJobs. */
+  private cronJobsAtFork: CronJobSnapshot[] | null = null;
 
   // ── Startup phase tracking (phased health probes) ──
   private startupPhase: 'compiling' | 'modules-loading' | 'health-waiting' | 'running' = 'compiling';
@@ -920,6 +992,9 @@ export class OpenClawEngineManager extends EventEmitter {
       }
     }
 
+    // Snapshot cron store before gateway startup to detect missed jobs later.
+    this.cronJobsAtFork = this.readGatewayCronJobs();
+
     const forkArgs = ['gateway', '--bind', 'loopback', '--port', String(port), '--token', token, '--verbose'];
     console.log(`[OpenClaw] forking gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}, args=${JSON.stringify(forkArgs)}`);
 
@@ -984,6 +1059,8 @@ export class OpenClawEngineManager extends EventEmitter {
     console.log(`[OpenClaw] startGateway: gateway is running, total startup time: ${elapsed()}`);
     // Reset restart counter on successful start — gateway is healthy
     this.gatewayRestartAttempt = 0;
+    // Write "skipped" run log entries for jobs that were missed during gateway downtime.
+    this.writeSkippedCronRunLogs();
     this.setStatus({
       phase: 'running',
       version: runtime.version,
@@ -1966,6 +2043,106 @@ export class OpenClawEngineManager extends EventEmitter {
       if (this.shutdownRequested) return;
       void this.startGateway('auto-restart-after-crash');
     }, delay);
+  }
+
+  private readGatewayCronJobs(): CronJobSnapshot[] | null {
+    try {
+      const cronStorePath = path.join(this.stateDir, 'cron', 'jobs.json');
+      const raw = fs.readFileSync(cronStorePath, 'utf8');
+      const store = JSON.parse(raw);
+      if (!Array.isArray(store.jobs)) return null;
+      return store.jobs.map((j: Record<string, unknown>) => {
+        const rawSchedule = j.schedule as Record<string, unknown> | undefined;
+        return {
+          id: j.id as string,
+          name: (j.name as string) ?? '',
+          enabled: j.enabled !== false,
+          lastRunAtMs: (j.state as Record<string, unknown>)?.lastRunAtMs as number | null ?? null,
+          nextRunAtMs: (j.state as Record<string, unknown>)?.nextRunAtMs as number | null ?? null,
+          runningAtMs: (j.state as Record<string, unknown>)?.runningAtMs as number | null ?? null,
+          schedule: rawSchedule
+            ? {
+                kind: (rawSchedule.kind as string) ?? '',
+                expr: rawSchedule.expr as string | undefined,
+                everyMs: rawSchedule.everyMs as number | undefined,
+                tz: rawSchedule.tz as string | undefined,
+                anchorMs: rawSchedule.anchorMs as number | undefined,
+              }
+            : null,
+        };
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /** After gateway startup, write "skipped" run log entries for jobs missed during downtime. */
+  private writeSkippedCronRunLogs(): void {
+    if (!this.cronJobsAtFork?.length) return;
+    const spawnedAt = this.gatewaySpawnedAt;
+    if (!spawnedAt) return;
+
+    // Only write when skipMissedJobs is enabled in the gateway config.
+    try {
+      const configRaw = fs.readFileSync(this.configPath, 'utf8');
+      const config = JSON.parse(configRaw);
+      if (config.cron?.skipMissedJobs !== true) return;
+    } catch {
+      return;
+    }
+
+    const runsDir = path.join(this.stateDir, 'cron', 'runs');
+    ensureDir(runsDir);
+
+    const offlineEndMs = Date.now();
+
+    let totalSkippedCount = 0;
+    for (const job of this.cronJobsAtFork) {
+      if (!job.enabled) continue;
+      if (job.lastRunAtMs == null || job.nextRunAtMs == null) continue;
+
+      // A run was missed if the last run completed before gateway spawn AND
+      // the next scheduled run was also due before gateway spawn.
+      if (job.lastRunAtMs < spawnedAt && job.nextRunAtMs < spawnedAt) {
+        const logPath = path.join(runsDir, `${job.id}.jsonl`);
+
+        // Enumerate all missed schedule boundaries during the offline window.
+        const missedTimes = job.schedule
+          ? enumerateMissedCycleBoundaries(job.schedule, job.nextRunAtMs, offlineEndMs)
+          : [job.nextRunAtMs];
+
+        let jobSkippedCount = 0;
+        for (const runAtMs of missedTimes) {
+          const entry = {
+            ts: Date.now(),
+            jobId: job.id,
+            jobName: job.name,
+            action: 'finished',
+            status: 'skipped',
+            runAtMs,
+            durationMs: 0,
+            reason: 'skipMissedJobs enabled - skipped startup catch-up after restart',
+          };
+          try {
+            fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf8');
+            jobSkippedCount++;
+          } catch (err) {
+            console.error(`[OpenClaw] Failed to write skipped run log for job ${job.id}:`, err);
+          }
+        }
+
+        if (jobSkippedCount > 0) {
+          console.log(
+            `[OpenClaw] Cron job "${job.name}": wrote ${jobSkippedCount} skipped entry/entries (offline ${new Date(job.nextRunAtMs).toISOString()} → ${new Date(offlineEndMs).toISOString()})`,
+          );
+        }
+        totalSkippedCount += jobSkippedCount;
+      }
+    }
+
+    if (totalSkippedCount > 0) {
+      console.log(`[OpenClaw] Wrote ${totalSkippedCount} skipped cron run log entries total (skipMissedJobs=true)`);
+    }
   }
 
   private setStatus(next: OpenClawEngineStatus): void {
