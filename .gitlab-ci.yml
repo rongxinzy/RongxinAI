@@ -22,6 +22,8 @@ stages:
 
 variables:
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+  ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
 
 # ═══════════════════════════════════════════════════════
 # Stage 1: Lint（仅变更的 TS/TSX 文件）
@@ -52,6 +54,8 @@ lint:
       fi
     - cp -r node_modules /opt/ci-cache/node_modules 2>/dev/null || true
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
@@ -70,6 +74,8 @@ build-renderer:
     - npm run build
     - test -f dist/index.html
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - src/renderer/**/*
@@ -93,6 +99,8 @@ build-main:
       - dist-electron/
     expire_in: 1 hour
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - src/main/**/*
@@ -106,6 +114,8 @@ build-skills:
   script:
     - npm run build:skills
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - SKILLs/**/*
@@ -122,6 +132,8 @@ test:
   script:
     - npm test
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
@@ -143,34 +155,171 @@ test:
 # ═══════════════════════════════════════════════════════
 
 build-windows:
+  timeout: 2h
   stage: build-platforms
   tags:
     - windows
   image: null
   before_script: []
+  variables:
+    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+    ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+    GIT_CLEAN_FLAGS: none
   cache:
-    - key: "win-npm-$CI_COMMIT_REF_SLUG"
+    - key: "win-npm-dev"
       paths:
         - node_modules/
     - key: "win-python-3.11.9"
       paths:
         - resources/python-win/
+    - key: "win-openclaw-v2026.4.14"
+      paths:
+        - vendor/openclaw-runtime/win-x64/
+        - build-tar/win-resources.tar
   script:
-    # 确保 pnpm 可用（OpenClaw 构建依赖 pnpm monorepo）
-    - npm ci
-    - npm install -g pnpm
-    - $env:PATH = "$(npm prefix -g);$env:PATH"
-    # 准备便携 Python 运行时（缓存命中时跳过下载）
-    - npm run setup:python-runtime
-    # 完整打包流程：OpenClaw 运行时 → 编译 → skills → electron-builder
-    - npm run dist:win
+    # 手动清理构建输出（替代 git clean，避免删除缓存目录）
+    - if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+    - if (Test-Path dist-electron) { Remove-Item dist-electron -Recurse -Force }
+    - if (Test-Path release) { Remove-Item release -Recurse -Force }
+    # Windows Defender 排除构建目录（防止 ML 模型误报查杀 gateway-bundle.mjs 等 minified JS）
     - |
-      echo "Build output:"
-      dir release\*.exe
-  artifacts:
-    paths:
-      - release/*.exe
-    expire_in: 7 days
+      try {
+        Add-MpPreference -ExclusionPath "$env:CI_PROJECT_DIR\vendor\openclaw-runtime" -ErrorAction Stop
+        Add-MpPreference -ExclusionPath "$env:CI_PROJECT_DIR\build-tar" -ErrorAction Stop
+        Write-Host "Defender exclusions added for build directories"
+      } catch {
+        Write-Host "Defender exclusions skipped: $_"
+      }
+    # Ensure NSIS is available — electron-builder silently skips NSIS if makensis is missing
+    - if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+        Write-Error "NSIS (makensis) not found in PATH. Install NSIS and add to system PATH."
+        exit 1
+      }
+    - Write-Host "makensis $(makensis -VERSION)"
+    # 确保 C:\nodejs junction 存在（避免空格路径在 shell:true 时截断）
+    - if (-not (Test-Path C:\nodejs\node.exe)) { New-Item -ItemType Junction -Path C:\nodejs -Target "C:\Program Files\nodejs" -Force }
+    - $env:PATH = "C:\nodejs;C:\Program Files (x86)\NSIS;$env:PATH"
+    # 使用国内 npm 镜像加速（锁文件 hash 保证依赖完整性不受影响）
+    - npm ci
+    - npm install -g pnpm --registry https://registry.npmmirror.com
+    - pnpm config set registry https://registry.npmmirror.com
+    - $env:PATH = "$(npm prefix -g);$env:PATH"
+    # 准备 Python 运行时：优先从本机预装目录复制（秒级），fallback 到下载
+    - |
+      $preinst = "C:\ci-cache\python-embed"
+      $pythonDir = "resources\python-win"
+      if (-not (Test-Path "$pythonDir\python.exe")) {
+        if (Test-Path "$preinst\python.exe") {
+          Write-Host "Copying Python from pre-installed $preinst ..."
+          Copy-Item "$preinst\*" "$pythonDir\" -Recurse -Force
+        } else {
+          Write-Host "Pre-installed Python not found at $preinst, downloading..."
+          $pythonVer = "3.11.9"
+          $zip = "$env:TEMP\python-$pythonVer-embed-amd64.zip"
+          $mirror = if ($env:PYTHON_MIRROR) { $env:PYTHON_MIRROR } else { "https://www.python.org/ftp/python/$pythonVer" }
+          Invoke-WebRequest -Uri "$mirror/python-$pythonVer-embed-amd64.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $pythonDir -Force
+          Remove-Item $zip
+          $pth = Get-ChildItem "$pythonDir\*._pth" | Select-Object -First 1
+          if ($pth) {
+            $content = (Get-Content $pth.FullName -Raw) -replace '(?m)^#import site', 'import site'
+            if ($content -notmatch '^import site$') { $content += "`r`nimport site" }
+            Set-Content $pth.FullName $content -NoNewline
+          }
+          Copy-Item "$pythonDir\python.exe" "$pythonDir\python3.exe" -Force
+          $getPip = "$env:TEMP\get-pip.py"
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
+          & "$pythonDir\python.exe" $getPip --no-warn-script-location
+          Remove-Item $getPip
+        }
+        Write-Host "Python runtime ready"
+      } else {
+        Write-Host "Python runtime already present (cached)"
+      }
+    # 验证
+    - |
+      if (-not (Test-Path resources\python-win\python.exe)) {
+        Write-Error "FATAL: Python runtime setup failed"
+        Get-ChildItem resources\ -Directory | ForEach-Object { Write-Host "resources dir: $($_.Name)" }
+        exit 1
+      }
+      & resources\python-win\python.exe --version
+      & resources\python-win\python.exe -m pip --version
+    # 手动下载 Electron 二进制到 node_modules/electron/dist/（避免 GitHub 不可达）
+    - $electronVer = "40.2.1"
+    - $electronDist = "node_modules\electron\dist"
+    - |
+      if (-not (Test-Path "$electronDist\electron.exe")) {
+        Write-Host "Downloading Electron $electronVer from npmmirror..."
+        $zip = "$env:TEMP\electron-v$electronVer-win32-x64.zip"
+        Invoke-WebRequest -Uri "https://npmmirror.com/mirrors/electron/v$electronVer/electron-v$electronVer-win32-x64.zip" -OutFile $zip
+        Expand-Archive -Path $zip -DestinationPath $electronDist -Force
+        Remove-Item $zip
+        Write-Host "Electron extracted to $electronDist"
+      } else {
+        Write-Host "Electron already present at $electronDist"
+      }
+    - Test-Path "$electronDist\electron.exe" -PathType Leaf
+    # 确定安装包版本号：release 分支用纯净版本号，其他分支附加 commit SHA
+    # 通过 APP_BUILD_VERSION 环境变量传递给 ensure-build-version.js，
+    # 该脚本在 electron-builder 运行前才打补丁，避免被中间步骤还原
+    - |
+      $pkg = Get-Content package.json -Raw
+      $pkgVersion = ($pkg | ConvertFrom-Json).version
+      $isRelease = $env:CI_COMMIT_TAG -match '^v\d+\.\d+\.\d+$'
+      if (-not $isRelease) {
+        $sha = $env:CI_COMMIT_SHORT_SHA
+        $fullVersion = "$pkgVersion-$sha"
+        $env:APP_BUILD_VERSION = $fullVersion
+        Write-Host "Dev build: version=$fullVersion"
+      } else {
+        $env:APP_BUILD_VERSION = ""
+        Write-Host "Release build: version=$pkgVersion"
+      }
+    # 完整打包流程：OpenClaw 运行时 → 编译 → skills → electron-builder
+    # DEBUG=electron-builder 输出详细打包日志，用于排查 NSIS/asar 失败
+    - $env:DEBUG = "electron-builder"
+    - npm run dist:win
+    # 诊断：列出 release/ 完整内容（无论成功与否都打印，便于排查）
+    - Write-Host "=== Release directory contents ==="
+    - Get-ChildItem release\ -Depth 1 | ForEach-Object { Write-Host "$($_.Length,10) $($_.FullName)" }
+    # 验证产物并上传 Artifactory
+    - $exe = Get-ChildItem release\*.exe | Select-Object -First 1
+    - |
+      if ($exe) {
+        Write-Host "Package: $($exe.FullName) ($([math]::Round($exe.Length/1MB,1)) MB)"
+        $encodedName = [uri]::EscapeDataString($exe.Name)
+        $uploadUrl = "http://172.18.5.249:8081/artifactory/RongxinAI/windows/$encodedName"
+        Write-Host "Uploading to $uploadUrl ..."
+        $cred = "$env:ARTIFACTORY_USER"
+        if ($cred -and $env:ARTIFACTORY_PASSWORD) {
+          Write-Host "Auth: user='$cred' password=***"
+          # 将凭据写入临时 netrc 文件（进程参数不可见），上传后立即删除
+          # 使用 [IO.Path]::GetTempPath() 而非 $env:TEMP（Runner 以 SYSTEM 运行时后者可能为空）
+          $tmpDir = [System.IO.Path]::GetTempPath()
+          $netrc = Join-Path $tmpDir "artifactory-netrc-$PID.txt"
+          "machine 172.18.5.249 login $cred password $env:ARTIFACTORY_PASSWORD" | Out-File $netrc -Encoding ASCII
+          try {
+            & curl.exe --basic --fail --connect-timeout 10 --max-time 900 --netrc-file "$netrc" -T "$($exe.FullName)" "$uploadUrl" 2>&1
+            if ($LASTEXITCODE -eq 0) { Write-Host "Uploaded to Artifactory" } else { Write-Host "Artifactory upload exit=$LASTEXITCODE (non-fatal)" }
+          } finally {
+            Remove-Item $netrc -Force -ErrorAction SilentlyContinue
+          }
+        } else {
+          Write-Host "Skipping upload: ARTIFACTORY_USER or ARTIFACTORY_PASSWORD not set"
+        }
+      } else {
+        Write-Error "FATAL: electron-builder finished but no .exe found in release/"
+        # 区分打包阶段失败 vs NSIS 阶段失败
+        if (Test-Path release\win-unpacked) {
+          Write-Error "  -> win-unpacked/ directory EXISTS: ASAR packaging succeeded, NSIS installer creation failed"
+          Write-Host "win-unpacked contents:"
+          Get-ChildItem release\win-unpacked -Recurse -Depth 2 | ForEach-Object { Write-Host "  $($_.FullName)" }
+        } else {
+          Write-Error "  -> win-unpacked/ directory MISSING: even ASAR packaging did not complete"
+        }
+        exit 1
+      }
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
     - if: $CI_PIPELINE_SOURCE == "web"
