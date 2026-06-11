@@ -13,6 +13,7 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppModelUnloadResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
@@ -423,6 +424,7 @@ interface IElectronAPI {
     setBackendSelection: (input: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
     installBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
     uninstallBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeUninstallResult>;
+    getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;

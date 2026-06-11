@@ -8,7 +8,6 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelUnloadResult,
-  LlamaCppRuntimeListDevicesResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -26,7 +25,11 @@ import {
 } from '../../shared/llamacpp';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import { LlamaCppManager, resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
+import {
+  filterLlamaCppServiceConfigByRuntimeCapabilities,
+  LlamaCppManager,
+  resolveLlamaCppDeviceSelection,
+} from '../libs/llamacppManager';
 import {
   buildLlamaCppOpenClawAppConfig,
   buildLlamaCppRunningModelBinding,
@@ -49,7 +52,7 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   modelsMax: '0',
   timeout: '600',
   threadsHttp: '4',
-  cacheReuse: '0',
+  cacheReuse: '256',
   cacheRam: '8192',
   ctxSize: '4096',
   parallel: '1',
@@ -254,6 +257,9 @@ export function registerLlamaCppIpcHandlers(
     if (!ref) return await manager.uninstallRuntime();
     return await manager.uninstallBackend(ref);
   });
+  ipcMain.handle(LlamaCppIpcChannel.GetRuntimeCapabilities, async () =>
+    manager.getRuntimeCapabilities(),
+  );
   ipcMain.handle(LlamaCppIpcChannel.ImportRuntime, async () => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
@@ -285,18 +291,19 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(
     LlamaCppIpcChannel.SetServiceConfig,
     async (_event, config: LlamaCppServiceConfig) => {
-      const runtimeDevices = await manager.listRuntimeDevices().catch((): LlamaCppRuntimeListDevicesResult => ({
-          success: false,
-          devices: [],
-          error: 'failed to list llama.cpp runtime devices',
-        }));
+      const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
       if (
         (config.device?.trim() || config.mainGpu?.trim())
+        && runtimeDevices
         && getLlamaCppGpuDetectionState(runtimeDevices) === LlamaCppGpuDetectionState.DetectionFailed
       ) {
         console.warn('[LlamaCpp] gpu selector settings were dropped because runtime device detection failed');
       }
-      const sanitized = sanitizeLlamaCppServiceConfig(config);
+      const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
+      const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
+        sanitizeLlamaCppServiceConfig(config),
+        runtimeCapabilities,
+      );
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       return sanitized;
     },
