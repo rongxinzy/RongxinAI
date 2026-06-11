@@ -540,17 +540,22 @@ async function beforePack(context) {
     ];
 
     console.log(`[electron-builder-hooks] Packing combined Windows tar: ${outputTar}`);
-    const t0 = Date.now();
 
-    // Remove old tar if exists
-    if (existsSync(outputTar)) rmSync(outputTar);
-
-    packMultipleSources(sources, outputTar);
-    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-    const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
-    console.log(
-      `[electron-builder-hooks] Combined tar packed in ${elapsed}s: ${sizeMB} MB`
-    );
+    // If tar already exists (restored from CI cache), skip repack (~10 min saved)
+    if (existsSync(outputTar) && statSync(outputTar).size > 0) {
+      const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
+      console.log(
+        `[electron-builder-hooks] Using cached tar: ${sizeMB} MB`
+      );
+    } else {
+      const t0 = Date.now();
+      packMultipleSources(sources, outputTar);
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
+      console.log(
+        `[electron-builder-hooks] Combined tar packed in ${elapsed}s: ${sizeMB} MB`
+      );
+    }
   }
 
   if (!isWindowsTarget(context)) {

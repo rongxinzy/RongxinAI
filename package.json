@@ -6,7 +6,7 @@
     "email": "dev@rongxinai.com"
   },
   "license": "MIT",
-  "version": "2026.5.22",
+  "version": "2026.6.10",
   "openclaw": {
     "version": "v2026.4.14",
     "repo": "https://github.com/openclaw/openclaw.git",
@@ -90,7 +90,7 @@
     "dist:mac:arm64": "npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --arm64",
     "dist:mac:universal": "npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --universal",
     "predist:win": "npm run openclaw:runtime:win-x64",
-    "dist:win": "npm run setup:python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win --x64 --publish never",
+    "dist:win": "npm run build && npm run build:skills && npm run prepare:modelscope-tokens && node scripts/ensure-build-version.js && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
     "predist:linux": "npm run openclaw:runtime:linux-x64",
     "dist:linux": "npm run build && npm run compile:electron && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --linux --publish never",
     "clean:release": "rimraf release",
