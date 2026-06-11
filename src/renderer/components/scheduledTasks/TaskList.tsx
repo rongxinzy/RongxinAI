@@ -36,8 +36,10 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  const statusLabel = i18nService.t(getStatusLabelKey(task.state.lastStatus));
-  const statusTone = getStatusTone(task.state.lastStatus);
+  const isRunning = task.state.runningAtMs !== null;
+  const displayStatus = isRunning ? 'running' : task.state.lastStatus;
+  const statusLabel = i18nService.t(getStatusLabelKey(displayStatus));
+  const statusTone = getStatusTone(displayStatus);
 
   return (
     <div
