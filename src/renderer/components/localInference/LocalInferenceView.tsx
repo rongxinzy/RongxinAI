@@ -42,6 +42,7 @@ import {
   createLlamaCppStreamState as createOllamaStreamState,
   getLlamaCppGpuDetectionState,
   getLlamaCppLaunchContextLimitViolation,
+  getLlamaCppModelsMaxLimitViolation,
   LlamaCppGpuDetectionState,
   type LlamaCppStructuredServiceFieldError,
   type LlamaCppStructuredServiceFieldKey,
@@ -1182,6 +1183,27 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handlePreload = (request: LaunchRequest, openDebugger: boolean) => {
     void runAction(async () => {
+      const loadLimitViolation = getLlamaCppModelsMaxLimitViolation({
+        modelsMax: serviceConfig.modelsMax,
+        targetModelName: request.input.model,
+        runningModelNames: Array.from(
+          new Set(
+            runningModels
+              .map(model => (model.name || model.model || '').trim())
+              .filter(Boolean),
+          ),
+        ),
+      });
+      if (loadLimitViolation) {
+        showToast(
+          i18nService
+            .t('localInferenceLoadModelLimitReached')
+            .replace('{limit}', String(loadLimitViolation.limit))
+            .replace('{next}', String(loadLimitViolation.next)),
+          LocalInferenceToastKind.Info,
+        );
+        return;
+      }
       const servicePatch = resolveLaunchServiceConfig(request.gpuPreset, request.customGpuDevices);
       if (servicePatch && hasServiceConfigPatchChanged(serviceConfig, servicePatch)) {
         if (status?.status === 'running' && !status.managedByApp) {
@@ -5440,7 +5462,7 @@ function getInstallableMarketplaceModels(
     const installedModelName = model.installedPath
       ? installedModelPathMap.get(model.installedPath)
       : undefined;
-    return !model.installed && !installedModelName;
+  return !model.installed && !installedModelName;
   });
 }
 

@@ -61,6 +61,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppUnloadVramRecoveryPending: '模型已从 llama.cpp 运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
     llamacppUnloadConfirmationPending: '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
     llamacppLaunchContextExceedsTrainingLimit: '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
+    llamacppLoadModelLimitReached: '同时驻留模型的数量为 {limit}，不能启动第 {next} 个模型，需先手动关闭已启动的模型。',
     localInferenceImportRuntimeDialogTitle: '选择 llama.cpp backend',
     localInferenceImportRuntimeDialogMessage: '请选择 llama.cpp backend 主包压缩包（zip 或 tar.gz）；如果已经解压，请进入目录后选择其中任意文件。RongxinAI 会校验平台和 backend 类型后导入。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
@@ -328,6 +329,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppUnloadVramRecoveryPending: 'The model has been removed from the llama.cpp running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
     llamacppUnloadConfirmationPending: 'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
     llamacppLaunchContextExceedsTrainingLimit: 'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
+    llamacppLoadModelLimitReached: 'The loaded model limit is {limit}. You cannot start model number {next}; unload an existing model first.',
     localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Backend',
     localInferenceImportRuntimeDialogMessage: 'Select a llama.cpp backend archive (zip or tar.gz). If it is already extracted, open that directory and choose any file inside it. RongxinAI will validate the platform and backend type before importing it.',
     coworkErrorUnknown:
