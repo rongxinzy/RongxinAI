@@ -13,6 +13,7 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppModelUnloadResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeImportResult,
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
@@ -418,6 +419,7 @@ interface IElectronAPI {
     install: () => Promise<LlamaCppRuntimeInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
     listRuntimeDevices: () => Promise<LlamaCppRuntimeListDevicesResult>;
+    getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
