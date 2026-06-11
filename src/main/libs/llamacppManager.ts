@@ -174,7 +174,7 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     const runtimeConfig = await this.resolveRuntimeServiceConfig();
-    const runtimeCapabilities = await this.getRuntimeCapabilities().catch(() => null);
+    const runtimeCapabilities = await this.getRuntimeCapabilities().catch((): null => null);
     const filteredRuntimeConfig = filterLlamaCppServiceConfigByRuntimeCapabilities(
       runtimeConfig,
       runtimeCapabilities,
