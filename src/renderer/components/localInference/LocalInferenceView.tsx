@@ -30,13 +30,15 @@ import type {
   LlamaCppModel as OllamaModel,
   LlamaCppModelLaunchInput as OllamaModelLaunchInput,
   LlamaCppRunningModel as OllamaRunningModel,
-  LlamaCppRuntimeListDevicesResult,
+  LlamaCppRuntimeCapabilities,
+  LlamaCppRuntimeDevice,
   LlamaCppServiceConfig as OllamaServiceConfig,
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
 import {
   createLlamaCppStreamState as createOllamaStreamState,
   getLlamaCppLaunchContextLimitViolation,
+  LlamaCppServiceConfigFieldKey as ServiceConfigCapabilityKey,
   type LlamaCppStructuredServiceFieldError,
   type LlamaCppStructuredServiceFieldKey,
   reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
@@ -124,9 +126,10 @@ type OllamaServiceConfigFormState = {
   jinja: string;
 };
 
-type ServiceConfigGroup = 'basic' | 'advanced';
+type ServiceConfigGroup = 'service' | 'cache' | 'gpu' | 'compat' | 'request';
 type ServiceConfigField = {
   key: keyof OllamaServiceConfigFormState;
+  capabilityKey: typeof ServiceConfigCapabilityKey[keyof typeof ServiceConfigCapabilityKey];
   labelKey: string;
   paramName: string;
   group: ServiceConfigGroup;
@@ -135,6 +138,17 @@ type ServiceConfigField = {
   placeholderKey?: string;
   hintKey: string;
   restartRequired: boolean;
+};
+
+type ServiceConfigGroupDefinition = {
+  key: ServiceConfigGroup;
+  titleKey: string;
+  descriptionKey: string;
+};
+type ServiceConfigFieldState = {
+  visible: boolean;
+  disabled: boolean;
+  disabledReason?: string;
 };
 
 type InferenceOptionField = {
@@ -209,12 +223,40 @@ const smallOutlineButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50';
 const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
+const SERVICE_CONFIG_GROUPS: ServiceConfigGroupDefinition[] = [
+  {
+    key: 'service',
+    titleKey: 'localInferenceServiceConfigGroupService',
+    descriptionKey: 'localInferenceServiceConfigGroupServiceDescription',
+  },
+  {
+    key: 'cache',
+    titleKey: 'localInferenceServiceConfigGroupCache',
+    descriptionKey: 'localInferenceServiceConfigGroupCacheDescription',
+  },
+  {
+    key: 'gpu',
+    titleKey: 'localInferenceServiceConfigGroupGpu',
+    descriptionKey: 'localInferenceServiceConfigGroupGpuDescription',
+  },
+  {
+    key: 'compat',
+    titleKey: 'localInferenceServiceConfigGroupCompat',
+    descriptionKey: 'localInferenceServiceConfigGroupCompatDescription',
+  },
+  {
+    key: 'request',
+    titleKey: 'localInferenceServiceConfigGroupRequest',
+    descriptionKey: 'localInferenceServiceConfigGroupRequestDescription',
+  },
+];
 const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   {
     key: 'modelsMax',
+    capabilityKey: ServiceConfigCapabilityKey.ModelsMax,
     labelKey: 'localInferenceServiceConfigModelsMaxLabel',
     paramName: 'models-max',
-    group: 'basic',
+    group: 'service',
     type: 'input',
     placeholderKey: 'localInferenceLaunchDefault',
     hintKey: 'localInferenceServiceConfigModelsMaxHint',
@@ -222,67 +264,63 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'modelsAutoload',
+    capabilityKey: ServiceConfigCapabilityKey.ModelsAutoload,
     labelKey: 'localInferenceServiceConfigModelsAutoloadLabel',
     paramName: 'models-autoload',
-    group: 'basic',
+    group: 'service',
     type: 'select',
     hintKey: 'localInferenceServiceConfigModelsAutoloadHint',
     restartRequired: true,
   },
   {
-    key: 'device',
-    labelKey: 'localInferenceServiceConfigDeviceLabel',
-    paramName: 'device',
-    group: 'basic',
-    type: 'input',
-    placeholderKey: 'localInferenceLaunchDefault',
-    hintKey: 'localInferenceServiceConfigDeviceHint',
-    restartRequired: true,
-  },
-  {
     key: 'parallel',
+    capabilityKey: ServiceConfigCapabilityKey.Parallel,
     labelKey: 'localInferenceServiceConfigParallelLabel',
     paramName: 'parallel',
-    group: 'advanced',
+    group: 'request',
     type: 'input',
     placeholder: '1',
     hintKey: 'localInferenceServiceConfigParallelHint',
     restartRequired: true,
   },
   {
-    key: 'timeout',
-    labelKey: 'localInferenceServiceConfigTimeoutLabel',
-    paramName: 'timeout',
-    group: 'basic',
-    type: 'input',
-    placeholder: '600',
-    hintKey: 'localInferenceServiceConfigTimeoutHint',
-    restartRequired: true,
-  },
-  {
     key: 'threadsHttp',
+    capabilityKey: ServiceConfigCapabilityKey.ThreadsHttp,
     labelKey: 'localInferenceServiceConfigThreadsHttpLabel',
     paramName: 'threads-http',
-    group: 'advanced',
+    group: 'request',
     type: 'input',
     placeholderKey: 'localInferenceLaunchDefault',
     hintKey: 'localInferenceServiceConfigThreadsHttpHint',
     restartRequired: true,
   },
   {
+    key: 'timeout',
+    capabilityKey: ServiceConfigCapabilityKey.Timeout,
+    labelKey: 'localInferenceServiceConfigTimeoutLabel',
+    paramName: 'timeout',
+    group: 'service',
+    type: 'input',
+    placeholder: '600',
+    hintKey: 'localInferenceServiceConfigTimeoutHint',
+    restartRequired: true,
+  },
+  {
     key: 'cachePrompt',
+    capabilityKey: ServiceConfigCapabilityKey.CachePrompt,
     labelKey: 'localInferenceServiceConfigCachePromptLabel',
     paramName: 'cache-prompt',
-    group: 'advanced',
+    group: 'cache',
     type: 'select',
     hintKey: 'localInferenceServiceConfigCachePromptHint',
     restartRequired: true,
   },
   {
     key: 'cacheReuse',
+    capabilityKey: ServiceConfigCapabilityKey.CacheReuse,
     labelKey: 'localInferenceServiceConfigCacheReuseLabel',
     paramName: 'cache-reuse',
-    group: 'advanced',
+    group: 'cache',
     type: 'input',
     placeholder: '256',
     hintKey: 'localInferenceServiceConfigCacheReuseHint',
@@ -290,9 +328,10 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'cacheRam',
+    capabilityKey: ServiceConfigCapabilityKey.CacheRam,
     labelKey: 'localInferenceServiceConfigCacheRamLabel',
     paramName: 'cache-ram',
-    group: 'advanced',
+    group: 'cache',
     type: 'input',
     placeholder: '8192',
     hintKey: 'localInferenceServiceConfigCacheRamHint',
@@ -300,37 +339,52 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'jinja',
+    capabilityKey: ServiceConfigCapabilityKey.Jinja,
     labelKey: 'localInferenceServiceConfigJinjaLabel',
     paramName: 'jinja',
-    group: 'advanced',
+    group: 'compat',
     type: 'select',
     hintKey: 'localInferenceServiceConfigJinjaHint',
     restartRequired: true,
   },
   {
     key: 'splitMode',
+    capabilityKey: ServiceConfigCapabilityKey.SplitMode,
     labelKey: 'localInferenceServiceConfigSplitModeLabel',
     paramName: 'split-mode',
-    group: 'advanced',
+    group: 'gpu',
     type: 'select',
     hintKey: 'localInferenceServiceConfigSplitModeHint',
     restartRequired: true,
   },
   {
     key: 'tensorSplit',
+    capabilityKey: ServiceConfigCapabilityKey.TensorSplit,
     labelKey: 'localInferenceServiceConfigTensorSplitLabel',
     paramName: 'tensor-split',
-    group: 'advanced',
+    group: 'gpu',
     type: 'input',
     placeholder: '3,2',
     hintKey: 'localInferenceServiceConfigTensorSplitHint',
     restartRequired: true,
   },
   {
+    key: 'device',
+    capabilityKey: ServiceConfigCapabilityKey.Device,
+    labelKey: 'localInferenceServiceConfigDeviceLabel',
+    paramName: 'device',
+    group: 'gpu',
+    type: 'input',
+    placeholderKey: 'localInferenceLaunchDefault',
+    hintKey: 'localInferenceServiceConfigDeviceHint',
+    restartRequired: true,
+  },
+  {
     key: 'mainGpu',
+    capabilityKey: ServiceConfigCapabilityKey.MainGpu,
     labelKey: 'localInferenceServiceConfigMainGpuLabel',
     paramName: 'main-gpu',
-    group: 'advanced',
+    group: 'gpu',
     type: 'input',
     placeholder: '0',
     hintKey: 'localInferenceServiceConfigMainGpuHint',
@@ -338,18 +392,20 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'flashAttn',
+    capabilityKey: ServiceConfigCapabilityKey.FlashAttn,
     labelKey: 'localInferenceServiceConfigFlashAttnLabel',
     paramName: 'flash-attn',
-    group: 'advanced',
+    group: 'gpu',
     type: 'select',
     hintKey: 'localInferenceServiceConfigFlashAttnHint',
     restartRequired: true,
   },
   {
     key: 'mlock',
+    capabilityKey: ServiceConfigCapabilityKey.Mlock,
     labelKey: 'localInferenceServiceConfigMlockLabel',
     paramName: 'mlock',
-    group: 'advanced',
+    group: 'compat',
     type: 'select',
     hintKey: 'localInferenceServiceConfigMlockHint',
     restartRequired: true,
@@ -1843,20 +1899,41 @@ function OllamaServiceConfigDialog({
 }) {
   const [form, setForm] = useState<OllamaServiceConfigFormState>(() => serviceConfigToForm(config));
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [runtimeDevices, setRuntimeDevices] = useState<LlamaCppRuntimeListDevicesResult | null>(null);
+  const [runtimeCapabilities, setRuntimeCapabilities] = useState<LlamaCppRuntimeCapabilities | null>(null);
+  const fieldStates = useMemo(
+    () =>
+      Object.fromEntries(
+        SERVICE_CONFIG_FIELDS.map(field => [
+          field.key,
+          getServiceConfigFieldState(field.key, form, runtimeCapabilities),
+        ]),
+      ) as Record<keyof OllamaServiceConfigFormState, ServiceConfigFieldState>,
+    [form, runtimeCapabilities],
+  );
+  const isFieldApplicable = useCallback(
+    (key: keyof OllamaServiceConfigFormState) => {
+      const fieldState = fieldStates[key];
+      return Boolean(fieldState?.visible && !fieldState.disabled);
+    },
+    [fieldStates],
+  );
+  const deviceFieldRuntimeError = getServiceConfigDeviceRuntimeError(
+    form.device,
+    runtimeCapabilities,
+    isFieldApplicable('device'),
+  );
   const structuredValidation = validateLlamaCppStructuredServiceConfig({
     modelsMax: form.modelsMax,
-    device: form.device,
+    device: isFieldApplicable('device') ? form.device : '',
     parallel: form.parallel,
     timeout: form.timeout,
     threadsHttp: form.threadsHttp,
-    cacheReuse: form.cacheReuse,
-    cacheRam: form.cacheRam,
+    cacheReuse: isFieldApplicable('cacheReuse') ? form.cacheReuse : '',
+    cacheRam: isFieldApplicable('cacheRam') ? form.cacheRam : '',
     ctxSize: form.ctxSize,
-    tensorSplit: form.tensorSplit,
+    tensorSplit: isFieldApplicable('tensorSplit') ? form.tensorSplit : '',
     splitMode: form.splitMode,
-    mainGpu: form.mainGpu,
+    mainGpu: isFieldApplicable('mainGpu') ? form.mainGpu : '',
     batchSize: form.batchSize,
     ubatchSize: form.ubatchSize,
     threads: form.threads,
@@ -1865,37 +1942,59 @@ function OllamaServiceConfigDialog({
   });
 
   useEffect(() => {
-    setForm(serviceConfigToForm(config, runtimeDevices));
-  }, [config, runtimeDevices]);
+    setForm(serviceConfigToForm(config, runtimeCapabilities?.devices));
+  }, [config, runtimeCapabilities]);
 
   useEffect(() => {
     let cancelled = false;
-    void window.electron.llamacpp.listRuntimeDevices()
+    void window.electron.llamacpp.getRuntimeCapabilities()
       .then(result => {
-        if (!cancelled) setRuntimeDevices(result);
+        if (!cancelled) setRuntimeCapabilities(result);
       })
       .catch(() => {
-        if (!cancelled) setRuntimeDevices(null);
+        if (!cancelled) setRuntimeCapabilities(null);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const visibleFields = useMemo(
+    () => SERVICE_CONFIG_FIELDS.filter(field => fieldStates[field.key]?.visible),
+    [fieldStates],
+  );
+  const visibleGroups = useMemo(
+    () =>
+      SERVICE_CONFIG_GROUPS.map(group => ({
+        ...group,
+        fields: visibleFields.filter(field => field.group === group.key),
+      })).filter(group => group.fields.length > 0),
+    [visibleFields],
+  );
+  const gpuFieldsHidden = useMemo(
+    () =>
+      !visibleFields.some(field => field.group === 'gpu') &&
+      SERVICE_CONFIG_FIELDS.some(field => field.group === 'gpu'),
+    [visibleFields],
+  );
+
   const updateForm = (key: keyof OllamaServiceConfigFormState, value: string) => {
     setSaveError(null);
     setForm(current => ({ ...current, [key]: value }));
   };
   const renderField = (field: ServiceConfigField) => {
+    const fieldState = fieldStates[field.key];
     const placeholder = field.placeholderKey
       ? i18nService.t(field.placeholderKey)
       : (field.placeholder ?? '');
     const label = i18nService.t(field.labelKey);
     const hint = i18nService.t(field.hintKey);
-    const fieldError = getStructuredServiceConfigFieldErrorMessage(
-      field.key,
-      structuredValidation.fieldErrors,
-    );
+    const fieldError = field.key === 'device'
+      ? deviceFieldRuntimeError
+      : getStructuredServiceConfigFieldErrorMessage(
+        field.key,
+        structuredValidation.fieldErrors,
+      );
     return field.type === 'select' ? (
       <ServiceConfigSelect
         key={field.key}
@@ -1903,6 +2002,8 @@ function OllamaServiceConfigDialog({
         paramName={field.paramName}
         value={form[field.key]}
         hint={hint}
+        disabled={fieldState.disabled}
+        disabledReason={fieldState.disabledReason}
         onChange={value => updateForm(field.key, value)}
         options={getServiceConfigSelectOptions(field.key)}
       />
@@ -1915,6 +2016,8 @@ function OllamaServiceConfigDialog({
         placeholder={placeholder}
         hint={hint}
         error={fieldError}
+        disabled={fieldState.disabled}
+        disabledReason={fieldState.disabledReason}
         onChange={value => updateForm(field.key, value)}
       />
     );
@@ -1922,37 +2025,43 @@ function OllamaServiceConfigDialog({
 
   const save = async () => {
     setSaveError(null);
-    if (structuredValidation.hasErrors) {
+    if (structuredValidation.hasErrors || deviceFieldRuntimeError) {
       setSaveError(i18nService.t('localInferenceServiceConfigValidationFixErrors'));
       return;
     }
     const result = await onSave({
       host: form.host,
       port: form.port,
-      device: form.device,
-      modelsMax: form.modelsMax,
-      ...(form.modelsAutoload ? { modelsAutoload: form.modelsAutoload === 'true' } : {}),
-      parallel: form.parallel,
+      ...(isFieldApplicable('device') ? { device: form.device } : {}),
+      ...(isFieldApplicable('modelsMax') ? { modelsMax: form.modelsMax } : {}),
+      ...(isFieldApplicable('modelsAutoload') && form.modelsAutoload
+        ? { modelsAutoload: form.modelsAutoload === 'true' }
+        : {}),
+      ...(isFieldApplicable('parallel') ? { parallel: form.parallel } : {}),
       ctxSize: form.ctxSize,
       gpuLayers: form.gpuLayers,
       batchSize: form.batchSize,
       ubatchSize: form.ubatchSize,
       threads: form.threads,
       threadsBatch: form.threadsBatch,
-      timeout: form.timeout,
-      threadsHttp: form.threadsHttp,
-      cacheReuse: form.cacheReuse,
-      cacheRam: form.cacheRam,
-      ...(form.cachePrompt ? { cachePrompt: form.cachePrompt === 'true' } : {}),
-      ...(form.flashAttn
+      ...(isFieldApplicable('timeout') ? { timeout: form.timeout } : {}),
+      ...(isFieldApplicable('threadsHttp') ? { threadsHttp: form.threadsHttp } : {}),
+      ...(isFieldApplicable('cacheReuse') ? { cacheReuse: form.cacheReuse } : {}),
+      ...(isFieldApplicable('cacheRam') ? { cacheRam: form.cacheRam } : {}),
+      ...(isFieldApplicable('cachePrompt') && form.cachePrompt
+        ? { cachePrompt: form.cachePrompt === 'true' }
+        : {}),
+      ...(isFieldApplicable('flashAttn') && form.flashAttn
         ? { flashAttn: form.flashAttn as NonNullable<OllamaServiceConfig['flashAttn']> }
         : {}),
-      mainGpu: form.mainGpu,
-      tensorSplit: form.tensorSplit,
+      ...(isFieldApplicable('mainGpu') ? { mainGpu: form.mainGpu } : {}),
+      ...(isFieldApplicable('tensorSplit') ? { tensorSplit: form.tensorSplit } : {}),
       ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
-      mlock: form.mlock === 'true',
-      ...(form.jinja ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> } : {}),
-      ...(form.splitMode
+      ...(isFieldApplicable('mlock') ? { mlock: form.mlock === 'true' } : {}),
+      ...(isFieldApplicable('jinja') && form.jinja
+        ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> }
+        : {}),
+      ...(isFieldApplicable('splitMode') && form.splitMode
         ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> }
         : {}),
     });
@@ -2002,47 +2111,32 @@ function OllamaServiceConfigDialog({
                 {saveError}
               </p>
             )}
+            {gpuFieldsHidden && (
+              <p className="mb-4 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-700 dark:text-sky-300">
+                {i18nService.t('localInferenceServiceConfigGpuHiddenHint')}
+              </p>
+            )}
             <div className="space-y-5">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-2">
-                  <h4 className="text-sm font-semibold text-foreground">
-                    {i18nService.t('localInferenceServiceConfigGroupBasic')}
-                  </h4>
-                  <span className="text-[11px] text-secondary">
-                    {i18nService.t('localInferenceServiceConfigRestartRequired')}
-                  </span>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {SERVICE_CONFIG_FIELDS.filter(field => field.group === 'basic').map(renderField)}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setAdvancedOpen(current => !current)}
-                  className="flex w-full items-center justify-between gap-3 border-b border-border/70 pb-2 text-left"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold text-foreground">
-                      {i18nService.t('localInferenceServiceConfigGroupAdvanced')}
+              {visibleGroups.map(group => (
+                <div key={group.key} className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-2">
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">
+                        {i18nService.t(group.titleKey)}
+                      </span>
+                      <span className="mt-1 block text-xs text-secondary">
+                        {i18nService.t(group.descriptionKey)}
+                      </span>
                     </span>
-                    <span className="mt-1 block text-xs text-secondary">
-                      {i18nService.t('localInferenceServiceConfigAdvancedDescription')}
+                    <span className="text-[11px] text-secondary">
+                      {i18nService.t('localInferenceServiceConfigRestartRequired')}
                     </span>
-                  </span>
-                  <span className="shrink-0 text-xs text-secondary">
-                    {advancedOpen ? i18nService.t('hide') : i18nService.t('show')}
-                  </span>
-                </button>
-                {advancedOpen && (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {SERVICE_CONFIG_FIELDS.filter(field => field.group === 'advanced').map(
-                      renderField,
-                    )}
                   </div>
-                )}
-              </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {group.fields.map(renderField)}
+                  </div>
+                </div>
+              ))}
             </div>
             <p className="mt-4 text-xs text-secondary">
               {running && !managedByApp
@@ -2066,7 +2160,7 @@ function OllamaServiceConfigDialog({
           <button
             type="button"
             onClick={() => void save()}
-            disabled={loading || structuredValidation.hasErrors}
+            disabled={loading || structuredValidation.hasErrors || Boolean(deviceFieldRuntimeError)}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             {i18nService.t('save')}
@@ -2139,6 +2233,8 @@ function ServiceConfigInput({
   placeholder,
   hint,
   error,
+  disabled = false,
+  disabledReason,
   onChange,
 }: {
   label: string;
@@ -2147,22 +2243,25 @@ function ServiceConfigInput({
   placeholder: string;
   hint: string;
   error?: string;
+  disabled?: boolean;
+  disabledReason?: string;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-2">
+    <label className={`space-y-2 ${disabled ? 'opacity-60' : ''}`}>
       <span className="flex items-baseline gap-2">
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <code className="text-[11px] text-secondary">{paramName}</code>
       </span>
       <input
+        disabled={disabled}
         value={value}
         placeholder={placeholder}
         onChange={event => onChange(event.target.value)}
-        className={`h-10 w-full rounded-lg bg-surface-input px-3 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-secondary focus:border-primary/60 ${error ? 'border border-red-500/70 focus:border-red-500' : 'border border-border'}`}
+        className={`h-10 w-full rounded-lg px-3 font-mono text-sm outline-none transition-colors placeholder:text-secondary disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-raised disabled:text-secondary ${error ? 'border border-red-500/70 bg-surface-input text-foreground focus:border-red-500' : 'border border-border bg-surface-input text-foreground focus:border-primary/60'}`}
       />
-      <p className="text-xs text-secondary">{hint}</p>
-      {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
+      <p className="text-xs text-secondary">{disabled && disabledReason ? disabledReason : hint}</p>
+      {!disabled && error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </label>
   );
 }
@@ -2173,6 +2272,8 @@ function ServiceConfigSelect({
   value,
   hint,
   options,
+  disabled = false,
+  disabledReason,
   onChange,
 }: {
   label: string;
@@ -2180,18 +2281,21 @@ function ServiceConfigSelect({
   value: string;
   hint: string;
   options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
+  disabledReason?: string;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="space-y-2">
+    <label className={`space-y-2 ${disabled ? 'opacity-60' : ''}`}>
       <span className="flex items-baseline gap-2">
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <code className="text-[11px] text-secondary">{paramName}</code>
       </span>
       <select
+        disabled={disabled}
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
+        className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:cursor-not-allowed disabled:bg-surface-raised disabled:text-secondary"
       >
         <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
         {options.map(option => (
@@ -2200,7 +2304,7 @@ function ServiceConfigSelect({
           </option>
         ))}
       </select>
-      <p className="text-xs text-secondary">{hint}</p>
+      <p className="text-xs text-secondary">{disabled && disabledReason ? disabledReason : hint}</p>
     </label>
   );
 }
@@ -4086,9 +4190,68 @@ function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string):
   return `${devices} · ${patch.splitMode ?? i18nService.t('localInferenceLaunchDefault')}`;
 }
 
+function getServiceConfigFieldState(
+  key: keyof OllamaServiceConfigFormState,
+  form: OllamaServiceConfigFormState,
+  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
+): ServiceConfigFieldState {
+  const field = SERVICE_CONFIG_FIELDS.find(candidate => candidate.key === key);
+  if (!field) {
+    return { visible: false, disabled: false };
+  }
+  const support = runtimeCapabilities?.supports[field.capabilityKey];
+  if (support === false) {
+    return { visible: false, disabled: false };
+  }
+  const gpuDeviceCount = runtimeCapabilities?.gpuDeviceCount ?? 0;
+  if (field.key === 'tensorSplit') {
+    if (gpuDeviceCount <= 1) {
+      return { visible: false, disabled: false };
+    }
+    return {
+      visible: true,
+      disabled: form.splitMode !== 'tensor',
+      disabledReason:
+        form.splitMode !== 'tensor'
+          ? i18nService.t('localInferenceServiceConfigTensorSplitDisabledHint')
+          : undefined,
+    };
+  }
+  if (field.key === 'mainGpu') {
+    if (gpuDeviceCount <= 1) {
+      return { visible: false, disabled: false };
+    }
+    const disabled = form.splitMode === 'layer' || form.splitMode === 'tensor';
+    return {
+      visible: true,
+      disabled,
+      disabledReason: disabled
+        ? i18nService.t('localInferenceServiceConfigMainGpuDisabledHint')
+        : undefined,
+    };
+  }
+  if (field.key === 'device' || field.key === 'splitMode') {
+    if (gpuDeviceCount <= 1) {
+      return { visible: false, disabled: false };
+    }
+    return { visible: true, disabled: false };
+  }
+  if (field.key === 'cacheReuse' || field.key === 'cacheRam') {
+    const disabled = form.cachePrompt === 'false';
+    return {
+      visible: true,
+      disabled,
+      disabledReason: disabled
+        ? i18nService.t('localInferenceServiceConfigPromptCacheDependentHint')
+        : undefined,
+    };
+  }
+  return { visible: true, disabled: false };
+}
+
 function serviceConfigToForm(
   config: OllamaServiceConfig,
-  runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
+  runtimeDevices?: LlamaCppRuntimeDevice[] | null,
 ): OllamaServiceConfigFormState {
   return {
     host: config.host ?? '',
@@ -4120,18 +4283,18 @@ function serviceConfigToForm(
 
 function normalizeServiceConfigDeviceForForm(
   value: string | undefined,
-  runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
+  runtimeDevices?: LlamaCppRuntimeDevice[] | null,
 ): string {
   const trimmed = value?.trim();
   if (!trimmed) return '';
   if (/^\d+(?:\s*,\s*\d+)*$/.test(trimmed)) return trimmed;
-  if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
+  if (!Array.isArray(runtimeDevices) || runtimeDevices.length === 0) {
     return trimmed;
   }
   const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
   if (parts.length === 0) return '';
   const indexes = parts.map(part =>
-    runtimeDevices.devices.findIndex(device => device.id === part || device.name === part),
+    runtimeDevices.findIndex(device => device.id === part || device.name === part),
   );
   if (indexes.some(index => index < 0)) return trimmed;
   return indexes.join(',');
@@ -4160,6 +4323,32 @@ function getStructuredServiceConfigFieldErrorMessage(
     default:
       return undefined;
   }
+}
+
+function getServiceConfigDeviceRuntimeError(
+  value: string,
+  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
+  applicable: boolean,
+): string | undefined {
+  if (!applicable) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (!runtimeCapabilities?.deviceProbeSucceeded || runtimeCapabilities.devices.length === 0) {
+    return undefined;
+  }
+  const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0 || !parts.every(part => /^\d+$/.test(part))) {
+    return undefined;
+  }
+  const maxIndex = runtimeCapabilities.devices.length - 1;
+  const hasOutOfRangeIndex = parts.some((part) => {
+    const index = Number.parseInt(part, 10);
+    return !Number.isFinite(index) || index < 0 || index > maxIndex;
+  });
+  if (!hasOutOfRangeIndex) return undefined;
+  return i18nService
+    .t('localInferenceServiceConfigFieldErrorDeviceIndexRange')
+    .replace('{max}', String(maxIndex));
 }
 
 function getSanitizedServiceConfigFields(
