@@ -156,23 +156,14 @@ test('sanitizeLlamaCppServiceConfig drops tensor split when split mode is not te
 });
 
 test('sanitizeLlamaCppServiceConfig drops tensor split when it exceeds available device count', () => {
-  expect(sanitizeLlamaCppServiceConfig(
-    {
-      splitMode: 'tensor',
-      tensorSplit: '3,2,1',
-    },
-    {
-      success: true,
-      devices: [
-        { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090' },
-        { id: 'CUDA1', name: 'NVIDIA GeForce RTX 4080' },
-      ],
-    },
-  )).toEqual({
+  expect(sanitizeLlamaCppServiceConfig({
     splitMode: 'tensor',
+    tensorSplit: '3,2,1',
+  })).toEqual({
+    splitMode: 'tensor',
+    tensorSplit: '3,2,1',
   });
 });
-
 test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () => {
   expect(sanitizeLlamaCppServiceConfig({
     runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,
@@ -186,72 +177,6 @@ test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimi
   })).toEqual({
     modelsMax: '0',
   });
-});
-
-test('sanitizeLlamaCppServiceConfig normalizes numeric device indexes to CUDA device ids', () => {
-  expect(sanitizeLlamaCppServiceConfig(
-    {
-      device: '0,1',
-    },
-    {
-      success: true,
-      devices: [
-        { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090' },
-        { id: 'CUDA1', name: 'NVIDIA GeForce RTX 4080' },
-      ],
-    },
-  )).toEqual({
-    device: 'CUDA0,CUDA1',
-  });
-});
-
-test('sanitizeLlamaCppServiceConfig maps numeric device indexes to runtime devices on non-CUDA backends', () => {
-  expect(sanitizeLlamaCppServiceConfig(
-    {
-      device: '0',
-    },
-    {
-      success: true,
-      devices: [
-        { id: 'METAL0', name: 'Apple GPU', backend: 'metal' },
-        { id: 'CPU', name: 'CPU', backend: 'cpu' },
-      ],
-    },
-  )).toEqual({
-    device: 'METAL0',
-  });
-});
-
-test('sanitizeLlamaCppServiceConfig preserves explicit runtime device ids on non-CUDA backends', () => {
-  expect(sanitizeLlamaCppServiceConfig(
-    {
-      device: 'METAL0',
-    },
-    {
-      success: true,
-      devices: [
-        { id: 'METAL0', name: 'Apple GPU', backend: 'metal' },
-        { id: 'CPU', name: 'CPU', backend: 'cpu' },
-      ],
-    },
-  )).toEqual({
-    device: 'METAL0',
-  });
-});
-
-test('sanitizeLlamaCppServiceConfig clears invalid visible devices back to default visibility', () => {
-  expect(sanitizeLlamaCppServiceConfig(
-    {
-      device: '0,3',
-    },
-    {
-      success: true,
-      devices: [
-        { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090' },
-        { id: 'CUDA1', name: 'NVIDIA GeForce RTX 4080' },
-      ],
-    },
-  )).toEqual({});
 });
 
 test('getLlamaCppLoadedModelLimitViolation blocks loading a third model when modelsMax is two', () => {
@@ -279,7 +204,7 @@ test('getLlamaCppLoadedModelLimitViolation allows reloading an already running m
   })).toBeNull();
 });
 
-test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw model selection', () => {
+test('shouldSyncOpenClawAfterRunningModelRefresh only syncs on model stop', () => {
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-loaded')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-unloaded')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-running')).toBe(false);
@@ -287,7 +212,7 @@ test('shouldSyncOpenClawAfterRunningModelRefresh only allows explicit OpenClaw m
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-deleted')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-stopped')).toBe(true);
 });
 
