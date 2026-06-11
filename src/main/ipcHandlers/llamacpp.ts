@@ -8,7 +8,6 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
   LlamaCppModelUnloadResult,
-  LlamaCppRuntimeListDevicesResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
