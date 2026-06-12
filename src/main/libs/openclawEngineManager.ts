@@ -162,6 +162,22 @@ const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Respons
   }
 };
 
+/**
+ * Returns true when the file at `filePath` can be opened for reading.
+ * On Windows, antivirus scanners (Windows Defender) can transiently lock files,
+ * causing fs.existsSync() to return true but fs.openSync() to fail with UNKNOWN.
+ * This probe distinguishes "file exists" from "file is actually readable".
+ */
+function isFileReadable(filePath: string): boolean {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    fs.closeSync(fd);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export class OpenClawEngineManager extends EventEmitter {
   private readonly baseDir: string;
   private readonly logsDir: string;
@@ -376,9 +392,12 @@ export class OpenClawEngineManager extends EventEmitter {
    * warmup-compile-cache.cjs helper is not in production builds, so we write
    * an inlined equivalent into the state directory.
    */
-  private async runCompileCacheWarmup(): Promise<void> {
+  private async runCompileCacheWarmup(): Promise<boolean> {
     // Double-check: avoid duplicate warmup via lock.
-    if (fs.existsSync(this.warmingLockPath)) return this.waitForWarmupIfInProgress();
+    if (fs.existsSync(this.warmingLockPath)) {
+      await this.waitForWarmupIfInProgress();
+      return this.isCompileCachePopulated();
+    }
 
     fs.writeFileSync(this.warmingLockPath, String(process.pid), 'utf8');
     console.log('[OpenClaw] Starting compile-cache warmup...');
@@ -413,7 +432,7 @@ export class OpenClawEngineManager extends EventEmitter {
       `}).catch((err) => {`,
       `  try { require('node:module').flushCompileCache(); } catch (_) {}`,
       `  process.stderr.write('[warmup] finished with error (cache still written): ' + err.message + ' (' + elapsed() + ')\\n');`,
-      `  process.exit(0);`,
+      `  process.exit(1);`,
       `});`,
     ].join('\n');
 
@@ -423,7 +442,7 @@ export class OpenClawEngineManager extends EventEmitter {
       fs.writeFileSync(launcherPath, launcherSrc, 'utf8');
     }
 
-    return new Promise<void>((resolve) => {
+    return new Promise<boolean>((resolve) => {
       const child = spawn(process.execPath, [launcherPath], {
         env: {
           ...process.env,
@@ -441,31 +460,38 @@ export class OpenClawEngineManager extends EventEmitter {
         if (text) console.log(`[OpenClaw warmup] ${text}`);
       });
 
+      let settled = false;
       const done = (exitCode: number | null) => {
+        if (settled) return;
+        settled = true;
         this.warmupProcess = null;
         console.log(`[OpenClaw] cache warmup finished (exitCode=${exitCode})`);
         this.cleanupWarmingLock();
         // Remove the temp launcher on success.
         try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch { /* ignore cleanup errors */ }
-        resolve();
+        resolve(exitCode === 0);
       };
 
       child.once('exit', done);
       child.once('error', (err) => {
+        if (settled) return;
+        settled = true;
         console.warn(`[OpenClaw] cache warmup error: ${err.message}`);
         this.warmupProcess = null;
         this.cleanupWarmingLock();
-        resolve();
+        resolve(false);
       });
 
       // Hard timeout: never block startup for more than 120s on warmup.
       setTimeout(() => {
+        if (settled) return;
+        settled = true;
         if (this.warmupProcess === child) {
           console.warn('[OpenClaw] cache warmup timed out after 120s, killing');
           try { child.kill(); } catch { /* process already exited */ }
           this.warmupProcess = null;
           this.cleanupWarmingLock();
-          resolve();
+          resolve(false);
         }
       }, 120_000);
     });
@@ -769,8 +795,10 @@ export class OpenClawEngineManager extends EventEmitter {
             message: t('gatewayStartupPrecompiling'),
             canRetry: false,
           });
-          await this.runCompileCacheWarmup();
-          this.writeV8CompatMarker();
+          const warmupOk = await this.runCompileCacheWarmup();
+          if (warmupOk) {
+            this.writeV8CompatMarker();
+          }
         }
       }
     }
@@ -1226,8 +1254,11 @@ export class OpenClawEngineManager extends EventEmitter {
     if (process.platform === 'win32') {
       const bundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs');
       if (fs.existsSync(bundlePath)) {
-        console.log('[OpenClaw] resolveOpenClawEntry: using bundle fast path');
-        return this.ensureGatewayLauncherCjsForBundle(runtimeRoot);
+        if (isFileReadable(bundlePath)) {
+          console.log('[OpenClaw] resolveOpenClawEntry: using bundle fast path');
+          return this.ensureGatewayLauncherCjsForBundle(runtimeRoot);
+        }
+        console.warn('[OpenClaw] resolveOpenClawEntry: bundle exists but is locked (Windows Defender?), falling back to ESM path');
       }
     }
 
