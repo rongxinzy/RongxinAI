@@ -427,7 +427,7 @@ export function mapGatewayRun(entry: GatewayRunLogEntry): ScheduledTaskRun {
   const tsMs = safeFiniteNumber(entry.runAtMs ?? entry.ts, Date.now());
 
   return {
-    id: `${entry.jobId}-${entry.ts}`,
+    id: `${entry.jobId}-${entry.runAtMs ?? entry.ts}`,
     taskId: entry.jobId,
     sessionId: entry.sessionId ?? null,
     sessionKey: entry.sessionKey ?? null,
@@ -463,7 +463,10 @@ export class CronJobService {
   /** Job IDs currently running (non-null `runningAtMs`), updated during polling. */
   private runningJobIds: Set<string> = new Set();
 
-  private static readonly POLL_INTERVAL_MS = 15_000;
+  /** Polling interval for cron job state and run log sync.
+   *  15s is the production default.  During local development 5s gives
+   *  a better chance of catching brief "running" windows for fast tasks. */
+  private static readonly POLL_INTERVAL_MS = 5_000;
 
   constructor(deps: CronJobServiceDeps) {
     this.getGatewayClient = deps.getGatewayClient;
