@@ -458,9 +458,10 @@ export class LlamaCppManager extends EventEmitter {
   async uninstallRuntime(): Promise<LlamaCppRuntimeUninstallResult> {
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     try {
-      if (this.process && this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
-        await this.stop();
-      }
+      // Mirror importRuntime cleanup: ensure the configured port is no longer
+      // occupied before removing the app-managed runtime files.
+      await this.stop();
+      await killByPort(this.getServiceConfig());
 
       const deleted = fs.existsSync(runtimeRoot);
       fs.rmSync(runtimeRoot, { recursive: true, force: true });

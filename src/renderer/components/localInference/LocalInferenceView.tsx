@@ -564,6 +564,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const messagesRef = useRef<InferenceMessage[]>([]);
   const conversationVersionRef = useRef(0);
   const isRunning = status?.status === 'running';
+  const runtimeConfigured = hasConfiguredLlamaCppRuntime(status);
   const normalizedPullName = pullName.trim();
   const activePullProgress = activePullName ? pullProgress[activePullName] : undefined;
   const pulling = isPullInProgress(activePullProgress);
@@ -846,6 +847,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, [servicePopoverOpen]);
 
   useEffect(() => {
+    if (runtimeConfigured) return;
+    setServiceConfigDialogOpen(false);
+  }, [runtimeConfigured]);
+
+  useEffect(() => {
     const unsubscribers = [
       window.electron.llamacpp.onStatusChanged((s) => { cachedStatus = s; setStatus(s); }),
       window.electron.llamacpp.onPullProgress(({ name, chunk }) => {
@@ -873,9 +879,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const nextServiceConfig = await loadOllamaServiceConfig();
       setServiceConfig(nextServiceConfig);
       const nextStatus = await refreshStatus();
+      await refreshLocalModels();
       if (nextStatus.status === 'running') {
-        await refreshLocalModels();
         await refreshRunningModels();
+      } else {
+        setRunningModels([]);
       }
     });
     return () => {
@@ -986,9 +994,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       } else {
         await refreshStatus();
       }
-      if ((await refreshStatus()).status === 'running') {
-        await refreshLocalModels();
+      const nextStatus = await refreshStatus();
+      await refreshLocalModels();
+      if (nextStatus.status === 'running') {
         await refreshRunningModels();
+      } else {
+        setRunningModels([]);
       }
     });
   };
@@ -1046,8 +1057,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           LocalInferenceToastKind.Info,
         );
       }
+      await refreshLocalModels();
       if (result.status.status === 'running') {
-        await refreshLocalModels();
         await refreshRunningModels();
       } else {
         setRunningModels([]);
@@ -1444,15 +1455,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onUninstallRuntime={handleUninstallRuntime}
               onOpenImportGuide={() => setImportGuideOpen(true)}
               onOpenServiceConfig={() => {
+                if (!runtimeConfigured) return;
                 setServicePopoverOpen(false);
                 setServiceConfigDialogOpen(true);
               }}
               onRefresh={() =>
                 void runAction(async () => {
                   const nextStatus = await refreshStatus();
+                  await refreshLocalModels();
                   if (nextStatus.status === 'running') {
-                    await refreshLocalModels();
                     await refreshRunningModels();
+                  } else {
+                    setRunningModels([]);
                   }
                 })
               }
@@ -1535,7 +1549,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onLaunch={handlePreload}
         />
       )}
-      {serviceConfigDialogOpen && (
+      {serviceConfigDialogOpen && runtimeConfigured && (
         <OllamaServiceConfigDialog
           loading={loading}
           running={isRunning}
@@ -1667,6 +1681,16 @@ function ImportGuideDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+function hasConfiguredLlamaCppRuntime(status: OllamaStatusSnapshot | null): boolean {
+  if (!status) return false;
+  if (status.status === 'unknown' || status.status === 'not-installed') return false;
+  return Boolean(
+    status.executablePath?.trim() ||
+    status.runtimeRoot?.trim() ||
+    status.runtimeTargetId?.trim(),
+  );
+}
+
 function ServicePopover({
   containerRef,
   open,
@@ -1702,6 +1726,7 @@ function ServicePopover({
 }) {
   const running = status?.status === 'running';
   const managedByApp = Boolean(status?.managedByApp);
+  const runtimeConfigured = hasConfiguredLlamaCppRuntime(status);
   const displayStatus = status?.status === 'installed' ? 'stopped' : (status?.status ?? 'unknown');
   const canPrepare =
     status?.status === 'not-installed' ||
@@ -1760,6 +1785,15 @@ function ServicePopover({
                   .replace('{running}', String(runningModels.length))}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+              title={i18nService.t('refresh')}
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
           <div className={`mt-3 grid gap-2 ${downloadCount > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -1823,24 +1857,17 @@ function ServicePopover({
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className={smallOutlineButtonClass}
-            >
-              <ArrowPathIcon className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              {i18nService.t('refresh')}
-            </button>
-            <button
-              type="button"
-              onClick={onOpenServiceConfig}
-              disabled={loading}
-              className={smallOutlineButtonClass}
-            >
-              <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
-              {i18nService.t('localInferenceServiceConfigTitle')}
-            </button>
+            {runtimeConfigured && (
+              <button
+                type="button"
+                onClick={onOpenServiceConfig}
+                disabled={loading}
+                className={smallOutlineButtonClass}
+              >
+                <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+                {i18nService.t('localInferenceServiceConfigTitle')}
+              </button>
+            )}
             {!running && canPrepare && (
               <button
                 type="button"
