@@ -39,7 +39,7 @@ const GATEWAY_PORT_SCAN_LIMIT = 80;
 // quickly (~5-15s), while a cold cache requires V8 compilation (~25-35s) and
 // plugin loading on top.
 const GATEWAY_BOOT_TIMEOUT_MS_COLD = 600 * 1000; // 10 min — cold start may need V8 compilation
-const GATEWAY_BOOT_TIMEOUT_MS_WARM = 120 * 1000; // 2 min — warm start typically completes in <30s
+const GATEWAY_BOOT_TIMEOUT_MS_WARM = 300 * 1000; // 5 min — warm start, but first-launch after warmup can be slow
 const GATEWAY_MAX_RESTART_ATTEMPTS = 5;
 const GATEWAY_RESTART_DELAYS = [3_000, 5_000, 10_000, 20_000, 30_000];
 
@@ -1807,7 +1807,11 @@ export class OpenClawEngineManager extends EventEmitter {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      if (trimmed.includes('[openclaw-launcher] loading bundle') && !this.startupPhaseLogged.has('compiling')) {
+      if (
+        (trimmed.includes('[openclaw-launcher] loading bundle') ||
+         trimmed.includes('[openclaw-launcher] falling back to import')) &&
+        !this.startupPhaseLogged.has('compiling')
+      ) {
         this.startupPhaseLogged.add('compiling');
         this.startupPhase = 'compiling';
         this.setStatus({
@@ -1819,7 +1823,11 @@ export class OpenClawEngineManager extends EventEmitter {
         });
       }
 
-      if (trimmed.includes('[openclaw-launcher] import ok') && !this.startupPhaseLogged.has('modules-loading')) {
+      if (
+        (trimmed.includes('[openclaw-launcher] import ok') ||
+         (trimmed.includes('[openclaw-launcher] import') && trimmed.includes(' ok '))) &&
+        !this.startupPhaseLogged.has('modules-loading')
+      ) {
         this.startupPhaseLogged.add('modules-loading');
         this.startupPhase = 'modules-loading';
         this.setStatus({
