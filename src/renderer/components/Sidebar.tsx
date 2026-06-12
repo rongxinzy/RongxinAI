@@ -78,6 +78,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const agentScrollContainerRef = useRef<HTMLDivElement>(null);
+  // 保存侧边栏树中所有可见 session ID（跨所有 Agent 聚合），
+  // 供批量模式"全选"使用，避免因 Redux sessions 被限定到单个 Agent 而导致全选范围错误
+  const allVisibleSessionIdsRef = useRef<string[]>([]);
   const isMac = window.electron.platform === 'darwin';
 
   useEffect(() => {
@@ -158,14 +161,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
   }, []);
 
+  const handleVisibleSessionsChange = useCallback((ids: string[]) => {
+    allVisibleSessionIdsRef.current = ids;
+  }, []);
+
   const handleSelectAll = useCallback(() => {
+    const allIds = allVisibleSessionIdsRef.current;
     setSelectedIds(prev => {
-      if (prev.size === sessions.length) {
+      if (prev.size === allIds.length && allIds.length > 0) {
         return new Set();
       }
-      return new Set(sessions.map(s => s.id));
+      return new Set(allIds);
     });
-  }, [sessions]);
+  }, []);
 
   const handleBatchDeleteClick = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -348,6 +356,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onShowCowork={onShowCowork}
             onToggleSelection={handleToggleSelection}
             onEnterBatchMode={handleEnterBatchMode}
+            onVisibleSessionsChange={handleVisibleSessionsChange}
           />
         </div>
         <div
@@ -384,7 +393,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <label className="flex items-center gap-2 cursor-pointer text-sm text-secondary">
             <input
               type="checkbox"
-              checked={selectedIds.size === sessions.length && sessions.length > 0}
+              checked={selectedIds.size === allVisibleSessionIdsRef.current.length && allVisibleSessionIdsRef.current.length > 0}
               onChange={handleSelectAll}
               className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
             />
