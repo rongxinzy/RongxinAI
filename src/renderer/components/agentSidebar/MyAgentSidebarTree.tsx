@@ -20,6 +20,8 @@ interface MyAgentSidebarTreeProps {
   onShowCowork: () => void;
   onToggleSelection: (sessionId: string) => void;
   onEnterBatchMode: (sessionId: string) => void;
+  /** 上报当前侧边栏树中所有可见 session ID，供批量全选使用 */
+  onVisibleSessionsChange?: (ids: string[]) => void;
 }
 
 const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
@@ -28,6 +30,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   onShowCowork,
   onToggleSelection,
   onEnterBatchMode,
+  onVisibleSessionsChange,
 }) => {
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -45,6 +48,19 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   useEffect(() => {
     void agentService.loadAgents();
   }, []);
+
+  // 每当 agentNodes 变化时，将当前侧边栏树中所有可见的 task ID
+  // 上报给父组件，供批量模式"全选"功能使用，确保跨 Agent 全选正确
+  useEffect(() => {
+    if (!onVisibleSessionsChange) return;
+    const ids: string[] = [];
+    agentNodes.forEach((agent) => {
+      agent.tasks.forEach((task) => {
+        ids.push(task.id);
+      });
+    });
+    onVisibleSessionsChange(ids);
+  }, [agentNodes, onVisibleSessionsChange]);
 
   const handleSelectTask = async (task: AgentSidebarTaskNode) => {
     if (task.agentId !== currentAgentId) {
