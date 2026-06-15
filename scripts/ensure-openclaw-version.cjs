@@ -95,7 +95,7 @@ if (!openclawConfig || !openclawConfig.version) {
 }
 
 const desiredVersion = openclawConfig.version;
-const repoUrl = openclawConfig.repo || 'https://github.com/openclaw/openclaw.git';
+const repoUrl = process.env.OPENCLAW_REPO || openclawConfig.repo || 'https://github.com/openclaw/openclaw.git';
 const openclawSrc = process.env.OPENCLAW_SRC || path.resolve(rootDir, '..', 'openclaw');
 
 log(`Desired OpenClaw version: ${desiredVersion}`);
