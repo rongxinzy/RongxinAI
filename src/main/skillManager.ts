@@ -1082,7 +1082,7 @@ const downloadClawhubSkill = async (
   const npxCliJs = resolveNpxCliJs();
   const electronPath = getElectronNodeRuntimePath();
 
-  const installAttempts = [
+  const installAttempts: Array<{label: string; npmRegistry: string | undefined; site: string; registry: string}> = [
     {
       label: 'china-mirror',
       npmRegistry: CLAWHUB_NPM_REGISTRY_CN,
@@ -1095,9 +1095,9 @@ const downloadClawhubSkill = async (
       site: CLAWHUB_SITE_OFFICIAL,
       registry: CLAWHUB_REGISTRY_OFFICIAL,
     },
-  ] as const;
+  ];
 
-  const buildAttempt = (attempt: typeof installAttempts[number]): {
+  const buildAttempt = (attempt: (typeof installAttempts)[number]): {
     command: string;
     args: string[];
     env: NodeJS.ProcessEnv;
