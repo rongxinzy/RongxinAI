@@ -350,6 +350,9 @@ build-linux:
     GIT_CLEAN_FLAGS: none
     # 跳过 Electron postinstall 下载，由脚本手动下载到 node_modules/electron/dist/
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    # 从内网 GitLab 镜像拉取 OpenClaw 源码（避免 GitHub 不可达）
+    OPENCLAW_REPO: "ssh://git@172.18.5.179:8122/rxzy-opensource/openclaw-mirror.git"
+    OPENCLAW_SRC: "${CI_PROJECT_DIR}/vendor/openclaw-src"
   cache:
     - key: "linux-npm-release-1-0"
       paths:
@@ -357,6 +360,7 @@ build-linux:
     - key: "linux-openclaw-v2026.4.14"
       paths:
         - vendor/openclaw-runtime/linux-x64/
+        - vendor/openclaw-src/
   script:
     # 清理构建输出（不删 node_modules，保留缓存命中的依赖）
     - rm -rf dist dist-electron release
