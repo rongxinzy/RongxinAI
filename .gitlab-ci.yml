@@ -324,3 +324,114 @@ build-windows:
     - if: $CI_COMMIT_TAG =~ /^v/
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
+
+# ═══════════════════════════════════════════════════════
+# Linux 安装包构建（Docker executor，复用 rongxinai-ci 镜像）
+#
+# 触发条件：
+#   - 推送 v* 格式的 tag（自动）
+#   - 通过 Web UI 手动触发（Pipeline → Run pipeline → 手动点 ▶ build-linux）
+#
+# 产物：AppImage + deb
+# ═══════════════════════════════════════════════════════
+
+build-linux:
+  timeout: 2h
+  stage: build-platforms
+  image: rongxinai-ci:latest
+  # 覆盖默认 before_script：build-windows 同样跳过，避免 npm install 与
+  # npm ci 重复执行。此处改为 npm install --prefer-offline，与 node_modules
+  # 缓存协同：首次全量安装，后续命中缓存仅校验增量，大幅提速。
+  before_script: []
+  variables:
+    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+    ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+    NODE_OPTIONS: '--max-old-space-size=8192'
+    GIT_CLEAN_FLAGS: none
+    # 跳过 Electron postinstall 下载，由脚本手动下载到 node_modules/electron/dist/
+    ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  cache:
+    - key: "linux-npm-release-1-0"
+      paths:
+        - node_modules/
+    - key: "linux-openclaw-v2026.4.14"
+      paths:
+        - vendor/openclaw-runtime/linux-x64/
+  script:
+    # 清理构建输出（不删 node_modules，保留缓存命中的依赖）
+    - rm -rf dist dist-electron release
+    # 确保 Electron 打包所需的系统库存在（镜像可能已预装，缺少则安装）
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 2>/dev/null || true
+    # 安装依赖：使用 npm install（非 ci）以利用 node_modules 缓存
+    # --prefer-offline 优先本地 npm cache，--ignore-scripts 跳过 postinstall
+    - npm install --prefer-offline --no-audit --ignore-scripts
+    - npm install -g pnpm --registry https://registry.npmmirror.com
+    - pnpm config set registry https://registry.npmmirror.com
+    # 手动下载 Electron 二进制（避免 GitHub 不可达）
+    # node_modules 缓存命中时此步骤为 no-op
+    - |
+      ELECTRON_VER="40.2.1"
+      ELECTRON_DIST="node_modules/electron/dist"
+      if [ ! -f "$ELECTRON_DIST/electron" ]; then
+        echo "Downloading Electron $ELECTRON_VER from npmmirror..."
+        curl -fsSL "https://npmmirror.com/mirrors/electron/v$ELECTRON_VER/electron-v$ELECTRON_VER-linux-x64.zip" -o /tmp/electron.zip
+        mkdir -p "$ELECTRON_DIST"
+        unzip -qo /tmp/electron.zip -d "$ELECTRON_DIST"
+        rm -f /tmp/electron.zip
+        echo "Electron extracted to $ELECTRON_DIST"
+      else
+        echo "Electron already present at $ELECTRON_DIST"
+      fi
+    # 版本号处理
+    - |
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      if echo "$CI_COMMIT_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+        export APP_BUILD_VERSION=""
+        echo "Release build: version=$PKG_VERSION"
+      else
+        export APP_BUILD_VERSION="$PKG_VERSION-$CI_COMMIT_SHORT_SHA"
+        echo "Dev build: version=$APP_BUILD_VERSION"
+      fi
+    # 完整打包：OpenClaw 运行时 → 编译 → skills → electron-builder
+    - npm run openclaw:runtime:linux-x64
+    - DEBUG=electron-builder npm run dist:linux
+    # 验证产物
+    - |
+      echo "=== Release directory contents ==="
+      ls -lh release/
+    - |
+      if ls release/*.AppImage 1>/dev/null 2>&1 || ls release/*.deb 1>/dev/null 2>&1; then
+        echo "Linux packages built successfully"
+      else
+        echo "FATAL: No .AppImage or .deb found in release/"
+        exit 1
+      fi
+    # 上传到 Artifactory
+    - |
+      for pkg in release/*.AppImage release/*.deb; do
+        if [ -f "$pkg" ]; then
+          SIZE=$(du -h "$pkg" | cut -f1)
+          echo "Package: $pkg ($SIZE)"
+          ENCODED_NAME=$(python3 -c "import urllib.parse; print(urllib.parse.quote_plus('$(basename "$pkg")'))")
+          UPLOAD_URL="http://172.18.5.249:8081/artifactory/RongxinAI/linux/$ENCODED_NAME"
+          if [ -n "$ARTIFACTORY_USER" ] && [ -n "$ARTIFACTORY_PASSWORD" ]; then
+            echo "Uploading to $UPLOAD_URL ..."
+            curl -sS --fail --connect-timeout 10 --max-time 900 \
+              -u "$ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD" \
+              -T "$pkg" "$UPLOAD_URL" \
+              && echo "Uploaded to Artifactory" \
+              || echo "Artifactory upload failed (non-fatal)"
+          else
+            echo "Skipping upload: ARTIFACTORY_USER or ARTIFACTORY_PASSWORD not set"
+          fi
+        fi
+      done
+  artifacts:
+    paths:
+      - release/*.AppImage
+      - release/*.deb
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
