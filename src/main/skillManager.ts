@@ -832,6 +832,25 @@ type GithubRepoSource = {
   repo: string;
 };
 
+type SkillDownloadErrorCode =
+  | 'clawhub_not_found'
+  | 'clawhub_network'
+  | 'clawhub_already_installed'
+  | 'npx_unavailable'
+  | 'github_download_failed'
+  | 'invalid_source'
+  | 'unknown';
+
+class SkillDownloadError extends Error {
+  constructor(
+    readonly code: SkillDownloadErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SkillDownloadError';
+  }
+}
+
 const extractErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
@@ -974,6 +993,40 @@ const isNpmPackageSpec = (source: string): boolean => {
   return false;
 };
 
+const CLAWHUB_HOSTS = [
+  'clawhub.ai',
+  'www.clawhub.ai',
+  'cn.clawhub-mirror.com',
+] as const;
+
+const CLAWHUB_NPM_REGISTRY_CN = 'https://registry.npmmirror.com';
+const CLAWHUB_SITE_CN = 'https://cn.clawhub-mirror.com';
+const CLAWHUB_REGISTRY_CN = 'https://cn.clawhub-mirror.com';
+const CLAWHUB_SITE_OFFICIAL = 'https://clawhub.ai';
+const CLAWHUB_REGISTRY_OFFICIAL = 'https://clawhub.ai';
+const CLAWHUB_CLI_VERSION = '0.21.0';
+
+const classifyClawhubInstallError = (message: string): SkillDownloadErrorCode => {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('skill not found')) return 'clawhub_not_found';
+  if (normalized.includes('already installed')) return 'clawhub_already_installed';
+  if (
+    normalized.includes('network error')
+    || normalized.includes('fetch failed')
+    || normalized.includes('timed out')
+    || normalized.includes('econnreset')
+    || normalized.includes('enotfound')
+    || normalized.includes('etimedout')
+    || normalized.includes('socket hang up')
+  ) {
+    return 'clawhub_network';
+  }
+  if (normalized.includes('npx is not available') || normalized.includes('node.js')) {
+    return 'npx_unavailable';
+  }
+  return 'unknown';
+};
+
 /**
  * Parse a clawhub.ai URL and extract the skill name.
  * Supports: /skills/{owner}/{name} and /skills/{name}
@@ -981,7 +1034,7 @@ const isNpmPackageSpec = (source: string): boolean => {
 const parseClawhubUrl = (source: string): { name: string } | null => {
   try {
     const url = new URL(source);
-    if (url.hostname !== 'clawhub.ai' && url.hostname !== 'www.clawhub.ai') return null;
+    if (!CLAWHUB_HOSTS.includes(url.hostname as typeof CLAWHUB_HOSTS[number])) return null;
     const segments = url.pathname.split('/').filter(Boolean);
     // Format: /skills/{owner}/{name}
     if (segments.length >= 3 && segments[0] === 'skills') {
@@ -1029,54 +1082,117 @@ const downloadClawhubSkill = async (
   const npxCliJs = resolveNpxCliJs();
   const electronPath = getElectronNodeRuntimePath();
 
-  let command: string;
-  let args: string[];
-  if (npxCliJs) {
-    console.log(
-      `[downloadClawhubSkill] cwd="${targetDir}" skill="${skillName}" `
-      + `electron="${electronPath}" npxCliJs="${npxCliJs}"`,
-    );
-    command = electronPath;
-    args = [npxCliJs, 'clawhub@latest', 'install', skillName, '--dir', targetDir, '--no-input', '--force'];
-    // Inject --require script to hide CMD windows from all descendant processes
-    const hideScript = ensureWindowsHideScript();
-    if (hideScript) {
-      args = ['--require', hideScript, ...args];
+  const installAttempts: Array<{label: string; npmRegistry: string | undefined; site: string; registry: string}> = [
+    {
+      label: 'china-mirror',
+      npmRegistry: CLAWHUB_NPM_REGISTRY_CN,
+      site: CLAWHUB_SITE_CN,
+      registry: CLAWHUB_REGISTRY_CN,
+    },
+    {
+      label: 'official-fallback',
+      npmRegistry: undefined,
+      site: CLAWHUB_SITE_OFFICIAL,
+      registry: CLAWHUB_REGISTRY_OFFICIAL,
+    },
+  ];
+
+  const buildAttempt = (attempt: (typeof installAttempts)[number]): {
+    command: string;
+    args: string[];
+    env: NodeJS.ProcessEnv;
+  } => {
+    const installArgs = [
+      `clawhub@${CLAWHUB_CLI_VERSION}`,
+      'install',
+      skillName,
+      '--dir',
+      targetDir,
+      '--site',
+      attempt.site,
+      '--registry',
+      attempt.registry,
+      '--no-input',
+      '--force',
+    ];
+    if (npxCliJs) {
+      console.log(
+        `[downloadClawhubSkill] attempt=${attempt.label} cwd="${targetDir}" skill="${skillName}" `
+        + `electron="${electronPath}" npxCliJs="${npxCliJs}" site="${attempt.site}" registry="${attempt.registry}" npmRegistry="${attempt.npmRegistry ?? 'default'}"`,
+      );
+      let args = [npxCliJs];
+      if (attempt.npmRegistry) {
+        args.push('--registry', attempt.npmRegistry);
+      }
+      args.push(...installArgs);
+      const hideScript = ensureWindowsHideScript();
+      if (hideScript) {
+        args = ['--require', hideScript, ...args];
+      }
+      return {
+        command: electronPath,
+        args,
+        env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+      };
     }
-  } else {
+
     const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
     console.log(
-      `[downloadClawhubSkill] cwd="${targetDir}" skill="${skillName}" `
-      + `bundled npx not found, falling back to system "${npxCommand}"`,
+      `[downloadClawhubSkill] attempt=${attempt.label} cwd="${targetDir}" skill="${skillName}" `
+      + `bundled npx not found, falling back to system "${npxCommand}" site="${attempt.site}" registry="${attempt.registry}" npmRegistry="${attempt.npmRegistry ?? 'default'}"`,
     );
     if (!hasCommand(npxCommand, env)) {
-      throw new Error('npx is not available. Please install Node.js from https://nodejs.org/');
+      throw new SkillDownloadError(
+        'npx_unavailable',
+        'npx is not available. Please install Node.js from https://nodejs.org/',
+      );
     }
-    command = npxCommand;
-    args = ['clawhub@latest', 'install', skillName, '--dir', targetDir, '--no-input', '--force'];
-  }
-
-  try {
-    await runCommand(command, args, {
-      cwd: targetDir,
+    const args = [];
+    if (attempt.npmRegistry) {
+      args.push('--registry', attempt.npmRegistry);
+    }
+    args.push(...installArgs);
+    return {
+      command: npxCommand,
+      args,
       env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-    });
-  } catch (error) {
+    };
+  };
+
+  const cleanError = (error: unknown): string => {
     const raw = error instanceof Error ? error.message : String(error);
-    // Strip ANSI escape codes and decode URL-encoded characters
-    const cleaned = raw
-       
+    return raw
       .replace(/\x1b\[[0-9;]*m/g, '')
       .replace(/%[0-9A-Fa-f]{2}/g, (match) => {
         try { return decodeURIComponent(match); } catch { return match; }
       })
       .trim();
+  };
 
-    if (/skill not found/i.test(cleaned)) {
-      throw new Error(t('skillErrClawhubNotFound'));
+  const errors: string[] = [];
+  for (const attempt of installAttempts) {
+    const run = buildAttempt(attempt);
+    try {
+      await runCommand(run.command, run.args, {
+        cwd: targetDir,
+        env: run.env,
+      });
+      return;
+    } catch (error) {
+      const cleaned = cleanError(error);
+      errors.push(`[${attempt.label}] ${cleaned}`);
+      console.warn(`[downloadClawhubSkill] attempt=${attempt.label} failed: ${cleaned}`);
+      const errorCode = classifyClawhubInstallError(cleaned);
+      if (errorCode === 'clawhub_not_found') {
+        throw new SkillDownloadError('clawhub_not_found', t('skillErrClawhubNotFound'));
+      }
     }
-    throw new Error(t('skillErrClawhubDownloadFailed') + '\n' + cleaned);
   }
+
+  throw new SkillDownloadError(
+    classifyClawhubInstallError(errors.join('\n')),
+    t('skillErrClawhubDownloadFailed') + '\n' + errors.join('\n\n'),
+  );
 };
 
 /**
@@ -1754,6 +1870,7 @@ export class SkillManager {
     success: boolean;
     skills?: SkillRecord[];
     error?: string;
+    errorCode?: SkillDownloadErrorCode;
     auditReport?: SkillSecurityReport;
     pendingInstallId?: string;
   }> {
@@ -1807,7 +1924,7 @@ export class SkillManager {
       } else {
         const normalized = this.normalizeGitSource(trimmed);
         if (!normalized) {
-          return { success: false, error: t('skillErrInvalidSource') };
+          return { success: false, error: t('skillErrInvalidSource'), errorCode: 'invalid_source' };
         }
         const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-'));
         cleanupPath = tempRoot;
@@ -1951,7 +2068,14 @@ export class SkillManager {
       return { success: true, skills: this.listSkills() };
     } catch (error) {
       cleanupPathSafely(cleanupPath);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to download skill' };
+      if (error instanceof SkillDownloadError) {
+        return { success: false, error: error.message, errorCode: error.code };
+      }
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to download skill',
+        errorCode: 'unknown',
+      };
     }
   }
 

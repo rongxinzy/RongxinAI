@@ -95,6 +95,7 @@ class SkillService {
     success: boolean;
     skills?: Skill[];
     error?: string;
+    errorCode?: string;
     auditReport?: any;
     pendingInstallId?: string;
   }> {
@@ -132,6 +133,7 @@ class SkillService {
     success: boolean;
     skills?: Skill[];
     error?: string;
+    errorCode?: string;
     auditReport?: any;
     pendingInstallId?: string;
   }> {
