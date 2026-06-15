@@ -251,7 +251,10 @@ function toGatewaySchedule(schedule: Schedule): GatewaySchedule {
   }
 }
 
-function toGatewayPayload(payload: ScheduledTaskPayload): GatewayPayload {
+function toGatewayPayload(
+  payload: ScheduledTaskPayload,
+  delivery?: ScheduledTaskDelivery,
+): GatewayPayload {
   if (payload.kind === PayloadKind.SystemEvent) {
     return {
       kind: PayloadKind.SystemEvent,
@@ -259,9 +262,17 @@ function toGatewayPayload(payload: ScheduledTaskPayload): GatewayPayload {
     };
   }
 
+  // Inject delivery info so the agent knows whether a notification channel
+  // is configured, avoiding blind "未配置通知渠道" notes on tasks that DO
+  // have delivery enabled.
+  const hasDelivery = delivery && delivery.mode !== 'none' && delivery.channel;
+  const deliveryNote = hasDelivery
+    ? `\n\n[Delivery: mode=${delivery!.mode}, channel=${delivery!.channel}]`
+    : '\n\n[Delivery: mode=none, 未配置 IM 通知通道。如果用户要求发送/通知，请在输出末尾追加提示。]';
+
   return {
     kind: PayloadKind.AgentTurn,
-    message: payload.message,
+    message: payload.message + deliveryNote,
     ...(typeof payload.timeoutSeconds === 'number'
       ? { timeoutSeconds: payload.timeoutSeconds }
       : {}),
@@ -527,7 +538,7 @@ export class CronJobService {
       schedule: toGatewaySchedule(input.schedule),
       sessionTarget: input.sessionTarget,
       wakeMode: input.wakeMode,
-      payload: toGatewayPayload(input.payload),
+      payload: toGatewayPayload(input.payload, input.delivery),
       ...(gatewayDelivery ? { delivery: gatewayDelivery } : {}),
       ...(input.agentId?.trim() ? { agentId: input.agentId.trim() } : {}),
       ...(input.sessionKey?.trim() ? { sessionKey: input.sessionKey.trim() } : {}),
@@ -566,7 +577,7 @@ export class CronJobService {
     if (input.schedule !== undefined) patch.schedule = toGatewaySchedule(input.schedule);
     if (input.sessionTarget !== undefined) patch.sessionTarget = input.sessionTarget;
     if (input.wakeMode !== undefined) patch.wakeMode = input.wakeMode;
-    if (input.payload !== undefined) patch.payload = toGatewayPayload(input.payload);
+    if (input.payload !== undefined) patch.payload = toGatewayPayload(input.payload, input.delivery);
     if (input.delivery !== undefined)
       patch.delivery = toGatewayDelivery(input.delivery) ?? { mode: DeliveryMode.None };
     if (input.agentId !== undefined) patch.agentId = input.agentId?.trim() || null;
