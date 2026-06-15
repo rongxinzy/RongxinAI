@@ -31,6 +31,7 @@ type ImportSourceType = 'github' | 'clawhub';
 type DirectImportSource = 'zip' | 'folder' | 'remote';
 
 const importSourceTypes: ImportSourceType[] = ['github', 'clawhub'];
+const CLAWHUB_ALLOWED_HOSTS = new Set(['clawhub.ai', 'www.clawhub.ai', 'cn.clawhub-mirror.com']);
 const MARKETPLACE_MIN_PAGE_SIZE = 8;
 const MARKETPLACE_MAX_PAGE_SIZE = 40;
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 20;
@@ -83,6 +84,23 @@ const getMarketplacePageItems = (currentPage: number, pageCount: number): Market
 
   return items;
 };
+
+function resolveSkillDownloadErrorMessage(errorCode?: string, fallback?: string): string {
+  switch (errorCode) {
+    case 'clawhub_not_found':
+      return i18nService.t('skillDownloadFailedNotFound');
+    case 'clawhub_network':
+      return i18nService.t('skillDownloadFailedNetwork');
+    case 'clawhub_already_installed':
+      return i18nService.t('skillDownloadFailedAlreadyInstalled');
+    case 'npx_unavailable':
+      return i18nService.t('skillDownloadFailedNpxUnavailable');
+    case 'invalid_source':
+      return i18nService.t('skillDownloadFailedInvalidSource');
+    default:
+      return fallback || i18nService.t('skillDownloadFailed');
+  }
+}
 
 const importTabConfig: Record<ImportSourceType, {
   tabLabelKey: string;
@@ -386,13 +404,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     console.log('[SkillsManager] downloadSkill result:', JSON.stringify({
       success: result.success,
       error: result.error,
+      errorCode: result.errorCode,
       hasAuditReport: !!result.auditReport,
       pendingInstallId: result.pendingInstallId,
       riskLevel: result.auditReport?.riskLevel,
       findingsCount: result.auditReport?.findings?.length,
     }));
     if (!result.success) {
-      setSkillActionError(result.error || i18nService.t('skillDownloadFailed'));
+      setSkillActionError(resolveSkillDownloadErrorMessage(result.errorCode, result.error));
       return;
     }
     // Security audit returned — show report modal
@@ -470,7 +489,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     try {
       const url = new URL(trimmed);
       const host = url.hostname.toLowerCase();
-      if (importTab === 'clawhub' && host !== 'clawhub.ai' && host !== 'www.clawhub.ai') {
+      if (importTab === 'clawhub' && !CLAWHUB_ALLOWED_HOSTS.has(host)) {
         setSkillActionError(i18nService.t('importSourceMismatchClawhub'));
         return;
       }

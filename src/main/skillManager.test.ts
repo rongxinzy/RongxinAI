@@ -219,7 +219,7 @@ test('integration: skill with block scalar description', () => {
 const parseClawhubUrl = (source: string): { name: string } | null => {
   try {
     const url = new URL(source);
-    if (url.hostname !== 'clawhub.ai' && url.hostname !== 'www.clawhub.ai') return null;
+    if (!['clawhub.ai', 'www.clawhub.ai', 'cn.clawhub-mirror.com'].includes(url.hostname)) return null;
     const segments = url.pathname.split('/').filter(Boolean);
     // Format: /skills/{owner}/{name}
     if (segments.length >= 3 && segments[0] === 'skills') {
@@ -249,6 +249,10 @@ test('clawhub: /{owner}/{name} extracts skill name', () => {
 
 test('clawhub: /{owner}/{name} with www prefix', () => {
   expect(parseClawhubUrl('https://www.clawhub.ai/steipete/slack')).toEqual({ name: 'slack' });
+});
+
+test('clawhub: mirror hostname extracts skill name', () => {
+  expect(parseClawhubUrl('https://cn.clawhub-mirror.com/skills/steipete/slack')).toEqual({ name: 'slack' });
 });
 
 test('clawhub: /{owner}/{name} with trailing slash', () => {

@@ -323,6 +323,7 @@ interface IElectronAPI {
       success: boolean;
       skills?: Skill[];
       error?: string;
+      errorCode?: string;
       auditReport?: any;
       pendingInstallId?: string;
     }>;
@@ -333,6 +334,7 @@ interface IElectronAPI {
       success: boolean;
       skills?: Skill[];
       error?: string;
+      errorCode?: string;
       auditReport?: any;
       pendingInstallId?: string;
     }>;
