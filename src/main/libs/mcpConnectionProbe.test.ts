@@ -1,11 +1,20 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const connectMock = vi.fn();
-const listToolsMock = vi.fn();
-const closeClientMock = vi.fn();
-const closeTransportMock = vi.fn();
-const resolveStdioCommandMock = vi.fn();
-const getEnhancedEnvMock = vi.fn();
+const {
+  connectMock,
+  listToolsMock,
+  closeClientMock,
+  closeTransportMock,
+  resolveStdioCommandMock,
+  getEnhancedEnvMock,
+} = vi.hoisted(() => ({
+  connectMock: vi.fn<(args: unknown) => Promise<void>>(),
+  listToolsMock: vi.fn<() => Promise<{ tools: unknown[] }>>(),
+  closeClientMock: vi.fn<() => Promise<void>>(),
+  closeTransportMock: vi.fn<() => Promise<void>>(),
+  resolveStdioCommandMock: vi.fn<() => Promise<{ command: string; args: string[]; env: Record<string, string> | undefined }>>(),
+  getEnhancedEnvMock: vi.fn<() => Promise<Record<string, string>>>(),
+}));
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
   Client: class MockClient {
