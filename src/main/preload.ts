@@ -101,6 +101,7 @@ contextBridge.exposeInMainWorld('electron', {
     delete: (id: string) => ipcRenderer.invoke(McpIpc.Delete, id),
     setEnabled: (options: { id: string; enabled: boolean }) =>
       ipcRenderer.invoke(McpIpc.SetEnabled, options),
+    testConnection: (data: unknown) => ipcRenderer.invoke(McpIpc.TestConnection, data),
     fetchMarketplace: () => ipcRenderer.invoke(McpIpc.FetchMarketplace),
     refreshBridge: () => ipcRenderer.invoke(McpIpc.RefreshBridge),
     onBridgeSyncStart: (callback: () => void) =>

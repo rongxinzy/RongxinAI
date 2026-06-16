@@ -138,7 +138,7 @@ function prependRequireArg(args: string[], scriptPath: string): string[] {
 
 // ── Command resolution ────────────────────────────────────────────
 
-interface ResolvedStdioCommand {
+export interface ResolvedStdioCommand {
   command: string;
   args: string[];
   env: Record<string, string> | undefined;
@@ -207,7 +207,7 @@ function isNodeCommand(normalized: string): 'node' | 'npx' | 'npm' | null {
  * 1. Use system-installed Node.js if available (avoids Electron stdin quirks)
  * 2. Fall back to Electron runtime with ELECTRON_RUN_AS_NODE=1
  */
-async function resolveStdioCommand(server: McpServerRecord): Promise<ResolvedStdioCommand> {
+export async function resolveStdioCommand(server: McpServerRecord): Promise<ResolvedStdioCommand> {
   const stdioCommand = server.command || '';
   let effectiveCommand = stdioCommand;
   const stdioArgs = server.args || [];
