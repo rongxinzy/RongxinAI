@@ -208,6 +208,21 @@ rm -rf node_modules package-lock.json
 # Avoid npm peer resolution conflicts caused by dev-only lint toolchain.
 npm pkg delete devDependencies >/dev/null 2>&1 || true
 
+# RongxinAI: remove channel plugins that pull unreachable git dependencies
+node -e "
+	const fs=require('fs'),path=require('path');
+	const f='package.json';
+	const p=JSON.parse(fs.readFileSync(f,'utf8'));
+	const removed=[];
+	['dependencies','optionalDependencies','peerDependencies'].forEach(key=>{
+	if(p[key])['@openclaw/whatsapp','@whiskeysockets/baileys'].forEach(d=>{
+	if(p[key][d]){delete p[key][d];removed.push(key+':'+d);}});
+	});
+	if(removed.length)console.log('[RongxinAI] Removed: '+removed.join(', '));
+	else console.log('[RongxinAI] WARNING: @whiskeysockets/baileys not found in package.json');
+	fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');
+	" || echo "[RongxinAI] ERROR: failed to strip deps"
+
 echo "[openclaw-runtime] npm target platform=$NPM_TARGET_PLATFORM arch=$NPM_TARGET_ARCH"
 NPM_CONFIG_LEGACY_PEER_DEPS=true \
 npm_config_platform="$NPM_TARGET_PLATFORM" \
