@@ -1249,7 +1249,7 @@ export const UserMessageItem: React.FC<{
         <div className="pl-4 sm:pl-8 md:pl-12">
           <div className="flex items-start gap-3 flex-row-reverse">
             <div className="w-full min-w-0 flex flex-col items-end">
-              <div className="w-fit max-w-[54rem] rounded-2xl px-4 py-2.5 bg-surface text-foreground shadow-subtle">
+              <div className="w-fit max-w-full rounded-2xl px-4 py-2.5 bg-surface text-foreground shadow-subtle">
                 {displayContent?.trim() && (
                   <MarkdownContent
                     content={displayContent}
