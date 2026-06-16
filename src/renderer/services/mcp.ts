@@ -1,4 +1,4 @@
-import { McpConnectionTestResult, McpServerConfig, McpServerFormData, McpRegistryEntry, McpMarketplaceCategoryInfo, McpCategory, McpMarketplaceServer } from '../types/mcp';
+import { McpCategory, McpConnectionTestResult, McpMarketplaceCategoryInfo, McpMarketplaceServer,McpRegistryEntry, McpServerConfig, McpServerFormData } from '../types/mcp';
 
 export function normalizeMcpErrorMessage(message: string): string {
   const trimmed = message.trim();

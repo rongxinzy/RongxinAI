@@ -1,5 +1,5 @@
-import type { McpServerFormData, McpServerRecord } from '../mcpStore';
 import { isValidMcpCommandFormat, isValidMcpUrlFormat } from '../../shared/mcpValidation';
+import type { McpServerFormData, McpServerRecord } from '../mcpStore';
 
 export async function validateMcpServerConfig(
   data: Pick<McpServerFormData, 'transportType' | 'command' | 'url'>,
