@@ -32,7 +32,11 @@ const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 // Ensure the current Node's directory is first in PATH for the whole build chain
 const env = { ...process.env };
 if (process.platform === 'win32') {
-  const nodeDir = path.dirname(process.execPath);
+  // 优先使用 C:\nodejs junction 避免路径空格导致 shell:true 截断
+  const junctionNode = path.join(path.parse(process.execPath).root, 'nodejs', 'node.exe');
+  const nodeDir = fs.existsSync(junctionNode)
+    ? path.dirname(junctionNode)
+    : path.dirname(process.execPath);
   const pathEntries = Object.entries(env).filter(([k]) => k.toUpperCase() === 'PATH');
   const pathValue = pathEntries.map(([, v]) => v).join(path.delimiter);
   for (const [k] of pathEntries) delete env[k];
