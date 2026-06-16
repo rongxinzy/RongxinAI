@@ -1,0 +1,25 @@
+import { expect, test } from 'vitest';
+
+import { normalizeMcpErrorMessage } from './mcp';
+
+test('normalizeMcpErrorMessage shortens Streamable HTTP HTML responses', () => {
+  const result = normalizeMcpErrorMessage(
+    'Streamable HTTP error: Error POSTing to endpoint: <!doctype html><html lang="en"><head><title>Example Domain</title></head><body>Example Domain</body></html>',
+  );
+
+  expect(result).toBe('The target URL is not a valid Streamable HTTP MCP endpoint.');
+});
+
+test('normalizeMcpErrorMessage shortens generic MCP HTML responses', () => {
+  const result = normalizeMcpErrorMessage(
+    'Error POSTing to endpoint: <!doctype html><html><body>Example Domain</body></html>',
+  );
+
+  expect(result).toBe('The target URL is not a valid MCP endpoint.');
+});
+
+test('normalizeMcpErrorMessage shortens connection closed errors', () => {
+  const result = normalizeMcpErrorMessage('MCP error -32000: Connection closed');
+
+  expect(result).toBe('The MCP server closed the connection unexpectedly.');
+});

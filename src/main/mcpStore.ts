@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import Database from 'better-sqlite3';
+import crypto from 'crypto';
 
 export interface McpServerRecord {
   id: string;
@@ -129,7 +129,7 @@ export class McpStore {
     this.db
       .prepare(
         `INSERT INTO mcp_servers (id, name, description, enabled, transport_type, config_json, created_at, updated_at)
-       VALUES (?, ?, ?, 1, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
       )
       .run(id, data.name, data.description, data.transportType, configJson, now, now);
 

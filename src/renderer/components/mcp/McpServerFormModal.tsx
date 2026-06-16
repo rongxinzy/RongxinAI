@@ -1,5 +1,6 @@
 import React, { useEffect,useState } from 'react';
 
+import { validateMcpTransportFields } from '../../../shared/mcpValidation';
 import { i18nService } from '../../services/i18n';
 import { McpRegistryEntry,McpServerConfig, McpServerFormData } from '../../types/mcp';
 import Modal from '../common/Modal';
@@ -10,7 +11,7 @@ interface McpServerFormModalProps {
   registryEntry?: McpRegistryEntry | null; // install from registry mode
   existingNames: string[];
   onClose: () => void;
-  onSave: (data: McpServerFormData) => void;
+  onSave: (data: McpServerFormData) => Promise<{ success: boolean; error?: string }>;
 }
 
 const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
@@ -34,6 +35,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
   const [headerRows, setHeaderRows] = useState<{ key: string; value: string }[]>([]);
   const [error, setError] = useState('');
   const [envErrors, setEnvErrors] = useState<Record<number, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -105,58 +107,30 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
     setEnvErrors({});
   }, [isOpen, server, registryEntry]);
 
-  const handleSave = () => {
+  const buildValidatedFormData = (): McpServerFormData | null => {
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError(i18nService.t('mcpNameRequired'));
-      return;
+      return null;
     }
 
-    // Check name uniqueness (excluding current server in edit mode)
     const otherNames = existingNames.filter(n => !isEdit || n !== server?.name);
     if (otherNames.includes(trimmedName)) {
       setError(i18nService.t('mcpNameExists'));
-      return;
+      return null;
     }
 
-    let validatedCommand = '';
-    let validatedUrl = '';
-
-    // stdio — 命令校验（非空 + 格式）
-    if (transportType === 'stdio') {
-      const cmd = command.trim();
-      if (!cmd) {
-        setError(i18nService.t('mcpCommandRequired'));
-        return;
-      }
-      if (!/^[a-zA-Z0-9][a-zA-Z0-9._\-\/:\\\\ ]*$/.test(cmd)) {
-        setError(i18nService.t('mcpCommandInvalid'));
-        return;
-      }
-      validatedCommand = cmd;
+    const validatedCommand = command.trim();
+    const validatedUrl = url.trim();
+    const transportErrorKey = validateMcpTransportFields(transportType, {
+      command: validatedCommand,
+      url: validatedUrl,
+    });
+    if (transportErrorKey) {
+      setError(i18nService.t(transportErrorKey));
+      return null;
     }
 
-    // SSE / HTTP — URL 校验（非空 + 格式 + 协议）
-    if (transportType === 'sse' || transportType === 'http') {
-      const rawUrl = url.trim();
-      if (!rawUrl) {
-        setError(i18nService.t('mcpUrlRequired'));
-        return;
-      }
-      try {
-        const parsed = new URL(rawUrl);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          setError(i18nService.t('mcpUrlInvalid'));
-          return;
-        }
-      } catch {
-        setError(i18nService.t('mcpUrlInvalid'));
-        return;
-      }
-      validatedUrl = rawUrl;
-    }
-
-    // Validate required env vars
     const missingRequiredIndices: Record<number, boolean> = {};
     envRows.forEach((row, index) => {
       if (row.required && !row.value.trim()) {
@@ -165,7 +139,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
     });
     if (Object.keys(missingRequiredIndices).length > 0) {
       setEnvErrors(missingRequiredIndices);
-      return;
+      return null;
     }
 
     const args = argsText
@@ -200,13 +174,29 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       if (Object.keys(headers).length > 0) data.headers = headers;
     }
 
-    // Attach registry metadata if installing from registry
     if (isRegistry && registryEntry) {
       data.isBuiltIn = true;
       data.registryId = registryEntry.id;
     }
 
-    onSave(data);
+    return data;
+  };
+
+  const handleSave = () => {
+    const data = buildValidatedFormData();
+    if (!data) return;
+    void (async () => {
+      setError('');
+      setIsSaving(true);
+      try {
+        const result = await onSave(data);
+        if (!result.success) {
+          setError(result.error || i18nService.t('mcpCreateFailed'));
+        }
+      } finally {
+        setIsSaving(false);
+      }
+    })();
   };
 
   const handleAddEnvRow = () => {
@@ -475,11 +465,11 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
           {error && (
             <div className="text-xs text-red-500">{error}</div>
           )}
-
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className="px-3 py-1.5 text-xs rounded-lg border border-border text-secondary hover:bg-surface-raised transition-colors"
             >
               {i18nService.t('cancel')}
@@ -487,9 +477,10 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className="px-3 py-1.5 text-xs rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors"
+              disabled={isSaving}
+              className="px-3 py-1.5 text-xs rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {saveText}
+              {isSaving ? i18nService.t('testing') : saveText}
             </button>
           </div>
         </div>

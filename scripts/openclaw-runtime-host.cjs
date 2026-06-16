@@ -32,7 +32,7 @@ const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 // Ensure the current Node's directory is first in PATH for the whole build chain
 const env = { ...process.env };
 if (process.platform === 'win32') {
-  // 优先使用 C:\nodejs junction 避免路径空格导致 shell:true 截断
+  // Prefer junction path (e.g. C:\nodejs) to avoid spaces breaking shell:true spawn
   const junctionNode = path.join(path.parse(process.execPath).root, 'nodejs', 'node.exe');
   const nodeDir = fs.existsSync(junctionNode)
     ? path.dirname(junctionNode)

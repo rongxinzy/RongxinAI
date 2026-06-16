@@ -93,7 +93,11 @@ if (!bashExecutable) {
 //    through deeply-nested npm/cmd.exe process chains.
 const env = { ...process.env };
 if (process.platform === 'win32') {
-  const nodeDir = path.dirname(process.execPath);
+  // Prefer junction path (e.g. C:\nodejs) to avoid spaces breaking shell:true spawn
+  const junctionNode = path.join(path.parse(process.execPath).root, 'nodejs', 'node.exe');
+  const nodeDir = fs.existsSync(junctionNode)
+    ? path.dirname(junctionNode)
+    : path.dirname(process.execPath);
   const pathEntries = Object.entries(env).filter(([k]) => k.toUpperCase() === 'PATH');
   const pathValue = pathEntries.map(([, v]) => v).join(path.delimiter);
   for (const [k] of pathEntries) delete env[k];
