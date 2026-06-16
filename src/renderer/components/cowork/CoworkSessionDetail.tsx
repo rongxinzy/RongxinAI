@@ -1253,7 +1253,7 @@ export const UserMessageItem: React.FC<{
                 {displayContent?.trim() && (
                   <MarkdownContent
                     content={displayContent}
-                    className="max-w-none whitespace-pre-wrap break-words"
+                    className="max-w-none whitespace-pre-wrap break-all"
                     onImageClick={setExpandedImage}
                   />
                 )}
