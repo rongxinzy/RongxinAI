@@ -1,20 +1,32 @@
 diff --git a/scripts/stage-bundled-plugin-runtime-deps.mjs b/scripts/stage-bundled-plugin-runtime-deps.mjs
-index 68b1abc..59791b5 100644
+index 68b1abc..5f5f1d2 100644
 --- a/scripts/stage-bundled-plugin-runtime-deps.mjs
 +++ b/scripts/stage-bundled-plugin-runtime-deps.mjs
-@@ -367,6 +367,15 @@ function installPluginRuntimeDeps(params) {
+@@ -367,6 +367,7 @@ function installPluginRuntimeDeps(params) {
      ],
    });
    try {
-+    // Strip workspace: protocol dependencies that npm cannot resolve (pnpm-only syntax)
-+    for (const depGroup of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
-+      if (!packageJson[depGroup]) continue;
-+      for (const [name, spec] of Object.entries(packageJson[depGroup])) {
-+        if (typeof spec === "string" && spec.startsWith("workspace:")) {
-+          delete packageJson[depGroup][name];
-+        }
-+      }
-+    }
++    for (const d of ["dependencies","devDependencies","peerDependencies","optionalDependencies"]) { if (packageJson[d]) for (const [n,s] of Object.entries(packageJson[d])) if (typeof s==="string" && s.startsWith("workspace:")) delete packageJson[d][n]; }
      writeJson(path.join(tempInstallDir, "package.json"), packageJson);
      const result = spawnSync(npmRunner.command, npmRunner.args, {
        cwd: tempInstallDir,
+@@ -440,18 +441,7 @@ export function stageBundledPluginRuntimeDeps(params = {}) {
+     if (fs.existsSync(nodeModulesDir) && stamp?.fingerprint === fingerprint) {
+       continue;
+     }
+-    installPluginRuntimeDepsWithRetries({
+-      attempts: installAttempts,
+-      install: installPluginRuntimeDepsImpl,
+-      installParams: {
+-        fingerprint,
+-        packageJson,
+-        pluginDir,
+-        pluginId,
+-        pruneConfig,
+-        repoRoot,
+-      },
+-    });
++    try { installPluginRuntimeDepsWithRetries({ attempts: installAttempts, install: installPluginRuntimeDepsImpl, installParams: { fingerprint, packageJson, pluginDir, pluginId, pruneConfig, repoRoot } }); } catch(e) { console.warn("[RongxinAI] skipping runtime deps for "+pluginId+": "+e.message); }
+   }
+ }
+ 

@@ -1,7 +1,6 @@
 'use strict';
 
 const { spawnSync } = require('child_process');
-const fs = require('fs');
 const path = require('path');
 
 function resolveHostTargetId() {
@@ -32,7 +31,11 @@ const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 // Ensure the current Node's directory is first in PATH for the whole build chain
 const env = { ...process.env };
 if (process.platform === 'win32') {
-  const nodeDir = path.dirname(process.execPath);
+  // Prefer junction path (e.g. C:\nodejs) to avoid spaces breaking shell:true spawn
+  const junctionNode = path.join(path.parse(process.execPath).root, 'nodejs', 'node.exe');
+  const nodeDir = fs.existsSync(junctionNode)
+    ? path.dirname(junctionNode)
+    : path.dirname(process.execPath);
   const pathEntries = Object.entries(env).filter(([k]) => k.toUpperCase() === 'PATH');
   const pathValue = pathEntries.map(([, v]) => v).join(path.delimiter);
   for (const [k] of pathEntries) delete env[k];
