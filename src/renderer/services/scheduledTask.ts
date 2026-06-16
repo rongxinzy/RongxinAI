@@ -238,11 +238,16 @@ class ScheduledTaskService {
     try {
       const result = await api.listRuns(taskId, limit, offset, filter);
       if (result.success && result.runs) {
+        // 网关 sortDir 排序字段不可控（可能按 ts 而非 runAtMs），
+        // 前端二次排序确保按 startedAt 倒序
+        const sorted = [...result.runs].sort(
+          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+        );
         const hasMore = result.runs.length >= limit;
         if (offset && offset > 0) {
-          store.dispatch(appendRuns({ taskId, runs: result.runs, hasMore }));
+          store.dispatch(appendRuns({ taskId, runs: sorted, hasMore }));
         } else {
-          store.dispatch(setRuns({ taskId, runs: result.runs, hasMore }));
+          store.dispatch(setRuns({ taskId, runs: sorted, hasMore }));
         }
       }
     } catch (err: unknown) {
@@ -257,11 +262,15 @@ class ScheduledTaskService {
     try {
       const result = await api.listAllRuns(limit, offset, filter);
       if (result.success && result.runs) {
+        // 前端二次排序确保按 startedAt 倒序（网关 sortBy 字段不可控）
+        const sorted = [...result.runs].sort(
+          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+        );
         const hasMore = (result.runs as unknown[]).length >= (limit ?? 50);
         if (offset && offset > 0) {
-          store.dispatch(appendAllRuns({ runs: result.runs, hasMore }));
+          store.dispatch(appendAllRuns({ runs: sorted, hasMore }));
         } else {
-          store.dispatch(setAllRuns({ runs: result.runs, hasMore }));
+          store.dispatch(setAllRuns({ runs: sorted, hasMore }));
         }
       }
     } catch (err: unknown) {
