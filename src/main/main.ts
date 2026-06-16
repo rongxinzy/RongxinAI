@@ -12,6 +12,7 @@ import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
 import { CoworkStreamIpc } from '../shared/ipc/channels';
+import { McpIpc } from '../shared/ipc/channels';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
@@ -73,10 +74,10 @@ import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEnd
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
-import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { validateMcpServerConfig, validateStoredMcpServerConfig } from './libs/mcpCommandValidation';
+import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import { McpServerManager } from './libs/mcpServerManager';
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { OllamaManager } from './libs/ollamaManager';
@@ -133,7 +134,6 @@ import {
   resolveInitialAppWindowState,
   type WindowRectangle,
 } from './windowState';
-import { McpIpc } from '../shared/ipc/channels';
 
 const gwDiagTs = (): string => {
   const d = new Date();
