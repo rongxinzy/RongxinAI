@@ -33,6 +33,12 @@ export interface McpServerFormData {
   registryId?: string;
 }
 
+export interface McpConnectionTestResult {
+  success: boolean;
+  error?: string;
+  toolCount?: number;
+}
+
 // Built-in MCP registry entry (pure frontend definition)
 export interface McpRegistryEntry {
   id: string;                    // unique identifier, e.g. 'filesystem'
