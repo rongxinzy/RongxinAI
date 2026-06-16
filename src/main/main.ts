@@ -12,6 +12,7 @@ import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
 import { CoworkStreamIpc } from '../shared/ipc/channels';
+import { McpIpc } from '../shared/ipc/channels';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
@@ -75,6 +76,8 @@ import { LlamaCppManager } from './libs/llamacppManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
+import { validateMcpServerConfig, validateStoredMcpServerConfig } from './libs/mcpCommandValidation';
+import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import { McpServerManager } from './libs/mcpServerManager';
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { OllamaManager } from './libs/ollamaManager';
@@ -3017,7 +3020,7 @@ if (!gotTheLock) {
   });
 
   // MCP Server IPC handlers
-  ipcMain.handle('mcp:list', () => {
+  ipcMain.handle(McpIpc.List, () => {
     try {
       const servers = getMcpStore().listServers();
       return { success: true, servers };
@@ -3026,7 +3029,7 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('mcp:create', async (_event, data: {
+  ipcMain.handle(McpIpc.Create, async (_event, data: {
     name: string;
     description: string;
     transportType: string;
@@ -3037,6 +3040,11 @@ if (!gotTheLock) {
     headers?: Record<string, string>;
   }) => {
     try {
+      const validationError = await validateMcpServerConfig(data as McpServerFormData);
+      if (validationError) {
+        return { success: false, error: validationError };
+      }
+
       getMcpStore().createServer(data as McpServerFormData);
       const servers = getMcpStore().listServers();
       // Trigger async MCP bridge refresh (don't await — let UI show DB result immediately)
@@ -3047,7 +3055,7 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('mcp:update', async (_event, id: string, data: {
+  ipcMain.handle(McpIpc.Update, async (_event, id: string, data: {
     name?: string;
     description?: string;
     transportType?: string;
@@ -3056,8 +3064,34 @@ if (!gotTheLock) {
     env?: Record<string, string>;
     url?: string;
     headers?: Record<string, string>;
+    githubUrl?: string;
+    registryId?: string;
   }) => {
     try {
+      const existing = getMcpStore().getServer(id);
+      if (!existing) {
+        return { success: false, error: 'MCP server not found' };
+      }
+
+      const merged: McpServerFormData = {
+        name: data.name ?? existing.name,
+        description: data.description ?? existing.description,
+        transportType: (data.transportType ?? existing.transportType) as McpServerFormData['transportType'],
+        command: data.command !== undefined ? data.command : existing.command,
+        args: data.args !== undefined ? data.args : existing.args,
+        env: data.env !== undefined ? data.env : existing.env,
+        url: data.url !== undefined ? data.url : existing.url,
+        headers: data.headers !== undefined ? data.headers : existing.headers,
+        isBuiltIn: existing.isBuiltIn,
+        githubUrl: data.githubUrl !== undefined ? data.githubUrl : existing.githubUrl,
+        registryId: data.registryId !== undefined ? data.registryId : existing.registryId,
+      };
+
+      const validationError = await validateMcpServerConfig(merged);
+      if (validationError) {
+        return { success: false, error: validationError };
+      }
+
       getMcpStore().updateServer(id, data as Partial<McpServerFormData>);
       const servers = getMcpStore().listServers();
       refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
@@ -3067,7 +3101,22 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('mcp:delete', async (_event, id: string) => {
+  ipcMain.handle(McpIpc.TestConnection, async (_event, data: McpServerFormData) => {
+    try {
+      const validationError = await validateMcpServerConfig(data);
+      if (validationError) {
+        return { success: false, error: validationError };
+      }
+      return await probeMcpConnection(data);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to test MCP connection',
+      };
+    }
+  });
+
+  ipcMain.handle(McpIpc.Delete, async (_event, id: string) => {
     try {
       getMcpStore().deleteServer(id);
       const servers = getMcpStore().listServers();
@@ -3078,8 +3127,23 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('mcp:setEnabled', async (_event, options: { id: string; enabled: boolean }) => {
+  ipcMain.handle(McpIpc.SetEnabled, async (_event, options: { id: string; enabled: boolean }) => {
     try {
+      if (options.enabled) {
+        const existing = getMcpStore().getServer(options.id);
+        if (!existing) {
+          return { success: false, error: 'MCP server not found' };
+        }
+        const validationError = await validateStoredMcpServerConfig(existing);
+        if (validationError) {
+          return { success: false, error: validationError };
+        }
+        const probeResult = await probeMcpConnection(existing);
+        if (!probeResult.success) {
+          return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
+        }
+      }
+
       getMcpStore().setEnabled(options.id, options.enabled);
       const servers = getMcpStore().listServers();
       refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
@@ -3089,7 +3153,7 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('mcp:fetchMarketplace', async () => {
+  ipcMain.handle(McpIpc.FetchMarketplace, async () => {
     const url = getMcpMarketplaceUrl();
     try {
       const https = await import('https');
@@ -3122,7 +3186,7 @@ if (!gotTheLock) {
   });
 
   // Explicit bridge refresh — renderer can await this for loading state
-  ipcMain.handle('mcp:refreshBridge', async () => {
+  ipcMain.handle(McpIpc.RefreshBridge, async () => {
     try {
       const result = await refreshMcpBridge();
       return { success: true, tools: result.tools, error: result.error };
