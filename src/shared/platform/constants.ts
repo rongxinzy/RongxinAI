@@ -176,26 +176,14 @@ class PlatformRegistryImpl {
 
   // ── Platform Lists ──
 
-  /** 已禁用的 channel（网易龙虾邮箱，后续替换为自研邮箱 IM） */
-  private static readonly DISABLED_CHANNELS = new Set(['clawemail', 'clawemail-email']);
-
-  private isPlatformDisabled(def: PlatformDef): boolean {
-    return def.channelAliases.some(a => PlatformRegistryImpl.DISABLED_CHANNELS.has(a));
-  }
-
   /** All platform ids. Array order = UI display order. */
   get platforms(): readonly Platform[] {
-    return this._platforms.filter(p => {
-      const def = this.platformIndex.get(p);
-      return def ? !this.isPlatformDisabled(def) : true;
-    });
+    return this._platforms;
   }
 
   /** Platforms filtered by region, preserving definition order. */
   platformsByRegion(region: 'china' | 'global'): readonly Platform[] {
-    return this.defs
-      .filter(d => d.region === region && !this.isPlatformDisabled(d))
-      .map(d => d.id);
+    return this.defs.filter(d => d.region === region).map(d => d.id);
   }
 
   // ── Single Platform Queries ──
