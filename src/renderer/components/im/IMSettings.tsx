@@ -86,7 +86,7 @@ const IMSettings: React.FC = () => {
   const [feishuExpanded, setFeishuExpanded] = useState(false);
   const [activeDingTalkInstanceId, setActiveDingTalkInstanceId] = useState<string | null>(null);
   const [dingtalkExpanded, setDingtalkExpanded] = useState(false);
-  const [emailExpanded, setEmailExpanded] = useState(false);
+  const [, setEmailExpanded] = useState(false);
   const [activeEmailInstanceId, setActiveEmailInstanceId] = useState<string | null>(null);
   const [activeWecomInstanceId, setActiveWecomInstanceId] = useState<string | null>(null);
   const [wecomExpanded, setWecomExpanded] = useState(false);
@@ -133,7 +133,7 @@ const IMSettings: React.FC = () => {
 
   // Auto-run connectivity tests for all enabled platforms on mount
   useEffect(() => {
-    const imPlatforms: Platform[] = ['weixin', 'dingtalk', 'qq', 'feishu', 'email', 'wecom', 'telegram', 'discord'];
+    const imPlatforms: Platform[] = ['weixin', 'dingtalk', 'qq', 'feishu', 'wecom', 'telegram', 'discord'];
     const enabledPlatforms = imPlatforms.filter(platform => isPlatformEnabled(platform));
     if (enabledPlatforms.length === 0) return;
 
@@ -368,7 +368,7 @@ const IMSettings: React.FC = () => {
         // Not connected — keep QR visible with reconnect overlay.
         setWeixinQrStatus('expired');
       }
-    } catch (err) {
+    } catch {
       if (weixinTimerRef.current) { clearTimeout(weixinTimerRef.current); weixinTimerRef.current = null; }
       if (!isMountedRef.current) return;
       setWeixinQrStatus('expired');
@@ -990,72 +990,6 @@ const IMSettings: React.FC = () => {
                         </div>
                       );
                     })}
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          if (platform === 'email') {
-            return (
-              <div key="email">
-                {/* Email Platform Header - clickable to expand/collapse */}
-                <div
-                  onClick={() => { setActivePlatform('email'); setActiveEmailInstanceId(null); setEmailExpanded(!emailExpanded); }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
-                    activePlatform === 'email'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
-                >
-                  <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
-                      <img src={PlatformRegistry.logo('email')} alt="Email" className="w-6 h-6 object-contain rounded-md" />
-                    </div>
-                    <span className={`text-sm font-medium truncate ${activePlatform === 'email' ? 'text-primary' : 'text-foreground'}`}>
-                      {i18nService.t('email')}
-                    </span>
-                  </div>
-                  <span className="text-xs opacity-50">{emailExpanded ? '\u25BC' : '\u25B6'}</span>
-                </div>
-                {/* Email Instance Sub-items */}
-                {emailExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
-                    {config.email.instances.map((inst) => {
-                      const instStatus = status.email.instances.find(s => s.instanceId === inst.instanceId);
-                      const isSelected = activePlatform === 'email' && activeEmailInstanceId === inst.instanceId;
-                      const dotColor = !inst.enabled ? 'bg-gray-400' : (instStatus?.connected ? 'bg-green-500' : 'bg-yellow-500');
-                      return (
-                        <div
-                          key={inst.instanceId}
-                          onClick={() => { setActivePlatform('email'); setActiveEmailInstanceId(inst.instanceId); }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
-                          <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
-                            {inst.instanceName}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {/* Add account button */}
-                    <button
-                      type="button"
-                      disabled={config.email.instances.length >= MAX_EMAIL_INSTANCES}
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const inst = await imService.addEmailInstance(`Email ${config.email.instances.length + 1}`);
-                        if (inst) { setActivePlatform('email'); setActiveEmailInstanceId(inst.instanceId); setEmailExpanded(true); }
-                      }}
-                      className="w-full flex items-center p-1.5 pl-2 rounded-lg text-sm text-secondary hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <span className="mr-1">+</span>
-                      {i18nService.t('imEmailAddInstance')}
-                    </button>
                   </div>
                 )}
               </div>
