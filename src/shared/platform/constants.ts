@@ -178,12 +178,13 @@ class PlatformRegistryImpl {
 
   /** All platform ids. Array order = UI display order. */
   get platforms(): readonly Platform[] {
-    return this._platforms;
+    // 龙虾邮箱前端入口已关闭，从所有平台列表中过滤
+    return this._platforms.filter(p => p !== 'email');
   }
 
   /** Platforms filtered by region, preserving definition order. */
   platformsByRegion(region: 'china' | 'global'): readonly Platform[] {
-    return this.defs.filter(d => d.region === region).map(d => d.id);
+    return this.defs.filter(d => d.region === region && d.id !== 'email').map(d => d.id);
   }
 
   // ── Single Platform Queries ──
