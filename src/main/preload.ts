@@ -154,6 +154,8 @@ contextBridge.exposeInMainWorld('electron', {
     listRuntimeDevices: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListRuntimeDevices),
     getRuntimeCapabilities: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetRuntimeCapabilities),
     importRuntime: () => ipcRenderer.invoke(LlamaCppIpcChannel.ImportRuntime),
+    fetchWindowsRuntimeManifest: (url: string) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.FetchWindowsRuntimeManifest, url),
     start: () => ipcRenderer.invoke(LlamaCppIpcChannel.Start),
     stop: () => ipcRenderer.invoke(LlamaCppIpcChannel.Stop),
     restart: () => ipcRenderer.invoke(LlamaCppIpcChannel.Restart),

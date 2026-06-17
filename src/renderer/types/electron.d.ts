@@ -427,6 +427,7 @@ interface IElectronAPI {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
+    fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
     listRuntimeDevices: () => Promise<LlamaCppRuntimeListDevicesResult>;
     getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
