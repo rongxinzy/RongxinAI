@@ -210,6 +210,37 @@ const LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS = 500;
 const LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS = 3_000;
 const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
 const OPENCLAW_MIN_CTX = 32000;
+const LLAMACPP_WINDOWS_RUNTIME_VERSION = 'b9444';
+const LLAMACPP_WINDOWS_RUNTIME_BASE_URL =
+  `https://rongxinai.krli.org/llamacpp/${LLAMACPP_WINDOWS_RUNTIME_VERSION}`;
+const LLAMACPP_WINDOWS_RUNTIME_MANIFEST_URL =
+  `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/manifest.json`;
+const LLAMACPP_WINDOWS_RUNTIME_DOWNLOAD_FALLBACKS = [
+  {
+    id: 'cpu-x64',
+    href: `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/llama-${LLAMACPP_WINDOWS_RUNTIME_VERSION}-bin-win-cpu-x64.zip`,
+  },
+  {
+    id: 'cpu-arm64',
+    href: `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/llama-${LLAMACPP_WINDOWS_RUNTIME_VERSION}-bin-win-cpu-arm64.zip`,
+  },
+  {
+    id: 'cuda-12-x64',
+    href: `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/llama-${LLAMACPP_WINDOWS_RUNTIME_VERSION}-bin-win-cuda-12.4-x64.zip`,
+  },
+  {
+    id: 'cuda-13-x64',
+    href: `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/llama-${LLAMACPP_WINDOWS_RUNTIME_VERSION}-bin-win-cuda-13.3-x64.zip`,
+  },
+  {
+    id: 'hip-radeon-x64',
+    href: `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/llama-${LLAMACPP_WINDOWS_RUNTIME_VERSION}-bin-win-hip-radeon-x64.zip`,
+  },
+  {
+    id: 'vulkan-x64',
+    href: `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/llama-${LLAMACPP_WINDOWS_RUNTIME_VERSION}-bin-win-vulkan-x64.zip`,
+  },
+] as const;
 const DIRECT_ANSWER_SYSTEM_HINT = [
   'Answer as quickly and directly as possible.',
   'Skip unnecessary drafts, long internal monologues, and unrelated exploration.',
@@ -518,7 +549,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
@@ -555,6 +585,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [launchTarget, setLaunchTarget] = useState<OllamaModel | null>(null);
   const [servicePopoverOpen, setServicePopoverOpen] = useState(false);
   const [serviceConfigDialogOpen, setServiceConfigDialogOpen] = useState(false);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [importGuideOpen, setImportGuideOpen] = useState(false);
   const [serviceConfig, setServiceConfig] = useState<OllamaServiceConfig>({});
   const marketplaceSearchRef = useRef<number>(0);
@@ -954,6 +985,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handlePrepare = () => {
     void runAction(async () => {
       if (status?.status === 'not-installed') {
+        if (window.electron.platform === 'win32') {
+          setInstallGuideOpen(true);
+          return;
+        }
         const result = await window.electron.llamacpp.install();
         showToast(
           result?.success
@@ -1537,36 +1572,83 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onSave={handleSaveServiceConfig}
         />
       )}
+      {installGuideOpen && (
+        <ImportGuideDialog
+          mode="install"
+          onClose={() => setInstallGuideOpen(false)}
+        />
+      )}
       {importGuideOpen && (
-        <ImportGuideDialog onClose={() => setImportGuideOpen(false)} />
+        <ImportGuideDialog
+          mode="import"
+          onClose={() => setImportGuideOpen(false)}
+        />
       )}
     </div>
   );
 };
 
-function ImportGuideDialog({ onClose }: { onClose: () => void }) {
+function ImportGuideDialog({
+  mode,
+  onClose,
+}: {
+  mode: 'install' | 'import';
+  onClose: () => void;
+}) {
   const platform = window.electron.platform as string;
   const isWin = platform === 'win32';
-  const isMac = platform === 'darwin';
-
-  const executable = isWin ? 'llama-server.exe' : 'llama-server';
-
-  const filesKey = isWin
-    ? 'localInferenceImportGuideFilesWin'
-    : isMac
-      ? 'localInferenceImportGuideFilesMac'
-      : 'localInferenceImportGuideFilesLinux';
-
-  const noteKey = isWin
-    ? 'localInferenceImportGuideStep1WinNote'
-    : isMac
-      ? 'localInferenceImportGuideStep1MacNote'
-      : 'localInferenceImportGuideStep1LinuxNote';
+  const showWindowsDownloads = isWin && mode === 'install';
+  const showExternalDownloadLink = mode === 'import' && !showWindowsDownloads;
+  const [windowsDownloads, setWindowsDownloads] = useState<
+    Array<{ id: string; href: string; title: string; subtitle: string }>
+  >([]);
+  const [windowsDownloadsLoading, setWindowsDownloadsLoading] = useState(false);
 
   const openUrl = useCallback(() => {
     const url = i18nService.t('localInferenceImportGuideStep1Url');
     window.electron.shell.openExternal(url).catch(() => undefined);
   }, []);
+
+  const openWindowsRuntimeUrl = useCallback((url: string) => {
+    window.electron.shell.openExternal(url).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!showWindowsDownloads) return;
+    let cancelled = false;
+
+    const fallbackDownloads = LLAMACPP_WINDOWS_RUNTIME_DOWNLOAD_FALLBACKS
+      .map(download => buildWindowsRuntimeDownload(download.href))
+      .filter((download): download is NonNullable<typeof download> => Boolean(download));
+
+    setWindowsDownloads(fallbackDownloads);
+    setWindowsDownloadsLoading(true);
+
+    void fetch(LLAMACPP_WINDOWS_RUNTIME_MANIFEST_URL)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(manifest => {
+        if (cancelled) return;
+        const resolved = extractWindowsRuntimeDownloadsFromManifest(manifest);
+        if (resolved.length > 0) {
+          setWindowsDownloads(resolved);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) {
+          setWindowsDownloadsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showWindowsDownloads]);
 
   return (
     <div
@@ -1580,7 +1662,11 @@ function ImportGuideDialog({ onClose }: { onClose: () => void }) {
         <div className="flex items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-foreground">
-              {i18nService.t('localInferenceImportGuideTitle')}
+              {i18nService.t(
+                mode === 'install'
+                  ? 'localInferenceImportGuideTitle'
+                  : 'localInferenceImportGuideHelpTitle',
+              )}
             </h3>
             <p className="mt-1 text-sm text-secondary">
               {i18nService.t('localInferenceImportGuideDescription')}
@@ -1598,16 +1684,6 @@ function ImportGuideDialog({ onClose }: { onClose: () => void }) {
 
         {/* Body */}
         <div className="overflow-y-auto px-4 py-4">
-          {/* OS info */}
-          <div className="rounded-lg border border-border bg-surface/60 px-3 py-2.5 mb-4">
-            <p className="text-xs font-medium text-foreground">
-              {isWin ? 'Windows' : isMac ? 'macOS' : 'Linux'}
-            </p>
-            <p className="mt-1 text-xs text-secondary">
-              {i18nService.t(filesKey)} ({executable})
-            </p>
-          </div>
-
           {/* Steps */}
           <ol className="space-y-4 text-sm">
             <li className="flex gap-3">
@@ -1616,17 +1692,42 @@ function ImportGuideDialog({ onClose }: { onClose: () => void }) {
                 <p className="text-foreground">
                   {i18nService.t('localInferenceImportGuideStep1')}
                 </p>
-                <button
-                  type="button"
-                  onClick={openUrl}
-                  className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                >
-                  {i18nService.t('localInferenceImportGuideStep1LinkLabel')}
-                  <ArrowTopRightOnSquareIcon className="h-3 w-3" />
-                </button>
-                <p className="mt-1 text-xs text-secondary">
-                  {i18nService.t(noteKey)}
-                </p>
+                {showWindowsDownloads ? (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {windowsDownloads.map(download => (
+                      <button
+                        key={download.id}
+                        type="button"
+                        onClick={() => openWindowsRuntimeUrl(download.href)}
+                        className="flex min-h-[72px] w-full items-center justify-between rounded-lg border border-border bg-surface/60 px-3 py-2 text-left text-xs transition-colors hover:bg-surface-raised"
+                      >
+                        <span className="min-w-0">
+                          <span className="block font-medium text-foreground">
+                            {download.title}
+                          </span>
+                          <span className="mt-0.5 block text-secondary">
+                            {download.subtitle}
+                          </span>
+                        </span>
+                        <ArrowTopRightOnSquareIcon className="ml-3 h-3.5 w-3.5 shrink-0 text-primary" />
+                      </button>
+                    ))}
+                    {windowsDownloadsLoading && (
+                      <p className="px-1 text-[11px] text-secondary">
+                        {i18nService.t('localInferenceImportGuideWindowsLoading')}
+                      </p>
+                    )}
+                  </div>
+                ) : showExternalDownloadLink ? (
+                  <button
+                    type="button"
+                    onClick={openUrl}
+                    className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    {i18nService.t('localInferenceImportGuideStep1LinkLabel')}
+                    <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+                  </button>
+                ) : null}
               </div>
             </li>
             <li className="flex gap-3">
@@ -1657,6 +1758,114 @@ function ImportGuideDialog({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+}
+
+function extractWindowsRuntimeDownloadsFromManifest(
+  manifest: unknown,
+): Array<{ id: string; href: string; title: string; subtitle: string }> {
+  const urls = new Set<string>();
+  collectWindowsRuntimeUrls(manifest, urls);
+  return Array.from(urls)
+    .map(url => buildWindowsRuntimeDownload(url))
+    .filter((download): download is NonNullable<typeof download> => Boolean(download))
+    .sort((left, right) => compareWindowsRuntimeDownloads(left.id, right.id));
+}
+
+function collectWindowsRuntimeUrls(value: unknown, target: Set<string>): void {
+  if (typeof value === 'string') {
+    if (
+      /^https?:\/\//i.test(value) &&
+      /win/i.test(value) &&
+      /\.(zip|exe)$/i.test(value)
+    ) {
+      target.add(value);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(item => collectWindowsRuntimeUrls(item, target));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach(item => collectWindowsRuntimeUrls(item, target));
+  }
+}
+
+function buildWindowsRuntimeDownload(url: string): {
+  id: string;
+  href: string;
+  title: string;
+  subtitle: string;
+} | null {
+  const fileName = getWindowsRuntimeFileName(url);
+  if (!fileName) return null;
+  const lowerFileName = fileName.toLowerCase();
+  const versionMatch = lowerFileName.match(/llama-(b\d+)-/);
+  const version = versionMatch?.[1] ?? LLAMACPP_WINDOWS_RUNTIME_VERSION;
+  const variantId = getWindowsRuntimeVariantId(lowerFileName);
+  const titleKey = getWindowsRuntimeVariantLabelKey(variantId);
+
+  return {
+    id: `${version}-${variantId}-${fileName}`,
+    href: url,
+    title: i18nService
+      .t('localInferenceImportGuideWindowsBuildTitle')
+      .replace('{version}', version)
+      .replace('{variant}', i18nService.t(titleKey)),
+    subtitle: i18nService.t(titleKey),
+  };
+}
+
+function getWindowsRuntimeFileName(url: string): string | null {
+  try {
+    const pathname = new URL(url).pathname;
+    const fileName = pathname.split('/').pop()?.trim();
+    return fileName || null;
+  } catch {
+    return null;
+  }
+}
+
+function getWindowsRuntimeVariantId(fileName: string): string {
+  if (/cuda[-.]?13/.test(fileName)) return 'cuda13';
+  if (/cuda[-.]?12/.test(fileName)) return 'cuda12';
+  if (/hip|radeon|rocm/.test(fileName)) return 'radeon';
+  if (/integrated|igpu|vulkan|d3d12/.test(fileName)) return 'integrated';
+  if (/arm64/.test(fileName)) return 'cpuArm64';
+  if (/cpu/.test(fileName)) return 'cpu';
+  return 'generic';
+}
+
+function getWindowsRuntimeVariantLabelKey(variantId: string): string {
+  switch (variantId) {
+    case 'cuda13':
+      return 'localInferenceImportGuideWindowsCuda13Label';
+    case 'cuda12':
+      return 'localInferenceImportGuideWindowsCuda12Label';
+    case 'radeon':
+      return 'localInferenceImportGuideWindowsRadeonLabel';
+    case 'integrated':
+      return 'localInferenceImportGuideWindowsIntegratedLabel';
+    case 'cpuArm64':
+      return 'localInferenceImportGuideWindowsCpuArm64Label';
+    case 'cpu':
+      return 'localInferenceImportGuideWindowsCpuLabel';
+    default:
+      return 'localInferenceImportGuideWindowsGenericLabel';
+  }
+}
+
+function compareWindowsRuntimeDownloads(leftId: string, rightId: string): number {
+  const priority = (id: string): number => {
+    if (id.includes('-cpu-')) return 0;
+    if (id.includes('-cpuArm64-')) return 1;
+    if (id.includes('-integrated-')) return 2;
+    if (id.includes('-radeon-')) return 3;
+    if (id.includes('-cuda12-')) return 4;
+    if (id.includes('-cuda13-')) return 5;
+    return 6;
+  };
+  return priority(leftId) - priority(rightId) || leftId.localeCompare(rightId);
 }
 
 function hasConfiguredLlamaCppRuntime(status: OllamaStatusSnapshot | null): boolean {
@@ -1717,7 +1926,7 @@ function ServicePopover({
     status.status !== 'not-installed';
   const actionLabel =
     status?.status === 'not-installed'
-      ? i18nService.t('localInferenceInstall')
+      ? i18nService.t('localInferenceDownload')
       : i18nService.t('localInferenceStart');
   const [downloadsExpanded, setDownloadsExpanded] = useState(false);
   const downloadEntries = useMemo(
@@ -1874,7 +2083,7 @@ function ServicePopover({
                   onClick={onOpenImportGuide}
                   disabled={loading}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-                  title={i18nService.t('localInferenceImportGuideTitle')}
+                  title={i18nService.t('localInferenceImportGuideHelpTitle')}
                 >
                   <QuestionMarkCircleIcon className="h-4 w-4" />
                 </button>
