@@ -215,6 +215,25 @@ const LLAMACPP_WINDOWS_RUNTIME_BASE_URL =
   `https://rongxinai.krli.org/llamacpp/${LLAMACPP_WINDOWS_RUNTIME_VERSION}`;
 const LLAMACPP_WINDOWS_RUNTIME_MANIFEST_URL =
   `${LLAMACPP_WINDOWS_RUNTIME_BASE_URL}/manifest.json`;
+
+/**
+ * Windows runtime download variants.
+ * Order matters for two independent concerns:
+ *  - `match` is tested top-to-bottom against the lowercased archive name (first
+ *    hit wins), so more specific variants must come before broader ones
+ *    (e.g. cpuArm64 before cpu, cuda12/13 before generic cpu).
+ *  - `priority` controls display sort order (lower = shown first).
+ * This is the single source of truth for variant id / label / sort order.
+ */
+const WINDOWS_RUNTIME_VARIANTS = [
+  { id: 'cpuArm64', labelKey: 'localInferenceImportGuideWindowsCpuArm64Label', match: /arm64/, priority: 1 },
+  { id: 'integrated', labelKey: 'localInferenceImportGuideWindowsIntegratedLabel', match: /integrated|igpu|vulkan|d3d12/, priority: 2 },
+  { id: 'radeon', labelKey: 'localInferenceImportGuideWindowsRadeonLabel', match: /hip|radeon|rocm/, priority: 3 },
+  { id: 'cuda12', labelKey: 'localInferenceImportGuideWindowsCuda12Label', match: /cuda[-.]?12/, priority: 4 },
+  { id: 'cuda13', labelKey: 'localInferenceImportGuideWindowsCuda13Label', match: /cuda[-.]?13/, priority: 5 },
+  { id: 'cpu', labelKey: 'localInferenceImportGuideWindowsCpuLabel', match: /cpu/, priority: 0 },
+] as const;
+
 const LLAMACPP_WINDOWS_RUNTIME_DOWNLOAD_FALLBACKS = [
   {
     id: 'cpu-x64',
@@ -549,6 +568,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
+  const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>('inference');
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
@@ -1619,20 +1639,15 @@ function ImportGuideDialog({
 
     const fallbackDownloads = LLAMACPP_WINDOWS_RUNTIME_DOWNLOAD_FALLBACKS
       .map(download => buildWindowsRuntimeDownload(download.href))
-      .filter((download): download is NonNullable<typeof download> => Boolean(download));
+      .filter((download): download is WindowsRuntimeDownload => download !== null);
 
     setWindowsDownloads(fallbackDownloads);
     setWindowsDownloadsLoading(true);
 
-    void fetch(LLAMACPP_WINDOWS_RUNTIME_MANIFEST_URL)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json();
-      })
+    void window.electron.llamacpp
+      .fetchWindowsRuntimeManifest(LLAMACPP_WINDOWS_RUNTIME_MANIFEST_URL)
       .then(manifest => {
-        if (cancelled) return;
+        if (cancelled || !manifest) return;
         const resolved = extractWindowsRuntimeDownloadsFromManifest(manifest);
         if (resolved.length > 0) {
           setWindowsDownloads(resolved);
@@ -1767,8 +1782,9 @@ function extractWindowsRuntimeDownloadsFromManifest(
   collectWindowsRuntimeUrls(manifest, urls);
   return Array.from(urls)
     .map(url => buildWindowsRuntimeDownload(url))
-    .filter((download): download is NonNullable<typeof download> => Boolean(download))
-    .sort((left, right) => compareWindowsRuntimeDownloads(left.id, right.id));
+    .filter((download): download is WindowsRuntimeDownload => download !== null)
+    .sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id))
+    .map(({ id, href, title, subtitle }) => ({ id, href, title, subtitle }));
 }
 
 function collectWindowsRuntimeUrls(value: unknown, target: Set<string>): void {
@@ -1791,29 +1807,41 @@ function collectWindowsRuntimeUrls(value: unknown, target: Set<string>): void {
   }
 }
 
-function buildWindowsRuntimeDownload(url: string): {
+type WindowsRuntimeDownload = {
   id: string;
   href: string;
   title: string;
   subtitle: string;
-} | null {
+  priority: number;
+};
+
+function buildWindowsRuntimeDownload(url: string): WindowsRuntimeDownload | null {
   const fileName = getWindowsRuntimeFileName(url);
   if (!fileName) return null;
   const lowerFileName = fileName.toLowerCase();
   const versionMatch = lowerFileName.match(/llama-(b\d+)-/);
   const version = versionMatch?.[1] ?? LLAMACPP_WINDOWS_RUNTIME_VERSION;
-  const variantId = getWindowsRuntimeVariantId(lowerFileName);
-  const titleKey = getWindowsRuntimeVariantLabelKey(variantId);
+  const variant = matchWindowsRuntimeVariant(lowerFileName);
+  const labelKey =
+    variant?.labelKey ?? 'localInferenceImportGuideWindowsGenericLabel';
+  const variantLabel = i18nService.t(labelKey);
 
   return {
-    id: `${version}-${variantId}-${fileName}`,
+    id: `${version}-${variant?.id ?? 'generic'}-${fileName}`,
     href: url,
     title: i18nService
       .t('localInferenceImportGuideWindowsBuildTitle')
       .replace('{version}', version)
-      .replace('{variant}', i18nService.t(titleKey)),
-    subtitle: i18nService.t(titleKey),
+      .replace('{variant}', variantLabel),
+    subtitle: variantLabel,
+    priority: variant?.priority ?? Number.MAX_SAFE_INTEGER,
   };
+}
+
+function matchWindowsRuntimeVariant(
+  fileName: string,
+): (typeof WINDOWS_RUNTIME_VARIANTS)[number] | undefined {
+  return WINDOWS_RUNTIME_VARIANTS.find(variant => variant.match.test(fileName));
 }
 
 function getWindowsRuntimeFileName(url: string): string | null {
@@ -1824,48 +1852,6 @@ function getWindowsRuntimeFileName(url: string): string | null {
   } catch {
     return null;
   }
-}
-
-function getWindowsRuntimeVariantId(fileName: string): string {
-  if (/cuda[-.]?13/.test(fileName)) return 'cuda13';
-  if (/cuda[-.]?12/.test(fileName)) return 'cuda12';
-  if (/hip|radeon|rocm/.test(fileName)) return 'radeon';
-  if (/integrated|igpu|vulkan|d3d12/.test(fileName)) return 'integrated';
-  if (/arm64/.test(fileName)) return 'cpuArm64';
-  if (/cpu/.test(fileName)) return 'cpu';
-  return 'generic';
-}
-
-function getWindowsRuntimeVariantLabelKey(variantId: string): string {
-  switch (variantId) {
-    case 'cuda13':
-      return 'localInferenceImportGuideWindowsCuda13Label';
-    case 'cuda12':
-      return 'localInferenceImportGuideWindowsCuda12Label';
-    case 'radeon':
-      return 'localInferenceImportGuideWindowsRadeonLabel';
-    case 'integrated':
-      return 'localInferenceImportGuideWindowsIntegratedLabel';
-    case 'cpuArm64':
-      return 'localInferenceImportGuideWindowsCpuArm64Label';
-    case 'cpu':
-      return 'localInferenceImportGuideWindowsCpuLabel';
-    default:
-      return 'localInferenceImportGuideWindowsGenericLabel';
-  }
-}
-
-function compareWindowsRuntimeDownloads(leftId: string, rightId: string): number {
-  const priority = (id: string): number => {
-    if (id.includes('-cpu-')) return 0;
-    if (id.includes('-cpuArm64-')) return 1;
-    if (id.includes('-integrated-')) return 2;
-    if (id.includes('-radeon-')) return 3;
-    if (id.includes('-cuda12-')) return 4;
-    if (id.includes('-cuda13-')) return 5;
-    return 6;
-  };
-  return priority(leftId) - priority(rightId) || leftId.localeCompare(rightId);
 }
 
 function hasConfiguredLlamaCppRuntime(status: OllamaStatusSnapshot | null): boolean {

@@ -26,6 +26,7 @@ export const LlamaCppIpcChannel = {
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
   ChatStreamChunk: 'llamacpp:chat-stream-chunk',
+  FetchWindowsRuntimeManifest: 'llamacpp:fetch-windows-runtime-manifest',
 } as const;
 
 export type LlamaCppIpcChannel = typeof LlamaCppIpcChannel[keyof typeof LlamaCppIpcChannel];

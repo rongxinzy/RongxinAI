@@ -244,6 +244,24 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Install, async () => {
     return await manager.installRuntime();
   });
+  ipcMain.handle(
+    LlamaCppIpcChannel.FetchWindowsRuntimeManifest,
+    async (_event, url: string) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          console.warn(
+            `[LlamaCpp] windows runtime manifest request failed with status ${response.status}`,
+          );
+          return null;
+        }
+        return (await response.json()) as unknown;
+      } catch (error) {
+        console.warn('[LlamaCpp] failed to fetch windows runtime manifest:', error);
+        return null;
+      }
+    },
+  );
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
   ipcMain.handle(LlamaCppIpcChannel.GetRuntimeCapabilities, async () =>
