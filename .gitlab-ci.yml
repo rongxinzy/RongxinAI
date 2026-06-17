@@ -190,6 +190,8 @@ build-windows:
       } catch {
         Write-Host "Defender exclusions skipped: $_"
       }
+    # 清理损坏的 NSIS 缓存（elevate.exe 等文件丢失会导致 electron-builder ENOENT）
+    - if (Test-Path "$env:TEMP\electron-builder-cache\nsis") { Remove-Item "$env:TEMP\electron-builder-cache\nsis" -Recurse -Force }
     # Ensure NSIS is available — electron-builder silently skips NSIS if makensis is missing
     - if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
         Write-Error "NSIS (makensis) not found in PATH. Install NSIS and add to system PATH."
