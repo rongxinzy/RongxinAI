@@ -16,7 +16,9 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    electron([
+    // CI build-renderer job 跳过 electron 构建（由 build-main job 单独负责）
+    // 避免 renderer + main/preload 在同一进程内叠加 heap 导致 OOM
+    ...(process.env.VITE_SKIP_ELECTRON ? [] : [electron([
       {
         // 主进程入口文件
         entry: 'src/main/main.ts',
@@ -56,7 +58,7 @@ export default defineConfig({
         },
         onstart() {},
       },
-    ]),
+    ])]),
     renderer(),
   ],
   base: process.env.NODE_ENV === 'development' ? '/' : './',
@@ -71,6 +73,8 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     minify: false,
+    // CI 中指定 chrome130（Electron 40 运行时）跳过降级转译省内存
+    ...(process.env.CI && { target: 'chrome130' }),
   },
   server: {
     port: devPort,
