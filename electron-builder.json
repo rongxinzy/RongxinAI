@@ -78,6 +78,7 @@
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
+    "afterSign": "scripts/notarize.js",
     "extendInfo": {
       "CFBundleIconName": "icon",
       "NSCalendarsUsageDescription": "RongxinAI 需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
@@ -152,7 +153,6 @@
   "dmg": {
     "sign": false
   },
-  "afterSign": "scripts/notarize.js",
   "win": {
     "target": [
       "nsis"
