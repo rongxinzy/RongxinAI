@@ -1499,6 +1499,7 @@ export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeD
     const match = trimmed.match(/^([A-Za-z]+[\w.-]*)\s*:\s*(.+)$/);
     if (!match) continue;
     const id = match[1].trim();
+    if (id.toUpperCase() !== 'CPU' && !/\d+$/.test(id)) continue;
     const rawName = match[2].replace(/\s*\([^)]*\)\s*$/, '').trim();
     const backend = inferLlamaCppDeviceBackend(id, rawName);
     devices.push({

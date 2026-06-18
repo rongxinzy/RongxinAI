@@ -19,6 +19,9 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
+import {
+  listLlamaCppRuntimeDevices,
+} from './llamacppManager';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
   copyDirectoryContents,
@@ -569,6 +572,7 @@ export async function importLlamaCppBackendArchive(input: {
   if (validation) return { success: false, error: validation };
 
   const backendDir = getLlamaCppBackendDir(input.runtimeRoot, parsed.ref);
+  const previousRef = readCurrentBackendRef(input.runtimeRoot);
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-backend-import-'));
   try {
     const extractDir = path.join(tempDir, 'extract');
@@ -596,6 +600,16 @@ export async function importLlamaCppBackendArchive(input: {
       installedAt: new Date().toISOString(),
     });
     syncCurrentBackend(input.runtimeRoot, parsed.ref);
+
+    const deviceError = await validateImportedBackendDevices({
+      runtimeRoot: input.runtimeRoot,
+      ref: parsed.ref,
+      platform: input.platform,
+    });
+    if (deviceError) {
+      throw new Error(deviceError);
+    }
+
     return {
       success: true,
       backend: parsed.ref,
@@ -603,6 +617,7 @@ export async function importLlamaCppBackendArchive(input: {
     };
   } catch (error) {
     fs.rmSync(backendDir, { recursive: true, force: true });
+    restorePreviousBackend(input.runtimeRoot, previousRef);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -695,6 +710,7 @@ async function importLlamaCppBackendDirectory(input: {
   if (validation) return { success: false, error: validation };
 
   const backendDir = getLlamaCppBackendDir(input.runtimeRoot, metadata.ref);
+  const previousRef = readCurrentBackendRef(input.runtimeRoot);
   try {
     fs.rmSync(backendDir, { recursive: true, force: true });
     fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
@@ -713,6 +729,16 @@ async function importLlamaCppBackendDirectory(input: {
       installedAt: new Date().toISOString(),
     });
     syncCurrentBackend(input.runtimeRoot, metadata.ref);
+
+    const deviceError = await validateImportedBackendDevices({
+      runtimeRoot: input.runtimeRoot,
+      ref: metadata.ref,
+      platform: input.platform,
+    });
+    if (deviceError) {
+      throw new Error(deviceError);
+    }
+
     return {
       success: true,
       backend: metadata.ref,
@@ -720,6 +746,7 @@ async function importLlamaCppBackendDirectory(input: {
     };
   } catch (error) {
     fs.rmSync(backendDir, { recursive: true, force: true });
+    restorePreviousBackend(input.runtimeRoot, previousRef);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -816,6 +843,9 @@ function validateBackendForMachine(
   if (entry.accelerator === 'cuda' && !hasNvidiaGpu) {
     return 'CUDA backend requires an NVIDIA GPU.';
   }
+  if (entry.accelerator === 'vulkan') {
+    return 'Vulkan backend will validate device availability after installation.';
+  }
   if (entry.backend === 'win-x64-hip') {
     return 'HIP backend requires a Windows x64 machine with AMD HIP/ROCm support. RongxinAI will validate device availability after installation.';
   }
@@ -840,9 +870,13 @@ function normalizeArch(arch: string): string {
 }
 
 function normalizeBackendId(backend: string): string {
-  if (/^win-cuda-12(?:\.\d+)?-x64$/.test(backend)) return LlamaCppRuntimeTargetId.WinX64Cuda12;
+  if (/^win-cuda-13(?:\.\d+)?-x64$/i.test(backend)) return 'win-x64-cuda-13';
+  if (/^win-cuda-12(?:\.\d+)?-x64$/i.test(backend)) return LlamaCppRuntimeTargetId.WinX64Cuda12;
+  if (/^win-cuda-\d+(?:\.\d+)?-x64$/i.test(backend)) return LlamaCppRuntimeTargetId.WinX64Cuda12;
   if (backend === 'win-cpu-x64') return LlamaCppRuntimeTargetId.WinX64;
   if (backend === 'win-cpu-arm64') return LlamaCppRuntimeTargetId.WinArm64;
+  if (backend === 'win-x64-vulkan') return 'win-x64-vulkan';
+  if (backend === 'win-x64-hip') return 'win-x64-hip';
   if (backend === 'macos-arm64') return LlamaCppRuntimeTargetId.MacArm64;
   if (backend === 'macos-x64') return LlamaCppRuntimeTargetId.MacX64;
   if (backend === 'ubuntu-x64') return LlamaCppRuntimeTargetId.LinuxX64;
@@ -859,6 +893,51 @@ function inferBackendAccelerator(backend: string): LlamaCppBackendManifestEntry[
   if (backend.startsWith('mac-') || backend.startsWith('macos-')) return 'metal';
   if (backend.includes('cpu') || backend.startsWith('win-') || backend.startsWith('linux-')) return 'cpu';
   return 'unknown';
+}
+
+async function validateImportedBackendDevices(input: {
+  runtimeRoot: string;
+  ref: LlamaCppBackendRef;
+  platform: NodeJS.Platform;
+}): Promise<string | undefined> {
+  const executablePath = getLlamaCppCurrentExecutablePath(input.runtimeRoot, input.platform);
+  const devicesResult = await listLlamaCppRuntimeDevices({
+    executablePath,
+    platform: input.platform,
+  });
+  if (!devicesResult.success) {
+    return `Failed to detect devices: ${devicesResult.error || 'unknown error'}`;
+  }
+  const detectedBackends = new Set(devicesResult.devices.map(device => device.backend));
+  const requiredBackend = backendRequiresDeviceValidation(input.ref.backend);
+  if (requiredBackend && !detectedBackends.has(requiredBackend)) {
+    const detected = Array.from(detectedBackends).filter(Boolean).join(', ') || 'none';
+    return `The selected backend requires ${requiredBackend}, but only ${detected} devices were detected.`;
+  }
+  return undefined;
+}
+
+function backendRequiresDeviceValidation(backend: string): string | undefined {
+  if (backend.includes('cuda')) return 'cuda';
+  if (backend.includes('vulkan')) return 'vulkan';
+  if (backend.includes('hip') || backend.includes('rocm')) return 'rocm';
+  return undefined;
+}
+
+function restorePreviousBackend(
+  runtimeRoot: string,
+  previousRef: LlamaCppBackendRef | undefined,
+): void {
+  if (!previousRef) {
+    removeCurrentBackendLink(runtimeRoot);
+    return;
+  }
+  try {
+    syncCurrentBackend(runtimeRoot, previousRef);
+  } catch (error) {
+    console.error('[LlamaCpp] failed to restore previous backend after import:', error);
+    removeCurrentBackendLink(runtimeRoot);
+  }
 }
 
 async function downloadArchive(
