@@ -7,6 +7,10 @@
 workflow:
   auto_cancel:
     on_new_commit: interruptible
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - when: never
 
 default:
   image: rongxinai-ci:latest
@@ -57,7 +61,6 @@ lint:
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 2: 构建
@@ -69,9 +72,10 @@ build-renderer:
     - job: lint
       optional: true
   variables:
-    NODE_OPTIONS: '--max-old-space-size=4096'
+    VITE_SKIP_ELECTRON: '1'
   script:
-    - npm run build
+    - npx tsc --noEmit
+    - node --max-old-space-size=1792 node_modules/.bin/vite build --sourcemap false
     - test -f dist/index.html
   rules:
     - if: $CI_COMMIT_TAG
@@ -83,7 +87,6 @@ build-renderer:
         - tsconfig.json
         - tailwind.config.js
         - postcss.config.js
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 build-main:
   stage: build
@@ -107,7 +110,6 @@ build-main:
         - src/common/**/*
         - electron-tsconfig.json
         - src/main/preload.ts
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 build-skills:
   stage: build
@@ -119,7 +121,6 @@ build-skills:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - changes:
         - SKILLs/**/*
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 3: 测试
@@ -135,7 +136,6 @@ test:
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "release-1.0" || $CI_COMMIT_BRANCH == "dev"
 
 # ═══════════════════════════════════════════════════════
 # Stage 4: 平台打包（自托管 Runner）
@@ -346,7 +346,6 @@ build-linux:
   variables:
     NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
     ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
-    NODE_OPTIONS: '--max-old-space-size=4096'
     GIT_CLEAN_FLAGS: none
     # 跳过 Electron postinstall 下载
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
