@@ -9,7 +9,6 @@ const {
   buildClawhubDownloadFailureMessage,
   buildOpenClawSkillInstallConfig,
   getOpenClawRuntimeRootCandidates,
-  resolveOpenClawRuntimeRoot,
 } = __skillManagerTestUtils;
 
 // ==================== parseFrontmatter ====================
