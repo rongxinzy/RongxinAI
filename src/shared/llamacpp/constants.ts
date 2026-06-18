@@ -42,6 +42,7 @@ export type LlamaCppRuntimeBackend =
 
 export const LlamaCppRuntimeCudaMajor = {
   Cuda12: '12',
+  Cuda13: '13',
 } as const;
 
 export type LlamaCppRuntimeCudaMajor =

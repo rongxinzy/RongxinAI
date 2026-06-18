@@ -905,7 +905,10 @@ function isRuntimeBackend(value: unknown): value is NonNullable<LlamaCppServiceC
 function isRuntimeCudaMajor(
   value: unknown,
 ): value is NonNullable<LlamaCppServiceConfig['runtimeCudaMajor']> {
-  return value === LlamaCppRuntimeCudaMajor.Cuda12;
+  return (
+    value === LlamaCppRuntimeCudaMajor.Cuda12 ||
+    value === LlamaCppRuntimeCudaMajor.Cuda13
+  );
 }
 
 function isReasoningFormat(
