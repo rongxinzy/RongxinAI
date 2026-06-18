@@ -70,7 +70,13 @@ import { saveCoworkApiConfig } from './libs/coworkConfigStore';
 import { getCoworkLogPath } from './libs/coworkLogger';
 import { registerProxyTokenRefresher, startCoworkOpenAICompatProxy, stopCoworkOpenAICompatProxy } from './libs/coworkOpenAICompatProxy';
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
-import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
+import {
+  getMcpMarketplaceUrl,
+  getServerApiBaseUrl,
+  getSkillStoreSiteUrl,
+  getSkillStoreUrl,
+  refreshEndpointsTestMode,
+} from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
@@ -2880,9 +2886,8 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('skills:fetchMarketplace', async () => {
-    const url = getSkillStoreUrl();
-    const clawhubBase = 'https://clawhub.ai/api/v1/skills';
-    const apiUrl = url || clawhubBase;
+    const apiUrl = getSkillStoreUrl();
+    const siteUrl = getSkillStoreSiteUrl();
     console.log(`[SkillMarketplace] fetching from: ${apiUrl}`);
     try {
       const FEATURED_LIMIT = 40;
@@ -2919,11 +2924,11 @@ if (!gotTheLock) {
         description: item.summary || item.description || '',
         tags: item.tags ? Object.keys(item.tags as Record<string, unknown>) : [],
         stats: item.stats,
-        url: `https://clawhub.ai/skills/${item.slug || item.id}`,
+        url: `${siteUrl}/skills/${item.slug || item.id}`,
         version: ((item.tags as Record<string, string> | undefined)?.latest) || '1.0.0',
         source: {
           from: 'ClawHub',
-          url: `https://clawhub.ai/skills/${item.slug || item.id}`,
+          url: `${siteUrl}/skills/${item.slug || item.id}`,
           author: ((item.owner as Record<string, unknown> | undefined)?.displayName as string) ?? '',
         },
       }));

@@ -2,7 +2,15 @@ import { expect,test } from 'vitest';
 
 import { __skillManagerTestUtils } from './skillManager';
 
-const { parseFrontmatter, isTruthy, extractDescription } = __skillManagerTestUtils;
+const {
+  parseFrontmatter,
+  isTruthy,
+  extractDescription,
+  buildClawhubDownloadFailureMessage,
+  buildOpenClawSkillInstallConfig,
+  getOpenClawRuntimeRootCandidates,
+  resolveOpenClawRuntimeRoot,
+} = __skillManagerTestUtils;
 
 // ==================== parseFrontmatter ====================
 
@@ -220,7 +228,7 @@ test('integration: skill with block scalar description', () => {
 const parseClawhubUrl = (source: string): { name: string } | null => {
   try {
     const url = new URL(source);
-    if (!['clawhub.ai', 'www.clawhub.ai', 'cn.clawhub-mirror.com'].includes(url.hostname)) return null;
+    if (!['clawhub.ai', 'www.clawhub.ai'].includes(url.hostname)) return null;
     const segments = url.pathname.split('/').filter(Boolean);
     // Format: /skills/{owner}/{name}
     if (segments.length >= 3 && segments[0] === 'skills') {
@@ -250,10 +258,6 @@ test('clawhub: /{owner}/{name} extracts skill name', () => {
 
 test('clawhub: /{owner}/{name} with www prefix', () => {
   expect(parseClawhubUrl('https://www.clawhub.ai/steipete/slack')).toEqual({ name: 'slack' });
-});
-
-test('clawhub: mirror hostname extracts skill name', () => {
-  expect(parseClawhubUrl('https://cn.clawhub-mirror.com/skills/steipete/slack')).toEqual({ name: 'slack' });
 });
 
 test('clawhub: /{owner}/{name} with trailing slash', () => {
@@ -302,4 +306,61 @@ test('clawhub: invalid URL returns null', () => {
 
 test('clawhub: empty string returns null', () => {
   expect(parseClawhubUrl('')).toBeNull();
+});
+
+test('clawhub: unknown install failures keep the frontend message concise', () => {
+  const message = buildClawhubDownloadFailureMessage(
+    'Failed to download skill from ClawHub. Please try again later.',
+    ['Command failed with exit code 1'],
+  );
+
+  expect(message).toBe('Failed to download skill from ClawHub. Please try again later.');
+});
+
+test('openclaw skill install config points the default agent workspace at the temp workspace dir', () => {
+  const config = buildOpenClawSkillInstallConfig('/tmp/openclaw-skill-workspace');
+
+  expect(config).toEqual({
+    agents: {
+      defaults: {
+        workspace: '/tmp/openclaw-skill-workspace',
+      },
+    },
+    gateway: {
+      mode: 'local',
+    },
+    session: {
+      dmScope: 'per-channel-peer',
+    },
+    tools: {
+      profile: 'coding',
+    },
+  });
+});
+
+test('openclaw runtime root candidates use packaged cfmind location', () => {
+  expect(
+    getOpenClawRuntimeRootCandidates(
+      true,
+      '/Applications/RongxinAI.app/Contents/Resources/app.asar',
+      '/Users/dev/RongxinAI-release',
+      '/Applications/RongxinAI.app/Contents/Resources',
+    ),
+  ).toEqual([
+    '/Applications/RongxinAI.app/Contents/Resources/cfmind',
+  ]);
+});
+
+test('openclaw runtime root candidates prefer local vendor paths in development', () => {
+  expect(
+    getOpenClawRuntimeRootCandidates(
+      false,
+      '/Users/dev/RongxinAI-release',
+      '/Users/dev/RongxinAI-release',
+      '/Applications/RongxinAI.app/Contents/Resources',
+    ),
+  ).toEqual([
+    '/Users/dev/RongxinAI-release/vendor/openclaw-runtime/current',
+    '/Users/dev/RongxinAI-release/vendor/openclaw-runtime/current',
+  ]);
 });

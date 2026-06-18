@@ -1204,11 +1204,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     githubImportExamples:
       '示例：owner/repo；https://github.com/owner/repo/tree/main/SKILLs/my-skill',
     clawhubTabLabel: 'ClawHub',
-    clawhubImportDescription: '粘贴 ClawHub 或中国镜像的技能页面链接，将自动安装对应技能。',
+    clawhubImportDescription: '粘贴 ClawHub 的技能页面链接，将自动安装对应技能。',
     clawhubImportUrlLabel: 'ClawHub URL',
     clawhubSkillPlaceholder: '例如：https://clawhub.ai/skills/owner/skill-name',
     clawhubImportExamples: '示例：https://clawhub.ai/skills/owner/skill-name',
-    importSourceMismatchClawhub: '请输入 ClawHub 或中国镜像的链接，或切换到 GitHub 标签页导入。',
+    importSourceMismatchClawhub: '请输入 ClawHub 链接，或切换到 GitHub 标签页导入。',
     importSourceMismatchGithub:
       '请输入 GitHub 链接或 owner/repo 格式，或切换到 ClawHub 标签页导入。',
     importSkill: '导入',
@@ -3272,11 +3272,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Examples: owner/repo; https://github.com/owner/repo/tree/main/SKILLs/my-skill',
     clawhubTabLabel: 'ClawHub',
     clawhubImportDescription:
-      'Paste a ClawHub or China mirror skill page URL to automatically install the skill.',
+      'Paste a ClawHub skill page URL to automatically install the skill.',
     clawhubImportUrlLabel: 'ClawHub URL',
     clawhubSkillPlaceholder: 'e.g. https://clawhub.ai/skills/owner/skill-name',
     clawhubImportExamples: 'Example: https://clawhub.ai/skills/owner/skill-name',
-    importSourceMismatchClawhub: 'Please enter a ClawHub or China mirror URL, or switch to the GitHub tab.',
+    importSourceMismatchClawhub: 'Please enter a ClawHub URL, or switch to the GitHub tab.',
     importSourceMismatchGithub:
       'Please enter a GitHub URL or owner/repo, or switch to the ClawHub tab.',
     importSkill: 'Import',

@@ -2,7 +2,7 @@
  * Skill Services Manager - Manages background services for skills
  */
 
-import { execSync, spawn, spawnSync } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -12,59 +12,38 @@ import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 
 /**
- * Resolve the user's login shell PATH on macOS/Linux.
- * Packaged Electron apps on macOS don't inherit the user's shell profile,
- * so node/npm won't be in PATH unless we resolve it explicitly.
- */
-function resolveUserShellPath(): string | null {
-  if (process.platform === 'win32') return null;
-
-  try {
-    const shell = process.env.SHELL || '/bin/bash';
-    // Use non-interactive login shell to avoid side effects in interactive startup scripts.
-    const result = execSync(`${shell} -lc 'echo __PATH__=$PATH'`, {
-      encoding: 'utf-8',
-      timeout: 5000,
-      env: { ...process.env },
-    });
-    const match = result.match(/__PATH__=(.+)/);
-    return match ? match[1].trim() : null;
-  } catch (error) {
-    console.warn('[SkillServices] Failed to resolve user shell PATH:', error);
-    return null;
-  }
-}
-
-/**
  * Build an environment for spawning skill service scripts.
- * Merges the user's shell PATH with the current process environment.
+ * Uses a minimal PATH to avoid triggering shell startup side effects.
  */
 function buildSkillServiceEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env };
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
-  if (app.isPackaged) {
-    if (!env.HOME) {
-      env.HOME = app.getPath('home');
-    }
+  if (!env.HOME) {
+    env.HOME = app.getPath('home');
+  }
 
-    const userPath = resolveUserShellPath();
-    if (userPath) {
-      env.PATH = userPath;
-      console.log('[SkillServices] Resolved user shell PATH for skill services');
-    } else {
-      // Fallback: append common node installation paths
-      const commonPaths = [
+  if (process.platform === 'win32' && !env.USERPROFILE) {
+    env.USERPROFILE = env.HOME;
+  }
+
+  const commonPaths = process.platform === 'win32'
+    ? [
+        env.PATH,
+        'C:\\Program Files\\nodejs',
+        'C:\\Program Files (x86)\\nodejs',
+        `${env.APPDATA || ''}\\npm`,
+        `${env.LOCALAPPDATA || ''}\\Programs\\nodejs`,
+      ]
+    : [
+        env.PATH,
         '/usr/local/bin',
         '/opt/homebrew/bin',
-        `${env.HOME}/.nvm/current/bin`,
-        `${env.HOME}/.volta/bin`,
-        `${env.HOME}/.fnm/current/bin`,
+        '/opt/local/bin',
+        '/usr/bin',
+        '/bin',
       ];
-      env.PATH = [env.PATH, ...commonPaths].filter(Boolean).join(':');
-      console.log('[SkillServices] Using fallback PATH for skill services');
-    }
-  }
+  env.PATH = commonPaths.filter(Boolean).join(process.platform === 'win32' ? ';' : ':');
 
   // Expose Electron executable so skill scripts can run JS with ELECTRON_RUN_AS_NODE
   // even when system Node.js is not installed.
@@ -226,6 +205,62 @@ export class SkillServiceManager {
     };
   }
 
+  private resolveBundledNpmCliJs(): string | null {
+    const candidates = app.isPackaged
+      ? [path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npm-cli.js')]
+      : [
+          path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+          path.join(process.cwd(), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        ];
+    return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
+  }
+
+  private runCommandNoShell(
+    command: string,
+    args: string[],
+    options: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs?: number }
+  ): void {
+    const result = spawnSync(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+      timeout: options.timeoutMs ?? 120000,
+      windowsHide: true,
+    });
+
+    if (result.status === 0) {
+      return;
+    }
+
+    const detail = result.stderr?.trim() || result.stdout?.trim() || result.error?.message || `exit=${result.status ?? 'null'}`;
+    throw new Error(detail);
+  }
+
+  private runNpmNoShell(
+    npmArgs: string[],
+    options: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs?: number }
+  ): void {
+    const npmCliJs = this.resolveBundledNpmCliJs();
+    if (npmCliJs) {
+      this.runCommandNoShell(
+        getElectronNodeRuntimePath(),
+        [npmCliJs, ...npmArgs],
+        {
+          ...options,
+          env: {
+            ...options.env,
+            ELECTRON_RUN_AS_NODE: '1',
+          },
+        },
+      );
+      return;
+    }
+
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    this.runCommandNoShell(npmCommand, npmArgs, options);
+  }
+
   private ensureWebSearchRuntimeReady(skillPath: string): void {
     if (this.isWebSearchRuntimeHealthy(skillPath)) {
       return;
@@ -247,7 +282,7 @@ export class SkillServiceManager {
         throw new Error('Web-search runtime is incomplete and npm is not available to repair it');
       }
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
-      execSync('npm install', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
+      this.runNpmNoShell(['install'], { cwd: skillPath, env });
     }
 
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
@@ -256,7 +291,7 @@ export class SkillServiceManager {
         throw new Error('Web-search dist files are missing/outdated and npm is not available to rebuild them');
       }
       console.log('[SkillServices] Compiling web-search TypeScript...');
-      execSync('npm run build', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
+      this.runNpmNoShell(['run', 'build'], { cwd: skillPath, env });
     }
 
     if (!this.isWebSearchRuntimeHealthy(skillPath)) {

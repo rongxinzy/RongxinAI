@@ -288,6 +288,71 @@ function buildSkillEnv(): Record<string, string | undefined> {
   return env;
 }
 
+/**
+ * Build a minimal environment for bundled OpenClaw skill install/update flows.
+ * This intentionally avoids probing the user's login shell PATH on macOS,
+ * which can trigger an extra Terminal window in packaged apps.
+ */
+function buildBundledSkillInstallEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env };
+
+  normalizePathKey(env);
+
+  if (!env.HOME) {
+    env.HOME = app.getPath('home');
+  }
+  if (process.platform === 'win32' && !env.USERPROFILE) {
+    env.USERPROFILE = env.HOME;
+  }
+
+  if (process.platform === 'win32') {
+    const registryPath = resolveWindowsRegistryPath();
+    if (registryPath) {
+      const currentPath = env.PATH || '';
+      const seen = new Set(currentPath.toLowerCase().split(';').map(s => s.trim().replace(/[\\/]+$/, '')).filter(Boolean));
+      const extra: string[] = [];
+      for (const entry of registryPath.split(';')) {
+        const trimmed = entry.trim();
+        if (!trimmed) continue;
+        const key = trimmed.toLowerCase().replace(/[\\/]+$/, '');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        extra.push(trimmed);
+      }
+      if (extra.length > 0) {
+        env.PATH = currentPath ? `${currentPath};${extra.join(';')}` : extra.join(';');
+      }
+    }
+
+    const commonWinPaths = [
+      'C:\\Program Files\\nodejs',
+      'C:\\Program Files (x86)\\nodejs',
+      `${env.APPDATA || ''}\\npm`,
+      `${env.LOCALAPPDATA || ''}\\Programs\\nodejs`,
+    ].filter(Boolean);
+    const pathSet = new Set((env.PATH || '').toLowerCase().split(';').map(s => s.trim().replace(/[\\/]+$/, '')));
+    const missingPaths = commonWinPaths.filter(p => !pathSet.has(p.toLowerCase().replace(/[\\/]+$/, '')));
+    if (missingPaths.length > 0) {
+      env.PATH = env.PATH ? `${env.PATH};${missingPaths.join(';')}` : missingPaths.join(';');
+    }
+  } else {
+    const commonPaths = [
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/local/bin',
+      '/usr/bin',
+      '/bin',
+    ];
+    env.PATH = [env.PATH, ...commonPaths].filter(Boolean).join(':');
+  }
+
+  env.LOBSTERAI_ELECTRON_PATH = getElectronNodeRuntimePath();
+  appendPythonRuntimeToEnv(env);
+  normalizePathKey(env);
+
+  return env;
+}
+
 export type SkillRecord = {
   id: string;
   name: string;
@@ -586,6 +651,38 @@ const runCommand = (
   const child = spawn(command, args, {
     cwd: options?.cwd,
     env: options?.env,
+    windowsHide: true,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let stderr = '';
+  child.stderr.on('data', chunk => {
+    stderr += chunk.toString();
+  });
+  child.on('error', error => reject(error));
+  child.on('close', code => {
+    if (code === 0) {
+      resolve();
+      return;
+    }
+    reject(new Error(stderr.trim() || `Command failed with exit code ${code}`));
+  });
+});
+
+const runNodeScriptCommand = (
+  entryPath: string,
+  args: string[],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+): Promise<void> => new Promise((resolve, reject) => {
+  const env = { ...(options?.env || {}) };
+  const hasSystemNode = hasCommand('node', env);
+  const command = hasSystemNode ? 'node' : getElectronNodeRuntimePath();
+  const childEnv: NodeJS.ProcessEnv = hasSystemNode
+    ? env
+    : { ...env, ELECTRON_RUN_AS_NODE: '1' };
+
+  const child = spawn(command, [entryPath, ...args], {
+    cwd: options?.cwd,
+    env: childEnv,
     windowsHide: true,
     stdio: ['ignore', 'ignore', 'pipe'],
   });
@@ -996,15 +1093,7 @@ const isNpmPackageSpec = (source: string): boolean => {
 const CLAWHUB_HOSTS = [
   'clawhub.ai',
   'www.clawhub.ai',
-  'cn.clawhub-mirror.com',
 ] as const;
-
-const CLAWHUB_NPM_REGISTRY_CN = 'https://registry.npmmirror.com';
-const CLAWHUB_SITE_CN = 'https://cn.clawhub-mirror.com';
-const CLAWHUB_REGISTRY_CN = 'https://cn.clawhub-mirror.com';
-const CLAWHUB_SITE_OFFICIAL = 'https://clawhub.ai';
-const CLAWHUB_REGISTRY_OFFICIAL = 'https://clawhub.ai';
-const CLAWHUB_CLI_VERSION = '0.21.0';
 
 const classifyClawhubInstallError = (message: string): SkillDownloadErrorCode => {
   const normalized = message.toLowerCase();
@@ -1026,6 +1115,27 @@ const classifyClawhubInstallError = (message: string): SkillDownloadErrorCode =>
   }
   return 'unknown';
 };
+
+const buildClawhubDownloadFailureMessage = (baseMessage: string, _details: string[]): string => {
+  return baseMessage;
+};
+
+const buildOpenClawSkillInstallConfig = (workspaceDir: string): Record<string, unknown> => ({
+  agents: {
+    defaults: {
+      workspace: workspaceDir,
+    },
+  },
+  gateway: {
+    mode: 'local',
+  },
+  session: {
+    dmScope: 'per-channel-peer',
+  },
+  tools: {
+    profile: 'coding',
+  },
+});
 
 /**
  * Parse a clawhub.ai URL and extract the skill name.
@@ -1054,110 +1164,62 @@ const parseClawhubUrl = (source: string): { name: string } | null => {
   }
 };
 
-/**
- * Resolve the bundled npx-cli.js path for running npx commands
- * without requiring a system Node.js installation.
- */
-const resolveNpxCliJs = (): string | null => {
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npx-cli.js')]
-    : [
-        path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', 'npx-cli.js'),
-        path.join(process.cwd(), 'node_modules', 'npm', 'bin', 'npx-cli.js'),
-      ];
+const getOpenClawRuntimeRootCandidates = (
+  isPackaged: boolean,
+  appPath: string,
+  cwd: string,
+  resourcesPath: string,
+): string[] => (isPackaged
+  ? [path.join(resourcesPath, 'cfmind')]
+  : [
+      path.join(appPath, 'vendor', 'openclaw-runtime', 'current'),
+      path.join(cwd, 'vendor', 'openclaw-runtime', 'current'),
+    ]);
+
+const resolveOpenClawRuntimeRoot = (): string | null => {
+  const candidateRoots = getOpenClawRuntimeRootCandidates(
+    app.isPackaged,
+    app.getAppPath(),
+    process.cwd(),
+    process.resourcesPath,
+  );
+
+  for (const candidate of candidateRoots) {
+    if (!candidate || !fs.existsSync(candidate)) continue;
+    try {
+      return fs.realpathSync(candidate);
+    } catch {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+const resolveBundledOpenClawCliJs = (): string | null => {
+  const runtimeRoot = resolveOpenClawRuntimeRoot();
+  if (!runtimeRoot) return null;
+  const candidates = [
+    path.join(runtimeRoot, 'openclaw.mjs'),
+    path.join(runtimeRoot, 'gateway.asar', 'openclaw.mjs'),
+  ];
   return candidates.find(c => fs.existsSync(c)) || null;
 };
 
 /**
- * Download a skill from ClawHub using `npx clawhub@latest install {name}`.
- * Prefers the bundled npx (via Electron runtime) so it works in packaged
- * apps where system Node.js is not installed.
+ * Download a skill from ClawHub using the bundled `openclaw skills install`
+ * command into a temporary workspace, then let RongxinAI scan/copy the result.
  */
 const downloadClawhubSkill = async (
   skillName: string,
   targetDir: string,
   env: NodeJS.ProcessEnv
-): Promise<void> => {
+): Promise<string> => {
   fs.mkdirSync(targetDir, { recursive: true });
-  const npxCliJs = resolveNpxCliJs();
+  const openclawCliJs = resolveBundledOpenClawCliJs();
   const electronPath = getElectronNodeRuntimePath();
-
-  const installAttempts: Array<{label: string; npmRegistry: string | undefined; site: string; registry: string}> = [
-    {
-      label: 'china-mirror',
-      npmRegistry: CLAWHUB_NPM_REGISTRY_CN,
-      site: CLAWHUB_SITE_CN,
-      registry: CLAWHUB_REGISTRY_CN,
-    },
-    {
-      label: 'official-fallback',
-      npmRegistry: undefined,
-      site: CLAWHUB_SITE_OFFICIAL,
-      registry: CLAWHUB_REGISTRY_OFFICIAL,
-    },
-  ];
-
-  const buildAttempt = (attempt: (typeof installAttempts)[number]): {
-    command: string;
-    args: string[];
-    env: NodeJS.ProcessEnv;
-  } => {
-    const installArgs = [
-      `clawhub@${CLAWHUB_CLI_VERSION}`,
-      'install',
-      skillName,
-      '--dir',
-      targetDir,
-      '--site',
-      attempt.site,
-      '--registry',
-      attempt.registry,
-      '--no-input',
-      '--force',
-    ];
-    if (npxCliJs) {
-      console.log(
-        `[downloadClawhubSkill] attempt=${attempt.label} cwd="${targetDir}" skill="${skillName}" `
-        + `electron="${electronPath}" npxCliJs="${npxCliJs}" site="${attempt.site}" registry="${attempt.registry}" npmRegistry="${attempt.npmRegistry ?? 'default'}"`,
-      );
-      let args = [npxCliJs];
-      if (attempt.npmRegistry) {
-        args.push('--registry', attempt.npmRegistry);
-      }
-      args.push(...installArgs);
-      const hideScript = ensureWindowsHideScript();
-      if (hideScript) {
-        args = ['--require', hideScript, ...args];
-      }
-      return {
-        command: electronPath,
-        args,
-        env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-      };
-    }
-
-    const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-    console.log(
-      `[downloadClawhubSkill] attempt=${attempt.label} cwd="${targetDir}" skill="${skillName}" `
-      + `bundled npx not found, falling back to system "${npxCommand}" site="${attempt.site}" registry="${attempt.registry}" npmRegistry="${attempt.npmRegistry ?? 'default'}"`,
-    );
-    if (!hasCommand(npxCommand, env)) {
-      throw new SkillDownloadError(
-        'npx_unavailable',
-        'npx is not available. Please install Node.js from https://nodejs.org/',
-      );
-    }
-    const args = [];
-    if (attempt.npmRegistry) {
-      args.push('--registry', attempt.npmRegistry);
-    }
-    args.push(...installArgs);
-    return {
-      command: npxCommand,
-      args,
-      env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-    };
-  };
+  if (!openclawCliJs) {
+    throw new SkillDownloadError('unknown', t('skillErrClawhubDownloadFailed'));
+  }
 
   const cleanError = (error: unknown): string => {
     const raw = error instanceof Error ? error.message : String(error);
@@ -1169,30 +1231,58 @@ const downloadClawhubSkill = async (
       .trim();
   };
 
-  const errors: string[] = [];
-  for (const attempt of installAttempts) {
-    const run = buildAttempt(attempt);
-    try {
-      await runCommand(run.command, run.args, {
-        cwd: targetDir,
-        env: run.env,
-      });
-      return;
-    } catch (error) {
-      const cleaned = cleanError(error);
-      errors.push(`[${attempt.label}] ${cleaned}`);
-      console.warn(`[downloadClawhubSkill] attempt=${attempt.label} failed: ${cleaned}`);
-      const errorCode = classifyClawhubInstallError(cleaned);
-      if (errorCode === 'clawhub_not_found') {
-        throw new SkillDownloadError('clawhub_not_found', t('skillErrClawhubNotFound'));
-      }
-    }
-  }
-
-  throw new SkillDownloadError(
-    classifyClawhubInstallError(errors.join('\n')),
-    t('skillErrClawhubDownloadFailed') + '\n' + errors.join('\n\n'),
+  const workspaceRoot = path.join(targetDir, 'openclaw-workspace');
+  const stateRoot = path.join(targetDir, 'openclaw-state');
+  const configPath = path.join(targetDir, 'openclaw.json');
+  const workspaceSkillsRoot = path.join(workspaceRoot, 'skills');
+  fs.mkdirSync(workspaceRoot, { recursive: true });
+  fs.mkdirSync(stateRoot, { recursive: true });
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify(buildOpenClawSkillInstallConfig(workspaceRoot), null, 2),
+    'utf8',
   );
+
+  let args = [
+    openclawCliJs,
+    'skills',
+    'install',
+    skillName,
+    '--force',
+  ];
+  const hideScript = ensureWindowsHideScript();
+  if (hideScript) {
+    args = ['--require', hideScript, ...args];
+  }
+  const runEnv: NodeJS.ProcessEnv = {
+    ...env,
+    ELECTRON_RUN_AS_NODE: '1',
+    OPENCLAW_NO_RESPAWN: '1',
+    OPENCLAW_HOME: stateRoot,
+    OPENCLAW_STATE_DIR: stateRoot,
+    OPENCLAW_CONFIG_PATH: configPath,
+    LOBSTERAI_ELECTRON_PATH: electronPath.replace(/\\/g, '/'),
+    LOBSTERAI_OPENCLAW_ENTRY: openclawCliJs.replace(/\\/g, '/'),
+  };
+
+  try {
+    await runNodeScriptCommand(openclawCliJs, args.slice(1), {
+      cwd: targetDir,
+      env: runEnv,
+    });
+    return workspaceSkillsRoot;
+  } catch (error) {
+    const cleaned = cleanError(error);
+    console.warn(`[downloadClawhubSkill] openclaw skills install failed: ${cleaned}`);
+    const errorCode = classifyClawhubInstallError(cleaned);
+    if (errorCode === 'clawhub_not_found') {
+      throw new SkillDownloadError('clawhub_not_found', t('skillErrClawhubNotFound'));
+    }
+    throw new SkillDownloadError(
+      errorCode,
+      buildClawhubDownloadFailureMessage(t('skillErrClawhubDownloadFailed'), [cleaned]),
+    );
+  }
 };
 
 /**
@@ -1918,9 +2008,8 @@ export class SkillManager {
         console.log(`[SkillManager] downloadSkill: detected ClawHub URL, skill name="${clawhubParsed.name}"`);
         const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-clawhub-'));
         cleanupPath = tempRoot;
-        const env = buildSkillEnv();
-        await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
-        localSource = tempRoot;
+        const env = buildBundledSkillInstallEnv();
+        localSource = await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
       } else {
         const normalized = this.normalizeGitSource(trimmed);
         if (!normalized) {
@@ -2132,9 +2221,8 @@ export class SkillManager {
       } else if (parseClawhubUrl(downloadUrl)) {
         const clawhubParsed = parseClawhubUrl(downloadUrl)!;
         console.log(`[SkillManager] upgrade detected ClawHub URL, skill="${clawhubParsed.name}"`);
-        const env = buildSkillEnv();
-        await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
-        localSource = tempRoot;
+        const env = buildBundledSkillInstallEnv();
+        localSource = await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
       } else {
         const normalized = this.normalizeGitSource(downloadUrl);
         if (!normalized) {
@@ -2779,16 +2867,13 @@ export class SkillManager {
     console.log(`[skills]   Working directory: ${skillDir}`);
 
     try {
-      // On Windows, use shell: true so cmd.exe resolves npm.cmd correctly
-      const isWin = process.platform === 'win32';
-      const result = spawnSync('npm', ['install'], {
+      const result = spawnSync(npmCommand, ['install'], {
         cwd: skillDir,
         encoding: 'utf-8',
         stdio: 'pipe',
         timeout: 120000, // 2 minute timeout
         env,
-        shell: isWin,
-        windowsHide: isWin,
+        windowsHide: true,
       });
 
       console.log(`[skills] npm install exit code: ${result.status}`);
@@ -3065,5 +3150,9 @@ export const __skillManagerTestUtils = {
   isTruthy,
   extractDescription,
   parseClawhubUrl,
+  buildClawhubDownloadFailureMessage,
+  buildOpenClawSkillInstallConfig,
+  getOpenClawRuntimeRootCandidates,
+  resolveOpenClawRuntimeRoot,
   isWindowsDeletePermissionError,
 };
