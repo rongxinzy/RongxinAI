@@ -69,7 +69,7 @@ build-renderer:
     - job: lint
       optional: true
   variables:
-    NODE_OPTIONS: '--max-old-space-size=8192'
+    NODE_OPTIONS: '--max-old-space-size=4096'
   script:
     - npm run build
     - test -f dist/index.html
@@ -346,7 +346,7 @@ build-linux:
   variables:
     NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
     ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
-    NODE_OPTIONS: '--max-old-space-size=8192'
+    NODE_OPTIONS: '--max-old-space-size=4096'
     GIT_CLEAN_FLAGS: none
     # 跳过 Electron postinstall 下载
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
