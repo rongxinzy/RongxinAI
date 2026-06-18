@@ -31,7 +31,8 @@ type ImportSourceType = 'github' | 'clawhub';
 type DirectImportSource = 'zip' | 'folder' | 'remote';
 
 const importSourceTypes: ImportSourceType[] = ['github', 'clawhub'];
-const CLAWHUB_ALLOWED_HOSTS = new Set(['clawhub.ai', 'www.clawhub.ai', 'cn.clawhub-mirror.com']);
+const CLAWHUB_ALLOWED_HOSTS = new Set(['clawhub.ai', 'www.clawhub.ai']);
+const CLAWHUB_BROWSE_URL = 'https://clawhub.ai/skills';
 const MARKETPLACE_MIN_PAGE_SIZE = 8;
 const MARKETPLACE_MAX_PAGE_SIZE = 40;
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 20;
@@ -964,7 +965,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               </div>
               <button
                 type="button"
-                onClick={() => void window.electron.shell.openExternal('https://clawhub.ai/skills')}
+                onClick={() => void window.electron.shell.openExternal(CLAWHUB_BROWSE_URL)}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
               >
                 <LinkIcon className="h-3.5 w-3.5" />
