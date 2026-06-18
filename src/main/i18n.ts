@@ -64,6 +64,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppLoadModelLimitReached: '同时驻留模型的数量为 {limit}，不能启动第 {next} 个模型，需先手动关闭已启动的模型。',
     localInferenceImportRuntimeDialogTitle: '选择 llama.cpp 运行时目录',
     localInferenceImportRuntimeDialogMessage: '请选择包含 {name} 可执行文件的目录。该目录中的所有文件将被复制到 RongxinAI 管理的运行时目录中。',
+    localInferenceImportRuntimeHelpProbeFailed: 'llama.cpp 运行时验证失败（--help）：{error}',
+    localInferenceImportRuntimeDeviceProbeFailed: 'llama.cpp 设备检测失败（--list-devices）：{error}',
+    localInferenceImportRuntimeBackendMismatch: '所选运行时需要 {expected} 设备，但当前只检测到：{detected}。请更新显卡驱动，或改用 CPU 版本。',
+    localInferenceImportRuntimeUnknownError: '未知错误',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
     // IM error replies (differentiated by error kind)
@@ -332,6 +336,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppLoadModelLimitReached: 'The loaded model limit is {limit}. You cannot start model number {next}; unload an existing model first.',
     localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Runtime Directory',
     localInferenceImportRuntimeDialogMessage: 'Select the directory containing the {name} executable. All files in this directory will be copied into the RongxinAI-managed runtime directory.',
+    localInferenceImportRuntimeHelpProbeFailed: 'llama.cpp runtime validation failed while running --help: {error}',
+    localInferenceImportRuntimeDeviceProbeFailed: 'llama.cpp device detection failed while running --list-devices: {error}',
+    localInferenceImportRuntimeBackendMismatch: 'The selected runtime requires a {expected} device, but only these backends were detected: {detected}. Update the graphics driver or import the CPU runtime.',
+    localInferenceImportRuntimeUnknownError: 'unknown error',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',

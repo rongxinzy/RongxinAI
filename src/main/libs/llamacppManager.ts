@@ -29,6 +29,7 @@ import {
   LlamaCppRuntimeCudaMajor,
   LlamaCppServiceConfigFieldKey,
 } from '../../shared/llamacpp';
+import { t } from '../i18n';
 import { LlamaCppClient } from './llamacppClient';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
@@ -63,6 +64,13 @@ type ExecFileRunner = (
     windowsHide: boolean;
   },
 ) => Promise<{ stdout: string; stderr: string }>;
+
+type LlamaCppRuntimeImportProbe = {
+  success: boolean;
+  targetId?: string;
+  devices: LlamaCppRuntimeDevice[];
+  error?: string;
+};
 
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
@@ -399,58 +407,80 @@ export class LlamaCppManager extends EventEmitter {
       };
     }
 
+    const probe = await probeLlamaCppRuntimeImport({
+      sourceDir,
+      executablePath: sourceExecutable,
+      platform: process.platform,
+      arch: process.arch,
+    });
+    if (!probe.success || !probe.targetId) {
+      return {
+        success: false,
+        error: probe.error || 'The selected llama.cpp runtime failed compatibility validation.',
+      };
+    }
+
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     const currentRuntimeRoot = path.join(runtimeRoot, 'current');
-    const targetBinDir = path.join(currentRuntimeRoot, 'bin');
-    const targetExecutable = path.join(targetBinDir, executableName);
+    const stagingRuntimeRoot = path.join(runtimeRoot, `.import-${Date.now()}`);
+    const stagingBinDir = path.join(stagingRuntimeRoot, 'bin');
+    const backupRuntimeRoot = path.join(runtimeRoot, `.backup-${Date.now()}`);
+    const targetExecutable = path.join(currentRuntimeRoot, 'bin', executableName);
+    const previousExecutablePath = this.executablePath;
 
     try {
+      fs.mkdirSync(stagingBinDir, { recursive: true });
+      copyDirectoryContents(sourceDir, stagingBinDir);
+      const stagingExecutable = path.join(stagingBinDir, executableName);
+      if (!fs.existsSync(stagingExecutable)) {
+        throw new Error(`The copied runtime is missing ${executableName}.`);
+      }
+      if (process.platform !== 'win32') {
+        fs.chmodSync(stagingExecutable, 0o755);
+      }
+      fs.writeFileSync(
+        path.join(stagingRuntimeRoot, 'runtime-build-info.json'),
+        JSON.stringify({
+          target: probe.targetId,
+          source: 'user-import',
+          importedFrom: sourceDir,
+          importedAt: new Date().toISOString(),
+          devices: probe.devices,
+        }, null, 2) + '\n',
+        'utf8',
+      );
+
       // Stop any llama.cpp process on the configured port, regardless of
       // whether it was started by this app instance (this.process may be
       // null after a restart even though the old process is still alive).
       await this.stop();
       await killByPort(this.getServiceConfig());
 
-      // Clear existing runtime and copy the user's files
-      fs.rmSync(currentRuntimeRoot, { recursive: true, force: true });
-      fs.mkdirSync(targetBinDir, { recursive: true });
-      copyDirectoryContents(sourceDir, targetBinDir);
-
-      if (!fs.existsSync(targetExecutable)) {
-        throw new Error(`复制后缺少 ${executableName}，请检查源目录内容。`);
-      }
-
-      if (process.platform !== 'win32') {
-        fs.chmodSync(targetExecutable, 0o755);
-      }
-
-      // Write build info
-      fs.writeFileSync(
-        path.join(currentRuntimeRoot, 'runtime-build-info.json'),
-        JSON.stringify({
-          target: resolveLlamaCppRuntimeTargetId(process.platform, process.arch),
-          source: 'user-import',
-          importedFrom: sourceDir,
-          importedAt: new Date().toISOString(),
-        }, null, 2) + '\n',
-        'utf8',
-      );
+      fs.mkdirSync(runtimeRoot, { recursive: true });
+      activateStagedLlamaCppRuntime({
+        stagingRuntimeRoot,
+        currentRuntimeRoot,
+        backupRuntimeRoot,
+        validate: () => {
+          if (!fs.existsSync(targetExecutable)) {
+            throw new Error(`The installed runtime is missing ${executableName}.`);
+          }
+        },
+      });
 
       this.executablePath = targetExecutable;
       this.setStatus({
         status: 'installed',
         executablePath: targetExecutable,
         managedByApp: false,
+        ...resolveLlamaCppRuntimeMetadata(targetExecutable),
       });
       return { success: true, executablePath: targetExecutable };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.setStatus({
-        status: 'not-installed',
-        executablePath: this.executablePath ?? undefined,
-        managedByApp: false,
-        error: message,
-      });
+      removeDirectoryBestEffort(stagingRuntimeRoot);
+      this.executablePath = previousExecutablePath;
+      await this.detect();
       return { success: false, error: message };
     }
   }
@@ -1187,6 +1217,164 @@ export async function listLlamaCppRuntimeDevices(input: {
   }
 }
 
+export async function probeLlamaCppRuntimeImport(input: {
+  sourceDir: string;
+  executablePath: string;
+  platform: NodeJS.Platform;
+  arch: string;
+  runner?: ExecFileRunner;
+}): Promise<LlamaCppRuntimeImportProbe> {
+  const helpResult = await listLlamaCppRuntimeHelpFlags({
+    executablePath: input.executablePath,
+    platform: input.platform,
+    runner: input.runner,
+  });
+  if (!helpResult.success) {
+    return {
+      success: false,
+      devices: [],
+      error: t('localInferenceImportRuntimeHelpProbeFailed', {
+        error: helpResult.error || t('localInferenceImportRuntimeUnknownError'),
+      }),
+    };
+  }
+
+  const devicesResult = await listLlamaCppRuntimeDevices({
+    executablePath: input.executablePath,
+    platform: input.platform,
+    runner: input.runner,
+  });
+  if (!devicesResult.success) {
+    return {
+      success: false,
+      devices: [],
+      error: t('localInferenceImportRuntimeDeviceProbeFailed', {
+        error: devicesResult.error || t('localInferenceImportRuntimeUnknownError'),
+      }),
+    };
+  }
+
+  const expectedBackend = inferImportedRuntimeExpectedBackend(input.sourceDir);
+  const detectedBackends = new Set(devicesResult.devices.map(device => device.backend));
+  if (expectedBackend && !detectedBackends.has(expectedBackend)) {
+    const detected = Array.from(detectedBackends).filter(Boolean).join(', ') || 'none';
+    return {
+      success: false,
+      devices: devicesResult.devices,
+      error: t('localInferenceImportRuntimeBackendMismatch', {
+        expected: expectedBackend,
+        detected,
+      }),
+    };
+  }
+
+  return {
+    success: true,
+    targetId: inferImportedRuntimeTargetId({
+      sourceDir: input.sourceDir,
+      platform: input.platform,
+      arch: input.arch,
+      devices: devicesResult.devices,
+    }),
+    devices: devicesResult.devices,
+  };
+}
+
+export function inferImportedRuntimeTargetId(input: {
+  sourceDir: string;
+  platform: NodeJS.Platform;
+  arch: string;
+  devices: LlamaCppRuntimeDevice[];
+}): string | undefined {
+  const baseTargetId = resolveLlamaCppRuntimeTargetId(input.platform, input.arch) ?? undefined;
+  if (input.platform !== 'win32') return baseTargetId;
+
+  const source = buildRuntimeImportIdentitySource(input.sourceDir);
+  if (/cuda[-_.]?13/.test(source)) return LlamaCppRuntimeTargetId.WinX64Cuda13;
+  if (/cuda/.test(source)) return LlamaCppRuntimeTargetId.WinX64Cuda12;
+  if (/hip|radeon|rocm/.test(source)) return LlamaCppRuntimeTargetId.WinX64Rocm;
+  if (/vulkan|igpu|integrated/.test(source)) return LlamaCppRuntimeTargetId.WinX64Vulkan;
+  if (/arm64/.test(source)) return LlamaCppRuntimeTargetId.WinArm64;
+
+  const detectedBackends = new Set(input.devices.map(device => device.backend));
+  if (detectedBackends.has('cuda')) return LlamaCppRuntimeTargetId.WinX64Cuda12;
+  if (detectedBackends.has('rocm')) return LlamaCppRuntimeTargetId.WinX64Rocm;
+  if (detectedBackends.has('vulkan')) return LlamaCppRuntimeTargetId.WinX64Vulkan;
+  return baseTargetId;
+}
+
+function inferImportedRuntimeExpectedBackend(sourceDir: string): string | undefined {
+  const source = buildRuntimeImportIdentitySource(sourceDir);
+  if (/cuda/.test(source)) return 'cuda';
+  if (/hip|radeon|rocm/.test(source)) return 'rocm';
+  if (/vulkan|igpu|integrated/.test(source)) return 'vulkan';
+  return undefined;
+}
+
+function buildRuntimeImportIdentitySource(sourceDir: string): string {
+  const sourceBaseName = path.basename(sourceDir);
+  const packageDirectoryName = /^llama-.+-bin-win-/i.test(sourceBaseName)
+    ? sourceBaseName
+    : sourceBaseName.toLowerCase() === 'bin' &&
+        /^llama-.+-bin-win-/i.test(path.basename(path.dirname(sourceDir)))
+      ? path.basename(path.dirname(sourceDir))
+      : '';
+  return [
+    packageDirectoryName,
+    ...listRuntimeImportFileNames(sourceDir),
+  ].join(' ').toLowerCase();
+}
+
+function listRuntimeImportFileNames(sourceDir: string): string[] {
+  try {
+    return fs.readdirSync(sourceDir, { withFileTypes: true })
+      .filter(entry => entry.isFile())
+      .map(entry => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+function removeDirectoryBestEffort(targetDir: string): void {
+  try {
+    fs.rmSync(targetDir, { recursive: true, force: true });
+  } catch (error) {
+    console.warn(`[LlamaCpp] failed to remove temporary runtime directory ${targetDir}:`, error);
+  }
+}
+
+export function activateStagedLlamaCppRuntime(input: {
+  stagingRuntimeRoot: string;
+  currentRuntimeRoot: string;
+  backupRuntimeRoot: string;
+  validate?: () => void;
+}): void {
+  let currentMovedToBackup = false;
+  let stagingMovedToCurrent = false;
+  try {
+    if (fs.existsSync(input.currentRuntimeRoot)) {
+      fs.renameSync(input.currentRuntimeRoot, input.backupRuntimeRoot);
+      currentMovedToBackup = true;
+    }
+    fs.renameSync(input.stagingRuntimeRoot, input.currentRuntimeRoot);
+    stagingMovedToCurrent = true;
+    input.validate?.();
+    removeDirectoryBestEffort(input.backupRuntimeRoot);
+  } catch (error) {
+    try {
+      if (stagingMovedToCurrent) {
+        fs.rmSync(input.currentRuntimeRoot, { recursive: true, force: true });
+      }
+      if (currentMovedToBackup) {
+        fs.renameSync(input.backupRuntimeRoot, input.currentRuntimeRoot);
+      }
+    } catch (rollbackError) {
+      console.error('[LlamaCpp] failed to restore the previous runtime after import:', rollbackError);
+    }
+    throw error;
+  }
+}
+
 export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeDevice[] {
   const devices: LlamaCppRuntimeDevice[] = [];
   for (const line of output.split(/\r?\n/)) {
@@ -1195,6 +1383,7 @@ export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeD
     const match = trimmed.match(/^([A-Za-z]+[\w.-]*)\s*:\s*(.+)$/);
     if (!match) continue;
     const id = match[1].trim();
+    if (id.toUpperCase() !== 'CPU' && !/\d+$/.test(id)) continue;
     const rawName = match[2].replace(/\s*\([^)]*\)\s*$/, '').trim();
     const backend = inferLlamaCppDeviceBackend(id, rawName);
     devices.push({
@@ -1499,12 +1688,36 @@ function runtimeBackendFieldsFromTargetId(
     };
   }
   if (targetId?.includes('cuda')) {
-    return { runtimeBackend: LlamaCppRuntimeBackend.Cuda };
+    return {
+      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+      runtimeCudaMajor: undefined,
+    };
+  }
+  if (targetId === LlamaCppRuntimeTargetId.WinX64Cuda13) {
+    return {
+      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda13,
+    };
+  }
+  if (
+    targetId === LlamaCppRuntimeTargetId.WinX64Vulkan ||
+    targetId === LlamaCppRuntimeTargetId.WinX64Rocm
+  ) {
+    return {
+      runtimeBackend: undefined,
+      runtimeCudaMajor: undefined,
+    };
   }
   if (targetId) {
-    return { runtimeBackend: LlamaCppRuntimeBackend.Cpu };
+    return {
+      runtimeBackend: LlamaCppRuntimeBackend.Cpu,
+      runtimeCudaMajor: undefined,
+    };
   }
-  return {};
+  return {
+    runtimeBackend: undefined,
+    runtimeCudaMajor: undefined,
+  };
 }
 
 function resolveExecutableDir(executablePath: string, platform: NodeJS.Platform): string {

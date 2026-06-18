@@ -6,12 +6,14 @@ import { expect, test } from 'vitest';
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import type { MarketplaceModel } from '../../shared/marketplace';
 import {
+  activateStagedLlamaCppRuntime,
   buildLlamaCppExecutableCandidates,
   buildLlamaCppServeEnv,
   buildLlamaServerArgs,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
+  inferImportedRuntimeTargetId,
   isPathInside,
   listLlamaCppRuntimeDevices,
   LlamaCppManager,
@@ -19,11 +21,13 @@ import {
   modelLaunchOptionsToPreset,
   parseLlamaCppHelpFlags,
   parseLlamaCppListDevicesOutput,
+  probeLlamaCppRuntimeImport,
   resolveLlamaCppDeviceSelection,
   resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
   selectLlamaCppRuntimeTarget,
 } from './llamacppManager';
+import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { MarketplaceService } from './marketplaceService';
 
 test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
@@ -337,6 +341,7 @@ test('buildLlamaCppServeEnv does not duplicate PATH entries on Windows', () => {
 test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
   expect(parseLlamaCppListDevicesOutput([
     'Available devices:',
+    'ggml_vulkan: Found 0 Vulkan devices',
     '  CUDA0: NVIDIA GeForce RTX 4090 (24564 MiB, 0 MiB free)',
     '  CUDA1: NVIDIA GeForce RTX 3090',
     '  CPU: CPU',
@@ -416,6 +421,120 @@ test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', asyn
     rawOutput: 'CUDA0: NVIDIA GeForce RTX 4090\n',
     devices: [{ id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' }],
   });
+});
+
+test('probeLlamaCppRuntimeImport accepts a Vulkan package only when Vulkan is detected', async () => {
+  const result = await probeLlamaCppRuntimeImport({
+    sourceDir: 'C:\\Downloads\\llama-b9444-bin-win-vulkan-x64',
+    executablePath: 'C:\\Downloads\\llama-b9444-bin-win-vulkan-x64\\llama-server.exe',
+    platform: 'win32',
+    arch: 'x64',
+    runner: async (_file, args) => {
+      if (args[0] === '--help') {
+        return { stdout: 'Usage: llama-server [options]\n--device DEVICE\n', stderr: '' };
+      }
+      return {
+        stdout: 'Vulkan0: Intel(R) Arc Graphics\nCPU: CPU\n',
+        stderr: '',
+      };
+    },
+  });
+
+  expect(result).toEqual({
+    success: true,
+    targetId: LlamaCppRuntimeTargetId.WinX64Vulkan,
+    devices: [
+      { id: 'Vulkan0', name: 'Intel(R) Arc Graphics', backend: 'vulkan' },
+      { id: 'CPU', name: 'CPU', backend: 'cpu' },
+    ],
+  });
+});
+
+test('probeLlamaCppRuntimeImport rejects a Vulkan package when only CPU is detected', async () => {
+  const result = await probeLlamaCppRuntimeImport({
+    sourceDir: 'C:\\Downloads\\llama-b9444-bin-win-vulkan-x64',
+    executablePath: 'C:\\Downloads\\llama-b9444-bin-win-vulkan-x64\\llama-server.exe',
+    platform: 'win32',
+    arch: 'x64',
+    runner: async (_file, args) => {
+      if (args[0] === '--help') {
+        return { stdout: 'Usage: llama-server [options]\n', stderr: '' };
+      }
+      return { stdout: 'CPU: CPU\n', stderr: '' };
+    },
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.devices).toEqual([{ id: 'CPU', name: 'CPU', backend: 'cpu' }]);
+});
+
+test('inferImportedRuntimeTargetId records imported Windows GPU package backends', () => {
+  expect(inferImportedRuntimeTargetId({
+    sourceDir: 'C:\\Downloads\\llama-b9444-bin-win-cuda-13.3-x64',
+    platform: 'win32',
+    arch: 'x64',
+    devices: [{ id: 'CUDA0', name: 'NVIDIA GPU', backend: 'cuda' }],
+  })).toBe(LlamaCppRuntimeTargetId.WinX64Cuda13);
+
+  expect(inferImportedRuntimeTargetId({
+    sourceDir: 'C:\\Downloads\\llama-b9444-bin-win-hip-radeon-x64',
+    platform: 'win32',
+    arch: 'x64',
+    devices: [{ id: 'ROCm0', name: 'AMD Radeon', backend: 'rocm' }],
+  })).toBe(LlamaCppRuntimeTargetId.WinX64Rocm);
+});
+
+test('probeLlamaCppRuntimeImport does not infer CUDA from an arbitrary parent directory', async () => {
+  const sourceDir = path.join(
+    os.tmpdir(),
+    'cuda-downloads',
+    'plain-cpu-runtime',
+  );
+  const result = await probeLlamaCppRuntimeImport({
+    sourceDir,
+    executablePath: path.join(sourceDir, 'llama-server.exe'),
+    platform: 'win32',
+    arch: 'x64',
+    runner: async (_file, args) => {
+      if (args[0] === '--help') {
+        return { stdout: 'Usage: llama-server [options]\n', stderr: '' };
+      }
+      return { stdout: 'CPU: CPU\n', stderr: '' };
+    },
+  });
+
+  expect(result).toEqual({
+    success: true,
+    targetId: LlamaCppRuntimeTargetId.WinX64,
+    devices: [{ id: 'CPU', name: 'CPU', backend: 'cpu' }],
+  });
+});
+
+test('activateStagedLlamaCppRuntime restores the previous runtime when validation fails', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-runtime-transaction-'));
+  const currentRuntimeRoot = path.join(root, 'current');
+  const stagingRuntimeRoot = path.join(root, 'staging');
+  const backupRuntimeRoot = path.join(root, 'backup');
+  fs.mkdirSync(currentRuntimeRoot, { recursive: true });
+  fs.mkdirSync(stagingRuntimeRoot, { recursive: true });
+  fs.writeFileSync(path.join(currentRuntimeRoot, 'marker.txt'), 'old', 'utf8');
+  fs.writeFileSync(path.join(stagingRuntimeRoot, 'marker.txt'), 'new', 'utf8');
+
+  try {
+    expect(() => activateStagedLlamaCppRuntime({
+      stagingRuntimeRoot,
+      currentRuntimeRoot,
+      backupRuntimeRoot,
+      validate: () => {
+        throw new Error('activation failed');
+      },
+    })).toThrow('activation failed');
+
+    expect(fs.readFileSync(path.join(currentRuntimeRoot, 'marker.txt'), 'utf8')).toBe('old');
+    expect(fs.existsSync(backupRuntimeRoot)).toBe(false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('modelLaunchOptionsToPreset writes model startup parameters for models-preset.ini', () => {
