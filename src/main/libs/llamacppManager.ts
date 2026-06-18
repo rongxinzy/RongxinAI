@@ -1312,16 +1312,18 @@ function inferImportedRuntimeExpectedBackend(sourceDir: string): string | undefi
 }
 
 function buildRuntimeImportIdentitySource(sourceDir: string): string {
-  const sourceBaseName = path.basename(sourceDir);
+  // Normalize Windows paths so path.basename works on POSIX CI runners too.
+  const normalizedSourceDir = sourceDir.replace(/\\/g, '/');
+  const sourceBaseName = path.basename(normalizedSourceDir);
   const packageDirectoryName = /^llama-.+-bin-win-/i.test(sourceBaseName)
     ? sourceBaseName
     : sourceBaseName.toLowerCase() === 'bin' &&
-        /^llama-.+-bin-win-/i.test(path.basename(path.dirname(sourceDir)))
-      ? path.basename(path.dirname(sourceDir))
+        /^llama-.+-bin-win-/i.test(path.basename(path.dirname(normalizedSourceDir)))
+      ? path.basename(path.dirname(normalizedSourceDir))
       : '';
   return [
     packageDirectoryName,
-    ...listRuntimeImportFileNames(sourceDir),
+    ...listRuntimeImportFileNames(normalizedSourceDir),
   ].join(' ').toLowerCase();
 }
 
