@@ -681,28 +681,48 @@ export class CronJobService {
       ...(filter?.endDate && { endMs: new Date(filter.endDate + 'T23:59:59').getTime() }),
       ...(filter?.status && { status: toGatewayRunStatus(filter.status) }),
     });
-    if (!Array.isArray(result.entries) || result.entries.length === 0) return [];
+    if (!Array.isArray(result.entries)) result.entries = [];
 
-    // Build job metadata maps for entries that need enrichment
+    // Build job metadata maps for entries that need enrichment,
+    // and collect currently-running jobs to synthesize in-progress run entries.
     const nameMap = new Map<string, string>();
     const payloadMap = new Map<string, string>();
+    const runningRuns: ScheduledTaskRunWithName[] = [];
     try {
       const jobs = await this.listJobs();
       for (const job of jobs) {
         nameMap.set(job.id, job.name);
         const promptText = job.payload.kind === 'systemEvent' ? job.payload.text : job.payload.message;
         if (promptText) payloadMap.set(job.id, promptText);
+        if (job.state.runningAtMs) {
+          runningRuns.push({
+            id: `${job.id}-running`,
+            taskId: job.id,
+            sessionId: null,
+            sessionKey: null,
+            status: 'running',
+            startedAt: new Date(job.state.runningAtMs).toISOString(),
+            finishedAt: null,
+            durationMs: null,
+            error: null,
+            taskName: job.name,
+            taskPayload: promptText || undefined,
+          });
+        }
       }
     } catch {
-      // fall through
+      // fall through — running runs will be empty, completed runs still work
     }
 
-    return result.entries.map(entry => ({
+    const completed = result.entries.map(entry => ({
       ...mapGatewayRun(entry),
       taskName:
         entry.jobName || nameMap.get(entry.jobId) || extractRunTitle(entry.summary) || entry.jobId,
       taskPayload: payloadMap.get(entry.jobId),
     }));
+
+    if (filter?.status === 'running') return runningRuns;
+    return [...runningRuns, ...completed];
   }
 
   startPolling(): void {
