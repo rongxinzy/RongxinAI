@@ -134,11 +134,11 @@ describe('Cron × Channel Probe Integration', () => {
   test('all 8 IM platforms have corresponding test coverage', () => {
     // Ensures the platform list stays in sync.  If a platform is added or
     // removed, this test forces a conscious decision about test coverage.
-    expect(ALL_IM_PLATFORMS).toHaveLength(8);
+    expect(ALL_IM_PLATFORMS).toHaveLength(7);
 
     const expectedPlatforms: Platform[] = [
       'telegram', 'discord', 'feishu', 'dingtalk',
-      'wecom', 'weixin', 'qq', 'email',
+      'wecom', 'weixin', 'qq',
     ];
     const actual = [...ALL_IM_PLATFORMS].sort();
     const expected = [...expectedPlatforms].sort();

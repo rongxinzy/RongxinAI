@@ -27,7 +27,7 @@ import {
   readAllowFromStore,
   rejectPairingRequest,
 } from './im/imPairingStore';
-import type { DingTalkInstanceConfig, DiscordInstanceConfig, EmailMultiInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
+import type { DingTalkInstanceConfig, DiscordInstanceConfig, FeishuInstanceConfig, Platform, QQInstanceConfig, TelegramInstanceConfig, WecomInstanceConfig } from './im/types';
 import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
@@ -1183,13 +1183,6 @@ const getOpenClawConfigSync = (): OpenClawConfigSync => {
           return getIMGatewayManager().getIMStore().getWecomInstances();
         } catch {
           return [];
-        }
-      },
-      getEmailOpenClawConfig: () => {
-        try {
-          return getIMGatewayManager().getIMStore().getEmailConfig();
-        } catch {
-          return { instances: [] };
         }
       },
       getWeixinConfig: () => {
@@ -2841,30 +2834,6 @@ if (!gotTheLock) {
 
   ipcMain.handle('skills:setConfig', async (_event, skillId: string, config: Record<string, string>) => {
     const result = getSkillManager().setSkillConfig(skillId, config);
-    // When email skill config changes, sync IM store email accounts and trigger
-    // gateway restart so the new credentials take effect. The skill .env is the
-    // authoritative data source for email credentials at runtime, but the
-    // IM store's email config is what sync() serializes into openclaw.json.
-    if (skillId === 'imap-smtp-email' && result.success) {
-      try {
-        const email = config.IMAP_USER || '';
-        const instanceConfig: Partial<import('./im/types').EmailInstanceConfig> = {
-          enabled: true,
-          email,
-          password: config.IMAP_PASS || undefined,
-          transport: 'imap',
-          imapHost: config.IMAP_HOST || undefined,
-          imapPort: parseInt(config.IMAP_PORT || '0', 10) || undefined,
-          smtpHost: config.SMTP_HOST || undefined,
-          smtpPort: parseInt(config.SMTP_PORT || '0', 10) || undefined,
-          smtpSecure: config.SMTP_SECURE === 'true' ? true : config.SMTP_SECURE === 'false' ? false : undefined,
-        };
-        getIMGatewayManager().getIMStore().setEmailInstanceConfig('email-1', instanceConfig);
-        scheduleImConfigSync();
-      } catch (err) {
-        console.error('[skills:setConfig] Failed to sync email config to IM store:', err);
-      }
-    }
     return result;
   });
 
@@ -4452,68 +4421,6 @@ if (!gotTheLock) {
     }
   });
 
-  // Email: Test connection
-  ipcMain.handle('email:testConnection', async (event, { instanceId }: { instanceId: string }) => {
-    try {
-      const imManager = getIMGatewayManager();
-      const imStore = imManager.getIMStore();
-      const emailConfig = imStore.getEmailConfig();
-      const instance = emailConfig.instances.find(i => i.instanceId === instanceId);
-
-      if (!instance) {
-        throw new Error('Instance not found');
-      }
-
-      if (instance.transport === 'imap') {
-        // Test IMAP connection using node-imap
-         
-        let Imap: new (config: Record<string, unknown>) => any;
-        try {
-          Imap = require('imap');
-        } catch {
-          throw new Error('IMAP module not installed. Please install the imap package.');
-        }
-        const deriveImapHost = (email: string) => {
-          const domain = email.split('@')[1];
-          return `imap.${domain}`;
-        };
-
-        const connection = new Imap({
-          user: instance.email,
-          password: instance.password,
-          host: instance.imapHost || deriveImapHost(instance.email),
-          port: instance.imapPort || 993,
-          tls: true,
-        });
-
-        await new Promise<void>((resolve, reject) => {
-          connection.once('ready', () => {
-            connection.end();
-            resolve();
-          });
-          connection.once('error', reject);
-          connection.connect();
-        });
-      } else if (instance.transport === 'ws') {
-        // Test WebSocket connection by fetching token
-        let fetchIMToken: (apiKey: string, email: string, logger: typeof console) => Promise<unknown>;
-        try {
-          ({ fetchIMToken } = require('@clawemail/node-sdk'));
-        } catch {
-          throw new Error('Email SDK not installed. Please install the @clawemail/node-sdk package.');
-        }
-        await fetchIMToken(instance.apiKey!, instance.email, console);
-      }
-
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  });
-
   // ---- Pairing IPC handlers ----
 
   ipcMain.handle('im:pairing:list', async (_event, platform: string) => {
@@ -4717,28 +4624,6 @@ if (!gotTheLock) {
     }
   });
 
-  // Email Multi-Instance handlers
-  ipcMain.handle('im:email:instance:add', async (_event, name: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_EMAIL_INSTANCE_CONFIG: defaults } = await import('./im/types');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'Email',
-        email: '',
-        agentId: 'main',
-      };
-      getIMGatewayManager().getIMStore().setEmailInstanceConfig(instanceId, instance);
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add email instance',
-      };
-    }
-  });
-
   // WeCom Multi-Instance handlers
   ipcMain.handle('im:wecom:instance:add', async (_event, name: string) => {
     try {
@@ -4759,21 +4644,6 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('im:email:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteEmailInstance(instanceId);
-      if (getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete email instance',
-      };
-    }
-  });
-
   ipcMain.handle('im:wecom:instance:delete', async (_event, instanceId: string) => {
     try {
       getIMGatewayManager().getIMStore().deleteWecomInstance(instanceId);
@@ -4785,21 +4655,6 @@ if (!gotTheLock) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to delete WeCom instance',
-      };
-    }
-  });
-
-  ipcMain.handle('im:email:instance:config:set', async (_event, instanceId: string, config: Partial<EmailMultiInstanceConfig['instances'][number]>, options?: { syncGateway?: boolean }) => {
-    try {
-      getIMGatewayManager().getIMStore().setEmailInstanceConfig(instanceId, config);
-      if (options?.syncGateway && getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to set email instance config',
       };
     }
   });
