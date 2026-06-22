@@ -3,7 +3,6 @@
  * Configuration UI for DingTalk, Feishu and Telegram IM bots
  */
 
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/20/solid';
 import { CheckCircleIcon, ExclamationTriangleIcon,SignalIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import type { Platform } from '@shared/platform';
@@ -16,12 +15,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { i18nService } from '../../services/i18n';
 import { imService } from '../../services/im';
 import { RootState } from '../../store';
-import { clearError, setDingTalkInstanceConfig, setDiscordInstanceConfig, setEmailInstanceConfig, setFeishuInstanceConfig, setQQInstanceConfig, setTelegramInstanceConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
-import type { EmailInstanceConfig, IMConnectivityCheck, IMConnectivityTestResult, IMGatewayConfig, WeixinOpenClawConfig } from '../../types/im';
-import { MAX_DINGTALK_INSTANCES, MAX_DISCORD_INSTANCES, MAX_EMAIL_INSTANCES, MAX_FEISHU_INSTANCES, MAX_QQ_INSTANCES, MAX_TELEGRAM_INSTANCES, MAX_WECOM_INSTANCES } from '../../types/im';
+import { clearError, setDingTalkInstanceConfig, setDiscordInstanceConfig, setFeishuInstanceConfig, setQQInstanceConfig, setTelegramInstanceConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
+import type { IMConnectivityCheck, IMConnectivityTestResult, IMGatewayConfig, WeixinOpenClawConfig } from '../../types/im';
+import { MAX_DINGTALK_INSTANCES, MAX_DISCORD_INSTANCES, MAX_FEISHU_INSTANCES, MAX_QQ_INSTANCES, MAX_TELEGRAM_INSTANCES, MAX_WECOM_INSTANCES } from '../../types/im';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
-import TrashIcon from '../icons/TrashIcon';
 import DingTalkInstanceSettings from './DingTalkInstanceSettings';
 import DiscordInstanceSettings from './DiscordInstanceSettings';
 import FeishuInstanceSettings from './FeishuInstanceSettings';
@@ -86,8 +84,6 @@ const IMSettings: React.FC = () => {
   const [feishuExpanded, setFeishuExpanded] = useState(false);
   const [activeDingTalkInstanceId, setActiveDingTalkInstanceId] = useState<string | null>(null);
   const [dingtalkExpanded, setDingtalkExpanded] = useState(false);
-  const [, setEmailExpanded] = useState(false);
-  const [activeEmailInstanceId, setActiveEmailInstanceId] = useState<string | null>(null);
   const [activeWecomInstanceId, setActiveWecomInstanceId] = useState<string | null>(null);
   const [wecomExpanded, setWecomExpanded] = useState(false);
   const [activeTelegramInstanceId, setActiveTelegramInstanceId] = useState<string | null>(null);
@@ -101,11 +97,6 @@ const IMSettings: React.FC = () => {
   const [configLoaded, setConfigLoaded] = useState(false);
   // Re-entrancy guard for gateway toggle to prevent rapid ON→OFF→ON
   const [togglingPlatform, setTogglingPlatform] = useState<Platform | null>(null);
-  // Loading state for email instance toggle (stores instanceId being toggled on)
-  const [emailToggleLoading, setEmailToggleLoading] = useState<string | null>(null);
-  const [emailDrafts, setEmailDrafts] = useState<Record<string, { allowFrom?: string; a2aAgentDomains?: string }>>({});
-  // Track visibility of password fields (eye toggle)
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   // WeCom quick setup state
   const [wecomQuickSetupStatus, setWecomQuickSetupStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [wecomQuickSetupError, setWecomQuickSetupError] = useState<string>('');
@@ -258,11 +249,6 @@ const IMSettings: React.FC = () => {
       setWeixinQrUrl('');
       setWeixinQrError('');
     }
-  }, [activePlatform]);
-
-  // Reset password visibility when switching platforms
-  useEffect(() => {
-    setShowSecrets({});
   }, [activePlatform]);
 
   // Initialize IM service and subscribe status updates
@@ -450,7 +436,7 @@ const IMSettings: React.FC = () => {
         return;
       }
 
-      if (platform === 'qq' || platform === 'email' || platform === 'wecom') {
+      if (platform === 'qq' || platform === 'wecom') {
         // Multi-instance platforms toggle per instance in their detail panels
         return;
       }
@@ -478,8 +464,6 @@ const IMSettings: React.FC = () => {
   const qqConnected = status.qq?.instances?.some(i => i.connected) ?? false;
   const wecomConnected = status.wecom?.instances?.some(i => i.connected) ?? false;
   const weixinConnected = status.weixin?.connected ?? false;
-  const emailConnected = status.email.instances.some(i => i.connected);
-
   // Compute visible platforms based on language
   const platforms = useMemo<Platform[]>(() => {
     return getVisibleIMPlatforms(language) as Platform[];
@@ -527,9 +511,6 @@ const IMSettings: React.FC = () => {
     if (platform === 'feishu') {
       return config.feishu.instances?.some(i => i.enabled);
     }
-    if (platform === 'email') {
-      return config.email.instances.some(i => i.enabled);
-    }
     if (platform === 'wecom') {
       return config.wecom.instances?.some(i => i.enabled);
     }
@@ -550,7 +531,6 @@ const IMSettings: React.FC = () => {
     if (platform === 'qq') return qqConnected;
     if (platform === 'wecom') return wecomConnected;
     if (platform === 'weixin') return weixinConnected;
-    if (platform === 'email') return emailConnected;
     return feishuConnected;
   };
 
@@ -624,19 +604,6 @@ const IMSettings: React.FC = () => {
           }
         }
       }
-      return;
-    }
-
-    // For Email, persist email config and test (OpenClaw mode)
-    if (platform === 'email') {
-      await imService.persistConfig({ email: config.email });
-      // Pass only the active instance to avoid testing wrong instance
-      const activeInstance = activeEmailInstanceId
-        ? config.email.instances.find(i => i.instanceId === activeEmailInstanceId)
-        : config.email.instances.find(i => i.enabled) || config.email.instances[0];
-      await runConnectivityTest(platform, {
-        email: { instances: activeInstance ? [activeInstance] : [] },
-      } as Partial<IMGatewayConfig>);
       return;
     }
 
@@ -1444,340 +1411,6 @@ const IMSettings: React.FC = () => {
               connectivityResults={connectivityResults}
               language={language}
             />
-          );
-        })()}
-
-        {/* Email Settings (multi-instance, inline form like feishu/qq) */}
-        {activePlatform === 'email' && !activeEmailInstanceId && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <img src={PlatformRegistry.logo('email')} alt="Email" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
-              {config.email.instances.length === 0
-                ? i18nService.t('imEmailNoInstances')
-                : i18nService.t('imEmailSelectInstance')}
-            </p>
-            {config.email.instances.length < MAX_EMAIL_INSTANCES && (
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  const inst = await imService.addEmailInstance(`Email ${config.email.instances.length + 1}`);
-                  if (inst) { setActivePlatform('email'); setActiveEmailInstanceId(inst.instanceId); setEmailExpanded(true); }
-                }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              >
-                + {i18nService.t('imEmailAddInstance')}
-              </button>
-            )}
-          </div>
-        )}
-        {activePlatform === 'email' && activeEmailInstanceId && (() => {
-          const inst = config.email.instances.find(i => i.instanceId === activeEmailInstanceId);
-          if (!inst) return null;
-          const instStatus = status.email.instances.find(s => s.instanceId === inst.instanceId);
-          const inputClass = 'block w-full rounded-lg bg-surface border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm transition-colors';
-          const labelClass = 'block text-xs font-medium text-secondary mb-1';
-          return (
-            <div className="space-y-4">
-              {/* Instance Header: Name, Status, Enable Toggle, Delete */}
-              <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
-                    <img src={PlatformRegistry.logo('email')} alt="Email" className="w-4 h-4 object-contain rounded" />
-                  </div>
-                  <h3 className="text-sm font-medium text-foreground truncate">{inst.instanceName}</h3>
-                </div>
-
-                {/* Status badge */}
-                <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-                  instStatus?.connected
-                    ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-                    : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
-                }`}>
-                  {instStatus?.connected ? i18nService.t('connected') : i18nService.t('disconnected')}
-                </div>
-
-                {/* Enable toggle */}
-                <button
-                  type="button"
-                  disabled={emailToggleLoading === inst.instanceId}
-                  onClick={async () => {
-                    const newEnabled = !inst.enabled;
-
-                    // Turning OFF — no connectivity check needed
-                    if (!newEnabled) {
-                      const success = await imService.updateEmailInstanceConfig(inst.instanceId, { enabled: false });
-                      if (success) {
-                        dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { enabled: false } }));
-                      }
-                      return;
-                    }
-
-                    // Turning ON — run connectivity test first
-                    if (emailToggleLoading) return;
-                    setEmailToggleLoading(inst.instanceId);
-                    try {
-                      const result = await runConnectivityTest('email', {
-                        email: { instances: [inst] },
-                      } as Partial<IMGatewayConfig>);
-                      if (result && result.verdict !== 'fail') {
-                        const success = await imService.updateEmailInstanceConfig(inst.instanceId, { enabled: true });
-                        if (success) {
-                          dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { enabled: true } }));
-                          dispatch(clearError());
-                        }
-                      } else {
-                        void window.electron.dialog.showMessageBox({
-                          type: 'warning',
-                          message: i18nService.t('emailConnectivityFailAlert'),
-                        });
-                      }
-                    } finally {
-                      setEmailToggleLoading(null);
-                    }
-                  }}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                    emailToggleLoading === inst.instanceId
-                      ? 'cursor-wait bg-gray-400 dark:bg-gray-600'
-                      : inst.enabled
-                        ? `cursor-pointer ${instStatus?.connected ? 'bg-green-500' : 'bg-yellow-500'}`
-                        : 'cursor-pointer bg-gray-400 dark:bg-gray-600'
-                  }`}
-                  title={inst.enabled ? i18nService.t('imQQDisableInstance') : i18nService.t('imQQEnableInstance')}
-                >
-                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
-                    emailToggleLoading === inst.instanceId
-                      ? 'translate-x-0 bg-gray-300 dark:bg-gray-500 animate-pulse'
-                      : inst.enabled
-                        ? 'translate-x-4 bg-white'
-                        : 'translate-x-0 bg-white'
-                  }`} />
-                </button>
-
-                {/* Delete button */}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await imService.deleteEmailInstance(inst.instanceId);
-                    const remaining = config.email.instances.filter(i => i.instanceId !== inst.instanceId);
-                    setActiveEmailInstanceId(remaining.length > 0 ? remaining[0].instanceId : null);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
-                  title={i18nService.t('delete') || 'Delete'}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  {i18nService.t('delete')}
-                </button>
-              </div>
-
-              {/* Email Address */}
-              <div>
-                <label className={labelClass}>{i18nService.t('emailAddress')} <span className="text-red-500">*</span></label>
-                <input
-                  type="email"
-                  value={inst.email}
-                  onChange={e => {
-                    const email = e.target.value;
-                    const instanceName = email.split('@')[0] || '';
-                    dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { email, instanceName } }));
-                  }}
-                  onBlur={e => {
-                    const email = e.target.value;
-                    const instanceName = email.split('@')[0] || '';
-                    void imService.persistEmailInstanceConfig(inst.instanceId, { email, instanceName, transport: 'ws' });
-                  }}
-                  placeholder={i18nService.t('emailAddressPlaceholder')}
-                  className={inputClass}
-                />
-              </div>
-
-              {/* API Key (always shown, transport is always ws) */}
-              <div>
-                <label className={labelClass}>{i18nService.t('emailApiKey')} <span className="text-red-500">*</span></label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type={showSecrets[`email.${inst.instanceId}.apiKey`] ? 'text' : 'password'}
-                      value={inst.apiKey || ''}
-                      onChange={e => dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { apiKey: e.target.value } }))}
-                      onBlur={e => void imService.persistEmailInstanceConfig(inst.instanceId, { apiKey: e.target.value })}
-                      placeholder={i18nService.t('emailApiKeyPlaceholder')}
-                      className={`${inputClass} w-full pr-8`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSecrets(prev => ({ ...prev, [`email.${inst.instanceId}.apiKey`]: !prev[`email.${inst.instanceId}.apiKey`] }))}
-                      className="absolute right-2 inset-y-0 flex items-center p-0.5 rounded text-secondary hover:text-primary transition-colors"
-                      title={showSecrets[`email.${inst.instanceId}.apiKey`] ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
-                    >
-                      {showSecrets[`email.${inst.instanceId}.apiKey`]
-                        ? <EyeIcon className="h-4 w-4" />
-                        : <EyeSlashIcon className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <p className="text-xs text-secondary mt-1">{i18nService.t('apiKeyHint')}</p>
-              </div>
-
-              {/* Advanced Options */}
-              <details className="group">
-                <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
-                  {i18nService.t('imAdvancedSettings')}
-                </summary>
-                <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
-                  {/* Allow From (whitelist) */}
-                  <div>
-                    <label className={labelClass}>{i18nService.t('emailAllowFrom')}</label>
-                    <input
-                      type="text"
-                      value={emailDrafts[inst.instanceId]?.allowFrom ?? (inst.allowFrom ?? ['*']).join(', ')}
-                      onChange={e => setEmailDrafts(prev => ({ ...prev, [inst.instanceId]: { ...prev[inst.instanceId], allowFrom: e.target.value } }))}
-                      onFocus={() => {
-                        setEmailDrafts(prev => {
-                          if (prev[inst.instanceId]?.allowFrom !== undefined) return prev;
-                          return { ...prev, [inst.instanceId]: { ...prev[inst.instanceId], allowFrom: (inst.allowFrom ?? ['*']).join(', ') } };
-                        });
-                      }}
-                      onBlur={e => {
-                        const parsed = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                        dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { allowFrom: parsed } }));
-                        void imService.persistEmailInstanceConfig(inst.instanceId, { allowFrom: parsed });
-                        setEmailDrafts(prev => ({ ...prev, [inst.instanceId]: { ...prev[inst.instanceId], allowFrom: parsed.join(', ') } }));
-                      }}
-                      placeholder={i18nService.t('emailAllowFromPlaceholder')}
-                      className={inputClass}
-                    />
-                    <p className="text-xs text-secondary mt-1">{i18nService.t('emailAllowFromHint')}</p>
-                  </div>
-
-                  {/* Reply Mode */}
-                  <div>
-                    <label className={labelClass}>{i18nService.t('emailReplyMode')}</label>
-                    <select
-                      value={inst.replyMode ?? 'complete'}
-                      onChange={e => {
-                        const replyMode = e.target.value as EmailInstanceConfig['replyMode'];
-                        dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { replyMode } }));
-                        void imService.persistEmailInstanceConfig(inst.instanceId, { replyMode });
-                      }}
-                      className={inputClass}
-                    >
-                      <option value="immediate">{i18nService.t('emailReplyModeImmediate')}</option>
-                      <option value="accumulated">{i18nService.t('emailReplyModeAccumulated')}</option>
-                      <option value="complete">{i18nService.t('emailReplyModeComplete')}</option>
-                    </select>
-                  </div>
-
-                  {/* Reply To */}
-                  <div>
-                    <label className={labelClass}>{i18nService.t('emailReplyTo')}</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={inst.replyTo === 'sender' || !inst.replyTo}
-                          onChange={() => {
-                            dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { replyTo: 'sender' } }));
-                            void imService.persistEmailInstanceConfig(inst.instanceId, { replyTo: 'sender' });
-                          }}
-                          className="accent-primary"
-                        />
-                        {i18nService.t('emailReplyToSender')}
-                      </label>
-                      <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={inst.replyTo === 'all'}
-                          onChange={() => {
-                            dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { replyTo: 'all' } }));
-                            void imService.persistEmailInstanceConfig(inst.instanceId, { replyTo: 'all' });
-                          }}
-                          className="accent-primary"
-                        />
-                        {i18nService.t('emailReplyToAll')}
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* A2A Config */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-secondary">{i18nService.t('emailA2aEnabled')}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const a2aEnabled = !(inst.a2aEnabled ?? true);
-                          dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { a2aEnabled } }));
-                          void imService.persistEmailInstanceConfig(inst.instanceId, { a2aEnabled });
-                        }}
-                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out cursor-pointer ${
-                          (inst.a2aEnabled ?? true) ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          (inst.a2aEnabled ?? true) ? 'translate-x-4' : 'translate-x-0'
-                        }`} />
-                      </button>
-                    </div>
-                    <div>
-                      <label className={labelClass}>{i18nService.t('emailA2aAgentDomains')}</label>
-                      <input
-                        type="text"
-                        value={emailDrafts[inst.instanceId]?.a2aAgentDomains ?? (inst.a2aAgentDomains ?? []).join(', ')}
-                        onChange={e => setEmailDrafts(prev => ({ ...prev, [inst.instanceId]: { ...prev[inst.instanceId], a2aAgentDomains: e.target.value } }))}
-                        onFocus={() => {
-                          setEmailDrafts(prev => {
-                            if (prev[inst.instanceId]?.a2aAgentDomains !== undefined) return prev;
-                            return { ...prev, [inst.instanceId]: { ...prev[inst.instanceId], a2aAgentDomains: (inst.a2aAgentDomains ?? []).join(', ') } };
-                          });
-                        }}
-                        onBlur={e => {
-                          const parsed = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                          dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { a2aAgentDomains: parsed } }));
-                          void imService.persistEmailInstanceConfig(inst.instanceId, { a2aAgentDomains: parsed });
-                          setEmailDrafts(prev => ({ ...prev, [inst.instanceId]: { ...prev[inst.instanceId], a2aAgentDomains: parsed.join(', ') } }));
-                        }}
-                        placeholder={i18nService.t('emailA2aAgentDomainsPlaceholder')}
-                        className={inputClass}
-                      />
-                      <p className="text-xs text-secondary mt-1">{i18nService.t('emailA2aAgentDomainsHint')}</p>
-                    </div>
-                    <div>
-                      <label className={labelClass}>{i18nService.t('emailA2aMaxTurns')}</label>
-                      <input
-                        type="number"
-                        value={inst.a2aMaxPingPongTurns ?? 20}
-                        onChange={e => {
-                          const a2aMaxPingPongTurns = parseInt(e.target.value) || 20;
-                          dispatch(setEmailInstanceConfig({ instanceId: inst.instanceId, config: { a2aMaxPingPongTurns } }));
-                        }}
-                        onBlur={e => void imService.persistEmailInstanceConfig(inst.instanceId, {
-                          a2aMaxPingPongTurns: parseInt(e.target.value) || 20,
-                        })}
-                        className={inputClass}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </details>
-
-              {/* Connectivity test button */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => void handleConnectivityTest('email')}
-                  disabled={testingPlatform === 'email'}
-                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-xl border border-border text-foreground hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
-                >
-                  <SignalIcon className="h-3.5 w-3.5 mr-1.5" />
-                  {testingPlatform === 'email'
-                    ? i18nService.t('imConnectivityTesting')
-                    : connectivityResults['email' as keyof typeof connectivityResults]
-                      ? i18nService.t('imConnectivityRetest')
-                      : i18nService.t('imConnectivityTest')}
-                </button>
-              </div>
-            </div>
           );
         })()}
 
