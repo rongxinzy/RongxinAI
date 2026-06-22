@@ -284,6 +284,12 @@ interface McpMarketplaceData {
   servers: McpMarketplaceServer[];
 }
 
+interface McpConnectionTestResult {
+  success: boolean;
+  error?: string;
+  toolCount?: number;
+}
+
 import type { Platform } from '@shared/platform';
 
 import type { Agent, PresetAgent } from './agent';
@@ -323,16 +329,7 @@ interface IElectronAPI {
       success: boolean;
       skills?: Skill[];
       error?: string;
-      auditReport?: any;
-      pendingInstallId?: string;
-    }>;
-    upgrade: (
-      skillId: string,
-      downloadUrl: string,
-    ) => Promise<{
-      success: boolean;
-      skills?: Skill[];
-      error?: string;
+      errorCode?: string;
       auditReport?: any;
       pendingInstallId?: string;
     }>;
@@ -372,6 +369,7 @@ interface IElectronAPI {
       id: string;
       enabled: boolean;
     }) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
+    testConnection: (data: any) => Promise<McpConnectionTestResult>;
     fetchMarketplace: () => Promise<{
       success: boolean;
       data?: McpMarketplaceData;
@@ -418,12 +416,8 @@ interface IElectronAPI {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
-    listRuntimeDevices: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeListDevicesResult>;
-    listBackends: () => Promise<import('../../shared/llamacpp').LlamaCppBackendListResult>;
-    getBackendSelection: () => Promise<import('../../shared/llamacpp').LlamaCppBackendRef | undefined>;
-    setBackendSelection: (input: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
-    installBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
-    uninstallBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeUninstallResult>;
+    fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
+    listRuntimeDevices: () => Promise<LlamaCppRuntimeListDevicesResult>;
     getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
