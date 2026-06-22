@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -13,6 +14,7 @@ import {
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
+  getLlamaCppWindowsVcRuntimeMissingMessage,
   inferImportedRuntimeTargetId,
   isPathInside,
   listLlamaCppRuntimeDevices,
@@ -26,9 +28,16 @@ import {
   resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
   selectLlamaCppRuntimeTarget,
+  setLlamaCppSpawnRunnerForTests,
 } from './llamacppManager';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { MarketplaceService } from './marketplaceService';
+
+class FakeChildProcess extends EventEmitter {
+  stdout = new EventEmitter();
+  stderr = new EventEmitter();
+  pid = 1234;
+}
 
 test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
   expect(buildLlamaCppExecutableCandidates({
@@ -43,9 +52,9 @@ test('buildLlamaCppExecutableCandidates orders managed and explicit runtime path
   }).slice(0, 5)).toEqual([
     'C:/custom/env/llama-server.exe',
     'C:/custom/ui/llama-server.exe',
-    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/bin/llama-server.exe',
-    'C:/App/resources/llamacpp/llama-server.exe',
-    'C:/App/resources/llamacpp/bin/llama-server.exe',
+    path.win32.join('C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime', 'current', 'bin', 'llama-server.exe'),
+    path.win32.join('C:/App/resources', 'llamacpp', 'llama-server.exe'),
+    path.win32.join('C:/App/resources', 'llamacpp', 'bin', 'llama-server.exe'),
   ]);
 });
 
@@ -338,6 +347,103 @@ test('buildLlamaCppServeEnv does not duplicate PATH entries on Windows', () => {
   });
 });
 
+test('getLlamaCppWindowsVcRuntimeMissingMessage recognizes missing VC++ runtime DLLs for win-x64 runtimes', () => {
+  const message = getLlamaCppWindowsVcRuntimeMissingMessage({
+    runtimeTargetId: LlamaCppRuntimeTargetId.WinX64Cuda12,
+    startupError: 'The code execution cannot proceed because VCRUNTIME140_1.dll was not found.',
+  });
+  expect(message).toContain('Microsoft Visual C++ Redistributable');
+  expect(message).toContain('VCRUNTIME140_1.DLL');
+});
+
+test('getLlamaCppWindowsVcRuntimeMissingMessage resolves packaged runtime targets from executablePath', () => {
+  const message = getLlamaCppWindowsVcRuntimeMissingMessage({
+    executablePath: 'C:\\Program Files\\RongxinAI\\resources\\llamacpp\\bin\\llama-server.exe',
+    startupError: 'The code execution cannot proceed because MSVCP140.dll was not found.',
+  });
+  expect(message).toContain('Microsoft Visual C++ Redistributable');
+  expect(message).toContain('MSVCP140.DLL');
+});
+
+test('getLlamaCppWindowsVcRuntimeMissingMessage ignores non-win-x64 runtimes', () => {
+  expect(getLlamaCppWindowsVcRuntimeMissingMessage({
+    runtimeTargetId: LlamaCppRuntimeTargetId.WinArm64,
+    startupError: 'The code execution cannot proceed because VCRUNTIME140.dll was not found.',
+  })).toBeNull();
+});
+
+test('getLlamaCppWindowsVcRuntimeMissingMessage ignores unrelated startup errors', () => {
+  expect(getLlamaCppWindowsVcRuntimeMissingMessage({
+    runtimeTargetId: LlamaCppRuntimeTargetId.WinX64,
+    startupError: 'bind() failed: Address already in use',
+  })).toBeNull();
+  expect(getLlamaCppWindowsVcRuntimeMissingMessage({
+    runtimeTargetId: LlamaCppRuntimeTargetId.WinX64Cuda12,
+    startupError: 'The code execution cannot proceed because CUDART64_12.dll was not found.',
+  })).toBeNull();
+});
+
+test('start surfaces the VC++ runtime hint when packaged llama.cpp exits during startup', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-start-exit-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  const fakeProcess = new FakeChildProcess();
+
+  manager.getPresetPath = () => presetPath;
+  (manager as any).executablePath = 'C:\\Program Files\\RongxinAI\\resources\\llamacpp\\bin\\llama-server.exe';
+  (manager as any).isHealthy = async () => false;
+  (manager as any).resolveRuntimeServiceConfig = async () => ({});
+  (manager as any).getRuntimeCapabilities = async () => null;
+  (manager as any).waitUntilHealthy = async () => {
+    fakeProcess.stderr.emit(
+      'data',
+      Buffer.from('The code execution cannot proceed because VCRUNTIME140_1.dll was not found.'),
+    );
+    fakeProcess.emit('exit', 1, null);
+    await new Promise(resolve => setImmediate(resolve));
+  };
+
+  setLlamaCppSpawnRunnerForTests((() => fakeProcess) as any);
+  try {
+    const status = await manager.start();
+    expect(status.status).toBe('error');
+    expect(status.error).toContain('Microsoft Visual C++ Redistributable');
+    expect(status.error).toContain('VCRUNTIME140_1.DLL');
+  } finally {
+    setLlamaCppSpawnRunnerForTests(null);
+  }
+});
+
+test('start surfaces the VC++ runtime hint when spawn emits an error', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-start-error-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  const fakeProcess = new FakeChildProcess();
+
+  manager.getPresetPath = () => presetPath;
+  (manager as any).executablePath = 'C:\\Program Files\\RongxinAI\\resources\\llamacpp\\bin\\llama-server.exe';
+  (manager as any).isHealthy = async () => false;
+  (manager as any).resolveRuntimeServiceConfig = async () => ({});
+  (manager as any).getRuntimeCapabilities = async () => null;
+  (manager as any).waitUntilHealthy = async () => {
+    fakeProcess.emit(
+      'error',
+      new Error('The code execution cannot proceed because MSVCP140.dll was not found.'),
+    );
+    await new Promise(resolve => setImmediate(resolve));
+  };
+
+  setLlamaCppSpawnRunnerForTests((() => fakeProcess) as any);
+  try {
+    const status = await manager.start();
+    expect(status.status).toBe('error');
+    expect(status.error).toContain('Microsoft Visual C++ Redistributable');
+    expect(status.error).toContain('MSVCP140.DLL');
+  } finally {
+    setLlamaCppSpawnRunnerForTests(null);
+  }
+});
+
 test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
   expect(parseLlamaCppListDevicesOutput([
     'Available devices:',
@@ -448,6 +554,22 @@ test('probeLlamaCppRuntimeImport accepts a Vulkan package only when Vulkan is de
       { id: 'CPU', name: 'CPU', backend: 'cpu' },
     ],
   });
+});
+
+test('probeLlamaCppRuntimeImport surfaces the VC++ runtime hint when --help fails with missing VC DLLs', async () => {
+  const result = await probeLlamaCppRuntimeImport({
+    sourceDir: 'C:\\Downloads\\llama-b9444-bin-win-cpu-x64',
+    executablePath: 'C:\\Downloads\\llama-b9444-bin-win-cpu-x64\\llama-server.exe',
+    platform: 'win32',
+    arch: 'x64',
+    runner: async () => {
+      throw new Error('The code execution cannot proceed because VCRUNTIME140_1.dll was not found.');
+    },
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.error).toContain('Microsoft Visual C++ Redistributable');
+  expect(result.error).toContain('VCRUNTIME140_1.DLL');
 });
 
 test('probeLlamaCppRuntimeImport rejects a Vulkan package when only CPU is detected', async () => {

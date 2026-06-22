@@ -51,6 +51,10 @@ const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 600_000;
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_HELP_PROBE_TIMEOUT_MS = 10_000;
+const WINDOWS_X64_RUNTIME_TARGET_PREFIX = 'win-x64';
+const WINDOWS_X64_VC_RUNTIME_DLL_PATTERN =
+  /\b(?:msvcp140(?:_[0-9]+)?|vcruntime140(?:_[0-9]+)?)\.dll\b/i;
+let spawnLlamaCppProcess = spawn;
 
 type RequestOptions = { signal?: AbortSignal };
 type ExecFileRunner = (
@@ -71,6 +75,49 @@ type LlamaCppRuntimeImportProbe = {
   devices: LlamaCppRuntimeDevice[];
   error?: string;
 };
+
+export function getLlamaCppWindowsVcRuntimeMissingMessage(input: {
+  runtimeTargetId?: string;
+  executablePath?: string;
+  sourceDir?: string;
+  platform?: NodeJS.Platform;
+  arch?: string;
+  startupError?: string;
+}): string | null {
+  const runtimeTargetId = (
+    input.runtimeTargetId?.trim() ||
+    resolveLlamaCppRuntimeTargetIdForExecutable(input.executablePath) ||
+    (input.sourceDir && input.platform && input.arch
+      ? inferImportedRuntimeTargetId({
+        sourceDir: input.sourceDir,
+        platform: input.platform,
+        arch: input.arch,
+        devices: [],
+      })
+      : undefined)
+  )?.toLowerCase();
+  if (!runtimeTargetId?.startsWith(WINDOWS_X64_RUNTIME_TARGET_PREFIX)) {
+    return null;
+  }
+  const startupError = input.startupError?.trim();
+  if (!startupError) return null;
+  const missingDllMatch = startupError.match(WINDOWS_X64_VC_RUNTIME_DLL_PATTERN);
+  if (!missingDllMatch) {
+    return null;
+  }
+  const dll = missingDllMatch
+    ? t('llamacppWindowsVcRuntimeMissingDll', { dll: missingDllMatch[0].toUpperCase() })
+    : '';
+  return t('llamacppWindowsVcRuntimeMissing', {
+    dll,
+  });
+}
+
+export function setLlamaCppSpawnRunnerForTests(
+  runner: typeof spawn | null | undefined,
+): void {
+  spawnLlamaCppProcess = runner ?? spawn;
+}
 
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
@@ -188,7 +235,7 @@ export class LlamaCppManager extends EventEmitter {
       runtimeCapabilities,
     );
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
-    this.process = spawn(
+    this.process = spawnLlamaCppProcess(
       this.executablePath,
       buildLlamaServerArgs(filteredRuntimeConfig, this.getModelsDir(), this.getPresetPath()),
       {
@@ -211,12 +258,17 @@ export class LlamaCppManager extends EventEmitter {
       );
       this.process = null;
       if (this.status.status === 'starting') {
+        const vcRuntimeMissingMessage = getLlamaCppWindowsVcRuntimeMissingMessage({
+          runtimeTargetId: this.status.runtimeTargetId,
+          executablePath: this.executablePath ?? undefined,
+          startupError: this.startupStderr,
+        });
         const stderrSnippet = this.startupStderr
           ? `: ${this.startupStderr.slice(0, 300)}`
           : ` (exit code ${code ?? 'null'})`;
         this.setStatus({
           status: 'error',
-          error: `llama.cpp exited unexpectedly during startup${stderrSnippet}`,
+          error: vcRuntimeMissingMessage || `llama.cpp exited unexpectedly during startup${stderrSnippet}`,
           executablePath: this.executablePath ?? undefined,
           managedByApp: false,
         });
@@ -232,9 +284,14 @@ export class LlamaCppManager extends EventEmitter {
     });
     this.process.on('error', error => {
       console.warn('[LlamaCpp] process failed:', error);
+      const vcRuntimeMissingMessage = getLlamaCppWindowsVcRuntimeMissingMessage({
+        runtimeTargetId: this.status.runtimeTargetId,
+        executablePath: this.executablePath ?? undefined,
+        startupError: error.message,
+      });
       this.setStatus({
         status: 'error',
-        error: error.message,
+        error: vcRuntimeMissingMessage || error.message,
         executablePath: this.executablePath ?? undefined,
         managedByApp: false,
       });
@@ -1230,6 +1287,20 @@ export async function probeLlamaCppRuntimeImport(input: {
     runner: input.runner,
   });
   if (!helpResult.success) {
+    const vcRuntimeMissingMessage = getLlamaCppWindowsVcRuntimeMissingMessage({
+      executablePath: input.executablePath,
+      sourceDir: input.sourceDir,
+      platform: input.platform,
+      arch: input.arch,
+      startupError: helpResult.error,
+    });
+    if (vcRuntimeMissingMessage) {
+      return {
+        success: false,
+        devices: [],
+        error: vcRuntimeMissingMessage,
+      };
+    }
     return {
       success: false,
       devices: [],
@@ -1516,20 +1587,21 @@ export function buildLlamaCppExecutableCandidates(input: {
   configuredExecutablePath?: string;
 }): string[] {
   const extension = input.platform === 'win32' ? '.exe' : '';
+  const pathApi = input.platform === 'win32' ? path.win32 : path.posix;
   const candidates = [
     input.envPath?.trim(),
     input.configuredExecutablePath?.trim(),
-    path.join(input.userRuntimeRoot, 'current', 'bin', `llama-server${extension}`),
-    path.join(input.resourceRoot, 'llamacpp', `llama-server${extension}`),
-    path.join(input.resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
+    pathApi.join(input.userRuntimeRoot, 'current', 'bin', `llama-server${extension}`),
+    pathApi.join(input.resourceRoot, 'llamacpp', `llama-server${extension}`),
+    pathApi.join(input.resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
   ];
 
   if (!input.isPackaged) {
     candidates.push(
-      path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-      path.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
-      path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-      path.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
+      pathApi.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
+      pathApi.join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
+      pathApi.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
+      pathApi.join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
       '/opt/homebrew/bin/llama-server',
       '/usr/local/bin/llama-server',
       '/usr/bin/llama-server',
@@ -1643,8 +1715,8 @@ function resolveLlamaCppRuntimeMetadata(executablePath: string | undefined): Par
       deviceProbeAvailable: false,
     };
   }
-  const runtimeRoot = getManagedRuntimeRootForExecutable(executablePath);
-  const targetId = runtimeRoot ? readRuntimeTargetId(runtimeRoot) : undefined;
+  const runtimeRoot = getLlamaCppRuntimeRootForExecutable(executablePath);
+  const targetId = resolveLlamaCppRuntimeTargetIdForExecutable(executablePath);
   return {
     ...(targetId ? { runtimeTargetId: targetId } : {}),
     ...runtimeBackendFieldsFromTargetId(targetId),
@@ -1653,7 +1725,7 @@ function resolveLlamaCppRuntimeMetadata(executablePath: string | undefined): Par
   };
 }
 
-function getManagedRuntimeRootForExecutable(executablePath: string): string | undefined {
+function getLlamaCppRuntimeRootForExecutable(executablePath: string): string | undefined {
   const userRuntimeRoot = getUserLlamaCppRuntimeRoot();
   const userCurrentRoot = path.join(userRuntimeRoot, 'current');
   if (isPathInside(executablePath, userCurrentRoot)) {
@@ -1663,6 +1735,18 @@ function getManagedRuntimeRootForExecutable(executablePath: string): string | un
   const cwdCurrentRoot = path.join(process.cwd(), 'vendor', 'llamacpp-runtime', 'current');
   if (isPathInside(executablePath, cwdCurrentRoot)) {
     return cwdCurrentRoot;
+  }
+
+  const executableDir = path.dirname(executablePath);
+  if (path.basename(executableDir).toLowerCase() === 'llamacpp') {
+    return executableDir;
+  }
+  const parentDir = path.dirname(executableDir);
+  if (
+    path.basename(executableDir).toLowerCase() === 'bin' &&
+    path.basename(parentDir).toLowerCase() === 'llamacpp'
+  ) {
+    return parentDir;
   }
   return undefined;
 }
@@ -1678,6 +1762,25 @@ function readRuntimeTargetId(runtimeRoot: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function resolveLlamaCppRuntimeTargetIdForExecutable(executablePath: string | undefined): string | undefined {
+  if (!executablePath) return undefined;
+  const runtimeRoot = getLlamaCppRuntimeRootForExecutable(executablePath);
+  const targetIdFromBuildInfo = runtimeRoot ? readRuntimeTargetId(runtimeRoot) : undefined;
+  if (targetIdFromBuildInfo) {
+    return targetIdFromBuildInfo;
+  }
+
+  const normalizedPath = executablePath.replace(/\\/g, '/').toLowerCase();
+  if (!normalizedPath.includes('/llamacpp/')) {
+    return undefined;
+  }
+  if (/cuda[-_.]?13/.test(normalizedPath)) return LlamaCppRuntimeTargetId.WinX64Cuda13;
+  if (/cuda/.test(normalizedPath)) return LlamaCppRuntimeTargetId.WinX64Cuda12;
+  if (/hip|radeon|rocm/.test(normalizedPath)) return LlamaCppRuntimeTargetId.WinX64Rocm;
+  if (/vulkan|igpu|integrated/.test(normalizedPath)) return LlamaCppRuntimeTargetId.WinX64Vulkan;
+  return resolveLlamaCppRuntimeTargetId(process.platform, process.arch) ?? undefined;
 }
 
 function runtimeBackendFieldsFromTargetId(
