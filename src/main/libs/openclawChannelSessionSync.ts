@@ -6,6 +6,7 @@
  */
 
 import { BrowserWindow } from 'electron';
+
 import { PlatformRegistry } from '../../shared/platform';
 import type { CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
