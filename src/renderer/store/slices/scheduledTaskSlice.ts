@@ -68,7 +68,16 @@ const scheduledTaskSlice = createSlice({
     updateTaskState(state, action: PayloadAction<{ taskId: string; taskState: TaskState }>) {
       const task = state.tasks.find(t => t.id === action.payload.taskId);
       if (task) {
+        const wasRunning = task.state.runningAtMs != null;
         task.state = action.payload.taskState;
+        // When a task transitions from running → finished, immediately
+        // remove the synthetic running entry that listAllRuns created.
+        if (wasRunning && task.state.runningAtMs == null) {
+          const syntheticId = `${action.payload.taskId}-running`;
+          state.allRuns = state.allRuns.filter(r => r.id !== syntheticId);
+          const tr = state.runs[action.payload.taskId];
+          if (tr) state.runs[action.payload.taskId] = tr.filter(r => r.id !== syntheticId);
+        }
       }
     },
     selectTask(state, action: PayloadAction<string | null>) {
