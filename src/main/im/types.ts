@@ -354,80 +354,6 @@ export interface WeixinGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-// ==================== Email Channel Types ====================
-
-export interface EmailInstanceConfig {
-  instanceId: string; // "email-1", "email-2", etc.
-  instanceName: string; // Display name: "Work Email"
-  enabled: boolean; // Enable/disable this account
-
-  // Transport mode
-  transport: 'imap' | 'ws'; // IMAP/SMTP or WebSocket
-
-  // Account credentials
-  email: string; // user@example.com
-  password?: string; // Required if transport=imap
-  apiKey?: string; // Required if transport=ws (format: ck_*)
-
-  // Agent binding
-  agentId: string; // Agent ID (default: "main")
-
-  // IMAP/SMTP servers (optional, auto-detected if empty)
-  imapHost?: string;
-  imapPort?: number;
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpSecure?: boolean;
-
-  // Security & policy
-  allowFrom?: string[]; // Whitelist: ["user@example.com", "*.trusted.com"]
-
-  // Advanced options
-  replyMode?: 'immediate' | 'accumulated' | 'complete';
-  replyTo?: 'sender' | 'all';
-
-  // Agent-to-Agent collaboration
-  a2aEnabled?: boolean;
-  a2aAgentDomains?: string[];
-  a2aMaxPingPongTurns?: number;
-}
-
-export interface EmailMultiInstanceConfig {
-  instances: EmailInstanceConfig[];
-}
-
-export interface EmailInstanceStatus {
-  instanceId: string;
-  instanceName: string;
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  email: string | null;
-  transport: 'imap' | 'ws' | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
-export interface EmailMultiInstanceStatus {
-  instances: EmailInstanceStatus[];
-}
-
-export const DEFAULT_EMAIL_INSTANCE_CONFIG: Partial<EmailInstanceConfig> = {
-  enabled: false,
-  transport: 'ws',
-  agentId: 'main',
-  replyMode: 'complete',
-  replyTo: 'sender',
-  a2aEnabled: true,
-  a2aMaxPingPongTurns: 20,
-};
-
-export const DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG: EmailMultiInstanceConfig = {
-  instances: [],
-};
-
-export const MAX_EMAIL_INSTANCES = 5;
-
 // ==================== Common IM Types ====================
 
 export interface IMGatewayConfig {
@@ -438,7 +364,6 @@ export interface IMGatewayConfig {
   discord: DiscordMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
-  email: EmailMultiInstanceConfig;
   settings: IMSettings;
 }
 
@@ -457,7 +382,6 @@ export interface IMGatewayStatus {
   discord: DiscordMultiInstanceStatus;
   wecom: WecomMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
-  email: EmailMultiInstanceStatus;
 }
 
 // ==================== Media Attachment Types ====================
@@ -714,7 +638,6 @@ export const DEFAULT_IM_CONFIG: IMGatewayConfig = {
   discord: DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG,
   wecom: DEFAULT_WECOM_MULTI_INSTANCE_CONFIG,
   weixin: DEFAULT_WEIXIN_CONFIG,
-  email: DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG,
   settings: DEFAULT_IM_SETTINGS,
 };
 
@@ -778,7 +701,6 @@ export const DEFAULT_IM_STATUS: IMGatewayStatus = {
   discord: { instances: [] },
   wecom: { instances: [] },
   weixin: DEFAULT_WEIXIN_STATUS,
-  email: { instances: [] },
 };
 
 // ==================== Media Marker Types ====================

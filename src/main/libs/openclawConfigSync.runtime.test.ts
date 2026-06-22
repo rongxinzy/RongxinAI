@@ -53,11 +53,8 @@ vi.mock('./openclawLocalExtensions', () => ({
   findThirdPartyExtensionsDir: () => null,
   hasBundledOpenClawExtension: (id: string) => id !== 'qwen-portal-auth',
   resolveOpenClawExtensionPluginId: (id: string) => {
-    const manifestIds: Record<string, string> = {
-      'clawemail-email': 'email',
-    };
     if (id === 'qwen-portal-auth') return null;
-    return manifestIds[id] ?? id;
+    return id;
   },
 }));
 
@@ -743,7 +740,6 @@ describe('OpenClawConfigSync runtime config output', () => {
     fs.writeFileSync(configPath, JSON.stringify({
       plugins: {
         entries: {
-          'clawemail-email': { enabled: true },
           'openclaw-nim-channel': { enabled: true },
           'nimsuite-openclaw-nim-channel': { enabled: true },
         },
@@ -778,17 +774,6 @@ describe('OpenClawConfigSync runtime config output', () => {
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
-      getEmailOpenClawConfig: () => ({
-        instances: [{
-          instanceId: 'email-work',
-          instanceName: 'Work Email',
-          enabled: true,
-          transport: 'ws',
-          email: 'user@example.com',
-          apiKey: 'ck_test',
-          agentId: 'main',
-        }],
-      }),
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getIMSettings: () => null,
@@ -800,10 +785,8 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(result.ok).toBe(true);
 
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    expect(config.plugins.entries).not.toHaveProperty('clawemail-email');
     expect(config.plugins.entries).not.toHaveProperty('openclaw-nim-channel');
     expect(config.plugins.entries).not.toHaveProperty('nimsuite-openclaw-nim-channel');
-    expect(config.plugins.entries.email).toEqual({ enabled: true });
     expect(config.channels ?? {}).not.toHaveProperty('nim');
   });
 

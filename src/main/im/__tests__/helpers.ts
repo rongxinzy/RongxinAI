@@ -98,5 +98,4 @@ export const ALL_IM_PLATFORMS: readonly Platform[] = [
   'wecom',
   'weixin',
   'qq',
-  'email',
 ] as const;

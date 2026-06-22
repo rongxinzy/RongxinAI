@@ -357,65 +357,6 @@ export interface WeixinGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-// ==================== Email Channel Types ====================
-
-export interface EmailInstanceConfig {
-  instanceId: string;
-  instanceName: string;
-  enabled: boolean;
-  transport: 'imap' | 'ws';
-  email: string;
-  password?: string;
-  apiKey?: string;
-  agentId: string;
-  imapHost?: string;
-  imapPort?: number;
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpSecure?: boolean;
-  allowFrom?: string[];
-  replyMode?: 'immediate' | 'accumulated' | 'complete';
-  replyTo?: 'sender' | 'all';
-  a2aEnabled?: boolean;
-  a2aAgentDomains?: string[];
-  a2aMaxPingPongTurns?: number;
-}
-
-export interface EmailMultiInstanceConfig {
-  instances: EmailInstanceConfig[];
-}
-
-export interface EmailInstanceStatus {
-  instanceId: string;
-  instanceName: string;
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  email: string | null;
-  transport: 'imap' | 'ws' | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
-export interface EmailMultiInstanceStatus {
-  instances: EmailInstanceStatus[];
-}
-
-export const DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG: EmailMultiInstanceConfig = {
-  instances: [],
-};
-
-export const DEFAULT_EMAIL_INSTANCE_CONFIG: Partial<EmailInstanceConfig> = {
-  enabled: false,
-  transport: 'ws',
-  agentId: 'main',
-  replyMode: 'complete',
-  replyTo: 'sender',
-  allowFrom: ['*'],
-};
-
-export const MAX_EMAIL_INSTANCES = 5;
-
 // ==================== Common IM Types ====================
 
 export type IMPlatform = keyof Omit<IMGatewayConfig, 'settings'>;
@@ -428,7 +369,6 @@ export interface IMGatewayConfig {
   discord: DiscordMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
-  email: EmailMultiInstanceConfig;
   settings: IMSettings;
 }
 
@@ -447,7 +387,6 @@ export interface IMGatewayStatus {
   discord: DiscordMultiInstanceStatus;
   wecom: WecomMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
-  email: EmailMultiInstanceStatus;
 }
 
 // ==================== Media Attachment Types ====================
@@ -695,7 +634,6 @@ export const DEFAULT_IM_CONFIG: IMGatewayConfig = {
   discord: DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG,
   wecom: DEFAULT_WECOM_MULTI_INSTANCE_CONFIG,
   weixin: DEFAULT_WEIXIN_CONFIG,
-  email: DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG,
   settings: DEFAULT_IM_SETTINGS,
 };
 
@@ -722,9 +660,6 @@ export const DEFAULT_IM_STATUS: IMGatewayStatus = {
     lastError: null,
     lastInboundAt: null,
     lastOutboundAt: null,
-  },
-  email: {
-    instances: [],
   },
 };
 
