@@ -197,7 +197,7 @@ export function extractAccountIdFromKey(sessionKey: string): string | null {
   return null;
 }
 
-const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'email', 'wecom', 'telegram', 'discord']);
+const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'wecom', 'telegram', 'discord']);
 
 /**
  * Resolve the agent binding for a platform, supporting per-instance bindings.
@@ -262,7 +262,6 @@ function getChannelTitlePrefix(platform: string): string {
     telegram: 'TG',
     discord: 'Discord',
     qq: 'QQ',
-    email: t('channelPrefixEmail'),
   };
   const label = i18nMap[platform] ?? staticMap[platform] ?? platform;
   return `[${label}]`;

@@ -813,15 +813,6 @@ interface IElectronAPI {
       config: any,
       options?: { syncGateway?: boolean },
     ) => Promise<{ success: boolean; error?: string }>;
-    addEmailInstance: (
-      name: string,
-    ) => Promise<{ success: boolean; instance?: EmailInstanceConfig; error?: string }>;
-    deleteEmailInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
-    setEmailInstanceConfig: (
-      instanceId: string,
-      config: any,
-      options?: { syncGateway?: boolean },
-    ) => Promise<{ success: boolean; error?: string }>;
     addWecomInstance: (
       name: string,
     ) => Promise<{ success: boolean; instance?: WecomInstanceConfig; error?: string }>;
@@ -1118,48 +1109,6 @@ interface IElectronAPI {
   };
 }
 
-// IM Gateway types
-interface EmailInstanceConfig {
-  instanceId: string;
-  instanceName: string;
-  enabled: boolean;
-  transport: 'imap' | 'ws';
-  email: string;
-  password?: string;
-  apiKey?: string;
-  agentId: string;
-  imapHost?: string;
-  imapPort?: number;
-  smtpHost?: string;
-  smtpPort?: number;
-  allowFrom?: string[];
-  replyMode?: 'immediate' | 'accumulated' | 'complete';
-  replyTo?: 'sender' | 'all';
-  a2aEnabled?: boolean;
-  a2aAgentDomains?: string[];
-  a2aMaxPingPongTurns?: number;
-}
-
-interface EmailMultiInstanceConfig {
-  instances: EmailInstanceConfig[];
-}
-
-interface EmailInstanceStatus {
-  instanceId: string;
-  instanceName: string;
-  connected: boolean;
-  startedAt: number | null;
-  lastError: string | null;
-  email: string | null;
-  transport: 'imap' | 'ws' | null;
-  lastInboundAt: number | null;
-  lastOutboundAt: number | null;
-}
-
-interface EmailMultiInstanceStatus {
-  instances: EmailInstanceStatus[];
-}
-
 interface IMGatewayConfig {
   dingtalk: DingTalkMultiInstanceConfig;
   feishu: FeishuMultiInstanceConfig;
@@ -1168,7 +1117,6 @@ interface IMGatewayConfig {
   discord: DiscordMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
   weixin: WeixinOpenClawConfig;
-  email: EmailMultiInstanceConfig;
   settings: IMSettings;
 }
 
@@ -1414,7 +1362,6 @@ interface IMGatewayStatus {
   discord: DiscordMultiInstanceStatus;
   wecom: WecomMultiInstanceStatus;
   weixin: WeixinGatewayStatus;
-  email: EmailMultiInstanceStatus;
 }
 
 type IMConnectivityVerdict = 'pass' | 'warn' | 'fail';
