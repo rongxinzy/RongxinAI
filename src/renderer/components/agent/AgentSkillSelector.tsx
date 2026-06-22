@@ -25,7 +25,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
       setI18nReady(true);
       return;
     }
-    skillService.fetchMarketplaceSkills()
+    skillService.fetchMarketplaceSkills({ forceRefresh: false })
       .then(() => setI18nReady(true))
       .catch(() => setI18nReady(true));
   }, []);
