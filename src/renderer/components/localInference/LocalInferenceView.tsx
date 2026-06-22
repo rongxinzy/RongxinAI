@@ -1005,16 +1005,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handlePrepare = () => {
     void runAction(async () => {
       if (status?.status === 'not-installed') {
-        if (window.electron.platform === 'win32') {
-          setInstallGuideOpen(true);
-          return;
-        }
-        const result = await window.electron.llamacpp.install();
-        showToast(
-          result?.success
-            ? i18nService.t('localInferenceRuntimeReady')
-            : result?.error || i18nService.t('localInferenceRuntimeMissing'),
-        );
+        setInstallGuideOpen(true);
+        return;
       } else if (status?.status === 'installed' || status?.status === 'stopped') {
         const startStatus = await window.electron.llamacpp.start();
         if (startStatus.status !== 'running') {
@@ -1615,10 +1607,8 @@ function ImportGuideDialog({
   mode: 'install' | 'import';
   onClose: () => void;
 }) {
-  const platform = window.electron.platform as string;
-  const isWin = platform === 'win32';
-  const showWindowsDownloads = isWin && mode === 'install';
-  const showExternalDownloadLink = mode === 'import' && !showWindowsDownloads;
+  const showRuntimeDownloads = mode === 'install';
+  const showExternalDownloadLink = mode === 'import';
   const [windowsDownloads, setWindowsDownloads] = useState<
     Array<{ id: string; href: string; title: string; subtitle: string }>
   >([]);
@@ -1634,7 +1624,7 @@ function ImportGuideDialog({
   }, []);
 
   useEffect(() => {
-    if (!showWindowsDownloads) return;
+    if (!showRuntimeDownloads) return;
     let cancelled = false;
 
     const fallbackDownloads = LLAMACPP_WINDOWS_RUNTIME_DOWNLOAD_FALLBACKS
@@ -1663,7 +1653,7 @@ function ImportGuideDialog({
     return () => {
       cancelled = true;
     };
-  }, [showWindowsDownloads]);
+  }, [showRuntimeDownloads]);
 
   return (
     <div
@@ -1707,7 +1697,7 @@ function ImportGuideDialog({
                 <p className="text-foreground">
                   {i18nService.t('localInferenceImportGuideStep1')}
                 </p>
-                {showWindowsDownloads ? (
+                {showRuntimeDownloads ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {windowsDownloads.map(download => (
                       <button
@@ -1729,7 +1719,7 @@ function ImportGuideDialog({
                     ))}
                     {windowsDownloadsLoading && (
                       <p className="px-1 text-[11px] text-secondary">
-                        {i18nService.t('localInferenceImportGuideWindowsLoading')}
+                        {i18nService.t('localInferenceImportGuideDownloadsLoading')}
                       </p>
                     )}
                   </div>
