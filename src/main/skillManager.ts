@@ -706,7 +706,7 @@ const runNodeScriptCommand = (
   });
 });
 
-const runCommandCapture = (
+const _runCommandCapture = (
   command: string,
   args: string[],
   options?: { cwd?: string; env?: NodeJS.ProcessEnv }

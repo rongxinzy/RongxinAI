@@ -78,13 +78,6 @@ import {
   refreshEndpointsTestMode,
 } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
-import {
-  buildClawHubSkillInstallSource,
-  buildClawHubSkillPageUrl,
-  buildClawHubSkillSourceUrl,
-  findAmbiguousClawHubSkillSlugs,
-  mergeClawHubSkillDetail,
-} from './libs/skillMarketplace';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
@@ -121,6 +114,13 @@ import { startOpenClawTokenProxy, stopOpenClawTokenProxy } from './libs/openclaw
 import { migrateMainAgentWorkspace } from './libs/openclawWorkspaceMigration';
 import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
+import {
+  buildClawHubSkillInstallSource,
+  buildClawHubSkillPageUrl,
+  buildClawHubSkillSourceUrl,
+  findAmbiguousClawHubSkillSlugs,
+  mergeClawHubSkillDetail,
+} from './libs/skillMarketplace';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
 import {
