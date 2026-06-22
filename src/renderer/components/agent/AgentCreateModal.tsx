@@ -625,7 +625,7 @@ const AgentTemplatePickerModal: React.FC<{
   onClose: () => void;
   onNew: () => void;
   onSelect: (preset: PresetAgent) => void;
-}> = ({ presets, loading, onClose, onNew, onSelect }) => {
+}> = ({ presets, loading, onClose, onNew: _onNew, onSelect }) => {
   const isEn = i18nService.getLanguage() === 'en';
 
   return (
@@ -640,6 +640,7 @@ const AgentTemplatePickerModal: React.FC<{
           {i18nService.t('agentTemplateTitle')}
         </h2>
         <div className="flex items-center gap-2">
+          {/* TODO: 恢复"新建"模板功能时取消注释
           <button
             type="button"
             onClick={onNew}
@@ -647,6 +648,7 @@ const AgentTemplatePickerModal: React.FC<{
           >
             {i18nService.t('agentTemplateNew')}
           </button>
+          */}
           <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-raised transition-colors">
             <XMarkIcon className="h-5 w-5 text-secondary" />
           </button>
