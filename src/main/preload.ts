@@ -577,12 +577,6 @@ contextBridge.exposeInMainWorld('electron', {
     setFeishuInstanceConfig: (instanceId: string, config: unknown, options?: { syncGateway?: boolean }) =>
       ipcRenderer.invoke(ImInstanceIpc.feishuSetConfig, instanceId, config, options),
 
-    addEmailInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.emailAdd, name),
-    deleteEmailInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.emailDelete, instanceId),
-    setEmailInstanceConfig: (instanceId: string, config: unknown, options?: { syncGateway?: boolean }) =>
-      ipcRenderer.invoke(ImInstanceIpc.emailSetConfig, instanceId, config, options),
-
     addWecomInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.wecomAdd, name),
     deleteWecomInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.wecomDelete, instanceId),

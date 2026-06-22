@@ -13,8 +13,6 @@ import {
   DEFAULT_DINGTALK_OPENCLAW_CONFIG,
   DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG,
   DEFAULT_DISCORD_OPENCLAW_CONFIG,
-  DEFAULT_EMAIL_INSTANCE_CONFIG,
-  DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG,
   DEFAULT_FEISHU_MULTI_INSTANCE_CONFIG,
   DEFAULT_FEISHU_OPENCLAW_CONFIG,
   DEFAULT_IM_SETTINGS,
@@ -31,8 +29,6 @@ import {
   DiscordInstanceConfig,
   DiscordMultiInstanceConfig,
   DiscordOpenClawConfig,
-  EmailInstanceConfig,
-  EmailMultiInstanceConfig,
   FeishuInstanceConfig,
   FeishuMultiInstanceConfig,
   FeishuOpenClawConfig,
@@ -704,7 +700,6 @@ export class IMStore {
     const wecomMulti = this.getWecomMultiInstanceConfig();
     const weixin = this.getConfigValue<WeixinOpenClawConfig>('weixin') ?? DEFAULT_WEIXIN_CONFIG;
     const settings = this.getConfigValue<IMSettings>('settings') ?? DEFAULT_IM_SETTINGS;
-    const email = this.getEmailConfig();
 
     // Resolve enabled field: default to false for safety
     // User must explicitly enable the service by setting enabled: true
@@ -725,7 +720,6 @@ export class IMStore {
       qq: qqMulti,
       wecom: wecomMulti,
       weixin: resolveEnabled(weixin, DEFAULT_WEIXIN_CONFIG),
-      email,
       settings: { ...DEFAULT_IM_SETTINGS, ...settings },
     };
   }
@@ -751,9 +745,6 @@ export class IMStore {
     }
     if (config.weixin) {
       this.setWeixinConfig(config.weixin);
-    }
-    if (config.email) {
-      this.setEmailConfig(config.email);
     }
     if (config.settings) {
       this.setIMSettings(config.settings);
@@ -1216,87 +1207,6 @@ export class IMStore {
   setIMSettings(settings: Partial<IMSettings>): void {
     const current = this.getIMSettings();
     this.setConfigValue('settings', { ...current, ...settings });
-  }
-
-  // ==================== Email Channel Config ====================
-
-  /**
-   * Get email channel multi-instance configuration
-   */
-  getEmailConfig(): EmailMultiInstanceConfig {
-    const raw = this.db.prepare('SELECT value FROM im_config WHERE key = ?').get('email') as
-      | { value: string }
-      | undefined;
-
-    if (!raw?.value) {
-      return DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG;
-    }
-
-    try {
-      const parsed = JSON.parse(raw.value);
-
-      // Migration logic: detect v1 format (single account) and convert to v2 (multi-instance)
-      if (parsed.email && !parsed.instances) {
-        console.log('[EmailChannel] Migrating from v1 config format');
-        return {
-          instances: [
-            {
-              instanceId: 'email-1',
-              instanceName: 'Default',
-              enabled: parsed.enabled ?? false,
-              transport: 'imap',
-              email: parsed.email,
-              password: parsed.password,
-              agentId: 'main',
-              ...DEFAULT_EMAIL_INSTANCE_CONFIG,
-            },
-          ],
-        };
-      }
-
-      // v2 format: multi-instance mode
-      return {
-        instances: (parsed.instances || []).map((inst: any) => ({
-          ...DEFAULT_EMAIL_INSTANCE_CONFIG,
-          ...inst,
-        })),
-      };
-    } catch (error) {
-      console.error('[EmailChannel] Failed to parse config:', error);
-      return DEFAULT_EMAIL_MULTI_INSTANCE_CONFIG;
-    }
-  }
-
-  /**
-   * Set email channel multi-instance configuration
-   */
-  setEmailConfig(config: EmailMultiInstanceConfig): void {
-    this.setConfigValue('email', config);
-  }
-
-  setEmailInstanceConfig(instanceId: string, config: Partial<EmailInstanceConfig>): void {
-    const current = this.getEmailConfig();
-    const existing = current.instances.find(i => i.instanceId === instanceId);
-    if (existing) {
-      const updated = current.instances.map(i =>
-        i.instanceId === instanceId ? { ...i, ...config } : i,
-      );
-      this.setEmailConfig({ instances: updated });
-    } else {
-      this.setEmailConfig({
-        instances: [...current.instances, { ...DEFAULT_EMAIL_INSTANCE_CONFIG, ...config, instanceId } as EmailInstanceConfig],
-      });
-    }
-  }
-
-  deleteEmailInstance(instanceId: string): void {
-    const current = this.getEmailConfig();
-    const updated = current.instances.filter(i => i.instanceId !== instanceId);
-    this.setEmailConfig({ instances: updated });
-    // Clean up session mappings for this instance
-    this.db
-      .prepare('DELETE FROM im_session_mappings WHERE platform = ?')
-      .run(`email:${instanceId}`);
   }
 
   // ==================== Utility ====================

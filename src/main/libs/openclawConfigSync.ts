@@ -15,7 +15,6 @@ import type { Agent, CoworkConfig, CoworkExecutionMode } from '../coworkStore';
 import type { DiscordInstanceConfig, IMSettings, TelegramInstanceConfig } from '../im/types';
 import type {
   DingTalkInstanceConfig,
-  EmailMultiInstanceConfig,
   FeishuInstanceConfig,
   QQInstanceConfig,
   WecomInstanceConfig,
@@ -175,7 +174,6 @@ const MANAGED_OWNER_ALLOW_FROM = [
 ];
 
 const MANAGED_TOOL_DENY = ['web_search'] as const;
-const EMAIL_PLUGIN_ID = 'email';
 const REMOVED_NIM_CHANNEL_PLUGIN_IDS = [
   'openclaw-nim-channel',
   'nimsuite-openclaw-nim-channel',
@@ -938,7 +936,6 @@ type OpenClawConfigSyncDeps = {
   getFeishuInstances?: () => FeishuInstanceConfig[];
   getQQInstances?: () => QQInstanceConfig[];
   getWecomInstances?: () => WecomInstanceConfig[];
-  getEmailOpenClawConfig?: () => EmailMultiInstanceConfig;
   getWeixinConfig: () => WeixinOpenClawConfig | null;
   getIMSettings?: () => IMSettings | null;
   getMcpBridgeConfig?: () => McpBridgeConfig | null;
@@ -958,7 +955,6 @@ export class OpenClawConfigSync {
   private readonly getFeishuInstances: () => FeishuInstanceConfig[];
   private readonly getQQInstances: () => QQInstanceConfig[];
   private readonly getWecomInstances: () => WecomInstanceConfig[];
-  private readonly getEmailOpenClawConfig?: () => EmailMultiInstanceConfig;
   private readonly getWeixinConfig: () => WeixinOpenClawConfig | null;
   private readonly getIMSettings?: () => IMSettings | null;
   private readonly getMcpBridgeConfig?: () => McpBridgeConfig | null;
@@ -979,7 +975,6 @@ export class OpenClawConfigSync {
     this.getFeishuInstances = deps.getFeishuInstances ?? (() => []);
     this.getQQInstances = deps.getQQInstances ?? (() => []);
     this.getWecomInstances = deps.getWecomInstances ?? (() => []);
-    this.getEmailOpenClawConfig = deps.getEmailOpenClawConfig;
     this.getWeixinConfig = deps.getWeixinConfig;
     this.getIMSettings = deps.getIMSettings;
     this.getMcpBridgeConfig = deps.getMcpBridgeConfig;
@@ -1230,8 +1225,6 @@ export class OpenClawConfigSync {
 
     const wecomInstances = this.getWecomInstances();
 
-    const emailConfig = this.getEmailOpenClawConfig?.();
-
     const weixinConfig = this.getWeixinConfig();
 
     const hasAnyChannel = hasDingTalkOpenClaw;
@@ -1364,7 +1357,6 @@ export class OpenClawConfigSync {
           'dingtalk',
           ...REMOVED_NIM_CHANNEL_PLUGIN_IDS,
           ...REMOVED_POPO_NETEASEBEE_PLUGIN_IDS,
-          'clawemail-email',
           'qwen-portal-auth',
           'openclaw-qqbot',
           ...packageAliasPluginIds,
@@ -1398,8 +1390,6 @@ export class OpenClawConfigSync {
                 if (pluginMatches(plugin, 'wecom-openclaw-plugin'))
                   return wecomInstances.some(i => i.enabled && i.botId);
                 if (pluginMatches(plugin, 'openclaw-weixin')) return true; // Always keep enabled for QR login discovery
-                if (pluginMatches(plugin, 'clawemail-email', EMAIL_PLUGIN_ID))
-                  return !!emailConfig?.instances.some(i => i.enabled && i.email);
                 return true; // other plugins stay enabled
               })();
               return [plugin.pluginId, { enabled: pluginEnabled }];
@@ -1783,78 +1773,6 @@ export class OpenClawConfigSync {
       };
     }
 
-    // Sync Email OpenClaw channel config (multi-instance)
-    if (emailConfig?.instances && emailConfig.instances.length > 0) {
-      const enabledInstances = emailConfig.instances.filter(i => i.enabled && i.email);
-
-      if (enabledInstances.length > 0) {
-        const accounts: Record<string, unknown> = {};
-
-        for (const inst of enabledInstances) {
-          const accountId = inst.instanceId;
-          // Transform instanceId: email-1 → 1, email-work → WORK, uuid → UUID (dashes replaced with underscores)
-          const envSuffix = accountId
-            .replace(/^email-/, '')
-            .replace(/-/g, '_')
-            .toUpperCase();
-
-          const accountConfig: Record<string, unknown> = {
-            enabled: true,
-            name: inst.instanceName,
-            email: inst.email,
-            transport: inst.transport,
-          };
-
-          // IMAP/SMTP mode configuration
-          if (inst.transport === 'imap') {
-            accountConfig.password = `\${LOBSTER_EMAIL_${envSuffix}_PASSWORD}`;
-            if (inst.imapHost) accountConfig.imapHost = inst.imapHost;
-            if (inst.imapPort) accountConfig.imapPort = inst.imapPort;
-            if (inst.smtpHost) accountConfig.smtpHost = inst.smtpHost;
-            if (inst.smtpPort) accountConfig.smtpPort = inst.smtpPort;
-          }
-
-          // WebSocket mode configuration
-          if (inst.transport === 'ws') {
-            accountConfig.apiKey = `\${LOBSTER_EMAIL_${envSuffix}_APIKEY}`;
-          }
-
-          // Common configuration
-          if (inst.allowFrom?.length) {
-            accountConfig.allowFrom = inst.allowFrom;
-          }
-          if (inst.replyMode) {
-            accountConfig.replyMode = inst.replyMode;
-          }
-          if (inst.replyTo) {
-            accountConfig.replyTo = inst.replyTo;
-          }
-
-          // A2A configuration
-          if (
-            inst.a2aEnabled !== undefined ||
-            inst.a2aAgentDomains?.length ||
-            inst.a2aMaxPingPongTurns
-          ) {
-            accountConfig.a2a = {
-              enabled: inst.a2aEnabled ?? true,
-              ...(inst.a2aAgentDomains?.length ? { agentDomains: inst.a2aAgentDomains } : {}),
-              ...(inst.a2aMaxPingPongTurns ? { maxPingPongTurns: inst.a2aMaxPingPongTurns } : {}),
-            };
-          }
-
-          accounts[accountId] = accountConfig;
-        }
-
-        managedConfig.channels = {
-          ...((managedConfig.channels as Record<string, unknown>) || {}),
-          email: {
-            enabled: true,
-            accounts,
-          },
-        };
-      }
-    }
     // Sync Weixin OpenClaw channel config (via openclaw-weixin plugin)
     // Only write the channel entry when the plugin is actually installed,
     // otherwise the gateway rejects the config as invalid.
@@ -2172,27 +2090,6 @@ export class OpenClawConfigSync {
         env.LOBSTER_WECOM_SECRET = enabledWecom[idx].secret;
       } else {
         env[`LOBSTER_WECOM_SECRET_${idx}`] = enabledWecom[idx].secret;
-      }
-    }
-
-    // Email credentials
-    const emailConfig = this.getEmailOpenClawConfig?.();
-    if (emailConfig?.instances) {
-      for (const inst of emailConfig.instances) {
-        if (!inst.enabled || !inst.email) continue;
-
-        const envSuffix = inst.instanceId
-          .replace(/^email-/, '')
-          .replace(/-/g, '_')
-          .toUpperCase();
-
-        if (inst.transport === 'imap' && inst.password) {
-          env[`LOBSTER_EMAIL_${envSuffix}_PASSWORD`] = inst.password;
-        }
-
-        if (inst.transport === 'ws' && inst.apiKey) {
-          env[`LOBSTER_EMAIL_${envSuffix}_APIKEY`] = inst.apiKey;
-        }
       }
     }
 

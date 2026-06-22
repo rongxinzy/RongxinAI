@@ -10,14 +10,12 @@ import { store } from '../store';
 import {
   addDingTalkInstance,
   addDiscordInstance,
-  addEmailInstance,
   addFeishuInstance,
   addQQInstance,
   addTelegramInstance,
   addWecomInstance,
   removeDingTalkInstance,
   removeDiscordInstance,
-  removeEmailInstance,
   removeFeishuInstance,
   removeQQInstance,
   removeTelegramInstance,
@@ -25,7 +23,6 @@ import {
   setConfig,
   setDingTalkInstanceConfig,
   setDiscordInstanceConfig,
-  setEmailInstanceConfig,
   setError,
   setFeishuInstanceConfig,
   setLoading,
@@ -39,7 +36,6 @@ import type {
   DingTalkOpenClawConfig,
   DiscordInstanceConfig,
   DiscordOpenClawConfig,
-  EmailInstanceConfig,
   FeishuInstanceConfig,
   FeishuOpenClawConfig,
   IMConfigResult,
@@ -529,81 +525,6 @@ class IMService {
       return false;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update Feishu instance config';
-      store.dispatch(setError(message));
-      return false;
-    } finally {
-      store.dispatch(setLoading(false));
-    }
-  }
-
-  // ==================== Email Multi-Instance Operations ====================
-
-  async addEmailInstance(name: string): Promise<EmailInstanceConfig | null> {
-    try {
-      const result = await window.electron.im.addEmailInstance(name);
-      if (result.success && result.instance) {
-        store.dispatch(addEmailInstance(result.instance));
-        return result.instance;
-      }
-      console.error('[IM Service] Failed to add email instance:', result.error);
-      return null;
-    } catch (error) {
-      console.error('[IM Service] Failed to add email instance:', error);
-      return null;
-    }
-  }
-
-  async deleteEmailInstance(instanceId: string): Promise<boolean> {
-    try {
-      const result = await window.electron.im.deleteEmailInstance(instanceId);
-      if (result.success) {
-        store.dispatch(removeEmailInstance(instanceId));
-        return true;
-      }
-      console.error('[IM Service] Failed to delete email instance:', result.error);
-      return false;
-    } catch (error) {
-      console.error('[IM Service] Failed to delete email instance:', error);
-      return false;
-    }
-  }
-
-  async persistEmailInstanceConfig(instanceId: string, config: Partial<EmailInstanceConfig>): Promise<boolean> {
-    try {
-      const result: IMGatewayResult = await window.electron.im.setEmailInstanceConfig(
-        instanceId,
-        config,
-        { syncGateway: false },
-      );
-      if (result.success) {
-        store.dispatch(setEmailInstanceConfig({ instanceId, config }));
-        return true;
-      }
-      console.error('[IM Service] Failed to persist email instance config:', result.error);
-      return false;
-    } catch (error) {
-      console.error('[IM Service] Failed to persist email instance config:', error);
-      return false;
-    }
-  }
-
-  async updateEmailInstanceConfig(instanceId: string, config: Partial<EmailInstanceConfig>): Promise<boolean> {
-    try {
-      store.dispatch(setLoading(true));
-      const result: IMGatewayResult = await window.electron.im.setEmailInstanceConfig(
-        instanceId,
-        config,
-        { syncGateway: true },
-      );
-      if (result.success) {
-        await this.loadConfig();
-        await this.loadStatus();
-        return true;
-      }
-      store.dispatch(setError(result.error || 'Failed to update email instance config'));
-      return false;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update email instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
