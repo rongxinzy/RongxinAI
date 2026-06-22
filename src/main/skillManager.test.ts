@@ -6,10 +6,17 @@ const {
   parseFrontmatter,
   isTruthy,
   extractDescription,
+  buildNodeScriptArgv,
+  parseClawhubInstallSource,
+  buildClawhubInstallSource,
   buildClawhubDownloadFailureMessage,
   buildOpenClawSkillInstallConfig,
   getOpenClawRuntimeRootCandidates,
+  getSkillInstallId,
+  findInstalledSkillConflictId,
 } = __skillManagerTestUtils;
+
+const normalizePathSeparators = (paths: string[]): string[] => paths.map(p => p.replace(/\\/g, '/'));
 
 // ==================== parseFrontmatter ====================
 
@@ -224,22 +231,22 @@ test('integration: skill with block scalar description', () => {
 // Mirror of parseClawhubUrl from skillManager.ts
 // ---------------------------------------------------------------------------
 
-const parseClawhubUrl = (source: string): { name: string } | null => {
+const parseClawhubUrl = (source: string): { owner: string | null; name: string } | null => {
   try {
     const url = new URL(source);
     if (!['clawhub.ai', 'www.clawhub.ai'].includes(url.hostname)) return null;
     const segments = url.pathname.split('/').filter(Boolean);
     // Format: /skills/{owner}/{name}
     if (segments.length >= 3 && segments[0] === 'skills') {
-      return { name: segments[2] };
+      return { owner: segments[1], name: segments[2] };
     }
     // Format: /skills/{name}
     if (segments.length >= 2 && segments[0] === 'skills') {
-      return { name: segments[1] };
+      return { owner: null, name: segments[1] };
     }
     // Format: /{owner}/{name} (no /skills/ prefix)
     if (segments.length >= 2) {
-      return { name: segments[1] };
+      return { owner: segments[0], name: segments[1] };
     }
     return null;
   } catch {
@@ -252,15 +259,15 @@ const parseClawhubUrl = (source: string): { name: string } | null => {
 // ---------------------------------------------------------------------------
 
 test('clawhub: /{owner}/{name} extracts skill name', () => {
-  expect(parseClawhubUrl('https://clawhub.ai/steipete/slack')).toEqual({ name: 'slack' });
+  expect(parseClawhubUrl('https://clawhub.ai/steipete/slack')).toEqual({ owner: 'steipete', name: 'slack' });
 });
 
 test('clawhub: /{owner}/{name} with www prefix', () => {
-  expect(parseClawhubUrl('https://www.clawhub.ai/steipete/slack')).toEqual({ name: 'slack' });
+  expect(parseClawhubUrl('https://www.clawhub.ai/steipete/slack')).toEqual({ owner: 'steipete', name: 'slack' });
 });
 
 test('clawhub: /{owner}/{name} with trailing slash', () => {
-  expect(parseClawhubUrl('https://clawhub.ai/anthropic/web-search/')).toEqual({ name: 'web-search' });
+  expect(parseClawhubUrl('https://clawhub.ai/anthropic/web-search/')).toEqual({ owner: 'anthropic', name: 'web-search' });
 });
 
 // ---------------------------------------------------------------------------
@@ -268,11 +275,11 @@ test('clawhub: /{owner}/{name} with trailing slash', () => {
 // ---------------------------------------------------------------------------
 
 test('clawhub: /skills/{owner}/{name} extracts skill name', () => {
-  expect(parseClawhubUrl('https://clawhub.ai/skills/steipete/slack')).toEqual({ name: 'slack' });
+  expect(parseClawhubUrl('https://clawhub.ai/skills/steipete/slack')).toEqual({ owner: 'steipete', name: 'slack' });
 });
 
 test('clawhub: /skills/{owner}/{name} with trailing slash', () => {
-  expect(parseClawhubUrl('https://clawhub.ai/skills/anthropic/web-search/')).toEqual({ name: 'web-search' });
+  expect(parseClawhubUrl('https://clawhub.ai/skills/anthropic/web-search/')).toEqual({ owner: 'anthropic', name: 'web-search' });
 });
 
 // ---------------------------------------------------------------------------
@@ -280,7 +287,21 @@ test('clawhub: /skills/{owner}/{name} with trailing slash', () => {
 // ---------------------------------------------------------------------------
 
 test('clawhub: /skills/{name} extracts skill name', () => {
-  expect(parseClawhubUrl('https://clawhub.ai/skills/slack')).toEqual({ name: 'slack' });
+  expect(parseClawhubUrl('https://clawhub.ai/skills/slack')).toEqual({ owner: null, name: 'slack' });
+});
+
+test('clawhub: buildClawhubInstallSource keeps the owner when present', () => {
+  expect(buildClawhubInstallSource({ owner: 'jk-0001', name: 'automation-workflows' })).toBe('clawhub:automation-workflows');
+});
+
+test('clawhub: parseClawhubInstallSource accepts prefixed install spec', () => {
+  expect(parseClawhubInstallSource('clawhub:self-improving-agent')).toEqual({
+    name: 'self-improving-agent',
+  });
+});
+
+test('clawhub: parseClawhubInstallSource rejects plain npm package names', () => {
+  expect(parseClawhubInstallSource('self-improving-agent')).toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -316,6 +337,24 @@ test('clawhub: unknown install failures keep the frontend message concise', () =
   expect(message).toBe('Failed to download skill from ClawHub. Please try again later.');
 });
 
+test('node script argv keeps node preload flags before the script entry', () => {
+  expect(
+    buildNodeScriptArgv(
+      'D:/runtime/openclaw.mjs',
+      ['skills', 'install', 'self-improving-agent', '--force'],
+      ['--require', 'C:/Users/Administrator/AppData/Roaming/RongxinAI/bin/skill_windows_hide.cjs'],
+    ),
+  ).toEqual([
+    '--require',
+    'C:/Users/Administrator/AppData/Roaming/RongxinAI/bin/skill_windows_hide.cjs',
+    'D:/runtime/openclaw.mjs',
+    'skills',
+    'install',
+    'self-improving-agent',
+    '--force',
+  ]);
+});
+
 test('openclaw skill install config points the default agent workspace at the temp workspace dir', () => {
   const config = buildOpenClawSkillInstallConfig('/tmp/openclaw-skill-workspace');
 
@@ -338,28 +377,57 @@ test('openclaw skill install config points the default agent workspace at the te
 });
 
 test('openclaw runtime root candidates use packaged cfmind location', () => {
-  expect(
+  expect(normalizePathSeparators(
     getOpenClawRuntimeRootCandidates(
       true,
       '/Applications/RongxinAI.app/Contents/Resources/app.asar',
       '/Users/dev/RongxinAI-release',
       '/Applications/RongxinAI.app/Contents/Resources',
     ),
-  ).toEqual([
+  )).toEqual([
     '/Applications/RongxinAI.app/Contents/Resources/cfmind',
   ]);
 });
 
 test('openclaw runtime root candidates prefer local vendor paths in development', () => {
-  expect(
+  expect(normalizePathSeparators(
     getOpenClawRuntimeRootCandidates(
       false,
       '/Users/dev/RongxinAI-release',
       '/Users/dev/RongxinAI-release',
       '/Applications/RongxinAI.app/Contents/Resources',
     ),
-  ).toEqual([
+  )).toEqual([
     '/Users/dev/RongxinAI-release/vendor/openclaw-runtime/current',
     '/Users/dev/RongxinAI-release/vendor/openclaw-runtime/current',
   ]);
+});
+
+test('skill install id matches normalized folder name', () => {
+  expect(getSkillInstallId('C:/temp/self-improving-agent')).toBe('self-improving-agent');
+  expect(getSkillInstallId('C:/temp/Self Improving Agent')).toBe('Self-Improving-Agent');
+});
+
+test('detects conflict when a skill is already installed', () => {
+  expect(findInstalledSkillConflictId(
+    ['C:/temp/self-improving-agent'],
+    ['self-improving-agent'],
+    'C:/skills',
+  )).toBe('self-improving-agent');
+});
+
+test('does not report conflict for a fresh skill id set', () => {
+  expect(findInstalledSkillConflictId(
+    ['C:/temp/self-improving-agent', 'C:/temp/other-skill'],
+    ['existing-skill'],
+    'C:/skills',
+  )).toBeNull();
+});
+
+test('detects conflict when two incoming skill folders normalize to the same id', () => {
+  expect(findInstalledSkillConflictId(
+    ['C:/temp/Skill Name', 'C:/temp/Skill-Name'],
+    [],
+    'C:/skills',
+  )).toBe('Skill-Name');
 });

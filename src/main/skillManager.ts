@@ -668,10 +668,16 @@ const runCommand = (
   });
 });
 
+const buildNodeScriptArgv = (
+  entryPath: string,
+  args: string[],
+  nodeArgs: string[] = []
+): string[] => [...nodeArgs, entryPath, ...args];
+
 const runNodeScriptCommand = (
   entryPath: string,
   args: string[],
-  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv; nodeArgs?: string[] }
 ): Promise<void> => new Promise((resolve, reject) => {
   const env = { ...(options?.env || {}) };
   const hasSystemNode = hasCommand('node', env);
@@ -680,7 +686,7 @@ const runNodeScriptCommand = (
     ? env
     : { ...env, ELECTRON_RUN_AS_NODE: '1' };
 
-  const child = spawn(command, [entryPath, ...args], {
+  const child = spawn(command, buildNodeScriptArgv(entryPath, args, options?.nodeArgs), {
     cwd: options?.cwd,
     env: childEnv,
     windowsHide: true,
@@ -930,6 +936,7 @@ type GithubRepoSource = {
 };
 
 type SkillDownloadErrorCode =
+  | 'already_installed'
   | 'clawhub_not_found'
   | 'clawhub_network'
   | 'clawhub_already_installed'
@@ -953,6 +960,27 @@ const extractErrorMessage = (error: unknown): string => {
     return error.message;
   }
   return String(error);
+};
+
+const getSkillInstallId = (skillDir: string): string => normalizeFolderName(path.basename(skillDir));
+
+const findInstalledSkillConflictId = (
+  skillDirs: string[],
+  installedSkillIds: Iterable<string>,
+  root: string,
+): string | null => {
+  const seen = new Set(installedSkillIds);
+
+  for (const skillDir of skillDirs) {
+    const skillId = getSkillInstallId(skillDir);
+    const targetDir = resolveWithin(root, skillId);
+    if (seen.has(skillId) || fs.existsSync(targetDir)) {
+      return skillId;
+    }
+    seen.add(skillId);
+  }
+
+  return null;
 };
 
 const parseGithubRepoSource = (repoUrl: string): GithubRepoSource | null => {
@@ -1095,6 +1123,15 @@ const CLAWHUB_HOSTS = [
   'www.clawhub.ai',
 ] as const;
 
+const parseClawhubInstallSource = (source: string): { name: string } | null => {
+  const trimmed = source.trim();
+  const match = trimmed.match(/^clawhub:([\w.-]+)$/);
+  if (!match) return null;
+  return {
+    name: match[1],
+  };
+};
+
 const classifyClawhubInstallError = (message: string): SkillDownloadErrorCode => {
   const normalized = message.toLowerCase();
   if (normalized.includes('skill not found')) return 'clawhub_not_found';
@@ -1138,31 +1175,35 @@ const buildOpenClawSkillInstallConfig = (workspaceDir: string): Record<string, u
 });
 
 /**
- * Parse a clawhub.ai URL and extract the skill name.
+ * Parse a clawhub.ai URL and extract the skill owner/name.
  * Supports: /skills/{owner}/{name} and /skills/{name}
  */
-const parseClawhubUrl = (source: string): { name: string } | null => {
+const parseClawhubUrl = (source: string): { owner: string | null; name: string } | null => {
   try {
     const url = new URL(source);
     if (!CLAWHUB_HOSTS.includes(url.hostname as typeof CLAWHUB_HOSTS[number])) return null;
     const segments = url.pathname.split('/').filter(Boolean);
     // Format: /skills/{owner}/{name}
     if (segments.length >= 3 && segments[0] === 'skills') {
-      return { name: segments[2] };
+      return { owner: segments[1], name: segments[2] };
     }
     // Format: /skills/{name}
     if (segments.length >= 2 && segments[0] === 'skills') {
-      return { name: segments[1] };
+      return { owner: null, name: segments[1] };
     }
     // Format: /{owner}/{name} (no /skills/ prefix)
     if (segments.length >= 2) {
-      return { name: segments[1] };
+      return { owner: segments[0], name: segments[1] };
     }
     return null;
   } catch {
     return null;
   }
 };
+
+const buildClawhubInstallSource = (parsed: { owner: string | null; name: string }): string => (
+  `clawhub:${parsed.name}`
+);
 
 const getOpenClawRuntimeRootCandidates = (
   isPackaged: boolean,
@@ -1243,17 +1284,14 @@ const downloadClawhubSkill = async (
     'utf8',
   );
 
-  let args = [
-    openclawCliJs,
+  const args = [
     'skills',
     'install',
     skillName,
     '--force',
   ];
   const hideScript = ensureWindowsHideScript();
-  if (hideScript) {
-    args = ['--require', hideScript, ...args];
-  }
+  const nodeArgs = hideScript ? ['--require', hideScript] : undefined;
   const runEnv: NodeJS.ProcessEnv = {
     ...env,
     ELECTRON_RUN_AS_NODE: '1',
@@ -1266,9 +1304,10 @@ const downloadClawhubSkill = async (
   };
 
   try {
-    await runNodeScriptCommand(openclawCliJs, args.slice(1), {
+    await runNodeScriptCommand(openclawCliJs, args, {
       cwd: targetDir,
       env: runEnv,
+      nodeArgs,
     });
     return workspaceSkillsRoot;
   } catch (error) {
@@ -1552,13 +1591,66 @@ export class SkillManager {
     root: string;
     skillDirs: string[];
     timer: NodeJS.Timeout;
-    isUpgrade?: boolean;
-    existingSkillDir?: string;
   }>();
-  private upgradingSkillIds = new Set<string>();
   private deletingSkillIds = new Set<string>();
 
   constructor(private getStore: () => SqliteStore) {}
+
+  private createPendingInstallTimer(pendingId: string): NodeJS.Timeout {
+    return setTimeout(() => {
+      const pending = this.pendingInstalls.get(pendingId);
+      if (pending) {
+        cleanupPathSafely(pending.cleanupPath);
+        this.pendingInstalls.delete(pendingId);
+        console.log(`[SkillManager] Pending install ${pendingId} expired (TTL)`);
+      }
+    }, 5 * 60 * 1000);
+  }
+
+  private assertSkillDirsCanInstall(skillDirs: string[], root: string): void {
+    const installedSkillIds = new Set(this.listSkills().map(skill => skill.id));
+    const conflictId = findInstalledSkillConflictId(skillDirs, installedSkillIds, root);
+    if (conflictId) {
+      throw new SkillDownloadError(
+        'already_installed',
+        t('skillErrAlreadyInstalled').replace('{name}', conflictId),
+      );
+    }
+  }
+
+  private installSkillDirs(skillDirs: string[], root: string): string[] {
+    const installedIds: string[] = [];
+    const createdDirs: string[] = [];
+
+    try {
+      for (const skillDir of skillDirs) {
+        const skillId = getSkillInstallId(skillDir);
+        const targetDir = resolveWithin(root, skillId);
+
+        cpRecursiveSync(skillDir, targetDir);
+        createdDirs.push(targetDir);
+
+        const normalizeResult = normalizeWindowsSkillDirectoryAttrs(targetDir);
+        if (normalizeResult.success) {
+          console.log('[skills] install normalization applied for "%s" at %s', skillId, targetDir);
+        } else {
+          console.warn('[skills] install normalization failed for "%s" at %s: %s', skillId, targetDir, normalizeResult.detail || 'unknown');
+        }
+        installedIds.push(skillId);
+      }
+
+      return installedIds;
+    } catch (error) {
+      for (const createdDir of createdDirs.reverse()) {
+        try {
+          fs.rmSync(createdDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.warn('[skills] Failed to clean up partial install at "%s":', createdDir, cleanupError);
+        }
+      }
+      throw error;
+    }
+  }
 
   getSkillsRoot(): string {
     return path.resolve(app.getPath('userData'), SKILLS_DIR_NAME);
@@ -1997,19 +2089,27 @@ export class SkillManager {
         const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
         cleanupPath = tempRoot;
         localSource = await downloadZipUrl(trimmed, tempRoot);
+      } else if (parseClawhubInstallSource(trimmed)) {
+        const clawhubInstall = parseClawhubInstallSource(trimmed)!;
+        console.log(`[SkillManager] downloadSkill: detected ClawHub install source "${trimmed}"`);
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-clawhub-'));
+        cleanupPath = tempRoot;
+        const env = buildBundledSkillInstallEnv();
+        localSource = await downloadClawhubSkill(clawhubInstall.name, tempRoot, env);
+      } else if (parseClawhubUrl(trimmed)) {
+        const clawhubParsed = parseClawhubUrl(trimmed)!;
+        const installSource = buildClawhubInstallSource(clawhubParsed);
+        console.log(`[SkillManager] downloadSkill: detected ClawHub URL, install source="${installSource}"`);
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-clawhub-'));
+        cleanupPath = tempRoot;
+        const env = buildBundledSkillInstallEnv();
+        localSource = await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
       } else if (isNpmPackageSpec(trimmed)) {
         console.log(`[SkillManager] downloadSkill: detected npm package spec "${trimmed}"`);
         const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-npm-'));
         cleanupPath = tempRoot;
         localSource = await downloadNpmPackage(trimmed, tempRoot);
         console.log(`[SkillManager] downloadSkill: npm package extracted to ${localSource}`);
-      } else if (parseClawhubUrl(trimmed)) {
-        const clawhubParsed = parseClawhubUrl(trimmed)!;
-        console.log(`[SkillManager] downloadSkill: detected ClawHub URL, skill name="${clawhubParsed.name}"`);
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-clawhub-'));
-        cleanupPath = tempRoot;
-        const env = buildBundledSkillInstallEnv();
-        localSource = await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
       } else {
         const normalized = this.normalizeGitSource(trimmed);
         if (!normalized) {
@@ -2086,6 +2186,8 @@ export class SkillManager {
         return { success: false, error: t('skillErrNoSkillMd') };
       }
 
+      this.assertSkillDirsCanInstall(skillDirs, root);
+
       // Security scan before installation
       let auditReport: SkillSecurityReport | null = null;
       try {
@@ -2106,14 +2208,7 @@ export class SkillManager {
       if (auditReport && auditReport.riskLevel !== 'safe') {
         const pendingId = crypto.randomUUID();
         console.log(`[SkillManager] Risk detected (${auditReport.riskLevel}), pending user confirmation: ${pendingId}`);
-        const timer = setTimeout(() => {
-          const pending = this.pendingInstalls.get(pendingId);
-          if (pending) {
-            cleanupPathSafely(pending.cleanupPath);
-            this.pendingInstalls.delete(pendingId);
-            console.log(`[SkillManager] Pending install ${pendingId} expired (TTL)`);
-          }
-        }, 5 * 60 * 1000);
+        const timer = this.createPendingInstallTimer(pendingId);
 
         this.pendingInstalls.set(pendingId, {
           tempDir: localSource,
@@ -2132,22 +2227,7 @@ export class SkillManager {
 
       // Safe or scan failed — install directly
       console.log(`[SkillManager] Skill is safe (or scan failed), installing directly`);
-      for (const skillDir of skillDirs) {
-        const folderName = normalizeFolderName(path.basename(skillDir));
-        let targetDir = resolveWithin(root, folderName);
-        let suffix = 1;
-        while (fs.existsSync(targetDir)) {
-          targetDir = resolveWithin(root, `${folderName}-${suffix}`);
-          suffix += 1;
-        }
-        cpRecursiveSync(skillDir, targetDir);
-        const normalizeResult = normalizeWindowsSkillDirectoryAttrs(targetDir);
-        if (normalizeResult.success) {
-          console.log('[skills] install normalization applied for "%s" at %s', folderName, targetDir);
-        } else {
-          console.warn('[skills] install normalization failed for "%s" at %s: %s', folderName, targetDir, normalizeResult.detail || 'unknown');
-        }
-      }
+      this.installSkillDirs(skillDirs, root);
 
       cleanupPathSafely(cleanupPath);
       cleanupPath = null;
@@ -2168,253 +2248,6 @@ export class SkillManager {
     }
   }
 
-  async upgradeSkill(skillId: string, downloadUrl: string): Promise<{
-    success: boolean;
-    skills?: SkillRecord[];
-    error?: string;
-    auditReport?: SkillSecurityReport;
-    pendingInstallId?: string;
-  }> {
-    // Prevent concurrent upgrades of the same skill
-    if (this.upgradingSkillIds.has(skillId)) {
-      return { success: false, error: `Skill "${skillId}" is already being upgraded` };
-    }
-
-    // Find the installed skill
-    const installedSkills = this.listSkills();
-    const installed = installedSkills.find(s => s.id === skillId);
-    if (!installed) {
-      return { success: false, error: `Skill "${skillId}" is not installed` };
-    }
-
-    const existingSkillDir = path.dirname(installed.skillPath);
-    if (!fs.existsSync(existingSkillDir)) {
-      return { success: false, error: `Skill directory not found: ${existingSkillDir}` };
-    }
-
-    this.upgradingSkillIds.add(skillId);
-    try {
-      return await this.performUpgradeDownload(skillId, downloadUrl, existingSkillDir);
-    } finally {
-      this.upgradingSkillIds.delete(skillId);
-    }
-  }
-
-  private async performUpgradeDownload(skillId: string, downloadUrl: string, existingSkillDir: string): Promise<{
-    success: boolean;
-    skills?: SkillRecord[];
-    error?: string;
-    auditReport?: SkillSecurityReport;
-    pendingInstallId?: string;
-  }> {    let cleanupPath: string | null = null;
-    try {
-      console.log(`[SkillManager] starting upgrade for skill "${skillId}"`);
-      const root = this.ensureSkillsRoot();
-
-      // Download new version (reuse downloadSkill's download logic)
-      const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-upgrade-'));
-      cleanupPath = tempRoot;
-
-      let localSource: string;
-      if (isRemoteZipUrl(downloadUrl)) {
-        localSource = await downloadZipUrl(downloadUrl, tempRoot);
-      } else if (parseClawhubUrl(downloadUrl)) {
-        const clawhubParsed = parseClawhubUrl(downloadUrl)!;
-        console.log(`[SkillManager] upgrade detected ClawHub URL, skill="${clawhubParsed.name}"`);
-        const env = buildBundledSkillInstallEnv();
-        localSource = await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
-      } else {
-        const normalized = this.normalizeGitSource(downloadUrl);
-        if (!normalized) {
-          cleanupPathSafely(cleanupPath);
-          return { success: false, error: 'Invalid download URL' };
-        }
-        const repoName = normalizeFolderName(normalized.repoNameHint || deriveRepoName(normalized.repoUrl));
-        const clonePath = path.join(tempRoot, repoName);
-        const githubSource = parseGithubRepoSource(normalized.repoUrl);
-        let downloadedSourceRoot = clonePath;
-        let downloaded = false;
-
-        if (githubSource) {
-          try {
-            downloadedSourceRoot = await downloadGithubArchive(githubSource, tempRoot, normalized.ref);
-            downloaded = true;
-          } catch {
-            // Fall through to git clone
-          }
-        }
-
-        if (!downloaded) {
-          const gitRuntime = resolveGitCommand();
-          // For upgrades, prefer the installed skill's git remote URL over the
-          // marketplace URL — the latter may trigger HTTP redirects (e.g. ClawHub
-          // moving a skill from /skills/{slug} to /{user}/{slug}) that git cannot
-          // safely follow.  The installed repo's .git/config already points at the
-          // correct, working remote.
-          let cloneUrl = normalized.repoUrl;
-          if (fs.existsSync(path.join(existingSkillDir, '.git'))) {
-            try {
-              const { stdout } = await runCommandCapture(gitRuntime.command, ['remote', 'get-url', 'origin'], {
-                cwd: existingSkillDir,
-                env: gitRuntime.env,
-              });
-              const remoteUrl = stdout.trim();
-              if (remoteUrl) {
-                cloneUrl = remoteUrl;
-              }
-            } catch {
-              // Keep the original URL as fallback
-            }
-          }
-
-          try {
-            const cloneArgs = ['clone', '--depth', '1'];
-            if (normalized.ref) cloneArgs.push('--branch', normalized.ref);
-            cloneArgs.push(cloneUrl, clonePath);
-            await runCommand(gitRuntime.command, cloneArgs, { env: gitRuntime.env });
-          } catch (cloneErr: unknown) {
-            const cloneMsg = cloneErr instanceof Error ? cloneErr.message : String(cloneErr);
-            // If clone fails with a redirect error, fall back to fetching inside the
-            // existing repo — its on-disk remote URL may survive a redirect that a
-            // fresh clone cannot handle.
-            if (/unable to update url base from redirection/i.test(cloneMsg) || /redirect/i.test(cloneMsg)) {
-              console.log(`[SkillManager] clone redirect fallback, fetching in existing repo for "${skillId}"`);
-              const fetchArgs = ['fetch', '--depth', '1', 'origin'];
-              if (normalized.ref) fetchArgs.push(normalized.ref);
-              await runCommand(gitRuntime.command, fetchArgs, {
-                cwd: existingSkillDir,
-                env: gitRuntime.env,
-              });
-              await runCommand(gitRuntime.command, ['checkout', 'FETCH_HEAD'], {
-                cwd: existingSkillDir,
-                env: gitRuntime.env,
-              });
-              // Copy the updated existing dir to the temp clone path so the rest
-              // of the upgrade flow (security scan, atomic replace) works unchanged.
-              cpRecursiveSync(existingSkillDir, clonePath);
-            } else {
-              throw cloneErr;
-            }
-          }
-        }
-
-        if (normalized.sourceSubpath) {
-          const scopedSource = resolveWithin(downloadedSourceRoot, normalized.sourceSubpath);
-          if (!fs.existsSync(scopedSource)) {
-            cleanupPathSafely(cleanupPath);
-            return { success: false, error: `Path "${normalized.sourceSubpath}" not found` };
-          }
-          localSource = fs.statSync(scopedSource).isFile() && path.basename(scopedSource) === SKILL_FILE_NAME
-            ? path.dirname(scopedSource)
-            : scopedSource;
-        } else {
-          localSource = downloadedSourceRoot;
-        }
-      }
-
-      const skillDirs = collectSkillDirsFromSource(localSource);
-      if (skillDirs.length === 0) {
-        cleanupPathSafely(cleanupPath);
-        return { success: false, error: t('skillErrNoSkillMd') };
-      }
-
-      // Find the matching skill dir for this ID
-      const matchingSkillDir = skillDirs.find(d => normalizeFolderName(path.basename(d)) === skillId) || skillDirs[0];
-
-      // Security scan
-      let auditReport: SkillSecurityReport | null = null;
-      try {
-        const reports = await scanMultipleSkillDirs([matchingSkillDir]);
-        auditReport = mergeReports(reports);
-      } catch (err) {
-        console.warn('[SkillManager] Security scan failed (non-blocking):', err);
-      }
-
-      // If risk detected, cache for user confirmation
-      if (auditReport && auditReport.riskLevel !== 'safe') {
-        const pendingId = crypto.randomUUID();
-        console.log(`[SkillManager] Upgrade risk detected (${auditReport.riskLevel}), pending confirmation: ${pendingId}`);
-        const timer = setTimeout(() => {
-          const pending = this.pendingInstalls.get(pendingId);
-          if (pending) {
-            cleanupPathSafely(pending.cleanupPath);
-            this.pendingInstalls.delete(pendingId);
-          }
-        }, 5 * 60 * 1000);
-
-        this.pendingInstalls.set(pendingId, {
-          tempDir: localSource,
-          cleanupPath,
-          root,
-          skillDirs: [matchingSkillDir],
-          timer,
-          isUpgrade: true,
-          existingSkillDir,
-        });
-
-        // Ownership of cleanupPath transferred to pendingInstalls
-        cleanupPath = null;
-        return { success: true, auditReport, pendingInstallId: pendingId };
-      }
-
-      // Safe — perform upgrade
-      this.performSkillUpgrade(matchingSkillDir, existingSkillDir);
-
-      cleanupPathSafely(cleanupPath);
-      cleanupPath = null;
-
-      this.startWatching();
-      this.notifySkillsChanged();
-      return { success: true, skills: this.listSkills() };
-    } catch (error) {
-      cleanupPathSafely(cleanupPath);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to upgrade skill' };
-    }
-  }
-
-  private performSkillUpgrade(newSkillDir: string, existingSkillDir: string): void {
-    const upgradingDir = existingSkillDir + '.upgrading';
-
-    // Back up .env and _meta.json
-    let envBackup: Buffer | null = null;
-    let metaBackup: Buffer | null = null;
-    const envPath = path.join(existingSkillDir, '.env');
-    const metaPath = path.join(existingSkillDir, '_meta.json');
-    if (fs.existsSync(envPath)) {
-      envBackup = fs.readFileSync(envPath);
-    }
-    if (fs.existsSync(metaPath)) {
-      metaBackup = fs.readFileSync(metaPath);
-    }
-
-    // Atomic rename old dir to .upgrading backup
-    fs.renameSync(existingSkillDir, upgradingDir);
-
-    try {
-      // Copy new version to original path
-      cpRecursiveSync(newSkillDir, existingSkillDir);
-
-      // Restore .env and _meta.json
-      if (envBackup !== null) {
-        fs.writeFileSync(path.join(existingSkillDir, '.env'), envBackup);
-      }
-      if (metaBackup !== null) {
-        fs.writeFileSync(path.join(existingSkillDir, '_meta.json'), metaBackup);
-      }
-    } catch (error) {
-      // Roll back: remove partial new dir and restore backup
-      console.error('[SkillManager] upgrade copy failed, rolling back:', error);
-      if (fs.existsSync(existingSkillDir)) {
-        fs.rmSync(existingSkillDir, { recursive: true, force: true });
-      }
-      fs.renameSync(upgradingDir, existingSkillDir);
-      throw error;
-    }
-
-    // Remove backup
-    fs.rmSync(upgradingDir, { recursive: true, force: true });
-  }
-
   confirmPendingInstall(
     pendingId: string,
     action: SecurityReportAction
@@ -2427,59 +2260,40 @@ export class SkillManager {
     }
 
     clearTimeout(pending.timer);
-    this.pendingInstalls.delete(pendingId);
 
     if (action === 'cancel') {
+      this.pendingInstalls.delete(pendingId);
       cleanupPathSafely(pending.cleanupPath);
       return { success: true };
     }
 
-    // Install the skill(s)
-    const installedIds: string[] = [];
+    try {
+      this.assertSkillDirsCanInstall(pending.skillDirs, pending.root);
+      const installedIds = this.installSkillDirs(pending.skillDirs, pending.root);
 
-    // Upgrade path: overwrite existing skill directory
-    if (pending.isUpgrade && pending.existingSkillDir) {
-      for (const skillDir of pending.skillDirs) {
-        this.performSkillUpgrade(skillDir, pending.existingSkillDir);
-        installedIds.push(path.basename(pending.existingSkillDir));
-      }
-    } else {
-      // Fresh install path: find unique directory name
-      for (const skillDir of pending.skillDirs) {
-        const folderName = normalizeFolderName(path.basename(skillDir));
-        let targetDir = resolveWithin(pending.root, folderName);
-        let suffix = 1;
-        while (fs.existsSync(targetDir)) {
-          targetDir = resolveWithin(pending.root, `${folderName}-${suffix}`);
-          suffix += 1;
+      this.pendingInstalls.delete(pendingId);
+      cleanupPathSafely(pending.cleanupPath);
+
+      if (action === 'installDisabled') {
+        for (const id of installedIds) {
+          try {
+            this.setSkillEnabled(id, false);
+          } catch {
+            // Non-critical
+          }
         }
-        cpRecursiveSync(skillDir, targetDir);
-        const normalizeResult = normalizeWindowsSkillDirectoryAttrs(targetDir);
-        if (normalizeResult.success) {
-          console.log('[skills] install normalization applied for "%s" at %s', folderName, targetDir);
-        } else {
-          console.warn('[skills] install normalization failed for "%s" at %s: %s', folderName, targetDir, normalizeResult.detail || 'unknown');
-        }
-        installedIds.push(path.basename(targetDir));
       }
+
+      this.startWatching();
+      this.notifySkillsChanged();
+      return { success: true, skills: this.listSkills() };
+    } catch (error) {
+      pending.timer = this.createPendingInstallTimer(pendingId);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to install skill',
+      };
     }
-
-    cleanupPathSafely(pending.cleanupPath);
-
-    // If user chose 'installDisabled', disable all newly installed skills
-    if (action === 'installDisabled') {
-      for (const id of installedIds) {
-        try {
-          this.setSkillEnabled(id, false);
-        } catch {
-          // Non-critical
-        }
-      }
-    }
-
-    this.startWatching();
-    this.notifySkillsChanged();
-    return { success: true, skills: this.listSkills() };
   }
 
   startWatching(): void {
@@ -3149,10 +2963,15 @@ export const __skillManagerTestUtils = {
   parseFrontmatter,
   isTruthy,
   extractDescription,
+  buildNodeScriptArgv,
   parseClawhubUrl,
+  parseClawhubInstallSource,
+  buildClawhubInstallSource,
   buildClawhubDownloadFailureMessage,
   buildOpenClawSkillInstallConfig,
   getOpenClawRuntimeRootCandidates,
   resolveOpenClawRuntimeRoot,
   isWindowsDeletePermissionError,
+  getSkillInstallId,
+  findInstalledSkillConflictId,
 };

@@ -41,6 +41,7 @@ export interface MarketplaceSkill {
     versions?: number;
   };
   url: string;              // Download URL (.zip)
+  installSource?: string;
   version: string;
   source: {
     from: string;           // e.g. "Github"

@@ -89,6 +89,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillErrNoSkillMd: '来源中未找到 SKILL.md',
     skillErrInvalidSource:
       '无效的技能来源。支持 owner/repo、仓库链接、npm 包名、ClawHub 链接或 GitHub tree/blob 链接。',
+    skillErrAlreadyInstalled: '技能 {name} 已安装。如需覆盖安装，请先删除旧版本后重试。',
     skillErrClawhubNotFound: '在 ClawHub 上未找到该技能，请检查链接是否正确。',
     skillErrClawhubDownloadFailed: '从 ClawHub 下载技能失败，请稍后重试。',
 
@@ -364,6 +365,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillErrNoSkillMd: 'No SKILL.md found in source',
     skillErrInvalidSource:
       'Invalid skill source. Use owner/repo, repo URL, npm package spec, ClawHub URL, or a GitHub tree/blob URL.',
+    skillErrAlreadyInstalled: 'Skill {name} is already installed. Remove the existing version and try again.',
     skillErrClawhubNotFound: 'Skill not found on ClawHub. Please check the URL.',
     skillErrClawhubDownloadFailed: 'Failed to download skill from ClawHub. Please try again later.',
 
