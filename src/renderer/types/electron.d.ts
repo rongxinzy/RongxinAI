@@ -284,6 +284,12 @@ interface McpMarketplaceData {
   servers: McpMarketplaceServer[];
 }
 
+interface McpConnectionTestResult {
+  success: boolean;
+  error?: string;
+  toolCount?: number;
+}
+
 import type { Platform } from '@shared/platform';
 
 import type { Agent, PresetAgent } from './agent';
@@ -372,6 +378,7 @@ interface IElectronAPI {
       id: string;
       enabled: boolean;
     }) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
+    testConnection: (data: any) => Promise<McpConnectionTestResult>;
     fetchMarketplace: () => Promise<{
       success: boolean;
       data?: McpMarketplaceData;

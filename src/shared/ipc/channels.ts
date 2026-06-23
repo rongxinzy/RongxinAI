@@ -42,6 +42,7 @@ export const McpIpc = {
   Update: 'mcp:update',
   Delete: 'mcp:delete',
   SetEnabled: 'mcp:setEnabled',
+  TestConnection: 'mcp:testConnection',
   FetchMarketplace: 'mcp:fetchMarketplace',
   RefreshBridge: 'mcp:refreshBridge',
   BridgeSyncStart: 'mcp:bridge:syncStart',

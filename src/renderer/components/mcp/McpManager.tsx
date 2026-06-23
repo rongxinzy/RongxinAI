@@ -270,13 +270,11 @@ const McpManager: React.FC = () => {
     setInstallingRegistry(null);
   };
 
-  const handleSaveForm = async (data: McpServerFormData) => {
-    setActionError('');
+  const handleSaveForm = async (data: McpServerFormData): Promise<{ success: boolean; error?: string }> => {
     if (editingServer && editingServer.id) {
       const result = await mcpService.updateServer(editingServer.id, data);
       if (!result.success) {
-        setActionError(result.error || i18nService.t('mcpUpdateFailed'));
-        return;
+        return { success: false, error: result.error || i18nService.t('mcpUpdateFailed') };
       }
       if (result.servers) {
         dispatch(setMcpServers(result.servers));
@@ -284,14 +282,14 @@ const McpManager: React.FC = () => {
     } else {
       const result = await mcpService.createServer(data);
       if (!result.success) {
-        setActionError(result.error || i18nService.t('mcpCreateFailed'));
-        return;
+        return { success: false, error: result.error || i18nService.t('mcpCreateFailed') };
       }
       if (result.servers) {
         dispatch(setMcpServers(result.servers));
       }
     }
     handleCloseForm();
+    return { success: true };
   };
 
   const handleOpenCreateForm = () => {
