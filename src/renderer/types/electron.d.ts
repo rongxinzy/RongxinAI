@@ -419,6 +419,11 @@ interface IElectronAPI {
     fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
     listRuntimeDevices: () => Promise<LlamaCppRuntimeListDevicesResult>;
     getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
+    listBackends: () => Promise<import('../../shared/llamacpp').LlamaCppBackendListResult>;
+    getBackendSelection: () => Promise<import('../../shared/llamacpp').LlamaCppBackendRef | undefined>;
+    setBackendSelection: (input: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
+    installBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
+    uninstallBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeUninstallResult>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
