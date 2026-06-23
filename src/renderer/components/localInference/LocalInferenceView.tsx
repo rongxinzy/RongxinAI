@@ -3252,42 +3252,6 @@ function LaunchModelDialog({
       }),
     [model.name, runningModels, serviceConfig.modelsMax],
   );
-  const normalizeContextInput = useCallback(
-    (value: string) =>
-      normalizeLaunchContextValue(value, contextBounds, {
-        fallbackValue: parseOptionalInteger(serviceConfig.ctxSize ?? '') ?? 4096,
-      }),
-    [contextBounds, serviceConfig.ctxSize],
-  );
-  const normalizeGpuLayersInput = useCallback(
-    (value: string) =>
-      normalizeLaunchPositiveIntegerValue(value, {
-        min: 0,
-        max: 4096,
-        fallbackValue: parseOptionalInteger(serviceConfig.gpuLayers ?? '') ?? 0,
-      }),
-    [serviceConfig.gpuLayers],
-  );
-  const normalizeThreadsInput = useCallback(
-    (value: string) =>
-      normalizeLaunchPositiveIntegerValue(value, {
-        min: 1,
-        max: 512,
-        fallbackValue: Math.max(1, Math.min(Math.max(2, Math.floor(navigator.hardwareConcurrency || 4)) - 2, 16)),
-      }),
-    [],
-  );
-  const normalizeBatchInput = useCallback(
-    (value: string) =>
-      normalizeLaunchPositiveIntegerValue(value, {
-        min: 1,
-        max: 65536,
-        step: 32,
-        fallbackValue: parseOptionalInteger(serviceConfig.batchSize ?? '') ?? 256,
-      }),
-    [serviceConfig.batchSize],
-  );
->>>>>>> eb000a0c (fix(local-inference): show modelsMax limit notice inline in launch dialog)
 
   return (
     <div
@@ -5275,47 +5239,6 @@ function getModelContextWindowRange(params: number): ContextWindowBounds {
   if (params <= 8_000_000_000) return { min: 2048, max: 131072, step: 2048 };
   if (params <= 14_000_000_000) return { min: 2048, max: 131072, step: 4096 };
   return { min: 4096, max: 131072, step: 4096 };
-}
-
-function normalizeLaunchContextValue(
-  value: string,
-  bounds: ContextWindowBounds,
-  options?: { fallbackValue?: number },
-): string {
-  const fallbackBase = options?.fallbackValue ?? 4096;
-  const fallbackClamped = Math.min(Math.max(fallbackBase, bounds.min), bounds.max);
-  const fallbackAligned =
-    bounds.min + Math.floor((fallbackClamped - bounds.min) / bounds.step) * bounds.step;
-  const parsed = parseOptionalInteger(value);
-  if (parsed === undefined) {
-    return String(fallbackAligned);
-  }
-
-  const clamped = Math.min(Math.max(parsed, bounds.min), bounds.max);
-  const aligned = bounds.min + Math.floor((clamped - bounds.min) / bounds.step) * bounds.step;
-  return String(aligned);
-}
-
-function normalizeLaunchPositiveIntegerValue(
-  value: string,
-  options: {
-    min: number;
-    max: number;
-    fallbackValue: number;
-    step?: number;
-  },
-): string {
-  const parsed = parseOptionalInteger(value);
-  const base =
-    parsed === undefined
-      ? options.fallbackValue
-      : Math.min(Math.max(parsed, options.min), options.max);
-  let normalized = Math.min(Math.max(base, options.min), options.max);
-  if (options.step && options.step > 1) {
-    normalized = options.min + Math.floor((normalized - options.min) / options.step) * options.step;
-  }
-  normalized = Math.min(Math.max(normalized, options.min), options.max);
-  return String(normalized);
 }
 
 function getModelsMaxLimitNotice(input: {
