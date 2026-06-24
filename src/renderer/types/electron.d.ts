@@ -333,17 +333,6 @@ interface IElectronAPI {
       auditReport?: any;
       pendingInstallId?: string;
     }>;
-    upgrade: (
-      skillId: string,
-      downloadUrl: string,
-    ) => Promise<{
-      success: boolean;
-      skills?: Skill[];
-      error?: string;
-      errorCode?: string;
-      auditReport?: any;
-      pendingInstallId?: string;
-    }>;
     confirmInstall: (
       pendingId: string,
       action: string,
