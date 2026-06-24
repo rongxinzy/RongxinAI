@@ -17,27 +17,29 @@ interface TaskRunHistoryProps {
   taskPrompt?: string;
 }
 
-const STATUS_OPTIONS = ['success', 'error', 'skipped', 'running'] as const;
+// 单个任务同时只能运行一个实例，\"运行中\"状态在任务列表头已展示，
+// 历史记录页面不需要此过滤选项。如需恢复：取消注释并加回 STATUS_OPTIONS。
+const STATUS_OPTIONS = ['success', 'error', 'skipped'] as const;
 
 const statusLabelKeys: Record<string, string> = {
   success: 'scheduledTasksStatusSuccess',
   error: 'scheduledTasksStatusError',
   skipped: 'scheduledTasksStatusSkipped',
-  running: 'scheduledTasksStatusRunning',
+  // running: 'scheduledTasksStatusRunning',
 };
 
 const statusPillColors: Record<string, string> = {
   success: 'bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400',
   error: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400',
   skipped: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400',
-  running: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
+  // running: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
 };
 
 const statusIcons: Record<string, { icon: string; color: string }> = {
   success: { icon: '✓', color: 'text-green-500' },
   error: { icon: '✗', color: 'text-red-500' },
   skipped: { icon: '↷', color: 'text-yellow-500' },
-  running: { icon: '●', color: 'text-blue-500' },
+  // running: { icon: '●', color: 'text-blue-500' },
 };
 
 function applyClientFilter(runs: ScheduledTaskRun[], filter: RunFilter): ScheduledTaskRun[] {
