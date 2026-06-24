@@ -358,6 +358,7 @@ test('getLlamaCppWindowsVcRuntimeMissingMessage recognizes missing VC++ runtime 
 
 test('getLlamaCppWindowsVcRuntimeMissingMessage resolves packaged runtime targets from executablePath', () => {
   const message = getLlamaCppWindowsVcRuntimeMissingMessage({
+    runtimeTargetId: LlamaCppRuntimeTargetId.WinX64,
     executablePath: 'C:\\Program Files\\RongxinAI\\resources\\llamacpp\\bin\\llama-server.exe',
     startupError: 'The code execution cannot proceed because MSVCP140.dll was not found.',
   });
@@ -395,6 +396,10 @@ test('start surfaces the VC++ runtime hint when packaged llama.cpp exits during 
   (manager as any).resolveRuntimeServiceConfig = async () => ({});
   (manager as any).getRuntimeCapabilities = async () => null;
   (manager as any).waitUntilHealthy = async () => {
+    // setStatus inside start() calls resolveLlamaCppRuntimeMetadata which resolves
+    // the runtime target from process.platform — on non-Windows runners that yields
+    // undefined, so we set the win-x64 target explicitly before the exit handler runs.
+    (manager as any).status.runtimeTargetId = LlamaCppRuntimeTargetId.WinX64;
     fakeProcess.stderr.emit(
       'data',
       Buffer.from('The code execution cannot proceed because VCRUNTIME140_1.dll was not found.'),
@@ -426,6 +431,8 @@ test('start surfaces the VC++ runtime hint when spawn emits an error', async () 
   (manager as any).resolveRuntimeServiceConfig = async () => ({});
   (manager as any).getRuntimeCapabilities = async () => null;
   (manager as any).waitUntilHealthy = async () => {
+    // Same as above: ensure runtimeTargetId is set for the error handler
+    (manager as any).status.runtimeTargetId = LlamaCppRuntimeTargetId.WinX64;
     fakeProcess.emit(
       'error',
       new Error('The code execution cannot proceed because MSVCP140.dll was not found.'),
