@@ -72,7 +72,7 @@ test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to
     mainGpu: 'main',
   })).toEqual({
     modelsMax: '0',
-    timeout: '600',
+    timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
     cacheRam: '8192',
@@ -104,7 +104,7 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
     cacheRam: '9999999',
   })).toEqual({
     modelsMax: '0',
-    timeout: '600',
+    timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
     cacheRam: '8192',

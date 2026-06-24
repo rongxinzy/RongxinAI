@@ -291,41 +291,12 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
-    key: 'modelsAutoload',
-    labelKey: 'localInferenceServiceConfigModelsAutoloadLabel',
-    paramName: 'models-autoload',
-    group: 'service',
-    type: 'select',
-    hintKey: 'localInferenceServiceConfigModelsAutoloadHint',
-    restartRequired: true,
-  },
-  {
-    key: 'device',
-    labelKey: 'localInferenceServiceConfigDeviceLabel',
-    paramName: 'device',
-    group: 'gpu',
-    type: 'input',
-    placeholderKey: 'localInferenceLaunchDefault',
-    hintKey: 'localInferenceServiceConfigDeviceHint',
-    restartRequired: true,
-  },
-  {
-    key: 'parallel',
-    labelKey: 'localInferenceServiceConfigParallelLabel',
-    paramName: 'parallel',
-    group: 'request',
-    type: 'input',
-    placeholder: '1',
-    hintKey: 'localInferenceServiceConfigParallelHint',
-    restartRequired: true,
-  },
-  {
     key: 'timeout',
     labelKey: 'localInferenceServiceConfigTimeoutLabel',
     paramName: 'timeout',
     group: 'service',
     type: 'input',
-    placeholder: '600',
+    placeholder: '120',
     hintKey: 'localInferenceServiceConfigTimeoutHint',
     restartRequired: true,
   },
@@ -2422,15 +2393,42 @@ function OllamaServiceConfigDialog({
       setSaveError(i18nService.t('localInferenceServiceConfigValidationFixErrors'));
       return;
     }
-    const nextConfig: OllamaServiceConfig = { ...config };
-    applyServiceConfigScalar(nextConfig, 'host', form.host);
-    applyServiceConfigScalar(nextConfig, 'port', form.port);
-    for (const field of SERVICE_CONFIG_FIELDS) {
-      const fieldState = getFieldState(field);
-      if (!fieldState.visible || fieldState.omitOnSave) continue;
-      applyServiceConfigFieldToPayload(nextConfig, field.key, form[field.key], fieldState);
-    }
-    const result = await onSave(nextConfig);
+    const result = await onSave({
+      host: form.host,
+      port: form.port,
+      ...(isFieldApplicable('device') ? { device: form.device } : {}),
+      ...(isFieldApplicable('modelsMax') ? { modelsMax: form.modelsMax } : {}),
+      ...(isFieldApplicable('modelsAutoload')
+        ? { modelsAutoload: form.modelsAutoload === 'true' }
+        : {}),
+      ...(isFieldApplicable('parallel') ? { parallel: form.parallel } : {}),
+      ctxSize: form.ctxSize,
+      gpuLayers: form.gpuLayers,
+      batchSize: form.batchSize,
+      ubatchSize: form.ubatchSize,
+      threads: form.threads,
+      threadsBatch: form.threadsBatch,
+      ...(isFieldApplicable('timeout') ? { timeout: form.timeout } : {}),
+      ...(isFieldApplicable('threadsHttp') ? { threadsHttp: form.threadsHttp } : {}),
+      ...(isFieldApplicable('cacheReuse') ? { cacheReuse: form.cacheReuse } : {}),
+      ...(isFieldApplicable('cacheRam') ? { cacheRam: form.cacheRam } : {}),
+      ...(isFieldApplicable('cachePrompt') && form.cachePrompt
+        ? { cachePrompt: form.cachePrompt === 'true' }
+        : {}),
+      ...(isFieldApplicable('flashAttn') && form.flashAttn
+        ? { flashAttn: form.flashAttn as NonNullable<OllamaServiceConfig['flashAttn']> }
+        : {}),
+      ...(isFieldApplicable('mainGpu') ? { mainGpu: form.mainGpu } : {}),
+      ...(isFieldApplicable('tensorSplit') ? { tensorSplit: form.tensorSplit } : {}),
+      ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
+      ...(isFieldApplicable('mlock') ? { mlock: form.mlock === 'true' } : {}),
+      ...(isFieldApplicable('jinja') && form.jinja
+        ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> }
+        : {}),
+      ...(isFieldApplicable('splitMode') && form.splitMode
+        ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> }
+        : {}),
+    });
     if (result.success) {
       onClose();
     } else {
@@ -4984,7 +4982,7 @@ function serviceConfigToForm(
     port: config.port ?? '',
     device: normalizeServiceConfigDeviceForForm(config.device, runtimeDevices),
     modelsMax: config.modelsMax ?? '',
-    modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),
+    modelsAutoload: String(config.modelsAutoload === true),
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
     tensorSplit: config.tensorSplit ?? '',

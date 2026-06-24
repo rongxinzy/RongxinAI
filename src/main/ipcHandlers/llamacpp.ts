@@ -49,7 +49,7 @@ const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   modelsMax: '0',
-  timeout: '600',
+  timeout: '120',
   threadsHttp: '4',
   cacheReuse: '256',
   cacheRam: '8192',
