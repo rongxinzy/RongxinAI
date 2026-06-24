@@ -29,6 +29,7 @@ import {
   scanLocalGgufModels,
   selectLlamaCppRuntimeTarget,
   setLlamaCppSpawnRunnerForTests,
+  shouldEnableLlamaCppModelsAutoload,
 } from './llamacppManager';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { MarketplaceService } from './marketplaceService';
@@ -200,6 +201,40 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
     '--no-mmap',
     '--mlock',
   ]);
+});
+
+test('buildLlamaServerArgs disables autoload when more than one resident model is allowed', () => {
+  expect(buildLlamaServerArgs({
+    modelsAutoload: true,
+  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
+    '--no-models-autoload',
+  ]));
+
+  expect(buildLlamaServerArgs({
+    modelsMax: '2',
+    modelsAutoload: true,
+  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
+    '--models-max',
+    '2',
+    '--no-models-autoload',
+  ]));
+
+  expect(buildLlamaServerArgs({
+    modelsMax: '1',
+    modelsAutoload: true,
+  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
+    '--models-max',
+    '1',
+    '--models-autoload',
+  ]));
+});
+
+test('shouldEnableLlamaCppModelsAutoload only allows single-model residency', () => {
+  expect(shouldEnableLlamaCppModelsAutoload(undefined)).toBe(false);
+  expect(shouldEnableLlamaCppModelsAutoload('')).toBe(false);
+  expect(shouldEnableLlamaCppModelsAutoload('0')).toBe(false);
+  expect(shouldEnableLlamaCppModelsAutoload('1')).toBe(true);
+  expect(shouldEnableLlamaCppModelsAutoload('2')).toBe(false);
 });
 
 test('uses the configured timeout for connection and load operations', () => {
