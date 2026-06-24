@@ -18,6 +18,8 @@ import path from 'path';
 import type { McpServerRecord } from '../mcpStore';
 import { getElectronNodeRuntimePath, getEnhancedEnv } from './coworkUtil';
 import { getToolTextPreview, looksLikeTransportErrorText, serializeForLog, serializeToolContentForLog, truncateForLog } from './mcpLog';
+import { getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
+import { findBundledUvExecutable } from './uvRuntime';
 
 export interface McpToolManifestEntry {
   server: string;
@@ -200,6 +202,23 @@ function isNodeCommand(normalized: string): 'node' | 'npx' | 'npm' | null {
   return null;
 }
 
+function isPythonCommand(normalized: string): boolean {
+  return normalized === 'python'
+    || normalized === 'python.exe'
+    || normalized === 'python3'
+    || normalized === 'python3.exe';
+}
+
+function isUvCommand(normalized: string): 'uv' | 'uvx' | null {
+  if (normalized === 'uv' || normalized === 'uv.exe') {
+    return 'uv';
+  }
+  if (normalized === 'uvx' || normalized === 'uvx.exe') {
+    return 'uvx';
+  }
+  return null;
+}
+
 /**
  * Resolve a stdio MCP server command/args/env for the current platform.
  *
@@ -222,57 +241,61 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
   if (process.platform === 'win32' && app.isPackaged && effectiveCommand) {
     const normalized = effectiveCommand.trim().toLowerCase();
     const nodeCommandType = isNodeCommand(normalized);
+    const uvCommandType = isUvCommand(normalized);
+
+    if (isPythonCommand(normalized)) {
+      const pythonRoots = [getUserPythonRoot(), getBundledPythonRoot()].filter((value): value is string => Boolean(value));
+      const bundledPythonPath = pythonRoots
+        .map((root) => path.join(root, 'python.exe'))
+        .find((candidate) => fs.existsSync(candidate));
+      if (bundledPythonPath) {
+        effectiveCommand = bundledPythonPath;
+        log('INFO', `"${server.name}": using bundled Python runtime "${bundledPythonPath}"`);
+      }
+    }
+
+    if (uvCommandType) {
+      const bundledUvPath = findBundledUvExecutable(uvCommandType === 'uv' ? 'uv.exe' : 'uvx.exe');
+      if (bundledUvPath) {
+        effectiveCommand = bundledUvPath;
+        log('INFO', `"${server.name}": using bundled ${uvCommandType} runtime "${bundledUvPath}"`);
+      }
+    }
 
     if (nodeCommandType) {
-      const systemNode = findSystemNodePath();
-      if (systemNode) {
-        if (nodeCommandType === 'node') {
-          effectiveCommand = systemNode;
-          log('INFO', `"${server.name}": using system Node.js "${systemNode}" (preferred over Electron runtime)`);
-        } else {
-          const enhancedEnv = await getEnhancedEnv();
-          const npmBinDir = enhancedEnv.LOBSTERAI_NPM_BIN_DIR;
-          const cliJs = nodeCommandType === 'npx'
-            ? (npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '')
-            : (npmBinDir ? path.join(npmBinDir, 'npm-cli.js') : '');
-          if (cliJs && fs.existsSync(cliJs)) {
-            effectiveCommand = systemNode;
-            effectiveArgs = [cliJs, ...stdioArgs];
-            log('INFO', `"${server.name}": using system Node.js "${systemNode}" + ${nodeCommandType}-cli.js (preferred over Electron runtime)`);
-          } else {
-            effectiveCommand = stdioCommand;
-            log('INFO', `"${server.name}": using system "${stdioCommand}" directly`);
-          }
-        }
+      const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
+      const npmBinDir = enhancedEnv.LOBSTERAI_NPM_BIN_DIR;
+      const npxCliJs = npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '';
+      const npmCliJs = npmBinDir ? path.join(npmBinDir, 'npm-cli.js') : '';
+
+      const withElectronNodeEnv = (base: Record<string, string> | undefined): Record<string, string> => ({
+        ...(base || {}),
+        ELECTRON_RUN_AS_NODE: '1',
+        LOBSTERAI_ELECTRON_PATH: electronNodeRuntimePath,
+      });
+
+      if (nodeCommandType === 'node') {
+        effectiveCommand = electronNodeRuntimePath;
+        stdioEnv = withElectronNodeEnv(stdioEnv);
+        shouldInjectWindowsHide = true;
+        log('INFO', `"${server.name}": using bundled Electron Node runtime`);
+      } else if (nodeCommandType === 'npx' && npxCliJs && fs.existsSync(npxCliJs)) {
+        effectiveCommand = electronNodeRuntimePath;
+        effectiveArgs = [npxCliJs, ...stdioArgs];
+        stdioEnv = withElectronNodeEnv(stdioEnv);
+        shouldInjectWindowsHide = true;
+        log('INFO', `"${server.name}": using bundled Electron + npx-cli.js`);
+      } else if (nodeCommandType === 'npm' && npmCliJs && fs.existsSync(npmCliJs)) {
+        effectiveCommand = electronNodeRuntimePath;
+        effectiveArgs = [npmCliJs, ...stdioArgs];
+        stdioEnv = withElectronNodeEnv(stdioEnv);
+        shouldInjectWindowsHide = true;
+        log('INFO', `"${server.name}": using bundled Electron + npm-cli.js`);
       } else {
-        const enhancedEnv = await getEnhancedEnv();
-        const npmBinDir = enhancedEnv.LOBSTERAI_NPM_BIN_DIR;
-        const npxCliJs = npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '';
-        const npmCliJs = npmBinDir ? path.join(npmBinDir, 'npm-cli.js') : '';
-
-        const withElectronNodeEnv = (base: Record<string, string> | undefined): Record<string, string> => ({
-          ...(base || {}),
-          ELECTRON_RUN_AS_NODE: '1',
-          LOBSTERAI_ELECTRON_PATH: electronNodeRuntimePath,
-        });
-
-        if (nodeCommandType === 'node') {
-          effectiveCommand = electronNodeRuntimePath;
-          stdioEnv = withElectronNodeEnv(stdioEnv);
-          shouldInjectWindowsHide = true;
-          log('WARN', `"${server.name}": no system Node.js found, falling back to Electron runtime (may cause stdin issues)`);
-        } else if (nodeCommandType === 'npx' && npxCliJs && fs.existsSync(npxCliJs)) {
-          effectiveCommand = electronNodeRuntimePath;
-          effectiveArgs = [npxCliJs, ...stdioArgs];
-          stdioEnv = withElectronNodeEnv(stdioEnv);
-          shouldInjectWindowsHide = true;
-          log('WARN', `"${server.name}": no system Node.js found, falling back to Electron + npx-cli.js (may cause stdin issues)`);
-        } else if (nodeCommandType === 'npm' && npmCliJs && fs.existsSync(npmCliJs)) {
-          effectiveCommand = electronNodeRuntimePath;
-          effectiveArgs = [npmCliJs, ...stdioArgs];
-          stdioEnv = withElectronNodeEnv(stdioEnv);
-          shouldInjectWindowsHide = true;
-          log('WARN', `"${server.name}": no system Node.js found, falling back to Electron + npm-cli.js (may cause stdin issues)`);
+        const systemNode = findSystemNodePath();
+        if (systemNode) {
+          effectiveCommand = systemNode;
+          log('WARN', `"${server.name}": bundled ${nodeCommandType} shim is unavailable, falling back to system Node.js "${systemNode}"`);
         }
       }
     }
