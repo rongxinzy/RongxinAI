@@ -2663,7 +2663,6 @@ function ServiceConfigSelect({
   paramName,
   value,
   hint,
-  disabled,
   options,
   includeEmptyOption = true,
   disabled = false,
@@ -2677,7 +2676,7 @@ function ServiceConfigSelect({
   options: Array<{ value: string; label: string }>;
   includeEmptyOption?: boolean;
   disabled?: boolean;
-  options: Array<{ value: string; label: string }>;
+  disabledReason?: string;
   onChange: (value: string) => void;
 }) {
   return (
