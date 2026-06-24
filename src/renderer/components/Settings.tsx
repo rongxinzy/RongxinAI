@@ -4382,11 +4382,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             {/* Logo & App Name */}
             <img
               src="logo.png"
-              alt="RongxinAI"
+              alt="Leo"
               className="w-16 h-16 mb-3 select-none"
             />
-            <h3 className="text-lg font-semibold text-foreground">RongxinAI</h3>
+            <h3 className="text-lg font-semibold text-foreground">Leo</h3>
             <span className="text-xs text-secondary mt-1">v{appVersion}</span>
+            <span className="text-xs text-secondary mt-0.5">开放源码，汇聚智慧</span>
 
             {/* Info Card */}
             <div className="w-full mt-8 rounded-xl border border-border overflow-hidden">
@@ -4394,10 +4395,29 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 <span className="text-sm text-foreground">{i18nService.t('aboutVersion')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-secondary">{appVersion}</span>
-                  <span className="text-xs text-claude-textSecondary dark:text-claude-darkTextSecondary">
-                    {i18nService.t('settings.enterprise.managed')}
-                  </span>
                 </div>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <span className="text-sm text-foreground">GitHub</span>
+                <a
+                  href="https://github.com/rongxinzy/RongxinAI"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-secondary hover:text-primary hover:underline transition-colors"
+                >
+                  github.com/rongxinzy/RongxinAI
+                </a>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-foreground">关于我们</span>
+                <a
+                  href="http://www.rongxzy.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-secondary hover:text-primary hover:underline transition-colors"
+                >
+                  北京容芯致远科技有限公司
+                </a>
               </div>
             </div>
 
