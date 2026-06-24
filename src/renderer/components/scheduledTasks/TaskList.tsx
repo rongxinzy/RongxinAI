@@ -98,18 +98,24 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
           </button>
           {showMenu && (
             <div className="absolute right-0 top-full mt-1 w-32 rounded-lg shadow-lg bg-surface border border-border z-50 py-1">
-              <button
-                type="button"
-                onClick={event => {
-                  event.stopPropagation();
-                  setShowMenu(false);
-                  void scheduledTaskService.runManually(task.id);
-                }}
-                disabled={Boolean(task.state.runningAtMs)}
-                className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised disabled:opacity-50"
-              >
-                {i18nService.t('scheduledTasksRun')}
-              </button>
+              {task.state.runningAtMs ? (
+                <span className="block w-full text-left px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400">
+                  {i18nService.t('scheduledTasksStatusRunning')}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation();
+                    setShowMenu(false);
+                    void scheduledTaskService.runManually(task.id);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
+                  title={i18nService.t('scheduledTasksRunPreemptWarning')}
+                >
+                  {i18nService.t('scheduledTasksRun')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={event => {

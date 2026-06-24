@@ -81,15 +81,27 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
           >
             <PencilIcon className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => void scheduledTaskService.runManually(task.id)}
-            disabled={Boolean(task.state.runningAtMs)}
-            className="p-2 rounded-lg text-secondary hover:bg-surface-raised transition-colors disabled:opacity-50"
-            title={i18nService.t('scheduledTasksRun')}
-          >
-            <PlayIcon className="w-4 h-4" />
-          </button>
+          {task.state.runningAtMs ? (
+            <span
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20"
+              title={i18nService.t('scheduledTasksStatusRunning')}
+            >
+              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
+              </svg>
+              {i18nService.t('scheduledTasksStatusRunning')}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void scheduledTaskService.runManually(task.id)}
+              className="p-2 rounded-lg text-secondary hover:bg-surface-raised hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              title={i18nService.t('scheduledTasksRunPreemptWarning')}
+            >
+              <PlayIcon className="w-4 h-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onRequestDelete(task.id, task.name)}
