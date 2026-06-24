@@ -15,6 +15,14 @@ import {
 import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
+import { appendUvRuntimeToEnv } from './uvRuntime';
+
+const DOMESTIC_PYPI_INDEX_URL = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
+const DOMESTIC_NPM_REGISTRY_URL = 'https://registry.npmmirror.com';
+
+type EnhancedEnvOptions = {
+  includePackageMirrors?: boolean;
+};
 
 function appendEnvPath(current: string | undefined, additions: string[]): string | undefined {
   const items = new Set<string>();
@@ -962,11 +970,34 @@ function ensureWindowsBashUtf8InitScript(): string | null {
   }
 }
 
-function applyPackagedEnvOverrides(env: Record<string, string | undefined>): void {
+function applyDomesticPackageMirrorDefaults(env: Record<string, string | undefined>): void {
+  if (!env.PIP_INDEX_URL) {
+    env.PIP_INDEX_URL = DOMESTIC_PYPI_INDEX_URL;
+  }
+  if (!env.UV_DEFAULT_INDEX) {
+    env.UV_DEFAULT_INDEX = DOMESTIC_PYPI_INDEX_URL;
+  }
+
+  const hasNpmRegistry = Boolean(env.npm_config_registry || env.NPM_CONFIG_REGISTRY);
+  if (!hasNpmRegistry) {
+    env.npm_config_registry = DOMESTIC_NPM_REGISTRY_URL;
+    env.NPM_CONFIG_REGISTRY = DOMESTIC_NPM_REGISTRY_URL;
+  }
+}
+
+function applyPackagedEnvOverrides(
+  env: Record<string, string | undefined>,
+  options: EnhancedEnvOptions = {}
+): void {
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
+  const includePackageMirrors = options.includePackageMirrors === true;
 
   if (app.isPackaged && !env.LOBSTERAI_ELECTRON_PATH) {
     env.LOBSTERAI_ELECTRON_PATH = electronNodeRuntimePath;
+  }
+
+  if (includePackageMirrors) {
+    applyDomesticPackageMirrorDefaults(env);
   }
 
   // On Windows, resolve git-bash and ensure Git toolchain directories are available in PATH.
@@ -1081,6 +1112,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     }
 
     appendPythonRuntimeToEnv(env);
+    appendUvRuntimeToEnv(env);
 
     // Tell git-bash to inherit the PATH from the parent process instead of
     // rebuilding it from scratch. Without this, git-bash's /etc/profile (login
@@ -1217,6 +1249,8 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     env.NODE_PATH = appendEnvPath(env.NODE_PATH, nodePaths);
   }
 
+  appendUvRuntimeToEnv(env);
+
   // Verify node/npx resolution in the constructed environment
   verifyNodeEnvironment(env);
 }
@@ -1334,13 +1368,16 @@ export function getSkillsRoot(): string {
  * Get enhanced environment variables (including proxy configuration)
  * Async function to fetch system proxy and inject into environment variables
  */
-export async function getEnhancedEnv(target: OpenAICompatProxyTarget = 'local'): Promise<Record<string, string | undefined>> {
+export async function getEnhancedEnv(
+  target: OpenAICompatProxyTarget = 'local',
+  options: EnhancedEnvOptions = {}
+): Promise<Record<string, string | undefined>> {
   const config = getCurrentApiConfig(target);
   const env = config
     ? buildEnvForConfig(config)
     : { ...process.env };
 
-  applyPackagedEnvOverrides(env);
+  applyPackagedEnvOverrides(env, options);
 
   // Inject SKILLs directory path for skill scripts.
   // On Windows, normalise backslashes to forward slashes so the value is usable

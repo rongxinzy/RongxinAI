@@ -162,6 +162,10 @@
       {
         "from": "build-tar/win-resources.tar",
         "to": "win-resources.tar"
+      },
+      {
+        "from": "resources/vc_redist.x64.exe",
+        "to": "vc_redist.x64.exe"
       }
     ]
   },
