@@ -292,12 +292,31 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
   },
   {
     key: 'modelsAutoload',
-    capabilityKey: ServiceConfigCapabilityKey.ModelsAutoload,
     labelKey: 'localInferenceServiceConfigModelsAutoloadLabel',
     paramName: 'models-autoload',
     group: 'service',
     type: 'select',
     hintKey: 'localInferenceServiceConfigModelsAutoloadHint',
+    restartRequired: true,
+  },
+  {
+    key: 'device',
+    labelKey: 'localInferenceServiceConfigDeviceLabel',
+    paramName: 'device',
+    group: 'gpu',
+    type: 'input',
+    placeholderKey: 'localInferenceLaunchDefault',
+    hintKey: 'localInferenceServiceConfigDeviceHint',
+    restartRequired: true,
+  },
+  {
+    key: 'parallel',
+    labelKey: 'localInferenceServiceConfigParallelLabel',
+    paramName: 'parallel',
+    group: 'request',
+    type: 'input',
+    placeholder: '1',
+    hintKey: 'localInferenceServiceConfigParallelHint',
     restartRequired: true,
   },
   {
@@ -2378,9 +2397,7 @@ function OllamaServiceConfigDialog({
         paramName={field.paramName}
         value={form[field.key]}
         hint={hint}
-        disabled={fieldState.disabled}
-        disabledReason={fieldState.disabledReason}
-        includeEmptyOption={field.key !== 'modelsAutoload'}
+        disabled={disabled}
         onChange={value => updateForm(field.key, value)}
         options={getServiceConfigSelectOptions(field.key)}
       />
@@ -2405,42 +2422,15 @@ function OllamaServiceConfigDialog({
       setSaveError(i18nService.t('localInferenceServiceConfigValidationFixErrors'));
       return;
     }
-    const result = await onSave({
-      host: form.host,
-      port: form.port,
-      ...(isFieldApplicable('device') ? { device: form.device } : {}),
-      ...(isFieldApplicable('modelsMax') ? { modelsMax: form.modelsMax } : {}),
-      ...(fieldStates.modelsAutoload?.visible
-        ? { modelsAutoload: form.modelsMax === '1' && form.modelsAutoload === 'true' }
-        : {}),
-      ...(isFieldApplicable('parallel') ? { parallel: form.parallel } : {}),
-      ctxSize: form.ctxSize,
-      gpuLayers: form.gpuLayers,
-      batchSize: form.batchSize,
-      ubatchSize: form.ubatchSize,
-      threads: form.threads,
-      threadsBatch: form.threadsBatch,
-      ...(isFieldApplicable('timeout') ? { timeout: form.timeout } : {}),
-      ...(isFieldApplicable('threadsHttp') ? { threadsHttp: form.threadsHttp } : {}),
-      ...(isFieldApplicable('cacheReuse') ? { cacheReuse: form.cacheReuse } : {}),
-      ...(isFieldApplicable('cacheRam') ? { cacheRam: form.cacheRam } : {}),
-      ...(isFieldApplicable('cachePrompt') && form.cachePrompt
-        ? { cachePrompt: form.cachePrompt === 'true' }
-        : {}),
-      ...(isFieldApplicable('flashAttn') && form.flashAttn
-        ? { flashAttn: form.flashAttn as NonNullable<OllamaServiceConfig['flashAttn']> }
-        : {}),
-      ...(isFieldApplicable('mainGpu') ? { mainGpu: form.mainGpu } : {}),
-      ...(isFieldApplicable('tensorSplit') ? { tensorSplit: form.tensorSplit } : {}),
-      ...(form.mmap ? { noMmap: form.mmap === 'false' } : {}),
-      ...(isFieldApplicable('mlock') ? { mlock: form.mlock === 'true' } : {}),
-      ...(isFieldApplicable('jinja') && form.jinja
-        ? { jinja: form.jinja as NonNullable<OllamaServiceConfig['jinja']> }
-        : {}),
-      ...(isFieldApplicable('splitMode') && form.splitMode
-        ? { splitMode: form.splitMode as NonNullable<OllamaServiceConfig['splitMode']> }
-        : {}),
-    });
+    const nextConfig: OllamaServiceConfig = { ...config };
+    applyServiceConfigScalar(nextConfig, 'host', form.host);
+    applyServiceConfigScalar(nextConfig, 'port', form.port);
+    for (const field of SERVICE_CONFIG_FIELDS) {
+      const fieldState = getFieldState(field);
+      if (!fieldState.visible || fieldState.omitOnSave) continue;
+      applyServiceConfigFieldToPayload(nextConfig, field.key, form[field.key], fieldState);
+    }
+    const result = await onSave(nextConfig);
     if (result.success) {
       onClose();
     } else {
@@ -2663,20 +2653,16 @@ function ServiceConfigSelect({
   paramName,
   value,
   hint,
+  disabled,
   options,
-  includeEmptyOption = true,
-  disabled = false,
-  disabledReason, // eslint-disable-line @typescript-eslint/no-unused-vars
   onChange,
 }: {
   label: string;
   paramName: string;
   value: string;
   hint: string;
-  options: Array<{ value: string; label: string }>;
-  includeEmptyOption?: boolean;
   disabled?: boolean;
-  disabledReason?: string;
+  options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
   return (
@@ -2691,7 +2677,7 @@ function ServiceConfigSelect({
         onChange={event => onChange(event.target.value)}
         className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {includeEmptyOption && <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>}
+        <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
         {options.map(option => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -2750,7 +2736,7 @@ function getServiceConfigFieldState(
   return { visible: true, disabled: false };
 }
 
-function _applyServiceConfigFieldToPayload(
+function applyServiceConfigFieldToPayload(
   target: OllamaServiceConfig,
   key: keyof OllamaServiceConfigFormState,
   value: string,
@@ -4946,6 +4932,18 @@ function resolveLaunchServiceConfig(
   }
 }
 
+function updateServiceConfigForm(
+  form: OllamaServiceConfigFormState,
+  key: keyof OllamaServiceConfigFormState,
+  value: string,
+): OllamaServiceConfigFormState {
+  const next = { ...form, [key]: value };
+  if (key === "modelsMax" && value !== "1") {
+    next.modelsAutoload = "false";
+  }
+  return next;
+}
+
 function hasServiceConfigPatchChanged(
   current: OllamaServiceConfig,
   patch: Partial<OllamaServiceConfig>,
@@ -4986,80 +4984,6 @@ function formatLaunchGpuPresetSummary(preset: string, customGpuDevices: string):
   return `${devices} · ${patch.splitMode ?? i18nService.t('localInferenceLaunchDefault')}`;
 }
 
-function getServiceConfigFieldState(
-  key: keyof OllamaServiceConfigFormState,
-  form: OllamaServiceConfigFormState,
-  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
-): ServiceConfigFieldState {
-  const field = SERVICE_CONFIG_FIELDS.find(candidate => candidate.key === key);
-  if (!field) {
-    return { visible: false, disabled: false };
-  }
-  const support = runtimeCapabilities?.supports[field.capabilityKey];
-  if (support === false) {
-    return { visible: false, disabled: false };
-  }
-  const gpuDeviceCount = runtimeCapabilities?.gpuDeviceCount ?? 0;
-  if (field.key === 'tensorSplit') {
-    if (gpuDeviceCount <= 1) {
-      return { visible: false, disabled: false };
-    }
-    return {
-      visible: true,
-      disabled: form.splitMode !== 'tensor',
-      disabledReason:
-        form.splitMode !== 'tensor'
-          ? i18nService.t('localInferenceServiceConfigTensorSplitDisabledHint')
-          : undefined,
-    };
-  }
-  if (field.key === 'mainGpu') {
-    if (gpuDeviceCount <= 1) {
-      return { visible: false, disabled: false };
-    }
-    const disabled = form.splitMode === 'layer' || form.splitMode === 'tensor';
-    return {
-      visible: true,
-      disabled,
-      disabledReason: disabled
-        ? i18nService.t('localInferenceServiceConfigMainGpuDisabledHint')
-        : undefined,
-    };
-  }
-  if (field.key === 'device' || field.key === 'splitMode') {
-    if (gpuDeviceCount <= 1) {
-      return { visible: false, disabled: false };
-    }
-    return { visible: true, disabled: false };
-  }
-  if (field.key === 'modelsAutoload') {
-    return { visible: true, disabled: form.modelsMax !== '1' };
-  }
-  if (field.key === 'cacheReuse' || field.key === 'cacheRam') {
-    const disabled = form.cachePrompt === 'false';
-    return {
-      visible: true,
-      disabled,
-      disabledReason: disabled
-        ? i18nService.t('localInferenceServiceConfigPromptCacheDependentHint')
-        : undefined,
-    };
-  }
-  return { visible: true, disabled: false };
-}
-
-function updateServiceConfigForm(
-  form: OllamaServiceConfigFormState,
-  key: keyof OllamaServiceConfigFormState,
-  value: string,
-): OllamaServiceConfigFormState {
-  const next = { ...form, [key]: value };
-  if (key === 'modelsMax' && value !== '1') {
-    next.modelsAutoload = 'false';
-  }
-  return next;
-}
-
 function serviceConfigToForm(
   config: OllamaServiceConfig,
   runtimeDevices?: LlamaCppRuntimeListDevicesResult | null,
@@ -5072,7 +4996,7 @@ function serviceConfigToForm(
     port: config.port ?? '',
     device: normalizeServiceConfigDeviceForForm(config.device, runtimeDevices),
     modelsMax: config.modelsMax ?? '',
-    modelsAutoload: String(config.modelsMax === '1' && config.modelsAutoload === true),
+    modelsAutoload: String(config.modelsMax === "1" && config.modelsAutoload === true),
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
     tensorSplit: config.tensorSplit ?? '',
@@ -6232,20 +6156,6 @@ function SearchIcon({ className }: { className?: string }) {
 
 export const __test__getServiceConfigFields = () =>
   SERVICE_CONFIG_FIELDS.map(field => ({ ...field }));
-export const __test__serviceConfigToForm = (
-  config: OllamaServiceConfig,
-  runtimeDevices?: LlamaCppRuntimeDevice[] | null,
-) => serviceConfigToForm(config, runtimeDevices);
-export const __test__getServiceConfigFieldState = (
-  key: keyof OllamaServiceConfigFormState,
-  form: OllamaServiceConfigFormState,
-  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
-) => getServiceConfigFieldState(key, form, runtimeCapabilities);
-export const __test__updateServiceConfigForm = (
-  form: OllamaServiceConfigFormState,
-  key: keyof OllamaServiceConfigFormState,
-  value: string,
-) => updateServiceConfigForm(form, key, value);
 export const __test__getInferenceOptionFields = () =>
   INFERENCE_OPTION_FIELDS.map(field => ({ ...field }));
 export const __test__getMarketplacePageSize = () => MARKETPLACE_PAGE_SIZE;
