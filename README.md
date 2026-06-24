@@ -1,7 +1,7 @@
-# RongxinAI
+# LEO
 
 <p align="center">
-  <img src="public/logo.png" alt="RongxinAI" width="120">
+  <img src="public/logo.png" alt="LEO" width="120">
 </p>
 
 <p align="center">
@@ -18,14 +18,14 @@
 </p>
 
 <p align="center">
-  English · <a href="README_zh.md">中文</a>
+  English | <a href="README_zh.md">中文</a>
 </p>
 
 ---
 
-RongxinAI is a local-first desktop AI Agent workspace for development, research, automation, and personal productivity. It combines the OpenClaw runtime, llama.cpp local inference, built-in skills, MCP integrations, scheduled tasks, and IM or email reachability in one application.
+LEO is the official English product name of 李知远智能体, an AI Agent workspace by 北京容芯致远 for development, research, automation, and personal productivity. It combines the OpenClaw runtime, llama.cpp local inference, built-in skills, MCP integrations, scheduled tasks, and IM or email reachability in one application.
 
-RongxinAI is not just a chat UI. It is an execution environment where an Agent can work on your machine, request approval for sensitive tools, manage local GGUF models, run recurring tasks, and stay reachable from desktop and mobile channels.
+LEO is not just a chat UI. It is an execution environment where an Agent can work on your machine, request approval for sensitive tools, manage local GGUF models, run recurring tasks, and stay reachable from desktop and mobile channels.
 
 ## Key Features
 
@@ -40,10 +40,10 @@ RongxinAI is not just a chat UI. It is an execution environment where an Agent c
 ## How It Works
 
 <p align="center">
-  <img src="public/readme/rongxinai_architecture_en.svg" alt="RongxinAI architecture" width="760">
+  <img src="public/readme/rongxinai_architecture_en.svg" alt="LEO architecture" width="760">
 </p>
 
-RongxinAI uses Electron with strict process isolation. The Renderer hosts the React UI, Preload exposes controlled IPC through `contextBridge`, and the Main Process manages OpenClaw sessions, llama.cpp lifecycle, local storage, skills, MCP integrations, and messaging gateways.
+LEO uses Electron with strict process isolation. The Renderer hosts the React UI, Preload exposes controlled IPC through `contextBridge`, and the Main Process manages OpenClaw sessions, llama.cpp lifecycle, local storage, skills, MCP integrations, and messaging gateways.
 
 ## Quick Start
 
@@ -60,6 +60,8 @@ cd RongxinAI
 npm install
 npm run electron:dev
 ```
+
+The current repository name remains `RongxinAI` for compatibility.
 
 The Vite dev server runs at `http://localhost:5175` by default.
 
@@ -118,7 +120,7 @@ Key stream events:
 
 The local inference workspace manages the app-owned `llama-server` process, local GGUF models, the ModelScope-backed marketplace, and per-model launch parameters such as context length, GPU offload layers, threads, batch size, main GPU, memory mapping, and keep-alive.
 
-Default local model path:
+Current default local model path (legacy directory name retained for compatibility):
 
 - macOS: `~/Library/Application Support/RongxinAI/models/llamacpp`
 - Windows: `%APPDATA%\\RongxinAI\\models\\llamacpp`
@@ -143,7 +145,7 @@ Common built-in skills:
 
 ### Scheduled Tasks
 
-Scheduled tasks can be created from natural language or through the GUI. When a task runs, RongxinAI starts a Cowork session, keeps the result in the desktop app, and can optionally deliver notifications through configured IM or email channels.
+Scheduled tasks can be created from natural language or through the GUI. When a task runs, LEO starts a Cowork session, keeps the result in the desktop app, and can optionally deliver notifications through configured IM or email channels.
 
 ## Tech Stack
 
