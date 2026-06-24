@@ -110,7 +110,7 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
   expect(fields.length).toBeGreaterThan(0);
   expect(fields.map((field) => field.paramName)).toContain('parallel');
   expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
-  expect(serviceKeys).toEqual(['modelsMax', 'timeout']);
+  expect(serviceKeys).toEqual(['modelsMax', 'modelsAutoload', 'timeout']);
   expect(keys).not.toContain('host');
   expect(keys).not.toContain('port');
   expect(keys).not.toContain('ctxSize');
@@ -123,6 +123,51 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
   expect(keys).not.toContain('reasoning');
   expect(keys).not.toContain('reasoningFormat');
   expect(keys).not.toContain('reasoningBudget');
+});
+
+test('llama.cpp autoload is disabled by default and only editable with one resident model', async () => {
+  const module = await import('./LocalInferenceView');
+  const serviceConfigToForm = (module as unknown as {
+    __test__serviceConfigToForm?: (config: { modelsMax?: string; modelsAutoload?: boolean }) => {
+      modelsMax: string;
+      modelsAutoload: string;
+    };
+  }).__test__serviceConfigToForm;
+  const getServiceConfigFieldState = (module as unknown as {
+    __test__getServiceConfigFieldState?: (
+      key: string,
+      form: { modelsMax: string; modelsAutoload: string },
+      runtimeCapabilities: null,
+    ) => { visible: boolean; disabled: boolean };
+  }).__test__getServiceConfigFieldState;
+  const updateServiceConfigForm = (module as unknown as {
+    __test__updateServiceConfigForm?: (
+      form: { modelsMax: string; modelsAutoload: string },
+      key: string,
+      value: string,
+    ) => { modelsMax: string; modelsAutoload: string };
+  }).__test__updateServiceConfigForm;
+
+  expect(typeof serviceConfigToForm).toBe('function');
+  expect(typeof getServiceConfigFieldState).toBe('function');
+  expect(typeof updateServiceConfigForm).toBe('function');
+  if (!serviceConfigToForm || !getServiceConfigFieldState || !updateServiceConfigForm) return;
+
+  expect(serviceConfigToForm({}).modelsAutoload).toBe('false');
+  expect(serviceConfigToForm({ modelsMax: '2', modelsAutoload: true }).modelsAutoload).toBe('false');
+  expect(serviceConfigToForm({ modelsMax: '1', modelsAutoload: true }).modelsAutoload).toBe('true');
+  expect(getServiceConfigFieldState('modelsAutoload', { modelsMax: '2', modelsAutoload: 'false' }, null)).toEqual({
+    visible: true,
+    disabled: true,
+  });
+  expect(getServiceConfigFieldState('modelsAutoload', { modelsMax: '1', modelsAutoload: 'false' }, null)).toEqual({
+    visible: true,
+    disabled: false,
+  });
+  expect(updateServiceConfigForm({ modelsMax: '1', modelsAutoload: 'true' }, 'modelsMax', '2')).toEqual({
+    modelsMax: '2',
+    modelsAutoload: 'false',
+  });
 });
 
 test('launch gpu presets pin explicit devices for dual-gpu workstations', async () => {

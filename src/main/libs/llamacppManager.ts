@@ -1285,7 +1285,11 @@ export function buildLlamaServerArgs(
   ];
   appendArg(args, '--models-max', config.modelsMax);
   if (typeof config.modelsAutoload === 'boolean') {
-    args.push(config.modelsAutoload ? '--models-autoload' : '--no-models-autoload');
+    args.push(
+      config.modelsAutoload && shouldEnableLlamaCppModelsAutoload(config.modelsMax)
+        ? '--models-autoload'
+        : '--no-models-autoload',
+    );
   }
   appendArg(args, '--timeout', config.timeout);
   appendArg(args, '--threads-http', config.threadsHttp);
@@ -1383,6 +1387,10 @@ function appendArg(args: string[], name: string, value: string | undefined): voi
   const trimmed = value?.trim();
   if (!trimmed) return;
   args.push(name, trimmed);
+}
+
+export function shouldEnableLlamaCppModelsAutoload(modelsMax: string | undefined): boolean {
+  return normalizePositiveInteger(modelsMax) === 1;
 }
 
 function normalizePositiveInteger(value: string | undefined): number | undefined {

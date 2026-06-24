@@ -700,9 +700,13 @@ export function sanitizeLlamaCppServiceConfig(
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
   if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
   if (modelsMax) next.modelsMax = modelsMax;
-  if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
-  if (modelsAutoload === 'true') next.modelsAutoload = true;
-  if (modelsAutoload === 'false') next.modelsAutoload = false;
+  if (modelsAutoload !== undefined && modelsMax === '1') {
+    if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
+    if (modelsAutoload === 'true') next.modelsAutoload = true;
+    if (modelsAutoload === 'false') next.modelsAutoload = false;
+  } else if (modelsAutoload !== undefined) {
+    next.modelsAutoload = false;
+  }
   if (timeout) next.timeout = timeout;
   if (threadsHttp) next.threadsHttp = threadsHttp;
   if (typeof config?.cachePrompt === 'boolean') next.cachePrompt = config.cachePrompt;
