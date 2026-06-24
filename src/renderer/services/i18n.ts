@@ -1835,6 +1835,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksDelete: '删除',
     scheduledTasksDeleteConfirm: '确定要删除任务「{name}」吗？此操作不可撤销。',
     scheduledTasksRun: '立即运行',
+    scheduledTasksRunPreemptWarning: '手动执行可能抢占定时执行，后者将被跳过',
     scheduledTasksStop: '停止',
     scheduledTasksEnabled: '已启用',
     scheduledTasksDisabled: '已禁用',
@@ -3983,6 +3984,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksDeleteConfirm:
       'Are you sure you want to delete task "{name}"? This cannot be undone.',
     scheduledTasksRun: 'Run Now',
+    scheduledTasksRunPreemptWarning: 'Manual run may preempt scheduled execution',
     scheduledTasksStop: 'Stop',
     scheduledTasksEnabled: 'Enabled',
     scheduledTasksDisabled: 'Disabled',
