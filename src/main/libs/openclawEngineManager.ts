@@ -2082,7 +2082,6 @@ export class OpenClawEngineManager extends EventEmitter {
     const spawnedAt = this.gatewaySpawnedAt;
     if (!spawnedAt) return;
 
-    // Only write when skipMissedJobs is enabled in the gateway config.
     try {
       const configRaw = fs.readFileSync(this.configPath, 'utf8');
       const config = JSON.parse(configRaw);
@@ -2093,56 +2092,77 @@ export class OpenClawEngineManager extends EventEmitter {
 
     const runsDir = path.join(this.stateDir, 'cron', 'runs');
     ensureDir(runsDir);
+    const endMs = Date.now();
+    const reason = 'skipMissedJobs enabled - skipped startup catch-up after restart';
 
-    const offlineEndMs = Date.now();
-
-    let totalSkippedCount = 0;
+    let total = 0;
     for (const job of this.cronJobsAtFork) {
       if (!job.enabled) continue;
       if (job.lastRunAtMs == null || job.nextRunAtMs == null) continue;
+      // Only jobs whose last run AND next schedule both fell before the gateway spawned.
+      if (!(job.lastRunAtMs < spawnedAt && job.nextRunAtMs < spawnedAt)) continue;
+      total += this.writeSkippedEntriesForJob(job, runsDir, endMs, reason);
+    }
 
-      // A run was missed if the last run completed before gateway spawn AND
-      // the next scheduled run was also due before gateway spawn.
-      if (job.lastRunAtMs < spawnedAt && job.nextRunAtMs < spawnedAt) {
-        const logPath = path.join(runsDir, `${job.id}.jsonl`);
+    if (total > 0) {
+      console.log(`[OpenClaw] Wrote ${total} skipped cron run log entries total (skipMissedJobs=true)`);
+    }
+  }
 
-        // Enumerate all missed schedule boundaries during the offline window.
-        const missedTimes = job.schedule
-          ? enumerateMissedCycleBoundaries(job.schedule, job.nextRunAtMs, offlineEndMs)
-          : [job.nextRunAtMs];
+  /**
+   * Write skipped run-log entries for a single cron job.
+   *
+   * @returns the number of entries written (0 if nothing was missed).
+   */
+  private writeSkippedEntriesForJob(
+    job: CronJobSnapshot,
+    runsDir: string,
+    endMs: number,
+    reason: string,
+  ): number {
+    if (!job.nextRunAtMs) return 0;
+    const missed = job.schedule
+      ? enumerateMissedCycleBoundaries(job.schedule, job.nextRunAtMs, endMs)
+      : [job.nextRunAtMs];
 
-        let jobSkippedCount = 0;
-        for (const runAtMs of missedTimes) {
-          const entry = {
-            ts: Date.now(),
-            jobId: job.id,
-            jobName: job.name,
-            action: 'finished',
-            status: 'skipped',
-            runAtMs,
-            durationMs: 0,
-            reason: 'skipMissedJobs enabled - skipped startup catch-up after restart',
-          };
-          try {
-            fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf8');
-            jobSkippedCount++;
-          } catch (err) {
-            console.error(`[OpenClaw] Failed to write skipped run log for job ${job.id}:`, err);
-          }
-        }
-
-        if (jobSkippedCount > 0) {
-          console.log(
-            `[OpenClaw] Cron job "${job.name}": wrote ${jobSkippedCount} skipped entry/entries (offline ${new Date(job.nextRunAtMs).toISOString()} → ${new Date(offlineEndMs).toISOString()})`,
-          );
-        }
-        totalSkippedCount += jobSkippedCount;
+    let count = 0;
+    const logPath = path.join(runsDir, `${job.id}.jsonl`);
+    for (const runAtMs of missed) {
+      const entry = {
+        ts: Date.now(),
+        jobId: job.id,
+        jobName: job.name,
+        action: 'finished',
+        status: 'skipped',
+        runAtMs,
+        durationMs: 0,
+        reason,
+      };
+      try {
+        fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf8');
+        count++;
+      } catch (err) {
+        console.error(`[OpenClaw] Failed to write skipped run log for job ${job.id}:`, err);
       }
     }
+    return count;
+  }
 
-    if (totalSkippedCount > 0) {
-      console.log(`[OpenClaw] Wrote ${totalSkippedCount} skipped cron run log entries total (skipMissedJobs=true)`);
+  /** Write skipped run-log entries for missed cycles after system resume. */
+  writeSkippedCronRunLogsOnResume(): void {
+    const jobs = this.readGatewayCronJobs();
+    if (!jobs?.length) return;
+
+    const runsDir = path.join(this.stateDir, 'cron', 'runs');
+    ensureDir(runsDir);
+    const endMs = Date.now();
+
+    let total = 0;
+    for (const job of jobs) {
+      if (!job.enabled || !job.nextRunAtMs || job.nextRunAtMs >= endMs) continue;
+      total += this.writeSkippedEntriesForJob(job, runsDir, endMs, 'system-suspend');
     }
+    if (total > 0) console.log(`[OpenClaw] Wrote ${total} skipped cron run log entries after system resume`);
   }
 
   private setStatus(next: OpenClawEngineStatus): void {
