@@ -320,23 +320,13 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
-    key: 'modelsAutoload',
-    capabilityKey: ServiceConfigCapabilityKey.ModelsAutoload,
-    labelKey: 'localInferenceServiceConfigModelsAutoloadLabel',
-    paramName: 'models-autoload',
-    group: 'service',
-    type: 'select',
-    hintKey: 'localInferenceServiceConfigModelsAutoloadHint',
-    restartRequired: true,
-  },
-  {
     key: 'timeout',
     capabilityKey: ServiceConfigCapabilityKey.Timeout,
     labelKey: 'localInferenceServiceConfigTimeoutLabel',
     paramName: 'timeout',
     group: 'service',
     type: 'input',
-    placeholder: '600',
+    placeholder: '120',
     hintKey: 'localInferenceServiceConfigTimeoutHint',
     restartRequired: true,
   },
@@ -2247,7 +2237,7 @@ function OllamaServiceConfigDialog({
       port: form.port,
       ...(isFieldApplicable('device') ? { device: form.device } : {}),
       ...(isFieldApplicable('modelsMax') ? { modelsMax: form.modelsMax } : {}),
-      ...(isFieldApplicable('modelsAutoload') && form.modelsAutoload
+      ...(isFieldApplicable('modelsAutoload')
         ? { modelsAutoload: form.modelsAutoload === 'true' }
         : {}),
       ...(isFieldApplicable('parallel') ? { parallel: form.parallel } : {}),
@@ -4493,7 +4483,7 @@ function serviceConfigToForm(
     port: config.port ?? '',
     device: normalizeServiceConfigDeviceForForm(config.device, runtimeDevices),
     modelsMax: config.modelsMax ?? '',
-    modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),
+    modelsAutoload: String(config.modelsAutoload === true),
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
     tensorSplit: config.tensorSplit ?? '',
