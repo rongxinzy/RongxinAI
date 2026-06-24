@@ -5,6 +5,7 @@ const { existsSync, readdirSync, statSync, mkdirSync, readFileSync, rmSync, cpSy
 const { spawnSync } = require('child_process');
 const asar = require('@electron/asar');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
+const { ensurePortableUvRuntime, checkRuntimeHealth: checkUvRuntimeHealth } = require('./setup-uv-runtime.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const { DIST_DIFFS_EXTENSION_DIR, DIST_EXTENSIONS_DIR, summarizeGatewayAsarEntries } = require('./openclaw-runtime-packaging.cjs');
@@ -15,6 +16,93 @@ function isWindowsTarget(context) {
 
 function isMacTarget(context) {
   return context?.electronPlatformName === 'darwin';
+}
+
+function collectLatestMtimeMs(dir) {
+  let latest = 0;
+
+  function walk(current) {
+    let entries = [];
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      let stat;
+      try {
+        stat = statSync(fullPath);
+      } catch {
+        continue;
+      }
+      latest = Math.max(latest, Math.floor(stat.mtimeMs));
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      }
+    }
+  }
+
+  if (!existsSync(dir)) {
+    return latest;
+  }
+
+  const rootStat = statSync(dir);
+  latest = Math.max(latest, Math.floor(rootStat.mtimeMs));
+  walk(dir);
+  return latest;
+}
+
+function buildWindowsTarManifest(sources) {
+  return {
+    version: 1,
+    generatedAt: Date.now(),
+    sources: sources.map(({ label, dir, prefix }) => ({
+      label,
+      dir,
+      prefix,
+      exists: existsSync(dir),
+      latestMtimeMs: existsSync(dir) ? collectLatestMtimeMs(dir) : 0,
+    })),
+  };
+}
+
+function isWindowsTarManifestReusable(manifestPath, sources) {
+  if (!existsSync(manifestPath)) {
+    return false;
+  }
+
+  try {
+    const raw = readFileSync(manifestPath, 'utf8');
+    const saved = JSON.parse(raw);
+    if (!saved || saved.version !== 1 || !Array.isArray(saved.sources)) {
+      return false;
+    }
+
+    const current = buildWindowsTarManifest(sources);
+    if (saved.sources.length !== current.sources.length) {
+      return false;
+    }
+
+    for (let i = 0; i < current.sources.length; i += 1) {
+      const before = saved.sources[i];
+      const now = current.sources[i];
+      if (
+        before.label !== now.label
+        || before.dir !== now.dir
+        || before.prefix !== now.prefix
+        || before.exists !== now.exists
+        || before.latestMtimeMs !== now.latestMtimeMs
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function resolveTargetArch(context) {
@@ -513,6 +601,30 @@ async function beforePack(context) {
   installSkillDependencies();
 
   if (isWindowsTarget(context)) {
+    console.log('[electron-builder-hooks] Windows target detected, ensuring portable Python runtime is prepared...');
+    await ensurePortablePythonRuntime({ required: true });
+    const pythonRuntimeRoot = path.join(__dirname, '..', 'resources', 'python-win');
+    const pythonRuntimeHealth = checkRuntimeHealth(pythonRuntimeRoot, { requirePip: true });
+    if (!pythonRuntimeHealth.ok) {
+      throw new Error(
+        'Portable Python runtime health check failed before pack. Missing files: '
+        + pythonRuntimeHealth.missing.join(', ')
+      );
+    }
+
+    console.log('[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...');
+    await ensurePortableUvRuntime({ required: true });
+    const uvRuntimeRoot = path.join(__dirname, '..', 'resources', 'uv-win');
+    const uvRuntimeHealth = checkUvRuntimeHealth(uvRuntimeRoot);
+    if (!uvRuntimeHealth.ok) {
+      throw new Error(
+        'Portable uv runtime health check failed before pack. Missing files: '
+        + uvRuntimeHealth.missing.join(', ')
+      );
+    }
+  }
+
+  if (isWindowsTarget(context)) {
     // Pack all large resource directories into a single tar for faster NSIS
     // installation.  NSIS extracts thousands of small files very slowly on NTFS;
     // a single tar archive is extracted by 7z almost instantly, and we unpack
@@ -521,6 +633,7 @@ async function beforePack(context) {
     mkdirSync(buildTarDir, { recursive: true });
 
     const outputTar = path.join(buildTarDir, 'win-resources.tar');
+    const manifestPath = path.join(buildTarDir, 'win-resources.manifest.json');
     const sources = [
       {
         label: 'OpenClaw runtime',
@@ -537,19 +650,30 @@ async function beforePack(context) {
         dir: path.join(__dirname, '..', 'resources', 'python-win'),
         prefix: 'python-win',
       },
+      {
+        label: 'uv runtime',
+        dir: path.join(__dirname, '..', 'resources', 'uv-win'),
+        prefix: 'uv-win',
+      },
     ];
 
     console.log(`[electron-builder-hooks] Packing combined Windows tar: ${outputTar}`);
 
-    // If tar already exists (restored from CI cache), skip repack (~10 min saved)
-    if (existsSync(outputTar) && statSync(outputTar).size > 0) {
+    const canReuseCachedTar = existsSync(outputTar)
+      && statSync(outputTar).size > 0
+      && isWindowsTarManifestReusable(manifestPath, sources);
+
+    if (canReuseCachedTar) {
       const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
       console.log(
         `[electron-builder-hooks] Using cached tar: ${sizeMB} MB`
       );
     } else {
+      const manifest = buildWindowsTarManifest(sources);
       const t0 = Date.now();
       packMultipleSources(sources, outputTar);
+      const manifestPayload = `${JSON.stringify(manifest, null, 2)}\n`;
+      require('fs').writeFileSync(manifestPath, manifestPayload, 'utf8');
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
       const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
       console.log(
@@ -561,18 +685,6 @@ async function beforePack(context) {
   if (!isWindowsTarget(context)) {
     return;
   }
-
-  console.log('[electron-builder-hooks] Windows target detected, ensuring portable Python runtime is prepared...');
-  await ensurePortablePythonRuntime({ required: true });
-  const runtimeRoot = path.join(__dirname, '..', 'resources', 'python-win');
-  const runtimeHealth = checkRuntimeHealth(runtimeRoot, { requirePip: true });
-  if (!runtimeHealth.ok) {
-    throw new Error(
-      'Portable Python runtime health check failed before pack. Missing files: '
-      + runtimeHealth.missing.join(', ')
-    );
-  }
-
 }
 
 async function afterPack(context) {
