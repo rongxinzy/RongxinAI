@@ -210,6 +210,12 @@ test('uses the configured timeout for connection and load operations', () => {
   expect(manager.getConnectionAndLoadTimeoutMs()).toBe(900_000);
 });
 
+test('uses the default timeout for connection and load operations when config is empty', () => {
+  const manager = new LlamaCppManager(() => ({}));
+
+  expect(manager.getConnectionAndLoadTimeoutMs()).toBe(120_000);
+});
+
 test('selectLlamaCppRuntimeTarget chooses fixed CUDA 12 on Windows NVIDIA auto mode', () => {
   expect(selectLlamaCppRuntimeTarget({
     platform: 'win32',

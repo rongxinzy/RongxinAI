@@ -42,7 +42,7 @@ const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
 const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {};
 const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   modelsMax: '0',
-  timeout: '600',
+  timeout: '120',
   threadsHttp: '4',
   cacheReuse: '256',
   cacheRam: '8192',

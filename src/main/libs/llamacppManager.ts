@@ -47,7 +47,7 @@ import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 const execFileAsync = promisify(execFile);
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = '8080';
-const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 600_000;
+const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 120_000;
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_HELP_PROBE_TIMEOUT_MS = 10_000;
