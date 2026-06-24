@@ -104,7 +104,7 @@ test('llama.cpp service config field metadata uses UI parameter keys without CLI
 
   expect(fields.length).toBeGreaterThan(0);
   expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
-  expect(serviceKeys).toEqual(['modelsMax', 'modelsAutoload', 'timeout']);
+  expect(serviceKeys).toEqual(['modelsMax', 'timeout']);
   expect(keys).not.toContain('host');
   expect(keys).not.toContain('port');
   expect(keys).not.toContain('parallel');
