@@ -2666,7 +2666,7 @@ function ServiceConfigSelect({
   options,
   includeEmptyOption = true,
   disabled = false,
-  disabledReason,
+  disabledReason, // eslint-disable-line @typescript-eslint/no-unused-vars
   onChange,
 }: {
   label: string;
@@ -2750,7 +2750,7 @@ function getServiceConfigFieldState(
   return { visible: true, disabled: false };
 }
 
-function applyServiceConfigFieldToPayload(
+function _applyServiceConfigFieldToPayload(
   target: OllamaServiceConfig,
   key: keyof OllamaServiceConfigFormState,
   value: string,

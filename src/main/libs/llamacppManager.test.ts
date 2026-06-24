@@ -23,7 +23,6 @@ import {
   resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
   selectLlamaCppRuntimeTarget,
-  setLlamaCppSpawnRunnerForTests,
   shouldEnableLlamaCppModelsAutoload,
 } from './llamacppManager';
 import { MarketplaceService } from './marketplaceService';
