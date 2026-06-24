@@ -2717,12 +2717,17 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
 
   /**
    * Called when the system resumes from sleep/suspend.
-   * Resets the reconnect counter and triggers an immediate reconnect or health check.
+   * Restores WS connectivity and writes skipped cron run-log entries for any
+   * schedule boundaries that were missed while the system was suspended.
    */
   onSystemResume(): void {
     console.log('[GatewayReconnect] system resumed from sleep');
     this.cancelGatewayReconnect();
     this.gatewayReconnectAttempt = 0;
+    // Write skipped run-log entries for missed cron cycles during sleep.
+    // The gateway's cron scheduler self-recovers (it re-arms on the next tick),
+    // so we only need to fill the historical gap, not restart the process.
+    this.engineManager.writeSkippedCronRunLogsOnResume();
     if (!this.gatewayClient) {
       void this.attemptGatewayReconnect();
     } else {
