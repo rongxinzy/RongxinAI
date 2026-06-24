@@ -214,7 +214,7 @@
   DetailPrint "[Installer] Preparing installation steps"
 
   ; ─── Extract combined resource archive (win-resources.tar) ───
-  ; All large resource directories (cfmind/, SKILLs/, python-win/) are packed
+  ; All large resource directories (cfmind/, SKILLs/, python-win/, uv-win/) are packed
   ; into a single tar file. NSIS 7z extracts one large file almost instantly;
   ; we then unpack the tar here using Windows native tar.exe (C implementation).
   ; tar.exe is built into Windows 10 1803+ — Electron 40 requires Windows 10+,
@@ -226,6 +226,7 @@
   ; expansion of large resource trees.
   CreateDirectory "$INSTDIR\resources\cfmind"
   CreateDirectory "$INSTDIR\resources\python-win"
+  CreateDirectory "$INSTDIR\resources\uv-win"
   CreateDirectory "$INSTDIR\resources\SKILLs"
   DetailPrint "[Installer] Preparing resource directories"
   DetailPrint "[Installer] Adding Windows Defender exclusions before extraction"
@@ -234,7 +235,7 @@
   FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\RongxinAI\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\RongxinAI\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
@@ -298,6 +299,34 @@
   FileWrite $R9 "  Extract bundled resources: $5 ms$\r$\n"
   FileClose $R9
   Delete "$INSTDIR\resources\win-resources.tar"
+
+  DetailPrint "[Installer] Verifying bundled runtimes"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$python = Join-Path \"$INSTDIR\resources\python-win\" \"python.exe\";\
+    $$uv = Join-Path \"$INSTDIR\resources\uv-win\" \"uv.exe\";\
+    $$uvx = Join-Path \"$INSTDIR\resources\uv-win\" \"uvx.exe\";\
+    if (-not (Test-Path $$python)) { Write-Output \"missing:python\"; exit 10 };\
+    if (-not (Test-Path $$uv)) { Write-Output \"missing:uv\"; exit 11 };\
+    if (-not (Test-Path $$uvx)) { Write-Output \"missing:uvx\"; exit 12 };\
+    Write-Output \"ok\""'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" RuntimeVerifyDone
+    MessageBox MB_OK|MB_ICONSTOP "Bundled runtime verification failed: $1"
+    Abort
+  RuntimeVerifyDone:
+
+  IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 SkipVcRedistInstall
+    DetailPrint "[Installer] Installing bundled dependency: Microsoft Visual C++ Runtime"
+    DetailPrint "[Installer] Installing Microsoft Visual C++ Redistributable"
+    nsExec::ExecToStack '"$INSTDIR\resources\vc_redist.x64.exe" /install /quiet /norestart'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" SkipVcRedistInstall
+    StrCmp $0 "1638" SkipVcRedistInstall
+    StrCmp $0 "3010" SkipVcRedistInstall
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Redistributable installation did not complete successfully. llama.cpp local inference may be unavailable until the runtime is installed manually."
+  SkipVcRedistInstall:
 
   ; ── Restore user-created skills from AppData backup ──
   ; The backup was created in customInit before extraction began. Restore any
@@ -388,7 +417,7 @@
 !macro customUnInstall
   ; ─── Remove Windows Defender Exclusion on uninstall ───
   ; Clean up the exclusions we added during installation.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\RongxinAI\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\RongxinAI\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
   Pop $0
   Pop $1
 !macroend

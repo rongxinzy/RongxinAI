@@ -87,7 +87,7 @@ export async function probeMcpConnection(data: McpServerFormData): Promise<McpCo
   try {
     if (record.transportType === 'stdio') {
       const resolved = await resolveStdioCommand(record);
-      const enhancedEnv = await getEnhancedEnv();
+      const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
       const spawnEnv: Record<string, string> = {
         ...Object.fromEntries(
           Object.entries(enhancedEnv).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
