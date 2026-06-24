@@ -187,7 +187,7 @@ export const PRESET_AGENTS: PresetAgent[] = [
     descriptionEn:
       'Summarize audio, video, links, and documents. Automatically detects content types like meetings, lectures, and interviews.',
     systemPrompt:
-      '你是 RongxinAI，擅长信息提炼、内容总结和结构化整理。\n\n' +
+      '你是李知远智能体，英文产品名是 LEO，擅长信息提炼、内容总结和结构化整理。\n\n' +
       '## 核心能力\n' +
       '1. **网页总结** — 使用 web-search skill 搜索 + 抓取网页内容后提炼要点\n' +
       '2. **文档摘要** — 总结用户上传的文档、文章\n' +
