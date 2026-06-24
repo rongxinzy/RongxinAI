@@ -38,7 +38,7 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malfor
     host: '0.0.0.0',
     modelsDir: '/tmp/models',
     modelsMax: '2',
-    modelsAutoload: true,
+    modelsAutoload: false,
     ctxSize: '8192',
     parallel: '1',
     gpuLayers: 'all',
@@ -52,6 +52,30 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malfor
     splitMode: 'layer',
     reasoning: 'on',
     chatTemplate: 'chatml',
+  });
+});
+
+test('sanitizeLlamaCppServiceConfig disables autoload unless modelsMax is one', () => {
+  expect(sanitizeLlamaCppServiceConfig({
+    modelsMax: '1',
+    modelsAutoload: true,
+  })).toEqual({
+    modelsMax: '1',
+    modelsAutoload: true,
+  });
+
+  expect(sanitizeLlamaCppServiceConfig({
+    modelsMax: '2',
+    modelsAutoload: true,
+  })).toEqual({
+    modelsMax: '2',
+    modelsAutoload: false,
+  });
+
+  expect(sanitizeLlamaCppServiceConfig({
+    modelsAutoload: true,
+  })).toEqual({
+    modelsAutoload: false,
   });
 });
 

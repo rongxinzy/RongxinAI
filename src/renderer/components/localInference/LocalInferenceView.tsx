@@ -320,6 +320,16 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     restartRequired: true,
   },
   {
+    key: 'modelsAutoload',
+    capabilityKey: ServiceConfigCapabilityKey.ModelsAutoload,
+    labelKey: 'localInferenceServiceConfigModelsAutoloadLabel',
+    paramName: 'models-autoload',
+    group: 'service',
+    type: 'select',
+    hintKey: 'localInferenceServiceConfigModelsAutoloadHint',
+    restartRequired: true,
+  },
+  {
     key: 'timeout',
     capabilityKey: ServiceConfigCapabilityKey.Timeout,
     labelKey: 'localInferenceServiceConfigTimeoutLabel',
@@ -2183,7 +2193,7 @@ function OllamaServiceConfigDialog({
 
   const updateForm = (key: keyof OllamaServiceConfigFormState, value: string) => {
     setSaveError(null);
-    setForm(current => ({ ...current, [key]: value }));
+    setForm(current => updateServiceConfigForm(current, key, value));
   };
   const renderField = (field: ServiceConfigField) => {
     const fieldState = fieldStates[field.key];
@@ -2207,6 +2217,7 @@ function OllamaServiceConfigDialog({
         hint={hint}
         disabled={fieldState.disabled}
         disabledReason={fieldState.disabledReason}
+        includeEmptyOption={field.key !== 'modelsAutoload'}
         onChange={value => updateForm(field.key, value)}
         options={getServiceConfigSelectOptions(field.key)}
       />
@@ -2237,8 +2248,8 @@ function OllamaServiceConfigDialog({
       port: form.port,
       ...(isFieldApplicable('device') ? { device: form.device } : {}),
       ...(isFieldApplicable('modelsMax') ? { modelsMax: form.modelsMax } : {}),
-      ...(isFieldApplicable('modelsAutoload')
-        ? { modelsAutoload: form.modelsAutoload === 'true' }
+      ...(fieldStates.modelsAutoload?.visible
+        ? { modelsAutoload: form.modelsMax === '1' && form.modelsAutoload === 'true' }
         : {}),
       ...(isFieldApplicable('parallel') ? { parallel: form.parallel } : {}),
       ctxSize: form.ctxSize,
@@ -2475,6 +2486,7 @@ function ServiceConfigSelect({
   value,
   hint,
   options,
+  includeEmptyOption = true,
   disabled = false,
   disabledReason,
   onChange,
@@ -2484,6 +2496,7 @@ function ServiceConfigSelect({
   value: string;
   hint: string;
   options: Array<{ value: string; label: string }>;
+  includeEmptyOption?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   onChange: (value: string) => void;
@@ -2500,7 +2513,7 @@ function ServiceConfigSelect({
         onChange={event => onChange(event.target.value)}
         className="h-10 w-full rounded-lg border border-border bg-surface-input px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:cursor-not-allowed disabled:bg-surface-raised disabled:text-secondary"
       >
-        <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>
+        {includeEmptyOption && <option value="">{i18nService.t('localInferenceLaunchDefault')}</option>}
         {options.map(option => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -4461,6 +4474,9 @@ function getServiceConfigFieldState(
     }
     return { visible: true, disabled: false };
   }
+  if (field.key === 'modelsAutoload') {
+    return { visible: true, disabled: form.modelsMax !== '1' };
+  }
   if (field.key === 'cacheReuse' || field.key === 'cacheRam') {
     const disabled = form.cachePrompt === 'false';
     return {
@@ -4474,6 +4490,18 @@ function getServiceConfigFieldState(
   return { visible: true, disabled: false };
 }
 
+function updateServiceConfigForm(
+  form: OllamaServiceConfigFormState,
+  key: keyof OllamaServiceConfigFormState,
+  value: string,
+): OllamaServiceConfigFormState {
+  const next = { ...form, [key]: value };
+  if (key === 'modelsMax' && value !== '1') {
+    next.modelsAutoload = 'false';
+  }
+  return next;
+}
+
 function serviceConfigToForm(
   config: OllamaServiceConfig,
   runtimeDevices?: LlamaCppRuntimeDevice[] | null,
@@ -4483,7 +4511,7 @@ function serviceConfigToForm(
     port: config.port ?? '',
     device: normalizeServiceConfigDeviceForForm(config.device, runtimeDevices),
     modelsMax: config.modelsMax ?? '',
-    modelsAutoload: String(config.modelsAutoload === true),
+    modelsAutoload: String(config.modelsMax === '1' && config.modelsAutoload === true),
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
     tensorSplit: config.tensorSplit ?? '',
@@ -5564,6 +5592,20 @@ function SearchIcon({ className }: { className?: string }) {
 
 export const __test__getServiceConfigFields = () =>
   SERVICE_CONFIG_FIELDS.map(field => ({ ...field }));
+export const __test__serviceConfigToForm = (
+  config: OllamaServiceConfig,
+  runtimeDevices?: LlamaCppRuntimeDevice[] | null,
+) => serviceConfigToForm(config, runtimeDevices);
+export const __test__getServiceConfigFieldState = (
+  key: keyof OllamaServiceConfigFormState,
+  form: OllamaServiceConfigFormState,
+  runtimeCapabilities: LlamaCppRuntimeCapabilities | null,
+) => getServiceConfigFieldState(key, form, runtimeCapabilities);
+export const __test__updateServiceConfigForm = (
+  form: OllamaServiceConfigFormState,
+  key: keyof OllamaServiceConfigFormState,
+  value: string,
+) => updateServiceConfigForm(form, key, value);
 export const __test__getInferenceOptionFields = () =>
   INFERENCE_OPTION_FIELDS.map(field => ({ ...field }));
 export const __test__getMarketplacePageSize = () => MARKETPLACE_PAGE_SIZE;
