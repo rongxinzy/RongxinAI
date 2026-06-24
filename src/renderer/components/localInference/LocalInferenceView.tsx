@@ -106,6 +106,12 @@ type LaunchRequest = {
   customGpuDevices: string;
 };
 
+type ModelsMaxLimitNotice = {
+  message: string;
+  limit: number;
+  next: number;
+};
+
 type OllamaServiceConfigFormState = {
   host: string;
   port: string;
@@ -1215,25 +1221,19 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const handlePreload = (request: LaunchRequest, openDebugger: boolean) => {
     void runAction(async () => {
-      const loadLimitViolation = getLlamaCppModelsMaxLimitViolation({
+      const loadLimitNotice = getModelsMaxLimitNotice({
         modelsMax: serviceConfig.modelsMax,
         targetModelName: request.input.model,
         runningModelNames: Array.from(
           new Set(
             runningModels
               .map(model => (model.name || model.model || '').trim())
-              .filter(Boolean),
+            .filter(Boolean),
           ),
         ),
       });
-      if (loadLimitViolation) {
-        showToast(
-          i18nService
-            .t('localInferenceLoadModelLimitReached')
-            .replace('{limit}', String(loadLimitViolation.limit))
-            .replace('{next}', String(loadLimitViolation.next)),
-          LocalInferenceToastKind.Info,
-        );
+      if (loadLimitNotice) {
+        showToast(loadLimitNotice.message, LocalInferenceToastKind.Info);
         return;
       }
       const servicePatch = resolveLaunchServiceConfig(request.gpuPreset, request.customGpuDevices);
@@ -1681,6 +1681,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           model={launchTarget}
           loading={loading}
           serviceConfig={serviceConfig}
+          runningModels={runningModels}
           onClose={() => setLaunchTarget(null)}
           onLaunch={handlePreload}
         />
@@ -3146,12 +3147,14 @@ function LaunchModelDialog({
   model,
   loading,
   serviceConfig,
+  runningModels,
   onClose,
   onLaunch,
 }: {
   model: OllamaModel;
   loading: boolean;
   serviceConfig: OllamaServiceConfig;
+  runningModels: OllamaRunningModel[];
   onClose: () => void;
   onLaunch: (request: LaunchRequest, openDebugger: boolean) => void;
 }) {
@@ -3234,6 +3237,21 @@ function LaunchModelDialog({
   const servicePatch = resolveLaunchServiceConfig(form.gpuPreset, form.customGpuDevices);
   const gpuPresetChangesService =
     servicePatch !== null && hasServiceConfigPatchChanged(serviceConfig, servicePatch);
+  const modelsMaxLimitNotice = useMemo(
+    () =>
+      getModelsMaxLimitNotice({
+        modelsMax: serviceConfig.modelsMax,
+        targetModelName: model.name,
+        runningModelNames: Array.from(
+          new Set(
+            runningModels
+              .map(runningModel => (runningModel.name || runningModel.model || '').trim())
+              .filter(Boolean),
+          ),
+        ),
+      }),
+    [model.name, runningModels, serviceConfig.modelsMax],
+  );
 
   return (
     <div
@@ -3249,6 +3267,11 @@ function LaunchModelDialog({
               {i18nService.t('localInferenceLaunchTitle')}
             </h3>
             <p className="mt-1 truncate font-mono text-xs text-secondary">{model.name}</p>
+            {modelsMaxLimitNotice && (
+              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                {modelsMaxLimitNotice.message}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -5218,6 +5241,22 @@ function getModelContextWindowRange(params: number): ContextWindowBounds {
   return { min: 4096, max: 131072, step: 4096 };
 }
 
+function getModelsMaxLimitNotice(input: {
+  modelsMax: string | undefined;
+  targetModelName: string;
+  runningModelNames: string[];
+}): ModelsMaxLimitNotice | null {
+  const violation = getLlamaCppModelsMaxLimitViolation(input);
+  if (!violation) return null;
+  return {
+    ...violation,
+    message: i18nService
+      .t('localInferenceLoadModelLimitReached')
+      .replace('{limit}', String(violation.limit))
+      .replace('{next}', String(violation.next)),
+  };
+}
+
 function isPullInProgress(progress?: Record<string, unknown>): boolean {
   if (!progress) return false;
   const status = readProgressStatus(progress);
@@ -6145,6 +6184,11 @@ export const __test__getLaunchContextLimitMessage = (input: {
   requestedContextLength?: number;
   trainedContextLength?: number;
 }) => getLaunchContextLimitViolation(input);
+export const __test__getModelsMaxLimitNotice = (input: {
+  modelsMax: string | undefined;
+  targetModelName: string;
+  runningModelNames: string[];
+}) => getModelsMaxLimitNotice(input);
 export const __test__getModelCardBusyState = (input: {
   modelName: string;
   unloadingModelName: string | null;
