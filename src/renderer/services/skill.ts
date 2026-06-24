@@ -95,6 +95,7 @@ class SkillService {
     success: boolean;
     skills?: Skill[];
     error?: string;
+    errorCode?: string;
     auditReport?: any;
     pendingInstallId?: string;
   }> {
@@ -124,26 +125,6 @@ class SkillService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to confirm install';
       console.error('Failed to confirm install:', error);
-      return { success: false, error: message };
-    }
-  }
-
-  async upgradeSkill(skillId: string, downloadUrl: string): Promise<{
-    success: boolean;
-    skills?: Skill[];
-    error?: string;
-    auditReport?: any;
-    pendingInstallId?: string;
-  }> {
-    try {
-      const result = await window.electron.skills.upgrade(skillId, downloadUrl);
-      if (result.success && result.skills) {
-        this.skills = result.skills;
-      }
-      return result;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to upgrade skill';
-      console.error('Failed to upgrade skill:', error);
       return { success: false, error: message };
     }
   }
@@ -229,8 +210,10 @@ class SkillService {
     return this.localSkillDescriptions.size > 0 || this.marketplaceSkillDescriptions.size > 0;
   }
 
-  async fetchMarketplaceSkills(): Promise<{ skills: MarketplaceSkill[]; tags: MarketTag[] }> {
-    if (this.marketplaceCache) {
+  async fetchMarketplaceSkills(options: { forceRefresh?: boolean } = {}): Promise<{ skills: MarketplaceSkill[]; tags: MarketTag[] }> {
+    const { forceRefresh = false } = options;
+
+    if (!forceRefresh && this.marketplaceCache) {
       return this.marketplaceCache;
     }
     if (this.marketplaceFetchPromise) {

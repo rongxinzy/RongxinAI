@@ -329,16 +329,7 @@ interface IElectronAPI {
       success: boolean;
       skills?: Skill[];
       error?: string;
-      auditReport?: any;
-      pendingInstallId?: string;
-    }>;
-    upgrade: (
-      skillId: string,
-      downloadUrl: string,
-    ) => Promise<{
-      success: boolean;
-      skills?: Skill[];
-      error?: string;
+      errorCode?: string;
       auditReport?: any;
       pendingInstallId?: string;
     }>;
@@ -425,13 +416,14 @@ interface IElectronAPI {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
+    fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
     listRuntimeDevices: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeListDevicesResult>;
+    getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     listBackends: () => Promise<import('../../shared/llamacpp').LlamaCppBackendListResult>;
     getBackendSelection: () => Promise<import('../../shared/llamacpp').LlamaCppBackendRef | undefined>;
     setBackendSelection: (input: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
     installBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
     uninstallBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeUninstallResult>;
-    getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;

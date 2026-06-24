@@ -79,8 +79,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(SkillsIpc.SetEnabled, options),
     delete: (id: string) => ipcRenderer.invoke(SkillsIpc.Delete, id),
     download: (source: string) => ipcRenderer.invoke(SkillsIpc.Download, source),
-    upgrade: (skillId: string, downloadUrl: string) =>
-      ipcRenderer.invoke(SkillsIpc.Upgrade, skillId, downloadUrl),
     confirmInstall: (pendingId: string, action: string) =>
       ipcRenderer.invoke(SkillsIpc.ConfirmInstall, pendingId, action),
     getRoot: () => ipcRenderer.invoke(SkillsIpc.GetRoot),

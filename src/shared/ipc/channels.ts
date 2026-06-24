@@ -23,7 +23,6 @@ export const SkillsIpc = {
   SetEnabled: 'skills:setEnabled',
   Delete: 'skills:delete',
   Download: 'skills:download',
-  Upgrade: 'skills:upgrade',
   ConfirmInstall: 'skills:confirmInstall',
   GetRoot: 'skills:getRoot',
   AutoRoutingPrompt: 'skills:autoRoutingPrompt',
