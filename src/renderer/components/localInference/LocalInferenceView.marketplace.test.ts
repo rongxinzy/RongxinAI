@@ -383,6 +383,35 @@ test('launch dialog flags ctx-size values that exceed the trained context limit'
   });
 });
 
+test('launch dialog shows models-max notice before starting a second model', async () => {
+  const module = await import('./LocalInferenceView');
+  const getModelsMaxLimitNotice = (module as unknown as {
+    __test__getModelsMaxLimitNotice?: (input: {
+      modelsMax: string | undefined;
+      targetModelName: string;
+      runningModelNames: string[];
+    }) => { message: string; limit: number; next: number } | null;
+  }).__test__getModelsMaxLimitNotice;
+
+  expect(typeof getModelsMaxLimitNotice).toBe('function');
+  if (!getModelsMaxLimitNotice) return;
+
+  expect(getModelsMaxLimitNotice({
+    modelsMax: '1',
+    targetModelName: 'Qwen3-8B',
+    runningModelNames: ['DeepSeek-R1-7B'],
+  })).toEqual(expect.objectContaining({
+    limit: 1,
+    next: 2,
+  }));
+
+  expect(getModelsMaxLimitNotice({
+    modelsMax: '1',
+    targetModelName: 'Qwen3-8B',
+    runningModelNames: ['Qwen3-8B'],
+  })).toBeNull();
+});
+
 test('model card busy state only locks the unloading model card', async () => {
   const module = await import('./LocalInferenceView');
   const getModelCardBusyState = (module as unknown as {
