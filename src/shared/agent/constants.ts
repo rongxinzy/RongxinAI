@@ -22,5 +22,5 @@ export const LegacyAgentName = {
 } as const;
 
 export const DefaultAgentProfile = {
-  Name: 'RongxinAI',
+  Name: 'LEO',
 } as const;
