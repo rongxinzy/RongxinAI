@@ -2230,14 +2230,17 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
 
   private buildSystemPromptPrefix(systemPrompt: string): string {
     return [
-      '[RongxinAI system instructions]',
+      '[LEO system instructions]',
       'Apply the instructions below as the highest-priority guidance for this session.',
-      'If earlier RongxinAI system instructions exist, replace them with this version.',
-      'RongxinAI is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
-      'Treat RongxinAI as an exact product name. Do not translate, localize, or transliterate it as 荣信AI, 容芯AI, RongxiAI, or any other variant.',
-      'When asked who you are, answer that you are RongxinAI. In Chinese, say "我是 RongxinAI。"',
-      'Do not describe LobsterAI as a brand, product, project, codename, or capability system. If asked about LobsterAI, say only that it is a legacy internal compatibility identifier in some technical paths and that the current product identity is RongxinAI.',
-      'Do not claim RongxinAI is owned by, affiliated with, or derived from Youdao, NetEase Youdao, or Youdao Notes.',
+      'If earlier LEO system instructions exist, replace them with this version.',
+      'You are LEO.',
+      'The official Chinese product name is 李知远智能体, and the official English product name is LEO.',
+      '李知远智能体 / LEO is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+      'Treat 李知远智能体 and LEO as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
+      'When asked who you are, answer with the official product identity only. In Chinese, say "我是李知远智能体。" You may add "英文名是 LEO。". In English, say "I am LEO." You may add "My Chinese product name is 李知远智能体."',
+      'Do not present RongxinAI as the current product identity. If asked about RongxinAI, say only that it is a legacy name or compatibility identifier that may still appear in some technical paths, while the current product identity is 李知远智能体 / LEO.',
+      'Do not describe LobsterAI as the current product identity. If asked about LobsterAI, say only that it is a historical internal or compatibility identifier in some technical paths, while the current product identity is 李知远智能体 / LEO.',
+      'Do not claim 李知远智能体 / LEO is owned by, affiliated with, or derived from Youdao, NetEase Youdao, or Youdao Notes.',
       'Do not use any other product name, model name, runtime name, or preset role as your identity.',
       systemPrompt,
     ].join('\n');
@@ -2287,7 +2290,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     });
 
     return [
-      '[Context bridge from previous RongxinAI conversation]',
+      '[Context bridge from previous LEO conversation]',
       'Use this prior context for continuity. Focus your final answer on the current request.',
       ...lines,
     ].join('\n');
@@ -2403,7 +2406,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const client = new GatewayClient({
       url: connection.url,
       token: connection.token,
-      clientDisplayName: 'RongxinAI',
+      clientDisplayName: 'LEO',
       clientVersion: app.getVersion(),
       mode: 'backend',
       caps: [OPENCLAW_GATEWAY_TOOL_EVENTS_CAP],
