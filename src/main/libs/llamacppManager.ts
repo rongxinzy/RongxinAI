@@ -63,6 +63,7 @@ const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const LLAMACPP_HELP_PROBE_TIMEOUT_MS = 10_000;
+const LLAMACPP_LAST_LOADED_MODEL_KEY = 'llamacpp_last_loaded_model';
 
 type RequestOptions = { signal?: AbortSignal };
 type ExecFileRunner = (
@@ -76,6 +77,12 @@ type ExecFileRunner = (
     windowsHide: boolean;
   },
 ) => Promise<{ stdout: string; stderr: string }>;
+
+type LlamaCppManagerStorage = {
+  get<T = unknown>(key: string): T | undefined;
+  set<T = unknown>(key: string, value: T): void;
+  delete(key: string): void;
+};
 
 function backendRequiresDeviceValidation(ref: LlamaCppBackendRef): boolean {
   return ref.backend.includes('cuda')
@@ -119,6 +126,7 @@ export class LlamaCppManager extends EventEmitter {
   private runtimeContextLengthByModel = new Map<string, number>();
   private startupStderr = '';
   private readonly marketplaceService: MarketplaceService;
+  private readonly storage?: LlamaCppManagerStorage;
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
@@ -127,9 +135,12 @@ export class LlamaCppManager extends EventEmitter {
   constructor(
     private readonly getServiceConfig: () => LlamaCppServiceConfig = () => ({}),
     marketplaceService?: MarketplaceService,
+    storage?: LlamaCppManagerStorage,
   ) {
     super();
     this.marketplaceService = marketplaceService ?? new MarketplaceService(() => this.getModelsDir());
+    this.storage = storage;
+    this.storage = storage;
   }
 
   getStatus(): LlamaCppStatusSnapshot {
@@ -853,6 +864,53 @@ export class LlamaCppManager extends EventEmitter {
     });
   }
 
+  private async restoreLastLoadedModelIfNeeded(): Promise<void> {
+    const config = this.getServiceConfig();
+    if (!config.modelsAutoload || !shouldEnableLlamaCppModelsAutoload(config.modelsMax)) {
+      return;
+    }
+    const modelName = this.getLastLoadedModel();
+    if (!modelName) return;
+    let runningModels: LlamaCppRunningModel[] = [];
+    try {
+      runningModels = await this.listRunningModels();
+    } catch (error) {
+      console.warn('[LlamaCpp] failed to inspect running models before startup restore:', error);
+    }
+    if (runningModels.some(model => model.name === modelName || model.model === modelName || model.id === modelName)) {
+      return;
+    }
+    try {
+      console.log(`[LlamaCpp] restoring last loaded model on startup: ${modelName}`);
+      await this.loadModel({ model: modelName });
+    } catch (error) {
+      console.warn(`[LlamaCpp] failed to restore last loaded model on startup: ${modelName}`, error);
+    }
+  }
+
+  private getLastLoadedModel(): string | undefined {
+    if (!this.storage) return undefined;
+    const value = this.storage.get<unknown>(LLAMACPP_LAST_LOADED_MODEL_KEY);
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  private persistLastLoadedModel(modelName: string): void {
+    this.storage?.set(LLAMACPP_LAST_LOADED_MODEL_KEY, modelName.trim());
+  }
+
+  private clearLastLoadedModel(modelName?: string): void {
+    if (!this.storage) return;
+    if (!modelName) {
+      this.storage.delete(LLAMACPP_LAST_LOADED_MODEL_KEY);
+      return;
+    }
+    if (this.getLastLoadedModel() === modelName.trim()) {
+      this.storage.delete(LLAMACPP_LAST_LOADED_MODEL_KEY);
+    }
+  }
+
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
@@ -860,6 +918,7 @@ export class LlamaCppManager extends EventEmitter {
     const client = await this.client();
     await client.listModels();
     const result = await client.loadModel({ ...input, model: modelName });
+    this.persistLastLoadedModel(modelName);
     const resolvedRuntimeContextLength =
       input.options?.ctxSize ?? normalizePositiveInteger(this.getServiceConfig().ctxSize);
     if (resolvedRuntimeContextLength) {
@@ -2325,3 +2384,4 @@ function parseContentRangeTotal(value: string | null): number | undefined {
   const total = Number(match[1]);
   return Number.isFinite(total) ? total : undefined;
 }
+
