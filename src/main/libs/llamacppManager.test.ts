@@ -1,8 +1,9 @@
+import { app } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import type { MarketplaceModel } from '../../shared/marketplace';
@@ -1210,5 +1211,231 @@ test('installModel uses marketplace metadata when repo files are unavailable bef
     expect(fs.existsSync(result.path)).toBe(true);
   } finally {
     global.fetch = originalFetch;
+  }
+});
+
+test('start restores the last loaded model when single-resident autoload is enabled', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-restore-start-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const persistedModelNames: string[] = [];
+  const manager = new LlamaCppManager(
+    () => ({ modelsDir, modelsMax: '1', modelsAutoload: true }),
+    undefined,
+    {
+      get: (key: string) => key === 'llamacpp_last_loaded_model' ? 'Qwen3.5-0.8B-GGUF' : undefined,
+      set: (_key, value) => {
+        persistedModelNames.push(String(value));
+      },
+      delete: () => undefined,
+    },
+  );
+  const fakeProcess = new FakeChildProcess();
+
+  manager.getPresetPath = () => presetPath;
+  (manager as any).executablePath = path.join(modelsDir, 'llama-server.exe');
+  (manager as any).isHealthy = async () => false;
+  (manager as any).resolveRuntimeServiceConfig = async () => ({ modelsDir, modelsMax: '1', modelsAutoload: true });
+  (manager as any).getRuntimeCapabilities = async () => null;
+  (manager as any).waitUntilHealthy = async () => {
+    (manager as any).setStatus({ status: 'running', executablePath: (manager as any).executablePath, managedByApp: true });
+  };
+
+  const loads: string[] = [];
+  manager.listRunningModels = async () => [];
+  manager.client = async () => ({
+    listModels: async () => [],
+    loadModel: async (input: { model: string }) => {
+      loads.push(input.model);
+      return { success: true, runningModels: [] };
+    },
+  } as any);
+
+  setLlamaCppSpawnRunnerForTests((() => fakeProcess) as any);
+  try {
+    const status = await manager.start();
+    expect(status.status).toBe('running');
+    expect(loads).toEqual(['Qwen3.5-0.8B-GGUF']);
+    expect(persistedModelNames).toEqual([]);
+  } finally {
+    setLlamaCppSpawnRunnerForTests(null);
+  }
+});
+
+test('start skips restore when a model is already running', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-restore-running-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const manager = new LlamaCppManager(
+    () => ({ modelsDir, modelsMax: '1', modelsAutoload: true }),
+    undefined,
+    {
+      get: (key: string) => key === 'llamacpp_last_loaded_model' ? 'Qwen3.5-0.8B-GGUF' : undefined,
+      set: () => undefined,
+      delete: () => undefined,
+    },
+  );
+  const fakeProcess = new FakeChildProcess();
+
+  manager.getPresetPath = () => presetPath;
+  (manager as any).executablePath = path.join(modelsDir, 'llama-server.exe');
+  (manager as any).isHealthy = async () => false;
+  (manager as any).resolveRuntimeServiceConfig = async () => ({ modelsDir, modelsMax: '1', modelsAutoload: true });
+  (manager as any).getRuntimeCapabilities = async () => null;
+  (manager as any).waitUntilHealthy = async () => {
+    (manager as any).setStatus({ status: 'running', executablePath: (manager as any).executablePath, managedByApp: true });
+  };
+
+  const loads: string[] = [];
+  manager.listRunningModels = async () => [{ name: 'Qwen3.5-0.8B-GGUF', status: 'loaded' }];
+  manager.client = async () => ({
+    listModels: async () => [],
+    loadModel: async (input: { model: string }) => {
+      loads.push(input.model);
+      return { success: true, runningModels: [] };
+    },
+  } as any);
+
+  setLlamaCppSpawnRunnerForTests((() => fakeProcess) as any);
+  try {
+    await manager.start();
+    expect(loads).toEqual([]);
+  } finally {
+    setLlamaCppSpawnRunnerForTests(null);
+  }
+});
+
+test('start skips restore when autoload is disabled or multi-resident mode is enabled', async () => {
+  const cases = [
+    { modelsMax: '1', modelsAutoload: false },
+    { modelsMax: '2', modelsAutoload: true },
+  ] as const;
+
+  for (const config of cases) {
+    const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-restore-disabled-'));
+    const presetPath = path.join(modelsDir, 'models-preset.ini');
+    const manager = new LlamaCppManager(
+      () => ({ modelsDir, ...config }),
+      undefined,
+      {
+        get: (key: string) => key === 'llamacpp_last_loaded_model' ? 'Qwen3.5-0.8B-GGUF' : undefined,
+        set: () => undefined,
+        delete: () => undefined,
+      },
+    );
+    const fakeProcess = new FakeChildProcess();
+
+    manager.getPresetPath = () => presetPath;
+    (manager as any).executablePath = path.join(modelsDir, 'llama-server.exe');
+    (manager as any).isHealthy = async () => false;
+    (manager as any).resolveRuntimeServiceConfig = async () => ({ modelsDir, ...config });
+    (manager as any).getRuntimeCapabilities = async () => null;
+    (manager as any).waitUntilHealthy = async () => {
+      (manager as any).setStatus({ status: 'running', executablePath: (manager as any).executablePath, managedByApp: true });
+    };
+
+    const loads: string[] = [];
+    manager.listRunningModels = async () => [];
+    manager.client = async () => ({
+      listModels: async () => [],
+      loadModel: async (input: { model: string }) => {
+        loads.push(input.model);
+        return { success: true, runningModels: [] };
+      },
+    } as any);
+
+    setLlamaCppSpawnRunnerForTests((() => fakeProcess) as any);
+    try {
+      await manager.start();
+      expect(loads).toEqual([]);
+    } finally {
+      setLlamaCppSpawnRunnerForTests(null);
+    }
+  }
+});
+
+test('loadModel persists and unloadModel clears the last loaded model marker', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-last-model-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const store = new Map<string, unknown>();
+  const manager = new LlamaCppManager(
+    () => ({ modelsDir }),
+    undefined,
+    {
+      get: key => store.get(key),
+      set: (key, value) => {
+        store.set(key, value);
+      },
+      delete: key => {
+        store.delete(key);
+      },
+    },
+  );
+
+  manager.getPresetPath = () => presetPath;
+  manager.client = async () => ({
+    listModels: async () => [],
+    loadModel: async () => ({ success: true, runningModels: [] }),
+    unloadModel: async () => undefined,
+  } as any);
+
+  await manager.loadModel({ model: 'Qwen3.5-0.8B-GGUF' });
+  expect(store.get('llamacpp_last_loaded_model')).toBe('Qwen3.5-0.8B-GGUF');
+
+  await manager.unloadModel('Qwen3.5-0.8B-GGUF');
+  expect(store.has('llamacpp_last_loaded_model')).toBe(false);
+});
+
+test('uninstallRuntime clears the last loaded model marker after removing the runtime', async () => {
+  const userDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-uninstall-runtime-'));
+  const runtimeRoot = path.join(userDataRoot, 'llamacpp-runtime');
+  const runtimeExecutable = path.join(runtimeRoot, 'current', 'bin', 'llama-server.exe');
+  fs.mkdirSync(path.dirname(runtimeExecutable), { recursive: true });
+  fs.writeFileSync(runtimeExecutable, 'binary');
+
+  const store = new Map<string, unknown>([
+    ['llamacpp_last_loaded_model', 'Qwen3.5-0.8B-GGUF'],
+  ]);
+  const getPathSpy = vi.spyOn(app, 'getPath').mockImplementation((name: string) => {
+    if (name === 'userData') return userDataRoot;
+    return userDataRoot;
+  });
+  const manager = new LlamaCppManager(
+    () => ({ port: '65530' }),
+    undefined,
+    {
+      get: key => store.get(key),
+      set: (key, value) => {
+        store.set(key, value);
+      },
+      delete: key => {
+        store.delete(key);
+      },
+    },
+  );
+
+  (manager as any).executablePath = runtimeExecutable;
+  manager.stop = async () => ({
+    status: 'stopped',
+    checkedAt: new Date().toISOString(),
+    executablePath: runtimeExecutable,
+    managedByApp: false,
+  });
+  manager.detect = async () => ({
+    status: 'not-installed',
+    checkedAt: new Date().toISOString(),
+    managedByApp: false,
+  });
+
+  try {
+    const result = await manager.uninstallRuntime();
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      deleted: true,
+      runtimeRoot,
+    }));
+    expect(fs.existsSync(runtimeRoot)).toBe(false);
+    expect(store.has('llamacpp_last_loaded_model')).toBe(false);
+  } finally {
+    getPathSpy.mockRestore();
+    fs.rmSync(userDataRoot, { recursive: true, force: true });
   }
 });

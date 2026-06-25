@@ -262,7 +262,22 @@ export function registerLlamaCppIpcHandlers(
       }
     },
   );
-  ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
+  ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => {
+    const result = await manager.uninstallRuntime();
+    if (result.success) {
+      const currentConfig = getLlamaCppServiceConfig(options.getStore());
+      if (currentConfig.modelsAutoload) {
+        options.getStore().set(
+          LLAMACPP_SERVICE_CONFIG_KEY,
+          sanitizeLlamaCppServiceConfig({
+            ...currentConfig,
+            modelsAutoload: false,
+          }),
+        );
+      }
+    }
+    return result;
+  });
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async () => manager.listRuntimeDevices());
   ipcMain.handle(LlamaCppIpcChannel.GetRuntimeCapabilities, async () =>
     manager.getRuntimeCapabilities(),
@@ -385,8 +400,7 @@ export function registerLlamaCppIpcHandlers(
       model => model.name === modelName || model.model === modelName || model.id === modelName,
     );
     const beforeSnapshot = unloadingModel?.size_vram ? await getNvidiaSmiSnapshot() : null;
-    const client = await manager.client();
-    await client.unloadModel(modelName);
+    await manager.unloadModel(modelName);
     const confirmation = await waitForLlamaCppModelUnloadConfirmation({
       modelName,
       listRunningModels: () => manager.listRunningModels(),

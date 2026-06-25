@@ -54,6 +54,9 @@ const LLAMACPP_HELP_PROBE_TIMEOUT_MS = 10_000;
 const WINDOWS_X64_RUNTIME_TARGET_PREFIX = 'win-x64';
 const WINDOWS_X64_VC_RUNTIME_DLL_PATTERN =
   /\b(?:msvcp140(?:_[0-9]+)?|vcruntime140(?:_[0-9]+)?)\.dll\b/i;
+const LLAMACPP_LAST_LOADED_MODEL_KEY = 'llamacpp_last_loaded_model';
+const WINDOWS_RUNTIME_DELETE_RETRY_COUNT = 5;
+const WINDOWS_RUNTIME_DELETE_RETRY_DELAY_MS = 200;
 let spawnLlamaCppProcess = spawn;
 
 type RequestOptions = { signal?: AbortSignal };
@@ -74,6 +77,12 @@ type LlamaCppRuntimeImportProbe = {
   targetId?: string;
   devices: LlamaCppRuntimeDevice[];
   error?: string;
+};
+
+type LlamaCppManagerStorage = {
+  get<T = unknown>(key: string): T | undefined;
+  set<T = unknown>(key: string, value: T): void;
+  delete(key: string): void;
 };
 
 export function getLlamaCppWindowsVcRuntimeMissingMessage(input: {
@@ -125,6 +134,7 @@ export class LlamaCppManager extends EventEmitter {
   private runtimeContextLengthByModel = new Map<string, number>();
   private startupStderr = '';
   private readonly marketplaceService: MarketplaceService;
+  private readonly storage?: LlamaCppManagerStorage;
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
@@ -133,9 +143,11 @@ export class LlamaCppManager extends EventEmitter {
   constructor(
     private readonly getServiceConfig: () => LlamaCppServiceConfig = () => ({}),
     marketplaceService?: MarketplaceService,
+    storage?: LlamaCppManagerStorage,
   ) {
     super();
     this.marketplaceService = marketplaceService ?? new MarketplaceService(() => this.getModelsDir());
+    this.storage = storage;
   }
 
   getStatus(): LlamaCppStatusSnapshot {
@@ -298,6 +310,9 @@ export class LlamaCppManager extends EventEmitter {
     });
 
     await this.waitUntilHealthy(this.getConnectionAndLoadTimeoutMs());
+    if (this.status.status === 'running') {
+      await this.restoreLastLoadedModelIfNeeded();
+    }
     return this.status;
   }
 
@@ -549,13 +564,19 @@ export class LlamaCppManager extends EventEmitter {
       // occupied before removing the app-managed runtime files.
       await this.stop();
       await killByPort(this.getServiceConfig());
+      if (process.platform === 'win32') {
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
 
       const deleted = fs.existsSync(runtimeRoot);
-      fs.rmSync(runtimeRoot, { recursive: true, force: true });
+      if (deleted) {
+        await removeDirectoryWithRetries(runtimeRoot);
+      }
 
       if (this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
         this.executablePath = null;
       }
+      this.clearLastLoadedModel();
 
       const status = await this.detect();
       return { success: true, deleted, runtimeRoot, status };
@@ -640,18 +661,16 @@ export class LlamaCppManager extends EventEmitter {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
     await this.writeModelPreset({ ...input, model: modelName });
-    const client = await this.client();
-    await client.listModels();
-    const result = await client.loadModel({ ...input, model: modelName });
-    const resolvedRuntimeContextLength =
-      input.options?.ctxSize ?? normalizePositiveInteger(this.getServiceConfig().ctxSize);
-    if (resolvedRuntimeContextLength) {
-      this.runtimeContextLengthByModel.set(modelName, resolvedRuntimeContextLength);
-    }
-    return {
-      ...result,
-      runningModels: this.hydrateRunningModels(result.runningModels),
-    };
+    const result = await this.loadModelInternal({ ...input, model: modelName });
+    this.persistLastLoadedModel(modelName);
+    return result;
+  }
+
+  async unloadModel(modelName: string): Promise<void> {
+    const normalizedModelName = modelName.trim();
+    if (!normalizedModelName) throw new Error('Model name is required');
+    await (await this.client()).unloadModel(normalizedModelName);
+    this.clearLastLoadedModel(normalizedModelName);
   }
 
   async listRunningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
@@ -708,6 +727,7 @@ export class LlamaCppManager extends EventEmitter {
     await (await this.client()).unloadModel(modelName).catch((): undefined => undefined);
     fs.rmSync(target, { force: true, recursive: true });
     removeEmptyParentDirs(path.dirname(target), root);
+    this.clearLastLoadedModel(modelName);
     return { success: true, deleted: true, removedModelName: modelName };
   }
 
@@ -1012,6 +1032,49 @@ export class LlamaCppManager extends EventEmitter {
     }
   }
 
+  private async restoreLastLoadedModelIfNeeded(): Promise<void> {
+    const config = this.getServiceConfig();
+    if (!config.modelsAutoload || !shouldEnableLlamaCppModelsAutoload(config.modelsMax)) {
+      return;
+    }
+
+    const modelName = this.getLastLoadedModel();
+    if (!modelName) return;
+
+    let runningModels: LlamaCppRunningModel[] = [];
+    try {
+      runningModels = await this.listRunningModels();
+    } catch (error) {
+      console.warn('[LlamaCpp] failed to inspect running models before startup restore:', error);
+    }
+    if (runningModels.some(model => model.name === modelName || model.model === modelName || model.id === modelName)) {
+      return;
+    }
+
+    try {
+      console.log(`[LlamaCpp] restoring last loaded model on startup: ${modelName}`);
+      await this.loadModelInternal({ model: modelName });
+    } catch (error) {
+      console.warn(`[LlamaCpp] failed to restore last loaded model on startup: ${modelName}`, error);
+    }
+  }
+
+  private async loadModelInternal(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
+    const modelName = input.model.trim();
+    const client = await this.client();
+    await client.listModels();
+    const result = await client.loadModel({ ...input, model: modelName });
+    const resolvedRuntimeContextLength =
+      input.options?.ctxSize ?? normalizePositiveInteger(this.getServiceConfig().ctxSize);
+    if (resolvedRuntimeContextLength) {
+      this.runtimeContextLengthByModel.set(modelName, resolvedRuntimeContextLength);
+    }
+    return {
+      ...result,
+      runningModels: this.hydrateRunningModels(result.runningModels),
+    };
+  }
+
   private hydrateRunningModels(runningModels: LlamaCppRunningModel[]): LlamaCppRunningModel[] {
     const visibleModelNames = new Set<string>();
     const hydrated = runningModels.map(model => {
@@ -1045,6 +1108,29 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     return hydrated;
+  }
+
+  private getLastLoadedModel(): string | undefined {
+    if (!this.storage) return undefined;
+    const value = this.storage.get<unknown>(LLAMACPP_LAST_LOADED_MODEL_KEY);
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  private persistLastLoadedModel(modelName: string): void {
+    this.storage?.set(LLAMACPP_LAST_LOADED_MODEL_KEY, modelName.trim());
+  }
+
+  private clearLastLoadedModel(modelName?: string): void {
+    if (!this.storage) return;
+    if (!modelName) {
+      this.storage.delete(LLAMACPP_LAST_LOADED_MODEL_KEY);
+      return;
+    }
+    if (this.getLastLoadedModel() === modelName.trim()) {
+      this.storage.delete(LLAMACPP_LAST_LOADED_MODEL_KEY);
+    }
   }
 }
 
@@ -1422,6 +1508,15 @@ function removeDirectoryBestEffort(targetDir: string): void {
   } catch (error) {
     console.warn(`[LlamaCpp] failed to remove temporary runtime directory ${targetDir}:`, error);
   }
+}
+
+async function removeDirectoryWithRetries(targetDir: string): Promise<void> {
+  await fs.promises.rm(targetDir, {
+    recursive: true,
+    force: true,
+    maxRetries: process.platform === 'win32' ? WINDOWS_RUNTIME_DELETE_RETRY_COUNT : 0,
+    retryDelay: process.platform === 'win32' ? WINDOWS_RUNTIME_DELETE_RETRY_DELAY_MS : 0,
+  });
 }
 
 export function activateStagedLlamaCppRuntime(input: {

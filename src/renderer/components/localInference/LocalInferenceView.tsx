@@ -1088,6 +1088,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           LocalInferenceToastKind.Info,
         );
       }
+      const nextServiceConfig = await loadOllamaServiceConfig();
+      setServiceConfig(nextServiceConfig);
       await refreshLocalModels();
       if (result.status.status === 'running') {
         await refreshRunningModels();

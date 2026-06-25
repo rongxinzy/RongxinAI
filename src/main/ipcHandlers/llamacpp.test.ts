@@ -1,11 +1,14 @@
-import { expect, test } from 'vitest';
+import { ipcMain } from 'electron';
+import { expect, test, vi } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
+import { LlamaCppIpcChannel } from '../../shared/llamacpp';
 import {
   getLlamaCppLoadedModelLimitViolation,
   getRequiredVramRecoveryMiB,
   getTotalFreeVramMiB,
   hasRecoveredVram,
+  registerLlamaCppIpcHandlers,
   sanitizeLlamaCppServiceConfig,
   shouldSyncOpenClawAfterRunningModelRefresh,
   waitForLlamaCppModelUnloadConfirmation,
@@ -394,4 +397,50 @@ test('returns the last running-model snapshot when unload confirmation times out
     confirmed: false,
     runningModels,
   });
+});
+
+test('uninstall runtime disables models autoload after successful removal', async () => {
+  const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
+  const ipcMainHandle = vi.spyOn(ipcMain, 'handle').mockImplementation((channel, handler) => {
+    handlers.set(channel, handler);
+    return undefined as any;
+  });
+
+  const storeState = new Map<string, unknown>([
+    ['llamacpp_service_config', { modelsMax: '1', modelsAutoload: true }],
+  ]);
+  const store = {
+    get: (key: string) => storeState.get(key),
+    set: (key: string, value: unknown) => {
+      storeState.set(key, value);
+    },
+  };
+  const manager = {
+    on: () => undefined,
+    uninstallRuntime: async () => ({
+      success: true,
+      deleted: true,
+      runtimeRoot: 'C:\\Users\\Administrator\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime',
+      status: { status: 'not-installed', checkedAt: '2026-06-25T00:00:00.000Z' },
+    }),
+  } as any;
+
+  try {
+    registerLlamaCppIpcHandlers(manager, {
+      getStore: () => store as any,
+      syncOpenClawConfig: async () => ({ success: true }),
+    });
+
+    const handler = handlers.get(LlamaCppIpcChannel.UninstallRuntime);
+    expect(handler).toBeTypeOf('function');
+    const result = await handler?.({}, undefined);
+
+    expect(result).toEqual(expect.objectContaining({ success: true, deleted: true }));
+    expect(storeState.get('llamacpp_service_config')).toEqual({
+      modelsMax: '1',
+      modelsAutoload: false,
+    });
+  } finally {
+    ipcMainHandle.mockRestore();
+  }
 });
