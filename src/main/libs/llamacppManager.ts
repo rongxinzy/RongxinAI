@@ -64,8 +64,6 @@ const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const LLAMACPP_HELP_PROBE_TIMEOUT_MS = 10_000;
 const LLAMACPP_LAST_LOADED_MODEL_KEY = 'llamacpp_last_loaded_model';
-const WINDOWS_RUNTIME_DELETE_RETRY_COUNT = 5;
-const WINDOWS_RUNTIME_DELETE_RETRY_DELAY_MS = 200;
 
 type RequestOptions = { signal?: AbortSignal };
 type ExecFileRunner = (
@@ -2387,11 +2385,3 @@ function parseContentRangeTotal(value: string | null): number | undefined {
   return Number.isFinite(total) ? total : undefined;
 }
 
-async function removeDirectoryWithRetries(targetDir: string): Promise<void> {
-  await fs.promises.rm(targetDir, {
-    recursive: true,
-    force: true,
-    maxRetries: process.platform === 'win32' ? WINDOWS_RUNTIME_DELETE_RETRY_COUNT : 0,
-    retryDelay: process.platform === 'win32' ? WINDOWS_RUNTIME_DELETE_RETRY_DELAY_MS : 0,
-  });
-}
