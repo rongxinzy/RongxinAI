@@ -325,7 +325,7 @@ const SERVICE_CONFIG_FIELDS: ServiceConfigField[] = [
     paramName: 'timeout',
     group: 'service',
     type: 'input',
-    placeholder: '600',
+    placeholder: '120',
     hintKey: 'localInferenceServiceConfigTimeoutHint',
     restartRequired: true,
   },
@@ -2363,7 +2363,7 @@ function OllamaServiceConfigDialog({
 
   const updateForm = (key: keyof OllamaServiceConfigFormState, value: string) => {
     setSaveError(null);
-    setForm(current => ({ ...current, [key]: value }));
+    setForm(current => updateServiceConfigForm(current, key, value));
   };
   const getFieldState = (field: ServiceConfigField) =>
     getServiceConfigFieldState(field.key, {
@@ -4932,6 +4932,18 @@ function resolveLaunchServiceConfig(
   }
 }
 
+function updateServiceConfigForm(
+  form: OllamaServiceConfigFormState,
+  key: keyof OllamaServiceConfigFormState,
+  value: string,
+): OllamaServiceConfigFormState {
+  const next = { ...form, [key]: value };
+  if (key === "modelsMax" && value !== "1") {
+    next.modelsAutoload = "false";
+  }
+  return next;
+}
+
 function hasServiceConfigPatchChanged(
   current: OllamaServiceConfig,
   patch: Partial<OllamaServiceConfig>,
@@ -4984,7 +4996,7 @@ function serviceConfigToForm(
     port: config.port ?? '',
     device: normalizeServiceConfigDeviceForForm(config.device, runtimeDevices),
     modelsMax: config.modelsMax ?? '',
-    modelsAutoload: config.modelsAutoload === undefined ? '' : String(config.modelsAutoload),
+    modelsAutoload: String(config.modelsMax === "1" && config.modelsAutoload === true),
     parallel: config.parallel ?? '',
     splitMode: config.splitMode ?? '',
     tensorSplit: config.tensorSplit ?? '',
