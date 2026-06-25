@@ -959,7 +959,11 @@ const getOpenClawEngineManager = (): OpenClawEngineManager => {
 
 const getLlamaCppManager = (): LlamaCppManager => {
   if (!llamaCppManager) {
-    llamaCppManager = new LlamaCppManager(() => getLlamaCppServiceConfig(getStore()));
+    llamaCppManager = new LlamaCppManager(
+      () => getLlamaCppServiceConfig(getStore()),
+      undefined,
+      getStore(),
+    );
   }
   return llamaCppManager;
 };
