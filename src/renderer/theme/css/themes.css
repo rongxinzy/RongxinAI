@@ -8,11 +8,11 @@
   --lobster-primary-muted: rgba(59,130,246,0.10);
   --lobster-accent: #3B82F6;
   --lobster-accent-foreground: #ffffff;
-  --lobster-background: #F8F9FB;
+  --lobster-background: #fcfcfc; /*#F8F9FB;*/
   --lobster-foreground: #1A1D23;
   --lobster-surface: #FFFFFF;
   --lobster-surface-foreground: #1A1D23;
-  --lobster-surface-raised: #F0F1F4;
+  --lobster-surface-raised: #f9f9f9;/*#F0F1F4;*/
   --lobster-surface-overlay: rgba(240,241,244,0.92);
   --lobster-chat-user: #DBEAFE;
   --lobster-chat-user-foreground: #1e3a8a;
