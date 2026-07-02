@@ -2852,20 +2852,29 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       case 'coworkAgentEngine':
         return (
           <div className="space-y-6">
+            <p className="text-sm text-secondary">
+              {i18nService.t('coworkEngineArchInfo')}
+            </p>
             <div className="space-y-3">
               <div className="flex items-start gap-3 rounded-xl border px-3 py-2 text-sm border-border">
-                <input
-                  type="radio"
-                  checked={true}
-                  readOnly
-                  className="mt-1"
-                />
+                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-green-500 flex-shrink-0" />
                 <span>
                   <span className="block font-medium text-foreground">
-                    {i18nService.t('coworkAgentEngineOpenClaw')}
+                    Pi
                   </span>
                   <span className="block text-xs text-secondary">
-                    {i18nService.t('coworkAgentEngineOpenClawHint')}
+                    {i18nService.t('coworkEnginePiRole')}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border px-3 py-2 text-sm border-border">
+                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span>
+                  <span className="block font-medium text-foreground">
+                    OpenClaw
+                  </span>
+                  <span className="block text-xs text-secondary">
+                    {i18nService.t('coworkEngineOpenClawRole')}
                   </span>
                 </span>
               </div>

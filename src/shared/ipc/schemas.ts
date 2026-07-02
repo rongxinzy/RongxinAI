@@ -288,7 +288,7 @@ export const CoworkConfigSetSchema = {
   input: z.object({
     workingDirectory: z.string().optional(),
     executionMode: z.enum(['auto', 'local', 'sandbox']).optional(),
-    agentEngine: z.literal('openclaw').optional(),
+    agentEngine: z.enum(['openclaw', 'pi']).optional(),
     memoryEnabled: z.boolean().optional(),
     memoryImplicitUpdateEnabled: z.boolean().optional(),
     memoryLlmJudgeEnabled: z.boolean().optional(),

@@ -21,7 +21,7 @@ export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result
 
 // Cowork execution mode
 export type CoworkExecutionMode = 'auto' | 'local' | 'sandbox';
-export type CoworkAgentEngine = 'openclaw';
+export type CoworkAgentEngine = 'openclaw' | 'pi';
 
 export const OpenClawSessionKeepAlive = {
   OneDay: '1d',

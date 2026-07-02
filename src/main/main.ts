@@ -40,10 +40,10 @@ import {
 } from './ipcHandlers/scheduledTask';
 import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import {
-  type CoworkAgentEngine,
-  CoworkEngineRouter,
+  type CoworkRuntime,
   OpenClawRuntimeAdapter,
   type PermissionResult,
+  PiRuntimeAdapter,
 } from './libs/agentEngine';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
@@ -53,6 +53,7 @@ import {
   getLlamaCppModelContextWindow,
   isLlamaCppModelRunning,
   resolveAllEnabledProviderConfigs,
+  resolveAllProviderApiKeys,
   resolveCurrentApiConfig,
   resolveRawApiConfig,
   setAuthTokensGetter,
@@ -880,7 +881,27 @@ process.on('exit', (code) => {
 let store: SqliteStore | null = null;
 let coworkStore: CoworkStore | null = null;
 let openClawRuntimeAdapter: OpenClawRuntimeAdapter | null = null;
-let coworkEngineRouter: CoworkEngineRouter | null = null;
+let piRuntimeAdapter: PiRuntimeAdapter | null = null;
+
+const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
+  if (!piRuntimeAdapter) {
+    // Pi SDK resolves API keys from environment variables (ANTHROPIC_API_KEY etc.).
+    // Inject keys from RongxinAI's provider configuration before initializing Pi.
+    const keys = resolveAllProviderApiKeys();
+    const injected: string[] = [];
+    for (const [suffix, value] of Object.entries(keys)) {
+      const envKey = `${suffix}_API_KEY`;
+      if (!process.env[envKey] && value) {
+        process.env[envKey] = value;
+        injected.push(envKey);
+      }
+    }
+    console.log('[PiRuntime] Injected API keys:', injected.length > 0 ? injected.join(', ') : '(none — provider config may be empty)');
+    piRuntimeAdapter = new PiRuntimeAdapter();
+    piRuntimeAdapter.setCoworkStore(getCoworkStore());
+  }
+  return piRuntimeAdapter;
+};
 let skillManager: SkillManager | null = null;
 let mcpStore: McpStore | null = null;
 let mcpServerManager: McpServerManager | null = null;
@@ -1172,10 +1193,6 @@ const shouldRefreshServerQuotaForSession = (sessionId: string): boolean => {
 
   const apiConfig = resolveCurrentApiConfig();
   return apiConfig.providerMetadata?.providerName === ProviderName.LobsteraiServer;
-};
-
-const resolveCoworkAgentEngine = (): CoworkAgentEngine => {
-  return 'openclaw';
 };
 
 const getOpenClawConfigSync = (): OpenClawConfigSync => {
@@ -1516,10 +1533,8 @@ const doSyncOpenClawConfig = async (
   };
 };
 
-const bindCoworkRuntimeForwarder = (): void => {
-  if (coworkRuntimeForwarderBound) return;
-  const runtime = getCoworkEngineRouter();
-
+/** Forward events from a single runtime to all renderer windows via IPC. */
+const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
   runtime.on('message', (sessionId: string, message: unknown) => {
     const safeMessage = sanitizeCoworkMessageForIpc(message);
     const windows = BrowserWindow.getAllWindows();
@@ -1572,7 +1587,6 @@ const bindCoworkRuntimeForwarder = (): void => {
       if (win.isDestroyed()) return;
       win.webContents.send('cowork:stream:complete', { sessionId, claudeSessionId });
     });
-    // If this session used a server model, notify renderer to refresh quota.
     try {
       if (shouldRefreshServerQuotaForSession(sessionId)) {
         const windows = BrowserWindow.getAllWindows();
@@ -1587,7 +1601,6 @@ const bindCoworkRuntimeForwarder = (): void => {
   });
 
   runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
-    // Mark session as error in store so the .catch() fallback can detect duplicates.
     try { getCoworkStore().updateSession(sessionId, { status: 'error' }); } catch { /* ignore */ }
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((win) => {
@@ -1595,68 +1608,67 @@ const bindCoworkRuntimeForwarder = (): void => {
       win.webContents.send('cowork:stream:error', { sessionId, error });
     });
   });
+};
+
+const bindCoworkRuntimeForwarder = (): void => {
+  if (coworkRuntimeForwarderBound) return;
+
+  // Dual-kernel: bind both Pi (Work sessions) and OpenClaw (IM sessions).
+  // Both feed into the same cowork:stream:* IPC channels so the UI shows
+  // messages from both sources.
+  forwardRuntimeToRenderer(getPiRuntimeAdapter());       // Work → Pi
+  forwardRuntimeToRenderer(getOpenClawRuntimeAdapter());     // IM → OpenClaw
 
   coworkRuntimeForwarderBound = true;
 };
 
-const getCoworkEngineRouter = () => {
-  if (!coworkEngineRouter) {
-    if (!openClawRuntimeAdapter) {
-      openClawRuntimeAdapter = new OpenClawRuntimeAdapter(getCoworkStore(), getOpenClawEngineManager(), {
-        normalizeModelRef: normalizeOpenClawModelRef,
-        isModelAvailableForSession: validateSessionModelAvailability,
-        getModelContextWindow: (modelRef) => {
-          const parsed = parsePrimaryModelRef(modelRef);
-          if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) return undefined;
-          return getLlamaCppModelContextWindow(parsed.modelId);
-        },
-        getTriageConfig: () => getTriageConfig(getStore()),
-        getAgent: (agentId: string) => {
-          return getAgentManager().getAgent(agentId) ?? null;
-        },
-      });
-      // Wire up channel session sync for IM conversations via OpenClaw
-      try {
-        const imManager = getIMGatewayManager();
-        const imStore = imManager.getIMStore();
-        if (imStore) {
-          const channelSessionSync = new OpenClawChannelSessionSync({
-            coworkStore: getCoworkStore(),
-            imStore,
-            getDefaultCwd: (agentId?: string) => resolveAgentDefaultWorkingDirectory(agentId) || os.homedir(),
-            resolveJobName: (jobId) => getCronJobService().getJobNameSync(jobId),
-            onBindingChanged: (sessionKey, _platform, newAgentId) => {
-              // Patch the Gateway session to use the new agent's model for
-              // future inbound messages.  The current turn already started
-              // with the old agent's configuration.
-              const agent = getCoworkStore().getAgent(newAgentId);
-              const model = agent?.model || '';
-              if (model && openClawRuntimeAdapter) {
-                const availability = validateSessionModelAvailability(model);
-                if (!availability.available) {
-                  return;
-                }
-                const client = openClawRuntimeAdapter.getGatewayClient();
-                if (client) {
-                  void client.request('sessions.patch', { key: sessionKey, model }).catch((err) => {
-                    console.warn('[ChannelSessionSync] failed to patch Gateway session model after binding change:', err);
-                  });
-                }
-              }
-            },
-          });
-          openClawRuntimeAdapter.setChannelSessionSync(channelSessionSync);
-        }
-      } catch (error) {
-        console.warn('[Main] Failed to set up channel session sync:', error);
-      }
-    }
-    coworkEngineRouter = new CoworkEngineRouter({
-      getCurrentEngine: resolveCoworkAgentEngine,
-      openclawRuntime: openClawRuntimeAdapter,
+const getOpenClawRuntimeAdapter = (): OpenClawRuntimeAdapter => {
+  if (!openClawRuntimeAdapter) {
+    openClawRuntimeAdapter = new OpenClawRuntimeAdapter(getCoworkStore(), getOpenClawEngineManager(), {
+      normalizeModelRef: normalizeOpenClawModelRef,
+      isModelAvailableForSession: validateSessionModelAvailability,
+      getModelContextWindow: (modelRef) => {
+        const parsed = parsePrimaryModelRef(modelRef);
+        if (!parsed || parsed.providerId !== ProviderName.LlamaCpp) return undefined;
+        return getLlamaCppModelContextWindow(parsed.modelId);
+      },
+      getTriageConfig: () => getTriageConfig(getStore()),
+      getAgent: (agentId: string) => {
+        return getAgentManager().getAgent(agentId) ?? null;
+      },
     });
+    // Wire up channel session sync for IM conversations via OpenClaw
+    try {
+      const imManager = getIMGatewayManager();
+      const imStore = imManager.getIMStore();
+      if (imStore) {
+        const channelSessionSync = new OpenClawChannelSessionSync({
+          coworkStore: getCoworkStore(),
+          imStore,
+          getDefaultCwd: (agentId?: string) => resolveAgentDefaultWorkingDirectory(agentId) || os.homedir(),
+          resolveJobName: (jobId) => getCronJobService().getJobNameSync(jobId),
+          onBindingChanged: (sessionKey, _platform, newAgentId) => {
+            const agent = getCoworkStore().getAgent(newAgentId);
+            const model = agent?.model || '';
+            if (model && openClawRuntimeAdapter) {
+              const availability = validateSessionModelAvailability(model);
+              if (!availability.available) return;
+              const client = openClawRuntimeAdapter.getGatewayClient();
+              if (client) {
+                void client.request('sessions.patch', { key: sessionKey, model }).catch((err) => {
+                  console.warn('[ChannelSessionSync] failed to patch Gateway session model after binding change:', err);
+                });
+              }
+            }
+          },
+        });
+        openClawRuntimeAdapter.setChannelSessionSync(channelSessionSync);
+      }
+    } catch (error) {
+      console.warn('[Main] Failed to set up channel session sync:', error);
+    }
   }
-  return coworkEngineRouter;
+  return openClawRuntimeAdapter;
 };
 
 const getSkillManager = () => {
@@ -1864,8 +1876,13 @@ const getIMGatewayManager = () => {
   if (!imGatewayManager) {
     const sqliteStore = getStore();
 
-    // Get Cowork dependencies for IM Cowork mode
-    const runtime = getCoworkEngineRouter();
+    // IM always uses OpenClaw directly, bypassing the engine router.
+    // This ensures IM/Cron remain on OpenClaw regardless of the user's
+    // Work/Chat engine selection (Pi / OpenClaw).
+    if (!openClawRuntimeAdapter) {
+      throw new Error('[IMGateway] OpenClaw runtime adapter not initialized');
+    }
+    const runtime = openClawRuntimeAdapter;
     const store = getCoworkStore();
 
     imGatewayManager = new IMGatewayManager(
@@ -3221,7 +3238,11 @@ if (!gotTheLock) {
     log.info('session start requested', { prompt: options.prompt.slice(0, 80), agentId: options.agentId });
     return runWithCorrelationId(cid, async () => {
     try {
-      const engineStatus = await ensureOpenClawRunningForCowork();
+      // Work sessions use Pi (SDK mode, instant availability). No need to wait
+      // for OpenClaw — that gate is only for IM/Cron paths.
+      const engineStatus: { phase: 'running' | 'error'; version: null; message: string; canRetry: boolean } = getPiRuntimeAdapter()
+        ? { phase: 'running', version: null, message: 'Pi SDK ready', canRetry: false }
+        : { phase: 'error', version: null, message: 'Pi runtime not initialized', canRetry: true };
       if (engineStatus.phase !== 'running') {
         return getEngineNotReadyResponse(engineStatus);
       }
@@ -3295,7 +3316,7 @@ if (!gotTheLock) {
       coworkStoreInstance.updateSession(session.id, { status: 'running' });
 
       // Start the session asynchronously (skip initial user message since we already added it)
-      const runtime = getCoworkEngineRouter();
+      const runtime = getPiRuntimeAdapter();
       runtime.startSession(session.id, options.prompt, {
         skipInitialUserMessage: true,
         systemPrompt,
@@ -3345,12 +3366,15 @@ if (!gotTheLock) {
     imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
   }) => {
     try {
-      const engineStatus = await ensureOpenClawRunningForCowork();
+      // Work sessions use Pi (SDK mode, instant availability).
+      const engineStatus: { phase: 'running' | 'error'; version: null; message: string; canRetry: boolean } = getPiRuntimeAdapter()
+        ? { phase: 'running', version: null, message: 'Pi SDK ready', canRetry: false }
+        : { phase: 'error', version: null, message: 'Pi runtime not initialized', canRetry: true };
       if (engineStatus.phase !== 'running') {
         return getEngineNotReadyResponse(engineStatus);
       }
 
-      const runtime = getCoworkEngineRouter();
+      const runtime = getPiRuntimeAdapter();
       const existingSession = getCoworkStore().getSession(options.sessionId);
       if (options.imageAttachments?.length) {
         console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
@@ -3412,7 +3436,7 @@ if (!gotTheLock) {
 
   ipcMain.handle('cowork:session:stop', async (_event, sessionId: string) => {
     try {
-      const runtime = getCoworkEngineRouter();
+      const runtime = getPiRuntimeAdapter();
       runtime.stopSession(sessionId);
       return { success: true };
     } catch (error) {
@@ -3425,7 +3449,7 @@ if (!gotTheLock) {
 
   ipcMain.handle('cowork:session:delete', async (_event, sessionId: string) => {
     try {
-      getCoworkEngineRouter().stopSession(sessionId);
+      getPiRuntimeAdapter().stopSession(sessionId);
       const coworkStoreInstance = getCoworkStore();
       coworkStoreInstance.deleteSession(sessionId);
       // Clean up IM session mapping so that new channel messages
@@ -3438,7 +3462,7 @@ if (!gotTheLock) {
       // Notify runtime to purge in-memory caches for this session
       // so that channel messages can create a fresh session.
       try {
-        getCoworkEngineRouter().onSessionDeleted(sessionId);
+        getPiRuntimeAdapter().onSessionDeleted(sessionId);
       } catch {
         // Router may not be initialised yet; safe to ignore.
       }
@@ -3453,13 +3477,13 @@ if (!gotTheLock) {
 
   ipcMain.handle('cowork:session:deleteBatch', async (_event, sessionIds: string[]) => {
     try {
-      const runtime = getCoworkEngineRouter();
+      const runtime = getPiRuntimeAdapter();
       sessionIds.forEach((sessionId) => {
         runtime.stopSession(sessionId);
       });
       const coworkStoreInstance = getCoworkStore();
       coworkStoreInstance.deleteSessions(sessionIds);
-      const router = getCoworkEngineRouter();
+      const router = getPiRuntimeAdapter();
       for (const sessionId of sessionIds) {
         try {
           getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
@@ -3874,7 +3898,7 @@ if (!gotTheLock) {
         mcpBridgeServer.resolveAskUser(options.requestId, askUserResponse);
       }
 
-      const runtime = getCoworkEngineRouter();
+      const runtime = getPiRuntimeAdapter();
       runtime.respondToPermission(options.requestId, options.result);
       return { success: true };
     } catch (error) {
@@ -3939,7 +3963,7 @@ if (!gotTheLock) {
       if (patch.model) {
         patch.model = normalizeOpenClawModelRef(patch.model);
       }
-      const runtime = getCoworkEngineRouter();
+      const runtime = getPiRuntimeAdapter();
       await runtime.patchSession(sessionId, patch);
 
       if (patch.model !== undefined) {
@@ -4153,7 +4177,7 @@ if (!gotTheLock) {
   ipcMain.handle('cowork:config:set', async (_event, config: {
     workingDirectory?: string;
     executionMode?: 'auto' | 'local' | 'sandbox';
-    agentEngine?: CoworkAgentEngine;
+    agentEngine?: 'openclaw' | 'pi';
     memoryEnabled?: boolean;
     memoryImplicitUpdateEnabled?: boolean;
     memoryLlmJudgeEnabled?: boolean;
@@ -4173,9 +4197,10 @@ if (!gotTheLock) {
         config.executionMode && String(config.executionMode) === 'container'
           ? 'local'
           : config.executionMode;
-      const normalizedAgentEngine = config.agentEngine === 'openclaw'
-        ? 'openclaw'
-        : undefined;
+      const normalizedAgentEngine =
+        config.agentEngine === 'openclaw' || config.agentEngine === 'pi'
+          ? config.agentEngine
+          : undefined;
       const normalizedMemoryEnabled = typeof config.memoryEnabled === 'boolean'
         ? config.memoryEnabled
         : undefined;
@@ -5849,11 +5874,10 @@ if (!gotTheLock) {
     destroyTray();
     skillManager?.stopWatching();
 
-    // Stop Cowork sessions without blocking shutdown.
-    if (coworkEngineRouter) {
-      console.log('[Main] Stopping cowork sessions...');
-      coworkEngineRouter.stopAllSessions();
-    }
+    // Stop all active sessions from both kernels without blocking shutdown.
+    console.log('[Main] Stopping cowork sessions...');
+    if (piRuntimeAdapter) piRuntimeAdapter.stopAllSessions();
+    if (openClawRuntimeAdapter) openClawRuntimeAdapter.stopAllSessions();
 
     await stopCoworkOpenAICompatProxy().catch((error) => {
       console.error('Failed to stop OpenAI compatibility proxy:', error);
