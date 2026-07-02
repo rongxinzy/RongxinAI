@@ -6013,13 +6013,10 @@ if (!gotTheLock) {
     registerLlamaCppIpcHandlers(getLlamaCppManager(), {
       getStore,
       syncOpenClawConfig,
-      getAgentManager,
     });
     registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
-      syncOpenClawConfig,
-      getAgentManager,
     });
     registerMarketplaceIpcHandlers({
       getModelsDir: () => getLlamaCppManager().getModelsDir(),

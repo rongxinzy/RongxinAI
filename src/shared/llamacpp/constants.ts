@@ -19,7 +19,6 @@ export const LlamaCppIpcChannel = {
   Chat: 'llamacpp:chat',
   ChatStream: 'llamacpp:chat-stream',
   CancelChatStream: 'llamacpp:cancel-chat-stream',
-  SetOpenClawModel: 'llamacpp:set-openclaw-model',
   ImportRuntime: 'llamacpp:import-runtime',
   ListRuntimeDevices: 'llamacpp:runtime:list-devices',
   ListBackends: 'llamacpp:backends:list',

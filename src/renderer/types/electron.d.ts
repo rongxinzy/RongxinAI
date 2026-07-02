@@ -35,8 +35,6 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
-import type { AppConfig } from '../config';
-import type { Agent } from './agent';
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -400,13 +398,6 @@ interface IElectronAPI {
     chat: (payload: OllamaChatPayload) => Promise<OllamaChatChunk>;
     chatStream: (requestId: string, payload: OllamaChatPayload) => Promise<{ success: boolean }>;
     cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
-    setOpenClawModel: (modelName: string) => Promise<{
-      success: boolean;
-      error?: string;
-      config?: AppConfig;
-      modelRef?: string;
-      defaultAgent?: Agent | null;
-    }>;
     onStatusChanged: (callback: (snapshot: OllamaStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: OllamaInstallProgress) => void) => () => void;
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
@@ -447,13 +438,6 @@ interface IElectronAPI {
       payload: LlamaCppChatPayload,
     ) => Promise<{ success: boolean; finalChunk?: LlamaCppChatChunk | null }>;
     cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
-    setOpenClawModel: (modelName: string) => Promise<{
-      success: boolean;
-      error?: string;
-      config?: AppConfig;
-      modelRef?: string;
-      defaultAgent?: Agent | null;
-    }>;
     onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;

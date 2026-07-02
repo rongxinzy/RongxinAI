@@ -30,7 +30,6 @@ import {
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
 import {
-  buildLlamaCppOpenClawAppConfig,
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
@@ -177,10 +176,6 @@ export function registerLlamaCppIpcHandlers(
       restartGatewayIfRunning?: boolean;
       forceGatewayRestartIfRunning?: boolean;
     }) => Promise<{ success: boolean; error?: string }>;
-    getAgentManager?: () => {
-      getDefaultAgent: () => { id: string } | null;
-      updateAgent: (agentId: string, updates: { model?: string }) => unknown;
-    };
   },
 ): void {
   const updateRunningModelBindings = async (
@@ -530,38 +525,6 @@ export function registerLlamaCppIpcHandlers(
     if (!controller) return { success: true, cancelled: false };
     controller.abort(new Error('Generation cancelled'));
     return { success: true, cancelled: true };
-  });
-  ipcMain.handle(LlamaCppIpcChannel.SetOpenClawModel, async (_event, modelName: string) => {
-    const normalizedModelName = modelName.trim();
-    if (!normalizedModelName) {
-      throw new Error('Model name is required');
-    }
-    const current = options.getStore().get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
-    const next = buildLlamaCppOpenClawAppConfig(current, normalizedModelName);
-    const openClawModelRef = `llamacpp/${normalizedModelName}`;
-    options.getStore().set('app_config', next);
-    const defaultAgent = (() => {
-      try {
-        const agentManager = options.getAgentManager?.();
-        const agent = agentManager?.getDefaultAgent?.();
-        if (!agent) return null;
-        return agentManager.updateAgent(agent.id, { model: openClawModelRef });
-      } catch (error) {
-        console.warn('[LlamaCpp] failed to update the default OpenClaw agent model:', error);
-        return null;
-      }
-    })();
-    await refreshRunningModelBindings('llamacpp-set-openclaw-model');
-    const syncResult = await options.syncOpenClawConfig({
-      reason: 'llamacpp-local-model-selected',
-    });
-    return {
-      success: syncResult.success,
-      error: syncResult.error,
-      config: next,
-      modelRef: openClawModelRef,
-      defaultAgent,
-    };
   });
 }
 

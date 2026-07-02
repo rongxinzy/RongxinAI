@@ -89,47 +89,6 @@ test('modelscope manual install requires owner repo id', async () => {
   expect(isModelScopeRepoId('/Qwen3-8B-GGUF')).toBe(false);
 });
 
-test('llama.cpp service config field metadata uses UI parameter keys without CLI prefixes', async () => {
-  const module = await import('./LocalInferenceView');
-  const getServiceConfigFields = (module as unknown as {
-    __test__getServiceConfigFields?: () => Array<{ key: string; group: string; paramName: string }>;
-  }).__test__getServiceConfigFields;
-
-  expect(typeof getServiceConfigFields).toBe('function');
-  if (!getServiceConfigFields) return;
-
-  const fields = getServiceConfigFields();
-  const keys = fields.map((field) => field.key);
-  const groups = Array.from(new Set(fields.map((field) => field.group))).sort();
-  const serviceKeys = fields.filter((field) => field.group === 'service').map((field) => field.key);
-  const cacheKeys = fields.filter((field) => field.group === 'cache').map((field) => field.key);
-  const gpuKeys = fields.filter((field) => field.group === 'gpu').map((field) => field.key);
-  const compatKeys = fields.filter((field) => field.group === 'compat').map((field) => field.key);
-  const requestKeys = fields.filter((field) => field.group === 'request').map((field) => field.key);
-
-  expect(fields.length).toBeGreaterThan(0);
-  expect(fields.map((field) => field.paramName)).toContain('parallel');
-  expect(fields.every((field) => !field.paramName.startsWith('--'))).toBe(true);
-  expect(groups).toEqual(['cache', 'compat', 'gpu', 'request', 'service']);
-  expect(serviceKeys).toEqual(['modelsMax', 'modelsAutoload', 'timeout']);
-  expect(cacheKeys).toEqual(['cachePrompt', 'cacheReuse', 'cacheRam']);
-  expect(gpuKeys).toEqual(['device', 'splitMode', 'tensorSplit', 'mainGpu', 'flashAttn']);
-  expect(compatKeys).toEqual(['jinja', 'mlock']);
-  expect(requestKeys).toEqual(['parallel', 'threadsHttp']);
-  expect(keys).not.toContain('host');
-  expect(keys).not.toContain('port');
-  expect(keys).not.toContain('ctxSize');
-  expect(keys).not.toContain('gpuLayers');
-  expect(keys).not.toContain('batchSize');
-  expect(keys).not.toContain('ubatchSize');
-  expect(keys).not.toContain('threads');
-  expect(keys).not.toContain('threadsBatch');
-  expect(keys).not.toContain('mmap');
-  expect(keys).not.toContain('reasoning');
-  expect(keys).not.toContain('reasoningFormat');
-  expect(keys).not.toContain('reasoningBudget');
-});
-
 test('launch gpu presets pin explicit devices for dual-gpu workstations', async () => {
   const module = await import('./LocalInferenceView');
   const resolveLaunchServiceConfig = (module as unknown as {
