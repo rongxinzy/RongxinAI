@@ -186,8 +186,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(LlamaCppIpcChannel.ChatStream, requestId, payload),
     cancelChatStream: (requestId: string) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.CancelChatStream, requestId),
-    setOpenClawModel: (modelName: string) =>
-      ipcRenderer.invoke(LlamaCppIpcChannel.SetOpenClawModel, modelName),
     onStatusChanged: (callback: (snapshot: unknown) => void) =>
       onPush(LlamaCppIpcChannel.StatusChanged, callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>

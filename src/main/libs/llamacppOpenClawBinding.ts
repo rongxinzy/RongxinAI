@@ -1,6 +1,6 @@
 import type { LlamaCppRunningModel } from '../../shared/llamacpp';
 import type { ProviderConfig } from '../../shared/providers';
-import { ApiFormat, ProviderName } from '../../shared/providers';
+import { ProviderName } from '../../shared/providers';
 
 const LLAMACPP_MIN_OPENCLAW_MAX_TOKENS = 512;
 const LLAMACPP_MAX_OPENCLAW_MAX_TOKENS = 4096;
@@ -14,59 +14,6 @@ export type LlamaCppOpenClawAppConfig = {
   };
   providers?: Record<string, ProviderConfig>;
 };
-
-export function buildLlamaCppOpenClawAppConfig(
-  current: LlamaCppOpenClawAppConfig,
-  modelName: string,
-  baseUrl = 'http://127.0.0.1:8080/v1',
-): LlamaCppOpenClawAppConfig {
-  const trimmedModelName = modelName.trim();
-  if (!trimmedModelName) {
-    throw new Error('Model name is required');
-  }
-
-  const providers = { ...(current.providers ?? {}) };
-  const existing =
-    providers[ProviderName.LlamaCpp] ??
-    migrateLegacyOllamaProvider(providers[ProviderName.Ollama], baseUrl);
-  const existingModels = existing.models ?? [];
-  const hasModel = existingModels.some(model => model.id === trimmedModelName);
-  const models = hasModel
-    ? existingModels
-    : [...existingModels, { id: trimmedModelName, name: trimmedModelName, supportsImage: false }];
-
-  providers[ProviderName.LlamaCpp] = {
-    ...existing,
-    enabled: true,
-    apiKey: existing.apiKey ?? 'no-key',
-    baseUrl: existing.baseUrl?.trim() || baseUrl,
-    apiFormat: ApiFormat.OpenAI,
-    models,
-  };
-
-  return {
-    ...current,
-    providers,
-    model: {
-      ...(current.model ?? {}),
-      defaultModel: trimmedModelName,
-      defaultModelProvider: ProviderName.LlamaCpp,
-    },
-  };
-}
-
-export function migrateLegacyOllamaProvider(
-  provider: ProviderConfig | undefined,
-  baseUrl = 'http://127.0.0.1:8080/v1',
-): ProviderConfig {
-  return {
-    enabled: provider?.enabled ?? false,
-    apiKey: provider?.apiKey?.trim() || 'no-key',
-    baseUrl,
-    apiFormat: ApiFormat.OpenAI,
-    models: provider?.models ?? [],
-  };
-}
 
 export function removeLlamaCppModelFromAppConfig(
   current: LlamaCppOpenClawAppConfig,
