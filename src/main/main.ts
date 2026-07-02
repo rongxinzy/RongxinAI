@@ -899,6 +899,10 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     console.log('[PiRuntime] Injected API keys:', injected.length > 0 ? injected.join(', ') : '(none — provider config may be empty)');
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
+    piRuntimeAdapter.setSkillManager(getSkillManager());
+    if (mcpServerManager) {
+      piRuntimeAdapter.setMcpServerManager(mcpServerManager);
+    }
   }
   return piRuntimeAdapter;
 };

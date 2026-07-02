@@ -21,7 +21,9 @@ import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
+import type { SkillManager } from '../../skillManager';
 import { getCurrentApiConfig } from '../claudeSettings';
+import type { McpServerManager } from '../mcpServerManager';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -145,11 +147,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
   private readonly approvalSessionMap = new Map<string, string>();
   private store: CoworkStore | null = null;
+  private skillManager: SkillManager | null = null;
+  private mcpServerManager: McpServerManager | null = null;
 
-  /** Set the cowork store for message persistence (mirrors OpenClaw adapter pattern). */
-  setCoworkStore(store: CoworkStore): void {
-    this.store = store;
-  }
+  setCoworkStore(store: CoworkStore): void { this.store = store; }
+  setSkillManager(mgr: SkillManager): void { this.skillManager = mgr; }
+  setMcpServerManager(mgr: McpServerManager): void { this.mcpServerManager = mgr; }
 
   // Throttle state
   private readonly lastMessageUpdateEmitTime = new Map<string, number>();
@@ -213,9 +216,18 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         cwd: options.workspaceRoot || process.cwd(),
       };
 
-      // System prompt
-      if (options.systemPrompt?.trim()) {
-        sessionOptions.systemPrompt = options.systemPrompt.trim();
+      // System prompt — merge user config + skills manifest
+      const basePrompt = options.systemPrompt?.trim() || '';
+      const skillsPrompt = this.buildSkillsPrompt();
+      const mergedPrompt = [basePrompt, skillsPrompt].filter(Boolean).join('\n\n');
+      if (mergedPrompt) {
+        sessionOptions.systemPrompt = mergedPrompt;
+      }
+
+      // MCP tools — wrap as Pi custom tools so the agent can call them
+      const mcpTools = this.buildMcpCustomTools();
+      if (mcpTools.length > 0) {
+        sessionOptions.customTools = mcpTools;
       }
 
       // Resolve provider and model from RongxinAI's current API config.
@@ -742,6 +754,49 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     for (const [requestId, sid] of this.approvalSessionMap.entries()) {
       if (sid === sessionId) this.approvalSessionMap.delete(requestId);
     }
+  }
+
+  // ── Skills & MCP integration ──
+
+  private buildSkillsPrompt(): string {
+    if (!this.skillManager) return '';
+    const skills = this.skillManager.listSkills();
+    if (skills.length === 0) return '';
+
+    const entries = skills
+      .filter((s) => s.enabled)
+      .map((s) => `<skill><id>${s.id}</id><name>${s.name}</name><description>${s.description}</description><location>${s.skillPath}</location></skill>`)
+      .join('\n');
+
+    return [
+      '## Skills (mandatory)',
+      'Before replying: scan <available_skills> <description> entries.',
+      '- If exactly one skill clearly applies: read its SKILL.md at <location>, then follow its instructions.',
+      '- If multiple skills apply: ask the user which they want.',
+      '- If zero skills match: proceed without using any skill.',
+      '',
+      '<available_skills>',
+      entries,
+      '</available_skills>',
+    ].join('\n');
+  }
+
+  private buildMcpCustomTools(): Record<string, unknown>[] {
+    if (!this.mcpServerManager) return [];
+    const manifest = this.mcpServerManager.toolManifest;
+    if (manifest.length === 0) return [];
+
+    const mgr = this.mcpServerManager;
+    return manifest.map((entry) => ({
+      name: `mcp__${entry.server}__${entry.name}`,
+      description: `[MCP: ${entry.server}] ${entry.description}`,
+      parameters: entry.inputSchema as Record<string, unknown>,
+      execute: async (args: Record<string, unknown>) => {
+        const result = await mgr.callTool(entry.server, entry.name, args);
+        if (typeof result === 'string') return result;
+        return JSON.stringify(result);
+      },
+    }));
   }
 }
 
