@@ -6017,8 +6017,6 @@ if (!gotTheLock) {
     registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
-      syncOpenClawConfig,
-      getAgentManager,
     });
     registerMarketplaceIpcHandlers({
       getModelsDir: () => getLlamaCppManager().getModelsDir(),

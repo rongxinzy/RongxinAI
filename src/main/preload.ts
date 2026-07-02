@@ -133,8 +133,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(OllamaIpcChannel.ChatStream, requestId, payload),
     cancelChatStream: (requestId: string) =>
       ipcRenderer.invoke(OllamaIpcChannel.CancelChatStream, requestId),
-    setOpenClawModel: (modelName: string) =>
-      ipcRenderer.invoke(OllamaIpcChannel.SetOpenClawModel, modelName),
     onStatusChanged: (callback: (snapshot: unknown) => void) =>
       onPush(OllamaIpcChannel.StatusChanged, callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>
