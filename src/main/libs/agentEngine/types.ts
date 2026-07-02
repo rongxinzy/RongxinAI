@@ -2,7 +2,7 @@ import type { CoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import type { CoworkMessage } from '../../coworkStore';
 
-export type CoworkAgentEngine = 'openclaw';
+export type CoworkAgentEngine = 'openclaw' | 'pi';
 
 export type PermissionResult =
   | {

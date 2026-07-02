@@ -1320,6 +1320,67 @@ export const UserMessageItem: React.FC<{
   );
 });
 
+/**
+ * Smoothly reveal `target` one small step per animation frame while `active`,
+ * so uneven streaming chunks display at a steady, adaptive character rate
+ * (豆包-style typewriter). When inactive, or when `target` shrinks / is not a
+ * prefix of what's shown, it snaps to `target` immediately — nothing is lost.
+ */
+function useSmoothText(target: string, active: boolean): string {
+  const [display, setDisplay] = useState(target);
+  const displayRef = useRef(target);
+  const targetRef = useRef(target);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    displayRef.current = display;
+  }, [display]);
+
+  useEffect(() => {
+    targetRef.current = target;
+
+    // Snap instantly when not streaming, when finished, or on any non-append
+    // change (e.g. content replaced, shrunk, or a fresh message).
+    if (!active || target === displayRef.current || !target.startsWith(displayRef.current)) {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      displayRef.current = target;
+      setDisplay(target);
+      return;
+    }
+
+    if (rafRef.current !== null) return; // animation already running
+
+    const step = () => {
+      const full = targetRef.current;
+      const shown = displayRef.current;
+      if (shown.length >= full.length) {
+        rafRef.current = null;
+        return;
+      }
+      // Adaptive speed: the larger the backlog, the more chars per frame —
+      // long answers catch up, short ones still ease in. ~1/8 of the remaining
+      // gap, clamped to [2, 40] chars/frame (~60fps → smooth but never sluggish).
+      const remaining = full.length - shown.length;
+      const stepSize = Math.min(40, Math.max(2, Math.ceil(remaining / 8)));
+      const next = full.slice(0, shown.length + stepSize);
+      displayRef.current = next;
+      setDisplay(next);
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [target, active]);
+
+  return display;
+}
+
 const AssistantMessageItem: React.FC<{
   message: CoworkMessage;
   resolveLocalFilePath?: (href: string, text: string) => string | null;
@@ -1335,7 +1396,11 @@ const AssistantMessageItem: React.FC<{
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
-  const displayContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
+  const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
+  // Smooth "typewriter" reveal while streaming, so uneven backend chunks display
+  // at a steady character rate (engine-agnostic — works for Pi and OpenClaw alike).
+  const isStreaming = message.metadata?.isStreaming === true;
+  const displayContent = useSmoothText(rawContent, isStreaming);
   const modelLabel = getMessageModelLabel(turnMetadata);
   const handleBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
     const nextTarget = event.relatedTarget;
@@ -1437,7 +1502,8 @@ const ThinkingBlock: React.FC<{
 }> = ({ message, mapDisplayText }) => {
   const isCurrentlyStreaming = Boolean(message.metadata?.isStreaming);
   const [isExpanded, setIsExpanded] = useState(isCurrentlyStreaming);
-  const displayContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
+  const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
+  const displayContent = useSmoothText(rawContent, isCurrentlyStreaming);
 
   // Auto-expand while streaming, auto-collapse when streaming completes
   useEffect(() => {
@@ -2561,6 +2627,23 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       setCurrentRailIndex(lastRail);
     }
   }, [messagesLength, lastMessageContent, isStreaming, shouldAutoScroll, turns.length]);
+
+  // While streaming, the typewriter reveals text between store updates, growing
+  // scrollHeight without re-firing the effect above. Keep the view pinned to the
+  // bottom with a lightweight rAF loop so auto-scroll follows the animation.
+  useEffect(() => {
+    if (!isStreaming || !shouldAutoScroll) return;
+    let raf: number;
+    const tick = () => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isStreaming, shouldAutoScroll]);
 
 
   if (!currentSession) {
