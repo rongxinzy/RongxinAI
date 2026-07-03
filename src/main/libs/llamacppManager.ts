@@ -52,20 +52,16 @@ import {
   refreshInstallInputFromMarketplace,
   resolveManagedModelInstallDir,
 } from './llamacppModelInstallation';
-import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import {
   createLlamaCppRuntimeInstallPlan,
   executeLlamaCppRuntimeInstallPlan,
   resolveLlamaCppExecutableName,
-  resolveLlamaCppRuntimeTargetId,
 } from './llamacppRuntimeInstaller';
 import {
   findExternalLlamaCppExecutable,
   findLlamaCppExecutable,
   getUserLlamaCppRuntimeRoot,
   resolveLlamaCppRuntimeMetadata,
-  resolveLlamaCppRuntimeTargetPreference,
-  selectLlamaCppRuntimeTarget,
 } from './llamacppRuntimePaths';
 import {
   buildLlamaCppServeEnv,
