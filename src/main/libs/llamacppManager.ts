@@ -21,6 +21,7 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
+import { applyAutomaticLlamaCppServiceDefaults } from '../../shared/llamacpp';
 import {
   fetchLlamaCppBackendManifest,
   getLlamaCppBackendCompatibilityError,
@@ -206,9 +207,13 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     const runtimeConfig = await this.resolveRuntimeServiceConfig();
+    const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
+    const resolvedRuntimeConfig = applyAutomaticLlamaCppServiceDefaults(runtimeConfig, {
+      nvidiaSnapshot,
+    });
     const runtimeCapabilities = await this.getRuntimeCapabilities().catch((): null => null);
     const filteredRuntimeConfig = filterLlamaCppServiceConfigByRuntimeCapabilities(
-      runtimeConfig,
+      resolvedRuntimeConfig,
       runtimeCapabilities,
     );
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
