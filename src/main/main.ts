@@ -900,9 +900,16 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
     piRuntimeAdapter.setSkillManager(getSkillManager());
-    if (mcpServerManager) {
-      piRuntimeAdapter.setMcpServerManager(mcpServerManager);
-    }
+    // mcpServerManager is created async later (ensureOpenClawRunningForCowork),
+    // so it is always null here. Late-injection happens on every subsequent call.
+    console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
+  }
+  // Late-injection: mcpServerManager is created async after Pi init.
+  // On subsequent calls (e.g. from IPC handlers), it is available and
+  // we inject it so Pi sessions can use MCP tools.
+  if (mcpServerManager && !piRuntimeAdapter.hasMcpServerManager()) {
+    console.log('[PiRuntime] Late-injecting mcpServerManager (was null at init)');
+    piRuntimeAdapter.setMcpServerManager(mcpServerManager);
   }
   return piRuntimeAdapter;
 };
