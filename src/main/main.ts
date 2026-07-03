@@ -899,7 +899,6 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     console.log('[PiRuntime] Injected API keys:', injected.length > 0 ? injected.join(', ') : '(none — provider config may be empty)');
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
-    piRuntimeAdapter.setSkillManager(getSkillManager());
     // mcpServerManager is created async later (ensureOpenClawRunningForCowork),
     // so it is always null here. Late-injection happens on every subsequent call.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);

@@ -15,13 +15,14 @@
  */
 
 import { randomUUID } from 'crypto';
+import { app } from 'electron';
 import { EventEmitter } from 'events';
+import path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
-import type { SkillManager } from '../../skillManager';
 import { getCurrentApiConfig } from '../claudeSettings';
 import type { McpServerManager } from '../mcpServerManager';
 import type {
@@ -147,11 +148,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
   private readonly approvalSessionMap = new Map<string, string>();
   private store: CoworkStore | null = null;
-  private skillManager: SkillManager | null = null;
   private mcpServerManager: McpServerManager | null = null;
 
   setCoworkStore(store: CoworkStore): void { this.store = store; }
-  setSkillManager(mgr: SkillManager): void { this.skillManager = mgr; }
   setMcpServerManager(mgr: McpServerManager): void { this.mcpServerManager = mgr; this.mcpInjected = true; }
   hasMcpServerManager(): boolean { return this.mcpInjected; }
   private mcpInjected = false;
@@ -766,27 +765,27 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
   // ── Skills & MCP integration ──
 
+  /**
+   * Build a skills manifest prompt using Pi's native skill discovery.
+   * Pi SDK scans the RongxinAI SKILLs directory for SKILL.md files,
+   * parses YAML frontmatter, and formats them as XML with proper escaping.
+   *
+   * This replaces the hand-rolled XML builder — Pi's formatSkillsForPrompt
+   * follows the Agent Skills standard (agentskills.io).
+   */
   private buildSkillsPrompt(): string {
-    if (!this.skillManager) return '';
-    const skills = this.skillManager.listSkills();
-    if (skills.length === 0) return '';
-
-    const entries = skills
-      .filter((s) => s.enabled)
-      .map((s) => `<skill><id>${s.id}</id><name>${s.name}</name><description>${s.description}</description><location>${s.skillPath}</location></skill>`)
-      .join('\n');
-
-    return [
-      '## Skills (mandatory)',
-      'Before replying: scan <available_skills> <description> entries.',
-      '- If exactly one skill clearly applies: read its SKILL.md at <location>, then follow its instructions.',
-      '- If multiple skills apply: ask the user which they want.',
-      '- If zero skills match: proceed without using any skill.',
-      '',
-      '<available_skills>',
-      entries,
-      '</available_skills>',
-    ].join('\n');
+    try {
+      const skillsDir = path.join(app.getPath('userData'), 'SKILLs');
+      // Use Pi's native skill loader (sync, discovers SKILL.md files recursively)
+      const { loadSkillsFromDir } = require('@earendil-works/pi-coding-agent/dist/core/skills.js');
+      const result = loadSkillsFromDir({ dir: skillsDir, source: 'rongxinai' });
+      if (result.skills.length === 0) return '';
+      // Use Pi's native formatter (XML escaping, disableModelInvocation support)
+      const { formatSkillsForPrompt } = require('@earendil-works/pi-coding-agent/dist/core/skills.js');
+      return formatSkillsForPrompt(result.skills);
+    } catch {
+      return '';
+    }
   }
 
   private buildMcpCustomTools(): Record<string, unknown>[] {
