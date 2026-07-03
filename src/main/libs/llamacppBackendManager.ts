@@ -787,11 +787,7 @@ export function listInstalledBackendRefs(runtimeRoot: string): LlamaCppBackendRe
     for (const backendEntry of fs.readdirSync(path.join(backendsRoot, versionEntry.name), { withFileTypes: true })) {
       if (!backendEntry.isDirectory()) continue;
       const ref = toBackendRef(versionEntry.name, backendEntry.name);
-      const executablePath = resolveManagedBackendExecutablePath(
-        path.join(backendsRoot, ref.version, ref.backend),
-        process.platform,
-      );
-      if (fs.existsSync(executablePath)) {
+      if (hasManagedBackendExecutable(path.join(backendsRoot, ref.version, ref.backend))) {
         refs.push(ref);
       }
     }
@@ -900,6 +896,11 @@ async function validateImportedBackendDevices(input: {
   ref: LlamaCppBackendRef;
   platform: NodeJS.Platform;
 }): Promise<string | undefined> {
+  const requiredBackend = backendRequiresDeviceValidation(input.ref.backend);
+  if (!requiredBackend) {
+    return undefined;
+  }
+
   const executablePath = getLlamaCppCurrentExecutablePath(input.runtimeRoot, input.platform);
   const devicesResult = await listLlamaCppRuntimeDevices({
     executablePath,
@@ -909,8 +910,7 @@ async function validateImportedBackendDevices(input: {
     return `Failed to detect devices: ${devicesResult.error || 'unknown error'}`;
   }
   const detectedBackends = new Set(devicesResult.devices.map(device => device.backend));
-  const requiredBackend = backendRequiresDeviceValidation(input.ref.backend);
-  if (requiredBackend && !detectedBackends.has(requiredBackend)) {
+  if (!detectedBackends.has(requiredBackend)) {
     const detected = Array.from(detectedBackends).filter(Boolean).join(', ') || 'none';
     return `The selected backend requires ${requiredBackend}, but only ${detected} devices were detected.`;
   }
@@ -1336,6 +1336,15 @@ function resolveManagedBackendExecutablePath(runtimeDir: string, platform: NodeJ
   const rootPath = path.join(runtimeDir, executableName);
   if (fs.existsSync(rootPath)) return rootPath;
   return buildBinPath;
+}
+
+function hasManagedBackendExecutable(runtimeDir: string): boolean {
+  for (const executableName of ['llama-server', 'llama-server.exe']) {
+    if (fs.existsSync(path.join(runtimeDir, 'build', 'bin', executableName))) return true;
+    if (fs.existsSync(path.join(runtimeDir, 'bin', executableName))) return true;
+    if (fs.existsSync(path.join(runtimeDir, executableName))) return true;
+  }
+  return false;
 }
 
 function removeCurrentBackendLink(runtimeRoot: string): void {
