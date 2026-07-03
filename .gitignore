@@ -19,6 +19,7 @@ __pycache__/
 .pycache
 vendor/openclaw-runtime/
 vendor/openclaw-plugins/
+vendor/llamacpp-runtime/
 
 # Tar archives generated during Windows packaging
 build-tar/

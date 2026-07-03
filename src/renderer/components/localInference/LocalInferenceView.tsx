@@ -27,7 +27,6 @@ import {
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
-import { DEFAULT_INFERENCE_OPTIONS, normalizeOptions } from './inferenceOptions';
 import { InferencePanel } from './panels/InferencePanel';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
@@ -681,7 +680,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const streamStartTime = Date.now();
 
     try {
-      const normalizedOptions = normalizeOptions(DEFAULT_INFERENCE_OPTIONS);
       const payload: OllamaChatPayload = {
         model: selectedModel,
         stream: true,
@@ -695,17 +693,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           })),
           { role: 'user', content: userMessage },
         ],
-        options: Object.fromEntries(
-          Object.entries(normalizedOptions).filter(([key]) => key !== 'chat_template_kwargs'),
-        ),
-        ...(typeof normalizedOptions.chat_template_kwargs === 'object'
-          && normalizedOptions.chat_template_kwargs
-          ? {
-              chat_template_kwargs: normalizedOptions.chat_template_kwargs as {
-                enable_thinking: boolean;
-              },
-            }
-          : {}),
       };
       const streamResult = await window.electron.llamacpp.chatStream(requestId, payload);
       if (!isCurrentRequest()) return;
