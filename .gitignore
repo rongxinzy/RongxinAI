@@ -1,4 +1,4 @@
-build/*
+build/win-full/*
 !build/entitlements.mac.plist
 !build/icons/
 !build/icons/**
