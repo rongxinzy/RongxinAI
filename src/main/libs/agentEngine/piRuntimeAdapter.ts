@@ -456,6 +456,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               ? (typeof event.message.content === 'string' ? event.message.content : JSON.stringify(event.message.content))
               : '(no content)';
             console.error('[PiRuntime] Assistant error:', errMsg, 'detail:', errDetail);
+            if (this.store) {
+              this.store.updateSession(sessionId, { status: 'error' });
+            }
             this.emit('error', sessionId, classifyCoworkError(errMsg));
             return;
           }
@@ -544,8 +547,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         break;
 
       case 'agent_end':
-        // message_end already finalized the assistant/thinking messages (via
-        // messageUpdate on their existing ids). Only emit 'complete' here.
+        // Persist completed status to SQLite so the session shows as "completed"
+        // after switching away and back (mirrors OpenClaw adapter pattern).
+        if (this.store) {
+          this.store.updateSession(sessionId, { status: 'completed' });
+        }
         this.emit('complete', sessionId, null);
         break;
 
