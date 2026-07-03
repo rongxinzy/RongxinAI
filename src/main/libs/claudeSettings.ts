@@ -1,4 +1,4 @@
-import { type ApiFormat,type ProviderConfig, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { type ApiFormat,isProviderEnabled, type ProviderConfig, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import type { SqliteStore } from '../sqliteStore';
 import type { CoworkApiConfig } from './coworkConfigStore';
 import { type AnthropicApiFormat,normalizeProviderApiFormat } from './coworkFormatTransform';
@@ -288,10 +288,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   } | null => {
     for (const [providerName, providerConfig] of Object.entries(providers)) {
       const models = getEffectiveProviderModels(providerName, providerConfig);
-      if (
-        (!providerConfig?.enabled && providerName !== ProviderName.LlamaCpp)
-        || models.length === 0
-      ) {
+      if (!isProviderEnabled(providerName, providerConfig) || models.length === 0) {
         continue;
       }
       const fallbackModel = models.find((model) => model.id?.trim());
@@ -336,7 +333,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       ? getEffectiveProviderModels(preferredProviderName, preferredProvider)
       : [];
     if (
-      ((preferredProvider?.enabled || preferredProviderName === ProviderName.LlamaCpp))
+      isProviderEnabled(preferredProviderName, preferredProvider)
       && preferredModels.some((model) => model.id === modelId)
     ) {
       providerEntry = [preferredProviderName, preferredProvider];
@@ -346,7 +343,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   if (!providerEntry) {
     providerEntry = Object.entries(providers).find(([providerName, provider]) => {
       const models = getEffectiveProviderModels(providerName, provider);
-      if ((!provider?.enabled && providerName !== ProviderName.LlamaCpp) || models.length === 0) {
+      if (!isProviderEnabled(providerName, provider) || models.length === 0) {
         return false;
       }
       return models.some((model) => model.id === modelId);
@@ -610,7 +607,7 @@ export function resolveAllProviderApiKeys(): Record<string, string> {
     if (!appConfig?.providers) return result;
 
     for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
-      if (!providerConfig?.enabled) continue;
+      if (!isProviderEnabled(providerName, providerConfig)) continue;
       if (shouldUseOpenAICodexOAuth(providerName, providerConfig)) {
         continue;
       }
@@ -663,7 +660,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
   const result: ProviderRawConfig[] = [];
 
   for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
-    if (!providerConfig?.enabled && providerName !== ProviderName.LlamaCpp) continue;
+    if (!isProviderEnabled(providerName, providerConfig)) continue;
     if (providerName === ProviderName.LobsteraiServer) continue;
 
     // When minimax is in OAuth mode, use oauthAccessToken and oauthBaseUrl

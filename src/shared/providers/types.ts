@@ -1,7 +1,9 @@
 import type { ApiFormat } from './constants';
+import { ProviderName } from './constants';
 
 export interface ProviderConfig {
   enabled: boolean;
+  userEnabled?: boolean;
   apiKey: string;
   baseUrl: string;
   apiFormat?: ApiFormat;
@@ -22,4 +24,19 @@ export interface ProviderConfig {
   oauthBaseUrl?: string;
   oauthRefreshToken?: string;
   oauthTokenExpiresAt?: number;
+}
+
+export function isProviderEnabled(
+  providerName: string,
+  providerConfig?: Pick<ProviderConfig, 'enabled' | 'userEnabled'> | null,
+): boolean {
+  if (!providerConfig) {
+    return false;
+  }
+
+  if (providerName === ProviderName.LlamaCpp) {
+    return providerConfig.userEnabled === true;
+  }
+
+  return providerConfig.enabled === true;
 }

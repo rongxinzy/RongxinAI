@@ -9,3 +9,4 @@ export {
   ProviderRegistry,
 } from './constants';
 export type { ProviderConfig } from './types';
+export { isProviderEnabled } from './types';
