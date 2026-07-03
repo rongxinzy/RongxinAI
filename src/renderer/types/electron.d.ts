@@ -18,7 +18,6 @@ import type {
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
   LlamaCppRuntimeUninstallResult,
-  LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
@@ -419,8 +418,6 @@ interface IElectronAPI {
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
     restart: () => Promise<LlamaCppStatusSnapshot>;
-    getServiceConfig: () => Promise<LlamaCppServiceConfig>;
-    setServiceConfig: (config: LlamaCppServiceConfig) => Promise<LlamaCppServiceConfig>;
     modelsDir: () => Promise<string>;
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;

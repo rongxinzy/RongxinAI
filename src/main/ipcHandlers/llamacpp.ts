@@ -297,26 +297,6 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
-  ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
-    getLlamaCppServiceConfig(options.getStore()),
-  );
-    ipcMain.handle(
-      LlamaCppIpcChannel.SetServiceConfig,
-      async (_event, config: LlamaCppServiceConfig) => {
-        const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
-        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
-        const runtimeDevicesForSanitize = runtimeDevices?.success ? runtimeDevices : null;
-        const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
-          sanitizeLlamaCppServiceConfig(
-            config,
-            runtimeDevicesForSanitize,
-          ),
-          runtimeCapabilities,
-        );
-      options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
-      return sanitized;
-    },
-  );
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
 
   ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
