@@ -1,8 +1,12 @@
 import { expect, test } from 'vitest';
 
-import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
+import {
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+} from '../../shared/llamacpp';
 import {
   getLlamaCppLoadedModelLimitViolation,
+  getLlamaCppServiceConfig,
   getRequiredVramRecoveryMiB,
   getTotalFreeVramMiB,
   hasRecoveredVram,
@@ -102,7 +106,7 @@ test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to
     cacheRam: '8192',
     ctxSize: '4096',
     parallel: '1',
-    batchSize: '2048',
+    batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
     threads: '-1',
@@ -134,7 +138,7 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
     cacheRam: '8192',
     ctxSize: '4096',
     parallel: '1',
-    batchSize: '2048',
+    batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
     threads: '-1',
@@ -200,6 +204,30 @@ test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimi
     modelsMax: '',
   })).toEqual({
     modelsMax: '0',
+  });
+});
+
+test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not configure it', () => {
+  const store = {
+    get: () => ({ modelsMax: '1' }),
+  } as unknown as Parameters<typeof getLlamaCppServiceConfig>[0];
+
+  expect(getLlamaCppServiceConfig(store)).toEqual({
+    host: '127.0.0.1',
+    port: '8080',
+    modelsMax: '1',
+    timeout: '120',
+    threadsHttp: '4',
+    cacheReuse: '256',
+    cacheRam: '8192',
+    ctxSize: '4096',
+    parallel: '1',
+    batchSize: '512',
+    ubatchSize: '512',
+    gpuLayers: 'auto',
+    threads: '-1',
+    threadsBatch: '-1',
+    mainGpu: '0',
   });
 });
 

@@ -12,6 +12,8 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
+  applyLlamaCppChatDefaults,
+  DEFAULT_LLAMACPP_SERVICE_CONFIG,
   getLlamaCppAcceleratorDevices,
   getLlamaCppLaunchContextLimitViolation,
   getLlamaCppModelsMaxLimitViolation,
@@ -38,7 +40,6 @@ import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
-const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {};
 const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
 const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
 const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
@@ -46,19 +47,19 @@ const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
-  modelsMax: '0',
-  timeout: '120',
-  threadsHttp: '4',
-  cacheReuse: '256',
-  cacheRam: '8192',
-  ctxSize: '4096',
-  parallel: '1',
-  batchSize: '2048',
-  ubatchSize: '512',
-  gpuLayers: 'auto',
-  threads: '-1',
-  threadsBatch: '-1',
-  mainGpu: '0',
+  modelsMax: DEFAULT_LLAMACPP_SERVICE_CONFIG.modelsMax ?? '0',
+  timeout: DEFAULT_LLAMACPP_SERVICE_CONFIG.timeout ?? '120',
+  threadsHttp: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsHttp ?? '4',
+  cacheReuse: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheReuse ?? '256',
+  cacheRam: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheRam ?? '8192',
+  ctxSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ctxSize ?? '4096',
+  parallel: DEFAULT_LLAMACPP_SERVICE_CONFIG.parallel ?? '1',
+  batchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.batchSize ?? '512',
+  ubatchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ubatchSize ?? '512',
+  gpuLayers: DEFAULT_LLAMACPP_SERVICE_CONFIG.gpuLayers ?? 'auto',
+  threads: DEFAULT_LLAMACPP_SERVICE_CONFIG.threads ?? '-1',
+  threadsBatch: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsBatch ?? '-1',
+  mainGpu: DEFAULT_LLAMACPP_SERVICE_CONFIG.mainGpu ?? '0',
 } as const;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
@@ -466,7 +467,7 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.Chat, async (_event, payload: LlamaCppChatPayload) => {
     const client = await manager.client();
-    return await client.chat({ ...payload, stream: false });
+    return await client.chat({ ...applyLlamaCppChatDefaults(payload), stream: false });
   });
   ipcMain.handle(
     LlamaCppIpcChannel.ChatStream,
@@ -478,10 +479,11 @@ export function registerLlamaCppIpcHandlers(
       const controller = new AbortController();
       activeChats.set(requestId, controller);
       const client = await manager.client();
+      const chatPayload = applyLlamaCppChatDefaults(payload);
       let lastChunk: LlamaCppChatChunk | null = null;
       try {
         await client.chat(
-          { ...payload, stream: true },
+          { ...chatPayload, stream: true },
           chunk => {
             lastChunk = chunk;
             broadcast(LlamaCppIpcChannel.ChatStreamChunk, { requestId, chunk });
@@ -509,8 +511,10 @@ export function registerLlamaCppIpcHandlers(
 
 export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceConfig {
   return sanitizeLlamaCppServiceConfig(
-    store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ??
-      DEFAULT_LLAMACPP_SERVICE_CONFIG,
+    {
+      ...DEFAULT_LLAMACPP_SERVICE_CONFIG,
+      ...(store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {}),
+    },
   );
 }
 
