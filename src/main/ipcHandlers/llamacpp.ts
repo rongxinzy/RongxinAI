@@ -25,7 +25,6 @@ import {
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
-  filterLlamaCppServiceConfigByRuntimeCapabilities,
   LlamaCppManager,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
