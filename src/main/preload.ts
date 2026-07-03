@@ -162,9 +162,6 @@ contextBridge.exposeInMainWorld('electron', {
     start: () => ipcRenderer.invoke(LlamaCppIpcChannel.Start),
     stop: () => ipcRenderer.invoke(LlamaCppIpcChannel.Stop),
     restart: () => ipcRenderer.invoke(LlamaCppIpcChannel.Restart),
-    getServiceConfig: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetServiceConfig),
-    setServiceConfig: (config: unknown) =>
-      ipcRenderer.invoke(LlamaCppIpcChannel.SetServiceConfig, config),
     modelsDir: () => ipcRenderer.invoke(LlamaCppIpcChannel.ModelsDir),
     listLocalModels: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListLocalModels),
     listRunningModels: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListRunningModels),

@@ -5,8 +5,6 @@ export const LlamaCppIpcChannel = {
   Start: 'llamacpp:start',
   Stop: 'llamacpp:stop',
   Restart: 'llamacpp:restart',
-  GetServiceConfig: 'llamacpp:service-config:get',
-  SetServiceConfig: 'llamacpp:service-config:set',
   ModelsDir: 'llamacpp:models-dir',
   ListLocalModels: 'llamacpp:list-local-models',
   ListRunningModels: 'llamacpp:list-running-models',

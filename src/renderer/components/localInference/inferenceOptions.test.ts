@@ -1,103 +1,79 @@
 import { expect, test } from 'vitest';
 
-import {
-  DEFAULT_INFERENCE_OPTIONS,
-  getRecommendedInferenceOptions,
-  isDefaultInferenceOptions,
-  loadInferenceOptions,
-  normalizeOptions,
-  shouldApplyModelPreset,
-} from './inferenceOptions';
+import { DEFAULT_INFERENCE_OPTIONS, normalizeOptions } from './inferenceOptions';
 
-test('normalizes inference options for llama.cpp requests', () => {
-  const normalized = normalizeOptions({
-    ...DEFAULT_INFERENCE_OPTIONS,
-    seed: 42,
-    stop: '###, END',
-    min_p: 0.1,
-    presence_penalty: 0.4,
-    reasoning_preference: 'high',
-    cache_prompt: 'disabled',
+test('uses the shared local inference defaults', () => {
+  expect(DEFAULT_INFERENCE_OPTIONS).toEqual({
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    num_predict: 1024,
+    repeat_penalty: 1.1,
+    seed: -1,
+    stop: '',
+    min_p: 0.05,
+    presence_penalty: 0,
+    reasoning_preference: 'auto',
+    cache_prompt: 'auto',
   });
+});
 
-  expect(normalized).toEqual(expect.objectContaining({
-    temperature: DEFAULT_INFERENCE_OPTIONS.temperature,
-    top_p: DEFAULT_INFERENCE_OPTIONS.top_p,
-    top_k: DEFAULT_INFERENCE_OPTIONS.top_k,
-    max_tokens: DEFAULT_INFERENCE_OPTIONS.num_predict,
-    repeat_penalty: DEFAULT_INFERENCE_OPTIONS.repeat_penalty,
-    min_p: 0.1,
-    presence_penalty: 0.4,
-    cache_prompt: false,
-    seed: 42,
-    stop: ['###', 'END'],
+test('normalizes default options for llama.cpp requests', () => {
+  expect(normalizeOptions(DEFAULT_INFERENCE_OPTIONS)).toEqual({
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    max_tokens: 1024,
+    repeat_penalty: 1.1,
+    min_p: 0.05,
+    presence_penalty: 0,
+  });
+});
+
+test('normalizes explicit overrides for request-only fields', () => {
+  expect(
+    normalizeOptions({
+      ...DEFAULT_INFERENCE_OPTIONS,
+      seed: 42,
+      stop: '###, END',
+      reasoning_preference: 'high',
+      cache_prompt: 'disabled',
+    }),
+  ).toEqual({
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    max_tokens: 1024,
+    repeat_penalty: 1.1,
+    min_p: 0.05,
+    presence_penalty: 0,
     chat_template_kwargs: {
       enable_thinking: true,
     },
-  }));
-});
-
-test('loading inference options ignores deprecated thinking-specific settings', () => {
-  const storage = new Map<string, string>();
-  const originalLocalStorage = globalThis.localStorage;
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => storage.set(key, value),
-      removeItem: (key: string) => storage.delete(key),
-      clear: () => storage.clear(),
-      key: (index: number) => Array.from(storage.keys())[index] ?? null,
-      get length() {
-        return storage.size;
-      },
-    },
-  });
-
-  storage.set('lobsterai:llamacpp-inference-options', JSON.stringify({
-    reasoning_format: 'none',
-    thinking_forced_open: 'disabled',
-    thinking_budget_tokens: 0,
-    reasoning_preference: 'high',
-  }));
-
-  const loaded = loadInferenceOptions();
-  expect(loaded.reasoning_preference).toBe('high');
-  expect(loaded).toEqual(expect.objectContaining({
-    ...DEFAULT_INFERENCE_OPTIONS,
-    reasoning_preference: 'high',
-  }));
-  expect(loaded).not.toHaveProperty('reasoning_format');
-  expect(loaded).not.toHaveProperty('thinking_forced_open');
-  expect(loaded).not.toHaveProperty('thinking_budget_tokens');
-
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: originalLocalStorage,
+    cache_prompt: false,
+    seed: 42,
+    stop: ['###', 'END'],
   });
 });
 
-test('returns a Qwen preset with a shorter thinking budget', () => {
-  const recommended = getRecommendedInferenceOptions('Qwen3.5-0.8B-GGUF');
-
-  expect(recommended).toEqual(expect.objectContaining({
-    temperature: 0.3,
-    top_p: 0.8,
-    top_k: 20,
-    repeat_penalty: 1.05,
+test('supports disabling thinking and forcing prompt cache', () => {
+  expect(
+    normalizeOptions({
+      ...DEFAULT_INFERENCE_OPTIONS,
+      reasoning_preference: 'low',
+      cache_prompt: 'enabled',
+    }),
+  ).toEqual({
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 40,
+    max_tokens: 1024,
+    repeat_penalty: 1.1,
     min_p: 0.05,
-    presence_penalty: 0.6,
-  }));
-  expect(recommended).not.toHaveProperty('reasoning_format');
-  expect(recommended).not.toHaveProperty('thinking_forced_open');
-  expect(recommended).not.toHaveProperty('thinking_budget_tokens');
-});
-
-test('detects when a preset can be auto-applied', () => {
-  expect(isDefaultInferenceOptions(DEFAULT_INFERENCE_OPTIONS)).toBe(true);
-  expect(shouldApplyModelPreset(DEFAULT_INFERENCE_OPTIONS)).toBe(true);
-  expect(shouldApplyModelPreset({
-    ...DEFAULT_INFERENCE_OPTIONS,
-    temperature: 0.2,
-  })).toBe(false);
+    presence_penalty: 0,
+    chat_template_kwargs: {
+      enable_thinking: false,
+    },
+    cache_prompt: true,
+  });
 });
