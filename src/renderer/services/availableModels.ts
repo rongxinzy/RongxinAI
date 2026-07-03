@@ -1,5 +1,5 @@
 import type { LlamaCppRunningModel } from '../../shared/llamacpp';
-import { ProviderName, ProviderRegistry } from '../../shared/providers';
+import { isProviderEnabled, ProviderName, ProviderRegistry } from '../../shared/providers';
 import { type AppConfig, getProviderDisplayName } from '../config';
 import type { Model } from '../store/slices/modelSlice';
 
@@ -26,7 +26,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
     if (providerName === ProviderName.LlamaCpp) {
       return;
     }
-    if (!providerConfig.enabled || !providerConfig.models) {
+    if (!isProviderEnabled(providerName, providerConfig) || !providerConfig.models) {
       return;
     }
 
@@ -53,8 +53,6 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   }));
 }
 
-const LLAMACPP_OPENCLAW_MIN_CTX = 32000;
-
 export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]): Model[] {
   const models: Model[] = [];
 
@@ -63,12 +61,6 @@ export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]
     if (!name) {
       return;
     }
-
-    const ctxLength = model.runtime_context_length;
-    if (ctxLength != null && ctxLength < LLAMACPP_OPENCLAW_MIN_CTX) {
-      return;
-    }
-
     models.push({
       id: name,
       name,
@@ -99,6 +91,13 @@ export function mergeAvailableModels(
 
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
   const configuredModels = buildConfiguredAvailableModels(config);
+  const llamaCppEnabled = isProviderEnabled(
+    ProviderName.LlamaCpp,
+    config.providers?.[ProviderName.LlamaCpp],
+  );
+  if (!llamaCppEnabled) {
+    return configuredModels;
+  }
 
   try {
     const runningModels = await window.electron.llamacpp.listRunningModels();

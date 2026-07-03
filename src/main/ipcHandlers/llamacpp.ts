@@ -24,6 +24,7 @@ import {
   LlamaCppRuntimeCudaMajor,
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
+import { isProviderEnabled, ProviderName } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
@@ -34,6 +35,7 @@ import {
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
+  upsertLlamaCppProviderInAppConfig,
 } from '../libs/llamacppOpenClawBinding';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
@@ -63,7 +65,31 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
 } as const;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return reason === 'llamacpp-model-stopped';
+  return (
+    reason === 'llamacpp-model-loaded'
+    || reason === 'llamacpp-model-unloaded'
+    || reason === 'llamacpp-model-launched'
+    || reason === 'llamacpp-model-stopped'
+    || reason === 'llamacpp-model-visibility-refresh'
+  );
+}
+
+export function shouldSyncOpenClawForRunningModelRefresh(input: {
+  reason: string;
+  runningModelsChanged: boolean;
+  appConfigChanged: boolean;
+  appConfig: LlamaCppOpenClawAppConfig;
+}): boolean {
+  const llamaCppEnabled = isProviderEnabled(
+    ProviderName.LlamaCpp,
+    input.appConfig.providers?.[ProviderName.LlamaCpp],
+  );
+
+  return (
+    llamaCppEnabled
+    && (input.runningModelsChanged || input.appConfigChanged)
+    && shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
+  );
 }
 
 export function getLlamaCppLoadedModelLimitViolation(input: {
@@ -177,17 +203,27 @@ export function registerLlamaCppIpcHandlers(
       forceGatewayRestartIfRunning?: boolean;
     }) => Promise<{ success: boolean; error?: string }>;
   },
-): void {
+  ): void {
   const updateRunningModelBindings = async (
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
     reason: string,
   ): Promise<void> => {
-    const changed = updateLlamaCppRunningModels(
-      runningModels
-        .map(model => buildLlamaCppRunningModelBinding(model))
-        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
-    );
-    if (changed && shouldSyncOpenClawAfterRunningModelRefresh(reason)) {
+    const bindingModels = runningModels
+      .map(model => buildLlamaCppRunningModelBinding(model))
+      .filter((model): model is NonNullable<typeof model> => Boolean(model));
+    const runningModelsChanged = updateLlamaCppRunningModels(bindingModels);
+    const store = options.getStore();
+    const current = store.get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
+    const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
+    if (appConfigUpdate.changed) {
+      store.set('app_config', appConfigUpdate.config);
+    }
+    if (shouldSyncOpenClawForRunningModelRefresh({
+      reason,
+      runningModelsChanged,
+      appConfigChanged: appConfigUpdate.changed,
+      appConfig: appConfigUpdate.config,
+    })) {
       await options.syncOpenClawConfig({
         reason,
         restartGatewayIfRunning: true,
@@ -362,7 +398,7 @@ export function registerLlamaCppIpcHandlers(
       );
     }
     const result = await manager.loadModel({ ...input, model: modelName });
-    await refreshRunningModelBindings();
+    await refreshRunningModelBindings('llamacpp-model-loaded');
     return result;
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {

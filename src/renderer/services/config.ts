@@ -153,9 +153,8 @@ const ADDED_PROVIDER_MODELS: Record<string, { models: Array<{ id: string; name: 
 class ConfigService {
   private config: AppConfig = defaultConfig;
 
-  async init() {
-    try {
-      const storedConfig = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
+  private async loadFromStorage() {
+    const storedConfig = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
       if (!storedConfig) {
         console.warn('[ConfigService] init: no stored config found, using defaults');
       }
@@ -234,10 +233,26 @@ class ConfigService {
           } as AppConfig['shortcuts'],
           providers: mergedProviders as AppConfig['providers'],
         });
+      } else {
+        this.config = defaultConfig;
       }
+  }
+
+  async init() {
+    try {
+      await this.loadFromStorage();
     } catch (error) {
       console.error('[ConfigService] init failed:', error);
     }
+  }
+
+  async reload(): Promise<AppConfig> {
+    try {
+      await this.loadFromStorage();
+    } catch (error) {
+      console.error('[ConfigService] reload failed:', error);
+    }
+    return this.config;
   }
 
   getConfig(): AppConfig {
