@@ -152,7 +152,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
   setCoworkStore(store: CoworkStore): void { this.store = store; }
   setSkillManager(mgr: SkillManager): void { this.skillManager = mgr; }
-  setMcpServerManager(mgr: McpServerManager): void { this.mcpServerManager = mgr; }
+  setMcpServerManager(mgr: McpServerManager): void { this.mcpServerManager = mgr; this.mcpInjected = true; }
+  hasMcpServerManager(): boolean { return this.mcpInjected; }
+  private mcpInjected = false;
 
   // Throttle state
   private readonly lastMessageUpdateEmitTime = new Map<string, number>();
