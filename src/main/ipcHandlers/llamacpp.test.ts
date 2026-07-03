@@ -220,14 +220,10 @@ test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not 
     threadsHttp: '4',
     cacheReuse: '256',
     cacheRam: '8192',
-    ctxSize: '4096',
     parallel: '1',
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
-    threads: '-1',
-    threadsBatch: '-1',
-    mainGpu: '0',
   });
 });
 
