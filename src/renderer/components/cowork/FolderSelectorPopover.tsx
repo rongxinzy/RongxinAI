@@ -209,7 +209,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
       >
         {/* Add Folder option */}
         <Button variant="ghost" className="w-full justify-start gap-3 rounded-t-lg" onClick={handleAddFolder}>
-          <FolderPlus className="h-4 w-4 text-secondary" />
+          <FolderPlus className="h-4 w-4 text-muted-foreground" />
           <span>{i18nService.t('addFolder')}</span>
         </Button>
 
@@ -222,10 +222,10 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
         >
           <Button variant="ghost" className="w-full justify-between gap-3 rounded-b-lg">
             <div className="flex items-center gap-3">
-              <Clock className="h-4 w-4 text-secondary" />
+              <Clock className="h-4 w-4 text-muted-foreground" />
               <span>{i18nService.t('recentFolders')}</span>
             </div>
-            <ChevronRight className="h-3 w-3 text-secondary" />
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
           </Button>
 
           {/* Recent folders submenu */}
@@ -237,11 +237,11 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
               onMouseLeave={handleSubmenuMouseLeave}
             >
               {isLoading ? (
-                <div className="px-3 py-2.5 text-sm text-secondary">
+                <div className="px-3 py-2.5 text-sm text-muted-foreground">
                   {i18nService.t('loading')}
                 </div>
               ) : recentFolders.length === 0 ? (
-                <div className="px-3 py-2.5 text-sm text-secondary">
+                <div className="px-3 py-2.5 text-sm text-muted-foreground">
                   {i18nService.t('noRecentFolders')}
                 </div>
               ) : (
@@ -252,7 +252,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
                     className="w-full justify-start gap-2 first:rounded-t-lg last:rounded-b-lg"
                     onClick={() => handleSelectRecentFolder(folder)}
                   >
-                    <Folder className="h-4 w-4 flex-shrink-0 text-secondary" />
+                    <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                     <span className="truncate">{truncatePath(folder)}</span>
                   </Button>
                 ))

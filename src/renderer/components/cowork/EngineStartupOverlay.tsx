@@ -129,7 +129,7 @@ const EngineStartupOverlay: React.FC = () => {
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                <span className="text-xs text-secondary">{progressPercent}%</span>
+                <span className="text-xs text-muted-foreground">{progressPercent}%</span>
               </div>
             )}
             {isError && (

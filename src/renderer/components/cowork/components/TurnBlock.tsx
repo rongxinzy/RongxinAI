@@ -1,6 +1,8 @@
 import { Info, TriangleAlert } from 'lucide-react';
 import React from 'react';
 
+import { getUserErrorI18nKey } from '../../../../common/coworkError';
+import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
 import { i18nService } from '../../../services/i18n';
 import type { Artifact } from '../../../types/artifact';
@@ -26,7 +28,15 @@ export const TurnBlock: React.FC<{
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const isError = !hasText(message.content) && typeof message.metadata?.error === 'string';
-    const rawContent = hasText(message.content) ? message.content
+    // If the main process stored an errorKind, translate it via i18n so the
+    // user sees a friendly message (e.g. "任务执行出错，请重试…") instead of
+    // the raw Pi error string (e.g. "content is not iterable").
+    const errorKind = message.metadata?.errorKind as CoworkErrorKind | undefined;
+    const i18nKey = isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
+    const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
+    const rawContent = i18nMessage
+      ? i18nMessage
+      : hasText(message.content) ? message.content
       : (typeof message.metadata?.error === 'string' ? message.metadata.error : '');
     const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
     const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
@@ -34,9 +44,12 @@ export const TurnBlock: React.FC<{
     return (
       <div className="rounded-lg border border-border bg-background px-3 py-2">
         <div className="flex items-center gap-2">
-          {isError ? <TriangleAlert className="h-4 w-4 text-secondary flex-shrink-0" />
-            : <Info className="h-4 w-4 text-secondary flex-shrink-0" />}
-          <div className="text-xs whitespace-pre-wrap text-secondary">{content}</div>
+          {isError ? (
+            <TriangleAlert className="size-4 text-muted-foreground flex-shrink-0" />
+          ) : (
+            <Info className="size-4 text-muted-foreground flex-shrink-0" />
+          )}
+          <div className="text-xs whitespace-pre-wrap text-muted-foreground">{content}</div>
         </div>
       </div>
     );
@@ -56,12 +69,12 @@ export const TurnBlock: React.FC<{
         <div className="flex items-start gap-2">
           <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`} />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-secondary">{i18nService.t('coworkToolResult')}</div>
+            <div className="text-sm font-medium text-muted-foreground">{i18nService.t('coworkToolResult')}</div>
             {resultLineCount > 0 && <div className="text-xs text-muted mt-0.5">{resultLineCount} {resultLineCount === 1 ? 'line' : 'lines'} of output</div>}
             {resultLineCount === 0 && showNoDetailError && <div className={`text-xs mt-0.5 ${isToolError ? 'text-red-500/80' : 'text-muted'}`}>{fallbackText}</div>}
             {(hasToolResultText || showNoDetailError) && (
               <div className="mt-2 px-3 py-2 rounded-lg bg-surface-raised max-h-64 overflow-y-auto">
-                <pre className={`text-xs whitespace-pre-wrap break-words font-mono ${isToolError ? 'text-red-500' : hasToolResultText ? 'text-foreground' : 'text-secondary italic'}`}>{displayText}</pre>
+                <pre className={`text-xs whitespace-pre-wrap break-words font-mono ${isToolError ? 'text-red-500' : hasToolResultText ? 'text-foreground' : 'text-muted-foreground italic'}`}>{displayText}</pre>
               </div>
             )}
           </div>

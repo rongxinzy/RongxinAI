@@ -144,6 +144,11 @@ const STORE_UPDATE_THROTTLE_MS = 250;
 
 // ── PiRuntimeAdapter ──
 
+// Force ANSI color output from CLI tools (npm, git, jest, etc.) run by
+// Pi's bash tool.  Pi executes commands via spawn + pipe, so TTY-aware
+// tools won't emit escape sequences without this env var.
+if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
+
 export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
   private readonly approvalSessionMap = new Map<string, string>();
@@ -198,7 +203,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     const pi = await getPiModules();
 
-    // Emit user message to UI (unless the caller already did)
+    // Emit user message to UI (unless the caller already did).
+    // Must persist via store.addMessage() — the CoworkStore is the source of
+    // truth for messages; emit alone delivers to the in-memory Redux state
+    // but never writes to SQLite, causing the prompt to vanish on session switch.
     if (!options.skipInitialUserMessage) {
       const userMsg: CoworkMessage = {
         id: randomUUID(),
@@ -207,7 +215,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         timestamp: Date.now(),
         metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
       };
-      this.emit('message', sessionId, userMsg);
+      const persisted = this.store
+        ? this.store.addMessage(sessionId, userMsg)
+        : userMsg;
+      this.emit('message', sessionId, persisted);
     }
 
     const abortController = new AbortController();
@@ -302,7 +313,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     active.thinkingMessageId = null;
     active.toolResultMessageIdByCallId.clear();
 
-    // Emit user message
+    // Emit user message (persisted to SQLite, same as startSession).
     const userMsg: CoworkMessage = {
       id: randomUUID(),
       type: 'user',
@@ -310,7 +321,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       timestamp: Date.now(),
       metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
     };
-    this.emit('message', sessionId, userMsg);
+    const persisted = this.store
+      ? this.store.addMessage(sessionId, userMsg)
+      : userMsg;
+    this.emit('message', sessionId, persisted);
 
     try {
       await active.piSession.prompt(prompt);
@@ -457,10 +471,21 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               ? (typeof event.message.content === 'string' ? event.message.content : JSON.stringify(event.message.content))
               : '(no content)';
             console.error('[PiRuntime] Assistant error:', errMsg, 'detail:', errDetail);
+            // Persist a system error message so the error survives session
+            // switching and is visible in the message list.
+            // Store the classified error kind so the renderer can translate it
+            // into a user-friendly message via i18n (e.g. "任务执行出错，请重试…").
+            // Raw errMsg is kept for console diagnostics only.
+            const classified = classifyCoworkError(errMsg);
             if (this.store) {
               this.store.updateSession(sessionId, { status: 'error' });
+              this.store.addMessage(sessionId, {
+                type: 'system',
+                content: '',
+                metadata: { error: errMsg, errorKind: classified.kind },
+              });
             }
-            this.emit('error', sessionId, classifyCoworkError(errMsg));
+            this.emit('error', sessionId, classified);
             return;
           }
 
@@ -857,6 +882,10 @@ function resolvePiProvider(): string {
 function extractStreamingSnapshot(message?: PiEvent['message']): { text: string; thinking: string } {
   if (!message?.content) return { text: '', thinking: '' };
   if (typeof message.content === 'string') return { text: message.content, thinking: '' };
+  if (typeof message.content[Symbol.iterator] !== 'function') {
+    console.warn('[PiRuntime] message.content is not iterable (type=%s), returning empty snapshot', typeof message.content);
+    return { text: '', thinking: '' };
+  }
 
   let text = '';
   let thinking = '';

@@ -47,7 +47,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = (props
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <div className="text-sm font-medium">{i18nService.t('coworkMemoryEmbeddingEnabled')}</div>
-            <div className="text-xs text-secondary">{i18nService.t('coworkMemoryEmbeddingEnabledHint')}</div>
+            <div className="text-xs text-muted-foreground">{i18nService.t('coworkMemoryEmbeddingEnabledHint')}</div>
           </div>
           <Switch checked={embeddingEnabled} onCheckedChange={onEmbeddingEnabledChange} />
         </div>
@@ -64,28 +64,28 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = (props
                   ))}
                 </SelectContent>
               </Select>
-              <div className="text-xs text-secondary mt-1">{i18nService.t('coworkMemoryEmbeddingProviderHint')}</div>
+              <div className="text-xs text-muted-foreground mt-1">{i18nService.t('coworkMemoryEmbeddingProviderHint')}</div>
             </div>
 
             <div>
               <Label className="text-xs">{i18nService.t('coworkMemoryEmbeddingModel')}</Label>
               <Input value={embeddingModel} onChange={(e) => onEmbeddingModelChange(e.target.value)}
                 placeholder="text-embedding-3-large" className="mt-1" />
-              <div className="text-xs text-secondary mt-1">{i18nService.t('coworkMemoryEmbeddingModelHint')}</div>
+              <div className="text-xs text-muted-foreground mt-1">{i18nService.t('coworkMemoryEmbeddingModelHint')}</div>
             </div>
 
             <div>
               <Label className="text-xs">{i18nService.t('coworkMemoryEmbeddingRemoteBaseUrl')}</Label>
               <Input value={embeddingRemoteBaseUrl} onChange={(e) => onEmbeddingRemoteBaseUrlChange(e.target.value)}
                 placeholder="https://api.openai.com/v1" className="mt-1" />
-              <div className="text-xs text-secondary mt-1">{i18nService.t('coworkMemoryEmbeddingRemoteBaseUrlHint')}</div>
+              <div className="text-xs text-muted-foreground mt-1">{i18nService.t('coworkMemoryEmbeddingRemoteBaseUrlHint')}</div>
             </div>
 
             <div>
               <Label className="text-xs">{i18nService.t('coworkMemoryEmbeddingRemoteApiKey')}</Label>
               <Input type="password" value={embeddingRemoteApiKey} onChange={(e) => onEmbeddingRemoteApiKeyChange(e.target.value)}
                 className="mt-1" />
-              <div className="text-xs text-secondary mt-1">{i18nService.t('coworkMemoryEmbeddingRemoteApiKeyHint')}</div>
+              <div className="text-xs text-muted-foreground mt-1">{i18nService.t('coworkMemoryEmbeddingRemoteApiKeyHint')}</div>
             </div>
 
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
@@ -99,7 +99,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = (props
                   <Label className="text-xs">{i18nService.t('coworkMemoryEmbeddingWeight')}: {embeddingVectorWeight.toFixed(2)}</Label>
                   <input type="range" min="0" max="1" step="0.01" value={embeddingVectorWeight}
                     onChange={(e) => onEmbeddingVectorWeightChange(Number(e.target.value))} className="w-full mt-1" />
-                  <div className="text-xs text-secondary mt-1">{i18nService.t('coworkMemoryEmbeddingWeightHint')}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{i18nService.t('coworkMemoryEmbeddingWeightHint')}</div>
                 </div>
               </CollapsibleContent>
             </Collapsible>

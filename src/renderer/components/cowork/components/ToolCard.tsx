@@ -1,4 +1,12 @@
-import { Terminal } from '@shared/components/ai-elements/terminal';
+import {
+  Terminal,
+  TerminalActions,
+  TerminalContent,
+  TerminalCopyButton,
+  TerminalHeader,
+  TerminalStatus,
+  TerminalTitle,
+} from '@shared/components/ai-elements/terminal';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '@shared/components/ai-elements/tool';
 import type { ToolUIPart } from 'ai';
 import { Check } from 'lucide-react';
@@ -10,6 +18,7 @@ import type { ToolGroupItem } from '../helpers/messageGrouping';
 import type { ParsedTodoItem } from '../helpers/toolUtils';
 import {
   formatToolInput,
+  getRawToolResult,
   getToolDisplayName,
   getToolResultDisplay,
   isTodoWriteToolName,
@@ -58,6 +67,13 @@ export const ToolCard: React.FC<{
   const isError = Boolean(toolResult?.metadata?.isError || toolResult?.metadata?.error);
   const toolState = hasResult ? (isError ? 'output-error' as const : 'output-available' as const) : 'input-available' as const;
   const toolResultDisplay = toolResult ? mapText(getToolResultDisplay(toolResult)) : '';
+  // Terminal preserves ANSI codes.  Pi runs bash via spawn + pipe (no TTY), so
+  // commands won't auto-color.  We force the prompt to cyan, matching the
+  // official ai-elements Terminal example (`[36m$`).
+  const u001b = String.fromCharCode(0x1b);
+  const terminalOutput = hasResult
+    ? (toolInputDisplay ? `${u001b}[36m$ ${toolInputDisplay}${u001b}[0m\n` : '') + (toolResult ? getRawToolResult(toolResult) : '')
+    : (toolInputDisplay ?? '');
 
   return (
     <div className="relative py-1">
@@ -66,7 +82,21 @@ export const ToolCard: React.FC<{
         <ToolHeader type={`tool-${rawToolName}` as ToolUIPart['type']} state={toolState} title={displayName} />
         <ToolContent className="flex flex-col gap-4">
           {isBashTool ? (
-            <Terminal output={hasResult ? toolResultDisplay : (toolInputDisplay ?? '')} isStreaming={!hasResult} />
+            <Terminal
+              output={terminalOutput}
+              isStreaming={!hasResult}
+            >
+              <TerminalHeader>
+                <TerminalTitle>{displayName}</TerminalTitle>
+                <div className="flex items-center gap-1">
+                  <TerminalStatus />
+                  <TerminalActions>
+                    <TerminalCopyButton />
+                  </TerminalActions>
+                </div>
+              </TerminalHeader>
+              <TerminalContent />
+            </Terminal>
           ) : isTodoWriteTool && todoItems ? (
             <TodoWriteInputView items={todoItems} />
           ) : isEditWithDiff && diffDataList ? (

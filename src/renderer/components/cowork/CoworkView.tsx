@@ -440,7 +440,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           <WindowTitleBar inline />
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-secondary">
+          <div className="text-muted-foreground">
             {i18nService.t('loading')}
           </div>
         </div>
@@ -550,7 +550,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
               {i18nService.t('coworkWelcome')}
             </h2>
             <p
-              className="text-sm text-secondary max-w-md mx-auto animate-fade-in-up"
+              className="text-sm text-muted-foreground max-w-md mx-auto animate-fade-in-up"
               style={{ animationDelay: '120ms', animationFillMode: 'both' }}
             >
               {i18nService.t('coworkDescription')}

@@ -254,7 +254,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
               </h3>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-secondary">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {showRelativeTime && (
               <span className="whitespace-nowrap" title={relativeTime.full}>
                 {relativeTime.compact}
@@ -317,7 +317,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             </div>
             <h2 className="text-base font-semibold">{i18nService.t('deleteTaskConfirmTitle')}</h2>
           </div>
-          <p className="text-sm text-secondary">{i18nService.t('deleteTaskConfirmMessage')}</p>
+          <p className="text-sm text-muted-foreground">{i18nService.t('deleteTaskConfirmMessage')}</p>
           <DialogFooter>
             <Button variant="outline" onClick={handleCancelDelete}>{i18nService.t('cancel')}</Button>
             <Button variant="destructive" onClick={handleConfirmDelete}>{i18nService.t('deleteSession')}</Button>
