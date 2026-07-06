@@ -1,4 +1,5 @@
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { ExternalLink } from 'lucide-react';
 import React from 'react';
 import { useDispatch } from 'react-redux';
 
@@ -105,10 +106,11 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
   const subtitle = t(TYPE_LABEL_KEY[artifact.type]);
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={handleClick}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface-raised hover:bg-surface-hover transition-colors cursor-pointer max-w-sm w-full text-left"
+      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface-raised hover:bg-surface-hover transition-colors cursor-pointer max-w-sm w-full text-left h-auto"
     >
       <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
         <IconComponent className="w-5 h-5 text-primary" />
@@ -118,10 +120,10 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
         <div className="text-xs text-secondary">{subtitle}</div>
       </div>
       <div className="flex-shrink-0 flex items-center gap-1 text-primary text-sm font-medium">
-        <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+        <ExternalLink className="w-4 h-4" />
         <span>{t('artifactOpen')}</span>
       </div>
-    </button>
+    </Button>
   );
 };
 

@@ -1,4 +1,5 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { TriangleAlert } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -29,7 +30,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
       >
         <div className="flex flex-col items-center text-center">
           <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-3">
-            <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
+            <TriangleAlert className="w-5 h-5 text-red-500" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-2">
             {i18nService.t('scheduledTasksDelete')}
@@ -38,20 +39,22 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             {i18nService.t('scheduledTasksDeleteConfirm').replace('{name}', taskName)}
           </p>
           <div className="flex items-center gap-3 w-full">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onCancel}
               className="flex-1 px-4 py-2 text-sm rounded-lg text-foreground border border-border hover:bg-surface-raised transition-colors"
             >
               {i18nService.t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               onClick={onConfirm}
               className="flex-1 px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
             >
               {i18nService.t('scheduledTasksDelete')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

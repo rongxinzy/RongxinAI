@@ -1,3 +1,4 @@
+import { PanelLeft,Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -10,8 +11,6 @@ import type {
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
-import ComposeIcon from '../icons/ComposeIcon';
-import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
 import {
@@ -524,14 +523,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 onClick={onToggleSidebar}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
-                <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
+                <PanelLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={onNewChat}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
-                <ComposeIcon className="h-4 w-4" />
+                <Pencil className="h-4 w-4" />
               </button>
               {updateBadge}
             </div>
@@ -557,9 +556,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`h-7 rounded-md px-3 text-sm transition-colors ${
+                  className={`h-7 rounded-md px-3 text-sm font-medium transition-colors ${
                     activeTab === tab
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-secondary text-secondary-foreground'
                       : 'text-secondary hover:text-foreground'
                   }`}
                 >

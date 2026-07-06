@@ -1,21 +1,20 @@
-import { CheckIcon } from '@heroicons/react/24/outline';
-import React, { useEffect, useRef,useState } from 'react';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Check, Cog, Puzzle, Search } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { Skill } from '../../types/skill';
-import Cog6ToothIcon from '../icons/Cog6ToothIcon';
-import PuzzleIcon from '../icons/PuzzleIcon';
-import SearchIcon from '../icons/SearchIcon';
 
 interface SkillsPopoverProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectSkill: (skill: Skill) => void;
   onManageSkills: () => void;
-  anchorRef: React.RefObject<HTMLElement>;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }
 
 const SkillsPopover: React.FC<SkillsPopoverProps> = ({
@@ -112,14 +111,14 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
       {/* Search input */}
       <div className="p-3 border-b border-border">
         <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary" />
-          <input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary" />
+          <Input
             ref={searchInputRef}
             type="text"
             placeholder={i18nService.t('searchSkills')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-surface text-foreground placeholder-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-surface text-foreground placeholder-secondary border border-border focus-visible:ring-2 focus-visible:ring-primary"
           />
         </div>
       </div>
@@ -134,10 +133,11 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
           filteredSkills.map((skill) => {
             const isActive = activeSkillIds.includes(skill.id);
             return (
-              <button
+              <Button
                 key={skill.id}
+                variant="ghost"
                 onClick={() => handleSelectSkill(skill)}
-                className={`w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors ${
+                className={`w-full flex items-start gap-3 px-3 py-2.5 h-auto text-left transition-colors ${
                   isActive
                     ? 'dark:bg-primary/10 bg-primary/10'
                     : 'hover:bg-surface-raised'
@@ -149,9 +149,9 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                     : 'bg-surface-raised'
                 }`}>
                   {isActive ? (
-                    <CheckIcon className="h-4 w-4" />
+                    <Check className="h-4 w-4" />
                   ) : (
-                    <PuzzleIcon className="h-4 w-4 text-secondary" />
+                    <Puzzle className="h-4 w-4 text-secondary" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -173,7 +173,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                     {skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}
                   </p>
                 </div>
-              </button>
+              </Button>
             );
           })
         )}
@@ -181,13 +181,14 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
 
       {/* Footer - Manage Skills */}
       <div className="border-t border-border">
-        <button
+        <Button
+          variant="ghost"
           onClick={handleManageSkills}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm text-foreground hover:bg-surface-raised transition-colors rounded-b-xl"
+          className="w-full flex items-center justify-between px-4 py-3 h-auto text-sm text-foreground hover:bg-surface-raised transition-colors rounded-b-xl"
         >
           <span>{i18nService.t('manageSkills')}</span>
-          <Cog6ToothIcon className="h-4 w-4 text-secondary" />
-        </button>
+          <Cog className="h-4 w-4 text-secondary" />
+        </Button>
       </div>
     </div>
   );

@@ -1,7 +1,12 @@
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import { Switch } from '@shared/components/ui/switch';
+import { Textarea } from '@shared/components/ui/textarea';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
 import type { AgentTriageOverride } from '@shared/triage';
+import { Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -18,7 +23,6 @@ import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/opencla
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
 import { isLlamaCppModelRef } from '../cowork/agentModelSelection';
-import TrashIcon from '../icons/TrashIcon';
 import AgentAvatarPicker from './AgentAvatarPicker';
 import AgentConfirmDialog from './AgentConfirmDialog';
 import AgentDetailToolbar from './AgentDetailToolbar';
@@ -341,12 +345,12 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
           {hint}
         </p>
       )}
-      <textarea
+      <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 w-full resize-none border border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-secondary/45 focus:outline-none"
+        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-secondary/45 focus-visible:ring-0"
       />
     </div>
   );
@@ -516,7 +520,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <AgentAvatarPicker value={icon} onChange={setIcon} />
             <div className="min-w-0 flex-1 pt-0.5">
-              <input
+              <Input
                 type="text"
                 value={nameInputValue}
                 onChange={(e) => {
@@ -525,31 +529,32 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                 }}
                 placeholder={i18nService.t('agentNamePlaceholder')}
                 aria-label={i18nService.t('agentName')}
-                className="w-full bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-secondary/40 focus:outline-none"
+                className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-secondary/40 focus-visible:ring-0"
               />
-              <input
+              <Input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={i18nService.t('agentDescriptionPlaceholder')}
                 aria-label={i18nService.t('agentDescription')}
-                className="mt-0.5 w-full bg-transparent text-sm leading-5 text-secondary placeholder:text-secondary/50 focus:outline-none"
+                className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-secondary placeholder:text-secondary/50 focus-visible:ring-0"
               />
             </div>
           </div>
-          <button type="button" onClick={handleClose} className="mt-1 p-2 rounded-lg hover:bg-surface-raised transition-colors">
-            <XMarkIcon className="h-5 w-5 text-secondary" />
-          </button>
+          <Button type="button" variant="ghost" size="icon" onClick={handleClose} className="mt-1">
+            <X className="h-5 w-5 text-secondary" />
+          </Button>
         </div>
 
         {/* Tab bar */}
         <div className="flex shrink-0 border-b border-border px-4">
           {tabs.map((tab) => (
-            <button
+            <Button
               key={tab.key}
               type="button"
+              variant="ghost"
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+              className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'text-foreground'
                   : 'text-secondary hover:text-foreground'
@@ -559,7 +564,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               {activeTab === tab.key && (
                 <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-foreground rounded-full" />
               )}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -621,22 +626,13 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       {i18nService.t('agentTriageEnableHint')}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
+                  <Switch
+                    checked={!!triageOverride.enabled}
+                    onCheckedChange={(checked) => {
                       setTriageCustom(true);
-                      dispatchTriage({ enabled: !triageOverride.enabled });
+                      dispatchTriage({ enabled: checked });
                     }}
-                    className={`w-9 h-5 rounded-full flex items-center transition-colors shrink-0 ${
-                      triageOverride.enabled ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
-                    }`}
-                  >
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform ${
-                        triageOverride.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                      }`}
-                    />
-                  </button>
+                  />
                 </div>
 
                 {triageOverride.enabled && (
@@ -671,17 +667,21 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       <label className="text-sm font-medium text-foreground block mb-1">
                         {i18nService.t('agentTriageLightModel')}
                       </label>
-                      <select
-                        value={triageOverride.lightModelRef || ''}
-                        onChange={(e) => dispatchTriage({ lightModelRef: e.target.value })}
-                        className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                      <Select
+                        value={triageOverride.lightModelRef || undefined}
+                        onValueChange={(value) => dispatchTriage({ lightModelRef: value || undefined })}
                       >
-                        <option value="">不指定（使用 Agent 默认模型）</option>
-                        {availableModels.map((m) => {
-                          const ref = `${m.providerKey || 'unknown'}/${m.id}`;
-                          return <option key={ref} value={ref}>{m.name || m.id}</option>;
-                        })}
-                      </select>
+                        <SelectTrigger className="w-full text-sm border-border bg-surface text-foreground">
+                          <SelectValue placeholder="不指定（使用 Agent 默认模型）" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">不指定（使用 Agent 默认模型）</SelectItem>
+                          {availableModels.map((m) => {
+                            const ref = `${m.providerKey || 'unknown'}/${m.id}`;
+                            return <SelectItem key={ref} value={ref}>{m.name || m.id}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Heavy model */}
@@ -689,17 +689,21 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       <label className="text-sm font-medium text-foreground block mb-1">
                         {i18nService.t('agentTriageHeavyModel')}
                       </label>
-                      <select
-                        value={triageOverride.heavyModelRef || ''}
-                        onChange={(e) => dispatchTriage({ heavyModelRef: e.target.value })}
-                        className="w-full text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground"
+                      <Select
+                        value={triageOverride.heavyModelRef || undefined}
+                        onValueChange={(value) => dispatchTriage({ heavyModelRef: value || undefined })}
                       >
-                        <option value="">不指定（使用 Agent 默认模型）</option>
-                        {availableModels.map((m) => {
-                          const ref = `${m.providerKey || 'unknown'}/${m.id}`;
-                          return <option key={ref} value={ref}>{m.name || m.id}</option>;
-                        })}
-                      </select>
+                        <SelectTrigger className="w-full text-sm border-border bg-surface text-foreground">
+                          <SelectValue placeholder="不指定（使用 Agent 默认模型）" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">不指定（使用 Agent 默认模型）</SelectItem>
+                          {availableModels.map((m) => {
+                            const ref = `${m.providerKey || 'unknown'}/${m.id}`;
+                            return <SelectItem key={ref} value={ref}>{m.name || m.id}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Cross provider */}
@@ -707,19 +711,10 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       <span className="text-sm text-foreground">
                         {i18nService.t('agentTriageCrossProvider')}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => dispatchTriage({ allowCrossProviderSwitch: !triageOverride.allowCrossProviderSwitch })}
-                        className={`w-9 h-5 rounded-full flex items-center transition-colors ${
-                          triageOverride.allowCrossProviderSwitch ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
-                        }`}
-                      >
-                        <div
-                          className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform ${
-                            triageOverride.allowCrossProviderSwitch ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                          }`}
-                        />
-                      </button>
+                      <Switch
+                        checked={!!triageOverride.allowCrossProviderSwitch}
+                        onCheckedChange={(checked) => dispatchTriage({ allowCrossProviderSwitch: checked })}
+                      />
                     </label>
 
                     {triageOverride.allowCrossProviderSwitch && (
@@ -744,23 +739,24 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
           />
           <div className="flex shrink-0 gap-2">
             {!isMainAgent && (
-              <button
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                className="inline-flex h-9 items-center gap-1.5"
               >
-                <TrashIcon className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" />
                 {i18nService.t('delete')}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={handleSave}
               disabled={!name.trim() || saving}
-              className="h-9 px-5 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="h-9 px-5"
             >
               {saving ? i18nService.t('saving') : i18nService.t('save')}
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

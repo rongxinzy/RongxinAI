@@ -1,11 +1,11 @@
+import { Button } from '@shared/components/ui/button';
+import { Puzzle, X } from 'lucide-react';
 import React from 'react';
-import { useDispatch,useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
-import { clearActiveSkills,toggleActiveSkill } from '../../store/slices/skillSlice';
-import PuzzleIcon from '../icons/PuzzleIcon';
-import XMarkIcon from '../icons/XMarkIcon';
+import { clearActiveSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 
 const ActiveSkillBadge: React.FC = () => {
   const dispatch = useDispatch();
@@ -35,29 +35,32 @@ const ActiveSkillBadge: React.FC = () => {
           key={skill.id}
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-primary"
         >
-          <PuzzleIcon className="h-3.5 w-3.5 text-primary" />
+          <Puzzle className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-medium text-primary max-w-[80px] truncate">
             {skill.name}
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={(e) => handleRemoveSkill(e, skill.id)}
-            className="p-0.5 rounded hover:bg-primary-muted transition-colors"
+            className="rounded hover:bg-primary-muted transition-colors"
             title={i18nService.t('clearSkill')}
           >
-            <XMarkIcon className="h-2.5 w-2.5 text-primary" />
-          </button>
+            <X className="h-2.5 w-2.5 text-primary" />
+          </Button>
         </div>
       ))}
       {activeSkills.length > 1 && (
-        <button
+        <Button
           type="button"
+          variant="link"
           onClick={handleClearAll}
-          className="text-xs text-primary hover:text-primary-hover transition-colors"
+          className="text-xs text-primary hover:text-primary-hover transition-colors px-0"
           title={i18nService.t('clearAllSkills')}
         >
           {i18nService.t('clearAll')}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -21,7 +21,7 @@ import {
   SearchQuery,
   setSearchQuery,
 } from '@codemirror/search';
-import { Compartment, EditorState,Extension } from '@codemirror/state';
+import { Compartment, EditorState, Extension } from '@codemirror/state';
 import {
   crosshairCursor,
   drawSelection,
@@ -33,21 +33,23 @@ import {
   Panel,
   rectangularSelection,
 } from '@codemirror/view';
-import {
-  ArrowDownTrayIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/24/outline';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+import { Button } from '@shared/components/ui/button';
+// CopyIcon removed — using Copy from lucide-react instead
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@shared/components/ui/tooltip';
 import CodeMirror from '@uiw/react-codemirror';
-import React, { useCallback, useEffect, useMemo,useRef, useState } from 'react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Download,
+  Search,
+} from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { i18nService } from '../services/i18n';
-import CopyIcon from './icons/CopyIcon';
-import Tooltip, { TooltipAlign, TooltipPosition } from './ui/Tooltip';
 
 /** Word-wrap toggle icon: mimics a "wrap text" glyph */
 const WrapTextIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -877,7 +879,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
                 ariaLabel={searchOpen ? t('codeBlockSearchClose') : t('codeBlockSearch')}
                 active={searchOpen}
               >
-                <MagnifyingGlassIcon className="h-4 w-4" />
+                <Search className="h-4 w-4" />
               </HeaderButton>
             </CodeBlockTooltip>
             <CodeBlockTooltip content={wrap ? t('codeBlockWordWrapOff') : t('codeBlockWordWrap')}>
@@ -892,8 +894,8 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
             <CodeBlockTooltip content={t('copyToClipboard')}>
               <HeaderButton onClick={handleCopy} ariaLabel={t('copyToClipboard')}>
                 {isCopied
-                  ? <CheckIcon className="h-4 w-4 text-green-500" />
-                  : <CopyIcon className="h-4 w-4" />}
+                  ? <Check className="h-4 w-4 text-green-500" />
+                  : <Copy className="h-4 w-4" />}
               </HeaderButton>
             </CodeBlockTooltip>
             {/* Divider */}
@@ -930,15 +932,18 @@ const CodeBlockTooltip: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ content, children, className }) => (
-  <Tooltip
-    content={content}
-    className={className}
-    position={TooltipPosition.Bottom}
-    align={TooltipAlign.End}
-    delay={300}
-  >
-    {children}
-  </Tooltip>
+  <TooltipProvider delay={300}>
+    <Tooltip>
+      <TooltipTrigger render={<div className={className}>{children}</div>} />
+      <TooltipContent
+        side="bottom"
+        align="end"
+        className="bg-surface-overlay text-foreground border-border shadow-lg"
+      >
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
 );
 
 /** Thin icon button used in the code block header */
@@ -948,11 +953,13 @@ const HeaderButton: React.FC<{
   active?: boolean;
   children: React.ReactNode;
 }> = ({ onClick, ariaLabel, active = false, children }) => (
-  <button
+  <Button
     type="button"
+    variant="ghost"
+    size="icon"
     onClick={onClick}
     className={[
-      'inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors transform-gpu',
+      'h-7 w-7 rounded-md transition-colors transform-gpu',
       active
         ? 'bg-surface text-foreground'
         : 'text-secondary hover:bg-surface hover:text-foreground',
@@ -960,7 +967,7 @@ const HeaderButton: React.FC<{
     aria-label={ariaLabel}
   >
     {children}
-  </button>
+  </Button>
 );
 
 // ---------------------------------------------------------------------------
@@ -1378,18 +1385,20 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
             content={i18nService.t('copyToClipboard')}
             className="absolute top-2 right-2 z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200"
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={handleCopy}
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary hover:bg-surface-raised hover:text-foreground transition-colors transform-gpu"
               aria-label={i18nService.t('copyToClipboard')}
             >
               {isCopied ? (
-                <CheckIcon className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-500" />
               ) : (
-                <CopyIcon className="h-4 w-4" />
+                <Copy className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </CodeBlockTooltip>
           <code className="block px-4 py-3 font-mono dark:text-gray-100 text-gray-800 whitespace-pre">
             {trimmedCodeText}
@@ -1431,9 +1440,9 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               active={collapsed}
             >
               {collapsed ? (
-                <ChevronDownIcon className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4" />
               ) : (
-                <ChevronUpIcon className="h-4 w-4" />
+                <ChevronUp className="h-4 w-4" />
               )}
             </HeaderButton>
           </CodeBlockTooltip>
@@ -1445,7 +1454,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
                 ariaLabel={searchOpen ? i18nService.t('codeBlockSearchClose') : i18nService.t('codeBlockSearch')}
                 active={searchOpen}
               >
-                <MagnifyingGlassIcon className="h-4 w-4" />
+                <Search className="h-4 w-4" />
               </HeaderButton>
             </CodeBlockTooltip>
           )}
@@ -1472,9 +1481,9 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
           <CodeBlockTooltip content={i18nService.t('copyToClipboard')}>
             <HeaderButton onClick={handleCopy} ariaLabel={i18nService.t('copyToClipboard')}>
               {isCopied ? (
-                <CheckIcon className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-500" />
               ) : (
-                <CopyIcon className="h-4 w-4" />
+                <Copy className="h-4 w-4" />
               )}
             </HeaderButton>
           </CodeBlockTooltip>
@@ -1482,9 +1491,9 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
           <CodeBlockTooltip content={i18nService.t('saveToFile')}>
             <HeaderButton onClick={handleSave} ariaLabel={i18nService.t('saveToFile')}>
               {isSaved ? (
-                <CheckIcon className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-500" />
               ) : (
-                <ArrowDownTrayIcon className="h-4 w-4" />
+                <Download className="h-4 w-4" />
               )}
             </HeaderButton>
           </CodeBlockTooltip>

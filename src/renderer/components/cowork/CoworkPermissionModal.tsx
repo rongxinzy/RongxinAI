@@ -1,4 +1,5 @@
-import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { TriangleAlert, X } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -347,7 +348,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
           <div className={`p-2 rounded-full ${isQuestionTool && !isConfirmMode ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
-            <ExclamationTriangleIcon className={`h-6 w-6 ${isQuestionTool && !isConfirmMode ? 'text-blue-600 dark:text-blue-500' : 'text-yellow-600 dark:text-yellow-500'}`} />
+            <TriangleAlert className={`h-6 w-6 ${isQuestionTool && !isConfirmMode ? 'text-blue-600 dark:text-blue-500' : 'text-yellow-600 dark:text-yellow-500'}`} />
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-foreground">
@@ -361,13 +362,9 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                 : i18nService.t('coworkPermissionDescription')}
             </p>
           </div>
-          <button
-            onClick={handleDeny}
-            className="p-2 rounded-lg hover:bg-surface-raised text-secondary transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={handleDeny} aria-label="Close">
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
         {/* Content */}
@@ -427,21 +424,17 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                       {question.options.map((option) => {
                         const isSelected = selectedValues.includes(option.label);
                         return (
-                          <button
+                          <Button
                             key={option.label}
-                            type="button"
+                            variant={isSelected ? 'default' : 'outline'}
+                            className="w-full justify-start"
                             onClick={() => handleSelectOption(question, option.label)}
-                            className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
-                              isSelected
-                                ? 'border-primary bg-primary/10 text-foreground'
-                                : 'border-border text-secondary hover:bg-surface-raised'
-                            }`}
                           >
                             <div className="text-sm font-medium">{option.label}</div>
                             {option.description && (
                               <div className="text-xs mt-1 opacity-80">{option.description}</div>
                             )}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -481,7 +474,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         {/* Warning for dangerous operations - 固定在滚动区域外，始终可见 */}
         {(!isQuestionTool || isConfirmMode) && dangerLevel === 'destructive' && (
           <div className="flex items-start gap-2 p-3 mx-6 my-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <ExclamationTriangleIcon className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <TriangleAlert className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-red-700 dark:text-red-400">
                 {i18nService.t('coworkDestructiveOperation')}
@@ -494,7 +487,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         )}
         {(!isQuestionTool || isConfirmMode) && dangerLevel === 'caution' && (
           <div className="flex items-start gap-2 p-3 mx-6 my-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+            <TriangleAlert className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
                 {i18nService.t('coworkCautionOperation')}
@@ -508,19 +501,18 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-          <button
+          <Button
+            variant="ghost"
             onClick={isConfirmMode && confirmModeButtons ? () => handleConfirmModeSelect(confirmModeButtons.secondary.label) : handleDeny}
-            className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
           >
             {isConfirmMode && confirmModeButtons ? confirmModeButtons.secondary.label : denyButtonLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleApprove}
             disabled={!isComplete}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-primary hover:bg-primary-hover text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isConfirmMode && confirmModeButtons ? confirmModeButtons.primary.label : approveButtonLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

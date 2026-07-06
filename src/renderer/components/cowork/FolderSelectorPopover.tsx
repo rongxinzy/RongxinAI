@@ -1,13 +1,11 @@
+import { Button } from '@shared/components/ui/button';
+import { ChevronRight, Clock, Folder, FolderPlus } from 'lucide-react';
 import React, { useCallback,useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { getCompactFolderName } from '../../utils/path';
-import ChevronRightIcon from '../icons/ChevronRightIcon';
-import ClockIcon from '../icons/ClockIcon';
-import FolderIcon from '../icons/FolderIcon';
-import FolderPlusIcon from '../icons/FolderPlusIcon';
 
 interface FolderSelectorPopoverProps {
   isOpen: boolean;
@@ -210,13 +208,10 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
         style={portal ? portalStyle : undefined}
       >
         {/* Add Folder option */}
-        <button
-          onClick={handleAddFolder}
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-surface-raised transition-colors rounded-t-lg"
-        >
-          <FolderPlusIcon className="h-4 w-4 text-secondary" />
+        <Button variant="ghost" className="w-full justify-start gap-3 rounded-t-lg" onClick={handleAddFolder}>
+          <FolderPlus className="h-4 w-4 text-secondary" />
           <span>{i18nService.t('addFolder')}</span>
-        </button>
+        </Button>
 
         {/* Recent Folders option */}
         <div
@@ -225,15 +220,13 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
           onMouseEnter={handleSubmenuMouseEnter}
           onMouseLeave={handleSubmenuMouseLeave}
         >
-          <button
-            className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-surface-raised transition-colors rounded-b-lg"
-          >
+          <Button variant="ghost" className="w-full justify-between gap-3 rounded-b-lg">
             <div className="flex items-center gap-3">
-              <ClockIcon className="h-4 w-4 text-secondary" />
+              <Clock className="h-4 w-4 text-secondary" />
               <span>{i18nService.t('recentFolders')}</span>
             </div>
-            <ChevronRightIcon className="h-3 w-3 text-secondary" />
-          </button>
+            <ChevronRight className="h-3 w-3 text-secondary" />
+          </Button>
 
           {/* Recent folders submenu */}
           {showRecentSubmenu && (
@@ -253,14 +246,15 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
                 </div>
               ) : (
                 recentFolders.map((folder, index) => (
-                  <button
+                  <Button
                     key={index}
+                    variant="ghost"
+                    className="w-full justify-start gap-2 first:rounded-t-lg last:rounded-b-lg"
                     onClick={() => handleSelectRecentFolder(folder)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-raised transition-colors text-left first:rounded-t-lg last:rounded-b-lg"
                   >
-                    <FolderIcon className="h-4 w-4 flex-shrink-0 text-secondary" />
+                    <Folder className="h-4 w-4 flex-shrink-0 text-secondary" />
                     <span className="truncate">{truncatePath(folder)}</span>
-                  </button>
+                  </Button>
                 ))
               )}
             </div>

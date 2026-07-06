@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
@@ -66,16 +67,18 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
     <div className="h-full flex flex-col overflow-hidden">
       {isCsv && (
         <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border shrink-0">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowTable(!showTable)}
-            className={`px-2 py-0.5 text-xs rounded transition-colors ${
+            className={`px-2 py-0.5 text-xs rounded transition-colors h-auto ${
               showTable
-                ? 'bg-primary/10 text-primary'
+                ? 'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary'
                 : 'text-secondary hover:text-foreground hover:bg-surface'
             }`}
           >
             {showTable ? t('artifactTextView') : t('artifactTableView')}
-          </button>
+          </Button>
         </div>
       )}
 

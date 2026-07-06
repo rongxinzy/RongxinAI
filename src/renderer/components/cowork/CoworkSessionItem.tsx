@@ -1,14 +1,11 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@shared/components/ui/dropdown-menu';
+import { Ellipsis, ListChecks, Pencil, Pin, Trash2, TriangleAlert } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { CoworkSessionStatus, CoworkSessionSummary } from '../../types/cowork';
-import Modal from '../common/Modal';
-import EllipsisHorizontalIcon from '../icons/EllipsisHorizontalIcon';
-import ListChecksIcon from '../icons/ListChecksIcon';
-import PencilSquareIcon from '../icons/PencilSquareIcon';
-import PushPinIcon from '../icons/PushPinIcon';
-import TrashIcon from '../icons/TrashIcon';
 
 interface CoworkSessionItemProps {
   session: CoworkSessionSummary;
@@ -80,8 +77,6 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(session.title);
-  const [menuPosition, setMenuPosition] = useState<{ right: number; y: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const ignoreNextBlurRef = useRef(false);
@@ -93,50 +88,18 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
     }
   }, [isRenaming, session.title]);
 
-  const calculateMenuPosition = (height: number) => {
-    const rect = actionButtonRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    const padding = 8;
-    const right = Math.max(padding, window.innerWidth - rect.right);
-    const y = Math.min(rect.bottom + 8, window.innerHeight - height - padding);
-    return { right, y };
-  };
-
-  const openMenu = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isRenaming) return;
-    if (menuPosition) {
-      closeMenu();
-      return;
-    }
-    const menuHeight = showBatchOption ? 156 : 120;
-    const position = calculateMenuPosition(menuHeight);
-    if (position) {
-      setMenuPosition(position);
-    }
-    setShowConfirmDelete(false);
-  };
-
-  const closeMenu = () => {
-    setMenuPosition(null);
-    setShowConfirmDelete(false);
-  };
-
-  /* eslint-disable react-hooks/exhaustive-deps */
-  const handleTogglePin = (e: React.MouseEvent) => {
+  const handleTogglePin = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onTogglePin(!session.pinned);
-    closeMenu();
-  };
+  }, [onTogglePin, session.pinned]);
 
-  const handleRenameClick = (e: React.MouseEvent) => {
+  const handleRenameClick = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     ignoreNextBlurRef.current = false;
     setIsRenaming(true);
     setShowConfirmDelete(false);
     setRenameValue(session.title);
-    setMenuPosition(null);
-  };
+  }, [session.title]);
 
   const handleRenameSave = (e?: React.SyntheticEvent) => {
     e?.stopPropagation();
@@ -163,11 +126,10 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
     handleRenameSave(event);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
+  const handleDeleteClick = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setShowConfirmDelete(true);
-    setMenuPosition(null);
-  };
+  }, []);
 
   const handleConfirmDelete = () => {
     onDelete();
@@ -179,53 +141,17 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
     setShowConfirmDelete(false);
   };
 
-  const handleBatchClick = (e: React.MouseEvent) => {
+  const handleBatchClick = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    closeMenu();
     onEnterBatchMode();
-  };
-
-  useEffect(() => {
-    if (!menuPosition) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (!menuRef.current?.contains(target) && !actionButtonRef.current?.contains(target)) {
-        closeMenu();
-      }
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeMenu();
-      }
-    };
-    const handleScroll = () => closeMenu();
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [menuPosition]);
-
-  useEffect(() => {
-    if (!menuPosition) return;
-    const menuHeight = showConfirmDelete ? 112 : (showBatchOption ? 156 : 120);
-    const position = calculateMenuPosition(menuHeight);
-    if (position && (position.right !== menuPosition.right || position.y !== menuPosition.y)) {
-      setMenuPosition(position);
-    }
-  }, [menuPosition, showConfirmDelete]);
+  }, [onEnterBatchMode]);
 
   useEffect(() => {
     if (!isRenaming) return;
 
     requestAnimationFrame(() => {
       renameInputRef.current?.focus();
-  /* eslint-enable react-hooks/exhaustive-deps */
+   
       renameInputRef.current?.select();
     });
   }, [isRenaming]);
@@ -266,7 +192,6 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
     <div
       onClick={() => {
         if (isRenaming) return;
-        closeMenu();
         if (isBatchMode) {
           onToggleSelection();
           return;
@@ -353,90 +278,52 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
               : 'opacity-0 group-hover:opacity-100'
         }`}
       >
-        <button
-          ref={actionButtonRef}
-          onClick={openMenu}
-          className="p-1.5 rounded-lg bg-surface-raised text-secondary hover:bg-surface hover:bg-surface transition-colors"
-          aria-label={actionLabel}
-        >
-          {session.pinned ? (
-            <span className="relative block h-4 w-4">
-              <PushPinIcon className="h-4 w-4 transition-opacity duration-150 group-hover:opacity-0" />
-              <EllipsisHorizontalIcon className="absolute inset-0 h-4 w-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
-            </span>
-          ) : (
-            <EllipsisHorizontalIcon className="h-4 w-4" />
-          )}
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger>
+            <Button ref={actionButtonRef as React.Ref<HTMLButtonElement>} variant="ghost" size="icon-sm" aria-label={actionLabel}>
+              {session.pinned ? (
+                <span className="relative block h-4 w-4">
+                  <Pin className="h-4 w-4 transition-opacity duration-150 group-hover:opacity-0" />
+                  <Ellipsis className="absolute inset-0 h-4 w-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
+                </span>
+              ) : (
+                <Ellipsis className="h-4 w-4" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[124px]">
+            {menuItems.map((item) => (
+              <DropdownMenuItem key={item.key} onClick={item.onClick}>
+                <span className="flex items-center gap-2">
+                  {item.key === 'batch' && <ListChecks className="h-4 w-4" />}
+                  {item.key === 'rename' && <Pencil className="h-4 w-4" />}
+                  {item.key === 'pin' && <Pin className={`h-4 w-4 ${session.pinned ? 'opacity-60' : ''}`} />}
+                  {item.key === 'delete' && <Trash2 className="h-4 w-4" />}
+                  {item.label}
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       )}
 
-      {menuPosition && (
-        <div
-          ref={menuRef}
-          className="fixed z-50 w-max min-w-[124px] max-w-[calc(100vw-16px)] rounded-xl border border-border bg-surface shadow-lg overflow-hidden"
-          style={{ top: menuPosition.y, right: menuPosition.right }}
-          role="menu"
-        >
-          {menuItems.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={item.onClick}
-              className="w-full flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-surface-raised"
-            >
-              {item.key === 'batch' && <ListChecksIcon className="h-4 w-4" />}
-              {item.key === 'rename' && <PencilSquareIcon className="h-4 w-4" />}
-              {item.key === 'pin' && (
-                <PushPinIcon
-                  slashed={session.pinned}
-                  className={`h-4 w-4 ${session.pinned ? 'opacity-60' : ''}`}
-                />
-              )}
-              {item.key === 'delete' && <TrashIcon className="h-4 w-4" />}
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showConfirmDelete && (
-        <Modal onClose={handleCancelDelete} className="w-full max-w-sm mx-4 bg-surface rounded-2xl shadow-xl overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4">
-              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-500" />
-              </div>
-              <h2 className="text-base font-semibold text-foreground">
-                {i18nService.t('deleteTaskConfirmTitle')}
-              </h2>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showConfirmDelete} onOpenChange={(open) => { if (!open) handleCancelDelete(); }}>
+        <DialogContent className="max-w-sm" showCloseButton={false}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
+              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
             </div>
-
-            {/* Content */}
-            <div className="px-5 pb-4">
-              <p className="text-sm text-secondary">
-                {i18nService.t('deleteTaskConfirmMessage')}
-              </p>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-              <button
-                onClick={handleCancelDelete}
-                className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
-              >
-                {i18nService.t('cancel')}
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
-              >
-                {i18nService.t('deleteSession')}
-              </button>
-            </div>
-        </Modal>
-      )}
+            <h2 className="text-base font-semibold">{i18nService.t('deleteTaskConfirmTitle')}</h2>
+          </div>
+          <p className="text-sm text-secondary">{i18nService.t('deleteTaskConfirmMessage')}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelDelete}>{i18nService.t('cancel')}</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>{i18nService.t('deleteSession')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

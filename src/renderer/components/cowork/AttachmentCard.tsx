@@ -1,10 +1,11 @@
+import { Button } from '@shared/components/ui/button';
+import { X } from 'lucide-react';
 import React, { useEffect,useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { DraftAttachment } from '../../store/slices/coworkSlice';
 import FileTypeIcon from '../icons/fileTypes/FileTypeIcon';
 import { getFileTypeInfo,ImageFileIcon } from '../icons/fileTypes/index';
-import XMarkIcon from '../icons/XMarkIcon';
 
 interface AttachmentCardProps {
   attachment: DraftAttachment;
@@ -91,15 +92,16 @@ const ImageCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
       </div>
 
       {/* Delete button — top-right, visible on hover */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="absolute top-0.5 right-0.5 hidden group-hover:flex bg-black/60 hover:bg-black/80 text-white"
         onClick={() => onRemove(attachment.path)}
-        className="absolute top-0.5 right-0.5 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white"
         aria-label={i18nService.t('coworkAttachmentRemove')}
         title={i18nService.t('coworkAttachmentRemove')}
       >
-        <XMarkIcon className="h-2.5 w-2.5" />
-      </button>
+        <X className="h-2.5 w-2.5" />
+      </Button>
     </div>
   );
 };
@@ -128,15 +130,15 @@ const FileCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
       </div>
 
       {/* Delete button — top-right, visible on hover */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
         onClick={() => onRemove(attachment.path)}
-        className="absolute top-1 right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-claude-surfaceHover dark:bg-claude-darkSurfaceHover text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-text dark:hover:text-claude-darkText"
         aria-label={i18nService.t('coworkAttachmentRemove')}
         title={i18nService.t('coworkAttachmentRemove')}
       >
-        <XMarkIcon className="h-2.5 w-2.5" />
-      </button>
+        <X className="h-2.5 w-2.5" />
+      </Button>
     </div>
   );
 };

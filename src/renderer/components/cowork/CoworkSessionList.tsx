@@ -1,4 +1,4 @@
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { MessageCircle } from 'lucide-react';
 import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -77,7 +77,7 @@ const CoworkSessionList: React.FC<CoworkSessionListProps> = ({
     }
     return (
       <div className="flex flex-col items-center justify-center py-10 px-4">
-        <ChatBubbleLeftRightIcon className="h-10 w-10 dark:text-claude-darkTextSecondary/40 text-claude-textSecondary/40 mb-3" />
+        <MessageCircle className="h-10 w-10 dark:text-claude-darkTextSecondary/40 text-claude-textSecondary/40 mb-3" />
         <p className="text-sm font-medium dark:text-claude-darkTextSecondary text-claude-textSecondary mb-1">
           {i18nService.t('coworkNoSessions')}
         </p>

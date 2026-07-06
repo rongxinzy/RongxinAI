@@ -1,3 +1,7 @@
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import { Textarea } from '@shared/components/ui/textarea';
 import { PlatformRegistry } from '@shared/platform';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -462,10 +466,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
     }
   };
 
-  const inputClass =
-    'w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50';
-  const textareaInputClass =
-    'w-full rounded-t-lg px-3 py-2 text-sm text-foreground focus:outline-none resize-none bg-transparent';
   const labelClass = 'block text-[14px] font-normal leading-5 text-foreground/85 mb-1';
   const errorClass = 'text-xs text-red-500 mt-1';
   const hintClass = 'text-xs text-secondary mt-0.5';
@@ -496,22 +496,23 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
   };
 
   const renderPlanSelect = () => (
-    <select
-      value={form.planType}
-      onChange={event => updateForm({ planType: event.target.value as PlanType })}
-      className={`${inputClass} flex-1 min-w-0`}
-    >
-      <option value="once">{i18nService.t('scheduledTasksFormScheduleModeOnce')}</option>
-      <option value="hourly">{i18nService.t('scheduledTasksFormScheduleModeHourly')}</option>
-      <option value="daily">{i18nService.t('scheduledTasksFormScheduleModeDaily')}</option>
-      <option value="weekly">{i18nService.t('scheduledTasksFormScheduleModeWeekly')}</option>
-      <option value="monthly">{i18nService.t('scheduledTasksFormScheduleModeMonthly')}</option>
-      <option value="cron">
-        {i18nService.t(
-          'scheduledTasksFormScheduleModeCronCustom' as Parameters<typeof i18nService.t>[0],
-        )}
-      </option>
-    </select>
+    <Select value={form.planType} onValueChange={value => value && updateForm({ planType: value as PlanType })}>
+      <SelectTrigger className="flex-1 min-w-0">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="once">{i18nService.t('scheduledTasksFormScheduleModeOnce')}</SelectItem>
+        <SelectItem value="hourly">{i18nService.t('scheduledTasksFormScheduleModeHourly')}</SelectItem>
+        <SelectItem value="daily">{i18nService.t('scheduledTasksFormScheduleModeDaily')}</SelectItem>
+        <SelectItem value="weekly">{i18nService.t('scheduledTasksFormScheduleModeWeekly')}</SelectItem>
+        <SelectItem value="monthly">{i18nService.t('scheduledTasksFormScheduleModeMonthly')}</SelectItem>
+        <SelectItem value="cron">
+          {i18nService.t(
+            'scheduledTasksFormScheduleModeCronCustom' as Parameters<typeof i18nService.t>[0],
+          )}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   );
 
   const renderCronSection = () => {
@@ -532,7 +533,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
       }
     };
 
-    const fieldSelectClass = `rounded-md border border-border bg-surface px-1.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 flex-1 min-w-0`;
+    const fieldSelectClass = 'flex-1 min-w-0 text-xs h-8 px-1.5';
 
     return (
       <div className="space-y-2">
@@ -540,30 +541,26 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
 
         {/* Mode tabs */}
         <div className="flex items-center gap-0 border border-border rounded-lg overflow-hidden w-fit">
-          <button
+          <Button
             type="button"
+            variant={form.cronMode === 'builder' ? 'default' : 'ghost'}
+            size="xs"
             onClick={handleSwitchToBuilder}
-            className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-              form.cronMode === 'builder'
-                ? 'bg-primary text-white'
-                : 'bg-surface text-secondary hover:bg-surface-raised'
-            }`}
+            className="px-2.5 py-1 text-xs font-medium rounded-none transition-colors"
           >
             {i18nService.t(
               'scheduledTasksFormCronModeBuilder' as Parameters<typeof i18nService.t>[0],
             )}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant={form.cronMode === 'raw' ? 'default' : 'ghost'}
+            size="xs"
             onClick={handleSwitchToRaw}
-            className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-              form.cronMode === 'raw'
-                ? 'bg-primary text-white'
-                : 'bg-surface text-secondary hover:bg-surface-raised'
-            }`}
+            className="px-2.5 py-1 text-xs font-medium rounded-none transition-colors"
           >
             {i18nService.t('scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0])}
-          </button>
+          </Button>
         </div>
 
         {form.cronMode === 'builder' ? (
@@ -581,90 +578,100 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             {/* Field selects */}
             <div className="grid grid-cols-5 gap-1.5">
               {/* Minute */}
-              <select
+              <Select
                 value={form.cronBuilder.minute}
-                onChange={e =>
-                  updateForm({ cronBuilder: { ...form.cronBuilder, minute: e.target.value } })
-                }
-                className={fieldSelectClass}
+                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, minute: value } })}
               >
-                <option value="*">*</option>
-                {Array.from({ length: 60 }, (_, i) => (
-                  <option key={i} value={String(i)}>
-                    {String(i).padStart(2, '0')}
-                  </option>
-                ))}
-                <option value="*/5">*/5</option>
-                <option value="*/10">*/10</option>
-                <option value="*/15">*/15</option>
-                <option value="*/30">*/30</option>
-              </select>
+                <SelectTrigger className={fieldSelectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="*">*</SelectItem>
+                  {Array.from({ length: 60 }, (_, i) => (
+                    <SelectItem key={i} value={String(i)}>
+                      {String(i).padStart(2, '0')}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="*/5">*/5</SelectItem>
+                  <SelectItem value="*/10">*/10</SelectItem>
+                  <SelectItem value="*/15">*/15</SelectItem>
+                  <SelectItem value="*/30">*/30</SelectItem>
+                </SelectContent>
+              </Select>
               {/* Hour */}
-              <select
+              <Select
                 value={form.cronBuilder.hour}
-                onChange={e =>
-                  updateForm({ cronBuilder: { ...form.cronBuilder, hour: e.target.value } })
-                }
-                className={fieldSelectClass}
+                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, hour: value } })}
               >
-                <option value="*">*</option>
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={String(i)}>
-                    {String(i).padStart(2, '0')}
-                  </option>
-                ))}
-                <option value="*/2">*/2</option>
-                <option value="*/4">*/4</option>
-                <option value="*/6">*/6</option>
-                <option value="*/12">*/12</option>
-              </select>
+                <SelectTrigger className={fieldSelectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="*">*</SelectItem>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <SelectItem key={i} value={String(i)}>
+                      {String(i).padStart(2, '0')}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="*/2">*/2</SelectItem>
+                  <SelectItem value="*/4">*/4</SelectItem>
+                  <SelectItem value="*/6">*/6</SelectItem>
+                  <SelectItem value="*/12">*/12</SelectItem>
+                </SelectContent>
+              </Select>
               {/* DOM (day of month) */}
-              <select
+              <Select
                 value={form.cronBuilder.dom}
-                onChange={e =>
-                  updateForm({ cronBuilder: { ...form.cronBuilder, dom: e.target.value } })
-                }
-                className={fieldSelectClass}
+                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, dom: value } })}
               >
-                <option value="*">*</option>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                  <option key={d} value={String(d)}>
-                    {d}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={fieldSelectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="*">*</SelectItem>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {/* Month */}
-              <select
+              <Select
                 value={form.cronBuilder.month}
-                onChange={e =>
-                  updateForm({ cronBuilder: { ...form.cronBuilder, month: e.target.value } })
-                }
-                className={fieldSelectClass}
+                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, month: value } })}
               >
-                <option value="*">*</option>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                  <option key={m} value={String(m)}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={fieldSelectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="*">*</SelectItem>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <SelectItem key={m} value={String(m)}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {/* DOW (day of week) */}
-              <select
+              <Select
                 value={form.cronBuilder.dow}
-                onChange={e =>
-                  updateForm({ cronBuilder: { ...form.cronBuilder, dow: e.target.value } })
-                }
-                className={fieldSelectClass}
+                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, dow: value } })}
               >
-                <option value="*">*</option>
-                {WEEKDAY_KEYS.map((key, idx) => (
-                  <option key={idx} value={String(idx)}>
-                    {i18nService.t(key)}
-                  </option>
-                ))}
-                <option value="1-5">{i18nService.t('scheduledTasksCronWeekdays')}</option>
-                <option value="0,6">{i18nService.t('scheduledTasksCronWeekends')}</option>
-              </select>
+                <SelectTrigger className={fieldSelectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="*">*</SelectItem>
+                  {WEEKDAY_KEYS.map((key, idx) => (
+                    <SelectItem key={idx} value={String(idx)}>
+                      {i18nService.t(key)}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="1-5">{i18nService.t('scheduledTasksCronWeekdays')}</SelectItem>
+                  <SelectItem value="0,6">{i18nService.t('scheduledTasksCronWeekends')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {/* Generated expression preview */}
             <div className="flex items-center gap-2">
@@ -689,14 +696,14 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
         ) : (
           /* Raw expression input */
           <div>
-            <input
+            <Input
               type="text"
               value={form.cronExpr}
               onChange={e => updateForm({ cronExpr: e.target.value })}
               placeholder={i18nService.t(
                 'scheduledTasksFormCronInputPlaceholder' as Parameters<typeof i18nService.t>[0],
               )}
-              className={inputClass}
+              className="w-full"
               spellCheck={false}
             />
             <p className={hintClass}>
@@ -741,9 +748,11 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             {CRON_QUICK_PICKS.map(({ labelKey, expr }) => {
               const active = currentExpr === expr;
               return (
-                <button
+                <Button
                   key={expr}
                   type="button"
+                  variant={active ? 'outline' : 'ghost'}
+                  size="xs"
                   onClick={() => {
                     const parsed = exprToCronBuilder(expr);
                     updateForm({
@@ -759,7 +768,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                 >
                   {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
                   <span className="ml-1.5 opacity-50 font-mono">{expr}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -773,14 +782,14 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
               {i18nService.t('scheduledTasksFormOptional')}
             </span>
           </label>
-          <input
+          <Input
             type="text"
             value={form.cronTz}
             onChange={e => updateForm({ cronTz: e.target.value })}
             placeholder={i18nService.t(
               'scheduledTasksFormCronTimezonePlaceholder' as Parameters<typeof i18nService.t>[0],
             )}
-            className={inputClass}
+            className="w-full"
             spellCheck={false}
           />
         </div>
@@ -799,8 +808,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             <p className="text-sm text-secondary">{formatScheduleLabel(task!.schedule)}</p>
             {existingExpr && (
               <div className="flex items-center justify-end mt-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() =>
                     updateForm({ planType: 'cron', cronExpr: existingExpr, cronTz: existingTz })
                   }
@@ -809,7 +820,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                   {i18nService.t(
                     'scheduledTasksFormAdvancedEditAsCron' as Parameters<typeof i18nService.t>[0],
                   )}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -834,16 +845,16 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
           <div className="flex items-center gap-3">
             {renderPlanSelect()}
-            <input
+            <Input
               type="date"
               value={dateValue}
               onChange={e => {
                 const [y, mo, d] = e.target.value.split('-').map(Number);
                 if (!Number.isNaN(y)) updateForm({ year: y, month: mo, day: d });
               }}
-              className={`${inputClass} flex-1 min-w-0`}
+              className="flex-1 min-w-0"
             />
-            <input
+            <Input
               type="time"
               step="1"
               value={fullTimeValue}
@@ -855,7 +866,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                 if (parts.length > 2 && !Number.isNaN(parts[2])) patch.second = parts[2];
                 updateForm(patch);
               }}
-              className={`${inputClass} flex-1 min-w-0`}
+              className="flex-1 min-w-0"
             />
           </div>
         </div>
@@ -868,11 +879,11 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
           <div className="flex items-center gap-3">
             {renderPlanSelect()}
-            <input
+            <Input
               type="time"
               value={timeValue}
               onChange={e => handleTimeChange(e.target.value)}
-              className={`${inputClass} flex-1 min-w-0`}
+              className="flex-1 min-w-0"
             />
           </div>
         </div>
@@ -885,17 +896,21 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
           <div className="flex items-center gap-3">
             {renderPlanSelect()}
-            <select
-              value={form.minute}
-              onChange={e => updateForm({ minute: Number(e.target.value) })}
-              className={`${inputClass} !w-20 shrink-0 text-center`}
+            <Select
+              value={String(form.minute)}
+              onValueChange={value => value !== null && updateForm({ minute: Number(value) })}
             >
-              {Array.from({ length: 60 }, (_, i) => (
-                <option key={i} value={i}>
-                  {String(i).padStart(2, '0')}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-20 shrink-0 text-center">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 60 }, (_, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    {String(i).padStart(2, '0')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <span className="shrink-0 text-sm text-secondary">
               {i18nService.t('scheduledTasksFormHourlyMinuteSuffix')}
             </span>
@@ -940,20 +955,22 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
           <div className="flex items-center gap-3">
             {renderPlanSelect()}
-            <input
+            <Input
               type="time"
               value={timeValue}
               onChange={e => handleTimeChange(e.target.value)}
-              className={`${inputClass} flex-1 min-w-0`}
+              className="flex-1 min-w-0"
             />
           </div>
           <div className="flex items-center gap-1.5 mt-2">
             {WEEKDAY_SHORT_LABELS.map(([key, dayValue]) => {
               const selected = form.weekdays.includes(dayValue);
               return (
-                <button
+                <Button
                   key={dayValue}
                   type="button"
+                  variant={selected ? 'default' : 'ghost'}
+                  size="icon-xs"
                   onClick={() => toggleWeekday(dayValue)}
                   className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
                     selected
@@ -962,7 +979,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                   }`}
                 >
                   {i18nService.t(key)}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -975,23 +992,27 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
         <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
         <div className="flex items-center gap-3">
           {renderPlanSelect()}
-          <select
-            value={form.monthDay}
-            onChange={e => updateForm({ monthDay: Number(e.target.value) })}
-            className={`${inputClass} flex-1 min-w-0`}
+          <Select
+            value={String(form.monthDay)}
+            onValueChange={value => value !== null && updateForm({ monthDay: Number(value) })}
           >
-            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-              <option key={d} value={d}>
-                {d}
-                {i18nService.t('scheduledTasksFormMonthDaySuffix')}
-              </option>
-            ))}
-          </select>
-          <input
+            <SelectTrigger className="flex-1 min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                <SelectItem key={d} value={String(d)}>
+                  {d}
+                  {i18nService.t('scheduledTasksFormMonthDaySuffix')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
             type="time"
             value={timeValue}
             onChange={e => handleTimeChange(e.target.value)}
-            className={`${inputClass} flex-1 min-w-0`}
+            className="flex-1 min-w-0"
           />
         </div>
       </div>
@@ -1062,10 +1083,11 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             className={`relative ${showConversationSelector ? 'flex-1 min-w-0' : 'w-full'}`}
             ref={channelDropdownRef}
           >
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setChannelDropdownOpen(!channelDropdownOpen)}
-              className={`${inputClass} w-full flex items-center justify-between cursor-pointer`}
+              className="w-full flex items-center justify-between cursor-pointer h-auto px-3 py-1.5"
             >
               <span className="flex items-center gap-2 truncate">
                 {selectedLogo && (
@@ -1095,7 +1117,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                   d="M19 9l-7 7-7-7"
                 />
               </svg>
-            </button>
+            </Button>
 
             {channelDropdownOpen && (
               <div className="absolute z-50 w-full mt-1 rounded-xl border border-border bg-surface shadow-lg overflow-hidden">
@@ -1170,13 +1192,14 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           </div>
           {showConversationSelector && (
             <div className="relative flex-1 min-w-0" ref={convDropdownRef}>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   if (!conversationsLoading) setConvDropdownOpen(!convDropdownOpen);
                 }}
                 disabled={conversationsLoading}
-                className={`${inputClass} w-full flex items-center justify-between cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                className="w-full flex items-center justify-between cursor-pointer h-auto px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="truncate text-sm">
                   {conversationsLoading
@@ -1196,7 +1219,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                     d="M19 9l-7 7-7-7"
                   />
                 </svg>
-              </button>
+              </Button>
               {convDropdownOpen && !conversationsLoading && (
                 <div className="absolute z-50 w-full mt-1 rounded-xl border border-border bg-surface shadow-lg overflow-hidden">
                   {conversations.length === 0 ? (
@@ -1245,12 +1268,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
         {/* Task name */}
         <div>
           <label className={labelClass}>{i18nService.t('scheduledTasksFormName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-          <input
+          <Input
             type="text"
             value={form.name}
             onChange={event => updateForm({ name: event.target.value.slice(0, TASK_NAME_MAX_LENGTH) })}
             maxLength={TASK_NAME_MAX_LENGTH}
-            className={inputClass}
+            className="w-full"
             placeholder={i18nService.t('scheduledTasksFormNamePlaceholder')}
           />
           {errors.name && <p className={errorClass}>{errors.name}</p>}
@@ -1261,22 +1284,26 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           <label className={labelClass}>
             {i18nService.t('scheduledTasksFormAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
           </label>
-          <select
+          <Select
             value={form.agentId}
-            onChange={e => {
-              updateForm({ agentId: e.target.value, modelId: '' });
+            onValueChange={value => {
+              updateForm({ agentId: value ?? '', modelId: '' });
             }}
-            className={inputClass}
           >
-            <option value="" disabled>
-              {i18nService.t('scheduledTasksFormAgentPlaceholder')}
-            </option>
-            {agents.map(agent => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={i18nService.t('scheduledTasksFormAgentPlaceholder')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="" disabled>
+                {i18nService.t('scheduledTasksFormAgentPlaceholder')}
+              </SelectItem>
+              {agents.map(agent => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  {agent.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {errors.agentId && <p className={errorClass}>{errors.agentId}</p>}
         </div>
 
@@ -1299,10 +1326,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             </span>
           </div>
           <div className="rounded-lg border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/50">
-            <textarea
+            <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}
-              className={`${textareaInputClass} resize-y`}
+              className="resize-y"
               style={{ minHeight: '80px', height: '120px' }}
               placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
             />
@@ -1331,9 +1358,11 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {PROMPT_TEMPLATES.map(({ labelKey, textKey }) => (
-                  <button
+                  <Button
                     key={labelKey}
                     type="button"
+                    variant="outline"
+                    size="xs"
                     onClick={() =>
                       updateForm({
                         payloadText: i18nService.t(textKey as Parameters<typeof i18nService.t>[0]),
@@ -1342,7 +1371,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                     className="px-2 py-0.5 rounded-md text-xs border border-border bg-surface text-secondary hover:bg-surface-raised hover:text-foreground transition-colors"
                   >
                     {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -1362,10 +1391,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             {i18nService.t('scheduledTasksFormSubmitError')}
             {submitError}
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-xs"
             onClick={() => setSubmitError(null)}
-            className="shrink-0 ml-auto p-0.5 text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+            className="shrink-0 ml-auto text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
             aria-label="dismiss"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -1375,20 +1406,21 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                 clipRule="evenodd"
               />
             </svg>
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Footer */}
       <div className="shrink-0 flex items-center justify-end gap-2 px-4 py-2.5 border-t border-border">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={onCancel}
           className="px-3 py-1.5 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors"
         >
           {i18nService.t('cancel')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => void handleSubmit()}
           disabled={submitting}
@@ -1399,7 +1431,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             : mode === 'create'
               ? i18nService.t('scheduledTasksFormCreate')
               : i18nService.t('scheduledTasksFormUpdate')}
-        </button>
+        </Button>
       </div>
     </div>
   );

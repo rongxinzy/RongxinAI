@@ -3,11 +3,13 @@
  * Configuration UI for DingTalk, Feishu and Telegram IM bots
  */
 
-import { CheckCircleIcon, ExclamationTriangleIcon,SignalIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
 import WecomAIBotSDK from '@wecom/wecom-aibot-sdk';
+import { CheckCircle, RefreshCw,Signal, TriangleAlert, X, XCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useMemo, useRef,useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -46,17 +48,19 @@ const PlatformGuide: React.FC<{
       ))}
     </ol>
     {guideUrl && (
-      <button
+      <Button
         type="button"
+        variant="link"
+        size="sm"
         onClick={() => {
           window.electron.shell.openExternal(guideUrl).catch((err: unknown) => {
             console.error('[IM] Failed to open guide URL:', err);
           });
         }}
-        className="mt-2 text-xs font-medium text-primary dark:text-primary hover:text-primary dark:hover:text-blue-200 underline underline-offset-2 transition-colors"
+        className="mt-2 h-auto p-0 text-xs font-medium underline underline-offset-2"
       >
         {guideLabel || i18nService.t('imViewGuide')}
-      </button>
+      </Button>
     )}
   </div>
 );
@@ -718,19 +722,20 @@ const IMSettings: React.FC = () => {
 
   // Toggle gateway on/off - map platform to Redux action
   const renderConnectivityTestButton = (platform: Platform) => (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={() => handleConnectivityTest(platform)}
       disabled={isLoading || testingPlatform === platform}
-      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-xl border border-border text-foreground hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
     >
-      <SignalIcon className="h-3.5 w-3.5 mr-1.5" />
+      <Signal className="h-3.5 w-3.5 mr-1.5" />
       {testingPlatform === platform
         ? i18nService.t('imConnectivityTesting')
         : connectivityResults[platform]
           ? i18nService.t('imConnectivityRetest')
           : i18nService.t('imConnectivityTest')}
-    </button>
+    </Button>
   );
 
   useEffect(() => {
@@ -752,7 +757,7 @@ const IMSettings: React.FC = () => {
         {i18nService.t('imPairingApproval')}
       </label>
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={pairingCodeInput[platform] || ''}
           onChange={(e) => {
@@ -770,12 +775,14 @@ const IMSettings: React.FC = () => {
               }
             }
           }}
-          className="block flex-1 rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm font-mono uppercase tracking-widest transition-colors"
+          className="flex-1 font-mono uppercase tracking-widest"
           placeholder={i18nService.t('imPairingCodePlaceholder')}
           maxLength={8}
         />
-        <button
+        <Button
           type="button"
+          variant="default"
+          size="sm"
           onClick={() => {
             const code = (pairingCodeInput[platform] || '').trim();
             if (code) {
@@ -784,10 +791,10 @@ const IMSettings: React.FC = () => {
               });
             }
           }}
-          className="px-3 py-2 rounded-lg text-xs font-medium bg-green-500/15 text-green-600 dark:text-green-400 hover:bg-green-500/25 transition-colors"
+          className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
         >
           {i18nService.t('imPairingApprove')}
-        </button>
+        </Button>
       </div>
       {pairingStatus[platform] && (
         <p className={`text-xs ${pairingStatus[platform]!.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1211,17 +1218,17 @@ const IMSettings: React.FC = () => {
                 : (language === 'zh' ? '请在左侧选择一个钉钉实例' : 'Select a DingTalk instance from the sidebar.')}
             </p>
             {config.dingtalk.instances.length < MAX_DINGTALK_INSTANCES && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={async (e) => {
                   e.stopPropagation();
                   const inst = await imService.addDingTalkInstance(`DingTalk Bot ${config.dingtalk.instances.length + 1}`);
                   if (inst) { setActiveDingTalkInstanceId(inst.instanceId); setDingtalkExpanded(true); }
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
               >
                 + {i18nService.t('imDingTalkAddInstance')}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -1282,17 +1289,17 @@ const IMSettings: React.FC = () => {
                 : (language === 'zh' ? '请在左侧选择一个飞书实例' : 'Select a Feishu instance from the sidebar.')}
             </p>
             {config.feishu.instances.length < MAX_FEISHU_INSTANCES && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={async (e) => {
                   e.stopPropagation();
                   const inst = await imService.addFeishuInstance(`Feishu Bot ${config.feishu.instances.length + 1}`);
                   if (inst) { setActiveFeishuInstanceId(inst.instanceId); setFeishuExpanded(true); }
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
               >
                 + {i18nService.t('imFeishuAddInstance')}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -1353,17 +1360,17 @@ const IMSettings: React.FC = () => {
                 : (language === 'zh' ? '请在左侧选择一个 QQ 实例' : 'Select a QQ instance from the sidebar.')}
             </p>
             {config.qq.instances.length < MAX_QQ_INSTANCES && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={async (e) => {
                   e.stopPropagation();
                   const inst = await imService.addQQInstance(`QQ Bot ${config.qq.instances.length + 1}`);
                   if (inst) { setActiveQQInstanceId(inst.instanceId); setQqExpanded(true); }
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
               >
                 + {i18nService.t('imQQAddInstance')}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -1424,17 +1431,17 @@ const IMSettings: React.FC = () => {
                 : (language === 'zh' ? '请在左侧选择一个 Telegram 实例' : 'Select a Telegram instance from the sidebar.')}
             </p>
             {config.telegram.instances.length < MAX_TELEGRAM_INSTANCES && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={async (e) => {
                   e.stopPropagation();
                   const inst = await imService.addTelegramInstance(`Telegram Bot ${config.telegram.instances.length + 1}`);
                   if (inst) { setActiveTelegramInstanceId(inst.instanceId); setTelegramExpanded(true); }
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
               >
                 + {i18nService.t('imTelegramAddInstance')}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -1495,17 +1502,17 @@ const IMSettings: React.FC = () => {
                 : (language === 'zh' ? '请在左侧选择一个 Discord 实例' : 'Select a Discord instance from the sidebar.')}
             </p>
             {config.discord.instances.length < MAX_DISCORD_INSTANCES && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={async (e) => {
                   e.stopPropagation();
                   const inst = await imService.addDiscordInstance(`Discord Bot ${config.discord.instances.length + 1}`);
                   if (inst) { setActiveDiscordInstanceId(inst.instanceId); setDiscordExpanded(true); }
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
               >
                 + {language === 'zh' ? '添加 Discord 实例' : 'Add Discord Instance'}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -1563,13 +1570,12 @@ const IMSettings: React.FC = () => {
             <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center space-y-3">
               {weixinQrStatus === 'idle' && (
                 <>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => void handleWeixinQrLogin()}
-                    className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {i18nService.t('imWeixinScanBtn')}
-                  </button>
+                  </Button>
                   <p className="text-xs text-secondary">
                     {i18nService.t('imWeixinScanHint')}
                   </p>
@@ -1577,16 +1583,15 @@ const IMSettings: React.FC = () => {
               )}
               {weixinQrStatus === 'error' && (
                 <>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => void handleWeixinQrLogin()}
-                    className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {i18nService.t('imWeixinScanBtn')}
-                  </button>
+                  </Button>
                   {weixinQrError && (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                      <XCircleIcon className="h-4 w-4 flex-shrink-0" />
+                      <XCircle className="h-4 w-4 flex-shrink-0" />
                       {weixinQrError}
                     </div>
                   )}
@@ -1594,7 +1599,7 @@ const IMSettings: React.FC = () => {
               )}
               {weixinQrStatus === 'loading' && (
                 <div className="flex items-center justify-center gap-2 py-4">
-                  <ArrowPathIcon className="h-5 w-5 animate-spin text-primary" />
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
                   <span className="text-sm text-secondary">
                     {i18nService.t('imWeixinQrLoading')}
                   </span>
@@ -1613,20 +1618,20 @@ const IMSettings: React.FC = () => {
                     </div>
                     {weixinQrStatus === 'expired' && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => void handleWeixinQrLogin()}
-                          className="px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg"
+                          className="shadow-lg"
                         >
-                          <ArrowPathIcon className="h-4 w-4 inline mr-1.5" />
-                    {i18nService.t('imWeixinQrRefresh')}
-                        </button>
+                          <RefreshCw className="h-4 w-4 mr-1.5" />
+                          {i18nService.t('imWeixinQrRefresh')}
+                        </Button>
                       </div>
                     )}
                   </div>
                   {weixinQrStatus === 'waiting' && (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-secondary">
-                      <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                       {i18nService.t('imWeixinQrWaiting') || 'Waiting for scan...'}
                     </div>
                   )}
@@ -1634,7 +1639,7 @@ const IMSettings: React.FC = () => {
               )}
               {weixinQrStatus === 'success' && (
                 <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-                  <CheckCircleIcon className="h-4 w-4 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 flex-shrink-0" />
                   {i18nService.t('imWeixinQrSuccess')}
                 </div>
               )}
@@ -1680,19 +1685,23 @@ const IMSettings: React.FC = () => {
                   <label className="block text-xs font-medium text-secondary">
                     DM Policy
                   </label>
-                  <select
+                  <Select
                     value={weixinOpenClawConfig.dmPolicy}
-                    onChange={(e) => {
-                      const update = { dmPolicy: e.target.value as WeixinOpenClawConfig['dmPolicy'] };
+                    onValueChange={(value) => {
+                      const update = { dmPolicy: value as WeixinOpenClawConfig['dmPolicy'] };
                       void imService.updateConfig({ weixin: { ...weixinOpenClawConfig, ...update } });
                     }}
-                    className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm transition-colors"
                   >
-                    <option value="open">{i18nService.t('imDmPolicyOpen')}</option>
-                    <option value="pairing">{i18nService.t('imDmPolicyPairing')}</option>
-                    <option value="allowlist">{i18nService.t('imDmPolicyAllowlist')}</option>
-                    <option value="disabled">{i18nService.t('imDmPolicyDisabled')}</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">{i18nService.t('imDmPolicyOpen')}</SelectItem>
+                      <SelectItem value="pairing">{i18nService.t('imDmPolicyPairing')}</SelectItem>
+                      <SelectItem value="allowlist">{i18nService.t('imDmPolicyAllowlist')}</SelectItem>
+                      <SelectItem value="disabled">{i18nService.t('imDmPolicyDisabled')}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Allow From */}
@@ -1701,7 +1710,7 @@ const IMSettings: React.FC = () => {
                     Allow From (User IDs)
                   </label>
                   <div className="flex gap-2">
-                    <input
+                    <Input
                       type="text"
                       value={weixinAllowFromInput}
                       onChange={(e) => setWeixinAllowFromInput(e.target.value)}
@@ -1716,11 +1725,13 @@ const IMSettings: React.FC = () => {
                           }
                         }
                       }}
-                      className="block flex-1 rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm transition-colors"
+                      className="flex-1"
                       placeholder="wxid_xxx@im.wechat"
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => {
                         const id = weixinAllowFromInput.trim();
                         if (id && !weixinOpenClawConfig.allowFrom.includes(id)) {
@@ -1729,10 +1740,9 @@ const IMSettings: React.FC = () => {
                           void imService.updateConfig({ weixin: { ...weixinOpenClawConfig, allowFrom: newIds } });
                         }
                       }}
-                      className="px-3 py-2 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                     >
                       {i18nService.t('add') || '添加'}
-                    </button>
+                    </Button>
                   </div>
                   {weixinOpenClawConfig.allowFrom.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -1742,16 +1752,18 @@ const IMSettings: React.FC = () => {
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-surface border-border-subtle border text-foreground"
                         >
                           {id}
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
                             onClick={() => {
                               const newIds = weixinOpenClawConfig.allowFrom.filter((uid) => uid !== id);
                               void imService.updateConfig({ weixin: { ...weixinOpenClawConfig, allowFrom: newIds } });
                             }}
-                            className="text-secondary hover:text-red-500 dark:hover:text-red-400 transition-colors"
                           >
-                            <XMarkIcon className="w-3 h-3" />
-                          </button>
+                            <X className="w-3 h-3" />
+                          </Button>
                         </span>
                       ))}
                     </div>
@@ -1841,8 +1853,9 @@ const IMSettings: React.FC = () => {
                   : (language === 'zh' ? '请在左侧选择一个企业微信实例' : 'Select a WeCom instance from the sidebar.')}
               </p>
               {wecomMultiConfig.instances.length < MAX_WECOM_INSTANCES && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={async (e) => {
                     e.stopPropagation();
                     const name = `WeCom Bot ${wecomMultiConfig.instances.length + 1}`;
@@ -1852,10 +1865,9 @@ const IMSettings: React.FC = () => {
                       setWecomExpanded(true);
                     }
                   }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                 >
                   + {i18nService.t('imWecomAddInstance')}
-                </button>
+                </Button>
               )}
             </div>
           );
@@ -1867,14 +1879,16 @@ const IMSettings: React.FC = () => {
                 <div className="text-sm font-semibold text-foreground">
                   {`${i18nService.t(connectivityModalPlatform)} ${i18nService.t('imConnectivitySectionTitle')}`}
                 </div>
-                <button
-                  type="button"
-                  aria-label={i18nService.t('close')}
-                  onClick={() => setConnectivityModalPlatform(null)}
-                  className="p-1 rounded-md hover:bg-surface-raised text-secondary"
-                >
-                  <XMarkIcon className="h-4 w-4" />
-                </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={i18nService.t('close')}
+                onClick={() => setConnectivityModalPlatform(null)}
+                className="text-secondary"
+              >
+                <X className="h-4 w-4" />
+              </Button>
               </div>
 
               <div className="p-4 max-h-[65vh] overflow-y-auto">
@@ -1887,11 +1901,11 @@ const IMSettings: React.FC = () => {
                     <div className="flex items-center justify-between gap-2">
                       <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${verdictColorClass[connectivityResults[connectivityModalPlatform]!.verdict]}`}>
                         {connectivityResults[connectivityModalPlatform]!.verdict === 'pass' ? (
-                          <CheckCircleIcon className="h-3.5 w-3.5" />
+                          <CheckCircle className="h-3.5 w-3.5" />
                         ) : connectivityResults[connectivityModalPlatform]!.verdict === 'warn' ? (
-                          <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                          <TriangleAlert className="h-3.5 w-3.5" />
                         ) : (
-                          <XCircleIcon className="h-3.5 w-3.5" />
+                          <XCircle className="h-3.5 w-3.5" />
                         )}
                         {i18nService.t(`imConnectivityVerdict_${connectivityResults[connectivityModalPlatform]!.verdict}`)}
                       </div>

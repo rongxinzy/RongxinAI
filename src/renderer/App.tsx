@@ -1,4 +1,6 @@
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { TooltipProvider } from '@shared/components/ui/tooltip';
+import { MessageCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo,useRef, useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
@@ -643,7 +645,7 @@ const handleConfirmUpdate = useCallback(async () => {
         <div className="flex-1 flex items-center justify-center bg-background">
           <div className="flex flex-col items-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-accent animate-pulse">
-              <ChatBubbleLeftRightIcon className="h-8 w-8 text-white" />
+              <MessageCircle className="h-8 w-8 text-white" />
             </div>
             <div className="w-24 h-1 rounded-full bg-primary/20 overflow-hidden">
               <div className="h-full w-1/2 rounded-full bg-primary animate-shimmer" />
@@ -662,22 +664,21 @@ const handleConfirmUpdate = useCallback(async () => {
         <div className="flex-1 flex flex-col items-center justify-center bg-background">
           <div className="flex flex-col items-center space-y-6 max-w-md px-6">
             <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
-              <ChatBubbleLeftRightIcon className="h-8 w-8 text-white" />
+              <MessageCircle className="h-8 w-8 text-white" />
             </div>
             <div className="text-foreground text-xl font-medium text-center">{initError}</div>
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 onClick={() => window.electron.appInfo.relaunch()}
-                className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl transition-colors text-sm font-medium"
               >
                 {i18nService.t('restartApp')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => handleShowSettings()}
-                className="px-6 py-2.5 border border-border text-foreground hover:bg-surface-raised rounded-xl transition-colors text-sm font-medium"
               >
                 {i18nService.t('openSettings')}
-              </button>
+              </Button>
             </div>
           </div>
           {showSettings && (
@@ -694,7 +695,8 @@ const handleConfirmUpdate = useCallback(async () => {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-surface-raised">
+    <TooltipProvider delay={400}>
+      <div className="h-screen overflow-hidden flex flex-col bg-surface-raised">
       {toastMessage && (
         <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
       )}
@@ -787,7 +789,8 @@ const handleConfirmUpdate = useCallback(async () => {
         />
       )}
       {permissionModal}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };
 

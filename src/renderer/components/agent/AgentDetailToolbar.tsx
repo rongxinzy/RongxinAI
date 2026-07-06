@@ -1,4 +1,4 @@
-import { CubeIcon } from '@heroicons/react/24/outline';
+import { Box } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -24,7 +24,7 @@ const AgentDetailToolbar: React.FC<AgentDetailToolbarProps> = ({
       className="flex h-8 min-w-0 items-center gap-1 rounded-lg bg-surface-raised/70 pl-2 text-foreground"
       title={i18nService.t('agentDefaultModel')}
     >
-      <CubeIcon className="h-4 w-4 flex-shrink-0 text-secondary" />
+      <Box className="h-4 w-4 flex-shrink-0 text-secondary" />
       <ModelSelector
         dropdownDirection="up"
         value={model}

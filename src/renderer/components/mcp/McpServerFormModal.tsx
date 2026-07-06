@@ -1,8 +1,12 @@
-import React, { useEffect,useState } from 'react';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import { Textarea } from '@shared/components/ui/textarea';
+import React, { useEffect, useState } from 'react';
 
 import { validateMcpTransportFields } from '../../../shared/mcpValidation';
 import { i18nService } from '../../services/i18n';
-import { McpRegistryEntry,McpServerConfig, McpServerFormData } from '../../types/mcp';
+import { McpRegistryEntry, McpServerConfig, McpServerFormData } from '../../types/mcp';
 import Modal from '../common/Modal';
 
 interface McpServerFormModalProps {
@@ -245,10 +249,10 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  const inputClass = 'w-full px-3 py-2 text-sm rounded-xl bg-background text-foreground placeholder-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary';
+  const inputClass = 'w-full rounded-xl bg-background text-foreground border border-border';
   const readOnlyInputClass = inputClass + ' opacity-60 cursor-not-allowed';
   const labelClass = 'text-xs font-semibold tracking-wide text-secondary';
-  const kvInputClass = 'flex-1 px-2 py-1.5 text-sm rounded-lg bg-background text-foreground border border-border focus:outline-none focus:ring-1 focus:ring-primary';
+  const kvInputClass = 'flex-1 rounded-lg bg-background text-foreground border border-border';
 
   // Title
   const modalTitle = isEdit
@@ -274,7 +278,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
           {/* Name */}
           <div className="space-y-1.5">
             <label className={labelClass}>{i18nService.t('mcpServerName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-            <input
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -288,7 +292,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
           {/* Description */}
           <div className="space-y-1.5">
             <label className={labelClass}>{i18nService.t('mcpServerDescription')}</label>
-            <input
+            <Input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -300,16 +304,20 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
           {/* Transport Type */}
           <div className="space-y-1.5">
             <label className={labelClass}>{i18nService.t('mcpTransportType')}</label>
-            <select
+            <Select
               value={transportType}
-              onChange={(e) => setTransportType(e.target.value as 'stdio' | 'sse' | 'http')}
-              className={isRegistry ? readOnlyInputClass : inputClass}
+              onValueChange={(value) => setTransportType(value as 'stdio' | 'sse' | 'http')}
               disabled={isRegistry}
             >
-              <option value="stdio">{i18nService.t('mcpTransportStdio')}</option>
-              <option value="sse">{i18nService.t('mcpTransportSse')}</option>
-              <option value="http">{i18nService.t('mcpTransportHttp')}</option>
-            </select>
+              <SelectTrigger className={isRegistry ? readOnlyInputClass : inputClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stdio">{i18nService.t('mcpTransportStdio')}</SelectItem>
+                <SelectItem value="sse">{i18nService.t('mcpTransportSse')}</SelectItem>
+                <SelectItem value="http">{i18nService.t('mcpTransportHttp')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* stdio fields */}
@@ -317,7 +325,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
             <>
               <div className="space-y-1.5">
                 <label className={labelClass}>{i18nService.t('mcpCommand')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-                <input
+                <Input
                   type="text"
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
@@ -329,7 +337,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
 
               <div className="space-y-1.5">
                 <label className={labelClass}>{i18nService.t('mcpArgs')}</label>
-                <textarea
+                <Textarea
                   value={argsText}
                   onChange={(e) => setArgsText(e.target.value)}
                   placeholder={i18nService.t('mcpArgsPlaceholder')}
@@ -349,18 +357,20 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                       </span>
                     )}
                   </label>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={handleAddEnvRow}
-                    className="text-xs text-primary hover:text-primary/80 transition-colors"
+                    className="h-auto px-0 text-xs text-primary hover:text-primary/80"
                   >
                     + {i18nService.t('addKeyValue')}
-                  </button>
+                  </Button>
                 </div>
                 {envRows.map((row, index) => (
                   <div key={index} className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-2">
-                      <input
+                      <Input
                         type="text"
                         value={row.key}
                         onChange={(e) => handleUpdateEnvRow(index, 'key', e.target.value)}
@@ -368,28 +378,30 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                         className={row.required ? kvInputClass + ' opacity-60 cursor-not-allowed' : kvInputClass}
                         readOnly={!!row.required}
                       />
-                      <input
+                      <Input
                         type="text"
                         value={row.value}
                         onChange={(e) => handleUpdateEnvRow(index, 'value', e.target.value)}
                         placeholder={row.required ? `${row.key} *` : i18nService.t('mcpHeaderValue')}
                         className={
                           envErrors[index]
-                            ? kvInputClass + ' border-red-500 focus:ring-red-500'
+                            ? kvInputClass + ' border-red-500 focus-visible:ring-red-500'
                             : kvInputClass
                         }
                         autoFocus={isRegistry && index === 0 && !!row.required}
                       />
                       {!row.required && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleRemoveEnvRow(index)}
-                          className="p-1 text-secondary hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0"
+                          className="h-7 w-7 text-secondary hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                             <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
                           </svg>
-                        </button>
+                        </Button>
                       )}
                       {row.required && (
                         <span className="text-red-400 text-xs flex-shrink-0 w-4 text-center">*</span>
@@ -411,7 +423,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
             <>
               <div className="space-y-1.5">
                 <label className={labelClass}>{i18nService.t('mcpUrl')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-                <input
+                <Input
                   type="text"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -423,39 +435,43 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className={labelClass}>{i18nService.t('mcpHeaders')}</label>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={handleAddHeaderRow}
-                    className="text-xs text-primary hover:text-primary/80 transition-colors"
+                    className="h-auto px-0 text-xs text-primary hover:text-primary/80"
                   >
                     + {i18nService.t('addKeyValue')}
-                  </button>
+                  </Button>
                 </div>
                 {headerRows.map((row, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <input
+                    <Input
                       type="text"
                       value={row.key}
                       onChange={(e) => handleUpdateHeaderRow(index, 'key', e.target.value)}
                       placeholder={i18nService.t('mcpHeaderKey')}
                       className={kvInputClass}
                     />
-                    <input
+                    <Input
                       type="text"
                       value={row.value}
                       onChange={(e) => handleUpdateHeaderRow(index, 'value', e.target.value)}
                       placeholder={i18nService.t('mcpHeaderValue')}
                       className={kvInputClass}
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleRemoveHeaderRow(index)}
-                      className="p-1 text-secondary hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0"
+                      className="h-7 w-7 text-secondary hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                         <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
                       </svg>
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -466,22 +482,23 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
             <div className="text-xs text-red-500">{error}</div>
           )}
           <div className="flex items-center justify-end gap-2 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={isSaving}
-              className="px-3 py-1.5 text-xs rounded-lg border border-border text-secondary hover:bg-surface-raised transition-colors"
+              className="h-8 px-3 text-xs"
             >
               {i18nService.t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-3 py-1.5 text-xs rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="h-8 px-3 text-xs"
             >
               {isSaving ? i18nService.t('testing') : saveText}
-            </button>
+            </Button>
           </div>
         </div>
     </Modal>

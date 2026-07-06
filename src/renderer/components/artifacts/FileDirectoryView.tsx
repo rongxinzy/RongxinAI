@@ -1,3 +1,4 @@
+import { Input } from '@shared/components/ui/input';
 import React, { useMemo, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
@@ -87,12 +88,12 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({ artifacts, select
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-3 py-2 shrink-0">
-        <input
+        <Input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder={t('artifactSearchPlaceholder')}
-          className="w-full px-2 py-1 text-xs rounded border border-border bg-surface text-foreground placeholder:text-muted outline-none focus:border-primary transition-colors"
+          className="w-full text-xs"
         />
       </div>
       <div className="flex-1 overflow-y-auto">

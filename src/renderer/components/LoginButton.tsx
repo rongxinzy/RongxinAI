@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -141,10 +142,11 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       {/* Credits section - collapsible */}
       <div className="border-b border-border">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => setCreditsExpanded(!creditsExpanded)}
-          className="w-full px-4 py-2.5 flex items-center justify-between cursor-pointer hover:bg-surface-raised transition-colors"
+          className="w-full px-4 py-2.5 flex items-center justify-between cursor-pointer hover:bg-surface-raised transition-colors h-auto"
         >
           <span className="text-xs text-secondary">
             {i18nService.t('authCreditsRemaining')}
@@ -168,7 +170,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </div>
-        </button>
+        </Button>
 
         {/* Expanded credit details */}
         {creditsExpanded && (
@@ -184,30 +186,33 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 {i18nService.t('authZeroCredits')}
               </div>
             )}
-            <button
+            <Button
               type="button"
+              variant="link"
               onClick={handleLearnMore}
-              className="mt-2 text-xs text-primary hover:underline cursor-pointer"
+              className="mt-2 text-xs text-primary hover:underline cursor-pointer h-auto p-0"
             >
               {i18nService.t('authLearnMore')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {/* Actions */}
       <div className="py-1">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={handleSubscribe}
-          className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors cursor-pointer"
+          className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors cursor-pointer h-auto justify-start"
         >
           {i18nService.t('authValueAddedServices')}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
           onClick={handleLogout}
-          className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-surface-raised transition-colors cursor-pointer flex items-center gap-2"
+          className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-surface-raised transition-colors cursor-pointer flex items-center gap-2 h-auto justify-start"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -215,7 +220,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
           {i18nService.t('authLogout')}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -254,8 +259,9 @@ const LoginButton: React.FC = () => {
 
   return (
     <div ref={containerRef} className="relative">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={handleClick}
         className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] cursor-pointer"
       >
@@ -274,7 +280,7 @@ const LoginButton: React.FC = () => {
             {i18nService.t('login')}
           </>
         )}
-      </button>
+      </Button>
       {showMenu && <UserMenu onClose={() => setShowMenu(false)} />}
     </div>
   );

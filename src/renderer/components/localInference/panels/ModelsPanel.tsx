@@ -1,9 +1,4 @@
-import {
-  ArrowPathIcon,
-  PlayIcon,
-  StopIcon,
-  TrashIcon,
-} from '@heroicons/react/24/outline';
+import { Play, RefreshCw, Square, Trash2 } from 'lucide-react';
 
 import type {
   LlamaCppModel as OllamaModel,
@@ -167,7 +162,7 @@ function ModelCard({
         {cardBusy && (
           <div className="mt-3 max-w-xs rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
             <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-              <ArrowPathIcon className="h-3.5 w-3.5 animate-spin text-primary" />
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
               <span>{i18nService.t('localInferenceUnloadingHint')}</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-raised">
@@ -187,9 +182,9 @@ function ModelCard({
             className={smallOutlineButtonClass}
           >
             {cardBusy ? (
-              <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <StopIcon className="h-3.5 w-3.5" />
+              <Square className="h-3.5 w-3.5" />
             )}
             {cardBusy
               ? i18nService.t('localInferenceUnloading')
@@ -202,7 +197,7 @@ function ModelCard({
             disabled={buttonsDisabled}
             className={smallOutlineButtonClass}
           >
-            <PlayIcon className="h-3.5 w-3.5" />
+            <Play className="h-3.5 w-3.5" />
             {i18nService.t('localInferenceLoad')}
           </button>
         )}
@@ -212,7 +207,7 @@ function ModelCard({
           disabled={buttonsDisabled}
           className={smallDangerButtonClass}
         >
-          <TrashIcon className="h-3.5 w-3.5" />
+          <Trash2 className="h-3.5 w-3.5" />
           {i18nService.t('delete')}
         </button>
       </div>

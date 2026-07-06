@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React from 'react';
 
 import { type AppUpdateRuntimeState,AppUpdateStatus } from '../../../shared/appUpdate/constants';
@@ -131,51 +132,49 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
       {showInfoFooter && (
         <div className="px-5 pb-5 flex items-center justify-end gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors"
           >
             {i18nService.t('updateAvailableCancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onConfirm}
-            className="px-3 py-1.5 text-sm rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       )}
 
       {isDownloading && (
         <div className="px-5 pb-5 flex items-center justify-end">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onCancelDownload}
-            className="px-3 py-1.5 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors"
           >
             {i18nService.t('updateDownloadCancel')}
-          </button>
+          </Button>
         </div>
       )}
 
       {canInstall && (
         <div className="px-5 pb-5 flex items-center justify-end gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors"
           >
             {i18nService.t('updateReadyLater')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onConfirm}
-            className="px-3 py-1.5 text-sm rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -195,20 +194,19 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
       {isError && !canInstall && (
         <div className="px-5 pb-5 flex items-center justify-end gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors"
           >
             {i18nService.t('updateAvailableCancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onRetry}
-            className="px-3 py-1.5 text-sm rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       )}
     </Modal>

@@ -4,6 +4,8 @@
  * Supports unified and split (side-by-side) view modes.
  */
 
+import { Button } from '@shared/components/ui/button';
+import { Card } from '@shared/components/ui/card';
 import React, { useMemo,useState } from 'react';
 
 type DiffLineType = 'added' | 'removed' | 'context';
@@ -213,7 +215,7 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
   if (diffLines.length === 0) return null;
 
   return (
-    <div className="rounded-lg overflow-hidden border dark:border-claude-darkBorder border-claude-border">
+    <Card className="overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 dark:bg-claude-darkSurface bg-claude-surfaceInset border-b dark:border-claude-darkBorder border-claude-border">
         <div className="flex items-center gap-2 min-w-0">
@@ -233,28 +235,8 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
         </div>
         {/* View mode toggle */}
         <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 rounded-md p-0.5 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setViewMode('unified')}
-            className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
-              viewMode === 'unified'
-                ? 'bg-white dark:bg-claude-darkSurfaceHover shadow-sm dark:text-claude-darkText text-claude-text'
-                : 'dark:text-claude-darkTextSecondary text-claude-textSecondary hover:dark:text-claude-darkText hover:text-claude-text'
-            }`}
-          >
-            Unified
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('split')}
-            className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
-              viewMode === 'split'
-                ? 'bg-white dark:bg-claude-darkSurfaceHover shadow-sm dark:text-claude-darkText text-claude-text'
-                : 'dark:text-claude-darkTextSecondary text-claude-textSecondary hover:dark:text-claude-darkText hover:text-claude-text'
-            }`}
-          >
-            Split
-          </button>
+          <Button variant={viewMode === 'unified' ? 'secondary' : 'ghost'} size="xs" onClick={() => setViewMode('unified')}>Unified</Button>
+          <Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="xs" onClick={() => setViewMode('split')}>Split</Button>
         </div>
       </div>
 
@@ -313,7 +295,7 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
           </table>
         )}
       </div>
-    </div>
+    </Card>
   );
 };
 

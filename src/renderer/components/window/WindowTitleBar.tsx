@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React, { useEffect, useState } from 'react';
 
 interface WindowTitleBarProps {
@@ -91,21 +92,25 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={handleMinimize}
-        className="non-draggable h-8 w-8 inline-flex items-center justify-center rounded-lg transition-colors text-secondary hover:hover:bg-surface-raised"
+        className="non-draggable h-8 w-8 rounded-lg text-secondary hover:bg-surface-raised"
         aria-label="Minimize"
         title="Minimize"
       >
         <svg viewBox="0 0 12 12" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
           <path d="M2 6h8" />
         </svg>
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={handleToggleMaximize}
-        className="non-draggable h-8 w-8 inline-flex items-center justify-center rounded-lg transition-colors text-secondary hover:hover:bg-surface-raised"
+        className="non-draggable h-8 w-8 rounded-lg text-secondary hover:bg-surface-raised"
         aria-label={state.isMaximized ? 'Restore' : 'Maximize'}
         title={state.isMaximized ? 'Restore' : 'Maximize'}
       >
@@ -119,11 +124,13 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
             <path d="M2 2h8v8H2z" />
           </svg>
         )}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={handleClose}
-        className="non-draggable h-8 w-8 inline-flex items-center justify-center rounded-lg transition-colors text-secondary hover:bg-red-500 hover:text-white dark:hover:bg-red-500"
+        className="non-draggable h-8 w-8 rounded-lg text-secondary hover:bg-red-500 hover:text-white dark:hover:bg-red-500"
         aria-label="Close"
         title="Close"
       >
@@ -131,7 +138,7 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
           <path d="M3 3l6 6" />
           <path d="M9 3L3 9" />
         </svg>
-      </button>
+      </Button>
     </div>
   );
 };

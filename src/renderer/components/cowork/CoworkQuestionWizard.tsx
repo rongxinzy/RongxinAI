@@ -1,4 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -249,13 +250,9 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
               {i18nService.t('coworkQuestionWizardTitle')}
             </h2>
           </div>
-          <button
-            onClick={handleDeny}
-            className="p-2 rounded-lg hover:bg-surface-raised text-secondary transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={handleDeny} aria-label="Close">
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
         {/* Progress bar */}
@@ -287,13 +284,9 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
               <div className="flex items-center gap-2">
                 {/* Previous button */}
                 {!isFirstStep && (
-                  <button
-                    onClick={handlePrevious}
-                    className="p-1.5 rounded-lg text-foreground hover:bg-surface-raised transition-colors"
-                    title={i18nService.t('coworkQuestionWizardPrevious')}
-                  >
-                    <ChevronLeftIcon className="h-5 w-5" />
-                  </button>
+                  <Button variant="ghost" size="icon" onClick={handlePrevious} title={i18nService.t('coworkQuestionWizardPrevious')}>
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
                 )}
 
                 {/* Step dots */}
@@ -330,13 +323,9 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
 
                 {/* Next button */}
                 {!isLastStep && (
-                  <button
-                    onClick={handleNext}
-                    className="p-1.5 rounded-lg text-foreground hover:bg-surface-raised transition-colors"
-                    title={i18nService.t('coworkQuestionWizardNext')}
-                  >
-                    <ChevronRightIcon className="h-5 w-5" />
-                  </button>
+                  <Button variant="ghost" size="icon" onClick={handleNext} title={i18nService.t('coworkQuestionWizardNext')}>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
                 )}
               </div>
             </div>
@@ -346,15 +335,11 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
               {currentQuestion.options.map((option) => {
                 const isSelected = selectedValues.includes(option.label);
                 return (
-                  <button
+                  <Button
                     key={option.label}
-                    type="button"
+                    variant={isSelected ? 'default' : 'outline'}
+                    className="w-full justify-start px-4 py-3"
                     onClick={() => handleSelectOption(currentQuestion, option.label)}
-                    className={`w-full text-left rounded-lg border px-4 py-3 transition-all ${
-                      isSelected
-                        ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                        : 'border-border text-secondary hover:bg-surface-raised hover:border-primary/50'
-                    }`}
                   >
                     <div className="flex items-start gap-3">
                       {currentQuestion.multiSelect ? (
@@ -387,7 +372,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                         )}
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -401,31 +386,14 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                 placeholder={i18nService.t('coworkQuestionWizardOther')}
                 className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-secondary dark:placeholder:text-foregroundSecondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
               />
-              <button
-                type="button"
-                onClick={handleSkip}
-                className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors whitespace-nowrap"
-              >
-                {i18nService.t('coworkQuestionWizardSkip')}
-              </button>
+              <Button variant="ghost" onClick={handleSkip}>{i18nService.t('coworkQuestionWizardSkip')}</Button>
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end px-6 py-4 border-t border-border bg-surface-raised">
-          <button
-            onClick={handleSubmit}
-            disabled={!allAnswered}
-            className={`px-5 py-2 text-sm font-medium rounded-lg text-white transition-colors ${
-              allAnswered
-                ? 'bg-primary hover:bg-primary-hover'
-                : 'bg-primary/50 cursor-not-allowed'
-            }`}
-            title={!allAnswered ? i18nService.t('coworkQuestionWizardAnswerRequired') : undefined}
-          >
-            {i18nService.t('coworkQuestionWizardSubmit')}
-          </button>
+          <Button onClick={handleSubmit} disabled={!allAnswered}>{i18nService.t('coworkQuestionWizardSubmit')}</Button>
         </div>
       </div>
     </div>

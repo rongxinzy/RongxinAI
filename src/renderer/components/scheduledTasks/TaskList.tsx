@@ -1,4 +1,6 @@
-import { ClockIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Switch } from '@shared/components/ui/switch';
+import { Clock, EllipsisVertical } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -66,36 +68,28 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
 
       <div className="flex items-center justify-between gap-2">
         <span className={`text-xs font-medium ${statusTone}`}>{statusLabel}</span>
-        <button
-          type="button"
-          onClick={event => {
-            event.stopPropagation();
-            void scheduledTaskService.toggleTask(task.id, !task.enabled);
+        <Switch
+          checked={task.enabled}
+          onCheckedChange={(checked: boolean) => {
+            void scheduledTaskService.toggleTask(task.id, checked);
           }}
-          className={`relative shrink-0 w-7 h-4 rounded-full transition-colors ${
-            task.enabled ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform shadow-sm ${
-              task.enabled ? 'translate-x-3' : 'translate-x-0'
-            }`}
-          />
-        </button>
+        />
       </div>
 
       <div className="flex justify-center">
         <div className="relative" ref={menuRef}>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={event => {
               event.stopPropagation();
               setShowMenu(value => !value);
             }}
             className="p-1.5 rounded-md text-secondary hover:bg-surface-raised transition-colors"
           >
-            <EllipsisVerticalIcon className="w-5 h-5" />
-          </button>
+            <EllipsisVertical className="w-5 h-5" />
+          </Button>
           {showMenu && (
             <div className="absolute right-0 top-full mt-1 w-32 rounded-lg shadow-lg bg-surface border border-border z-50 py-1">
               {task.state.runningAtMs ? (
@@ -103,42 +97,48 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
                   {i18nService.t('scheduledTasksStatusRunning')}
                 </span>
               ) : (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={event => {
                     event.stopPropagation();
                     setShowMenu(false);
                     void scheduledTaskService.runManually(task.id);
                   }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
+                  className="w-full justify-start text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
                   title={i18nService.t('scheduledTasksRunPreemptWarning')}
                 >
                   {i18nService.t('scheduledTasksRun')}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={event => {
                   event.stopPropagation();
                   setShowMenu(false);
                   dispatch(selectTask(task.id));
                   dispatch(setViewMode('edit'));
                 }}
-                className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
+                className="w-full justify-start text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
               >
                 {i18nService.t('scheduledTasksEdit')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={event => {
                   event.stopPropagation();
                   setShowMenu(false);
                   onRequestDelete(task.id, task.name);
                 }}
-                className="w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-surface-raised"
+                className="w-full justify-start text-left px-3 py-1.5 text-sm text-red-500 hover:bg-surface-raised"
               >
                 {i18nService.t('scheduledTasksDelete')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -166,7 +166,7 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6">
-        <ClockIcon className="h-12 w-12 text-secondary/40 mb-4" />
+        <Clock className="h-12 w-12 text-secondary/40 mb-4" />
         <p className="text-sm font-medium text-secondary mb-1">
           {i18nService.t('scheduledTasksEmptyState')}
         </p>

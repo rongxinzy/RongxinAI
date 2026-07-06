@@ -1,5 +1,8 @@
-import React, { useRef } from 'react';
-import { createPortal } from 'react-dom';
+import {
+  Dialog,
+  DialogContent,
+} from '@shared/components/ui/dialog';
+import React from 'react';
 
 interface ModalProps {
   isOpen?: boolean;
@@ -11,53 +14,33 @@ interface ModalProps {
 }
 
 /**
- * Modal — A base modal overlay component with correct close-on-backdrop behavior.
+ * Modal — A backwards-compatible modal wrapper now implemented with shadcn/ui Dialog.
  *
- * Only closes when the user clicks the backdrop directly (mousedown + mouseup both on backdrop).
- * Dragging text from inside the modal to outside will NOT close the modal.
+ * The public props remain unchanged so all existing call sites keep working.
+ * The internal `onClick` callback is invoked when the modal content wrapper is
+ * clicked (preserving the legacy behavior).
  */
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   className,
-  overlayClassName,
+  overlayClassName: _overlayClassName,
   onClick,
   children,
 }) => {
-  const mouseDownOnBackdropRef = useRef(false);
+  const open = isOpen !== false;
 
-  if (isOpen === false) return null;
-
-  const modal = (
-    <div
-      className={overlayClassName ?? 'fixed inset-0 z-50 flex items-center justify-center bg-black/50'}
-      onMouseDown={(e) => {
-        // Record whether mousedown started on the backdrop (not on modal content)
-        mouseDownOnBackdropRef.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        // Only close if both mousedown and click ended on the backdrop
-        if (e.target === e.currentTarget && mouseDownOnBackdropRef.current) {
-          mouseDownOnBackdropRef.current = false;
-          onClose();
-        }
-      }}
-    >
-      <div
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <DialogContent
         className={className}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
+        showCloseButton={false}
+        onClick={onClick}
       >
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  if (typeof document === 'undefined') {
-    return modal;
-  }
-
-  return createPortal(modal, document.body);
 };
 
 export default Modal;

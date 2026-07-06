@@ -1,13 +1,4 @@
-import {
-  AdjustmentsHorizontalIcon,
-  ArrowDownTrayIcon,
-  ArrowPathIcon,
-  ArrowTopRightOnSquareIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  StopIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { Download, ExternalLink, Eye, EyeOff, RefreshCw, SlidersHorizontal, Square, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
@@ -173,7 +164,7 @@ export function MarketplacePanel({
                     : i18nService.t('marketplaceTokenNotConfigured')
                 }
               >
-                <AdjustmentsHorizontalIcon className="h-3.5 w-3.5" />
+                <SlidersHorizontal className="h-3.5 w-3.5" />
                 {savedToken
                   ? i18nService.t('marketplaceTokenConfigured')
                   : i18nService.t('marketplaceTokenSettings')}
@@ -215,7 +206,7 @@ export function MarketplacePanel({
                   hasSearched ? 'h-9 rounded-md px-3 text-xs' : 'h-16 rounded-2xl px-8 text-lg'
                 } inline-flex items-center gap-1 bg-primary font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                {marketplaceLoading && <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />}
+                {marketplaceLoading && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
                 {i18nService.t('marketplaceSearch')}
               </button>
             </div>
@@ -264,7 +255,7 @@ export function MarketplacePanel({
 
       {marketplaceLoading ? (
         <div className="flex min-h-[620px] items-center justify-center text-sm text-secondary">
-          <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
+          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
           {i18nService.t('loading')}
         </div>
       ) : !hasSearched ? null : installableModels.length === 0 ? (
@@ -332,7 +323,7 @@ export function MarketplacePanel({
                           onClick={() => void openExternalUrl(model.detailUrl!)}
                           className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
                         >
-                          <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                          <ExternalLink className="h-3.5 w-3.5" />
                           {i18nService.t('marketplaceOpenModelScope')}
                         </button>
                       )}
@@ -342,7 +333,7 @@ export function MarketplacePanel({
                           onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
                           className={smallOutlineButtonClass}
                         >
-                          <StopIcon className="h-3.5 w-3.5" />
+                          <Square className="h-3.5 w-3.5" />
                           {i18nService.t('marketplaceCancelInstall')}
                         </button>
                       ) : (
@@ -352,7 +343,7 @@ export function MarketplacePanel({
                           disabled={installing || loading}
                           className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
                         >
-                          <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                          <Download className="h-3.5 w-3.5" />
                           {i18nService.t('marketplaceInstall')}
                         </button>
                       )}
@@ -404,7 +395,7 @@ export function MarketplacePanel({
               onClick={() => setTokenModalOpen(false)}
               className="rounded-md p-1 text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
             >
-              <XMarkIcon className="h-5 w-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
           <p className="text-sm leading-relaxed text-secondary">
@@ -430,7 +421,7 @@ export function MarketplacePanel({
                     className="rounded p-0.5 text-secondary transition-colors hover:text-primary"
                     title={i18nService.t('marketplaceTokenClear')}
                   >
-                    <XMarkIcon className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </button>
                 )}
                 <button
@@ -439,9 +430,9 @@ export function MarketplacePanel({
                   className="rounded p-0.5 text-secondary transition-colors hover:text-primary"
                 >
                   {tokenInputVisible ? (
-                    <EyeSlashIcon className="h-4 w-4" />
+                    <EyeOff className="h-4 w-4" />
                   ) : (
-                    <EyeIcon className="h-4 w-4" />
+                    <Eye className="h-4 w-4" />
                   )}
                 </button>
               </div>

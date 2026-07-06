@@ -1,4 +1,5 @@
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { PanelLeft, Pencil, Plus } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -6,8 +7,6 @@ import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import type { PresetAgent } from '../../types/agent';
-import ComposeIcon from '../icons/ComposeIcon';
-import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import AgentAvatarIcon from './AgentAvatarIcon';
 import AgentCreateModal from './AgentCreateModal';
@@ -65,20 +64,24 @@ const AgentsView: React.FC<AgentsViewProps> = ({
         <div className="flex items-center space-x-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onToggleSidebar}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="h-8 w-8"
               >
-                <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
-              </button>
-              <button
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onNewChat}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="h-8 w-8"
               >
-                <ComposeIcon className="h-4 w-4" />
-              </button>
+                <Pencil className="h-4 w-4" />
+              </Button>
               {updateBadge}
             </div>
           )}
@@ -150,18 +153,19 @@ const AgentsView: React.FC<AgentsViewProps> = ({
                 />
               ))}
               {/* Create new agent card */}
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setIsCreateOpen(true)}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors min-h-[140px] cursor-pointer"
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 min-h-[140px] h-auto"
               >
                 <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary/10">
-                  <PlusIcon className="h-5 w-5 text-primary" />
+                  <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <span className="text-sm font-medium text-primary">
                   {i18nService.t('createNewAgent')}
                 </span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -186,10 +190,11 @@ const AgentCard: React.FC<{
   isActive: boolean;
   onClick: () => void;
 }> = ({ icon, name, description, isActive, onClick }) => (
-  <button
+  <Button
     type="button"
+    variant="outline"
     onClick={onClick}
-    className={`flex flex-col items-start gap-2 p-4 rounded-xl border-2 text-left transition-all min-h-[140px] hover:shadow-md hover:bg-surface-raised ${
+    className={`flex flex-col items-start gap-2 p-4 rounded-xl border-2 text-left transition-all min-h-[140px] hover:shadow-md hover:bg-surface-raised h-auto ${
       isActive
         ? 'border-primary bg-primary/5'
         : 'border-border'
@@ -211,7 +216,7 @@ const AgentCard: React.FC<{
         </div>
       )}
     </div>
-  </button>
+  </Button>
 );
 
 /* ── Uninstalled Preset Card ─────────────────────────── */
@@ -240,14 +245,14 @@ const UninstalledPresetCard: React.FC<{
         </div>
       )}
     </div>
-    <button
+    <Button
       type="button"
       onClick={onAdd}
       disabled={isAdding}
-      className="self-end px-3 py-1 text-xs font-medium rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 transition-colors"
+      className="self-end px-3 py-1 h-auto text-xs"
     >
       {isAdding ? '...' : i18nService.t('addAgent')}
-    </button>
+    </Button>
   </div>
 );
 

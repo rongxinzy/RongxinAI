@@ -1,19 +1,18 @@
-import { XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Switch } from '@shared/components/ui/switch';
+import { Pencil, Plug, Search, Trash2, XCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { mcpCategories,mcpRegistry } from '../../data/mcpRegistry';
+import { mcpCategories, mcpRegistry } from '../../data/mcpRegistry';
 import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
-import { McpMarketplaceCategoryInfo,McpRegistryEntry, McpServerConfig, McpServerFormData } from '../../types/mcp';
+import { McpMarketplaceCategoryInfo, McpRegistryEntry, McpServerConfig, McpServerFormData } from '../../types/mcp';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
-import ConnectorIcon from '../icons/ConnectorIcon';
-import PencilIcon from '../icons/PencilIcon';
-import SearchIcon from '../icons/SearchIcon';
-import TrashIcon from '../icons/TrashIcon';
 import McpServerFormModal from './McpServerFormModal';
 
 const TRANSPORT_BADGE_COLORS: Record<string, string> = {
@@ -391,13 +390,15 @@ const McpManager: React.FC = () => {
               : `${i18nService.t('mcpBridgeSyncDone') || 'MCP tools synced'}: ${bridgeSyncResult.tools} ${bridgeSyncResult.tools === 1 ? 'tool' : 'tools'}`
             }
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setBridgeSyncResult(null)}
-            className="ml-2 opacity-60 hover:opacity-100"
+            className="ml-2 h-auto w-auto opacity-60 hover:opacity-100"
           >
-            &times;
-          </button>
+            <span className="text-lg leading-none">&times;</span>
+          </Button>
         </div>
       )}
 
@@ -411,29 +412,31 @@ const McpManager: React.FC = () => {
         {/* Search */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary" />
+            <Input
               type="text"
               placeholder={i18nService.t('searchMcpServers')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-surface text-foreground placeholder-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full pl-9 pr-8 rounded-xl bg-surface text-foreground placeholder-secondary border border-border"
             />
             {searchQuery && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 text-secondary hover:text-primary"
               >
-                <XCircleIconSolid className="h-4 w-4" />
-              </button>
+                <XCircle className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
 
         {/* Tabs */}
         <div className="flex items-center border-b border-border">
-          <button type="button" onClick={() => setActiveTab('installed')} className={tabClass('installed')}>
+          <Button type="button" variant="ghost" onClick={() => setActiveTab('installed')} className={tabClass('installed')}>
             {i18nService.t('mcpInstalled')}
             {servers.length > 0 && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
@@ -441,8 +444,8 @@ const McpManager: React.FC = () => {
               </span>
             )}
             <div className={tabIndicatorClass('installed')} />
-          </button>
-          <button type="button" onClick={() => setActiveTab('marketplace')} className={tabClass('marketplace')}>
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setActiveTab('marketplace')} className={tabClass('marketplace')}>
             {i18nService.t('mcpMarketplace')}
             {marketplaceCount > 0 && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
@@ -450,8 +453,8 @@ const McpManager: React.FC = () => {
               </span>
             )}
             <div className={tabIndicatorClass('marketplace')} />
-          </button>
-          <button type="button" onClick={() => setActiveTab('custom')} className={tabClass('custom')}>
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setActiveTab('custom')} className={tabClass('custom')}>
             {i18nService.t('mcpCustom')}
             {customCount > 0 && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
@@ -459,25 +462,23 @@ const McpManager: React.FC = () => {
               </span>
             )}
             <div className={tabIndicatorClass('custom')} />
-          </button>
+          </Button>
         </div>
 
         {/* Category filter pills (Marketplace only) */}
         {activeTab === 'marketplace' && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {dynamicCategories.map((cat) => (
-              <button
+              <Button
                 key={cat.id}
                 type="button"
+                variant={activeCategory === cat.id ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
-                  activeCategory === cat.id
-                    ? 'bg-primary text-white'
-                    : 'bg-surface text-secondary hover:bg-surface-raised border border-border'
-                }`}
+                className="h-7 px-2.5 text-xs"
               >
                 {(i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) || i18nService.t(cat.key)}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -503,41 +504,37 @@ const McpManager: React.FC = () => {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
-                        <ConnectorIcon className="h-4 w-4 text-secondary" />
+                        <Plug className="h-4 w-4 text-secondary" />
                       </div>
                       <span className="text-sm font-medium text-foreground truncate">
                         {server.name}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleOpenEditForm(server)}
-                        className="p-1 rounded-lg text-secondary hover:text-primary dark:hover:text-primary transition-colors"
+                        className="h-7 w-7 text-secondary hover:text-primary dark:hover:text-primary"
                         title={i18nService.t('editMcpServer')}
                       >
-                        <PencilIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleRequestDelete(server)}
-                        className="p-1 rounded-lg text-secondary hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                        className="h-7 w-7 text-secondary hover:text-red-500 dark:hover:text-red-400"
                         title={i18nService.t('deleteMcpServer')}
                       >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <div
-                        className={`w-9 h-5 rounded-full flex items-center transition-colors cursor-pointer flex-shrink-0 ${
-                          server.enabled ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
-                        }`}
-                        onClick={() => handleToggleEnabled(server.id)}
-                      >
-                        <div
-                          className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform ${
-                            server.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                          }`}
-                        />
-                      </div>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Switch
+                        checked={server.enabled}
+                        onCheckedChange={() => handleToggleEnabled(server.id)}
+                      />
                     </div>
                   </div>
 
@@ -592,7 +589,7 @@ const McpManager: React.FC = () => {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
-                        <ConnectorIcon className="h-4 w-4 text-secondary" />
+                        <Plug className="h-4 w-4 text-secondary" />
                       </div>
                       <span className="text-sm font-medium text-foreground truncate">
                         {entry.name}
@@ -604,13 +601,13 @@ const McpManager: React.FC = () => {
                           {i18nService.t('mcpInstalled')}
                         </span>
                       ) : (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => handleInstallFromRegistry(entry)}
-                          className="px-2.5 py-1 text-xs rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
+                          className="h-7 px-2.5 text-xs"
                         >
                           {i18nService.t('mcpInstall')}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -645,13 +642,14 @@ const McpManager: React.FC = () => {
           {/* Custom servers grid (add button + server cards) */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {/* Add custom server card */}
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleOpenCreateForm}
-              className="rounded-xl border-2 border-dashed border-border text-secondary hover:border-primary hover:text-primary dark:hover:border-primary dark:hover:text-primary transition-colors flex items-center justify-center min-h-[120px] text-sm"
+              className="rounded-xl border-2 border-dashed border-border text-secondary hover:border-primary hover:text-primary dark:hover:border-primary dark:hover:text-primary h-auto min-h-[120px]"
             >
               + {i18nService.t('addMcpServer')}
-            </button>
+            </Button>
             {filteredCustom.map((server) => (
                 <div
                   key={server.id}
@@ -660,41 +658,37 @@ const McpManager: React.FC = () => {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
-                        <ConnectorIcon className="h-4 w-4 text-secondary" />
+                        <Plug className="h-4 w-4 text-secondary" />
                       </div>
                       <span className="text-sm font-medium text-foreground truncate">
                         {server.name}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleOpenEditForm(server)}
-                        className="p-1 rounded-lg text-secondary hover:text-primary dark:hover:text-primary transition-colors"
+                        className="h-7 w-7 text-secondary hover:text-primary dark:hover:text-primary"
                         title={i18nService.t('editMcpServer')}
                       >
-                        <PencilIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleRequestDelete(server)}
-                        className="p-1 rounded-lg text-secondary hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                        className="h-7 w-7 text-secondary hover:text-red-500 dark:hover:text-red-400"
                         title={i18nService.t('deleteMcpServer')}
                       >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <div
-                        className={`w-9 h-5 rounded-full flex items-center transition-colors cursor-pointer flex-shrink-0 ${
-                          server.enabled ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
-                        }`}
-                        onClick={() => handleToggleEnabled(server.id)}
-                      >
-                        <div
-                          className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform ${
-                            server.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                          }`}
-                        />
-                      </div>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Switch
+                        checked={server.enabled}
+                        onCheckedChange={() => handleToggleEnabled(server.id)}
+                      />
                     </div>
                   </div>
 
@@ -739,22 +733,24 @@ const McpManager: React.FC = () => {
               </div>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={handleCancelDelete}
                 disabled={isDeleting}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border text-secondary hover:bg-surface-raised transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="h-8 px-3 text-xs"
               >
                 {i18nService.t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                className="px-3 py-1.5 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:hover:bg-red-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="h-8 px-3 text-xs"
               >
                 {i18nService.t('confirmDelete')}
-              </button>
+              </Button>
             </div>
         </Modal>
       )}

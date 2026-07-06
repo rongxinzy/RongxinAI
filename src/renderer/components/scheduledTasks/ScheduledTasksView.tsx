@@ -1,4 +1,5 @@
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -6,8 +7,6 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
-import ComposeIcon from '../icons/ComposeIcon';
-import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import AllRunsHistory from './AllRunsHistory';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -116,31 +115,37 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         <div className="flex items-center space-x-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onToggleSidebar}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
-                <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
-              </button>
-              <button
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onNewChat}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
-                <ComposeIcon className="h-4 w-4" />
-              </button>
+                <Pencil className="h-4 w-4" />
+              </Button>
               {updateBadge}
             </div>
           )}
           {viewMode !== 'list' && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleBackToList}
               className="non-draggable p-2 rounded-lg hover:bg-surface-raised text-secondary transition-colors"
               aria-label={i18nService.t('back')}
             >
-              <ArrowLeftIcon className="h-5 w-5" />
-            </button>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
           )}
           <h1 className="text-lg font-semibold text-foreground">
             {i18nService.t('scheduledTasksTitle')}
@@ -153,39 +158,37 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       {showTabs && (
         <div className="flex items-center justify-between border-b border-border px-4 shrink-0">
           <div className="flex">
-            <button
+            <Button
               type="button"
+              variant={activeTab === 'tasks' ? 'default' : 'ghost'}
               onClick={() => handleTabChange('tasks')}
-              className={`px-4 py-2.5 text-[14px] font-normal leading-5 transition-colors relative ${
-                activeTab === 'tasks' ? 'text-foreground' : 'text-secondary hover:text-foreground'
-              }`}
+              className="px-4 py-2.5 text-[14px] font-normal leading-5 transition-colors relative rounded-none"
             >
               {i18nService.t('scheduledTasksTabTasks')}
               {activeTab === 'tasks' && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t" />
               )}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant={activeTab === 'history' ? 'default' : 'ghost'}
               onClick={() => handleTabChange('history')}
-              className={`px-4 py-2.5 text-[14px] font-normal leading-5 transition-colors relative ${
-                activeTab === 'history' ? 'text-foreground' : 'text-secondary hover:text-foreground'
-              }`}
+              className="px-4 py-2.5 text-[14px] font-normal leading-5 transition-colors relative rounded-none"
             >
               {i18nService.t('scheduledTasksTabHistory')}
               {activeTab === 'history' && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t" />
               )}
-            </button>
+            </Button>
           </div>
           {activeTab === 'tasks' && (
-            <button
+            <Button
               type="button"
               onClick={() => dispatch(setViewMode('create'))}
               className="px-3 py-1 text-[14px] font-normal leading-5 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
             >
               {i18nService.t('scheduledTasksNewTask')}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -253,15 +256,17 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             </h4>
             <p className="text-sm text-secondary mb-4">{i18nService.t('taskFormLeaveConfirm')}</p>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setShowLeaveConfirm(false)}
                 className="px-4 py-2 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors border border-border"
               >
                 {i18nService.t('taskFormStay')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={() => {
                   setShowLeaveConfirm(false);
                   pendingBackActionRef.current?.();
@@ -270,7 +275,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
               >
                 {i18nService.t('taskFormLeave')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

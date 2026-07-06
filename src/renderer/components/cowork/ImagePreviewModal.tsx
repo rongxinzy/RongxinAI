@@ -1,4 +1,5 @@
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { X } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -60,18 +61,16 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
       onClick={handleBackdropClick}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-end p-4">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onClose();
-          }}
-          className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="pointer-events-auto text-white/80 hover:bg-white/15 hover:text-white"
           title={i18nService.t('close')}
           aria-label={i18nService.t('close')}
         >
-          <XMarkIcon className="h-5 w-5" />
-        </button>
+          <X className="h-5 w-5" />
+        </Button>
       </div>
 
       <div

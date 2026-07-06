@@ -795,13 +795,32 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     const mgr = this.mcpServerManager;
     return manifest.map((entry) => ({
-      name: `mcp__${entry.server}__${entry.name}`,
+      name: `mcp__${sanitizeMcpToolName(entry.server)}__${sanitizeMcpToolName(entry.name)}`,
       description: `[MCP: ${entry.server}] ${entry.description}`,
       parameters: entry.inputSchema as Record<string, unknown>,
       execute: async (args: Record<string, unknown>) => {
-        const result = await mgr.callTool(entry.server, entry.name, args);
-        if (typeof result === 'string') return result;
-        return JSON.stringify(result);
+        // Pi SDK may pass the call ID string instead of the args object under
+        // certain error conditions.  Guard against any non-record value so the
+        // tool returns a graceful error instead of passing a string to
+        // mgr.callTool (which expects Record<string, unknown>).
+        if (!args || typeof args !== 'object' || Array.isArray(args)) {
+          console.warn(
+            `[PiRuntime] MCP tool "${entry.name}" received non-object args:`,
+            typeof args,
+          );
+          return JSON.stringify({
+            error: 'Tool arguments were not passed as a record — this is a Pi SDK internal error.',
+          });
+        }
+        try {
+          const result = await mgr.callTool(entry.server, entry.name, args);
+          if (typeof result === 'string') return result;
+          return JSON.stringify(result);
+        } catch (err) {
+          return JSON.stringify({
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       },
     }));
   }
@@ -855,6 +874,19 @@ function toToolInputRecord(args: unknown): Record<string, unknown> {
   }
   if (args === undefined || args === null) return {};
   return { value: args };
+}
+
+/**
+ * Sanitize an MCP server name or tool name so it matches the OpenAI API
+ * function name pattern: `^[a-zA-Z0-9_-]+$`.
+ * Characters outside this range are replaced with `_`, and consecutive
+ * underscores are collapsed to avoid double/mangled names.
+ */
+function sanitizeMcpToolName(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
 }
 
 /** Extract a display string from a Pi tool result (string, {text}, array of blocks, or JSON). */

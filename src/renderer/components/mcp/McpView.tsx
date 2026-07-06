@@ -1,8 +1,8 @@
+import { Button } from '@shared/components/ui/button';
+import { PanelLeft, Pencil } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
-import ComposeIcon from '../icons/ComposeIcon';
-import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import McpManager from './McpManager';
 
@@ -21,20 +21,24 @@ const McpView: React.FC<McpViewProps> = ({ isSidebarCollapsed, onToggleSidebar, 
         <div className="flex items-center space-x-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onToggleSidebar}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="h-8 w-8"
               >
-                <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
-              </button>
-              <button
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onNewChat}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="h-8 w-8"
               >
-                <ComposeIcon className="h-4 w-4" />
-              </button>
+                <Pencil className="h-4 w-4" />
+              </Button>
               {updateBadge}
             </div>
           )}

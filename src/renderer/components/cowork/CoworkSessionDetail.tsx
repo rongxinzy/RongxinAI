@@ -1,15 +1,10 @@
-import {
-  CheckIcon,
-  ChevronRightIcon,
-  DocumentArrowDownIcon,
-  PhotoIcon,
-} from '@heroicons/react/24/outline';
-import { FolderIcon } from '@heroicons/react/24/solid';
+import { Conversation, ConversationContent, ConversationScrollButton } from '@shared/components/ai-elements/conversation';
+import { Button } from '@shared/components/ui/button';
+import { Download, Folder, Image as ImageIcon, PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo,useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { getScheduledReminderDisplayText } from '../../../scheduledTask/reminderText';
 import { getArtifactTypeFromExtension, normalizeFilePathForDedup, parseCodeBlockArtifacts, parseFileLinksFromMessage, parseFilePathsFromText, parseToolArtifact, stripFileLinksFromText } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -18,7 +13,6 @@ import {
   selectCurrentMessagesLength,
   selectCurrentSession,
   selectIsStreaming,
-  selectLastMessageContent,
   selectRemoteManaged,
 } from '../../store/selectors/coworkSelectors';
 import {
@@ -36,24 +30,19 @@ import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { Artifact } from '../../types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type { CoworkImageAttachment,CoworkMessage, CoworkMessageMetadata } from '../../types/cowork';
-import type { Skill } from '../../types/skill';
 import { getCompactFolderName } from '../../utils/path';
-import { formatMessageDateTime } from '../../utils/tokenFormat';
-import { parseUserMessageForDisplay } from '../../utils/userMessageDisplay';
-import { ArtifactPanel, ArtifactPreviewCard } from '../artifacts';
-import ComposeIcon from '../icons/ComposeIcon';
-import CopyIcon from '../icons/CopyIcon';
-import ExclamationTriangleIcon from '../icons/ExclamationTriangleIcon';
-import InformationCircleIcon from '../icons/InformationCircleIcon';
-import PuzzleIcon from '../icons/PuzzleIcon';
-import SidebarToggleIcon from '../icons/SidebarToggleIcon';
-import MarkdownContent from '../MarkdownContent';
+import { ArtifactPanel } from '../artifacts';
 import WindowTitleBar from '../window/WindowTitleBar';
+import { ArtifactPanelIcon, StreamingBar } from './components/StreamingBar';
+import { TurnBlock } from './components/TurnBlock';
+import { UserBubble } from './components/UserBubble';
 import { type CoworkOpenShareOptionsEventDetail,CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
-import DiffView, { extractDiffFromToolInput } from './DiffView';
-import ImagePreviewModal, { type ImagePreviewSource } from './ImagePreviewModal';
-import LazyRenderTurn, { clearHeightCache } from './LazyRenderTurn';
+import type { CaptureRect } from './helpers/exportUtils';
+import { composeExportCanvas, domRectToCaptureRect, formatExportTimestamp, loadImageFromBase64, MAX_EXPORT_CANVAS_HEIGHT, MAX_EXPORT_SEGMENTS,sanitizeExportFileName, waitForNextFrame } from './helpers/exportUtils';
+import { buildConversationTurns, buildDisplayItems, hasRenderableAssistantContent } from './helpers/messageGrouping';
+// toolUtils helpers used in sub-components
+import { normalizeLocalPath, parseRootRelativePath,toAbsolutePathFromCwd } from './helpers/pathUtils';
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
   onContinue: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => boolean | void | Promise<boolean | void>;
@@ -64,240 +53,11 @@ interface CoworkSessionDetailProps {
   updateBadge?: React.ReactNode;
 }
 
-const AUTO_SCROLL_THRESHOLD = 120;
 const NAV_SCROLL_LOCK_DURATION = 800;
-const NAV_BOTTOM_SNAP_THRESHOLD = 20;
 const ARTIFACT_PANEL_TRANSITION_MS = 200;
 const ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH = 4;
 const COWORK_DETAIL_MIN_WIDTH = 480;
 const ARTIFACT_PANEL_MIN_WIDTH_RATIO = 1 / 6;
-const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
-
-const sanitizeExportFileName = (value: string): string => {
-  const sanitized = value.replace(INVALID_FILE_NAME_PATTERN, ' ').replace(/\s+/g, ' ').trim();
-  return sanitized || 'cowork-session';
-};
-
-const formatExportTimestamp = (value: Date): string => {
-  const pad = (num: number): string => String(num).padStart(2, '0');
-  return `${value.getFullYear()}${pad(value.getMonth() + 1)}${pad(value.getDate())}-${pad(value.getHours())}${pad(value.getMinutes())}${pad(value.getSeconds())}`;
-};
-
-type CaptureRect = { x: number; y: number; width: number; height: number };
-
-const MAX_EXPORT_CANVAS_HEIGHT = 32760;
-const MAX_EXPORT_SEGMENTS = 240;
-
-const waitForNextFrame = (): Promise<void> =>
-  new Promise((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
-
-const loadImageFromBase64 = (pngBase64: string): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Failed to decode captured image'));
-    img.src = `data:image/png;base64,${pngBase64}`;
-  });
-
-const domRectToCaptureRect = (rect: DOMRect): CaptureRect => ({
-  x: Math.max(0, Math.round(rect.x)),
-  y: Math.max(0, Math.round(rect.y)),
-  width: Math.max(0, Math.round(rect.width)),
-  height: Math.max(0, Math.round(rect.height)),
-});
-
-/** Format a date as "YYYY年MM月DD日" for the export header. */
-const formatExportDate = (ts: number): string => {
-  const d = new Date(ts);
-  return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
-};
-
-/** Draw a rounded-rectangle path (for card clipping / filling). */
-const roundRectPath = (
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number,
-) => {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.arcTo(x + w, y, x + w, y + r, r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-  ctx.lineTo(x + r, y + h);
-  ctx.arcTo(x, y + h, x, y + h - r, r);
-  ctx.lineTo(x, y + r);
-  ctx.arcTo(x, y, x + r, y, r);
-  ctx.closePath();
-};
-
-/**
- * Compose a final export canvas with a rounded-card layout:
- *   outer background → rounded card → header (title + date) → content → footer (logo + tagline)
- */
-const composeExportCanvas = async (
-  contentCanvas: HTMLCanvasElement,
-  title: string,
-  createdAt: number,
-): Promise<HTMLCanvasElement> => {
-  const isDark = document.documentElement.classList.contains('dark');
-  const dpr = window.devicePixelRatio || 1;
-  const fontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
-
-  const contentW = contentCanvas.width;   // CSS px
-  const contentH = contentCanvas.height;  // CSS px
-
-  // ── Layout constants (CSS px) ──
-  const outerPadX = 24;          // horizontal breathing room around card
-  const outerPadTop = 28;        // top breathing room
-  const outerPadBottom = 28;     // bottom breathing room
-  const cardRadius = 16;         // card corner radius
-  const cardInnerPadX = 28;      // text indent inside card
-  const headerHeight = 80;       // header area inside card
-  const footerHeight = 80;       // footer area inside card
-  const dividerThick = 1;
-  const logoCssSize = 34;
-
-  // ── Colors ──
-  const outerBg = isDark ? '#111111' : '#f0f0f0';
-  const cardBg = isDark ? '#1e1e1e' : '#ffffff';
-  const cardShadowColor = isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.08)';
-  const titleColor = isDark ? '#eeeeee' : '#1a1a1a';
-  const dateColor = isDark ? '#888888' : '#999999';
-  const dividerColor = isDark ? '#2a2a2a' : '#ebebeb';
-  const brandColor = isDark ? '#e0e0e0' : '#1a1a1a';
-  const subtitleColor = isDark ? '#888888' : '#888888';
-
-  // ── Compute dimensions ──
-  const cardW = contentW;
-  const cardH = headerHeight + dividerThick + contentH + dividerThick + footerHeight;
-  const totalW = cardW + outerPadX * 2;
-  const totalH = cardH + outerPadTop + outerPadBottom;
-
-  const final = document.createElement('canvas');
-  final.width = Math.round(totalW * dpr);
-  final.height = Math.round(totalH * dpr);
-  const ctx = final.getContext('2d');
-  if (!ctx) throw new Error('Canvas context unavailable');
-  ctx.scale(dpr, dpr);
-
-  // ── Outer background ──
-  ctx.fillStyle = outerBg;
-  ctx.fillRect(0, 0, totalW, totalH);
-
-  // ── Card shadow ──
-  ctx.save();
-  ctx.shadowColor = cardShadowColor;
-  ctx.shadowBlur = 24;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 4;
-  ctx.fillStyle = cardBg;
-  roundRectPath(ctx, outerPadX, outerPadTop, cardW, cardH, cardRadius);
-  ctx.fill();
-  ctx.restore();
-
-  // ── Clip to card bounds so content doesn't bleed past rounded corners ──
-  ctx.save();
-  roundRectPath(ctx, outerPadX, outerPadTop, cardW, cardH, cardRadius);
-  ctx.clip();
-
-  // card-local origin helpers
-  const cx = outerPadX;           // card left
-  const cy = outerPadTop;         // card top
-
-  // ── Header ──
-  const titleFontSize = 17;
-  const dateFontSize = 12;
-  ctx.textBaseline = 'middle';
-
-  // Title
-  ctx.fillStyle = titleColor;
-  ctx.font = `600 ${titleFontSize}px ${fontStack}`;
-  const maxTitleW = cardW - cardInnerPadX * 2;
-  let displayTitle = title || 'Cowork Session';
-  if (ctx.measureText(displayTitle).width > maxTitleW) {
-    while (displayTitle.length > 1 && ctx.measureText(displayTitle + '…').width > maxTitleW) {
-      displayTitle = displayTitle.slice(0, -1);
-    }
-    displayTitle += '…';
-  }
-  const headerCenterY = cy + headerHeight / 2;
-  ctx.fillText(displayTitle, cx + cardInnerPadX, headerCenterY - dateFontSize / 2 - 3);
-
-  // Date
-  ctx.fillStyle = dateColor;
-  ctx.font = `400 ${dateFontSize}px ${fontStack}`;
-  ctx.fillText(formatExportDate(createdAt), cx + cardInnerPadX, headerCenterY + titleFontSize / 2 + 3);
-
-  // ── Top divider ──
-  ctx.fillStyle = dividerColor;
-  ctx.fillRect(cx + cardInnerPadX, cy + headerHeight, cardW - cardInnerPadX * 2, dividerThick);
-
-  // ── Content ──
-  const contentY = cy + headerHeight + dividerThick;
-  ctx.drawImage(contentCanvas, cx, contentY, contentW, contentH);
-
-  // ── Bottom divider ──
-  const bottomDivY = contentY + contentH;
-  ctx.fillStyle = dividerColor;
-  ctx.fillRect(cx + cardInnerPadX, bottomDivY, cardW - cardInnerPadX * 2, dividerThick);
-
-  // ── Footer ──
-  const footerTop = bottomDivY + dividerThick;
-  const footerCenterY = footerTop + footerHeight / 2;
-
-  // Load logo
-  const logoImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Failed to load logo'));
-    img.src = 'logo.png';
-  });
-
-  // Logo with rounded clipping
-  const logoX = cx + cardInnerPadX;
-  const logoY = footerCenterY - logoCssSize / 2;
-  const logoRadius = 8;
-  ctx.save();
-  roundRectPath(ctx, logoX, logoY, logoCssSize, logoCssSize, logoRadius);
-  ctx.clip();
-  ctx.drawImage(logoImg, logoX, logoY, logoCssSize, logoCssSize);
-  ctx.restore();
-
-  // Re-clip to card (previous clip was consumed by logo)
-  ctx.save();
-  roundRectPath(ctx, outerPadX, outerPadTop, cardW, cardH, cardRadius);
-  ctx.clip();
-
-  // Brand text
-  const textX = logoX + logoCssSize + 12;
-  const brandFontSize = 13;
-  const taglineFontSize = 11;
-
-  ctx.fillStyle = brandColor;
-  ctx.font = `600 ${brandFontSize}px ${fontStack}`;
-  ctx.fillText('RongxinAI — 全场景个人助理 Agent', textX, footerCenterY - taglineFontSize / 2 - 2);
-
-  ctx.fillStyle = subtitleColor;
-  ctx.font = `400 ${taglineFontSize}px ${fontStack}`;
-  ctx.fillText('7×24 小时帮你干活的全场景个人助理', textX, footerCenterY + brandFontSize / 2 + 3);
-
-  ctx.restore(); // card clip
-
-  return final;
-};
-
-const ArtifactPanelIcon: React.FC<React.SVGProps<SVGSVGElement> & { open?: boolean }> = ({ open, ...props }) => {
-  const dividerX = open ? 10.5 : 12.5;
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="1.5" y="2" width="13" height="12" rx="2" />
-      <line x1={dividerX} y1="2" x2={dividerX} y2="14" />
-    </svg>
-  );
-};
-
 class ArtifactPanelErrorBoundary extends React.Component<
   { children: React.ReactNode; onClose: () => void },
   { hasError: boolean; error: Error | null }
@@ -320,1401 +80,19 @@ class ArtifactPanelErrorBoundary extends React.Component<
           <pre className="text-xs text-muted whitespace-pre-wrap max-w-full overflow-auto mb-3">
             {this.state.error?.message}
           </pre>
-          <button
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={() => { this.setState({ hasError: false, error: null }); this.props.onClose(); }}
-            className="px-3 py-1.5 text-xs rounded-lg bg-surface hover:bg-surface-hover text-foreground"
           >
             Close
-          </button>
+          </Button>
         </aside>
       );
     }
     return this.props.children;
   }
 }
-
-const formatUnknown = (value: unknown): string => {
-  if (typeof value === 'string') {
-    return value;
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
-const getStringArray = (value: unknown): string | null => {
-  if (!Array.isArray(value)) return null;
-  const lines = value.filter((item) => typeof item === 'string') as string[];
-  return lines.length > 0 ? lines.join('\n') : null;
-};
-
-type TodoStatus = 'completed' | 'in_progress' | 'pending' | 'unknown';
-
-type ParsedTodoItem = {
-  primaryText: string;
-  secondaryText: string | null;
-  status: TodoStatus;
-};
-
-const normalizeToolName = (value: string): string => value.toLowerCase().replace(/[\s_]+/g, '');
-
-const TOOL_USE_ERROR_TAG_PATTERN = /^<tool_use_error>([\s\S]*?)<\/tool_use_error>$/i;
-const ANSI_ESCAPE_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
-
-const getToolDisplayName = (toolName: string | undefined): string => {
-  if (!toolName) return 'Tool';
-  const normalized = normalizeToolName(toolName);
-  switch (normalized) {
-    case 'cron':
-      return 'Cron';
-    case 'exec':
-    case 'bash':
-    case 'shell':
-      return 'Bash';
-    case 'read':
-    case 'readfile':
-      return 'Read';
-    case 'write':
-    case 'writefile':
-      return 'Write';
-    case 'edit':
-    case 'editfile':
-      return 'Edit';
-    case 'multiedit':
-      return 'MultiEdit';
-    case 'process':
-      return 'Process';
-    default:
-      return toolName;
-  }
-};
-
-const isBashLikeToolName = (toolName: string | undefined): boolean => {
-  if (!toolName) return false;
-  const normalized = normalizeToolName(toolName);
-  return normalized === 'bash' || normalized === 'exec' || normalized === 'shell';
-};
-
-const getToolInputString = (
-  input: Record<string, unknown>,
-  keys: string[],
-): string | null => {
-  for (const key of keys) {
-    const value = input[key];
-    if (typeof value === 'string' && value.trim()) {
-      return value;
-    }
-  }
-  return null;
-};
-
-const truncatePreview = (value: string, maxLength = 120): string =>
-  value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
-
-const normalizeToolResultText = (value: string): string => {
-  const withoutAnsi = value.replace(ANSI_ESCAPE_PATTERN, '');
-  const errorTagMatch = withoutAnsi.trim().match(TOOL_USE_ERROR_TAG_PATTERN);
-  return errorTagMatch ? errorTagMatch[1].trim() : withoutAnsi;
-};
-
-const isTodoWriteToolName = (toolName: string | undefined): boolean => {
-  if (!toolName) return false;
-  return normalizeToolName(toolName) === 'todowrite';
-};
-
-const isCronToolName = (toolName: string | undefined): boolean => {
-  if (!toolName) return false;
-  return normalizeToolName(toolName) === 'cron';
-};
-
-const getCronToolSummary = (input: Record<string, unknown>): string | null => {
-  const action = getToolInputString(input, ['action']);
-  if (!action) return null;
-
-  const job = input.job && typeof input.job === 'object'
-    ? input.job as Record<string, unknown>
-    : null;
-  const jobName = job
-    ? getToolInputString(job, ['name', 'id'])
-    : null;
-  const jobId = getToolInputString(input, ['jobId', 'id'])
-    ?? (job ? getToolInputString(job, ['id']) : null);
-  const wakeText = getToolInputString(input, ['text']);
-
-  switch (action) {
-    case 'add':
-      return [action, jobName ?? jobId].filter(Boolean).join(' · ');
-    case 'update':
-    case 'remove':
-    case 'run':
-    case 'runs':
-      return [action, jobId ?? jobName].filter(Boolean).join(' · ');
-    case 'wake':
-      return [action, wakeText].filter(Boolean).join(' · ');
-    default:
-      return action;
-  }
-};
-
-const formatStructuredText = (value: string): string => {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
-    return value;
-  }
-
-  try {
-    return JSON.stringify(JSON.parse(trimmed), null, 2);
-  } catch {
-    return value;
-  }
-};
-
-const toTrimmedString = (value: unknown): string | null => (
-  typeof value === 'string' && value.trim() ? value.trim() : null
-);
-
-const normalizeTodoStatus = (value: unknown): TodoStatus => {
-  const normalized = typeof value === 'string'
-    ? value.trim().toLowerCase().replace(/-/g, '_')
-    : '';
-
-  if (normalized === 'completed') return 'completed';
-  if (normalized === 'in_progress' || normalized === 'running') return 'in_progress';
-  if (normalized === 'pending' || normalized === 'todo') return 'pending';
-  return 'unknown';
-};
-
-const parseTodoWriteItems = (input: unknown): ParsedTodoItem[] | null => {
-  if (!input || typeof input !== 'object') return null;
-  const record = input as Record<string, unknown>;
-  if (!Array.isArray(record.todos)) return null;
-
-  const parsedItems = record.todos
-    .map((rawTodo) => {
-      if (!rawTodo || typeof rawTodo !== 'object') {
-        return null;
-      }
-
-      const todo = rawTodo as Record<string, unknown>;
-      const activeForm = toTrimmedString(todo.activeForm);
-      const content = toTrimmedString(todo.content);
-      const primaryText = activeForm ?? content ?? i18nService.t('coworkTodoUntitled');
-      const secondaryText = content && content !== primaryText ? content : null;
-
-      return {
-        primaryText,
-        secondaryText,
-        status: normalizeTodoStatus(todo.status),
-      } satisfies ParsedTodoItem;
-    })
-    .filter((item): item is ParsedTodoItem => item !== null);
-
-  return parsedItems.length > 0 ? parsedItems : null;
-};
-
-const getTodoWriteSummary = (items: ParsedTodoItem[]): string => {
-  const completedCount = items.filter((item) => item.status === 'completed').length;
-  const inProgressCount = items.filter((item) => item.status === 'in_progress').length;
-  const pendingCount = items.length - completedCount - inProgressCount;
-
-  const summary = [
-    `${items.length} ${i18nService.t('coworkTodoItems')}`,
-    `${completedCount} ${i18nService.t('coworkTodoCompleted')}`,
-    `${inProgressCount} ${i18nService.t('coworkTodoInProgress')}`,
-    `${pendingCount} ${i18nService.t('coworkTodoPending')}`,
-  ];
-
-  const activeItem = items.find((item) => item.status === 'in_progress');
-  if (activeItem) {
-    summary.push(activeItem.primaryText);
-  }
-
-  return summary.join(' · ');
-};
-
-const getToolInputSummary = (
-  toolName: string | undefined,
-  toolInput?: Record<string, unknown>
-): string | null => {
-  if (!toolName || !toolInput) return null;
-  const input = toolInput as Record<string, unknown>;
-  if (isTodoWriteToolName(toolName)) {
-    const items = parseTodoWriteItems(input);
-    return items ? getTodoWriteSummary(items) : null;
-  }
-
-  const normalizedToolName = normalizeToolName(toolName);
-
-  switch (normalizedToolName) {
-    case 'cron':
-      return getCronToolSummary(input);
-    case 'bash':
-    case 'exec':
-    case 'shell':
-      return getToolInputString(input, ['command', 'cmd', 'script'])
-        ?? getStringArray(input.commands);
-    case 'read':
-    case 'readfile':
-    case 'write':
-    case 'writefile':
-    case 'edit':
-    case 'editfile':
-    case 'multiedit':
-      return getToolInputString(input, ['file_path', 'path', 'filePath', 'target_file', 'targetFile'])
-        ?? (
-          typeof input.content === 'string' && input.content.trim()
-            ? truncatePreview(input.content.split('\n')[0].trim())
-            : null
-        );
-    case 'glob':
-    case 'grep':
-      return getToolInputString(input, ['pattern', 'query']);
-    case 'task':
-      return getToolInputString(input, ['description', 'task']);
-    case 'webfetch':
-      return getToolInputString(input, ['url']);
-    case 'process': {
-      const action = getToolInputString(input, ['action']);
-      const sessionId = getToolInputString(input, ['sessionId', 'session_id']);
-      if (action && sessionId) return `${action} · ${sessionId}`;
-      return action ?? sessionId;
-    }
-    default:
-      return null;
-  }
-};
-
-const formatToolInput = (
-  toolName: string | undefined,
-  toolInput?: Record<string, unknown>
-): string | null => {
-  if (!toolInput) return null;
-  const summary = getToolInputSummary(toolName, toolInput);
-  if (summary && summary.trim()) {
-    return summary;
-  }
-  return formatUnknown(toolInput);
-};
-
-const hasText = (value: unknown): value is string =>
-  typeof value === 'string' && value.trim().length > 0;
-
-const getToolResultDisplay = (message: CoworkMessage): string => {
-  if (hasText(message.content)) {
-    return formatStructuredText(normalizeToolResultText(message.content));
-  }
-  if (hasText(message.metadata?.toolResult)) {
-    return formatStructuredText(normalizeToolResultText(message.metadata?.toolResult ?? ''));
-  }
-  if (hasText(message.metadata?.error)) {
-    return formatStructuredText(normalizeToolResultText(message.metadata?.error ?? ''));
-  }
-  return '';
-};
-
-const safeDecodeURIComponent = (value: string): string => {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-};
-
-const stripHashAndQuery = (value: string): string => value.split('#')[0].split('?')[0];
-
-const stripFileProtocol = (value: string): string => {
-  let cleaned = value.replace(/^file:\/\//i, '');
-  if (/^\/[A-Za-z]:/.test(cleaned)) {
-    cleaned = cleaned.slice(1);
-  }
-  return cleaned;
-};
-
-const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(value);
-
-const isAbsolutePath = (value: string): boolean => (
-  value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value)
-);
-
-const isRelativePath = (value: string): boolean => !isAbsolutePath(value) && !hasScheme(value);
-
-const parseRootRelativePath = (value: string): string | null => {
-  const trimmed = value.trim();
-  if (!/^file:\/\//i.test(trimmed)) return null;
-  const separatorIndex = trimmed.indexOf('::');
-  if (separatorIndex < 0) return null;
-
-  const rootPart = trimmed.slice(0, separatorIndex);
-  const relativePart = trimmed.slice(separatorIndex + 2);
-  if (!relativePart.trim()) return null;
-
-  const rootPath = safeDecodeURIComponent(stripFileProtocol(stripHashAndQuery(rootPart)));
-  const relativePath = safeDecodeURIComponent(stripHashAndQuery(relativePart));
-  if (!rootPath || !relativePath) return null;
-
-  const normalizedRoot = rootPath.replace(/[\\/]+$/, '');
-  const normalizedRelative = relativePath.replace(/^[\\/]+/, '');
-  if (!normalizedRelative) return null;
-
-  return `${normalizedRoot}/${normalizedRelative}`;
-};
-
-const normalizeLocalPath = (
-  value: string
-): { path: string; isRelative: boolean; isAbsolute: boolean } | null => {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  const fileScheme = /^file:\/\//i.test(trimmed);
-  const schemePresent = hasScheme(trimmed);
-  if (schemePresent && !fileScheme && !isAbsolutePath(trimmed)) return null;
-
-  let raw = trimmed;
-  if (fileScheme) {
-    raw = stripFileProtocol(raw);
-  }
-  raw = stripHashAndQuery(raw);
-  const decoded = safeDecodeURIComponent(raw);
-  const path = decoded || raw;
-  if (!path) return null;
-
-  const isAbsolute = isAbsolutePath(path);
-  const isRelative = isRelativePath(path);
-  return { path, isRelative, isAbsolute };
-};
-
-const toAbsolutePathFromCwd = (filePath: string, cwd: string): string => {
-  if (isAbsolutePath(filePath)) {
-    return filePath;
-  }
-  return `${cwd.replace(/\/$/, '')}/${filePath.replace(/^\.\//, '')}`;
-};
-
-export type ToolGroupItem = {
-  type: 'tool_group';
-  toolUse: CoworkMessage;
-  toolResult?: CoworkMessage | null;
-};
-
-export type DisplayItem =
-  | { type: 'message'; message: CoworkMessage }
-  | ToolGroupItem;
-
-export type AssistantTurnItem =
-  | { type: 'assistant'; message: CoworkMessage }
-  | { type: 'system'; message: CoworkMessage }
-  | { type: 'tool_group'; group: ToolGroupItem }
-  | { type: 'tool_result'; message: CoworkMessage };
-
-export type ConversationTurn = {
-  id: string;
-  userMessage: CoworkMessage | null;
-  assistantItems: AssistantTurnItem[];
-};
-
-export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
-  const items: DisplayItem[] = [];
-  const groupsByToolUseId = new Map<string, ToolGroupItem>();
-  let pendingAdjacentGroup: ToolGroupItem | null = null;
-
-  for (const message of messages) {
-    if (message.type === 'tool_use') {
-      const group: ToolGroupItem = { type: 'tool_group', toolUse: message };
-      items.push(group);
-
-      const toolUseId = message.metadata?.toolUseId;
-      if (typeof toolUseId === 'string' && toolUseId.trim()) {
-        groupsByToolUseId.set(toolUseId, group);
-      }
-      pendingAdjacentGroup = group;
-      continue;
-    }
-
-    if (message.type === 'tool_result') {
-      let matched = false;
-      const toolUseId = message.metadata?.toolUseId;
-      if (typeof toolUseId === 'string' && groupsByToolUseId.has(toolUseId)) {
-        const group = groupsByToolUseId.get(toolUseId);
-        if (group) {
-          group.toolResult = message;
-          matched = true;
-        }
-      } else if (pendingAdjacentGroup && !pendingAdjacentGroup.toolResult) {
-        pendingAdjacentGroup.toolResult = message;
-        matched = true;
-      }
-
-      pendingAdjacentGroup = null;
-      if (!matched) {
-        items.push({ type: 'message', message });
-      }
-      continue;
-    }
-
-    pendingAdjacentGroup = null;
-    items.push({ type: 'message', message });
-  }
-
-  return items;
-};
-
-export const buildConversationTurns = (items: DisplayItem[]): ConversationTurn[] => {
-  const turns: ConversationTurn[] = [];
-  let currentTurn: ConversationTurn | null = null;
-  let orphanIndex = 0;
-
-  const ensureTurn = (): ConversationTurn => {
-    if (currentTurn) return currentTurn;
-    const orphanTurn: ConversationTurn = {
-      id: `orphan-${orphanIndex++}`,
-      userMessage: null,
-      assistantItems: [],
-    };
-    turns.push(orphanTurn);
-    currentTurn = orphanTurn;
-    return orphanTurn;
-  };
-
-  for (const item of items) {
-    if (item.type === 'message' && item.message.type === 'user') {
-      currentTurn = {
-        id: item.message.id,
-        userMessage: item.message,
-        assistantItems: [],
-      };
-      turns.push(currentTurn);
-      continue;
-    }
-
-    const turn = ensureTurn();
-    if (item.type === 'tool_group') {
-      turn.assistantItems.push({ type: 'tool_group', group: item });
-      continue;
-    }
-
-    const message = item.message;
-    if (message.type === 'assistant') {
-      turn.assistantItems.push({ type: 'assistant', message });
-      continue;
-    }
-
-    if (message.type === 'system') {
-      turn.assistantItems.push({ type: 'system', message });
-      continue;
-    }
-
-    if (message.type === 'tool_result') {
-      turn.assistantItems.push({ type: 'tool_result', message });
-      continue;
-    }
-
-    if (message.type === 'tool_use') {
-      turn.assistantItems.push({
-        type: 'tool_group',
-        group: {
-          type: 'tool_group',
-          toolUse: message,
-        },
-      });
-    }
-  }
-
-  return turns;
-};
-
-const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
-  if (hasText(message.content) || hasText(message.metadata?.error)) {
-    return true;
-  }
-  if (message.metadata?.isThinking) {
-    return Boolean(message.metadata?.isStreaming);
-  }
-  return false;
-};
-
-const isVisibleAssistantTurnItem = (item: AssistantTurnItem): boolean => {
-  if (item.type === 'assistant' || item.type === 'system') {
-    return isRenderableAssistantOrSystemMessage(item.message);
-  }
-  if (item.type === 'tool_result') {
-    return hasText(getToolResultDisplay(item.message));
-  }
-  return true;
-};
-
-const getVisibleAssistantItems = (assistantItems: AssistantTurnItem[]): AssistantTurnItem[] =>
-  assistantItems.filter(isVisibleAssistantTurnItem);
-
-export const hasRenderableAssistantContent = (turn: ConversationTurn): boolean => (
-  getVisibleAssistantItems(turn.assistantItems).length > 0
-);
-
-const getToolResultLineCount = (result: string): number => {
-  if (!result) return 0;
-  return result.split('\n').length;
-};
-
-const TodoWriteInputView: React.FC<{ items: ParsedTodoItem[] }> = ({ items }) => {
-  const getStatusCheckboxClass = (status: TodoStatus): string => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500/10 border-green-500 text-green-500';
-      case 'in_progress':
-        return 'bg-transparent border-blue-500';
-      case 'pending':
-      case 'unknown':
-      default:
-        return 'bg-transparent border-border';
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      {items.map((item, index) => (
-        <div
-          key={`todo-item-${index}`}
-          className="flex items-start gap-2"
-        >
-          <span className={`mt-0.5 h-4 w-4 rounded-[4px] border flex-shrink-0 inline-flex items-center justify-center ${getStatusCheckboxClass(item.status)}`}>
-            {item.status === 'completed' && <CheckIcon className="h-3 w-3 stroke-[2.5]" />}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className={`text-xs whitespace-pre-wrap break-words leading-5 ${
-              item.status === 'completed'
-                ? 'text-muted'
-                : 'text-foreground'
-            }`}>
-              {item.primaryText}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const ToolCallGroup: React.FC<{
-  group: ToolGroupItem;
-  isLastInSequence?: boolean;
-  mapDisplayText?: (value: string) => string;
-}> = ({
-  group,
-  isLastInSequence = true,
-  mapDisplayText,
-}) => {
-  const { toolUse, toolResult } = group;
-  const rawToolName = typeof toolUse.metadata?.toolName === 'string' ? toolUse.metadata.toolName : 'Tool';
-  const toolName = getToolDisplayName(rawToolName);
-  const toolInput = toolUse.metadata?.toolInput;
-  const isCronTool = isCronToolName(rawToolName);
-  const isTodoWriteTool = isTodoWriteToolName(rawToolName);
-  const todoItems = isTodoWriteTool ? parseTodoWriteItems(toolInput) : null;
-  const mapText = mapDisplayText ?? ((value: string) => value);
-  const toolInputDisplayRaw = formatToolInput(rawToolName, toolInput);
-  const toolInputDisplay = toolInputDisplayRaw ? mapText(toolInputDisplayRaw) : null;
-  const toolInputSummaryRaw = getToolInputSummary(rawToolName, toolInput) ?? toolInputDisplayRaw;
-  const toolInputSummary = toolInputSummaryRaw ? mapText(toolInputSummaryRaw) : null;
-  const toolResultDisplayRaw = toolResult ? getToolResultDisplay(toolResult) : '';
-  const toolResultDisplay = mapText(toolResultDisplayRaw);
-  const hasToolResultText = hasText(toolResultDisplay);
-  const isToolError = Boolean(toolResult?.metadata?.isError || toolResult?.metadata?.error);
-  const showNoDetailError = isToolError && !hasToolResultText;
-  const toolResultFallback = showNoDetailError ? i18nService.t('coworkToolNoErrorDetail') : '';
-  const displayToolResult = hasToolResultText ? toolResultDisplay : toolResultFallback;
-  const [isExpanded, setIsExpanded] = useState(false);
-  const resultLineCount = hasToolResultText ? getToolResultLineCount(toolResultDisplay) : 0;
-  const toolResultSummary = isCronTool && hasToolResultText
-    ? truncatePreview(toolResultDisplay.replace(/\s+/g, ' '))
-    : null;
-
-  // Check if this is a Bash-like tool that should show terminal style
-  const isBashTool = isBashLikeToolName(rawToolName);
-
-  // Check if this is an Edit/MultiEdit tool with diff data
-  const diffDataList = useMemo(
-    () => extractDiffFromToolInput(rawToolName, toolInput as Record<string, unknown> | undefined),
-    [rawToolName, toolInput],
-  );
-  const isEditWithDiff = diffDataList !== null && diffDataList.length > 0;
-
-  return (
-    <div className="relative py-1">
-      {/* Vertical connecting line to next tool group */}
-      {!isLastInSequence && (
-        <div className="absolute left-[3.5px] top-[14px] bottom-[-8px] w-px bg-border" />
-      )}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-start gap-2 text-left group relative z-10"
-      >
-        <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
-          !toolResult
-            ? 'bg-blue-500 animate-pulse'
-            : isToolError
-              ? 'bg-red-500'
-              : 'bg-green-500'
-        }`} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-secondary">
-              {toolName}
-            </span>
-            {toolInputSummary && (
-              <code className="text-xs text-muted font-mono truncate max-w-full">
-                {toolInputSummary}
-              </code>
-            )}
-          </div>
-          {toolResult && !isTodoWriteTool && (hasToolResultText || showNoDetailError) && (
-            <div className={`text-xs mt-0.5 ${
-              hasToolResultText
-                ? 'text-muted'
-                : showNoDetailError
-                  ? 'text-red-500/80'
-                  : 'text-muted'
-            }`}>
-              {hasToolResultText
-                ? (toolResultSummary ?? `${resultLineCount} ${resultLineCount === 1 ? 'line' : 'lines'} of output`)
-                : toolResultFallback}
-            </div>
-          )}
-          {!toolResult && (
-            <div className="text-xs text-muted mt-0.5">
-              {i18nService.t('coworkToolRunning')}
-            </div>
-          )}
-        </div>
-      </button>
-      {isExpanded && (
-        <div className="ml-4 mt-2">
-          {isBashTool ? (
-            // Terminal-style display for Bash commands
-            <div className="rounded-lg overflow-hidden border border-border">
-              {/* Terminal header */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surfaceInset">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                <span className="ml-2 text-[10px] text-secondary font-medium">Terminal</span>
-              </div>
-              {/* Terminal content */}
-              <div className="bg-surface-inset px-3 py-3 max-h-72 overflow-y-auto font-mono text-xs">
-                {toolInputDisplay && (
-                  <div className="text-foreground">
-                    <span className="text-primary select-none">$ </span>
-                    <span className="whitespace-pre-wrap break-words">{toolInputDisplay}</span>
-                  </div>
-                )}
-                {toolResult && (hasToolResultText || showNoDetailError) && (
-                  <div className={`mt-1.5 whitespace-pre-wrap break-words ${
-                    isToolError
-                      ? 'text-red-400'
-                      : hasToolResultText
-                        ? 'text-secondary'
-                        : 'text-muted italic'
-                  }`}>
-                    {displayToolResult}
-                  </div>
-                )}
-                {!toolResult && (
-                  <div className="text-muted mt-1.5 italic">
-                    {i18nService.t('coworkToolRunning')}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : isTodoWriteTool && todoItems ? (
-            <TodoWriteInputView items={todoItems} />
-          ) : isEditWithDiff && diffDataList ? (
-            // Diff view for Edit/MultiEdit tools
-            <div className="space-y-2">
-              {diffDataList.map((diff, idx) => (
-                <DiffView
-                  key={idx}
-                  oldStr={diff.oldStr}
-                  newStr={diff.newStr}
-                  filePath={diff.filePath}
-                />
-              ))}
-              {toolResult && (hasToolResultText || showNoDetailError) && (
-                <div>
-                  <div className="text-[10px] font-medium dark:text-claude-darkTextSecondary/70 text-claude-textSecondary/70 uppercase tracking-wider mb-1">
-                    {i18nService.t('coworkToolResult')}
-                  </div>
-                  <div className="max-h-32 overflow-y-auto">
-                    <pre className={`text-xs whitespace-pre-wrap break-words font-mono ${
-                      isToolError
-                        ? 'text-red-500'
-                        : hasToolResultText
-                          ? 'dark:text-claude-darkText text-claude-text'
-                          : 'dark:text-claude-darkTextSecondary text-claude-textSecondary italic'
-                    }`}>
-                      {displayToolResult}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            // Standard display for other tools with input/output labels
-            <div className="space-y-2">
-              {toolInputDisplay && (
-                <div>
-                  <div className="text-[10px] font-medium text-muted uppercase tracking-wider mb-1">
-                    {i18nService.t('coworkToolInput')}
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
-                      {toolInputDisplay}
-                    </pre>
-                  </div>
-                </div>
-              )}
-              {toolResult && (hasToolResultText || showNoDetailError) && (
-                <div>
-                  <div className="text-[10px] font-medium text-muted uppercase tracking-wider mb-1">
-                    {i18nService.t('coworkToolResult')}
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    <pre className={`text-xs whitespace-pre-wrap break-words font-mono ${
-                      isToolError
-                        ? 'text-red-500'
-                        : hasToolResultText
-                          ? 'text-foreground'
-                          : 'text-secondary italic'
-                    }`}>
-                      {displayToolResult}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Message metadata helpers
-const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
-  const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
-  if (!model) return null;
-  return model.includes('/') ? (model.split('/').pop() || model) : model;
-};
-
-const messageMetaClassName = (visible: boolean, align: 'left' | 'right' = 'left'): string => [
-  'flex items-center gap-2 mt-1 text-[11px] text-zinc-400 dark:text-zinc-500 select-none transition-opacity duration-200',
-  align === 'right' ? 'justify-end' : '',
-  visible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-].filter(Boolean).join(' ');
-
-const hasFocusWithin = (element: HTMLElement): boolean => (
-  document.activeElement instanceof Node && element.contains(document.activeElement)
-);
-
-// Copy button component
-const CopyButton: React.FC<{
-  content: string;
-  visible: boolean;
-}> = ({ content, visible }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className={`p-1.5 rounded-md hover:bg-surface-raised transition-all duration-200 ${
-        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}
-      tabIndex={visible ? 0 : -1}
-      title={i18nService.t('copyToClipboard')}
-      aria-label={i18nService.t('copyToClipboard')}
-    >
-      {copied ? (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="w-4 h-4 text-green-500"
-          aria-hidden="true"
-        >
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      ) : (
-        <CopyIcon className="w-4 h-4 text-[var(--icon-secondary)]" />
-      )}
-    </button>
-  );
-};
-
-// Re-edit button component — lets the user re-fill a sent message back into the input
-const ReEditButton: React.FC<{
-  visible: boolean;
-  onClick: () => void;
-}> = ({ visible, onClick }) => {
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className={`p-1.5 rounded-md dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover transition-all duration-200 ${
-        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}
-      tabIndex={visible ? 0 : -1}
-      title={i18nService.t('coworkReEdit')}
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-4 h-4 text-[var(--icon-secondary)]"
-        aria-hidden="true"
-      >
-        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-        <path d="m15 5 4 4" />
-      </svg>
-    </button>
-  );
-};
-
-export const UserMessageItem: React.FC<{
-  message: CoworkMessage;
-  skills: Skill[];
-  onReEdit?: (message: CoworkMessage) => void;
-}> = React.memo(({ message, skills, onReEdit }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
-  const modelLabel = getMessageModelLabel(message.metadata);
-  const handleBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
-    setIsHovered(false);
-  }, []);
-  const handleMouseLeave = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (hasFocusWithin(event.currentTarget)) return;
-    setIsHovered(false);
-  }, []);
-
-  // Transform content for display: strip IM media metadata, render images inline
-  const displayContent = useMemo(
-    () => parseUserMessageForDisplay(message.content || ''),
-    [message.content]
-  );
-
-  // Get skills used for this message
-  const messageSkillIds = (message.metadata as CoworkMessageMetadata)?.skillIds || [];
-  const messageSkills = messageSkillIds
-    .map(id => skills.find(s => s.id === id))
-    .filter((s): s is NonNullable<typeof s> => s !== undefined);
-
-  // Get image attachments from metadata
-  const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ?? []) as CoworkImageAttachment[];
-
-  return (
-    <div
-      className="py-2 px-4 focus:outline-none"
-      tabIndex={0}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={handleMouseLeave}
-      onFocus={() => setIsHovered(true)}
-      onBlur={handleBlur}
-    >
-      <div className="max-w-5xl min-w-[320px] mx-auto">
-        <div className="pl-4 sm:pl-8 md:pl-12">
-          <div className="flex items-start gap-3 flex-row-reverse">
-            <div className="w-full min-w-0 flex flex-col items-end">
-              <div className="w-fit max-w-full rounded-2xl px-4 py-2.5 bg-surface text-foreground shadow-subtle">
-                {displayContent?.trim() && (
-                  <MarkdownContent
-                    content={displayContent}
-                    className="max-w-none whitespace-pre-wrap break-all"
-                    onImageClick={setExpandedImage}
-                  />
-                )}
-                {imageAttachments.length > 0 && (
-                  <div className={`flex flex-wrap gap-2 ${displayContent?.trim() ? 'mt-2' : ''}`}>
-                    {imageAttachments.map((img, idx) => (
-                      <div key={idx} className="relative group">
-                        <img
-                          src={`data:${img.mimeType};base64,${img.base64Data}`}
-                          alt={img.name}
-                          className="max-h-48 max-w-[16rem] rounded-lg object-contain cursor-pointer border border-border hover:border-primary transition-colors"
-                          title={img.name}
-                          onClick={() => setExpandedImage({
-                            src: `data:${img.mimeType};base64,${img.base64Data}`,
-                            alt: img.name,
-                            name: img.name,
-                          })}
-                        />
-                        <div className="absolute bottom-1 left-1 right-1 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity truncate pointer-events-none">
-                          <PhotoIcon className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{img.name}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className={messageMetaClassName(isHovered, 'right')} aria-hidden={!isHovered}>
-                {messageSkills.length > 0 && (
-                  <div className="flex items-center gap-1.5 mr-1.5">
-                    {messageSkills.map(skill => (
-                      <div
-                        key={skill.id}
-                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-primary-muted"
-                        title={skill.description}
-                      >
-                        <PuzzleIcon className="h-2.5 w-2.5 text-primary" />
-                        <span className="text-[10px] font-medium text-primary max-w-[60px] truncate">
-                          {skill.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <span>{formatMessageDateTime(message.timestamp)}</span>
-                {modelLabel && <span>{modelLabel}</span>}
-                <CopyButton
-                  content={message.content}
-                  visible={isHovered}
-                />
-                {onReEdit && (
-                  <ReEditButton
-                    visible={isHovered}
-                    onClick={() => onReEdit(message)}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <ImagePreviewModal image={expandedImage} onClose={() => setExpandedImage(null)} />
-    </div>
-  );
-});
-
-/**
- * Smoothly reveal `target` one small step per animation frame while `active`,
- * so uneven streaming chunks display at a steady, adaptive character rate
- * (豆包-style typewriter). When inactive, or when `target` shrinks / is not a
- * prefix of what's shown, it snaps to `target` immediately — nothing is lost.
- */
-function useSmoothText(target: string, active: boolean): string {
-  const [display, setDisplay] = useState(target);
-  const displayRef = useRef(target);
-  const targetRef = useRef(target);
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    displayRef.current = display;
-  }, [display]);
-
-  useEffect(() => {
-    targetRef.current = target;
-
-    // Snap instantly when not streaming, when finished, or on any non-append
-    // change (e.g. content replaced, shrunk, or a fresh message).
-    if (!active || target === displayRef.current || !target.startsWith(displayRef.current)) {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-      displayRef.current = target;
-      setDisplay(target);
-      return;
-    }
-
-    if (rafRef.current !== null) return; // animation already running
-
-    const step = () => {
-      const full = targetRef.current;
-      const shown = displayRef.current;
-      if (shown.length >= full.length) {
-        rafRef.current = null;
-        return;
-      }
-      // Adaptive speed: the larger the backlog, the more chars per frame —
-      // long answers catch up, short ones still ease in. ~1/8 of the remaining
-      // gap, clamped to [2, 40] chars/frame (~60fps → smooth but never sluggish).
-      const remaining = full.length - shown.length;
-      const stepSize = Math.min(40, Math.max(2, Math.ceil(remaining / 8)));
-      const next = full.slice(0, shown.length + stepSize);
-      displayRef.current = next;
-      setDisplay(next);
-      rafRef.current = requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
-
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-    };
-  }, [target, active]);
-
-  return display;
-}
-
-const AssistantMessageItem: React.FC<{
-  message: CoworkMessage;
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
-  mapDisplayText?: (value: string) => string;
-  showCopyButton?: boolean;
-  turnMetadata?: CoworkMessageMetadata | null;
-}> = ({
-  message,
-  resolveLocalFilePath,
-  mapDisplayText,
-  showCopyButton = false,
-  turnMetadata,
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
-  const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
-  // Smooth "typewriter" reveal while streaming, so uneven backend chunks display
-  // at a steady character rate (engine-agnostic — works for Pi and OpenClaw alike).
-  const isStreaming = message.metadata?.isStreaming === true;
-  const displayContent = useSmoothText(rawContent, isStreaming);
-  const modelLabel = getMessageModelLabel(turnMetadata);
-  const handleBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
-    setIsHovered(false);
-  }, []);
-  const handleMouseLeave = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (hasFocusWithin(event.currentTarget)) return;
-    setIsHovered(false);
-  }, []);
-
-  return (
-    <div
-      className="relative focus:outline-none"
-      tabIndex={showCopyButton ? 0 : undefined}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={handleMouseLeave}
-      onFocus={() => setIsHovered(true)}
-      onBlur={handleBlur}
-    >
-      <div className="text-foreground">
-        <MarkdownContent
-          content={displayContent}
-          className="prose dark:prose-invert max-w-none"
-          resolveLocalFilePath={resolveLocalFilePath}
-          showRevealInFolderAction
-          onImageClick={setExpandedImage}
-        />
-      </div>
-      {showCopyButton && (
-        <div className={messageMetaClassName(isHovered)} aria-hidden={!isHovered}>
-          <span>{formatMessageDateTime(message.timestamp)}</span>
-          {modelLabel && <span>{modelLabel}</span>}
-          <CopyButton
-            content={displayContent}
-            visible={isHovered}
-          />
-        </div>
-      )}
-      <ImagePreviewModal image={expandedImage} onClose={() => setExpandedImage(null)} />
-    </div>
-  );
-};
-
-// Streaming activity bar shown between messages and input
-const StreamingActivityBar: React.FC<{ messages: CoworkMessage[] }> = ({ messages }) => {
-  // Walk messages backwards to find the latest tool_use without a paired tool_result
-  const getStatusText = (): string => {
-    const toolUseIds = new Set<string>();
-    const toolResultIds = new Set<string>();
-    for (const msg of messages) {
-      const id = msg.metadata?.toolUseId;
-      if (typeof id === 'string') {
-        if (msg.type === 'tool_result') toolResultIds.add(id);
-        if (msg.type === 'tool_use') toolUseIds.add(id);
-      }
-    }
-    // Walk backwards to find latest unresolved tool_use
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.type === 'tool_use') {
-        const id = msg.metadata?.toolUseId;
-        if (typeof id === 'string' && !toolResultIds.has(id)) {
-          const toolName = typeof msg.metadata?.toolName === 'string' ? msg.metadata.toolName : null;
-          if (toolName) {
-            return `${i18nService.t('coworkToolRunning')} ${toolName}...`;
-          }
-        }
-      }
-    }
-    return `${i18nService.t('coworkToolRunning')}`;
-  };
-
-  return (
-    <div className="shrink-0 animate-fade-in px-4">
-      <div className="max-w-5xl min-w-[320px] mx-auto">
-        <div className="streaming-bar" />
-        <div className="py-1">
-          <span className="text-xs text-secondary">
-            {getStatusText()}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TypingDots: React.FC = () => (
-  <div className="flex items-center space-x-1.5 py-1">
-    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
-  </div>
-);
-
-const ThinkingBlock: React.FC<{
-  message: CoworkMessage;
-  mapDisplayText?: (value: string) => string;
-}> = ({ message, mapDisplayText }) => {
-  const isCurrentlyStreaming = Boolean(message.metadata?.isStreaming);
-  const [isExpanded, setIsExpanded] = useState(isCurrentlyStreaming);
-  const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
-  const displayContent = useSmoothText(rawContent, isCurrentlyStreaming);
-
-  // Auto-expand while streaming, auto-collapse when streaming completes
-  useEffect(() => {
-    if (isCurrentlyStreaming) {
-      setIsExpanded(true);
-    } else {
-      setIsExpanded(false);
-    }
-  }, [isCurrentlyStreaming]);
-
-  return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-raised transition-colors"
-      >
-        <ChevronRightIcon
-          className={`h-3.5 w-3.5 text-secondary flex-shrink-0 transition-transform duration-200 ${
-            isExpanded ? 'rotate-90' : ''
-          }`}
-        />
-        <span className="text-xs font-medium text-secondary">
-          {i18nService.t('reasoning')}
-        </span>
-        {isCurrentlyStreaming && (
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-        )}
-      </button>
-      {isExpanded && (
-        <div className="px-3 pb-3 max-h-64 overflow-y-auto">
-          <div className="text-xs leading-relaxed text-muted whitespace-pre-wrap">
-            {displayContent}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export const AssistantTurnBlock: React.FC<{
-  turn: ConversationTurn;
-  artifacts?: Artifact[];
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
-  mapDisplayText?: (value: string) => string;
-  showTypingIndicator?: boolean;
-  showCopyButtons?: boolean;
-}> = ({
-  turn,
-  artifacts,
-  resolveLocalFilePath,
-  mapDisplayText,
-  showTypingIndicator = false,
-  showCopyButtons = true,
-}) => {
-  const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
-
-  const renderSystemMessage = (message: CoworkMessage) => {
-    const isError = !hasText(message.content) && typeof message.metadata?.error === 'string';
-    const rawContent = hasText(message.content)
-      ? message.content
-      : (typeof message.metadata?.error === 'string' ? message.metadata.error : '');
-    const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
-    const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
-    if (!content.trim()) return null;
-
-    return (
-      <div className="rounded-lg border border-border bg-background px-3 py-2">
-        <div className="flex items-center gap-2">
-          {isError
-            ? <ExclamationTriangleIcon className="h-4 w-4 text-secondary flex-shrink-0" />
-            : <InformationCircleIcon className="h-4 w-4 text-secondary flex-shrink-0" />
-          }
-          <div className="text-xs whitespace-pre-wrap text-secondary">
-            {content}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderOrphanToolResult = (message: CoworkMessage) => {
-    const toolResultDisplayRaw = getToolResultDisplay(message);
-    const toolResultDisplay = mapDisplayText ? mapDisplayText(toolResultDisplayRaw) : toolResultDisplayRaw;
-    const isToolError = Boolean(message.metadata?.isError || message.metadata?.error);
-    const hasToolResultText = hasText(toolResultDisplay);
-    const resultLineCount = hasToolResultText ? getToolResultLineCount(toolResultDisplay) : 0;
-    const showNoDetailError = isToolError && !hasToolResultText;
-    const fallbackText = showNoDetailError ? i18nService.t('coworkToolNoErrorDetail') : '';
-    const displayText = hasToolResultText ? toolResultDisplay : fallbackText;
-    return (
-      <div className="py-1">
-        <div className="flex items-start gap-2">
-          <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
-            isToolError ? 'bg-red-500' : 'bg-surface-raised'
-          }`} />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-secondary">
-              {i18nService.t('coworkToolResult')}
-            </div>
-            {resultLineCount > 0 && (
-              <div className="text-xs text-muted mt-0.5">
-                {resultLineCount} {resultLineCount === 1 ? 'line' : 'lines'} of output
-              </div>
-            )}
-            {resultLineCount === 0 && showNoDetailError && (
-              <div className={`text-xs mt-0.5 ${
-                isToolError
-                  ? 'text-red-500/80'
-                  : 'text-muted'
-              }`}>
-                {fallbackText}
-              </div>
-            )}
-            {(hasToolResultText || showNoDetailError) && (
-              <div className="mt-2 px-3 py-2 rounded-lg bg-surface-raised max-h-64 overflow-y-auto">
-                <pre className={`text-xs whitespace-pre-wrap break-words font-mono ${
-                  isToolError
-                    ? 'text-red-500'
-                    : hasToolResultText
-                      ? 'text-foreground'
-                      : 'text-secondary italic'
-                }`}>
-                  {displayText}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="px-4 py-2">
-      <div className="max-w-5xl min-w-[320px] mx-auto">
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {visibleAssistantItems.map((item, index) => {
-              if (item.type === 'assistant') {
-                if (item.message.metadata?.isThinking) {
-                  return (
-                    <ThinkingBlock
-                      key={item.message.id}
-                      message={item.message}
-                      mapDisplayText={mapDisplayText}
-                    />
-                  );
-                }
-                // Check if there are any tool_group items after this assistant message
-                const hasToolGroupAfter = visibleAssistantItems
-                  .slice(index + 1)
-                  .some(laterItem => laterItem.type === 'tool_group');
-                const isLastAssistant = showCopyButtons && !hasToolGroupAfter;
-
-                return (
-                  <AssistantMessageItem
-                    key={item.message.id}
-                    message={item.message}
-                    resolveLocalFilePath={resolveLocalFilePath}
-                    mapDisplayText={mapDisplayText}
-                    showCopyButton={isLastAssistant}
-                    turnMetadata={isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined}
-                  />
-                );
-              }
-
-              if (item.type === 'tool_group') {
-                const nextItem = visibleAssistantItems[index + 1];
-                const isLastInSequence = !nextItem || nextItem.type !== 'tool_group';
-                return (
-                  <ToolCallGroup
-                    key={`tool-${item.group.toolUse.id}`}
-                    group={item.group}
-                    isLastInSequence={isLastInSequence}
-                    mapDisplayText={mapDisplayText}
-                  />
-                );
-              }
-
-              if (item.type === 'system') {
-                const systemMessage = renderSystemMessage(item.message);
-                if (!systemMessage) {
-                  return null;
-                }
-                return (
-                  <div key={item.message.id}>
-                    {systemMessage}
-                  </div>
-                );
-              }
-
-              return (
-                <div key={item.message.id}>
-                  {renderOrphanToolResult(item.message)}
-                </div>
-              );
-            })}
-            {showTypingIndicator && <TypingDots />}
-            {artifacts && artifacts.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {artifacts.map(artifact => (
-                  <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onManageSkills,
@@ -1730,23 +108,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const currentSession = useSelector(selectCurrentSession);
   const isStreaming = useSelector(selectIsStreaming);
   const remoteManaged = useSelector(selectRemoteManaged);
-  const lastMessageContent = useSelector(selectLastMessageContent);
   const messagesLength = useSelector(selectCurrentMessagesLength);
   const skills = useSelector((state: RootState) => state.skill.skills);
   const detailRootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
-  const isLoadingMoreMessagesRef = useRef(false);
-  const prevScrollHeightRef = useRef<number | null>(null);
 
-  // Clear lazy-render height cache when session changes
   const sessionId = currentSession?.id;
   const [gatewaySessionId, setGatewaySessionId] = useState<string | null>(null);
-  useEffect(() => {
-    clearHeightCache();
-  }, [sessionId]);
 
   useEffect(() => {
     if (sessionId) {
@@ -1768,7 +137,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const navigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turnElsCacheRef = useRef<HTMLElement[]>([]);
   const railLinesRef = useRef<HTMLDivElement>(null);
-  const [isScrollable, setIsScrollable] = useState(false);
   const [hoveredRailIndex, setHoveredRailIndex] = useState<number | null>(null);
   const [isRailHovered, setIsRailHovered] = useState(false);
   const [railTooltip, setRailTooltip] = useState<{ label: string; top: number; right: number; isUser: boolean } | null>(null);
@@ -1777,9 +145,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
 
-  useEffect(() => {
-    setShouldAutoScroll(true);
-  }, [currentSession?.id]);
 
   // ─── Artifact detection ─────────────────────────────────────────────
   const isPanelOpen = useSelector(selectIsPanelOpen);
@@ -2067,7 +432,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   // Reset nav state when session changes
   useEffect(() => {
-    setIsScrollable(false);
     setCurrentRailIndex(-1);
     currentRailIndexRef.current = -1;
     isNavigatingRef.current = false;
@@ -2351,115 +715,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     });
   };
 
-  const handleMessagesScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distanceToBottom <= AUTO_SCROLL_THRESHOLD;
-    setShouldAutoScroll((prev) => (prev === isNearBottom ? prev : isNearBottom));
-
-    // Check if content overflows the container (use functional updater to avoid redundant re-renders)
-    const scrollable = container.scrollHeight > container.clientHeight;
-    setIsScrollable((prev) => (prev === scrollable ? prev : scrollable));
-    if (!scrollable) return;
-
-    // Load older messages when scrolled near the top
-    if (container.scrollTop <= 80 && !isLoadingMoreMessagesRef.current) {
-      const sessionId = currentSession?.id;
-      const offset = currentSession?.messagesOffset ?? 0;
-      if (sessionId && offset > 0) {
-        isLoadingMoreMessagesRef.current = true;
-        setIsLoadingMoreMessages(true);
-        prevScrollHeightRef.current = container.scrollHeight;
-        coworkService.loadMoreMessages(sessionId).catch(() => {
-          prevScrollHeightRef.current = null;
-          isLoadingMoreMessagesRef.current = false;
-          setIsLoadingMoreMessages(false);
-        });
-      }
-    }
-
-
-    // Skip index recalculation during programmatic navigation
-    if (isNavigatingRef.current) return;
-
-    // Use turn-level elements (always in DOM, even for lazy-rendered turns) for scroll detection
-    const turnEls = turnElsCacheRef.current;
-    const railCount = railItemCountRef.current;
-    if (turnEls.length === 0 || railCount === 0) return;
-
-    // If at very bottom, snap to last rail item
-    if (distanceToBottom <= NAV_BOTTOM_SNAP_THRESHOLD) {
-      const lastRail = railCount - 1;
-      if (currentRailIndexRef.current !== lastRail) {
-        currentRailIndexRef.current = lastRail;
-        setCurrentRailIndex(lastRail);
-      }
-      return;
-    }
-
-    // Find current turn based on turn element offsetTop
-    const scrollTop = container.scrollTop;
-    let currentTurn = 0;
-    for (let i = 0; i < turnEls.length; i++) {
-      if (turnEls[i].offsetTop <= scrollTop + 80) {
-        currentTurn = i;
-      } else {
-        break;
-      }
-    }
-
-    // Map turn to rail index: check if scrolled past the midpoint of the turn
-    // (first half → user message = first rail item, second half → assistant = last rail item)
-    const range = turnToRailRangeRef.current[currentTurn];
-    if (!range) return;
-    let railIdx = range.first;
-    if (range.first !== range.last) {
-      const turnEl = turnEls[currentTurn];
-      const nextTurnTop = currentTurn + 1 < turnEls.length
-        ? turnEls[currentTurn + 1].offsetTop
-        : container.scrollHeight;
-      const turnMid = turnEl.offsetTop + (nextTurnTop - turnEl.offsetTop) / 2;
-      if (scrollTop + 80 >= turnMid) {
-        railIdx = range.last;
-      }
-    }
-
-    if (currentRailIndexRef.current !== railIdx) {
-      currentRailIndexRef.current = railIdx;
-      setCurrentRailIndex(railIdx);
-    }
-  }, [currentSession?.id, currentSession?.messagesOffset]);
-
-  // Auto-load older messages if content doesn't fill the container (no scrollbar = onScroll never fires)
+  // scroll + loadMore handled by Conversation (StickToBottom); rail state reset on session change
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || isLoadingMoreMessagesRef.current) return;
-    const sessionId = currentSession?.id;
-    const offset = currentSession?.messagesOffset ?? 0;
-    if (!sessionId || offset <= 0) return;
-    if (container.scrollHeight <= container.clientHeight) {
-      isLoadingMoreMessagesRef.current = true;
-      setIsLoadingMoreMessages(true);
-      prevScrollHeightRef.current = container.scrollHeight;
-      coworkService.loadMoreMessages(sessionId).catch(() => {
-        prevScrollHeightRef.current = null;
-        isLoadingMoreMessagesRef.current = false;
-        setIsLoadingMoreMessages(false);
-      });
-    }
-  }, [currentSession?.id, currentSession?.messagesOffset, currentSession?.messages.length]);
-
-  // Restore scroll position synchronously before browser paint when messages are prepended
-  useLayoutEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || prevScrollHeightRef.current === null) return;
-    const newScrollHeight = container.scrollHeight;
-    container.scrollTop += newScrollHeight - prevScrollHeightRef.current;
-    prevScrollHeightRef.current = null;
-    isLoadingMoreMessagesRef.current = false;
-    setIsLoadingMoreMessages(false);
-  }, [currentSession?.messages.length]);
+    setCurrentRailIndex(-1);
+    currentRailIndexRef.current = -1;
+    isNavigatingRef.current = false;
+    turnElsCacheRef.current = [];
+    if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
+    setHoveredRailIndex(null);
+  }, [currentSession?.id]);
 
   const navigateToRailItem = useCallback((railIndex: number) => {
     if (railIndex < 0 || railIndex >= railItemCountRef.current) return;
@@ -2575,7 +839,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     );
   }, [turns]);
 
-  // Sync rail index when turns change or rail first appears (isScrollable becomes true)
+  // Sync rail index when turns change or rail first appears ((turns.length > 1) becomes true)
   useEffect(() => {
     // After turns/scrollable change, if rail index is uninitialized (-1) or out of bounds,
     // wait for next frame so render IIFE has updated railItemCountRef, then sync
@@ -2590,7 +854,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       }
     });
     return () => cancelAnimationFrame(frameId);
-  }, [turns, isScrollable]);
+  }, [turns, turns.length]);
 
   // Scroll rail lines container to keep active item visible (without affecting page scroll)
   useEffect(() => {
@@ -2608,42 +872,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
   }, [currentRailIndex]);
 
-  // Auto scroll to bottom when new messages arrive or content updates (streaming)
-  useEffect(() => {
-    if (!shouldAutoScroll) {
-      return;
-    }
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-      setIsScrollable(container.scrollHeight > container.clientHeight);
-    }
-    // Sync rail index to last when auto-scrolled to bottom
-    if (turns.length > 0) {
-      // Use -1 when rail hasn't rendered yet (count is 0),
-      // so the render IIFE resolvedRailIndex fallback picks the last item
-      const lastRail = railItemCountRef.current > 0 ? railItemCountRef.current - 1 : -1;
-      currentRailIndexRef.current = lastRail;
-      setCurrentRailIndex(lastRail);
-    }
-  }, [messagesLength, lastMessageContent, isStreaming, shouldAutoScroll, turns.length]);
-
-  // While streaming, the typewriter reveals text between store updates, growing
-  // scrollHeight without re-firing the effect above. Keep the view pinned to the
-  // bottom with a lightweight rAF loop so auto-scroll follows the animation.
-  useEffect(() => {
-    if (!isStreaming || !shouldAutoScroll) return;
-    let raf: number;
-    const tick = () => {
-      const container = scrollContainerRef.current;
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [isStreaming, shouldAutoScroll]);
+  // StickToBottom (Conversation) handles auto-scroll during streaming
 
 
   if (!currentSession) {
@@ -2660,7 +889,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       if (!isStreaming) return null;
       return (
         <div data-export-role="assistant-block">
-          <AssistantTurnBlock
+          <TurnBlock
             turn={{
               id: 'streaming-only',
               userMessage: null,
@@ -2678,9 +907,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const isLastTurn = index === turns.length - 1;
       const showTypingIndicator = isStreaming && isLastTurn && !hasRenderableAssistantContent(turn);
       const showAssistantBlock = turn.assistantItems.length > 0 || showTypingIndicator;
-      // Always render last 3 turns (needed for streaming, auto-scroll, and smooth UX)
-      const alwaysRender = index >= turns.length - 3;
-
       // Compute rail indices for user/assistant messages (must match rail IIFE logic)
       let asstContent = '';
       for (const item of turn.assistantItems) {
@@ -2707,15 +933,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       );
 
       return (
-        <LazyRenderTurn key={turn.id} turnId={turn.id} alwaysRender={alwaysRender} data-turn-index={index}>
+        <div key={turn.id} data-turn-index={index}>
           {turn.userMessage && (
             <div data-export-role="user-message" className={isLastTurn ? 'animate-message-in' : undefined} {...(userRailIdx >= 0 ? { 'data-rail-index': userRailIdx } : undefined)}>
-              <UserMessageItem message={turn.userMessage} skills={skills} onReEdit={remoteManaged ? undefined : handleReEdit} />
+              <UserBubble message={turn.userMessage} skills={skills} onReEdit={remoteManaged ? undefined : handleReEdit} />
             </div>
           )}
           {showAssistantBlock && (
             <div data-export-role="assistant-block" className={isLastTurn ? 'animate-message-in' : undefined} {...(asstRailIdx >= 0 ? { 'data-rail-index': asstRailIdx } : undefined)}>
-              <AssistantTurnBlock
+              <TurnBlock
                 turn={turn}
                 artifacts={turnArtifacts}
                 resolveLocalFilePath={resolveLocalFilePath}
@@ -2725,7 +951,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               />
             </div>
           )}
-        </LazyRenderTurn>
+        </div>
       );
     });
   };
@@ -2738,20 +964,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         <div className="flex h-full items-center gap-2 min-w-0">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <button
-                type="button"
-                onClick={onToggleSidebar}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
-              >
-                <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
-              </button>
-              <button
-                type="button"
-                onClick={onNewChat}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
-              >
-                <ComposeIcon className="h-4 w-4" />
-              </button>
+              <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onNewChat}>
+                <Pencil className="h-4 w-4" />
+              </Button>
               {updateBadge}
             </div>
           )}
@@ -2771,27 +989,28 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         {/* Right side: Folder + Artifact toggle */}
         <div className="non-draggable flex items-center gap-1">
           {/* Folder button */}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleOpenFolder}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-secondary hover:bg-surface-raised hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5"
             aria-label={i18nService.t('coworkOpenFolder')}
           >
-            <FolderIcon className="h-4 w-4" />
+            <Folder className="h-4 w-4" />
             <span className="max-w-[120px] truncate text-xs">
               {truncatePath(currentSession.cwd)}
             </span>
-          </button>
+          </Button>
 
           {/* Artifact panel toggle */}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => dispatch(togglePanel())}
-            className="relative h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             aria-label={i18nService.t('artifactPanelToggle')}
           >
             <ArtifactPanelIcon className="h-4 w-4" open={isPanelOpen} />
-          </button>
+          </Button>
 
           <WindowTitleBar inline className="ml-1" />
         </div>
@@ -2813,40 +1032,40 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </h3>
             </div>
             <div className="py-1">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
                 onClick={(e) => { setShowExportOptions(false); handleShareClick(e); }}
                 disabled={isExportingImage}
-                className="w-full flex items-center gap-3 px-5 py-3 text-left text-sm dark:text-claude-darkText text-claude-text hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors disabled:opacity-50"
               >
-                <PhotoIcon className="h-5 w-5 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+                <ImageIcon className="h-5 w-5" />
                 <div>
                   <div className="font-medium">{i18nService.t('coworkExportImage')}</div>
-                  <div className="text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">{i18nService.t('coworkExportImageDesc')}</div>
+                  <div className="text-xs text-secondary">{i18nService.t('coworkExportImageDesc')}</div>
                 </div>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
                 onClick={() => { setShowExportOptions(false); handleExportText('md'); }}
-                className="w-full flex items-center gap-3 px-5 py-3 text-left text-sm dark:text-claude-darkText text-claude-text hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
               >
-                <DocumentArrowDownIcon className="h-5 w-5 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+                <Download className="h-5 w-5" />
                 <div>
                   <div className="font-medium">Markdown</div>
-                  <div className="text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">{i18nService.t('coworkExportMarkdownDesc')}</div>
+                  <div className="text-xs text-secondary">{i18nService.t('coworkExportMarkdownDesc')}</div>
                 </div>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
                 onClick={() => { setShowExportOptions(false); handleExportText('json'); }}
-                className="w-full flex items-center gap-3 px-5 py-3 text-left text-sm dark:text-claude-darkText text-claude-text hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
               >
-                <DocumentArrowDownIcon className="h-5 w-5 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+                <Download className="h-5 w-5" />
                 <div>
                   <div className="font-medium">JSON</div>
-                  <div className="text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">{i18nService.t('coworkExportJSONDesc')}</div>
+                  <div className="text-xs text-secondary">{i18nService.t('coworkExportJSONDesc')}</div>
                 </div>
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2856,22 +1075,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
       <div ref={detailRootRef} className="flex-1 flex flex-col bg-background h-full" style={{ minWidth: COWORK_DETAIL_MIN_WIDTH }}>
       <div className="relative flex-1 min-h-0">
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleMessagesScroll}
-          className={`h-full min-h-0 overflow-y-auto pt-3 ${turns.length > 1 && isScrollable ? 'pr-8' : 'pr-3'}`}
-        >
-          {isLoadingMoreMessages && (
-            <div className="py-2 text-center text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">
-              {i18nService.t('loading')}
+        <Conversation className="h-full">
+          <ConversationContent className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}>
+            <div ref={scrollContainerRef}>
+              {renderConversationTurns()}
+              <div className="h-20" />
             </div>
-          )}
-          {renderConversationTurns()}
-          <div className="h-20" />
-        </div>
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
 
         {/* Turn Navigation Rail — to the left of scrollbar */}
-        {turns.length > 1 && isScrollable && (
+        {turns.length > 1 && (
           <div
             className="absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
             style={{ maxHeight: 'calc(100% - 40px)' }}
@@ -3079,7 +1294,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       </div>
 
       {/* Streaming Activity Bar */}
-      {isStreaming && <StreamingActivityBar messages={currentSession.messages} />}
+      {isStreaming && <StreamingBar messages={currentSession.messages} />}
 
       {/* Input Area */}
       <div className="p-4 shrink-0">

@@ -1,4 +1,5 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { TriangleAlert } from 'lucide-react';
 import React from 'react';
 
 import Modal from '../common/Modal';
@@ -36,7 +37,7 @@ const AgentConfirmDialog: React.FC<AgentConfirmDialogProps> = ({
     >
       <div className="flex items-start gap-3 px-5 py-4">
         <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${variantIconClassName[variant]}`}>
-          <ExclamationTriangleIcon className="h-5 w-5" />
+          <TriangleAlert className="h-5 w-5" />
         </div>
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-foreground">
@@ -49,20 +50,20 @@ const AgentConfirmDialog: React.FC<AgentConfirmDialogProps> = ({
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
         >
           {cancelLabel}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="destructive"
           onClick={onConfirm}
-          className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity"
         >
           {confirmLabel}
-        </button>
+        </Button>
       </div>
     </Modal>
   );
