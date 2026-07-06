@@ -123,7 +123,7 @@ export const buildConversationTurns = (items: DisplayItem[]): ConversationTurn[]
 
 export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
   if (hasText(message.content) || hasText(message.metadata?.error)) return true;
-  if (message.metadata?.isThinking) return Boolean(message.metadata?.isStreaming);
+  if (message.metadata?.isThinking) return hasText(message.content) || Boolean(message.metadata?.isStreaming);
   return false;
 };
 
