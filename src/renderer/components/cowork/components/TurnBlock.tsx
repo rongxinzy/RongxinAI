@@ -1,8 +1,8 @@
 import { Info, TriangleAlert } from 'lucide-react';
 import React from 'react';
 
-import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import type { CoworkErrorKind } from '../../../../common/coworkError';
+import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
 import { i18nService } from '../../../services/i18n';
 import type { Artifact } from '../../../types/artifact';
