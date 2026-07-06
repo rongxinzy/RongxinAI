@@ -53,6 +53,7 @@ export const getToolDisplayName = (toolName: string | undefined): string => {
     case 'write': case 'writefile': return 'Write';
     case 'edit': case 'editfile': return 'Edit';
     case 'multiedit': return 'MultiEdit';
+    case 'mcp': return 'MCP';
     case 'process': return 'Process';
     default: return toolName;
   }
