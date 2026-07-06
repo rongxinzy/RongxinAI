@@ -67,3 +67,5 @@ docs/*
 localdocs/
 docker/
 llamacpp-oss-tools/
+.agents/
+skills-lock.json

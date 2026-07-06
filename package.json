@@ -178,7 +178,7 @@
     "ai-elements": "^1.9.0",
     "ansi-to-react": "^6.2.6",
     "axios": "^1.16.0",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "12.8.0",
     "bufferutil": "^4.1.0",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
