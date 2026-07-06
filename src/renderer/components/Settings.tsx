@@ -3,12 +3,12 @@ import { ArrowsRightLeftIcon, ArrowTopRightOnSquareIcon, ChatBubbleLeftIcon, Che
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { isProviderEnabled, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { type AppConfig, defaultConfig, getCustomProviderDefaultName, getProviderDisplayName, getVisibleProviders, isCustomProvider } from '../config';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
-import { collectAvailableModels } from '../services/availableModels';
+import { collectAvailableModels, LLAMACPP_RUNNING_MODELS_CHANGED_EVENT } from '../services/availableModels';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import { decryptSecret, decryptWithPassword, EncryptedPayload, encryptWithPassword, PasswordEncryptedPayload } from '../services/encryption';
@@ -107,6 +107,7 @@ const resolveModelSupportsImageForProvider = (
 
 interface ProviderExportEntry {
   enabled: boolean;
+  userEnabled?: boolean;
   apiKey: PasswordEncryptedPayload;
   baseUrl: string;
   apiFormat?: 'anthropic' | 'openai' | 'gemini';
@@ -128,6 +129,7 @@ interface ProvidersExportPayload {
 
 interface ProvidersImportEntry {
   enabled?: boolean;
+  userEnabled?: boolean;
   apiKey?: EncryptedPayload | PasswordEncryptedPayload | string;
   apiKeyEncrypted?: string;
   apiKeyIv?: string;
@@ -149,9 +151,15 @@ interface ProvidersImportPayload {
 }
 
 
-const providerRequiresApiKey = (provider: ProviderType) => provider !== 'ollama' && provider !== 'github-copilot';
+const LOCAL_NO_KEY_PROVIDERS = new Set<ProviderType>([
+  ProviderName.Ollama,
+  ProviderName.LlamaCpp,
+  'github-copilot',
+]);
+
+const providerRequiresApiKey = (provider: ProviderType) => !LOCAL_NO_KEY_PROVIDERS.has(provider);
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
-  if (provider === 'ollama') {
+  if (provider === ProviderName.Ollama || provider === ProviderName.LlamaCpp) {
     return true;
   }
 
@@ -175,7 +183,7 @@ const getProviderStatusBadge = (
   provider: ProviderType,
   providerConfig: ProviderConfig,
 ): ProviderStatusBadge => {
-  const enabled = providerConfig.enabled && hasProviderAuthConfigured(provider, providerConfig);
+  const enabled = isProviderEnabled(provider, providerConfig) && hasProviderAuthConfigured(provider, providerConfig);
   return enabled
     ? {
       labelKey: 'providerStatusOn',
@@ -374,10 +382,32 @@ const getDefaultProviders = (): ProvidersConfig => {
 
 const getDefaultActiveProvider = (): ProviderType => {
   const providers = (defaultConfig.providers ?? {}) as ProvidersConfig;
-  const visibleProviderKeys = providerKeys.filter((providerKey) => providerKey !== ProviderName.LlamaCpp);
-  const firstEnabledProvider = visibleProviderKeys.find(providerKey => providers[providerKey]?.enabled);
+  const visibleProviderKeys = providerKeys;
+  const firstEnabledProvider = visibleProviderKeys.find(providerKey =>
+    isProviderEnabled(providerKey, providers[providerKey]),
+  );
   return firstEnabledProvider ?? visibleProviderKeys[0];
 };
+
+const normalizeProviderModelsForSettings = (
+  providerKey: string,
+  models: ProviderConfig['models'],
+): ProviderConfig['models'] => models?.map((model, idx) => {
+  let id = model.id;
+  if (providerKey === 'qwen' && (id === 'vision-model' || id === 'coder-model')) {
+    const defaultModel = defaultConfig.providers?.qwen?.models?.[idx];
+    id = defaultModel?.id || (model.supportsImage ? 'qwen3.5-plus' : 'qwen3-coder-plus');
+  }
+  return {
+    ...model,
+    id,
+    supportsImage: ProviderRegistry.resolveModelSupportsImage(
+      providerKey,
+      id,
+      model.supportsImage,
+    ),
+  };
+});
 
 // System shortcuts that should not be captured (clipboard, undo, select-all, quit, etc.)
 const isSystemShortcut = (e: KeyboardEvent): boolean => {
@@ -591,7 +621,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const minimaxIsOAuthMode = providers.minimax.authType !== 'apikey';
   // OpenAI defaults to API key mode unless the user explicitly opts in to OAuth
   const openaiIsOAuthMode = providers.openai.authType === 'oauth';
-  const isBaseUrlLocked = (activeProvider === 'zhipu' && providers.zhipu.codingPlanEnabled) || (activeProvider === 'qwen' && providers.qwen.codingPlanEnabled) || (activeProvider === 'volcengine' && providers.volcengine.codingPlanEnabled) || (activeProvider === 'moonshot' && providers.moonshot.codingPlanEnabled) || (activeProvider === 'qianfan' && providers.qianfan.codingPlanEnabled) || (activeProvider === 'xiaomi' && providers.xiaomi.codingPlanEnabled) || (activeProvider === 'minimax' && minimaxIsOAuthMode) || (activeProvider === 'openai' && openaiIsOAuthMode);
+  const isBaseUrlLocked = (activeProvider === 'zhipu' && providers.zhipu.codingPlanEnabled) || (activeProvider === 'qwen' && providers.qwen.codingPlanEnabled) || (activeProvider === 'volcengine' && providers.volcengine.codingPlanEnabled) || (activeProvider === 'moonshot' && providers.moonshot.codingPlanEnabled) || (activeProvider === 'qianfan' && providers.qianfan.codingPlanEnabled) || (activeProvider === 'xiaomi' && providers.xiaomi.codingPlanEnabled) || (activeProvider === 'minimax' && minimaxIsOAuthMode) || (activeProvider === 'openai' && openaiIsOAuthMode) || activeProvider === ProviderName.LlamaCpp;
 
   // 创建引用来确保内容区域的滚动
   const contentRef = useRef<HTMLDivElement>(null);
@@ -696,6 +726,32 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const [bootstrapTab, setBootstrapTab] = useState<'IDENTITY.md' | 'SOUL.md' | 'USER.md'>('IDENTITY.md');
   const [openClawEngineStatus, setOpenClawEngineStatus] = useState<OpenClawEngineStatus | null>(null);
 
+  const syncLlamaCppProviderFromConfig = useCallback(async () => {
+    const config = await configService.reload();
+    const llamaCppProvider = config.providers?.[ProviderName.LlamaCpp];
+    if (!llamaCppProvider) {
+      return;
+    }
+
+    setProviders(prev => ({
+      ...prev,
+      [ProviderName.LlamaCpp]: {
+        ...prev[ProviderName.LlamaCpp],
+        ...llamaCppProvider,
+        enabled: prev[ProviderName.LlamaCpp].enabled,
+        userEnabled: prev[ProviderName.LlamaCpp].userEnabled,
+        apiFormat: getEffectiveApiFormat(
+          ProviderName.LlamaCpp,
+          llamaCppProvider.apiFormat,
+        ),
+        models: normalizeProviderModelsForSettings(
+          ProviderName.LlamaCpp,
+          llamaCppProvider.models,
+        ),
+      },
+    }));
+  }, []);
+
   useEffect(() => {
     setCoworkAgentEngine(coworkConfig.agentEngine || 'openclaw');
     setCoworkMemoryEnabled(coworkConfig.memoryEnabled ?? true);
@@ -741,8 +797,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   }, []);
 
   useEffect(() => {
-    try {
-      const config = configService.getConfig();
+    let active = true;
+    void (async () => {
+      try {
+        const config = await configService.reload();
+        if (!active) return;
 
       // Set general settings
       initialThemeRef.current = config.theme;
@@ -754,14 +813,18 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
       // Load auto-launch setting
       window.electron.autoLaunch.get().then(({ enabled }) => {
-        setAutoLaunchState(enabled);
+        if (active) {
+          setAutoLaunchState(enabled);
+        }
       }).catch(err => {
         console.error('Failed to load auto-launch setting:', err);
       });
 
       // Load prevent-sleep setting
       window.electron.preventSleep.get().then(({ enabled }) => {
-        setPreventSleepState(enabled);
+        if (active) {
+          setPreventSleepState(enabled);
+        }
       }).catch(err => {
         console.error('Failed to load prevent-sleep setting:', err);
       });
@@ -906,34 +969,27 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
           // After merging, find the first enabled provider to set as activeProvider
           // This ensures we don't use stale activeProvider from old config.api.baseUrl
-          const firstEnabledProvider = providerKeys.find(providerKey => merged[providerKey]?.enabled);
+          const firstEnabledProvider = providerKeys.find(providerKey =>
+            isProviderEnabled(providerKey, merged[providerKey]),
+          );
           if (firstEnabledProvider) {
             setActiveProvider(firstEnabledProvider);
           }
 
           return Object.fromEntries(
             Object.entries(merged).map(([providerKey, providerConfig]) => {
-              const models = providerConfig.models?.map((model, idx) => {
-                let id = model.id;
-                // Fix corrupted model IDs from previous OAuth mutation bug
-                if (providerKey === 'qwen' && (id === 'vision-model' || id === 'coder-model')) {
-                  const defaultModel = defaultConfig.providers?.qwen?.models?.[idx];
-                  id = defaultModel?.id || (model.supportsImage ? 'qwen3.5-plus' : 'qwen3-coder-plus');
-                }
-                return {
-                  ...model,
-                  id,
-                  supportsImage: ProviderRegistry.resolveModelSupportsImage(
-                    providerKey,
-                    id,
-                    model.supportsImage,
-                  ),
-                };
-              });
+              const models = normalizeProviderModelsForSettings(
+                providerKey,
+                providerConfig.models,
+              );
               return [
                 providerKey,
                 {
                   ...providerConfig,
+                  enabled: isProviderEnabled(providerKey, providerConfig),
+                  userEnabled: providerKey === ProviderName.LlamaCpp
+                    ? providerConfig.userEnabled === true
+                    : providerConfig.userEnabled,
                   apiFormat: getEffectiveApiFormat(providerKey, (providerConfig as ProviderConfig).apiFormat),
                   models,
                 },
@@ -950,10 +1006,34 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           ...config.shortcuts,
         }));
       }
-    } catch {
-      setError('Failed to load settings');
-    }
+      } catch {
+        if (active) {
+          setError('Failed to load settings');
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    const handleLlamaCppRunningModelsChanged = () => {
+      void syncLlamaCppProviderFromConfig().catch(() => undefined);
+    };
+
+    window.addEventListener(
+      LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+      handleLlamaCppRunningModelsChanged,
+    );
+    return () => {
+      window.removeEventListener(
+        LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+        handleLlamaCppRunningModelsChanged,
+      );
+    };
+  }, [syncLlamaCppProviderFromConfig]);
 
   useEffect(() => {
     const initialThemeId = initialThemeIdRef.current;
@@ -1009,7 +1089,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
   // Compute visible providers based on language, including active custom_N entries
   const visibleProviders = useMemo(() => {
-    const visibleKeys = getVisibleProviders(language).filter((key) => key !== ProviderName.LlamaCpp);
+    const visibleKeys = getVisibleProviders(language);
     const filtered: Partial<ProvidersConfig> = {};
     for (const key of visibleKeys) {
       if (providers[key as keyof ProvidersConfig]) {
@@ -1030,7 +1110,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     const visibleKeys = Object.keys(visibleProviders) as ProviderType[];
     if (visibleKeys.length > 0 && !visibleKeys.includes(activeProvider)) {
       // If current activeProvider is not visible, switch to first visible provider
-      const firstEnabledVisible = visibleKeys.find(key => visibleProviders[key]?.enabled);
+      const firstEnabledVisible = visibleKeys.find(key =>
+        isProviderEnabled(key, visibleProviders[key]),
+      );
       setActiveProvider(firstEnabledVisible ?? visibleKeys[0]);
     }
   }, [visibleProviders, activeProvider]);
@@ -1085,7 +1167,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     // If the deleted provider was active, switch to first visible
     if (activeProvider === key) {
       const visibleKeys = Object.keys(visibleProviders).filter(k => k !== key) as ProviderType[];
-      const firstEnabled = visibleKeys.find(k => visibleProviders[k]?.enabled);
+      const firstEnabled = visibleKeys.find(k =>
+        isProviderEnabled(k, visibleProviders[k]),
+      );
       setActiveProvider(firstEnabled ?? visibleKeys[0] ?? providerKeys[0]);
     }
   };
@@ -1567,7 +1651,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   // Toggle provider enabled status
   const toggleProviderEnabled = (provider: ProviderType) => {
     const providerConfig = providers[provider];
-    const isEnabling = !providerConfig.enabled;
+    const currentEnabled = isProviderEnabled(provider, providerConfig);
+    const isEnabling = !currentEnabled;
     const hasValidAuth = hasProviderAuthConfigured(provider, providerConfig);
 
     // GitHub Copilot requires device code auth — redirect to sign-in flow
@@ -1585,14 +1670,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       ...prev,
       [provider]: {
         ...prev[provider],
-        enabled: !prev[provider].enabled
+        enabled: !currentEnabled,
+        userEnabled: provider === ProviderName.LlamaCpp
+          ? !currentEnabled
+          : prev[provider].userEnabled,
       }
     }));
   };
 
   const enableProvider = (provider: ProviderType) => {
     setProviders(prev => {
-      if (prev[provider].enabled) {
+      if (isProviderEnabled(provider, prev[provider])) {
         return prev;
       }
 
@@ -1601,6 +1689,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         [provider]: {
           ...prev[provider],
           enabled: true,
+          userEnabled: provider === ProviderName.LlamaCpp ? true : prev[provider].userEnabled,
         },
       };
     });
@@ -1688,12 +1777,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         Object.entries(providers).map(([providerKey, providerConfig]) => {
           const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
           const hasValidAuth = hasProviderAuthConfigured(providerKey as ProviderType, providerConfig);
-          const normalizedEnabled = providerConfig.enabled && hasValidAuth;
+          const normalizedEnabled = providerKey === ProviderName.LlamaCpp
+            ? providerConfig.userEnabled === true
+            : providerConfig.enabled && hasValidAuth;
           return [
             providerKey,
             {
               ...providerConfig,
               enabled: normalizedEnabled,
+              userEnabled: providerKey === ProviderName.LlamaCpp
+                ? normalizedEnabled
+                : providerConfig.userEnabled,
               apiFormat,
               baseUrl: resolveBaseUrl(providerKey as ProviderType, providerConfig.baseUrl, apiFormat),
             },
@@ -1701,10 +1795,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         })
       ) as ProvidersConfig;
 
-      // Find the first enabled provider to use as the primary API
+      // Prefer a remote enabled provider for the app-wide fallback API, then
+      // fall back to any enabled local provider such as llama.cpp.
       const firstEnabledProvider = Object.entries(normalizedProviders).find(
-        ([providerKey, config]) => providerKey !== ProviderName.LlamaCpp && config.enabled
-      );
+        ([providerKey, config]) => providerKey !== ProviderName.LlamaCpp && isProviderEnabled(providerKey, config)
+      ) ?? Object.entries(normalizedProviders).find(([providerKey, config]) => isProviderEnabled(providerKey, config));
 
       const primaryProvider = firstEnabledProvider
         ? firstEnabledProvider[1]
@@ -1994,15 +2089,40 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       return;
     }
 
-    // 获取第一个可用模型 - use a shallow copy to avoid mutating state
-    const originalModel = providerConfig.models?.[0];
-    if (!originalModel) {
+    let firstModel = providerConfig.models?.[0]
+      ? { ...providerConfig.models[0] }
+      : undefined;
+
+    if (testingProvider === ProviderName.LlamaCpp) {
+      const runningModels = await window.electron.llamacpp.listRunningModels().catch(() => []);
+      const runningModelNames = runningModels
+        .map(model => model.name?.trim() || model.model?.trim() || model.id?.trim() || '')
+        .filter(Boolean);
+      if (runningModelNames.length === 0) {
+        showTestResultModal({
+          success: false,
+          message: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
+        }, testingProvider);
+        setIsTesting(false);
+        return;
+      }
+      const matchedConfiguredModel = (providerConfig.models ?? []).find(model =>
+        runningModelNames.includes(model.id) || runningModelNames.includes(model.name),
+      );
+      firstModel = matchedConfiguredModel
+        ? { ...matchedConfiguredModel }
+        : {
+            id: runningModelNames[0],
+            name: runningModelNames[0],
+            supportsImage: false,
+          };
+    }
+
+    if (!firstModel) {
       showTestResultModal({ success: false, message: i18nService.t('noModelsConfigured') }, testingProvider);
       setIsTesting(false);
       return;
     }
-
-    const firstModel = { ...originalModel };
 
     try {
       let response: Awaited<ReturnType<typeof window.electron.api.fetch>>;
@@ -2103,14 +2223,18 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       }
 
       if (response.ok) {
-        enableProvider(testingProvider);
+        if (testingProvider !== ProviderName.LlamaCpp) {
+          enableProvider(testingProvider);
+        }
         showTestResultModal({ success: true, message: i18nService.t('connectionSuccess') }, testingProvider);
       } else {
         const data = response.data || {};
         // 提取错误信息
         const errorMessage = data.error?.message || data.message || `${i18nService.t('connectionFailed')}: ${response.status}`;
         if (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('model output limit was reached')) {
-          enableProvider(testingProvider);
+          if (testingProvider !== ProviderName.LlamaCpp) {
+            enableProvider(testingProvider);
+          }
           showTestResultModal({ success: true, message: i18nService.t('connectionSuccess') }, testingProvider);
           return;
         }
@@ -2140,6 +2264,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           providerKey,
           {
             enabled: providerConfig.enabled,
+            userEnabled: providerConfig.userEnabled,
             apiKey,
             baseUrl: resolveBaseUrl(providerKey as ProviderType, providerConfig.baseUrl, apiFormat),
             apiFormat,
@@ -2288,6 +2413,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
         providerUpdates[providerKey] = {
           enabled: typeof providerData.enabled === 'boolean' ? providerData.enabled : existing?.enabled ?? false,
+          userEnabled: typeof providerData.userEnabled === 'boolean'
+            ? providerData.userEnabled
+            : providerKey === ProviderName.LlamaCpp
+              ? (typeof providerData.enabled === 'boolean' ? providerData.enabled : existing?.userEnabled ?? false)
+              : existing?.userEnabled,
           apiKey: apiKey ?? existing?.apiKey ?? '',
           baseUrl: typeof providerData.baseUrl === 'string' ? providerData.baseUrl : existing?.baseUrl ?? '',
           apiFormat: getEffectiveApiFormat(providerKey, providerData.apiFormat ?? existing?.apiFormat),
@@ -2372,6 +2502,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
         providerUpdates[providerKey] = {
           enabled: typeof providerData.enabled === 'boolean' ? providerData.enabled : existing?.enabled ?? false,
+          userEnabled: typeof providerData.userEnabled === 'boolean'
+            ? providerData.userEnabled
+            : providerKey === ProviderName.LlamaCpp
+              ? (typeof providerData.enabled === 'boolean' ? providerData.enabled : existing?.userEnabled ?? false)
+              : existing?.userEnabled,
           apiKey: apiKey ?? existing?.apiKey ?? '',
           baseUrl: typeof providerData.baseUrl === 'string' ? providerData.baseUrl : existing?.baseUrl ?? '',
           apiFormat: getEffectiveApiFormat(providerKey, providerData.apiFormat ?? existing?.apiFormat),
@@ -3049,9 +3184,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 const providerKey = provider as ProviderType;
                 const isCustom = isCustomProvider(provider);
                 const hasValidAuth = hasProviderAuthConfigured(providerKey, config);
-                const effectiveEnabled = providerKey === ProviderName.Ollama
-                  ? config.enabled
-                  : config.enabled && hasValidAuth;
+                const providerEnabled = isProviderEnabled(providerKey, config);
+                const effectiveEnabled = providerRequiresApiKey(providerKey)
+                  ? providerEnabled && hasValidAuth
+                  : providerEnabled;
                 const canToggleProvider = effectiveEnabled || hasValidAuth;
                 const displayLabel = isCustom
                   ? ((config as ProviderConfig).displayName || getCustomProviderDefaultName(provider))
@@ -3174,6 +3310,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               </div>
                 );
               })()}
+
+              {activeProvider === ProviderName.LlamaCpp && (
+                <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                  <p className="text-xs text-secondary">
+                    {i18nService.t('llamaCppProviderSettingsTitle')}
+                  </p>
+                </div>
+              )}
 
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
@@ -3916,7 +4060,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               )}
 
               {/* API 格式选择器 */}
-              {shouldShowApiFormatSelector(activeProvider) && !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
+              {shouldShowApiFormatSelector(activeProvider) && activeProvider !== ProviderName.LlamaCpp && !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
                 <div>
                   <label htmlFor={`${activeProvider}-apiFormat`} className="block text-xs font-medium text-foreground mb-1">
                     {i18nService.t('apiFormat')}
@@ -4144,14 +4288,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     <h3 className="text-xs font-medium text-foreground">
                       {i18nService.t('availableModels')}
                     </h3>
-                    <button
-                      type="button"
-                      onClick={handleAddModel}
-                      className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
-                    >
-                      <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
-                      {i18nService.t('addModel')}
-                    </button>
+                    {activeProvider !== ProviderName.LlamaCpp && (
+                      <button
+                        type="button"
+                        onClick={handleAddModel}
+                        className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
+                      >
+                        <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
+                        {i18nService.t('addModel')}
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 max-h-60 overflow-y-auto">
@@ -4174,20 +4320,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                                 {i18nService.t('imageInput')}
                               </span>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
-                              className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <PencilIcon className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteModel(model.id)}
-                              className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <TrashIcon className="h-3.5 w-3.5" />
-                            </button>
+                            {activeProvider !== ProviderName.LlamaCpp && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
+                                  className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <PencilIcon className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteModel(model.id)}
+                                  className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <TrashIcon className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -4196,14 +4346,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
                       <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
                         <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
-                        <button
-                          type="button"
-                          onClick={handleAddModel}
-                          className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
-                        >
-                          <PlusCircleIcon className="h-3 w-3 mr-1" />
-                          {i18nService.t('addFirstModel')}
-                        </button>
+                        {activeProvider !== ProviderName.LlamaCpp && (
+                          <button
+                            type="button"
+                            onClick={handleAddModel}
+                            className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
+                          >
+                            <PlusCircleIcon className="h-3 w-3 mr-1" />
+                            {i18nService.t('addFirstModel')}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

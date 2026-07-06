@@ -1,4 +1,4 @@
-import { resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { isProviderEnabled, ProviderName, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { store } from '../store';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
@@ -242,7 +242,9 @@ class ApiService {
   }
 
   private providerRequiresApiKey(provider: string): boolean {
-    return provider !== 'ollama' && provider !== 'github-copilot';
+    return provider !== ProviderName.Ollama
+      && provider !== ProviderName.LlamaCpp
+      && provider !== ProviderName.Copilot;
   }
 
   // 检测当前选择的模型属于哪个 provider
@@ -252,6 +254,7 @@ class ApiService {
       normalizedHint
       && (
         ['openai', 'deepseek', 'moonshot', 'zhipu', 'minimax', 'qwen', 'openrouter', 'gemini', 'anthropic', 'xiaomi', 'stepfun', 'volcengine', 'github-copilot', 'ollama'].includes(normalizedHint)
+        || normalizedHint === ProviderName.LlamaCpp
         || normalizedHint.startsWith('custom_')
       )
     ) {
@@ -290,7 +293,7 @@ class ApiService {
 
     if (appConfig?.providers?.[provider]) {
       const providerConfig = appConfig.providers[provider];
-      if (providerConfig.enabled && (providerConfig.apiKey || !this.providerRequiresApiKey(provider))) {
+      if (isProviderEnabled(provider, providerConfig) && (providerConfig.apiKey || !this.providerRequiresApiKey(provider))) {
         let baseUrl = providerConfig.baseUrl;
         let apiFormat = this.normalizeApiFormat(providerConfig.apiFormat);
 

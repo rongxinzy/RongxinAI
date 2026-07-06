@@ -1,13 +1,19 @@
 import { expect, test } from 'vitest';
 
-import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
+import {
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+} from '../../shared/llamacpp';
+import { ProviderName } from '../../shared/providers/constants';
 import {
   getLlamaCppLoadedModelLimitViolation,
+  getLlamaCppServiceConfig,
   getRequiredVramRecoveryMiB,
   getTotalFreeVramMiB,
   hasRecoveredVram,
   sanitizeLlamaCppServiceConfig,
   shouldSyncOpenClawAfterRunningModelRefresh,
+  shouldSyncOpenClawForRunningModelRefresh,
   waitForLlamaCppModelUnloadConfirmation,
 } from './llamacpp';
 
@@ -102,7 +108,7 @@ test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to
     cacheRam: '8192',
     ctxSize: '4096',
     parallel: '1',
-    batchSize: '2048',
+    batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
     threads: '-1',
@@ -134,7 +140,7 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
     cacheRam: '8192',
     ctxSize: '4096',
     parallel: '1',
-    batchSize: '2048',
+    batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
     threads: '-1',
@@ -203,6 +209,26 @@ test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimi
   });
 });
 
+test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not configure it', () => {
+  const store = {
+    get: () => ({ modelsMax: '1' }),
+  } as unknown as Parameters<typeof getLlamaCppServiceConfig>[0];
+
+  expect(getLlamaCppServiceConfig(store)).toEqual({
+    host: '127.0.0.1',
+    port: '8080',
+    modelsMax: '1',
+    timeout: '120',
+    threadsHttp: '4',
+    cacheReuse: '256',
+    cacheRam: '8192',
+    parallel: '1',
+    batchSize: '512',
+    ubatchSize: '512',
+    gpuLayers: 'auto',
+  });
+});
+
 test('getLlamaCppLoadedModelLimitViolation blocks loading a third model when modelsMax is two', () => {
   expect(getLlamaCppLoadedModelLimitViolation({
     modelsMax: '2',
@@ -228,16 +254,48 @@ test('getLlamaCppLoadedModelLimitViolation allows reloading an already running m
   })).toBeNull();
 });
 
-test('shouldSyncOpenClawAfterRunningModelRefresh only syncs on model stop', () => {
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-loaded')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-unloaded')).toBe(false);
+test('shouldSyncOpenClawAfterRunningModelRefresh syncs when running llama.cpp model bindings change', () => {
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-loaded')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-unloaded')).toBe(true);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-running')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-not-running')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-deleted')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(false);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(true);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-stopped')).toBe(true);
+});
+
+test('shouldSyncOpenClawForRunningModelRefresh requires the llama.cpp provider to be enabled', () => {
+  expect(shouldSyncOpenClawForRunningModelRefresh({
+    reason: 'llamacpp-model-loaded',
+    runningModelsChanged: true,
+    appConfigChanged: false,
+    appConfig: {
+      providers: {
+        [ProviderName.LlamaCpp]: {
+          enabled: false,
+          userEnabled: false,
+          models: [],
+        },
+      },
+    },
+  })).toBe(false);
+
+  expect(shouldSyncOpenClawForRunningModelRefresh({
+    reason: 'llamacpp-model-loaded',
+    runningModelsChanged: true,
+    appConfigChanged: false,
+    appConfig: {
+      providers: {
+        [ProviderName.LlamaCpp]: {
+          enabled: true,
+          userEnabled: true,
+          models: [],
+        },
+      },
+    },
+  })).toBe(true);
 });
 
 test('computes total free VRAM from nvidia-smi snapshots', () => {

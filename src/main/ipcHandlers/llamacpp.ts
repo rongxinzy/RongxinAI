@@ -2,8 +2,6 @@ import { BrowserWindow, dialog, ipcMain } from 'electron';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
-  LlamaCppChatChunk,
-  LlamaCppChatPayload,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
@@ -12,6 +10,7 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
+  DEFAULT_LLAMACPP_SERVICE_CONFIG,
   getLlamaCppAcceleratorDevices,
   getLlamaCppLaunchContextLimitViolation,
   getLlamaCppModelsMaxLimitViolation,
@@ -22,25 +21,24 @@ import {
   LlamaCppRuntimeCudaMajor,
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
+import { isProviderEnabled, ProviderName } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
-  filterLlamaCppServiceConfigByRuntimeCapabilities,
   LlamaCppManager,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
 import {
-  buildLlamaCppOpenClawAppConfig,
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
+  upsertLlamaCppProviderInAppConfig,
 } from '../libs/llamacppOpenClawBinding';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
-const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {};
 const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
 const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
 const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
@@ -48,23 +46,47 @@ const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 
 const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
-  modelsMax: '0',
-  timeout: '120',
-  threadsHttp: '4',
-  cacheReuse: '256',
-  cacheRam: '8192',
-  ctxSize: '4096',
-  parallel: '1',
-  batchSize: '2048',
-  ubatchSize: '512',
-  gpuLayers: 'auto',
-  threads: '-1',
-  threadsBatch: '-1',
-  mainGpu: '0',
+  modelsMax: DEFAULT_LLAMACPP_SERVICE_CONFIG.modelsMax ?? '0',
+  timeout: DEFAULT_LLAMACPP_SERVICE_CONFIG.timeout ?? '120',
+  threadsHttp: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsHttp ?? '4',
+  cacheReuse: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheReuse ?? '256',
+  cacheRam: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheRam ?? '8192',
+  ctxSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ctxSize ?? '4096',
+  parallel: DEFAULT_LLAMACPP_SERVICE_CONFIG.parallel ?? '1',
+  batchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.batchSize ?? '512',
+  ubatchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ubatchSize ?? '512',
+  gpuLayers: DEFAULT_LLAMACPP_SERVICE_CONFIG.gpuLayers ?? 'auto',
+  threads: DEFAULT_LLAMACPP_SERVICE_CONFIG.threads ?? '-1',
+  threadsBatch: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsBatch ?? '-1',
+  mainGpu: DEFAULT_LLAMACPP_SERVICE_CONFIG.mainGpu ?? '0',
 } as const;
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return reason === 'llamacpp-model-stopped';
+  return (
+    reason === 'llamacpp-model-loaded'
+    || reason === 'llamacpp-model-unloaded'
+    || reason === 'llamacpp-model-launched'
+    || reason === 'llamacpp-model-stopped'
+    || reason === 'llamacpp-model-visibility-refresh'
+  );
+}
+
+export function shouldSyncOpenClawForRunningModelRefresh(input: {
+  reason: string;
+  runningModelsChanged: boolean;
+  appConfigChanged: boolean;
+  appConfig: LlamaCppOpenClawAppConfig;
+}): boolean {
+  const llamaCppEnabled = isProviderEnabled(
+    ProviderName.LlamaCpp,
+    input.appConfig.providers?.[ProviderName.LlamaCpp],
+  );
+
+  return (
+    llamaCppEnabled
+    && (input.runningModelsChanged || input.appConfigChanged)
+    && shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
+  );
 }
 
 export function getLlamaCppLoadedModelLimitViolation(input: {
@@ -177,22 +199,28 @@ export function registerLlamaCppIpcHandlers(
       restartGatewayIfRunning?: boolean;
       forceGatewayRestartIfRunning?: boolean;
     }) => Promise<{ success: boolean; error?: string }>;
-    getAgentManager?: () => {
-      getDefaultAgent: () => { id: string } | null;
-      updateAgent: (agentId: string, updates: { model?: string }) => unknown;
-    };
   },
-): void {
+  ): void {
   const updateRunningModelBindings = async (
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
     reason: string,
   ): Promise<void> => {
-    const changed = updateLlamaCppRunningModels(
-      runningModels
-        .map(model => buildLlamaCppRunningModelBinding(model))
-        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
-    );
-    if (changed && shouldSyncOpenClawAfterRunningModelRefresh(reason)) {
+    const bindingModels = runningModels
+      .map(model => buildLlamaCppRunningModelBinding(model))
+      .filter((model): model is NonNullable<typeof model> => Boolean(model));
+    const runningModelsChanged = updateLlamaCppRunningModels(bindingModels);
+    const store = options.getStore();
+    const current = store.get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
+    const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
+    if (appConfigUpdate.changed) {
+      store.set('app_config', appConfigUpdate.config);
+    }
+    if (shouldSyncOpenClawForRunningModelRefresh({
+      reason,
+      runningModelsChanged,
+      appConfigChanged: appConfigUpdate.changed,
+      appConfig: appConfigUpdate.config,
+    })) {
       await options.syncOpenClawConfig({
         reason,
         restartGatewayIfRunning: true,
@@ -240,7 +268,6 @@ export function registerLlamaCppIpcHandlers(
   });
   manager.on('install-progress', sendProgress);
   const activeInstalls = new Map<string, AbortController>();
-  const activeChats = new Map<string, AbortController>();
 
   ipcMain.handle(LlamaCppIpcChannel.Status, async () => manager.detect());
   ipcMain.handle(LlamaCppIpcChannel.Install, async () => {
@@ -302,26 +329,6 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
-  ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
-    getLlamaCppServiceConfig(options.getStore()),
-  );
-    ipcMain.handle(
-      LlamaCppIpcChannel.SetServiceConfig,
-      async (_event, config: LlamaCppServiceConfig) => {
-        const runtimeDevices = await manager.listRuntimeDevices().catch((): null => null);
-        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
-        const runtimeDevicesForSanitize = runtimeDevices?.success ? runtimeDevices : null;
-        const sanitized = filterLlamaCppServiceConfigByRuntimeCapabilities(
-          sanitizeLlamaCppServiceConfig(
-            config,
-            runtimeDevicesForSanitize,
-          ),
-          runtimeCapabilities,
-        );
-      options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
-      return sanitized;
-    },
-  );
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
 
   ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
@@ -387,7 +394,7 @@ export function registerLlamaCppIpcHandlers(
       );
     }
     const result = await manager.loadModel({ ...input, model: modelName });
-    await refreshRunningModelBindings();
+    await refreshRunningModelBindings('llamacpp-model-loaded');
     return result;
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
@@ -490,85 +497,14 @@ export function registerLlamaCppIpcHandlers(
     controller.abort(new Error('Install cancelled'));
     return { success: true, cancelled: true };
   });
-  ipcMain.handle(LlamaCppIpcChannel.Chat, async (_event, payload: LlamaCppChatPayload) => {
-    const client = await manager.client();
-    return await client.chat({ ...payload, stream: false });
-  });
-  ipcMain.handle(
-    LlamaCppIpcChannel.ChatStream,
-    async (_event, requestId: string, payload: LlamaCppChatPayload) => {
-      if (typeof requestId !== 'string' || !requestId.trim())
-        throw new Error('Request ID is required');
-      if (activeChats.has(requestId))
-        throw new Error(`Chat stream already in progress: ${requestId}`);
-      const controller = new AbortController();
-      activeChats.set(requestId, controller);
-      const client = await manager.client();
-      let lastChunk: LlamaCppChatChunk | null = null;
-      try {
-        await client.chat(
-          { ...payload, stream: true },
-          chunk => {
-            lastChunk = chunk;
-            broadcast(LlamaCppIpcChannel.ChatStreamChunk, { requestId, chunk });
-          },
-          { signal: controller.signal },
-        );
-        return { success: true, finalChunk: lastChunk };
-      } catch (error) {
-        if (controller.signal.aborted || isAbortError(error)) {
-          throw new Error('Generation cancelled', { cause: error });
-        }
-        throw error;
-      } finally {
-        activeChats.delete(requestId);
-      }
-    },
-  );
-  ipcMain.handle(LlamaCppIpcChannel.CancelChatStream, async (_event, requestId: string) => {
-    const controller = activeChats.get(requestId);
-    if (!controller) return { success: true, cancelled: false };
-    controller.abort(new Error('Generation cancelled'));
-    return { success: true, cancelled: true };
-  });
-  ipcMain.handle(LlamaCppIpcChannel.SetOpenClawModel, async (_event, modelName: string) => {
-    const normalizedModelName = modelName.trim();
-    if (!normalizedModelName) {
-      throw new Error('Model name is required');
-    }
-    const current = options.getStore().get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
-    const next = buildLlamaCppOpenClawAppConfig(current, normalizedModelName);
-    const openClawModelRef = `llamacpp/${normalizedModelName}`;
-    options.getStore().set('app_config', next);
-    const defaultAgent = (() => {
-      try {
-        const agentManager = options.getAgentManager?.();
-        const agent = agentManager?.getDefaultAgent?.();
-        if (!agent) return null;
-        return agentManager.updateAgent(agent.id, { model: openClawModelRef });
-      } catch (error) {
-        console.warn('[LlamaCpp] failed to update the default OpenClaw agent model:', error);
-        return null;
-      }
-    })();
-    await refreshRunningModelBindings('llamacpp-set-openclaw-model');
-    const syncResult = await options.syncOpenClawConfig({
-      reason: 'llamacpp-local-model-selected',
-    });
-    return {
-      success: syncResult.success,
-      error: syncResult.error,
-      config: next,
-      modelRef: openClawModelRef,
-      defaultAgent,
-    };
-  });
 }
 
 export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceConfig {
   return sanitizeLlamaCppServiceConfig(
-    store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ??
-      DEFAULT_LLAMACPP_SERVICE_CONFIG,
+    {
+      ...DEFAULT_LLAMACPP_SERVICE_CONFIG,
+      ...(store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {}),
+    },
   );
 }
 

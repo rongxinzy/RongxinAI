@@ -236,6 +236,12 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - Naming: `PascalCase` for components (e.g., `Chat.tsx`), `camelCase` for functions/vars, and `*Slice.ts` for Redux slices.
 - Tailwind CSS is the primary styling approach; prefer utility classes over bespoke CSS.
 
+### File Length Limit
+
+- **单文件行数上限：** 单个文件最好不要超过 **800 行**，最多不能超过 **1000 行**。
+- **仅适用于新增文件：** 创建新文件时必须遵守此限制。拆分策略（子组件、按职责拆模块、提取类型到 `types.ts`）仅用于新建场景。
+- **已有超长文件：** 禁止给已有的超长文件继续追加逻辑。如需修改，将新增逻辑写入新文件，通过导入方式引用。**不要主动拆分已有超长文件**，除非用户明确要求重构。
+
 ## String Literal Constants
 
 **Never use bare string literals** for values that act as discriminants, status codes, IPC channel names, mode selectors, or any string compared/switched against in multiple places. Instead, define a centralized `as const` object and derive the type from it.

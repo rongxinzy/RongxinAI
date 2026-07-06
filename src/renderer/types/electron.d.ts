@@ -4,8 +4,6 @@ import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/a
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
   LlamaCppCancelInstallResult,
-  LlamaCppChatChunk,
-  LlamaCppChatPayload,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModel,
@@ -18,7 +16,6 @@ import type {
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
   LlamaCppRuntimeUninstallResult,
-  LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
@@ -35,8 +32,6 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
-import type { AppConfig } from '../config';
-import type { Agent } from './agent';
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -400,13 +395,6 @@ interface IElectronAPI {
     chat: (payload: OllamaChatPayload) => Promise<OllamaChatChunk>;
     chatStream: (requestId: string, payload: OllamaChatPayload) => Promise<{ success: boolean }>;
     cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
-    setOpenClawModel: (modelName: string) => Promise<{
-      success: boolean;
-      error?: string;
-      config?: AppConfig;
-      modelRef?: string;
-      defaultAgent?: Agent | null;
-    }>;
     onStatusChanged: (callback: (snapshot: OllamaStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: OllamaInstallProgress) => void) => () => void;
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
@@ -428,8 +416,6 @@ interface IElectronAPI {
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
     restart: () => Promise<LlamaCppStatusSnapshot>;
-    getServiceConfig: () => Promise<LlamaCppServiceConfig>;
-    setServiceConfig: (config: LlamaCppServiceConfig) => Promise<LlamaCppServiceConfig>;
     modelsDir: () => Promise<string>;
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;
@@ -439,25 +425,9 @@ interface IElectronAPI {
     unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
     installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
-    pullModel: (name: string) => Promise<{ success: boolean }>;
-    cancelPull: (name: string) => Promise<LlamaCppCancelInstallResult>;
-    chat: (payload: LlamaCppChatPayload) => Promise<LlamaCppChatChunk>;
-    chatStream: (
-      requestId: string,
-      payload: LlamaCppChatPayload,
-    ) => Promise<{ success: boolean; finalChunk?: LlamaCppChatChunk | null }>;
-    cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
-    setOpenClawModel: (modelName: string) => Promise<{
-      success: boolean;
-      error?: string;
-      config?: AppConfig;
-      modelRef?: string;
-      defaultAgent?: Agent | null;
-    }>;
     onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
-    onChatStreamChunk: (callback: (payload: { requestId: string; chunk: LlamaCppChatChunk }) => void) => () => void;
   };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;

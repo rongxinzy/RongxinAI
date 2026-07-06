@@ -5,6 +5,7 @@ import {
   buildLlamaCppRunningModelBinding,
   deriveLlamaCppOpenClawMaxTokens,
   removeLlamaCppModelFromAppConfig,
+  upsertLlamaCppProviderInAppConfig,
 } from './llamacppOpenClawBinding';
 
 test('removeLlamaCppModelFromAppConfig removes deleted llama.cpp model and clears default selection', () => {
@@ -65,19 +66,159 @@ test('buildLlamaCppRunningModelBinding returns null when runtime context length 
   })).toBeNull();
 });
 
-test('buildLlamaCppRunningModelBinding returns null when context below OpenClaw minimum', () => {
+test('buildLlamaCppRunningModelBinding accepts smaller runtime contexts for llama.cpp running models', () => {
   expect(buildLlamaCppRunningModelBinding({
     name: 'qwen-local',
     runtime_context_length: 4096,
-  })).toBeNull();
-
-  expect(buildLlamaCppRunningModelBinding({
+  })).toEqual({
+    id: 'qwen-local',
     name: 'qwen-local',
-    runtime_context_length: 31999,
-  })).toBeNull();
+    supportsImage: false,
+    contextWindow: 4096,
+    contextTokens: 4096,
+    maxTokens: 1024,
+  });
+});
 
-  expect(buildLlamaCppRunningModelBinding({
-    name: 'qwen-local',
-    runtime_context_length: 32000,
-  })).not.toBeNull();
+test('upsertLlamaCppProviderInAppConfig writes managed llama.cpp provider models without auto-enabling provider', () => {
+  const result = upsertLlamaCppProviderInAppConfig({
+    model: {
+      defaultModel: 'qwen-old',
+      defaultModelProvider: ProviderName.LlamaCpp,
+    },
+  }, [
+    {
+      id: 'qwen-local',
+      name: 'qwen-local',
+      supportsImage: false,
+      contextWindow: 8192,
+      contextTokens: 8192,
+      maxTokens: 2048,
+    },
+  ]);
+
+  expect(result.changed).toBe(true);
+  expect(result.clearedDefaultModel).toBe(true);
+  expect(result.config.model?.defaultModel).toBe('');
+  expect(result.config.providers?.[ProviderName.LlamaCpp]).toEqual({
+    enabled: false,
+    userEnabled: false,
+    apiKey: '',
+    baseUrl: 'http://127.0.0.1:8080/v1',
+    apiFormat: 'openai',
+    models: [
+      {
+        id: 'qwen-local',
+        name: 'qwen-local',
+        supportsImage: false,
+        contextWindow: 8192,
+        contextTokens: 8192,
+        maxTokens: 2048,
+      },
+    ],
+  });
+});
+
+test('upsertLlamaCppProviderInAppConfig preserves a user-disabled llama.cpp provider after models refresh', () => {
+  const result = upsertLlamaCppProviderInAppConfig({
+    providers: {
+      [ProviderName.LlamaCpp]: {
+        enabled: false,
+        userEnabled: false,
+        apiKey: '',
+        baseUrl: 'http://127.0.0.1:8080/v1',
+        apiFormat: 'openai',
+        models: [
+          {
+            id: 'qwen-local',
+            name: 'qwen-local',
+            supportsImage: false,
+            contextWindow: 8192,
+            contextTokens: 8192,
+            maxTokens: 2048,
+          },
+        ],
+      },
+    },
+  }, [
+    {
+      id: 'qwen-local',
+      name: 'qwen-local',
+      supportsImage: false,
+      contextWindow: 8192,
+      contextTokens: 8192,
+      maxTokens: 2048,
+    },
+  ]);
+
+  expect(result.config.providers?.[ProviderName.LlamaCpp]?.enabled).toBe(false);
+  expect(result.config.providers?.[ProviderName.LlamaCpp]?.userEnabled).toBe(false);
+});
+
+test('upsertLlamaCppProviderInAppConfig resets legacy auto-enabled llama.cpp providers without user intent', () => {
+  const result = upsertLlamaCppProviderInAppConfig({
+    providers: {
+      [ProviderName.LlamaCpp]: {
+        enabled: true,
+        apiKey: '',
+        baseUrl: 'http://127.0.0.1:8080/v1',
+        apiFormat: 'openai',
+        models: [],
+      },
+    },
+  }, [
+    {
+      id: 'qwen-local',
+      name: 'qwen-local',
+      supportsImage: false,
+      contextWindow: 8192,
+      contextTokens: 8192,
+      maxTokens: 2048,
+    },
+  ]);
+
+  expect(result.config.providers?.[ProviderName.LlamaCpp]?.enabled).toBe(false);
+  expect(result.config.providers?.[ProviderName.LlamaCpp]?.userEnabled).toBe(false);
+});
+
+test('upsertLlamaCppProviderInAppConfig ignores running-model order changes', () => {
+  const current = upsertLlamaCppProviderInAppConfig({}, [
+    {
+      id: 'b-model',
+      name: 'b-model',
+      supportsImage: false,
+      contextWindow: 8192,
+      contextTokens: 8192,
+      maxTokens: 2048,
+    },
+    {
+      id: 'a-model',
+      name: 'a-model',
+      supportsImage: false,
+      contextWindow: 4096,
+      contextTokens: 4096,
+      maxTokens: 1024,
+    },
+  ]).config;
+
+  const result = upsertLlamaCppProviderInAppConfig(current, [
+    {
+      id: 'a-model',
+      name: 'a-model',
+      supportsImage: false,
+      contextWindow: 4096,
+      contextTokens: 4096,
+      maxTokens: 1024,
+    },
+    {
+      id: 'b-model',
+      name: 'b-model',
+      supportsImage: false,
+      contextWindow: 8192,
+      contextTokens: 8192,
+      maxTokens: 2048,
+    },
+  ]);
+
+  expect(result.changed).toBe(false);
 });

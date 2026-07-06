@@ -19,7 +19,6 @@ export const OllamaIpcChannel = {
   Chat: 'ollama:chat',
   ChatStream: 'ollama:chat-stream',
   CancelChatStream: 'ollama:cancel-chat-stream',
-  SetOpenClawModel: 'ollama:set-openclaw-model',
   StatusChanged: 'ollama:status-changed',
   InstallProgress: 'ollama:install-progress',
   PullProgress: 'ollama:pull-progress',
