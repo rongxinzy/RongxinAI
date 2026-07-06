@@ -23,56 +23,71 @@
   color: var(--lobster-text-primary);
 }
 
-/* Improve code block styles */
-pre {
-  background-color: var(--lobster-surface-raised);
-  border-radius: 0.75rem !important;
-  padding: 1em !important;
-  margin: 1em 0 !important;
-  overflow-x: auto !important;
+/* Inline code styling (only applies to bare <code>, not inside pre blocks) */
+:not(pre) > code {
+  font-family: 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
 }
 
-/* ai-elements Terminal: reset global pre overrides so Terminal renders correctly */
-.bg-zinc-950 pre {
-  background-color: transparent !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  overflow-x: auto !important;
+/* Tables: use Streamdown's native rendering — only add border-color via theme variables */
+table {
+  border-collapse: collapse;
+}
+th, td {
+  border-color: var(--lobster-border);
 }
 
-/* CodeMirror: reset global pre/code overrides inside CM editor */
+/* CodeMirror editor: keep isolated */
 .cm-editor pre {
   border-radius: 0 !important;
   padding: 0 !important;
   margin: 0 !important;
   background-color: transparent !important;
 }
-
 .cm-editor code {
   font-family: inherit;
 }
 
-code {
+/* ── Streamdown 2.5 code-block → ai-elements flat single-card ── */
+/* Outer: group relative my-4 flex w-full flex-col gap-2 rounded-xl border border-border bg-sidebar p-2 */
+div[class~="bg-sidebar"][class~="my-4"] {
+  overflow: hidden !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid var(--lobster-border) !important;
+  background-color: var(--lobster-background) !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  display: block !important;
+  margin: 0.75rem 0 !important;
+}
+/* Header row */
+div[class~="bg-sidebar"][class~="my-4"] > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+  border-bottom: 1px solid var(--lobster-border) !important;
+  background-color: color-mix(in srgb, var(--color-muted, hsl(240 5% 84%)) 50%, transparent) !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  height: auto !important;
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+/* Header language label */
+div[class~="bg-sidebar"][class~="my-4"] > div:first-child span {
+  @apply font-mono text-xs text-muted-foreground;
+}
+/* Code body */
+div[class~="bg-sidebar"][class~="my-4"] > div:last-child {
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 1rem !important;
+  background: transparent !important;
+}
+div[class~="bg-sidebar"][class~="my-4"] > div:last-child pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
   font-family: 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
-}
-
-/* Improve table styles */
-table {
-  border-collapse: collapse;
-  margin: 1em 0;
-  width: 100%;
-}
-
-th, td {
-  border-color: var(--lobster-border);
-  padding: 0.5em;
-}
-
-th {
-  background-color: var(--lobster-surface-raised);
-  opacity: 0.8;
-  font-weight: bold;
 }
 
 /* Style for blockquotes */

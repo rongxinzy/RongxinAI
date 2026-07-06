@@ -30,6 +30,8 @@ import {
 } from "react";
 import { Streamdown } from "streamdown";
 
+import { AiPre } from "./streamdown-code-block";
+
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
 };
@@ -331,6 +333,7 @@ export const MessageResponse = memo(
         className
       )}
       plugins={streamdownPlugins}
+      components={{ pre: AiPre }}
       {...props}
     />
   ),
