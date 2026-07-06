@@ -236,10 +236,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         sessionOptions.systemPrompt = mergedPrompt;
       }
 
-      // MCP tools — wrap as Pi custom tools so the agent can call them
-      const mcpTools = this.buildMcpCustomTools();
-      if (mcpTools.length > 0) {
-        sessionOptions.customTools = mcpTools;
+      // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
+      // instead of N individual tools. Uses RongxinAI's McpServerManager
+      // for tool execution — no duplicate MCP connections.
+      const mcpProxyTool = this.buildMcpProxyTool();
+      if (mcpProxyTool) {
+        sessionOptions.customTools = [mcpProxyTool];
       }
 
       // Resolve provider and model from RongxinAI's current API config.
@@ -813,41 +815,176 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     }
   }
 
-  private buildMcpCustomTools(): Record<string, unknown>[] {
-    if (!this.mcpServerManager) return [];
+  /**
+   * Build a single MCP proxy tool (pi-mcp-adapter pattern) instead of
+   * registering every MCP tool as an individual customTool.
+   *
+   * One proxy tool costs ~200 system-prompt tokens regardless of how many
+   * MCP servers/tools are configured, vs N × ~200 tokens for per-tool
+   * registration. Uses RongxinAI's McpServerManager for tool execution
+   * rather than creating duplicate MCP connections.
+   */
+  private buildMcpProxyTool(): Record<string, unknown> | null {
+    if (!this.mcpServerManager) return null;
     const manifest = this.mcpServerManager.toolManifest;
-    if (manifest.length === 0) return [];
+    if (manifest.length === 0) return null;
 
     const mgr = this.mcpServerManager;
-    return manifest.map((entry) => ({
-      name: `mcp__${sanitizeMcpToolName(entry.server)}__${sanitizeMcpToolName(entry.name)}`,
-      description: `[MCP: ${entry.server}] ${entry.description}`,
-      parameters: entry.inputSchema as Record<string, unknown>,
-      execute: async (args: Record<string, unknown>) => {
-        // Pi SDK may pass the call ID string instead of the args object under
-        // certain error conditions.  Guard against any non-record value so the
-        // tool returns a graceful error instead of passing a string to
-        // mgr.callTool (which expects Record<string, unknown>).
-        if (!args || typeof args !== 'object' || Array.isArray(args)) {
-          console.warn(
-            `[PiRuntime] MCP tool "${entry.name}" received non-object args:`,
-            typeof args,
-          );
-          return JSON.stringify({
-            error: 'Tool arguments were not passed as a record — this is a Pi SDK internal error.',
-          });
-        }
+
+    const toolIndex = manifest.map((e) => ({
+      server: e.server,
+      name: e.name,
+      description: e.description,
+    }));
+
+    const buildStatusLine = (): string => {
+      const servers = this.mcpServerManager?.toolManifest ?? [];
+      const serverNames = [...new Set(servers.map((t) => t.server))];
+      const running = this.mcpServerManager?.isRunning ? 'running' : 'stopped';
+      return `MCP ${running} — ${serverNames.length} server(s), ${servers.length} tool(s):\n` +
+        serverNames.map((s) => {
+          const count = servers.filter((t) => t.server === s).length;
+          return `  ${s}: ${count} tool(s)`;
+        }).join('\n');
+    };
+
+    return {
+      name: 'mcp',
+      label: 'MCP',
+      description:
+        'MCP gateway — call MCP tools, search, or describe. ' +
+        'Use {tool, args} to invoke. Use {search} to find tools by name/description. ' +
+        'Use {describe} for parameter schemas. Use {server} to list tools on a server. ' +
+        'Use {} for status overview.',
+      promptSnippet: 'MCP gateway — call MCP tools (use search to discover, tool+args to invoke)',
+      parameters: {
+        type: 'object',
+        properties: {
+          tool: { type: 'string', description: 'Tool name to call (e.g. "read_file")' },
+          args: { type: 'string', description: 'Arguments as JSON string (e.g. {"path":"/tmp/x"})' },
+          server: { type: 'string', description: 'Filter to a specific server, or disambiguate tool calls' },
+          search: { type: 'string', description: 'Search tools by name or description (substring match)' },
+          describe: { type: 'string', description: 'Tool name to describe — returns parameter schema' },
+        },
+        additionalProperties: false,
+      },
+      execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+        // Pi SDK calls execute(toolCallId, params, signal, onUpdate, ctx).
+        // params is the validated parameter object (2nd arg, not 1st).
+        // MUST return AgentToolResult { content, details } — NOT a JSON string.
+        // Returning a string causes createToolResultMessage() to set
+        // content = undefined, which breaks the next LLM turn with
+        // "content is not iterable". See agent-loop.ts createToolResultMessage.
         try {
-          const result = await mgr.callTool(entry.server, entry.name, args);
-          if (typeof result === 'string') return result;
-          return JSON.stringify(result);
+          const tool = typeof params.tool === 'string' ? params.tool : undefined;
+          const argsStr = typeof params.args === 'string' ? params.args : undefined;
+          const server = typeof params.server === 'string' ? params.server : undefined;
+          const search = typeof params.search === 'string' ? params.search : undefined;
+          const describe = typeof params.describe === 'string' ? params.describe : undefined;
+
+          // ── tool + args: invoke an MCP tool ──
+          if (tool) {
+            let parsedArgs: Record<string, unknown> | undefined;
+            if (argsStr) {
+              try {
+                parsedArgs = JSON.parse(argsStr);
+                if (!parsedArgs || typeof parsedArgs !== 'object' || Array.isArray(parsedArgs)) {
+                  return {
+                    content: [{ type: 'text', text: 'args must be a JSON object, e.g. {"key":"value"}' }],
+                    details: {},
+                  };
+                }
+              } catch {
+                return {
+                  content: [{ type: 'text', text: `Invalid args JSON: ${argsStr}` }],
+                  details: {},
+                };
+              }
+            }
+            let resolvedServer: string | undefined = server;
+            if (!resolvedServer) {
+              const candidates = manifest.filter((e) => e.name === tool);
+              if (candidates.length === 0) {
+                return {
+                  content: [{ type: 'text', text: `Tool "${tool}" not found. Use mcp({ search: "..." }) to discover tools.` }],
+                  details: {},
+                };
+              }
+              if (candidates.length > 1) {
+                return {
+                  content: [{ type: 'text', text: `Tool "${tool}" exists on multiple servers: ${candidates.map((c) => c.server).join(', ')}. Use {server} to disambiguate.` }],
+                  details: {},
+                };
+              }
+              resolvedServer = candidates[0].server;
+            }
+            const result = await mgr.callTool(resolvedServer, tool, parsedArgs ?? {});
+            return { content: result.content, details: { isError: result.isError } };
+          }
+
+          // ── search: find tools by substring match ──
+          if (search) {
+            const q = search.toLowerCase();
+            const matches = toolIndex.filter(
+              (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
+            );
+            if (matches.length === 0) {
+              return {
+                content: [{ type: 'text', text: `No tools matching "${search}".` }],
+                details: {},
+              };
+            }
+            return {
+              content: [{ type: 'text', text: matches.slice(0, 30).map(
+                (t) => `[${t.server}] ${t.name}: ${t.description}`,
+              ).join('\n') + (matches.length > 30 ? `\n... and ${matches.length - 30} more` : '') }],
+              details: {},
+            };
+          }
+
+          // ── describe: show tool parameter schema ──
+          if (describe) {
+            const match = manifest.find((e) => e.name === describe);
+            if (!match) {
+              return {
+                content: [{ type: 'text', text: `Tool "${describe}" not found.` }],
+                details: {},
+              };
+            }
+            return {
+              content: [{ type: 'text', text: `[${match.server}] ${match.name}\n${match.description}\nParameters: ${JSON.stringify(match.inputSchema, null, 2)}` }],
+              details: {},
+            };
+          }
+
+          // ── server: list tools on a specific server ──
+          if (server) {
+            const serverTools = manifest.filter((e) => e.server === server);
+            if (serverTools.length === 0) {
+              return {
+                content: [{ type: 'text', text: `Server "${server}" not found or has no tools.` }],
+                details: {},
+              };
+            }
+            return {
+              content: [{ type: 'text', text: `${server} (${serverTools.length} tools):\n${serverTools.map((t) => `  ${t.name}: ${t.description}`).join('\n')}` }],
+              details: {},
+            };
+          }
+
+          // ── default: status overview ──
+          return {
+            content: [{ type: 'text', text: buildStatusLine() }],
+            details: {},
+          };
         } catch (err) {
-          return JSON.stringify({
-            error: err instanceof Error ? err.message : String(err),
-          });
+          return {
+            content: [{ type: 'text', text: `MCP error: ${err instanceof Error ? err.message : String(err)}` }],
+            details: {},
+          };
         }
       },
-    }));
+    };
   }
 }
 
@@ -903,19 +1040,6 @@ function toToolInputRecord(args: unknown): Record<string, unknown> {
   }
   if (args === undefined || args === null) return {};
   return { value: args };
-}
-
-/**
- * Sanitize an MCP server name or tool name so it matches the OpenAI API
- * function name pattern: `^[a-zA-Z0-9_-]+$`.
- * Characters outside this range are replaced with `_`, and consecutive
- * underscores are collapsed to avoid double/mangled names.
- */
-function sanitizeMcpToolName(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
 }
 
 /** Extract a display string from a Pi tool result (string, {text}, array of blocks, or JSON). */
