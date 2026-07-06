@@ -1,8 +1,6 @@
 import {
-  ArrowDownTrayIcon,
   ArrowPathIcon,
   PlayIcon,
-  ServerStackIcon,
   StopIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
@@ -24,76 +22,36 @@ export function ModelsPanel({
   unloadingModelName,
   localModels,
   runningModels,
-  pullName,
-  pulling,
-  onPullNameChange,
-  onPull,
-  onCancelPull,
   onLoadModel,
   onUnload,
   onDelete,
-  onOpenInference,
 }: {
   loading: boolean;
   unloadingModelName: string | null;
   localModels: OllamaModel[];
   runningModels: OllamaRunningModel[];
-  pullName: string;
-  pulling: boolean;
-  onPullNameChange: (value: string) => void;
-  onPull: () => void;
-  onCancelPull: () => void;
   onLoadModel: (model: OllamaModel) => void;
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
-  onOpenInference: (modelName: string) => void;
 }) {
+  const loadedModels = localModels.filter(model =>
+    runningModels.some(item => item.name === model.name || item.model === model.name),
+  );
+  const installedModels = localModels.filter(model =>
+    !runningModels.some(item => item.name === model.name || item.model === model.name),
+  );
+
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-border bg-surface px-3 py-3">
-        <h2 className="text-sm font-semibold text-foreground">
-          {i18nService.t('localInferencePullTitle')}
-        </h2>
-        <p className="mt-1 text-xs text-secondary">{i18nService.t('localInferencePullHint')}</p>
-        <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
-          <input
-            value={pullName}
-            onChange={event => onPullNameChange(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter' && pullName.trim() && !pulling) onPull();
-            }}
-            disabled={pulling}
-            placeholder={i18nService.t('localInferencePullPlaceholder')}
-            className="h-8 flex-1 rounded-md border border-border bg-background px-2.5 font-mono text-sm text-foreground outline-none transition-colors focus:border-primary/60 disabled:opacity-60"
-          />
-          {pulling ? (
-            <button type="button" onClick={onCancelPull} className={smallOutlineButtonClass}>
-              <StopIcon className="h-3.5 w-3.5" />
-              {i18nService.t('localInferenceCancelPull')}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onPull}
-              disabled={!pullName.trim() || loading}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-            >
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              {i18nService.t('localInferencePull')}
-            </button>
-          )}
-        </div>
-      </section>
-
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">
-          {i18nService.t('localInferenceRegisteredModels')}
+          {i18nService.t('localInferenceLoadedModels')}
         </h2>
-        {localModels.length === 0 ? (
-          <EmptyState title={i18nService.t('localInferenceNoModels')} />
+        {loadedModels.length === 0 ? (
+          <EmptyState title={i18nService.t('localInferenceNoLoadedModels')} />
         ) : (
           <div className="overflow-hidden rounded-lg border border-border bg-surface">
-            {localModels.map(model => {
+            {loadedModels.map(model => {
               const runningModel = runningModels.find(
                 item => item.name === model.name || item.model === model.name,
               );
@@ -107,7 +65,31 @@ export function ModelsPanel({
                   onLoadModel={() => onLoadModel(model)}
                   onUnload={() => onUnload(model.name)}
                   onDelete={() => onDelete(model.name)}
-                  onOpenInference={() => onOpenInference(model.name)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {i18nService.t('localInferenceRegisteredModels')}
+        </h2>
+        {installedModels.length === 0 ? (
+          <EmptyState title={i18nService.t('localInferenceNoModels')} />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border bg-surface">
+            {installedModels.map(model => {
+              return (
+                <ModelCard
+                  key={model.name}
+                  model={model}
+                  loading={loading}
+                  unloading={unloadingModelName === model.name}
+                  onLoadModel={() => onLoadModel(model)}
+                  onUnload={() => onUnload(model.name)}
+                  onDelete={() => onDelete(model.name)}
                 />
               );
             })}
@@ -126,7 +108,6 @@ function ModelCard({
   onLoadModel,
   onUnload,
   onDelete,
-  onOpenInference,
 }: {
   model: OllamaModel;
   runningModel?: OllamaRunningModel;
@@ -135,7 +116,6 @@ function ModelCard({
   onLoadModel: () => void;
   onUnload: () => void;
   onDelete: () => void;
-  onOpenInference: () => void;
 }) {
   const isRunning = Boolean(runningModel);
   const cardBusy = unloading;
@@ -226,15 +206,6 @@ function ModelCard({
             {i18nService.t('localInferenceLoad')}
           </button>
         )}
-        <button
-          type="button"
-          onClick={onOpenInference}
-          disabled={buttonsDisabled}
-          className={smallOutlineButtonClass}
-        >
-          <ServerStackIcon className="h-3.5 w-3.5" />
-          {i18nService.t('localInferenceInfer')}
-        </button>
         <button
           type="button"
           onClick={onDelete}

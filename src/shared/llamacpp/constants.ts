@@ -14,9 +14,6 @@ export const LlamaCppIpcChannel = {
   UnloadModel: 'llamacpp:unload-model',
   InstallModel: 'llamacpp:install-model',
   CancelInstall: 'llamacpp:cancel-install',
-  Chat: 'llamacpp:chat',
-  ChatStream: 'llamacpp:chat-stream',
-  CancelChatStream: 'llamacpp:cancel-chat-stream',
   ImportRuntime: 'llamacpp:import-runtime',
   ListRuntimeDevices: 'llamacpp:runtime:list-devices',
   ListBackends: 'llamacpp:backends:list',
@@ -27,7 +24,6 @@ export const LlamaCppIpcChannel = {
   GetRuntimeCapabilities: 'llamacpp:runtime:get-capabilities',
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
-  ChatStreamChunk: 'llamacpp:chat-stream-chunk',
 } as const;
 
 export type LlamaCppIpcChannel = typeof LlamaCppIpcChannel[keyof typeof LlamaCppIpcChannel];

@@ -66,219 +66,6 @@ test('marketplace only keeps installable models in the visible list', async () =
   ).toEqual(['a']);
 });
 
-test('modelscope manual install requires owner repo id', async () => {
-  const module = await import('./LocalInferenceView');
-  const isModelScopeRepoId = (module as {
-    __test__isModelScopeRepoId?: (value: string) => boolean;
-  }).__test__isModelScopeRepoId;
-
-  expect(typeof isModelScopeRepoId).toBe('function');
-  if (!isModelScopeRepoId) return;
-
-  expect(isModelScopeRepoId('Qwen/Qwen3-8B-GGUF')).toBe(true);
-  expect(isModelScopeRepoId('  unsloth/Qwen3.5-0.8B-GGUF  ')).toBe(true);
-  expect(isModelScopeRepoId('1')).toBe(false);
-  expect(isModelScopeRepoId('Qwen/')).toBe(false);
-  expect(isModelScopeRepoId('/Qwen3-8B-GGUF')).toBe(false);
-});
-
-test('streaming assistant display shows waiting dots until content or thinking arrives', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildStreamingAssistantMessage = (module as {
-    __test__buildStreamingAssistantMessage?: (input: {
-      content: string;
-      thinking: string;
-    }) => { content: string; thinking?: string; waiting?: boolean; createdAt: number };
-  }).__test__buildStreamingAssistantMessage;
-
-  expect(typeof buildStreamingAssistantMessage).toBe('function');
-  if (!buildStreamingAssistantMessage) return;
-
-  expect(buildStreamingAssistantMessage({ content: '', thinking: '' })).toEqual(
-    expect.objectContaining({
-      content: '',
-      waiting: true,
-    }),
-  );
-
-  expect(buildStreamingAssistantMessage({ content: '', thinking: 'checking' })).toEqual(
-    expect.objectContaining({
-      content: '',
-      thinking: 'checking',
-      waiting: false,
-    }),
-  );
-
-  expect(buildStreamingAssistantMessage({ content: 'answer', thinking: 'checking' })).toEqual(
-    expect.objectContaining({
-      content: 'answer',
-      thinking: 'checking',
-      waiting: false,
-    }),
-  );
-});
-
-test('new prompt scroll target points at the next assistant response start', async () => {
-  const module = await import('./LocalInferenceView');
-  const getNewAssistantScrollTargetIndex = (module as {
-    __test__getNewAssistantScrollTargetIndex?: (historyLength: number) => number;
-  }).__test__getNewAssistantScrollTargetIndex;
-  const getAssistantScrollTop = (module as {
-    __test__getAssistantScrollTop?: (input: {
-      containerScrollTop: number;
-      containerTop: number;
-      targetTop: number;
-      offset?: number;
-    }) => number;
-  }).__test__getAssistantScrollTop;
-
-  expect(typeof getNewAssistantScrollTargetIndex).toBe('function');
-  expect(typeof getAssistantScrollTop).toBe('function');
-  if (!getNewAssistantScrollTargetIndex || !getAssistantScrollTop) return;
-
-  expect(getNewAssistantScrollTargetIndex(0)).toBe(1);
-  expect(getNewAssistantScrollTargetIndex(4)).toBe(5);
-  expect(
-    getAssistantScrollTop({
-      containerScrollTop: 320,
-      containerTop: 100,
-      targetTop: 240,
-    }),
-  ).toBe(460);
-  expect(
-    getAssistantScrollTop({
-      containerScrollTop: 5,
-      containerTop: 100,
-      targetTop: 110,
-    }),
-  ).toBe(15);
-});
-
-test('jump-to-bottom visibility logic only triggers when content remains below viewport', async () => {
-  const module = await import('./LocalInferenceView');
-  const isScrollNearBottom = (module as {
-    __test__isScrollNearBottom?: (input: {
-      scrollTop: number;
-      clientHeight: number;
-      scrollHeight: number;
-      threshold?: number;
-    }) => boolean;
-  }).__test__isScrollNearBottom;
-  const hasHiddenContentBelow = (module as {
-    __test__hasHiddenContentBelow?: (input: {
-      scrollTop: number;
-      clientHeight: number;
-      scrollHeight: number;
-      threshold?: number;
-    }) => boolean;
-  }).__test__hasHiddenContentBelow;
-
-  expect(typeof isScrollNearBottom).toBe('function');
-  expect(typeof hasHiddenContentBelow).toBe('function');
-  if (!isScrollNearBottom || !hasHiddenContentBelow) return;
-
-  expect(
-    isScrollNearBottom({
-      scrollTop: 900,
-      clientHeight: 300,
-      scrollHeight: 1260,
-    }),
-  ).toBe(true);
-
-  expect(
-    isScrollNearBottom({
-      scrollTop: 720,
-      clientHeight: 300,
-      scrollHeight: 1260,
-    }),
-  ).toBe(false);
-
-  expect(
-    hasHiddenContentBelow({
-      scrollTop: 720,
-      clientHeight: 300,
-      scrollHeight: 1260,
-    }),
-  ).toBe(true);
-
-  expect(
-    hasHiddenContentBelow({
-      scrollTop: 952,
-      clientHeight: 300,
-      scrollHeight: 1260,
-    }),
-  ).toBe(false);
-});
-
-test('final assistant message keeps visible content and preserves thinking details', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildAssistantMessage = (module as {
-    __test__buildAssistantMessage?: (input: {
-      content: string;
-      thinking: string;
-    }) => { content: string; thinking?: string; createdAt: number; reasoningDurationSeconds?: number };
-  }).__test__buildAssistantMessage;
-
-  expect(typeof buildAssistantMessage).toBe('function');
-  if (!buildAssistantMessage) return;
-
-  const message = buildAssistantMessage({
-    content: 'answer',
-    thinking: 'hidden chain',
-  });
-
-  expect(message.content).toBe('answer');
-  expect(message.thinking).toBe('hidden chain');
-  expect(message.createdAt).toBeTypeOf('number');
-});
-
-test('final assistant message falls back to a generic notice when no visible answer exists', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildAssistantMessage = (module as {
-    __test__buildAssistantMessage?: (input: {
-      content: string;
-      thinking: string;
-    }) => { content: string; thinking?: string; createdAt: number; reasoningDurationSeconds?: number };
-  }).__test__buildAssistantMessage;
-
-  expect(typeof buildAssistantMessage).toBe('function');
-  if (!buildAssistantMessage) return;
-
-  const message = buildAssistantMessage({
-    content: '',
-    thinking: 'hidden chain',
-  });
-
-  expect(message.content).toBeTruthy();
-  expect(message.content).not.toContain('hidden chain');
-  expect(message.thinking).toBe('hidden chain');
-  expect(message.createdAt).toBeTypeOf('number');
-});
-
-test('latest user message index resolves the active conversation turn', async () => {
-  const module = await import('./LocalInferenceView');
-  const findLatestUserMessageIndex = (module as unknown as {
-    __test__findLatestUserMessageIndex?: (
-      messages: Array<{ role: 'user' | 'assistant'; content: string; createdAt: number }>,
-    ) => number;
-  }).__test__findLatestUserMessageIndex;
-
-  expect(typeof findLatestUserMessageIndex).toBe('function');
-  if (!findLatestUserMessageIndex) return;
-
-  expect(
-    findLatestUserMessageIndex([
-      { role: 'user', content: 'first', createdAt: 1 },
-      { role: 'assistant', content: 'reply', createdAt: 2 },
-      { role: 'user', content: 'latest', createdAt: 3 },
-      { role: 'assistant', content: 'final', createdAt: 4 },
-    ]),
-  ).toBe(2);
-  expect(findLatestUserMessageIndex([{ role: 'assistant', content: 'reply', createdAt: 1 }])).toBe(
-    -1,
-  );
-});
-
 test('model card busy state only locks the unloading model card', async () => {
   const module = await import('./LocalInferenceView');
   const getModelCardBusyState = (module as {
@@ -388,6 +175,23 @@ test('unload busy state keeps a minimum visible duration', async () => {
       minimumBusyMs: 500,
     }),
   ).toBe(0);
+});
+
+test('local inference service action only auto-starts the shared llama.cpp service', async () => {
+  const module = await import('./LocalInferenceView');
+  const resolveLlamaCppServiceAction = (module as {
+    __test__resolveLlamaCppServiceAction?: (snapshot: { status: string } | null | undefined) => string;
+  }).__test__resolveLlamaCppServiceAction;
+
+  expect(typeof resolveLlamaCppServiceAction).toBe('function');
+  if (!resolveLlamaCppServiceAction) return;
+
+  expect(resolveLlamaCppServiceAction({ status: 'not-installed' })).toBe('install');
+  expect(resolveLlamaCppServiceAction({ status: 'installed' })).toBe('start');
+  expect(resolveLlamaCppServiceAction({ status: 'stopped' })).toBe('start');
+  expect(resolveLlamaCppServiceAction({ status: 'running' })).toBe('ready');
+  expect(resolveLlamaCppServiceAction({ status: 'error' })).toBe('refresh');
+  expect(resolveLlamaCppServiceAction(null)).toBe('refresh');
 });
 
 test('local inference transient notices auto-dismiss within five seconds', async () => {

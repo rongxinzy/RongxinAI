@@ -1,16 +1,6 @@
-import type { LlamaCppChatChunk, LlamaCppInstallProgress } from '../../../shared/llamacpp';
+import type { LlamaCppInstallProgress } from '../../../shared/llamacpp';
 
-export type LocalInferenceTab = 'inference' | 'models' | 'marketplace';
-
-export type InferenceMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-  thinking?: string;
-  waiting?: boolean;
-  metrics?: LlamaCppChatChunk | null;
-  createdAt: number;
-  reasoningDurationSeconds?: number;
-};
+export type LocalInferenceTab = 'models' | 'marketplace';
 
 export const LocalInferenceToastKind = {
   Success: 'success',
@@ -28,25 +18,9 @@ export type LocalInferenceToast = {
   autoDismiss: boolean;
 };
 
-export type LocalInferenceInlineError = {
-  kind: 'context-overflow';
-  requestedTokens: number | null;
-  availableTokens: number | null;
-};
-
 export type LocalInferenceSessionState = {
   activeTab: LocalInferenceTab;
-  selectedModel: string;
-  systemPrompt: string;
-  prompt: string;
-  messages: InferenceMessage[];
 };
 
 export type InstallProgressState = Record<string, LlamaCppInstallProgress>;
-
-export type BuildAssistantMessageInput = {
-  content: string;
-  thinking: string;
-  metrics?: LlamaCppChatChunk | null;
-};
 

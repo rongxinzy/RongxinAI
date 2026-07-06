@@ -1,16 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
-  LlamaCppChatPayload as OllamaChatPayload,
   LlamaCppInstallProgress,
   LlamaCppModel as OllamaModel,
   LlamaCppModelLaunchInput,
   LlamaCppRunningModel as OllamaRunningModel,
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
-} from '../../../shared/llamacpp';
-import {
-  createLlamaCppStreamState as createOllamaStreamState,
-  reduceLlamaCppStreamChunk as reduceOllamaStreamChunk,
 } from '../../../shared/llamacpp';
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
@@ -27,14 +22,10 @@ import {
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
-import { InferencePanel } from './panels/InferencePanel';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
-  BuildAssistantMessageInput,
-  InferenceMessage,
   InstallProgressState,
-  LocalInferenceInlineError,
   LocalInferenceSessionState,
   LocalInferenceTab,
   LocalInferenceToast,
@@ -42,18 +33,9 @@ import type {
 } from './types';
 import { LocalInferenceToastKind } from './types';
 import {
-  buildAssistantMessage,
-  buildEffectiveSystemPrompt,
-  buildStreamingAssistantMessage,
-  computeStreamMetrics,
-  findLatestUserMessageIndex,
-  resolveLocalInferenceInlineError,
-} from './utils/chat';
-import {
   buildMarketplaceSearchParams,
   getInstallableMarketplaceModels,
   getMarketplacePageSize,
-  isModelScopeRepoId,
 } from './utils/marketplace';
 import {
   formatInstallProgressSummary,
@@ -63,7 +45,6 @@ import {
   isPullInProgress,
   normalizeInstallProgress,
 } from './utils/progress';
-import { getAssistantScrollTop, getNewAssistantScrollTargetIndex, hasHiddenContentBelow, isScrollNearBottom } from './utils/scroll';
 import {
   readLocalInferenceSessionState,
   writeLocalInferenceSessionState,
@@ -75,6 +56,16 @@ interface LocalInferenceViewProps {
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
 }
+
+const LlamaCppServiceAction = {
+  Ready: 'ready',
+  Install: 'install',
+  Start: 'start',
+  Refresh: 'refresh',
+} as const;
+
+type LlamaCppServiceAction =
+  (typeof LlamaCppServiceAction)[keyof typeof LlamaCppServiceAction];
 
 let cachedStatus: OllamaStatusSnapshot | null = null;
 
@@ -91,7 +82,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const restoredSession = restoredSessionRef.current;
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
-    restoredSession?.activeTab ?? 'inference',
+    restoredSession?.activeTab ?? 'models',
   );
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
@@ -99,23 +90,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
-  const [pullName, setPullName] = useState('');
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
-  const [selectedModel, setSelectedModel] = useState(restoredSession?.selectedModel ?? '');
-  const [systemPrompt, setSystemPrompt] = useState(restoredSession?.systemPrompt ?? '');
-  const [prompt, setPrompt] = useState(restoredSession?.prompt ?? '');
-  const [messages, setMessages] = useState<InferenceMessage[]>(restoredSession?.messages ?? []);
-  const [inferenceInlineError, setInferenceInlineError] = useState<LocalInferenceInlineError | null>(null);
-  const [streamingText, setStreamingText] = useState('');
-  const [streamingThinking, setStreamingThinking] = useState('');
-  const [sending, setSending] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const activeRequestIdRef = useRef<string | null>(null);
-  const messagesRef = useRef<InferenceMessage[]>(restoredSession?.messages ?? []);
-  const conversationVersionRef = useRef(0);
   const isRunning = status?.status === 'running';
-  const normalizedPullName = pullName.trim();
   const activePullProgress = activePullName ? pullProgress[activePullName] : undefined;
   const pulling = isPullInProgress(activePullProgress);
   const [marketplaceModels, setMarketplaceModels] = useState<MarketplaceModel[]>([]);
@@ -232,15 +209,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void searchMarketplace(params);
   }, [marketplaceQuery, searchMarketplace]);
 
-  const loadedModelNames = useMemo(
-    () => new Set(runningModels.map(model => model.name || model.model).filter(Boolean)),
-    [runningModels],
-  );
-  const loadedModels = useMemo(
-    () => localModels.filter(model => loadedModelNames.has(model.name)),
-    [localModels, loadedModelNames],
-  );
-
   const refreshStatus = useCallback(async () => {
     const nextStatus = await window.electron.llamacpp.status();
     cachedStatus = nextStatus;
@@ -339,10 +307,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 
   useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
     marketplaceQueryRef.current = marketplaceQuery;
   }, [marketplaceQuery]);
 
@@ -359,10 +323,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       sessionSaveTimerRef.current = null;
       writeLocalInferenceSessionState({
         activeTab,
-        selectedModel,
-        systemPrompt,
-        prompt,
-        messages,
       });
     }, 500);
     return () => {
@@ -370,7 +330,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         window.clearTimeout(sessionSaveTimerRef.current);
       }
     };
-  }, [activeTab, messages, prompt, selectedModel, systemPrompt]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!toast?.autoDismiss) return;
@@ -448,34 +408,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     searchMarketplace,
   ]);
 
-
-  const resetInferenceConversation = useCallback(() => {
-    const requestId = activeRequestIdRef.current;
-    conversationVersionRef.current += 1;
-    if (requestId) {
-      void window.electron.llamacpp.cancelChatStream(requestId).catch(() => undefined);
-    }
-    activeRequestIdRef.current = null;
-    messagesRef.current = [];
-    setMessages([]);
-    setInferenceInlineError(null);
-    setStreamingText('');
-    setStreamingThinking('');
-    setPrompt('');
-    setSending(false);
-    setCancelling(false);
-  }, []);
-
-  const handleSelectInferenceModel = useCallback(
-    (modelName: string) => {
-      if (modelName !== selectedModel) {
-        resetInferenceConversation();
-      }
-      setSelectedModel(modelName);
-    },
-    [resetInferenceConversation, selectedModel],
-  );
-
   useEffect(() => {
     if (!isRunning) return;
     const timer = window.setInterval(() => {
@@ -484,36 +416,25 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return () => window.clearInterval(timer);
   }, [isRunning, refreshRunningModels]);
 
-  useEffect(() => {
-    if (
-      selectedModel &&
-      loadedModels.some(model => model.name === selectedModel || model.model === selectedModel)
-    ) {
-      return;
-    }
-    const firstRunning = loadedModels[0]?.name;
-    if (firstRunning && firstRunning !== selectedModel) {
-      setSelectedModel(firstRunning);
-    }
-  }, [loadedModels, selectedModel]);
-
   const ensureLlamaCppRunning = useCallback(async () => {
     let snapshot = status ?? await refreshStatus();
+    let nextAction = resolveLlamaCppServiceAction(snapshot);
 
-    if (snapshot.status === 'not-installed') {
+    if (nextAction === LlamaCppServiceAction.Install) {
       const installResult = await window.electron.llamacpp.install();
       if (!installResult?.success) {
         throw new Error(installResult?.error || i18nService.t('localInferenceRuntimeMissing'));
       }
       showToast(i18nService.t('localInferenceRuntimeReady'), LocalInferenceToastKind.Success);
       snapshot = await refreshStatus();
+      nextAction = resolveLlamaCppServiceAction(snapshot);
     }
 
-    if (snapshot.status === 'installed' || snapshot.status === 'stopped') {
+    if (nextAction === LlamaCppServiceAction.Start) {
       snapshot = await window.electron.llamacpp.start();
       cachedStatus = snapshot;
       setStatus(snapshot);
-    } else if (snapshot.status !== 'running') {
+    } else if (nextAction === LlamaCppServiceAction.Refresh) {
       snapshot = await refreshStatus();
     }
 
@@ -526,49 +447,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return snapshot;
   }, [refreshLocalModels, refreshRunningModels, refreshStatus, showToast, status]);
 
-  const handlePull = () => {
-    if (!normalizedPullName) return;
-    if (!isModelScopeRepoId(normalizedPullName)) {
-      showToast(
-        i18nService.t('localInferencePullInvalidRepo'),
-        LocalInferenceToastKind.Error,
-      );
-      return;
-    }
-    setActivePullName(normalizedPullName);
-    setPullProgress(current => ({
-      ...current,
-      [normalizedPullName]: {
-        phase: 'starting',
-        modelId: normalizedPullName,
-        modelName: normalizedPullName,
-      },
-    }));
-    void runAction(async () => {
-      const result = await window.electron.llamacpp.installModel({
-        modelId: normalizedPullName,
-        displayName: normalizedPullName,
-      });
-      if (!result.success) return;
-      await refreshLocalModels();
-      showToast(
-        i18nService.t('localInferencePullDone').replace('{name}', normalizedPullName),
-        LocalInferenceToastKind.Success,
-      );
-    });
-  };
-
-  const handleCancelPull = () => {
-    if (!activePullName) return;
-    void window.electron.llamacpp.cancelPull(activePullName).catch(cancelError => {
-      showToast(
-        cancelError instanceof Error ? cancelError.message : String(cancelError),
-        LocalInferenceToastKind.Error,
-      );
-    });
-  };
-
-  const handleLoadModel = (model: OllamaModel, openInference = false) => {
+  const handleLoadModel = (model: OllamaModel) => {
     void runAction(async () => {
       await ensureLlamaCppRunning();
       const input: LlamaCppModelLaunchInput = {
@@ -578,11 +457,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const result = await window.electron.llamacpp.loadModel(input);
       setRunningModels(result.runningModels);
       notifyLlamaCppRunningModelsChanged();
-      resetInferenceConversation();
-      setSelectedModel(model.name);
-      if (openInference) {
-        setActiveTab('inference');
-      }
     });
   };
 
@@ -639,137 +513,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     });
   };
 
-  const sendPrompt = async () => {
-    if (!selectedModel || !loadedModelNames.has(selectedModel) || !prompt.trim()) return;
-    const userMessage = prompt.trim();
-    const createdAt = Date.now();
-    const baseHistory = messagesRef.current;
-    const nextHistory: InferenceMessage[] = [
-      ...baseHistory,
-      { role: 'user', content: userMessage, createdAt },
-    ];
-    setMessages(nextHistory);
-    messagesRef.current = nextHistory;
-    setPrompt('');
-    setStreamingText('');
-    setStreamingThinking('');
-    setSending(true);
-    setCancelling(false);
-    setInferenceInlineError(null);
-    dismissToast();
-    const requestId =
-      globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const conversationVersion = conversationVersionRef.current;
-    activeRequestIdRef.current = requestId;
-    const isCurrentRequest = () =>
-      activeRequestIdRef.current === requestId &&
-      conversationVersionRef.current === conversationVersion;
-    const effectiveSystemPrompt = buildEffectiveSystemPrompt(systemPrompt);
-
-    let streamState = createOllamaStreamState();
-    const unsubscribe = window.electron.llamacpp.onChatStreamChunk(
-      ({ requestId: eventRequestId, chunk }) => {
-        if (eventRequestId !== requestId || conversationVersionRef.current !== conversationVersion)
-          return;
-        streamState = reduceOllamaStreamChunk(streamState, chunk);
-        setStreamingThinking(streamState.thinking);
-        setStreamingText(streamState.content);
-      },
-    );
-
-    const streamStartTime = Date.now();
-
-    try {
-      const payload: OllamaChatPayload = {
-        model: selectedModel,
-        stream: true,
-        messages: [
-          ...(effectiveSystemPrompt
-            ? [{ role: 'system' as const, content: effectiveSystemPrompt }]
-            : []),
-          ...baseHistory.map(message => ({
-            role: message.role,
-            content: message.content,
-          })),
-          { role: 'user', content: userMessage },
-        ],
-      };
-      const streamResult = await window.electron.llamacpp.chatStream(requestId, payload);
-      if (!isCurrentRequest()) return;
-      if (streamResult.finalChunk) {
-        streamState = reduceOllamaStreamChunk(streamState, streamResult.finalChunk);
-      }
-      const metrics = computeStreamMetrics(streamState.finalChunk, streamStartTime, streamState.content);
-      const assistantMessage = buildAssistantMessage({
-        content: streamState.content,
-        thinking: streamState.thinking,
-        metrics,
-      });
-      setInferenceInlineError(null);
-      setMessages([...nextHistory, assistantMessage]);
-      messagesRef.current = [...nextHistory, assistantMessage];
-      await refreshRunningModels().catch(() => undefined);
-    } catch (sendError) {
-      if (!isCurrentRequest()) return;
-      if (sendError instanceof Error && sendError.message.includes('Generation cancelled')) {
-        showToast(i18nService.t('localInferenceGenerationCancelled'));
-        if (streamState.content || streamState.thinking) {
-          const metrics = computeStreamMetrics(
-            streamState.finalChunk,
-            streamStartTime,
-            streamState.content,
-          );
-          const assistantMessage = buildAssistantMessage({
-            content: streamState.content,
-            thinking: streamState.thinking,
-            metrics,
-          });
-          setMessages([...nextHistory, assistantMessage]);
-          messagesRef.current = [...nextHistory, assistantMessage];
-        }
-      } else {
-        const inlineError = resolveLocalInferenceInlineError(sendError);
-        if (inlineError) {
-          setMessages(nextHistory);
-          messagesRef.current = nextHistory;
-          setInferenceInlineError(inlineError);
-        } else {
-          setInferenceInlineError(null);
-          setMessages(baseHistory);
-          messagesRef.current = baseHistory;
-          showToast(
-            sendError instanceof Error ? sendError.message : String(sendError),
-            LocalInferenceToastKind.Error,
-          );
-        }
-      }
-    } finally {
-      unsubscribe();
-      if (isCurrentRequest()) {
-        activeRequestIdRef.current = null;
-        setSending(false);
-        setCancelling(false);
-        setStreamingText('');
-        setStreamingThinking('');
-      }
-    }
-  };
-
-  const stopGeneration = async () => {
-    const requestId = activeRequestIdRef.current;
-    if (!requestId) return;
-    setCancelling(true);
-    try {
-      await window.electron.llamacpp.cancelChatStream(requestId);
-    } catch (cancelError) {
-      showToast(
-        cancelError instanceof Error ? cancelError.message : String(cancelError),
-        LocalInferenceToastKind.Error,
-      );
-      setCancelling(false);
-    }
-  };
-
   return (
     <div className="relative flex h-full flex-1 flex-col bg-background">
       <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
@@ -806,12 +549,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-        <div
-          className={`mx-auto max-w-6xl px-4 py-5 ${activeTab === 'inference' ? 'flex h-full min-h-0 flex-col gap-4' : 'space-y-4'}`}
-        >
+        <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="inline-flex rounded-lg bg-surface-raised p-1">
-              {(['inference', 'models', 'marketplace'] as LocalInferenceTab[]).map(tab => (
+              {(['models', 'marketplace'] as LocalInferenceTab[]).map(tab => (
                 <button
                   key={tab}
                   type="button"
@@ -823,9 +564,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   }`}
                 >
                   {i18nService.t(
-                    tab === 'inference'
-                      ? 'localInferenceTabInference'
-                      : tab === 'models'
+                    tab === 'models'
                         ? 'localInferenceTabModels'
                         : 'localInferenceTabMarketplace',
                   )}
@@ -845,22 +584,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               unloadingModelName={unloadingModelName}
               localModels={localModels}
               runningModels={runningModels}
-              pullName={pullName}
-              pulling={pulling}
-              onPullNameChange={setPullName}
-              onPull={handlePull}
-              onCancelPull={handleCancelPull}
               onLoadModel={model => {
                 handleLoadModel(model);
               }}
               onUnload={handleUnload}
               onDelete={handleDelete}
-              onOpenInference={modelName => {
-                handleSelectInferenceModel(modelName);
-                setActiveTab('inference');
-              }}
             />
-          ) : activeTab === 'marketplace' ? (
+          ) : (
             <MarketplacePanel
               loading={loading}
               models={marketplaceModels}
@@ -875,28 +605,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onSearch={handleMarketplaceSearch}
               onInstall={handleMarketplaceInstall}
             />
-          ) : (
-            <div className="min-h-[520px] flex-1">
-              <InferencePanel
-                isRunning={isRunning}
-                selectedModel={selectedModel}
-                loadedModels={loadedModels}
-                systemPrompt={systemPrompt}
-                prompt={prompt}
-                messages={messages}
-                inlineError={inferenceInlineError}
-                streamingText={streamingText}
-                streamingThinking={streamingThinking}
-                sending={sending}
-                cancelling={cancelling}
-                onModelChange={handleSelectInferenceModel}
-                onSystemPromptChange={setSystemPrompt}
-                onPromptChange={setPrompt}
-                onSend={() => void sendPrompt()}
-                onStop={() => void stopGeneration()}
-                onOpenModels={() => setActiveTab('models')}
-              />
-            </div>
           )}
         </div>
       </div>
@@ -931,14 +639,23 @@ function getRemainingBusyMs(input: {
   return Math.max(0, input.minimumBusyMs - Math.max(0, input.nowMs - input.startedAtMs));
 }
 
+function resolveLlamaCppServiceAction(
+  snapshot: Pick<OllamaStatusSnapshot, 'status'> | null | undefined,
+): LlamaCppServiceAction {
+  switch (snapshot?.status) {
+    case 'running':
+      return LlamaCppServiceAction.Ready;
+    case 'not-installed':
+      return LlamaCppServiceAction.Install;
+    case 'installed':
+    case 'stopped':
+      return LlamaCppServiceAction.Start;
+    default:
+      return LlamaCppServiceAction.Refresh;
+  }
+}
+
 export const __test__getMarketplacePageSize = () => getMarketplacePageSize();
-export const __test__buildAssistantMessage = (input: BuildAssistantMessageInput) =>
-  buildAssistantMessage(input);
-export const __test__buildStreamingAssistantMessage = (
-  input: Parameters<typeof buildStreamingAssistantMessage>[0],
-) => buildStreamingAssistantMessage(input);
-export const __test__getNewAssistantScrollTargetIndex = (historyLength: number) =>
-  getNewAssistantScrollTargetIndex(historyLength);
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);
@@ -946,15 +663,6 @@ export const __test__getInstallableMarketplaceModels = (
   models: MarketplaceModel[],
   installedModelPathMap: Map<string, string>,
 ) => getInstallableMarketplaceModels(models, installedModelPathMap);
-export const __test__isModelScopeRepoId = (value: string) => isModelScopeRepoId(value);
-export const __test__isScrollNearBottom = (input: Parameters<typeof isScrollNearBottom>[0]) =>
-  isScrollNearBottom(input);
-export const __test__hasHiddenContentBelow = (input: Parameters<typeof hasHiddenContentBelow>[0]) =>
-  hasHiddenContentBelow(input);
-export const __test__getAssistantScrollTop = (input: Parameters<typeof getAssistantScrollTop>[0]) =>
-  getAssistantScrollTop(input);
-export const __test__findLatestUserMessageIndex = (messages: InferenceMessage[]) =>
-  findLatestUserMessageIndex(messages);
 export const __test__getModelCardBusyState = (input: {
   modelName: string;
   unloadingModelName: string | null;
@@ -969,6 +677,9 @@ export const __test__getRemainingBusyMs = (input: {
   nowMs: number;
   minimumBusyMs: number;
 }) => getRemainingBusyMs(input);
+export const __test__resolveLlamaCppServiceAction = (
+  snapshot: Pick<OllamaStatusSnapshot, 'status'> | null | undefined,
+) => resolveLlamaCppServiceAction(snapshot);
 export const __test__isInstallTerminalPhase = (phase: LlamaCppInstallProgress['phase']) =>
   isInstallTerminalPhase(phase);
 export const __test__getLocalInferenceToastAutoDismissMs = () =>

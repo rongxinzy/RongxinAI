@@ -172,15 +172,6 @@ contextBridge.exposeInMainWorld('electron', {
     installModel: (input: unknown) => ipcRenderer.invoke(LlamaCppIpcChannel.InstallModel, input),
     cancelInstall: (modelId: string) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.CancelInstall, modelId),
-    pullModel: (name: string) =>
-      ipcRenderer.invoke(LlamaCppIpcChannel.InstallModel, { modelId: name, displayName: name }),
-    cancelPull: (name: string) =>
-      ipcRenderer.invoke(LlamaCppIpcChannel.CancelInstall, name),
-    chat: (payload: unknown) => ipcRenderer.invoke(LlamaCppIpcChannel.Chat, payload),
-    chatStream: (requestId: string, payload: unknown) =>
-      ipcRenderer.invoke(LlamaCppIpcChannel.ChatStream, requestId, payload),
-    cancelChatStream: (requestId: string) =>
-      ipcRenderer.invoke(LlamaCppIpcChannel.CancelChatStream, requestId),
     onStatusChanged: (callback: (snapshot: unknown) => void) =>
       onPush(LlamaCppIpcChannel.StatusChanged, callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>
@@ -193,8 +184,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on(LlamaCppIpcChannel.InstallProgress, handler);
       return () => { ipcRenderer.removeListener(LlamaCppIpcChannel.InstallProgress, handler); };
     },
-    onChatStreamChunk: (callback: (payload: unknown) => void) =>
-      onPush(LlamaCppIpcChannel.ChatStreamChunk, callback),
   },
   marketplace: {
     search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
