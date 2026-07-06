@@ -3,11 +3,8 @@ import type { ReactNode } from 'react';
 
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
-import {
-  localInferenceMutedTextClass,
-  localInferenceSoftTextClass,
-} from '../constants';
-import { type LocalInferenceToast,LocalInferenceToastKind } from '../types';
+import { localInferenceMutedTextClass } from '../constants';
+import { type LocalInferenceToast, LocalInferenceToastKind } from '../types';
 import { progressBarPercent } from '../utils/progress';
 
 export function LocalInferenceToastView({
@@ -62,26 +59,6 @@ export function LocalInferenceToastView({
         </button>
       </div>
     </div>
-  );
-}
-
-export function Badge({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode;
-  tone?: 'neutral' | 'success';
-}) {
-  return (
-    <span
-      className={`inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium ${
-        tone === 'success'
-          ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-          : `bg-surface-raised ${localInferenceSoftTextClass}`
-      }`}
-    >
-      {children}
-    </span>
   );
 }
 
