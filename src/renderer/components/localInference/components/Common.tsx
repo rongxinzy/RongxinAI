@@ -3,6 +3,10 @@ import type { ReactNode } from 'react';
 
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
+import {
+  localInferenceMutedTextClass,
+  localInferenceSoftTextClass,
+} from '../constants';
 import { type LocalInferenceToast,LocalInferenceToastKind } from '../types';
 import { progressBarPercent } from '../utils/progress';
 
@@ -51,7 +55,7 @@ export function LocalInferenceToastView({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-surface-raised hover:text-foreground"
           aria-label={i18nService.t('close')}
         >
           <X className="h-4 w-4" />
@@ -73,7 +77,7 @@ export function Badge({
       className={`inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium ${
         tone === 'success'
           ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-          : 'bg-surface-raised text-secondary'
+          : `bg-surface-raised ${localInferenceSoftTextClass}`
       }`}
     >
       {children}
@@ -94,8 +98,8 @@ export function EmptyState({
     <div
       className={`flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center ${className}`.trim()}
     >
-      <Server className="h-7 w-7 text-secondary" />
-      <p className="text-sm font-medium text-secondary">{title}</p>
+      <Server className={`h-7 w-7 ${localInferenceMutedTextClass}`} />
+      <p className={`text-sm font-medium ${localInferenceMutedTextClass}`}>{title}</p>
       {action}
     </div>
   );

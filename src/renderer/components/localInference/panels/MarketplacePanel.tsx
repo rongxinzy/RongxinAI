@@ -5,7 +5,12 @@ import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
 import { EmptyState, InstallProgressBar } from '../components/Common';
-import { smallOutlineButtonClass } from '../constants';
+import {
+  localInferenceMutedTextClass,
+  localInferencePlaceholderTextClass,
+  localInferenceSoftTextClass,
+  smallOutlineButtonClass,
+} from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   capabilityLabel,
@@ -156,7 +161,7 @@ export function MarketplacePanel({
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   savedToken
                     ? 'border border-green-400/30 bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400'
-                    : 'border border-border bg-surface text-secondary hover:border-primary/40 hover:text-foreground'
+                    : `border border-border bg-surface ${localInferenceSoftTextClass} hover:border-primary/40 hover:text-foreground`
                 }`}
                 title={
                   savedToken
@@ -171,7 +176,7 @@ export function MarketplacePanel({
               </button>
             </div>
             {hasSearched && (
-              <p className="mt-1 text-xs text-secondary">{i18nService.t('marketplaceDescription')}</p>
+              <p className={`mt-1 text-xs ${localInferenceMutedTextClass}`}>{i18nService.t('marketplaceDescription')}</p>
             )}
           </div>
         </div>
@@ -188,7 +193,7 @@ export function MarketplacePanel({
                 <SearchIcon
                   className={`${
                     hasSearched ? 'left-2.5 h-3.5 w-3.5' : 'left-4 h-5 w-5'
-                  } pointer-events-none absolute top-1/2 -translate-y-1/2 text-secondary`}
+                  } pointer-events-none absolute top-1/2 -translate-y-1/2 text-foreground/55`}
                 />
                 <input
                   value={query}
@@ -196,7 +201,7 @@ export function MarketplacePanel({
                   placeholder={i18nService.t('marketplaceSearchPlaceholder')}
                   className={`${
                     hasSearched ? 'h-9 rounded-md pl-8 pr-2 text-xs' : 'h-16 rounded-2xl pl-12 pr-4 text-lg'
-                  } w-full border border-border bg-surface-input text-foreground placeholder:text-secondary focus:outline-none focus:ring-1 focus:ring-primary`}
+                  } w-full border border-border bg-surface-input text-foreground ${localInferencePlaceholderTextClass.replace('text-', 'placeholder:')} focus:outline-none focus:ring-1 focus:ring-primary`}
                 />
               </div>
               <button
@@ -222,7 +227,7 @@ export function MarketplacePanel({
             ? 'border-yellow-400/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
             : savedToken
               ? 'border-green-400/40 bg-green-500/10 text-green-600 dark:text-green-400'
-              : 'border-border bg-surface text-secondary';
+              : `border-border bg-surface ${localInferenceSoftTextClass}`;
         const statusText = isAuthError
           ? i18nService.t('marketplaceSearchStatusTokenInvalid')
           : marketplaceError
@@ -254,7 +259,7 @@ export function MarketplacePanel({
       )}
 
       {marketplaceLoading ? (
-        <div className="flex min-h-[620px] items-center justify-center text-sm text-secondary">
+        <div className={`flex min-h-[620px] items-center justify-center text-sm ${localInferenceMutedTextClass}`}>
           <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
           {i18nService.t('loading')}
         </div>
@@ -276,21 +281,21 @@ export function MarketplacePanel({
                       <h3 className="max-h-10 min-w-0 overflow-hidden break-all text-sm font-semibold leading-5 text-foreground">
                         {model.repoId}
                       </h3>
-                      <span className="inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] font-medium text-secondary">
+                      <span className={`inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] font-medium ${localInferenceSoftTextClass}`}>
                         {model.recommendedTag}
                       </span>
-                      <span className="inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-medium text-secondary">
+                      <span className={`inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-medium ${localInferenceSoftTextClass}`}>
                         {capabilityLabel(model.capability)}
                       </span>
                     </div>
-                    <p className="mt-1.5 max-h-10 overflow-hidden text-xs leading-5 text-secondary">
+                    <p className={`mt-1.5 max-h-10 overflow-hidden text-xs leading-5 ${localInferenceMutedTextClass}`}>
                       {model.description}
                     </p>
                     <div className="mt-2 flex max-h-5 flex-wrap gap-1.5 overflow-hidden">
                       {model.sizes.map(size => (
                         <span
                           key={size}
-                          className="inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-mono text-secondary"
+                          className={`inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-mono ${localInferenceSoftTextClass}`}
                         >
                           {size}
                         </span>
@@ -298,7 +303,7 @@ export function MarketplacePanel({
                       {model.tags.slice(0, 3).map(tag => (
                         <span
                           key={tag}
-                          className="inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] text-secondary"
+                          className={`inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] ${localInferenceSoftTextClass}`}
                         >
                           {tag}
                         </span>
@@ -306,7 +311,7 @@ export function MarketplacePanel({
                     </div>
                     {progress && (
                       <div className="mt-2 rounded-md bg-surface-raised px-2 py-1.5">
-                        <div className="flex items-center justify-between gap-2 text-[11px] text-secondary">
+                        <div className={`flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}>
                           <span>{formatPullProgress(progress)}</span>
                           {typeof progress.percent === 'number' && <span>{progress.percent}%</span>}
                         </div>
@@ -315,7 +320,7 @@ export function MarketplacePanel({
                     )}
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="text-xs text-secondary">{formatDownloadCount(model.downloads)}</span>
+                    <span className={`text-xs ${localInferenceMutedTextClass}`}>{formatDownloadCount(model.downloads)}</span>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {model.detailUrl && (
                         <button
@@ -363,7 +368,7 @@ export function MarketplacePanel({
               >
                 {i18nService.t('skillMarketplacePrevPage')}
               </button>
-              <span className="inline-flex h-8 min-w-16 items-center justify-center text-sm text-secondary">
+              <span className={`inline-flex h-8 min-w-16 items-center justify-center text-sm ${localInferenceMutedTextClass}`}>
                 {currentPage}/{pageCount} {i18nService.t('marketplacePageUnit')}
               </span>
               <button
@@ -393,16 +398,16 @@ export function MarketplacePanel({
             <button
               type="button"
               onClick={() => setTokenModalOpen(false)}
-              className="rounded-md p-1 text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              className={`rounded-md p-1 ${localInferenceMutedTextClass} transition-colors hover:bg-surface-raised hover:text-foreground`}
             >
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-sm leading-relaxed text-secondary">
+          <p className={`text-sm leading-relaxed ${localInferenceMutedTextClass}`}>
             {i18nService.t('marketplaceTokenSettingsDesc')}
           </p>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold tracking-wide text-secondary">
+            <label className={`text-xs font-semibold tracking-wide ${localInferenceMutedTextClass}`}>
               ModelScope API Token
             </label>
             <div className="relative">
@@ -411,14 +416,14 @@ export function MarketplacePanel({
                 value={tokenInput}
                 onChange={event => setTokenInput(event.target.value)}
                 placeholder={i18nService.t('marketplaceTokenPlaceholder')}
-                className="w-full rounded-xl border border-border bg-surface-inset px-3 py-2 pr-16 text-sm text-foreground placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
+                className={`w-full rounded-xl border border-border bg-surface-inset px-3 py-2 pr-16 text-sm text-foreground ${localInferencePlaceholderTextClass.replace('text-', 'placeholder:')} focus:outline-none focus:ring-2 focus:ring-primary`}
               />
               <div className="absolute inset-y-0 right-2 flex items-center gap-1">
                 {tokenInput && (
                   <button
                     type="button"
                     onClick={() => setTokenInput('')}
-                    className="rounded p-0.5 text-secondary transition-colors hover:text-primary"
+                    className={`rounded p-0.5 ${localInferenceMutedTextClass} transition-colors hover:text-primary`}
                     title={i18nService.t('marketplaceTokenClear')}
                   >
                     <X className="h-4 w-4" />
@@ -427,7 +432,7 @@ export function MarketplacePanel({
                 <button
                   type="button"
                   onClick={() => setTokenInputVisible(v => !v)}
-                  className="rounded p-0.5 text-secondary transition-colors hover:text-primary"
+                  className={`rounded p-0.5 ${localInferenceMutedTextClass} transition-colors hover:text-primary`}
                 >
                   {tokenInputVisible ? (
                     <EyeOff className="h-4 w-4" />
@@ -443,7 +448,7 @@ export function MarketplacePanel({
               type="button"
               onClick={handleClearToken}
               disabled={!savedToken}
-              className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-secondary transition-colors hover:border-red-400/40 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className={`rounded-lg border border-border px-3 py-2 text-xs font-medium ${localInferenceSoftTextClass} transition-colors hover:border-red-400/40 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40`}
             >
               {i18nService.t('marketplaceTokenClear')}
             </button>
@@ -451,7 +456,7 @@ export function MarketplacePanel({
               <button
                 type="button"
                 onClick={() => setTokenModalOpen(false)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                className={`rounded-lg border border-border px-4 py-2 text-xs font-medium ${localInferenceSoftTextClass} transition-colors hover:bg-surface-raised hover:text-foreground`}
               >
                 {i18nService.t('cancel')}
               </button>

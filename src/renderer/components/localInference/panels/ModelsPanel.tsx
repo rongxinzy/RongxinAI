@@ -7,6 +7,7 @@ import type {
 import { i18nService } from '../../../services/i18n';
 import { Badge, EmptyState } from '../components/Common';
 import {
+  localInferenceMutedTextClass,
   smallDangerButtonClass,
   smallOutlineButtonClass,
 } from '../constants';
@@ -37,14 +38,12 @@ export function ModelsPanel({
   );
 
   return (
-    <div className="space-y-4">
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">
-          {i18nService.t('localInferenceLoadedModels')}
-        </h2>
-        {loadedModels.length === 0 ? (
-          <EmptyState title={i18nService.t('localInferenceNoLoadedModels')} />
-        ) : (
+    <div className="flex flex-col gap-4">
+      {loadedModels.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-foreground">
+            {i18nService.t('localInferenceStatus_running')}
+          </h2>
           <div className="overflow-hidden rounded-lg border border-border bg-surface">
             {loadedModels.map(model => {
               const runningModel = runningModels.find(
@@ -64,10 +63,10 @@ export function ModelsPanel({
               );
             })}
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      <section className="space-y-3">
+      <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-foreground">
           {i18nService.t('localInferenceRegisteredModels')}
         </h2>
@@ -122,12 +121,12 @@ function ModelCard({
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate font-mono text-sm font-medium text-foreground">{model.name}</h3>
+          <h3 className="truncate text-sm font-medium text-foreground">{model.name}</h3>
           {model.details?.parameter_size && <Badge>{model.details.parameter_size}</Badge>}
           {model.details?.quantization_level && <Badge>{model.details.quantization_level}</Badge>}
-          {isRunning && <Badge tone="success">{i18nService.t('localInferenceLoaded')}</Badge>}
+          {isRunning && <Badge tone="success">{i18nService.t('localInferenceStatus_running')}</Badge>}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary">
+        <div className={`mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs ${localInferenceMutedTextClass}`}>
           {model.size ? (
             <span>
               {i18nService.t('localInferenceSize')}: {formatBytes(model.size)}

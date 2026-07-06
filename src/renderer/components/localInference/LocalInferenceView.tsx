@@ -19,6 +19,7 @@ import {
   LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
+  localInferenceSoftTextClass,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { MarketplacePanel } from './panels/MarketplacePanel';
@@ -521,14 +522,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               <button
                 type="button"
                 onClick={onToggleSidebar}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-surface-raised hover:text-foreground"
               >
                 <PanelLeft className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={onNewChat}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-surface-raised hover:text-foreground"
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -559,7 +560,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   className={`h-7 rounded-md px-3 text-sm font-medium transition-colors ${
                     activeTab === tab
                       ? 'bg-secondary text-secondary-foreground'
-                      : 'text-secondary hover:text-foreground'
+                      : `${localInferenceSoftTextClass} hover:text-foreground`
                   }`}
                 >
                   {i18nService.t(
@@ -570,7 +571,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 </button>
               ))}
             </div>
-            <div className="text-xs text-secondary">
+            <div
+              className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${
+                isRunning
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'border-border bg-surface text-foreground/80'
+              }`}
+            >
               {isRunning
                 ? i18nService.t('localInferenceStatus_running')
                 : i18nService.t('localInferenceStatus_stopped')}
