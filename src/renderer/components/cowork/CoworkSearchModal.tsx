@@ -82,11 +82,11 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
             className="h-12 text-[13px] border-0"
           />
           <CommandList className="max-h-[320px] px-2 pb-2">
-            <div className="px-2 pb-1 text-[12px] text-secondary pt-1">
+            <div className="px-2 pb-1 text-[12px] text-muted-foreground pt-1">
               {i18nService.t('searchRecentTasks')}
             </div>
             {filteredSessions.length === 0 ? (
-              <div className="py-10 text-center text-sm text-secondary">
+              <div className="py-10 text-center text-sm text-muted-foreground">
                 {isLoading ? i18nService.t('loading') : i18nService.t('searchNoResults')}
               </div>
             ) : (
@@ -108,7 +108,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                       </svg>
                     )}
                     <span className="min-w-0 flex-1 truncate font-medium">{session.title}</span>
-                    <span className="max-w-[136px] shrink-0 truncate text-[12px] text-secondary/75">{agentName}</span>
+                    <span className="max-w-[136px] shrink-0 truncate text-[12px] text-muted-foreground/75">{agentName}</span>
                   </CommandItem>
                 );
               })

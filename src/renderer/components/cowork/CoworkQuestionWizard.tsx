@@ -270,7 +270,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex-1">
                 {currentQuestion.header && (
-                  <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-surface-raised text-secondary mb-3">
+                  <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-surface-raised text-muted-foreground mb-3">
                     {currentQuestion.header}
                   </span>
                 )}
@@ -305,7 +305,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                             ? 'bg-primary text-white shadow-md'
                             : isAnswered
                             ? 'bg-green-500/20 dark:bg-green-600/20 text-green-700 dark:text-green-400 border border-green-500 dark:border-green-600 hover:scale-105'
-                            : 'bg-surface-raised text-secondary hover:bg-primary/20 dark:hover:bg-primary/20 hover:scale-105'
+                            : 'bg-surface-raised text-muted-foreground hover:bg-primary/20 dark:hover:bg-primary/20 hover:scale-105'
                         }`}
                         title={question.question}
                       >
@@ -384,7 +384,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                 value={otherInputs[currentStep] || ''}
                 onChange={(e) => handleOtherInputChange(e.target.value)}
                 placeholder={i18nService.t('coworkQuestionWizardOther')}
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-secondary dark:placeholder:text-foregroundSecondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground dark:placeholder:text-foregroundSecondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
               />
               <Button variant="ghost" onClick={handleSkip}>{i18nService.t('coworkQuestionWizardSkip')}</Button>
             </div>

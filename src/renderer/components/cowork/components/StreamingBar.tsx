@@ -51,7 +51,7 @@ export const StreamingBar: React.FC<{ messages: CoworkMessage[] }> = ({ messages
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="streaming-bar" />
         <div className="py-1">
-          <span className="text-xs text-secondary">{getStatusText()}</span>
+          <span className="text-xs text-muted-foreground">{getStatusText()}</span>
         </div>
       </div>
     </div>

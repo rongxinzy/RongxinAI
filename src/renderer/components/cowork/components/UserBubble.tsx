@@ -80,7 +80,7 @@ export const UserBubble: React.FC<{
           {messageSkills.length > 0 && (
             <div className="flex items-center gap-1">
               {messageSkills.map(skill => (
-                <span key={skill.id} className="px-1.5 py-0.5 text-[10px] rounded bg-surface-raised text-secondary">{skill.name}</span>
+                <span key={skill.id} className="px-1.5 py-0.5 text-[10px] rounded bg-surface-raised text-muted-foreground">{skill.name}</span>
               ))}
             </div>
           )}

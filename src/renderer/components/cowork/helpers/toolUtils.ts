@@ -223,3 +223,18 @@ export const getToolResultDisplay = (
     return formatStructuredText(normalizeToolResultText(meta?.error ?? ''));
   return '';
 };
+
+/** Like getToolResultDisplay but preserves ANSI escape sequences for Terminal rendering. */
+export const getRawToolResult = (
+  message: { content: string; metadata?: Record<string, unknown> | null },
+): string => {
+  const meta = message.metadata;
+  const raw = hasText(message.content) ? message.content
+    : hasText(meta?.toolResult) ? meta?.toolResult
+    : hasText(meta?.error) ? meta?.error
+    : '';
+  if (!raw) return '';
+  const trimmed = (raw ?? '').trim();
+  const errorTagMatch = trimmed.match(/^<tool_use_error>([\s\S]*?)<\/tool_use_error>$/i);
+  return errorTagMatch ? errorTagMatch[1].trim() : (raw ?? '');
+};

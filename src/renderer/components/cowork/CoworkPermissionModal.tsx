@@ -356,7 +356,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                 ? i18nService.t('coworkSelectionRequired')
                 : i18nService.t('coworkPermissionRequired')}
             </h2>
-            <p className="text-sm text-secondary">
+            <p className="text-sm text-muted-foreground">
               {isQuestionTool && !isConfirmMode
                 ? i18nService.t('coworkSelectionDescription')
                 : i18nService.t('coworkPermissionDescription')}
@@ -377,7 +377,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
               </p>
               {requestedCommand && (
                 <div className="mt-3">
-                  <label className="block text-xs font-medium text-secondary uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                     {i18nService.t('coworkToolInput')}
                   </label>
                   <div className="px-3 py-2 rounded-lg bg-surface max-h-40 overflow-y-auto">
@@ -400,7 +400,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                     {/* 问题 */}
                     <div className="text-sm font-medium text-foreground">
                       {question.header && (
-                        <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 mr-1.5 rounded-full bg-surface-raised text-secondary align-middle">
+                        <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 mr-1.5 rounded-full bg-surface-raised text-muted-foreground align-middle">
                           {question.header}
                         </span>
                       )}
@@ -409,7 +409,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                     {/* 命令详情 */}
                     {requestedCommand && (
                       <div>
-                        <label className="block text-xs font-medium text-secondary uppercase tracking-wider mb-1">
+                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                           {i18nService.t('coworkToolInput')}
                         </label>
                         <div className="px-3 py-2 rounded-lg bg-background max-h-40 overflow-y-auto">
@@ -446,7 +446,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
             <>
               {/* Tool name */}
               <div>
-                <label className="block text-xs font-medium text-secondary uppercase tracking-wider mb-1">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                   {i18nService.t('coworkToolName')}
                 </label>
                 <div className="px-3 py-2 rounded-lg bg-background">
@@ -458,7 +458,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
 
               {/* Tool input */}
               <div>
-                <label className="block text-xs font-medium text-secondary uppercase tracking-wider mb-1">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                   {i18nService.t('coworkToolInput')}
                 </label>
                 <div className="px-3 py-2 rounded-lg bg-background">

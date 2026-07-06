@@ -1041,7 +1041,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 <ImageIcon className="h-5 w-5" />
                 <div>
                   <div className="font-medium">{i18nService.t('coworkExportImage')}</div>
-                  <div className="text-xs text-secondary">{i18nService.t('coworkExportImageDesc')}</div>
+                  <div className="text-xs text-muted-foreground">{i18nService.t('coworkExportImageDesc')}</div>
                 </div>
               </Button>
               <Button
@@ -1052,7 +1052,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 <Download className="h-5 w-5" />
                 <div>
                   <div className="font-medium">Markdown</div>
-                  <div className="text-xs text-secondary">{i18nService.t('coworkExportMarkdownDesc')}</div>
+                  <div className="text-xs text-muted-foreground">{i18nService.t('coworkExportMarkdownDesc')}</div>
                 </div>
               </Button>
               <Button
@@ -1063,7 +1063,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 <Download className="h-5 w-5" />
                 <div>
                   <div className="font-medium">JSON</div>
-                  <div className="text-xs text-secondary">{i18nService.t('coworkExportJSONDesc')}</div>
+                  <div className="text-xs text-muted-foreground">{i18nService.t('coworkExportJSONDesc')}</div>
                 </div>
               </Button>
             </div>
