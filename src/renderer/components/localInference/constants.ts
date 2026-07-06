@@ -27,3 +27,7 @@ export const smallOutlineButtonClass =
 export const smallDangerButtonClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/30';
 
+export const localInferenceMutedTextClass = 'text-foreground/70';
+export const localInferenceSoftTextClass = 'text-foreground/75';
+export const localInferencePlaceholderTextClass = 'text-foreground/45';
+
