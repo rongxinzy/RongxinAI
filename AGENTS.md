@@ -229,6 +229,85 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - `mermaid` - Diagram rendering
 - `dompurify` - SVG/HTML sanitization
 
+## UI Component Libraries
+
+项目使用两套 UI 组件库。**所有 UI 代码必须优先使用这些组件，禁止自造轮子。**
+
+### shadcn/ui（基础组件）
+
+位于 `src/shared/components/ui/`，基于 [shadcn/ui](https://ui.shadcn.com/)（base-nova 风格，lucide 图标库）。
+
+| 组件 | 用途 |
+|------|------|
+| `button`, `button-group` | 按钮 |
+| `input`, `input-group`, `textarea` | 输入框 |
+| `select` | 下拉选择 |
+| `checkbox`, `radio-group`, `switch` | 选择控件 |
+| `dialog`, `sheet`, `popover`, `hover-card` | 弹层 |
+| `tooltip` | 提示 |
+| `dropdown-menu`, `command` | 菜单 |
+| `tabs` | 标签页 |
+| `card` | 卡片 |
+| `sidebar` | 侧边栏 |
+| `table` | 表格 |
+| `badge` | 徽标 |
+| `avatar` | 头像 |
+| `label` | 标签 |
+| `separator` | 分隔线 |
+| `scroll-area` | 滚动区域 |
+| `collapsible` | 折叠面板 |
+| `breadcrumb` | 面包屑 |
+| `skeleton`, `spinner` | 加载态 |
+| `sonner` | Toast 通知 |
+
+### ai-elements（对话组件）
+
+位于 `src/shared/components/ai-elements/`，用于聊天/AI 对话场景。
+
+| 组件 | 用途 |
+|------|------|
+| `conversation` | 对话容器 |
+| `message` | 消息气泡 |
+| `prompt-input` | 输入框 |
+| `code-block` | 代码块渲染 |
+| `reasoning` | 推理过程展示 |
+| `tool` | 工具调用展示 |
+| `attachments` | 附件预览 |
+| `sources` | 来源引用 |
+| `suggestion` | 建议问题 |
+| `shimmer` | 加载闪烁效果 |
+| `terminal` | 终端输出 |
+
+### 规则
+
+1. **先查再写。** 写任何 UI 前，先检查上面两个目录是否有现成组件可用。
+2. **禁止自造基础组件。** 不要自己写 button / dialog / select / tooltip / tabs / popover 等，shadcn/ui 已有。
+3. **图标用 lucide-react。** 禁止手写 SVG 图标组件（项目已删除 30+ 个自定义 icon，全部迁移到 lucide）。
+4. **对话 UI 用 ai-elements。** 聊天、消息、推理展示等场景必须用 ai-elements，不要自己拼。
+
+### 样式工具
+
+- 样式合并：`cn()` from `@shared/lib/utils`（clsx + tailwind-merge）
+- 组件样式覆写：用 Tailwind className，不要写独立 CSS
+
+### 导入路径
+
+```typescript
+// shadcn/ui
+import { Button } from '@shared/components/ui/button';
+import { Dialog, DialogContent, DialogHeader } from '@shared/components/ui/dialog';
+
+// ai-elements
+import { Message } from '@shared/components/ai-elements/message';
+import { Conversation } from '@shared/components/ai-elements/conversation';
+
+// 工具
+import { cn } from '@shared/lib/utils';
+
+// 图标
+import { Settings, Plus, Trash } from 'lucide-react';
+```
+
 ## Coding Style & Naming Conventions
 
 - Use TypeScript, functional React components, and Hooks; keep logic in `src/renderer/services/` when it is not UI-specific.
