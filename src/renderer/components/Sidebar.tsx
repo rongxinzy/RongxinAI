@@ -41,7 +41,7 @@ const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
-  'w-full inline-flex h-7 items-center gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]';
+  'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]';
 const activeSidebarNavItemClassName =
   `${sidebarNavItemClassName} bg-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
 const sidebarCreateIconClassName = 'h-4 w-4 shrink-0 text-secondary/40 dark:text-secondary/45';
@@ -394,7 +394,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       />
       {isBatchMode ? (
         <div className="px-3 pb-3 pt-1 flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer text-sm text-secondary">
+          <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-secondary">
             <Checkbox
               checked={selectedIds.size === allVisibleSessionIdsRef.current.length && allVisibleSessionIdsRef.current.length > 0}
               onCheckedChange={handleSelectAll}
@@ -402,7 +402,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             />
             {i18nService.t('batchSelectAll')}
           </label>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-start gap-2">
             <Button
               type="button"
               variant="destructive"
@@ -437,7 +437,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             variant="ghost"
             onClick={() => onShowSettings()}
-            className={`inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${hideLogin ? 'w-full' : 'shrink-0'}`}
+            className={`inline-flex h-7 items-center !justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${hideLogin ? 'w-full' : 'shrink-0'}`}
             aria-label={i18nService.t('settings')}
           >
             <Cog className="h-4 w-4 shrink-0" />

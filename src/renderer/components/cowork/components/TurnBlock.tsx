@@ -94,6 +94,8 @@ export const TurnBlock: React.FC<{
         chain.push(item);
       } else if (item.type === 'tool_group') {
         chain.push(item);
+      } else if (item.type === 'tool_result') {
+        chain.push(item);
       } else {
         visible.push(item);
       }
