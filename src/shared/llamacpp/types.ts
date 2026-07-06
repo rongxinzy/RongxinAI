@@ -326,45 +326,6 @@ export type LlamaCppModelUnloadResult = {
   warning?: string;
 };
 
-export type LlamaCppChatMessage = {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  thinking?: string;
-  tool_calls?: LlamaCppToolCall[];
-  tool_name?: string;
-};
-
-export type LlamaCppChatPayload = {
-  model: string;
-  messages: LlamaCppChatMessage[];
-  stream?: boolean;
-  options?: Record<string, unknown>;
-  chat_template_kwargs?: {
-    enable_thinking: boolean;
-  };
-};
-
-export type LlamaCppToolCall = {
-  function: {
-    name: string;
-    arguments: Record<string, unknown>;
-  };
-};
-
-export type LlamaCppChatChunk = {
-  model?: string;
-  created_at?: string;
-  message?: LlamaCppChatMessage;
-  done?: boolean;
-  done_reason?: string;
-  error?: string;
-  prompt_eval_count?: number;
-  eval_count?: number;
-  predicted_per_second?: number;
-  timings?: Record<string, unknown>;
-  usage?: Record<string, unknown>;
-};
-
 export type LlamaCppInstallModelInput = {
   modelId: string;
   filePath?: string;

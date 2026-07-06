@@ -2,8 +2,6 @@ import { BrowserWindow, dialog, ipcMain } from 'electron';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
-  LlamaCppChatChunk,
-  LlamaCppChatPayload,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
@@ -12,7 +10,6 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
-  applyLlamaCppChatDefaults,
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
   getLlamaCppAcceleratorDevices,
   getLlamaCppLaunchContextLimitViolation,
@@ -271,7 +268,6 @@ export function registerLlamaCppIpcHandlers(
   });
   manager.on('install-progress', sendProgress);
   const activeInstalls = new Map<string, AbortController>();
-  const activeChats = new Map<string, AbortController>();
 
   ipcMain.handle(LlamaCppIpcChannel.Status, async () => manager.detect());
   ipcMain.handle(LlamaCppIpcChannel.Install, async () => {
@@ -499,48 +495,6 @@ export function registerLlamaCppIpcHandlers(
     // a double broadcast (cancelling → cancelled) and an extra
     // terminal-phase callback in the renderer.
     controller.abort(new Error('Install cancelled'));
-    return { success: true, cancelled: true };
-  });
-  ipcMain.handle(LlamaCppIpcChannel.Chat, async (_event, payload: LlamaCppChatPayload) => {
-    const client = await manager.client();
-    return await client.chat({ ...applyLlamaCppChatDefaults(payload), stream: false });
-  });
-  ipcMain.handle(
-    LlamaCppIpcChannel.ChatStream,
-    async (_event, requestId: string, payload: LlamaCppChatPayload) => {
-      if (typeof requestId !== 'string' || !requestId.trim())
-        throw new Error('Request ID is required');
-      if (activeChats.has(requestId))
-        throw new Error(`Chat stream already in progress: ${requestId}`);
-      const controller = new AbortController();
-      activeChats.set(requestId, controller);
-      const client = await manager.client();
-      const chatPayload = applyLlamaCppChatDefaults(payload);
-      let lastChunk: LlamaCppChatChunk | null = null;
-      try {
-        await client.chat(
-          { ...chatPayload, stream: true },
-          chunk => {
-            lastChunk = chunk;
-            broadcast(LlamaCppIpcChannel.ChatStreamChunk, { requestId, chunk });
-          },
-          { signal: controller.signal },
-        );
-        return { success: true, finalChunk: lastChunk };
-      } catch (error) {
-        if (controller.signal.aborted || isAbortError(error)) {
-          throw new Error('Generation cancelled', { cause: error });
-        }
-        throw error;
-      } finally {
-        activeChats.delete(requestId);
-      }
-    },
-  );
-  ipcMain.handle(LlamaCppIpcChannel.CancelChatStream, async (_event, requestId: string) => {
-    const controller = activeChats.get(requestId);
-    if (!controller) return { success: true, cancelled: false };
-    controller.abort(new Error('Generation cancelled'));
     return { success: true, cancelled: true };
   });
 }

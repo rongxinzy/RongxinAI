@@ -2,8 +2,6 @@ import { expect, test } from 'vitest';
 
 import {
   applyAutomaticLlamaCppServiceDefaults,
-  applyLlamaCppChatDefaults,
-  DEFAULT_LLAMACPP_CHAT_OPTIONS,
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
   resolveAutomaticLlamaCppContextSize,
 } from './defaults';
@@ -21,32 +19,6 @@ test('llama.cpp service defaults are explicit and stable', () => {
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
-  });
-});
-
-test('applyLlamaCppChatDefaults uses Ollama-style generation defaults', () => {
-  expect(applyLlamaCppChatDefaults({
-    model: 'qwen3',
-    messages: [{ role: 'user', content: 'hello' }],
-  }).options).toEqual(DEFAULT_LLAMACPP_CHAT_OPTIONS);
-});
-
-test('applyLlamaCppChatDefaults preserves request-level overrides', () => {
-  expect(applyLlamaCppChatDefaults({
-    model: 'qwen3',
-    messages: [{ role: 'user', content: 'hello' }],
-    options: {
-      temperature: 0.3,
-      max_tokens: 256,
-      num_predict: 128,
-      top_k: 20,
-    },
-  }).options).toEqual({
-    ...DEFAULT_LLAMACPP_CHAT_OPTIONS,
-    temperature: 0.3,
-    max_tokens: 256,
-    num_predict: 128,
-    top_k: 20,
   });
 });
 

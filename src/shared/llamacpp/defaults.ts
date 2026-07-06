@@ -1,5 +1,5 @@
 import type { NvidiaSmiSnapshot } from '../hardware';
-import type { LlamaCppChatPayload, LlamaCppServiceConfig } from './types';
+import type { LlamaCppServiceConfig } from './types';
 
 const LLAMACPP_DEFAULT_CONTEXT_HIGH_VRAM_MIB = 20 * 1024;
 
@@ -16,36 +16,6 @@ export const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {
   ubatchSize: '512',
   gpuLayers: 'auto',
 };
-
-export const DEFAULT_LLAMACPP_CHAT_OPTIONS = {
-  num_predict: -1,
-  num_keep: 4,
-  temperature: 0.8,
-  top_k: 40,
-  top_p: 0.9,
-  typical_p: 1.0,
-  repeat_last_n: 64,
-  repeat_penalty: 1.1,
-  presence_penalty: 0,
-  frequency_penalty: 0,
-  seed: -1,
-} as const satisfies Record<string, unknown>;
-
-export function mergeLlamaCppChatOptions(
-  options: Record<string, unknown> | undefined,
-): Record<string, unknown> {
-  return {
-    ...DEFAULT_LLAMACPP_CHAT_OPTIONS,
-    ...(options ?? {}),
-  };
-}
-
-export function applyLlamaCppChatDefaults(payload: LlamaCppChatPayload): LlamaCppChatPayload {
-  return {
-    ...payload,
-    options: mergeLlamaCppChatOptions(payload.options),
-  };
-}
 
 export function resolveAutomaticLlamaCppContextSize(
   snapshot: NvidiaSmiSnapshot | null | undefined,
