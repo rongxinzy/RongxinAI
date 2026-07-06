@@ -1,0 +1,14 @@
+diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
+index 32aaeb5..e13d8d0 100644
+--- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
++++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
+@@ -162,6 +162,9 @@ function estimateTextAndImageContentChars(content) {
+     if (typeof content === "string") {
+         return content.length;
+     }
++    if (content == null || typeof content[Symbol.iterator] !== "function") {
++        return 0;
++    }
+     let chars = 0;
+     for (const block of content) {
+         if (block.type === "text" && block.text) {

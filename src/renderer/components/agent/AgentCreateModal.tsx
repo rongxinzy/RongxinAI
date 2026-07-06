@@ -1,7 +1,10 @@
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import { DefaultAgentAvatarIcon } from '@shared/agent/avatar';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Textarea } from '@shared/components/ui/textarea';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
+import { X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -294,12 +297,26 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
       <p className="shrink-0 text-xs leading-5 text-secondary">
         {hint}
       </p>
-      <textarea
+      <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 w-full resize-none border border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-secondary/45 focus:outline-none"
+        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-secondary/45 focus-visible:ring-0"
+      />
+    </div>
+  );
+
+  const renderToggle = (isOn: boolean) => (
+    <div
+      className={`relative w-9 h-5 rounded-full transition-colors ${
+        isOn ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+      }`}
+    >
+      <div
+        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+          isOn ? 'translate-x-4' : 'translate-x-0.5'
+        }`}
       />
     </div>
   );
@@ -310,47 +327,54 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <AgentAvatarPicker value={icon} onChange={setIcon} />
           <div className="min-w-0 flex-1 pt-0.5">
-            <input
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={i18nService.t('agentNamePlaceholder')}
               aria-label={i18nService.t('agentName')}
-              className="w-full bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-secondary/40 focus:outline-none"
+              className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-secondary/40 focus-visible:ring-0"
               autoFocus
             />
-            <input
+            <Input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={i18nService.t('agentDescriptionPlaceholder')}
               aria-label={i18nService.t('agentDescription')}
-              className="mt-0.5 w-full bg-transparent text-sm leading-5 text-secondary placeholder:text-secondary/50 focus:outline-none"
+              className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-secondary placeholder:text-secondary/50 focus-visible:ring-0"
             />
           </div>
         </div>
         <div className="mt-1 flex shrink-0 items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => setShowTemplatePicker(true)}
-            className="h-8 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground hover:bg-surface-raised transition-colors"
+            className="h-8 px-3 text-sm font-medium"
           >
             {i18nService.t('agentUseTemplate')}
-          </button>
-          <button type="button" onClick={handleClose} className="p-2 rounded-lg hover:bg-surface-raised transition-colors">
-            <XMarkIcon className="h-5 w-5 text-secondary" />
-          </button>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+          >
+            <X className="h-5 w-5 text-secondary" />
+          </Button>
         </div>
       </div>
 
       {/* Tab bar */}
       <div className="flex shrink-0 border-b border-border px-7">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.key}
             type="button"
+            variant="ghost"
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+            className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'text-foreground'
                 : 'text-secondary hover:text-foreground'
@@ -360,7 +384,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
             {activeTab === tab.key && (
               <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-foreground rounded-full" />
             )}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -470,17 +494,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                               {boundToOther ? (
                                 <div className="w-9 h-5" />
                               ) : (
-                                <div
-                                  className={`relative w-9 h-5 rounded-full transition-colors ${
-                                    isBound ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
-                                  }`}
-                                >
-                                  <div
-                                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                      isBound ? 'translate-x-4' : 'translate-x-0.5'
-                                    }`}
-                                  />
-                                </div>
+                                renderToggle(isBound)
                               )}
                             </div>
                           );
@@ -528,19 +542,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                       </div>
                       <div className="flex items-center gap-2">
                         {configured ? (
-                          boundToOther ? <div className="w-9 h-5" /> : (
-                            <div
-                              className={`relative w-9 h-5 rounded-full transition-colors ${
-                                bound ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
-                              }`}
-                            >
-                              <div
-                                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                  bound ? 'translate-x-4' : 'translate-x-0.5'
-                                }`}
-                              />
-                            </div>
-                          )
+                          boundToOther ? <div className="w-9 h-5" /> : renderToggle(bound)
                         ) : (
                           <span className="text-xs text-secondary/50">
                             {i18nService.t('agentIMNotConfigured') || 'Not configured'}
@@ -564,14 +566,14 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           onWorkingDirectoryChange={setWorkingDirectory}
         />
         <div className="flex shrink-0 gap-2">
-          <button
+          <Button
             type="button"
             onClick={handleCreate}
             disabled={!name.trim() || creating}
-            className="h-9 px-5 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="h-9 px-5"
           >
             {creating ? i18nService.t('creating') : i18nService.t('create')}
-          </button>
+          </Button>
         </div>
       </div>
     </>
@@ -641,17 +643,23 @@ const AgentTemplatePickerModal: React.FC<{
         </h2>
         <div className="flex items-center gap-2">
           {/* TODO: 恢复"新建"模板功能时取消注释
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onNew}
-            className="h-8 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground hover:bg-surface-raised transition-colors"
+            className="h-8 px-3 text-sm font-medium"
           >
             {i18nService.t('agentTemplateNew')}
-          </button>
+          </Button>
           */}
-          <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-raised transition-colors">
-            <XMarkIcon className="h-5 w-5 text-secondary" />
-          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5 text-secondary" />
+          </Button>
         </div>
       </div>
 
@@ -671,9 +679,10 @@ const AgentTemplatePickerModal: React.FC<{
               const description = isEn && preset.descriptionEn ? preset.descriptionEn : preset.description;
 
               return (
-                <button
+                <Button
                   key={preset.id}
                   type="button"
+                  variant="outline"
                   onClick={() => onSelect(preset)}
                   className="group flex min-h-[132px] flex-col items-start rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary/40 hover:bg-surface-raised"
                 >
@@ -691,7 +700,7 @@ const AgentTemplatePickerModal: React.FC<{
                   <div className="mt-3 text-sm leading-6 text-foreground/90 line-clamp-3">
                     {description}
                   </div>
-                </button>
+                </Button>
               );
             })}
           </div>

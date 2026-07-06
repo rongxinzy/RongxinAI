@@ -1,15 +1,12 @@
-import { ShareIcon } from '@heroicons/react/20/solid';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@shared/components/ui/button';
+import { Checkbox } from '@shared/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@shared/components/ui/dropdown-menu';
+import { Input } from '@shared/components/ui/input';
+import { Ellipsis, ListChecks, Loader, Pencil, Pin, Share, Trash2, TriangleAlert } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import Modal from '../common/Modal';
-import EllipsisHorizontalIcon from '../icons/EllipsisHorizontalIcon';
-import ListChecksIcon from '../icons/ListChecksIcon';
-import LoadingIcon from '../icons/LoadingIcon';
-import PencilSquareIcon from '../icons/PencilSquareIcon';
-import PushPinIcon from '../icons/PushPinIcon';
-import TrashIcon from '../icons/TrashIcon';
 import { AgentSidebarIndicator } from './constants';
 import { formatAgentTaskRelativeTime } from './time';
 import type { AgentSidebarTaskNode } from './types';
@@ -28,149 +25,40 @@ interface AgentTaskRowProps {
   onEnterBatchMode: () => void;
 }
 
-const ACTION_MENU_VIEWPORT_PADDING = 8;
-const ACTION_MENU_VERTICAL_GAP = 4;
-const ACTION_MENU_HEIGHT = 164;
-const ACTION_MENU_WITH_BATCH_HEIGHT = 196;
-
 const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
-  task,
-  isBatchMode,
-  isSelected,
-  showBatchOption = false,
-  onSelect,
-  onDelete,
-  onShare,
-  onTogglePin,
-  onRename,
-  onToggleSelection,
-  onEnterBatchMode,
+  task, isBatchMode, isSelected, showBatchOption = false,
+  onSelect, onDelete, onShare, onTogglePin, onRename, onToggleSelection, onEnterBatchMode,
 }) => {
-  const [menuPosition, setMenuPosition] = useState<{ right: number; top: number } | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [suppressPinHover, setSuppressPinHover] = useState(false);
   const [renameValue, setRenameValue] = useState(task.title);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const actionButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const isMenuOpen = menuPosition !== null;
 
-  const calculateMenuPosition = useCallback(() => {
-    const rect = actionButtonRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-
-    const menuHeight = showBatchOption ? ACTION_MENU_WITH_BATCH_HEIGHT : ACTION_MENU_HEIGHT;
-    const right = Math.max(ACTION_MENU_VIEWPORT_PADDING, window.innerWidth - rect.right);
-    const top = Math.max(
-      ACTION_MENU_VIEWPORT_PADDING,
-      Math.min(
-        rect.bottom + ACTION_MENU_VERTICAL_GAP,
-        window.innerHeight - menuHeight - ACTION_MENU_VIEWPORT_PADDING,
-      ),
-    );
-
-    return { right, top };
-  }, [showBatchOption]);
-
-  const closeMenu = useCallback(() => {
-    setMenuPosition(null);
-  }, []);
-
-  const toggleMenu = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (isMenuOpen) {
-      closeMenu();
-      return;
-    }
-
-    const position = calculateMenuPosition();
-    if (position) {
-      setMenuPosition(position);
-    }
-  };
-
-  useEffect(() => {
-    if (!isRenaming) {
-      setRenameValue(task.title);
-    }
-  }, [isRenaming, task.title]);
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (!menuRef.current?.contains(target) && !actionButtonRef.current?.contains(target)) {
-        closeMenu();
-      }
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeMenu();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [closeMenu, isMenuOpen]);
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    const updateMenuPosition = () => {
-      const position = calculateMenuPosition();
-      if (position) {
-        setMenuPosition(position);
-      } else {
-        closeMenu();
-      }
-    };
-    window.addEventListener('resize', updateMenuPosition);
-    window.addEventListener('scroll', updateMenuPosition, true);
-    return () => {
-      window.removeEventListener('resize', updateMenuPosition);
-      window.removeEventListener('scroll', updateMenuPosition, true);
-    };
-  }, [calculateMenuPosition, closeMenu, isMenuOpen]);
+  useEffect(() => { if (!isRenaming) setRenameValue(task.title); }, [isRenaming, task.title]);
 
   useEffect(() => {
     if (!isRenaming) return;
-    requestAnimationFrame(() => {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
-    });
+    requestAnimationFrame(() => { renameInputRef.current?.focus(); renameInputRef.current?.select(); });
   }, [isRenaming]);
 
   const handleRowClick = () => {
     if (isRenaming) return;
-    if (isBatchMode) {
-      onToggleSelection();
-      return;
-    }
+    if (isBatchMode) { onToggleSelection(); return; }
     onSelect();
   };
 
   const handleRenameSave = async () => {
     const nextTitle = renameValue.trim();
     setIsRenaming(false);
-    if (nextTitle && nextTitle !== task.title) {
-      await onRename(nextTitle);
-    }
+    if (nextTitle && nextTitle !== task.title) await onRename(nextTitle);
   };
 
-  const handleRenameCancel = () => {
-    setRenameValue(task.title);
-    setIsRenaming(false);
-  };
+  const handleRenameCancel = () => { setRenameValue(task.title); setIsRenaming(false); };
 
   const indicatorLabel = task.indicator === AgentSidebarIndicator.Running
-    ? i18nService.t('myAgentSidebarRunning')
-    : i18nService.t('myAgentSidebarUnreadResult');
-  const menuItemClassName =
-    'flex w-full items-center gap-2 whitespace-nowrap px-2.5 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]';
-  const menuIconClassName = 'h-3.5 w-3.5';
+    ? i18nService.t('myAgentSidebarRunning') : i18nService.t('myAgentSidebarUnreadResult');
   const relativeTime = formatAgentTaskRelativeTime(task.updatedAt || task.createdAt);
   const showRelativeTime = task.indicator === AgentSidebarIndicator.None;
   const pinLabel = task.pinned ? i18nService.t('coworkUnpinSession') : i18nService.t('coworkPinSession');
@@ -187,226 +75,100 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
       onClick={handleRowClick}
       onMouseMove={() => setSuppressPinHover(false)}
       onMouseLeave={() => setSuppressPinHover(false)}
-      role="treeitem"
-      aria-level={2}
-      aria-selected={task.isSelected}
+      role="treeitem" aria-level={2} aria-selected={task.isSelected}
     >
       {!isBatchMode && !isRenaming && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={(event) => {
             event.stopPropagation();
-            const nextPinned = !task.pinned;
             setSuppressPinHover(true);
             event.currentTarget.blur();
-            void onTogglePin(nextPinned);
+            void onTogglePin(!task.pinned);
           }}
-          className={`absolute left-[13px] top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-foreground transition-opacity hover:opacity-[0.46] focus:outline-none ${
-            suppressPinHover
-              ? 'pointer-events-none opacity-0'
-              : task.pinned
-                ? 'opacity-[0.46]'
-                : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-[0.3]'
-          }`}
-          aria-label={pinLabel}
-          title={pinLabel}
+          className={`absolute left-[13px] top-1/2 -translate-y-1/2 ${suppressPinHover ? 'pointer-events-none opacity-0' : task.pinned ? 'opacity-[0.46]' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-[0.3]'}`}
+          aria-label={pinLabel} title={pinLabel}
         >
-          <PushPinIcon className="h-3.5 w-3.5" />
-        </button>
+          <Pin className="h-3.5 w-3.5" />
+        </Button>
       )}
 
       {isBatchMode && (
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(event) => {
-            event.stopPropagation();
-            onToggleSelection();
-          }}
-          onClick={(event) => event.stopPropagation()}
-          className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 accent-primary"
-        />
+        <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelection()}
+          onClick={(e) => e.stopPropagation()} className="h-3.5 w-3.5 shrink-0" />
       )}
 
       {isRenaming ? (
-        <input
-          ref={renameInputRef}
-          value={renameValue}
-          onChange={(event) => setRenameValue(event.target.value)}
-          onClick={(event) => event.stopPropagation()}
+        <Input ref={renameInputRef} type="text" value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)} onClick={(e) => e.stopPropagation()}
           onBlur={() => void handleRenameSave()}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              void handleRenameSave();
-            }
-            if (event.key === 'Escape') {
-              handleRenameCancel();
-            }
-          }}
-          className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[14px] font-normal text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-        />
+          onKeyDown={(e) => { if (e.key === 'Enter') void handleRenameSave(); if (e.key === 'Escape') handleRenameCancel(); }}
+          className="min-w-0 flex-1 border border-border bg-background px-1.5 py-0.5 text-[14px] font-normal" />
       ) : (
         <>
-          <span className="min-w-0 flex-1 truncate">
-            {task.title}
-          </span>
+          <span className="min-w-0 flex-1 truncate">{task.title}</span>
           {task.indicator === AgentSidebarIndicator.Running && (
-            <span
-              className="inline-flex h-3 w-3 shrink-0 items-center justify-center transition-opacity group-hover:opacity-0"
-              title={indicatorLabel}
-              aria-label={indicatorLabel}
-            >
-              <LoadingIcon className="h-3 w-3 animate-spin text-secondary" aria-hidden="true" />
+            <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center transition-opacity group-hover:opacity-0" title={indicatorLabel}>
+              <Loader className="h-3 w-3 animate-spin text-secondary" />
             </span>
           )}
           {task.indicator === AgentSidebarIndicator.CompletedUnread && (
-            <span
-              className="h-[7px] w-[7px] shrink-0 rounded-full bg-blue-500 transition-opacity group-hover:opacity-0"
-              title={indicatorLabel}
-              aria-label={indicatorLabel}
-            />
+            <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-blue-500 transition-opacity group-hover:opacity-0" title={indicatorLabel} />
           )}
           {showRelativeTime && (
-            <span
-              className="shrink-0 whitespace-nowrap text-[12px] font-normal text-foreground opacity-[0.28] transition-opacity group-hover:opacity-0"
-              title={relativeTime.full}
-            >
-              {relativeTime.compact}
-            </span>
+            <span className="shrink-0 whitespace-nowrap text-[12px] font-normal text-foreground opacity-[0.28] transition-opacity group-hover:opacity-0"
+              title={relativeTime.full}>{relativeTime.compact}</span>
           )}
         </>
       )}
 
       {!isBatchMode && !isRenaming && (
-        <button
-          ref={actionButtonRef}
-          type="button"
-          onClick={toggleMenu}
-          className={`absolute right-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-foreground transition-opacity hover:opacity-[0.46] ${
-            isMenuOpen ? 'opacity-[0.46]' : 'opacity-0 group-hover:opacity-[0.3]'
-          }`}
-          aria-label={i18nService.t('coworkSessionActions')}
-        >
-          <EllipsisHorizontalIcon className="h-4 w-4" />
-        </button>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger>
+            <Button variant="ghost" size="icon-xs"
+              className={`absolute right-1 top-1/2 -translate-y-1/2 ${menuOpen ? 'opacity-[0.46]' : 'opacity-0 group-hover:opacity-[0.3]'}`}
+              aria-label={i18nService.t('coworkSessionActions')}>
+              <Ellipsis className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[124px]">
+            {showBatchOption && (
+              <DropdownMenuItem onClick={() => onEnterBatchMode()}>
+                <ListChecks className="h-3.5 w-3.5" /> {i18nService.t('batchOperations')}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => setIsRenaming(true)}>
+              <Pencil className="h-3.5 w-3.5" /> {i18nService.t('renameConversation')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void onTogglePin(!task.pinned)}>
+              <Pin className="h-3.5 w-3.5" /> {pinLabel}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void onShare()}>
+              <Share className="h-3.5 w-3.5" /> {i18nService.t('coworkShareSession')}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={() => setShowConfirmDelete(true)}>
+              <Trash2 className="h-3.5 w-3.5" /> {i18nService.t('deleteSession')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
-      {menuPosition && (
-        <div
-          ref={menuRef}
-          className="fixed z-[60] w-max min-w-[124px] max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
-          style={{ top: menuPosition.top, right: menuPosition.right }}
-          role="menu"
-        >
-          {showBatchOption && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                closeMenu();
-                onEnterBatchMode();
-              }}
-              className={menuItemClassName}
-              role="menuitem"
-            >
-              <ListChecksIcon className={menuIconClassName} />
-              {i18nService.t('batchOperations')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeMenu();
-              setIsRenaming(true);
-            }}
-            className={menuItemClassName}
-            role="menuitem"
-          >
-            <PencilSquareIcon className={menuIconClassName} />
-            {i18nService.t('renameConversation')}
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeMenu();
-              void onTogglePin(!task.pinned);
-            }}
-            className={menuItemClassName}
-            role="menuitem"
-          >
-            <PushPinIcon slashed={task.pinned} className={menuIconClassName} />
-            {task.pinned ? i18nService.t('coworkUnpinSession') : i18nService.t('coworkPinSession')}
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeMenu();
-              void onShare();
-            }}
-            className={menuItemClassName}
-            role="menuitem"
-          >
-            <ShareIcon className={menuIconClassName} />
-            {i18nService.t('coworkShareSession')}
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeMenu();
-              setShowConfirmDelete(true);
-            }}
-            className={menuItemClassName}
-            role="menuitem"
-          >
-            <TrashIcon className={menuIconClassName} />
-            {i18nService.t('deleteSession')}
-          </button>
-        </div>
-      )}
-
-      {showConfirmDelete && (
-        <Modal
-          onClose={() => setShowConfirmDelete(false)}
-          className="w-full max-w-sm mx-4 bg-surface rounded-2xl shadow-xl overflow-hidden"
-        >
-          <div className="flex items-center gap-3 px-5 py-4">
+      <Dialog open={showConfirmDelete} onOpenChange={(o) => { if (!o) setShowConfirmDelete(false); }}>
+        <DialogContent className="max-w-sm" showCloseButton={false}>
+          <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-500" />
+              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
             </div>
-            <h2 className="text-base font-semibold text-foreground">
-              {i18nService.t('deleteTaskConfirmTitle')}
-            </h2>
+            <h2 className="text-base font-semibold">{i18nService.t('deleteTaskConfirmTitle')}</h2>
           </div>
-          <div className="px-5 pb-4">
-            <p className="text-sm text-secondary">
-              {i18nService.t('deleteTaskConfirmMessage')}
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-            <button
-              type="button"
-              onClick={() => setShowConfirmDelete(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
-            >
-              {i18nService.t('cancel')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowConfirmDelete(false);
-                void onDelete();
-              }}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
-            >
-              {i18nService.t('deleteSession')}
-            </button>
-          </div>
-        </Modal>
-      )}
+          <p className="text-sm text-secondary">{i18nService.t('deleteTaskConfirmMessage')}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmDelete(false)}>{i18nService.t('cancel')}</Button>
+            <Button variant="destructive" onClick={() => { setShowConfirmDelete(false); void onDelete(); }}>{i18nService.t('deleteSession')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

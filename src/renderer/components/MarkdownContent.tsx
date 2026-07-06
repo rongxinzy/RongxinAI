@@ -1,7 +1,8 @@
 import 'katex/dist/katex.min.css';
 import 'katex/contrib/mhchem';
 
-import { DocumentIcon, FolderIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { FileText, Folder } from 'lucide-react';
 import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 // @ts-ignore
@@ -476,21 +477,23 @@ const createMarkdownComponents = (
           >
             {children}
             {isDirectoryLink ? (
-              <FolderIcon className="h-3.5 w-3.5 inline" />
+              <Folder className="h-3.5 w-3.5 inline" />
             ) : (
-              <DocumentIcon className="h-3.5 w-3.5 inline" />
+              <FileText className="h-3.5 w-3.5 inline" />
             )}
           </a>
           {shouldShowRevealInFolderAction && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={handleRevealInFolder}
-              className="inline-flex items-center justify-center rounded-md p-0.5 text-secondary hover:text-primary hover:bg-surface-hover opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+              className="inline-flex items-center justify-center rounded-md p-0.5 h-auto w-auto text-secondary hover:text-primary hover:bg-surface-hover opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
               title={i18nService.t('showInFolder')}
               aria-label={i18nService.t('showInFolder')}
             >
-              <FolderIcon className="h-3.5 w-3.5" />
-            </button>
+              <Folder className="h-3.5 w-3.5" />
+            </Button>
           )}
         </span>
       );

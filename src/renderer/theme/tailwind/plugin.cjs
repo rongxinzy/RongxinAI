@@ -41,7 +41,6 @@ module.exports = plugin(function () {
           subtle:      'var(--lobster-border-subtle)',
           input:       'var(--lobster-input-border)',
         },
-        muted:         'var(--lobster-text-muted)',
         destructive: {
           DEFAULT:     'var(--lobster-destructive)',
           foreground:  'var(--lobster-destructive-foreground)',
@@ -49,7 +48,39 @@ module.exports = plugin(function () {
         success:       'var(--lobster-success)',
         warning:       'var(--lobster-warning)',
 
-        // === Legacy claude.* aliases (map to --lobster-* for backward compat) ===
+        // === shadcn/ui compatible tokens (driven by CSS variables in shadcn-token-bridge.css) ===
+        ring: 'var(--ring)',
+        card: {
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
+        },
+        popover: {
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
+        },
+        muted: {
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
+        },
+        input: 'var(--input)',
+        sidebar: {
+          DEFAULT: 'var(--sidebar)',
+          foreground: 'var(--sidebar-foreground)',
+          primary: {
+            DEFAULT: 'var(--sidebar-primary)',
+            foreground: 'var(--sidebar-primary-foreground)',
+          },
+          accent: {
+            DEFAULT: 'var(--sidebar-accent)',
+            foreground: 'var(--sidebar-accent-foreground)',
+          },
+          border: 'var(--sidebar-border)',
+          ring: 'var(--sidebar-ring)',
+        },
         claude: {
           bg:                'var(--lobster-background)',
           surface:           'var(--lobster-surface)',
@@ -76,13 +107,13 @@ module.exports = plugin(function () {
           accentLight:       'var(--lobster-primary)',
           accentMuted:       'var(--lobster-primary-muted)',
         },
-        secondary: {
-          DEFAULT: 'var(--lobster-text-secondary)',
-          dark:    'var(--lobster-border)',
-        },
       },
       borderRadius: {
         theme: 'var(--lobster-radius)',
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
       },
     },
   },

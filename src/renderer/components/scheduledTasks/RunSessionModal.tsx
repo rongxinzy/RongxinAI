@@ -1,14 +1,12 @@
-import { ArrowPathIcon,XMarkIcon } from '@heroicons/react/24/outline';
-import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@shared/components/ui/button';
+import { RefreshCw, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { CoworkSession } from '../../types/cowork';
-import {
-  AssistantTurnBlock,
-  buildConversationTurns,
-  buildDisplayItems,
-  UserMessageItem,
-} from '../cowork/CoworkSessionDetail';
+import { TurnBlock } from '../cowork/components/TurnBlock';
+import { UserBubble } from '../cowork/components/UserBubble';
+import { buildConversationTurns, buildDisplayItems } from '../cowork/helpers/messageGrouping';
 
 interface RunSessionModalProps {
   sessionId?: string | null;
@@ -158,13 +156,15 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
           <h3 className="text-sm font-semibold text-foreground truncate">
             {session?.title || i18nService.t('scheduledTasksViewSession')}
           </h3>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             className="p-1 rounded-lg text-secondary hover:bg-surface-raised transition-colors"
           >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
+            <X className="w-5 h-5" />
+          </Button>
         </div>
 
         {/* Body */}
@@ -186,14 +186,16 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
           {error && (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <span className="text-sm text-secondary">{error}</span>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={handleManualRetry}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-primary hover:bg-surface-raised transition-colors"
               >
-                <ArrowPathIcon className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5" />
                 {i18nService.t('scheduledTasksSessionRetry')}
-              </button>
+              </Button>
             </div>
           )}
 
@@ -213,10 +215,10 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
                 return (
                   <React.Fragment key={turn.id}>
                     {turn.userMessage && (
-                      <UserMessageItem message={turn.userMessage} skills={[]} />
+                      <UserBubble message={turn.userMessage} skills={[]} />
                     )}
                     {showAssistantBlock && (
-                      <AssistantTurnBlock
+                      <TurnBlock
                         turn={turn}
                         showTypingIndicator={false}
                         showCopyButtons={true}

@@ -1,4 +1,5 @@
-import { ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { PanelLeft, Pencil, ShieldCheck } from 'lucide-react';
 import React, { useEffect, useRef,useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
@@ -18,8 +19,6 @@ import { clearSelection,selectAction, setActions } from '../../store/slices/quic
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
-import ComposeIcon from '../icons/ComposeIcon';
-import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import ModelSelector from '../ModelSelector';
 import { PromptPanel,QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
@@ -69,6 +68,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgent = agents.find((agent) => agent.id === currentAgentId);
   const currentAgentWorkingDirectory = currentAgent?.workingDirectory?.trim() || config.workingDirectory || '';
+
   const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
   const {
     isPersistingAgentModel,
@@ -327,7 +327,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
   const handleContinueSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => {
     if (!currentSession) return;
-    // Prevent duplicate submissions
     if (isContinuingRef.current) return;
     if (openClawStatus && !isOpenClawReadyForSession(openClawStatus)) {
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkErrorEngineNotReady') }));
@@ -336,18 +335,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
     isContinuingRef.current = true;
     try {
-      console.log('[CoworkView] handleContinueSession called', {
-        hasImageAttachments: !!imageAttachments,
-        imageAttachmentsCount: imageAttachments?.length ?? 0,
-        imageAttachmentsNames: imageAttachments?.map(a => a.name),
-        imageAttachmentsBase64Lengths: imageAttachments?.map(a => a.base64Data.length),
-      });
-
-      // Capture active skill IDs for this message
       const sessionSkillIds = [...activeSkillIds];
-
-      // Combine skill prompt with system prompt for continuation.
-      // Skip auto-routing prompt for OpenClaw — skills are loaded natively.
       const combinedSystemPrompt = [skillPrompt, config.systemPrompt]
         .filter(p => p?.trim())
         .join('\n\n') || undefined;
@@ -469,20 +457,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       <div className="non-draggable h-8 flex items-center">
         {isSidebarCollapsed && (
           <div className={`flex items-center gap-1 mr-2 ${isMac ? 'pl-[68px]' : ''}`}>
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
-            >
-              <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
-            </button>
-            <button
-              type="button"
-              onClick={onNewChat}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
-            >
-              <ComposeIcon className="h-4 w-4" />
-            </button>
+            <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onNewChat}>
+              <Pencil className="h-4 w-4" />
+            </Button>
             {updateBadge}
           </div>
         )}
@@ -497,7 +477,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       </div>
       <div className="non-draggable flex items-center">
         <div className="flex items-center gap-1.5 mr-2 px-2.5 py-1">
-          <ShieldCheckIcon className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+          <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
           <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
             {i18nService.t('lobsterGuardEnabled')}
           </span>
@@ -519,17 +499,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           <span className="opacity-70">({Math.round(openClawStatus.progressPercent)}%)</span>
         )}
       </div>
-      <button
-        type="button"
+      <Button
+        variant={isEngineError ? 'destructive' : 'default'}
+        size="xs"
         onClick={handleRestartGateway}
         disabled={isRestartingGateway}
-        className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isEngineError
-          ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600'
-          : 'bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600'
-        }`}
       >
         {i18nService.t('coworkOpenClawRestartGateway')}
-      </button>
+      </Button>
     </div>
   ) : null;
 

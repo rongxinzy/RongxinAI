@@ -1,4 +1,5 @@
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Plus } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -15,14 +16,16 @@ const MyAgentSidebarHeader: React.FC<MyAgentSidebarHeaderProps> = ({
       <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
         {i18nService.t('myAgents')}
       </h2>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-sm"
         onClick={onCreateAgent}
-        className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground opacity-[0.34] transition-opacity hover:opacity-[0.5]"
+        className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
         aria-label={i18nService.t('createNewAgent')}
       >
-        <PlusIcon className="h-4 w-4" />
-      </button>
+        <Plus className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

@@ -1,4 +1,5 @@
-import { PlayIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Pencil, Play, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -7,8 +8,6 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { setViewMode } from '../../store/slices/scheduledTaskSlice';
-import PencilIcon from '../icons/PencilIcon';
-import TrashIcon from '../icons/TrashIcon';
 import TaskRunHistory from './TaskRunHistory';
 import {
   formatDateTime,
@@ -73,14 +72,16 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => dispatch(setViewMode('edit'))}
             className="p-2 rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             title={i18nService.t('scheduledTasksEdit')}
           >
-            <PencilIcon className="w-4 h-4" />
-          </button>
+            <Pencil className="w-4 h-4" />
+          </Button>
           {task.state.runningAtMs ? (
             <span
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20"
@@ -93,23 +94,27 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
               {i18nService.t('scheduledTasksStatusRunning')}
             </span>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => void scheduledTaskService.runManually(task.id)}
               className="p-2 rounded-lg text-secondary hover:bg-surface-raised hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               title={i18nService.t('scheduledTasksRunPreemptWarning')}
             >
-              <PlayIcon className="w-4 h-4" />
-            </button>
+              <Play className="w-4 h-4" />
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => onRequestDelete(task.id, task.name)}
             className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             title={i18nService.t('scheduledTasksDelete')}
           >
-            <TrashIcon className="w-4 h-4" />
-          </button>
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 

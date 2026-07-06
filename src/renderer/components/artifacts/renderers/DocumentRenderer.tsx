@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -334,17 +335,19 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
       {sheets.length > 1 && (
         <div className="flex items-center gap-1 px-2 py-1 border-b border-[#e0e0e0] shrink-0 overflow-x-auto">
           {sheets.map((sheet, i) => (
-            <button
+            <Button
               key={i}
+              variant={i === activeSheet ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setActiveSheet(i)}
-              className={`px-2 py-0.5 text-xs rounded whitespace-nowrap transition-colors ${
+              className={`px-2 py-0.5 text-xs rounded whitespace-nowrap transition-colors h-auto ${
                 i === activeSheet
-                  ? 'bg-[#217346]/10 text-[#217346] font-medium'
+                  ? 'bg-[#217346]/10 text-[#217346] font-medium hover:bg-[#217346]/10 hover:text-[#217346]'
                   : 'text-[#666] hover:text-[#383a42] hover:bg-[#f0f2f5]'
               }`}
             >
               {sheet.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -948,12 +951,12 @@ const FileInfoFallback: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         <div className="text-xs text-muted mt-1">{ext.toUpperCase().slice(1)}</div>
       </div>
       {artifact.filePath && (
-        <button
+        <Button
           onClick={handleOpenWithApp}
-          className="px-3 py-1.5 text-xs rounded bg-primary text-white hover:bg-primary/90 transition-colors mt-2"
+          className="px-3 py-1.5 text-xs rounded mt-2 h-auto"
         >
           {t('artifactOpenWithApp')}
-        </button>
+        </Button>
       )}
     </div>
   );

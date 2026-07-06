@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -8,7 +9,7 @@ import { RootState } from '../../store';
 import { isDefaultAgentId } from '../../utils/agentDisplay';
 import AgentCreateModal from '../agent/AgentCreateModal';
 import AgentSettingsPanel from '../agent/AgentSettingsPanel';
-import { type CoworkOpenShareOptionsEventDetail,CoworkUiEvent } from '../cowork/constants';
+import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import AgentTreeNode from './AgentTreeNode';
 import MyAgentSidebarHeader from './MyAgentSidebarHeader';
 import type { AgentSidebarAgentNode, AgentSidebarTaskNode } from './types';
@@ -195,13 +196,13 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           <p className="text-xs font-medium text-secondary">
             {i18nService.t('myAgentSidebarNoAgents')}
           </p>
-          <button
+          <Button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="mt-3 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover"
+            className="mt-3 px-3 py-1.5 h-auto text-xs"
           >
             {i18nService.t('createNewAgent')}
-          </button>
+          </Button>
         </div>
       ) : projectAgentNodes.length > 0 ? (
         <div className="space-y-0.5 px-0">

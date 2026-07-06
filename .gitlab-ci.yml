@@ -76,7 +76,7 @@ build-renderer:
     VITE_SKIP_ELECTRON: '1'
   script:
     - npx tsc --noEmit
-    - node --max-old-space-size=1792 node_modules/.bin/vite build --sourcemap false
+    - node --max-old-space-size=4096 node_modules/.bin/vite build --sourcemap false
     - test -f dist/index.html
   rules:
     - if: $CI_COMMIT_TAG

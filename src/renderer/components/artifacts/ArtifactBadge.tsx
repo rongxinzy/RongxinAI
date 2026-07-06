@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -32,18 +33,19 @@ const ArtifactBadge: React.FC<ArtifactBadgeProps> = ({ artifact }) => {
   };
 
   return (
-    <button
+    <Button
+      variant="outline"
       onClick={handleClick}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors cursor-pointer
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer h-auto
         ${isSelected
-          ? 'border-primary bg-primary/10 text-primary'
+          ? 'border-primary bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary'
           : 'border-border bg-surface hover:bg-surface-hover text-foreground'
         }`}
     >
       <span>{TYPE_ICONS[artifact.type] || '📄'}</span>
       <span className="truncate max-w-[200px]">{artifact.title}</span>
       <span className="text-xs text-muted">{t('artifactView')}</span>
-    </button>
+    </Button>
   );
 };
 

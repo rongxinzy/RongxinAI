@@ -1,4 +1,5 @@
-import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { ArrowRight } from 'lucide-react';
 import React from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
@@ -41,13 +42,14 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
           const isPromptSelected = selectedPromptId === prompt.id;
 
           return (
-            <button
+            <Button
               key={prompt.id}
               type="button"
+              variant="outline"
               onClick={() => handlePromptClick(prompt)}
               className={`
                 group relative flex flex-col items-start gap-1.5 px-3.5 py-3 rounded-lg
-                border text-left transition-all duration-200
+                border text-left transition-all duration-200 h-auto
                 ${
                   isPromptSelected
                     ? 'dark:bg-primary-muted bg-primary-muted border-[color-mix(in_srgb,var(--lobster-primary)_50%,transparent)]'
@@ -60,7 +62,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
                 <span className={`text-sm font-medium ${isPromptSelected ? 'text-primary' : 'text-foreground'}`}>
                   {prompt.label}
                 </span>
-                <ArrowRightIcon
+                <ArrowRight
                   className={`
                     w-3.5 h-3.5 transition-all duration-200
                     ${
@@ -78,7 +80,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
                   {prompt.description}
                 </p>
               )}
-            </button>
+            </Button>
           );
         })}
       </div>

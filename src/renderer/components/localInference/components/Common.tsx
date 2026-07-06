@@ -1,10 +1,4 @@
-import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  ServerStackIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { CheckCircle, Info, Server, TriangleAlert, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
@@ -22,20 +16,20 @@ export function LocalInferenceToastView({
   const tone =
     toast.kind === LocalInferenceToastKind.Error
       ? {
-          Icon: ExclamationTriangleIcon,
+          Icon: TriangleAlert,
           borderClass: 'border-red-500/30',
           iconClass: 'bg-red-500/15 text-red-500',
           messageClass: 'text-red-700 dark:text-red-200',
         }
       : toast.kind === LocalInferenceToastKind.Success
         ? {
-            Icon: CheckCircleIcon,
+            Icon: CheckCircle,
             borderClass: 'border-emerald-500/30',
             iconClass: 'bg-emerald-500/15 text-emerald-500',
             messageClass: 'text-foreground',
           }
         : {
-            Icon: InformationCircleIcon,
+            Icon: Info,
             borderClass: 'border-primary/30',
             iconClass: 'bg-primary/15 text-primary',
             messageClass: 'text-foreground',
@@ -60,7 +54,7 @@ export function LocalInferenceToastView({
           className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
           aria-label={i18nService.t('close')}
         >
-          <XMarkIcon className="h-4 w-4" />
+          <X className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -100,7 +94,7 @@ export function EmptyState({
     <div
       className={`flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center ${className}`.trim()}
     >
-      <ServerStackIcon className="h-7 w-7 text-secondary" />
+      <Server className="h-7 w-7 text-secondary" />
       <p className="text-sm font-medium text-secondary">{title}</p>
       {action}
     </div>

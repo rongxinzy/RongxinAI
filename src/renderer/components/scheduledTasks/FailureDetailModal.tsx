@@ -1,4 +1,5 @@
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { X } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -49,13 +50,15 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
               <p className="text-xs text-secondary mt-0.5">{taskName}</p>
             )}
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             className="p-1 rounded-md text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <XMarkIcon className="h-4 w-4" />
-          </button>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Body */}
@@ -93,13 +96,14 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-border flex justify-end">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onClose}
             className="px-3 py-1.5 text-sm text-foreground bg-surface-raised hover:bg-surface-overlay rounded-md border border-border transition-colors"
           >
             {i18nService.t('close')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

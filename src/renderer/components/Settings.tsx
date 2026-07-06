@@ -1,5 +1,17 @@
-import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import { ArrowsRightLeftIcon, ArrowTopRightOnSquareIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, KeyIcon, ShieldCheckIcon, SignalIcon, SunIcon, UserCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Checkbox } from '@shared/components/ui/checkbox';
+import { Input } from '@shared/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@shared/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
+import { Switch } from '@shared/components/ui/switch';
+import { Textarea } from '@shared/components/ui/textarea';
+import { ArrowLeftRight, Box, Brain, CheckCircle, Cpu, ExternalLink, Eye, EyeOff, Info, Key, Mail, MessageCircle, Pencil, PlusCircle, ShieldCheck, Signal, Sun, Trash2, UserCircle, X, XCircle } from 'lucide-react';
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -28,14 +40,9 @@ import { OpenClawSessionKeepAlive as OpenClawSessionKeepAliveValues } from '../t
 import Modal from './common/Modal';
 import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
 import ErrorMessage from './ErrorMessage';
-import BrainIcon from './icons/BrainIcon';
-import PencilIcon from './icons/PencilIcon';
-import PlusCircleIcon from './icons/PlusCircleIcon';
 import { GitHubCopilotIcon } from './icons/providers';
-import TrashIcon from './icons/TrashIcon';
 import IMSettings from './im/IMSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
-import ThemedSelect from './ui/ThemedSelect';
 
 type TabType = 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'triage' | 'coworkMemory' | 'coworkAgent' | 'shortcuts' | 'im' | 'email' | 'about';
 
@@ -452,7 +459,7 @@ const isMacPlatform = navigator.platform.includes('Mac');
 
 const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
   const [recording, setRecording] = useState(false);
-  const divRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!recording) return;
@@ -467,21 +474,22 @@ const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void 
   useEffect(() => {
     if (!recording) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (divRef.current && !divRef.current.contains(e.target as Node)) setRecording(false);
+      if (buttonRef.current && !buttonRef.current.contains(e.target as Node)) setRecording(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [recording]);
 
   return (
-    <div
-      ref={divRef}
-      tabIndex={0}
+    <Button
+      ref={buttonRef}
+      type="button"
+      variant="outline"
       data-shortcut-input="true"
       onKeyDown={handleKeyDown}
       onClick={() => setRecording(true)}
       onBlur={() => setRecording(false)}
-      className={`w-36 rounded-xl border px-3 py-1.5 text-sm cursor-pointer select-none text-center outline-none transition-colors
+      className={`w-36 justify-center px-3 py-1.5 text-sm font-normal select-none transition-colors
         dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset dark:text-claude-darkText text-claude-text
         ${recording
           ? 'border-claude-accent ring-1 ring-claude-accent/30 dark:text-claude-darkTextSecondary text-claude-textSecondary'
@@ -489,23 +497,11 @@ const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void 
         }`}
     >
       {value || i18nService.t('shortcutNotSet')}
-    </div>
+    </Button>
   );
 };
 
 const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
   const currentLabel = (() => {
     const opt = SEND_SHORTCUT_OPTIONS.find(o => o.value === value);
     if (!opt) return value;
@@ -513,42 +509,29 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
   })();
 
   return (
-    <div ref={containerRef} className="relative">
-      <div
-        onClick={() => setOpen(!open)}
-        className={`w-36 rounded-xl border px-3 py-1.5 text-sm cursor-pointer select-none text-center outline-none transition-colors
+    <Select value={value} onValueChange={(newValue) => onChange(newValue ?? value)}>
+      <SelectTrigger
+        className="w-36 rounded-xl border dark:border-claude-darkBorder border-claude-border
           dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset dark:text-claude-darkText text-claude-text
-          ${open
-            ? 'border-claude-accent ring-1 ring-claude-accent/30'
-            : 'dark:border-claude-darkBorder border-claude-border hover:border-claude-accent/50'
-          }`}
+          px-3 py-1.5 text-sm focus:ring-1 focus:ring-claude-accent/30"
       >
-        {currentLabel}
-      </div>
-      {open && (
-        <div className="absolute right-0 mt-1 z-50 min-w-[160px] rounded-xl border dark:border-claude-darkBorder border-claude-border dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset shadow-elevated py-1">
-          {SEND_SHORTCUT_OPTIONS.map((option) => {
-            const label = isMacPlatform ? option.labelMac : option.label;
-            const isActive = value === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => { onChange(option.value); setOpen(false); }}
-                className={`flex items-center justify-between w-full px-3 py-1.5 text-sm transition-colors
-                  ${isActive
-                    ? 'dark:text-claude-accent text-claude-accent font-medium'
-                    : 'dark:text-claude-darkText text-claude-text'
-                  } hover:bg-claude-accent/10`}
-              >
-                <span>{label}</span>
-                {isActive && <span className="text-claude-accent">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+        <SelectValue placeholder={currentLabel} />
+      </SelectTrigger>
+      <SelectContent className="dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset dark:border-claude-darkBorder border-claude-border">
+        {SEND_SHORTCUT_OPTIONS.map((option) => {
+          const label = isMacPlatform ? option.labelMac : option.label;
+          return (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              className="text-sm dark:text-claude-darkText text-claude-text focus:bg-claude-accent/10 focus:text-claude-accent dark:focus:text-claude-accent"
+            >
+              {label}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
   );
 };
 
@@ -2566,16 +2549,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const sidebarTabs: { key: TabType; label: string; icon: React.ReactNode }[] = (() => {
     const allTabs = [
       { key: 'general' as TabType,        label: i18nService.t('general'),        icon: <SettingsSlidersIcon className="h-5 w-5" /> },
-      { key: 'appearance' as TabType,     label: i18nService.t('appearance'),     icon: <SunIcon className="h-5 w-5" /> },
-      { key: 'coworkAgentEngine' as TabType, label: i18nService.t('coworkAgentEngine'), icon: <CpuChipIcon className="h-5 w-5" /> },
-      { key: 'model' as TabType,          label: i18nService.t('model'),          icon: <CubeIcon className="h-5 w-5" /> },
-      { key: 'triage' as TabType,         label: i18nService.t('triageTab'),      icon: <ArrowsRightLeftIcon className="h-5 w-5" /> },
-      { key: 'im' as TabType,             label: i18nService.t('imBot'),          icon: <ChatBubbleLeftIcon className="h-5 w-5" /> },
-      { key: 'email' as TabType,          label: i18nService.t('emailTab'),       icon: <EnvelopeIcon className="h-5 w-5" /> },
-      { key: 'coworkMemory' as TabType,   label: i18nService.t('coworkMemoryTitle'), icon: <BrainIcon className="h-5 w-5" /> },
-      { key: 'coworkAgent' as TabType,    label: i18nService.t('coworkAgentTab'),    icon: <UserCircleIcon className="h-5 w-5" /> },
+      { key: 'appearance' as TabType,     label: i18nService.t('appearance'),     icon: <Sun className="h-5 w-5" /> },
+      { key: 'coworkAgentEngine' as TabType, label: i18nService.t('coworkAgentEngine'), icon: <Cpu className="h-5 w-5" /> },
+      { key: 'model' as TabType,          label: i18nService.t('model'),          icon: <Box className="h-5 w-5" /> },
+      { key: 'triage' as TabType,         label: i18nService.t('triageTab'),      icon: <ArrowLeftRight className="h-5 w-5" /> },
+      { key: 'im' as TabType,             label: i18nService.t('imBot'),          icon: <MessageCircle className="h-5 w-5" /> },
+      { key: 'email' as TabType,          label: i18nService.t('emailTab'),       icon: <Mail className="h-5 w-5" /> },
+      { key: 'coworkMemory' as TabType,   label: i18nService.t('coworkMemoryTitle'), icon: <Brain className="h-5 w-5" /> },
+      { key: 'coworkAgent' as TabType,    label: i18nService.t('coworkAgentTab'),    icon: <UserCircle className="h-5 w-5" /> },
       { key: 'shortcuts' as TabType,      label: i18nService.t('shortcuts'),      icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5"><rect x="2" y="4" width="20" height="14" rx="2" /><line x1="6" y1="8" x2="8" y2="8" /><line x1="10" y1="8" x2="12" y2="8" /><line x1="14" y1="8" x2="16" y2="8" /><line x1="6" y1="12" x2="8" y2="12" /><line x1="10" y1="12" x2="14" y2="12" /><line x1="16" y1="12" x2="18" y2="12" /><line x1="8" y1="15.5" x2="16" y2="15.5" /></svg> },
-      { key: 'about' as TabType,          label: i18nService.t('about'),          icon: <InformationCircleIcon className="h-5 w-5" /> },
+      { key: 'about' as TabType,          label: i18nService.t('about'),          icon: <Info className="h-5 w-5" /> },
     ];
     // Filter out tabs hidden by enterprise config
     // Filter out tabs with 'hide' action in enterprise config
@@ -2769,19 +2752,27 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('language')}
               </h4>
               <div className="w-[140px] shrink-0">
-                <ThemedSelect
-                  id="language"
-                  value={language}
-                  onChange={(value) => {
-                    const nextLanguage = value as LanguageType;
+                <div className="flex items-center space-x-3">
+                  <Select value={language} onValueChange={(v) => {
+                    const nextLanguage = v as LanguageType;
                     setLanguage(nextLanguage);
                     i18nService.setLanguage(nextLanguage, { persist: false });
-                  }}
-                  options={[
-                    { value: 'zh', label: i18nService.t('chinese') },
-                    { value: 'en', label: i18nService.t('english') }
-                  ]}
-                />
+                  }}>
+                    <SelectTrigger className="flex-1 rounded-lg bg-surface border-border text-foreground px-4 py-2.5 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-surface border-border">
+                      {[
+                        { value: 'zh', label: i18nService.t('chinese') },
+                        { value: 'en', label: i18nService.t('english') }
+                      ].map((option) => (
+                        <SelectItem key={option.value} value={option.value} className="text-sm text-foreground">
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -2790,17 +2781,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <h4 className="text-sm font-medium text-foreground mb-3">
                 {i18nService.t('autoLaunch')}
               </h4>
-              <label className="flex items-center justify-between cursor-pointer">
+              <label className="flex items-center justify-between">
                 <span className="text-sm text-secondary">
                   {i18nService.t('autoLaunchDescription')}
                 </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={autoLaunch}
-                  onClick={async () => {
+                <Switch
+                  checked={autoLaunch}
+                  onCheckedChange={async (next) => {
                     if (isUpdatingAutoLaunch) return;
-                    const next = !autoLaunch;
                     setIsUpdatingAutoLaunch(true);
                     try {
                       const result = await window.electron.autoLaunch.set(next);
@@ -2817,20 +2805,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     }
                   }}
                   disabled={isUpdatingAutoLaunch}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    isUpdatingAutoLaunch ? 'opacity-50 cursor-not-allowed' : ''
-                  } ${
-                    autoLaunch
-                      ? 'bg-primary'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      autoLaunch ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                />
               </label>
             </div>
 
@@ -2839,17 +2814,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <h4 className="text-sm font-medium text-foreground mb-3">
                 {i18nService.t('preventSleep')}
               </h4>
-              <label className="flex items-center justify-between cursor-pointer">
+              <label className="flex items-center justify-between">
                 <span className="text-sm text-secondary">
                   {i18nService.t('preventSleepDescription')}
                 </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={preventSleep}
-                  onClick={async () => {
+                <Switch
+                  checked={preventSleep}
+                  onCheckedChange={async (next) => {
                     if (isUpdatingPreventSleep) return;
-                    const next = !preventSleep;
                     setIsUpdatingPreventSleep(true);
                     try {
                       const result = await window.electron.preventSleep.set(next);
@@ -2866,20 +2838,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     }
                   }}
                   disabled={isUpdatingPreventSleep}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    isUpdatingPreventSleep ? 'opacity-50 cursor-not-allowed' : ''
-                  } ${
-                    preventSleep
-                      ? 'bg-primary'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      preventSleep ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                />
               </label>
             </div>
 
@@ -2888,29 +2847,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <h4 className="text-sm font-medium text-foreground mb-3">
                 {i18nService.t('useSystemProxy')}
               </h4>
-              <label className="flex items-center justify-between cursor-pointer">
+              <label className="flex items-center justify-between">
                 <span className="text-sm text-secondary">
                   {i18nService.t('useSystemProxyDescription')}
                 </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={useSystemProxy}
-                  onClick={() => {
-                    setUseSystemProxy((prev) => !prev);
-                  }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    useSystemProxy
-                      ? 'bg-primary'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      useSystemProxy ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={useSystemProxy}
+                  onCheckedChange={(next) => setUseSystemProxy(next)}
+                />
               </label>
             </div>
 
@@ -2918,29 +2862,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <h4 className="text-sm font-medium text-foreground mb-3">
                 {i18nService.t('sqliteAutoBackupEnabled')}
               </h4>
-              <label className="flex items-center justify-between cursor-pointer">
+              <label className="flex items-center justify-between">
                 <span className="text-sm text-secondary">
                   {i18nService.t('sqliteAutoBackupEnabledDescription')}
                 </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={sqliteAutoBackupEnabled}
-                  onClick={() => {
-                    setSqliteAutoBackupEnabled((prev) => !prev);
-                  }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    sqliteAutoBackupEnabled
-                      ? 'bg-primary'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      sqliteAutoBackupEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={sqliteAutoBackupEnabled}
+                  onCheckedChange={(next) => setSqliteAutoBackupEnabled(next)}
+                />
               </label>
             </div>
 
@@ -2949,29 +2878,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <h4 className="text-sm font-medium text-foreground mb-3">
                 {i18nService.t('skipMissedJobs')}
               </h4>
-              <label className="flex items-center justify-between cursor-pointer">
+              <label className="flex items-center justify-between">
                 <span className="text-sm text-secondary">
                   {i18nService.t('skipMissedJobsDescription')}
                 </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={skipMissedJobs}
-                  onClick={() => {
-                    setSkipMissedJobs((prev) => !prev);
-                  }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                    skipMissedJobs
-                      ? 'bg-primary'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      skipMissedJobs ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={skipMissedJobs}
+                  onCheckedChange={(next) => setSkipMissedJobs(next)}
+                />
               </label>
             </div>
 
@@ -3058,14 +2972,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     {i18nService.t('coworkMemoryManageHint')}
                   </div>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={handleOpenCoworkMemoryModal}
-                  className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-sm transition-colors active:scale-[0.98]"
                 >
-                  <PlusCircleIcon className="h-4 w-4 mr-1.5" />
+                  <PlusCircle className="h-4 w-4 mr-1.5" />
                   {i18nService.t('coworkMemoryCrudCreate')}
-                </button>
+                </Button>
               </div>
 
               {coworkMemoryStats && (
@@ -3074,12 +2987,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
               )}
 
-              <input
+              <Input
                 type="text"
                 value={coworkMemoryQuery}
                 onChange={(event) => setCoworkMemoryQuery(event.target.value)}
                 placeholder={i18nService.t('coworkMemorySearchPlaceholder')}
-                className="w-full rounded-lg border px-3 py-2 text-sm border-border bg-surface"
+                className="w-full text-sm"
               />
 
               <div className="rounded-lg border border-border">
@@ -3102,21 +3015,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             </div>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleEditCoworkMemoryEntry(entry)}
-                              className="rounded border px-2 py-1 border-border text-foreground hover:bg-surface-raised transition-colors"
                             >
                               {i18nService.t('edit')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => { void handleDeleteCoworkMemoryEntry(entry); }}
-                              className="rounded border px-2 py-1 text-red-500 border-border hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 transition-colors"
                               disabled={coworkMemoryListLoading}
+                              className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
                               {i18nService.t('delete')}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -3155,22 +3071,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   {i18nService.t('modelProviders')}
                 </h3>
                 <div className="flex items-center space-x-1">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={handleImportProvidersClick}
                     disabled={isImportingProviders || isExportingProviders}
-                    className="inline-flex items-center px-2 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
                   >
                     {i18nService.t('import')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={handleExportProviders}
                     disabled={isImportingProviders || isExportingProviders}
-                    className="inline-flex items-center px-2 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
                   >
                     {i18nService.t('export')}
-                  </button>
+                  </Button>
                 </div>
               </div>
               <input
@@ -3225,54 +3143,43 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     </div>
                     <div className="flex items-center ml-2 gap-1">
                       {isCustom && (
-                        <button
+                        <Button
                           type="button"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-claude-secondaryText hover:text-red-500 dark:text-claude-darkSecondaryText dark:hover:text-red-400 p-0.5"
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-claude-secondaryText hover:text-red-500 dark:text-claude-darkSecondaryText dark:hover:text-red-400 h-auto w-auto p-0.5"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteCustomProvider(providerKey);
                           }}
                           title={i18nService.t('deleteCustomProvider')}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                          </svg>
-                        </button>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
                       )}
-                      <div
-                        title={!canToggleProvider ? i18nService.t('configureApiKey') : undefined}
-                        className={`w-7 h-4 rounded-full flex items-center transition-colors ${
-                          effectiveEnabled ? 'bg-primary' : 'bg-gray-400 dark:bg-gray-600'
-                        } ${
-                          canToggleProvider ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!canToggleProvider) {
-                            return;
-                          }
+                      <Switch
+                        checked={effectiveEnabled}
+                        onCheckedChange={() => {
+                          if (!canToggleProvider) return;
                           toggleProviderEnabled(providerKey);
                         }}
-                      >
-                        <div
-                          className={`w-3 h-3 rounded-full bg-white shadow-md transform transition-transform ${
-                            effectiveEnabled ? 'translate-x-3.5' : 'translate-x-0.5'
-                          }`}
-                        />
-                      </div>
+                        disabled={!canToggleProvider}
+                        className="data-[disabled]:cursor-not-allowed"
+                      />
                     </div>
                   </div>
                 );
               })}
               {/* Add Custom Provider Button */}
               {CUSTOM_PROVIDER_KEYS.some(k => !providers[k]) && (
-              <button
-                type="button"
-                onClick={handleAddCustomProvider}
-                className="w-full flex items-center justify-center p-2 rounded-xl border border-dashed border-claude-border dark:border-claude-darkBorder text-claude-secondaryText dark:text-claude-darkSecondaryText hover:border-claude-accent hover:text-claude-accent transition-colors text-sm"
-              >
-                {i18nService.t('addCustomProvider')}
-              </button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddCustomProvider}
+                  className="w-full rounded-xl border-dashed border-claude-border dark:border-claude-darkBorder text-claude-secondaryText dark:text-claude-darkSecondaryText hover:border-claude-accent hover:text-claude-accent"
+                >
+                  {i18nService.t('addCustomProvider')}
+                </Button>
               )}
             </div>
 
@@ -3293,15 +3200,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     } {i18nService.t('providerSettings')}
                   </h3>
                   {ProviderRegistry.get(activeProvider)?.website && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => void window.electron.shell.openExternal(ProviderRegistry.get(activeProvider)!.website!)}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                      className="text-secondary hover:text-primary"
                       title={i18nService.t('visitOfficialSite')}
                       aria-label={i18nService.t('visitOfficialSite')}
                     >
-                      <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                    </button>
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
                 <div className={`px-2 py-0.5 rounded-lg text-xs font-medium ${statusBadge.className}`}>
@@ -3328,8 +3237,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('minimaxAuthMethodLabel')}
                     </p>
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => {
                           setProviders(prev => ({
                             ...prev,
@@ -3344,14 +3254,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${!minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
                       >
                         <div className="flex items-start justify-between">
-                          <KeyIcon className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                          {!minimaxIsOAuthMode && <CheckCircleIcon className="h-4 w-4 text-primary shrink-0" />}
+                          <Key className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+                          {!minimaxIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('minimaxOAuthTabApiKey')}</p>
                         <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('minimaxAuthApiKeyDesc')}</p>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => setProviders(prev => ({
                           ...prev,
                           minimax: {
@@ -3363,12 +3274,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
                       >
                         <div className="flex items-start justify-between">
-                          <ShieldCheckIcon className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                          {minimaxIsOAuthMode && <CheckCircleIcon className="h-4 w-4 text-primary shrink-0" />}
+                          <ShieldCheck className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+                          {minimaxIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('minimaxOAuthTabOAuth')}</p>
                         <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('minimaxAuthOAuthDesc')}</p>
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -3380,44 +3291,50 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           {i18nService.t('apiKey')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         {ProviderRegistry.get('minimax')?.apiKeyUrl && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => void window.electron.shell.openExternal(ProviderRegistry.get('minimax')!.apiKeyUrl!)}
-                            className="text-[11px] text-claude-accent hover:underline transition-colors"
+                            className="h-auto px-0 py-0 text-[11px] text-primary hover:underline"
                           >
                             {i18nService.t('getApiKey')} →
-                          </button>
+                          </Button>
                         )}
                       </div>
                       <div className="relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        id="minimax-apiKey"
-                        value={providers.minimax.apiKey}
-                        onChange={(e) => handleProviderConfigChange('minimax', 'apiKey', e.target.value)}
-                        className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 pr-16 text-xs"
-                        placeholder={i18nService.t('apiKeyPlaceholder')}
-                      />
-                      <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                        {providers.minimax.apiKey && (
-                          <button
+                        <Input
+                          type={showApiKey ? 'text' : 'password'}
+                          id="minimax-apiKey"
+                          value={providers.minimax.apiKey}
+                          onChange={(e) => handleProviderConfigChange('minimax', 'apiKey', e.target.value)}
+                          className="pr-16 text-xs"
+                          placeholder={i18nService.t('apiKeyPlaceholder')}
+                        />
+                        <div className="absolute right-2 inset-y-0 flex items-center gap-1">
+                          {providers.minimax.apiKey && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleProviderConfigChange('minimax', 'apiKey', '')}
+                              className="text-secondary hover:text-primary"
+                              title={i18nService.t('clear') || 'Clear'}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
                             type="button"
-                            onClick={() => handleProviderConfigChange('minimax', 'apiKey', '')}
-                            className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
-                            title={i18nService.t('clear') || 'Clear'}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowApiKey(!showApiKey)}
+                            className="text-secondary hover:text-primary"
+                            title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
                           >
-                            <XCircleIconSolid className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
-                          title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
-                        >
-                          {showApiKey ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-                        </button>
-                      </div>
+                            {showApiKey ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -3432,20 +3349,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             {i18nService.t('minimaxOAuthLoggedIn')}
                           </p>
                           <div className="flex gap-2">
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px]"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={handleMiniMaxOAuthLogout}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px] border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
                             >
                               {i18nService.t('minimaxOAuthLogout')}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -3458,29 +3379,31 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               {i18nService.t('minimaxOAuthRegionLabel')}
                             </label>
                             <div className="flex rounded-xl overflow-hidden border border-border">
-                              <button
+                              <Button
                                 type="button"
+                                variant={minimaxOAuthRegion === 'cn' ? 'default' : 'ghost'}
                                 onClick={() => setMinimaxOAuthRegion('cn')}
-                                className={`flex-1 py-1.5 text-xs font-medium transition-colors ${minimaxOAuthRegion === 'cn' ? 'bg-primary text-white' : 'text-secondary hover:bg-surface-raised'}`}
+                                className="flex-1 rounded-none py-1.5 text-xs font-medium h-auto"
                               >
                                 {i18nService.t('minimaxOAuthRegionCN')}
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant={minimaxOAuthRegion === 'global' ? 'default' : 'ghost'}
                                 onClick={() => setMinimaxOAuthRegion('global')}
-                                className={`flex-1 py-1.5 text-xs font-medium transition-colors ${minimaxOAuthRegion === 'global' ? 'bg-primary text-white' : 'text-secondary hover:bg-surface-raised'}`}
+                                className="flex-1 rounded-none py-1.5 text-xs font-medium h-auto"
                               >
                                 {i18nService.t('minimaxOAuthRegionGlobal')}
-                              </button>
+                              </Button>
                             </div>
                           </div>
-                          <button
+                          <Button
                             type="button"
                             onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                            className="w-full py-2 text-xs font-medium rounded-xl bg-primary text-white hover:bg-primary-hover transition-colors"
+                            className="w-full py-2 text-xs h-auto"
                           >
                             {i18nService.t('minimaxOAuthLogin')}
-                          </button>
+                          </Button>
                           <p className="text-[11px] text-secondary">
                             {i18nService.t('minimaxOAuthHint')}
                           </p>
@@ -3520,13 +3443,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <p className="text-[11px] text-secondary">
                             {i18nService.t('minimaxOAuthStatusPending')}
                           </p>
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={handleCancelMiniMaxLogin}
-                            className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                            className="h-auto px-2.5 py-1 text-[11px]"
                           >
                             {i18nService.t('minimaxOAuthCancel')}
-                          </button>
+                          </Button>
                         </div>
                       )}
 
@@ -3549,20 +3474,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             {minimaxOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px]"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => setMinimaxOAuthPhase({ kind: 'idle' })}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px]"
                             >
                               {i18nService.t('minimaxOAuthCancel')}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -3580,8 +3509,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('openaiAuthMethodLabel')}
                     </p>
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => {
                           setProviders(prev => ({
                             ...prev,
@@ -3595,14 +3525,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${!openaiIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
                       >
                         <div className="flex items-start justify-between">
-                          <KeyIcon className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                          {!openaiIsOAuthMode && <CheckCircleIcon className="h-4 w-4 text-primary shrink-0" />}
+                          <Key className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+                          {!openaiIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('openaiOAuthTabApiKey')}</p>
                         <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('openaiAuthApiKeyDesc')}</p>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => setProviders(prev => ({
                           ...prev,
                           openai: {
@@ -3613,12 +3544,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${openaiIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
                       >
                         <div className="flex items-start justify-between">
-                          <ShieldCheckIcon className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                          {openaiIsOAuthMode && <CheckCircleIcon className="h-4 w-4 text-primary shrink-0" />}
+                          <ShieldCheck className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
+                          {openaiIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('openaiOAuthTabOAuth')}</p>
                         <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('openaiAuthOAuthDesc')}</p>
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -3633,20 +3564,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             {openaiOAuthStatus.email ? ` (${openaiOAuthStatus.email})` : ''}
                           </p>
                           <div className="flex gap-2">
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px]"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => { void handleOpenAIOAuthLogout(); }}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px] border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
                             >
                               {i18nService.t('openaiOAuthLogout')}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -3654,13 +3589,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {/* Idle + not logged in — show login CTA */}
                       {openaiOAuthPhase.kind === 'idle' && openaiOAuthStatus && !openaiOAuthStatus.loggedIn && (
                         <div className="space-y-2">
-                          <button
+                          <Button
                             type="button"
                             onClick={handleOpenAIOAuthLogin}
-                            className="w-full py-2 text-xs font-medium rounded-xl bg-primary text-white hover:bg-primary-hover transition-colors"
+                            className="w-full py-2 text-xs h-auto"
                           >
                             {i18nService.t('openaiOAuthLogin')}
-                          </button>
+                          </Button>
                           <p className="text-[11px] text-secondary">
                             {i18nService.t('openaiOAuthHint')}
                           </p>
@@ -3676,13 +3611,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <p className="text-[11px] text-secondary">
                             {i18nService.t('openaiOAuthStatusPending')}
                           </p>
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => { void handleCancelOpenAIOAuthLogin(); }}
-                            className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                            className="h-auto px-2.5 py-1 text-[11px]"
                           >
                             {i18nService.t('openaiOAuthCancel')}
-                          </button>
+                          </Button>
                         </div>
                       )}
 
@@ -3706,20 +3643,23 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             {openaiOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
-                            <button
+                            <Button
                               type="button"
+                              size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px]"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => setOpenaiOAuthPhase({ kind: 'idle' })}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-border text-foreground hover:bg-surface-raised transition-colors"
+                              className="h-auto px-2.5 py-1 text-[11px]"
                             >
                               {i18nService.t('openaiOAuthCancel')}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -3739,43 +3679,49 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           {i18nService.t('apiKey')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         {ProviderRegistry.get(activeProvider)?.apiKeyUrl && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => void window.electron.shell.openExternal(ProviderRegistry.get(activeProvider)!.apiKeyUrl!)}
-                            className="text-[11px] text-claude-accent hover:underline transition-colors"
+                            className="h-auto px-0 py-0 text-[11px] text-primary hover:underline"
                           >
                             {i18nService.t('getApiKey')} →
-                          </button>
+                          </Button>
                         )}
                       </div>
                       <div className="relative">
-                        <input
+                        <Input
                           type={showApiKey ? 'text' : 'password'}
                           id={`${activeProvider}-apiKey`}
                           value={providers[activeProvider].apiKey}
                           onChange={(e) => handleProviderConfigChange(activeProvider, 'apiKey', e.target.value)}
-                          className="block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-16 text-xs"
+                          className="pr-16 text-xs"
                           placeholder={i18nService.t('apiKeyPlaceholder')}
                         />
                         <div className="absolute right-2 inset-y-0 flex items-center gap-1">
                           {providers[activeProvider].apiKey && (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleProviderConfigChange(activeProvider, 'apiKey', '')}
-                              className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
+                              className="text-secondary hover:text-primary"
                               title={i18nService.t('clear') || 'Clear'}
                             >
-                              <XCircleIconSolid className="h-4 w-4" />
-                            </button>
+                              <XCircle className="h-4 w-4" />
+                            </Button>
                           )}
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setShowApiKey(!showApiKey)}
-                            className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
+                            className="text-secondary hover:text-primary"
                             title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
                           >
-                            {showApiKey ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-                          </button>
+                            {showApiKey ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -3789,43 +3735,49 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           API Key<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         {ProviderRegistry.get('qwen')?.apiKeyUrl && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => void window.electron.shell.openExternal(ProviderRegistry.get('qwen')!.apiKeyUrl!)}
-                            className="text-[11px] text-claude-accent hover:underline transition-colors"
+                            className="h-auto px-0 py-0 text-[11px] text-primary hover:underline"
                           >
                             {i18nService.t('getApiKey')} →
-                          </button>
+                          </Button>
                         )}
                       </div>
                       <div className="relative">
-                        <input
+                        <Input
                           type={showApiKey ? 'text' : 'password'}
                           id="qwen-apiKey"
                           value={providers.qwen.apiKey}
                           onChange={(e) => handleProviderConfigChange('qwen', 'apiKey', e.target.value)}
-                          className="block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-16 text-xs"
+                          className="pr-16 text-xs"
                           placeholder={i18nService.t('apiKeyPlaceholder')}
                         />
                         <div className="absolute right-2 inset-y-0 flex items-center gap-1">
                           {providers.qwen.apiKey && (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleProviderConfigChange('qwen', 'apiKey', '')}
-                              className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
+                              className="text-secondary hover:text-primary"
                               title={i18nService.t('clear') || 'Clear'}
                             >
-                              <XCircleIconSolid className="h-4 w-4" />
-                            </button>
+                              <XCircle className="h-4 w-4" />
+                            </Button>
                           )}
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setShowApiKey(!showApiKey)}
-                            className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
+                            className="text-secondary hover:text-primary"
                             title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
                           >
-                            {showApiKey ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-                          </button>
+                            {showApiKey ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -3841,14 +3793,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
                   {(copilotAuthStatus === 'idle' || copilotAuthStatus === 'error') && !providers['github-copilot'].apiKey && (
                     <div className="space-y-2">
-                      <button
+                      <Button
                         type="button"
                         onClick={handleCopilotSignIn}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-claude-accent text-white text-xs font-medium hover:bg-claude-accent/90 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 text-xs h-auto"
                       >
                         <GitHubCopilotIcon className="w-4 h-4" />
                         {i18nService.t('githubCopilotSignIn')}
-                      </button>
+                      </Button>
                       {copilotError && (
                         <p className="text-xs text-red-500 dark:text-red-400">{copilotError}</p>
                       )}
@@ -3875,23 +3827,27 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <code className="text-lg font-mono font-bold tracking-widest dark:text-claude-darkText text-claude-text">
                             {copilotUserCode}
                           </code>
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => {
                               navigator.clipboard.writeText(copilotUserCode);
                             }}
-                            className="px-2 py-0.5 rounded text-[10px] text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent border border-claude-border dark:border-claude-darkBorder transition-colors"
+                            className="h-auto px-2 py-0.5 text-[10px]"
                           >
                             {i18nService.t('copy') || 'Copy'}
-                          </button>
+                          </Button>
                         </div>
-                        <button
+                        <Button
                           type="button"
+                          variant="link"
+                          size="sm"
                           onClick={() => window.electron.shell.openExternal(copilotVerificationUri)}
-                          className="mt-2 text-xs text-claude-accent hover:underline"
+                          className="mt-2 h-auto px-0 py-0 text-xs"
                         >
                           {copilotVerificationUri}
-                        </button>
+                        </Button>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 text-xs text-claude-textSecondary dark:text-claude-darkTextSecondary">
@@ -3901,13 +3857,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           </svg>
                           {i18nService.t('githubCopilotWaiting')}
                         </div>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={handleCopilotCancelAuth}
-                          className="text-xs text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-red-500 transition-colors"
+                          className="h-auto px-0 py-0 text-xs text-secondary hover:text-red-500"
                         >
                           {i18nService.t('cancel')}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -3922,13 +3880,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             : i18nService.t('githubCopilotConnected')}
                         </span>
                       </div>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={handleCopilotSignOut}
-                        className="text-xs text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-red-500 transition-colors"
+                        className="h-auto px-0 py-0 text-xs text-secondary hover:text-red-500"
                       >
                         {i18nService.t('githubCopilotSignOut')}
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -3939,12 +3899,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <label htmlFor={`${activeProvider}-displayName`} className="block text-xs font-medium dark:text-claude-darkText text-claude-text mb-1">
                     {i18nService.t('customDisplayName')}
                   </label>
-                  <input
+                  <Input
                     type="text"
                     id={`${activeProvider}-displayName`}
                     value={(providers[activeProvider] as ProviderConfig)?.displayName ?? ''}
                     onChange={(e) => handleProviderConfigChange(activeProvider, 'displayName', e.target.value)}
-                    className="block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 text-xs"
+                    className="text-xs"
                     placeholder={i18nService.t('customDisplayNamePlaceholder')}
                   />
                 </div>
@@ -3956,7 +3916,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   {i18nService.t('baseUrl')}
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     type="text"
                     id={`${activeProvider}-baseUrl`}
                     value={
@@ -3974,7 +3934,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     }
                     onChange={(e) => handleProviderConfigChange(activeProvider, 'baseUrl', e.target.value)}
                     disabled={isBaseUrlLocked}
-                    className={`block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-8 text-xs ${isBaseUrlLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`pr-8 text-xs ${isBaseUrlLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder={
                       activeProvider === 'qwen'
                         ? 'https://dashscope.aliyuncs.com/apps/anthropic'
@@ -3983,14 +3943,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   />
                   {providers[activeProvider].baseUrl && !isBaseUrlLocked && (
                     <div className="absolute right-2 inset-y-0 flex items-center">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleProviderConfigChange(activeProvider, 'baseUrl', '')}
-                        className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
+                        className="text-secondary hover:text-primary"
                         title={i18nService.t('clear') || 'Clear'}
                       >
-                        <XCircleIconSolid className="h-4 w-4" />
-                      </button>
+                        <XCircle className="h-4 w-4" />
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -4066,32 +4028,24 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     {i18nService.t('apiFormat')}
                   </label>
                   <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name={`${activeProvider}-apiFormat`}
-                        value="anthropic"
-                        checked={getEffectiveApiFormat(activeProvider, providers[activeProvider].apiFormat) !== 'openai'}
-                        onChange={() => handleProviderConfigChange(activeProvider, 'apiFormat', 'anthropic')}
-                        className="h-3.5 w-3.5 text-claude-accent focus:ring-claude-accent dark:bg-claude-darkSurface bg-claude-surface disabled:opacity-50"
-                      />
-                      <span className="ml-2 text-xs text-foreground">
-                        {i18nService.t('apiFormatNative')}
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name={`${activeProvider}-apiFormat`}
-                        value="openai"
-                        checked={getEffectiveApiFormat(activeProvider, providers[activeProvider].apiFormat) === 'openai'}
-                        onChange={() => handleProviderConfigChange(activeProvider, 'apiFormat', 'openai')}
-                        className="h-3.5 w-3.5 text-claude-accent focus:ring-claude-accent dark:bg-claude-darkSurface bg-claude-surface disabled:opacity-50"
-                      />
-                      <span className="ml-2 text-xs text-foreground">
-                        {i18nService.t('apiFormatOpenAI')}
-                      </span>
-                    </label>
+                    <RadioGroup
+                      value={getEffectiveApiFormat(activeProvider, providers[activeProvider].apiFormat) === 'openai' ? 'openai' : 'anthropic'}
+                      onValueChange={(value) => handleProviderConfigChange(activeProvider, 'apiFormat', value)}
+                      className="flex items-center space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="anthropic" id={`${activeProvider}-apiFormat-anthropic`} />
+                        <label htmlFor={`${activeProvider}-apiFormat-anthropic`} className="text-xs text-foreground">
+                          {i18nService.t('apiFormatNative')}
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="openai" id={`${activeProvider}-apiFormat-openai`} />
+                        <label htmlFor={`${activeProvider}-apiFormat-openai`} className="text-xs text-foreground">
+                          {i18nService.t('apiFormatOpenAI')}
+                        </label>
+                      </div>
+                    </RadioGroup>
                   </div>
                   <p className="mt-1 text-xs text-secondary">
                     {i18nService.t('apiFormatHint')}
@@ -4115,15 +4069,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('zhipuCodingPlanHint')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.zhipu.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('zhipu', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
+                  <Switch
+                    checked={providers.zhipu.codingPlanEnabled ?? false}
+                    onCheckedChange={(checked) => handleProviderConfigChange('zhipu', 'codingPlanEnabled', checked ? 'true' : 'false')}
+                    className="ml-3"
+                  />
                 </div>
               )}
 
@@ -4143,15 +4093,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('qwenCodingPlanHint')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.qwen.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('qwen', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
+                  <Switch
+                    checked={providers.qwen.codingPlanEnabled ?? false}
+                    onCheckedChange={(checked) => handleProviderConfigChange('qwen', 'codingPlanEnabled', checked ? 'true' : 'false')}
+                    className="ml-3"
+                  />
                 </div>
               )}
 
@@ -4171,15 +4117,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('volcengineCodingPlanHint')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.volcengine.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('volcengine', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
+                  <Switch
+                    checked={providers.volcengine.codingPlanEnabled ?? false}
+                    onCheckedChange={(checked) => handleProviderConfigChange('volcengine', 'codingPlanEnabled', checked ? 'true' : 'false')}
+                    className="ml-3"
+                  />
                 </div>
               )}
 
@@ -4199,15 +4141,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('moonshotCodingPlanHint')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.moonshot.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('moonshot', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
+                  <Switch
+                    checked={providers.moonshot.codingPlanEnabled ?? false}
+                    onCheckedChange={(checked) => handleProviderConfigChange('moonshot', 'codingPlanEnabled', checked ? 'true' : 'false')}
+                    className="ml-3"
+                  />
                 </div>
               )}
 
@@ -4227,15 +4165,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('qianfanCodingPlanHint')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.qianfan.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('qianfan', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
+                  <Switch
+                    checked={providers.qianfan.codingPlanEnabled ?? false}
+                    onCheckedChange={(checked) => handleProviderConfigChange('qianfan', 'codingPlanEnabled', checked ? 'true' : 'false')}
+                    className="ml-3"
+                  />
                 </div>
               )}
 
@@ -4255,30 +4189,28 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {i18nService.t('xiaomiCodingPlanHint')}
                     </p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.xiaomi.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('xiaomi', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
+                  <Switch
+                    checked={providers.xiaomi.codingPlanEnabled ?? false}
+                    onCheckedChange={(checked) => handleProviderConfigChange('xiaomi', 'codingPlanEnabled', checked ? 'true' : 'false')}
+                    className="ml-3"
+                  />
                 </div>
               )}
 
               {/* 测试连接按钮 */}
               {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
               <div className="flex items-center space-x-3">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={handleTestConnection}
                   disabled={isTesting || (providerRequiresApiKey(activeProvider) && !providers[activeProvider].apiKey)}
-                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-xl border dark:border-claude-darkBorder border-claude-border dark:text-claude-darkText text-claude-text dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
+                  className="inline-flex items-center px-3 py-1.5 text-xs h-auto"
                 >
-                  <SignalIcon className="h-3.5 w-3.5 mr-1.5" />
+                  <Signal className="h-3.5 w-3.5 mr-1.5" />
                   {isTesting ? i18nService.t('testing') : i18nService.t('testConnection')}
-                </button>
+                </Button>
               </div>
               )}
 
@@ -4294,7 +4226,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         onClick={handleAddModel}
                         className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
                       >
-                        <PlusCircleIcon className="h-3.5 w-3.5 mr-1" />
+                        <PlusCircle className="h-3.5 w-3.5 mr-1" />
                         {i18nService.t('addModel')}
                       </button>
                     )}
@@ -4327,14 +4259,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                                   onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
                                   className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
-                                  <PencilIcon className="h-3.5 w-3.5" />
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteModel(model.id)}
                                   className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
-                                  <TrashIcon className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </>
                             )}
@@ -4352,7 +4284,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             onClick={handleAddModel}
                             className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
                           >
-                            <PlusCircleIcon className="h-3 w-3 mr-1" />
+                            <PlusCircle className="h-3 w-3 mr-1" />
                             {i18nService.t('addFirstModel')}
                           </button>
                         )}
@@ -4386,14 +4318,19 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <label className="text-sm text-foreground">冷却轮次</label>
                   <p className="text-xs text-secondary mt-0.5">切换后需等待 N 轮才能再次切换，防止频繁抖动</p>
                 </div>
-                <input type="number" min="1" max="20" value={triageCooldownRounds}
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={triageCooldownRounds}
                   onChange={async (e) => {
                     const value = Math.max(1, Number(e.target.value) || 3);
                     setTriageCooldownRounds(value);
                     const config = await window.electron.triage.getConfig();
                     await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, cooldownRounds: value } });
                   }}
-                  className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground shrink-0" />
+                  className="w-20 text-sm text-center shrink-0"
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -4403,14 +4340,19 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <span className="text-xs text-secondary">轮</span>
-                  <input type="number" min="1" max="100" value={triageMaxConversationRounds}
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={triageMaxConversationRounds}
                     onChange={async (e) => {
                       const value = Math.max(1, Number(e.target.value) || 20);
                       setTriageMaxConversationRounds(value);
                       const config = await window.electron.triage.getConfig();
                       await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, maxConversationRoundsForTriage: value } });
                     }}
-                    className="w-20 text-sm text-center rounded-lg border px-2 py-1 border-border bg-surface text-foreground" />
+                    className="w-20 text-sm text-center"
+                  />
                 </div>
               </div>
             </div>
@@ -4427,17 +4369,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   </span>
                   <p className="text-xs text-secondary mt-0.5">需先在本地推理页启动 llama.cpp 并加载模型</p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
-                  <input type="checkbox" checked={triageUseLocalModel}
-                    onChange={async (e) => {
-                      const value = e.target.checked;
-                      setTriageUseLocalModel(value);
-                      const config = await window.electron.triage.getConfig();
-                      await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, useLocalModelTriage: value } });
-                    }}
-                    className="sr-only peer" />
-                  <div className="w-9 h-5 bg-surface-raised peer-checked:bg-primary rounded-full peer transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[16px]"/>
-                </label>
+                <Switch
+                  checked={triageUseLocalModel}
+                  onCheckedChange={async (value) => {
+                    setTriageUseLocalModel(value);
+                    const config = await window.electron.triage.getConfig();
+                    await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, useLocalModelTriage: value } });
+                  }}
+                  className="shrink-0 ml-2"
+                />
               </div>
 
               {triageUseLocalModel && (
@@ -4445,7 +4385,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <label className="text-xs font-medium text-secondary block mb-1">
                     {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
                   </label>
-                  <input type="text" value={triageModelName}
+                  <Input
+                    type="text"
+                    value={triageModelName}
                     onChange={async (e) => {
                       const value = e.target.value;
                       setTriageModelName(value);
@@ -4453,7 +4395,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       await window.electron.triage.setConfig({ ...config, rules: { ...config.rules, triageModelName: value } });
                     }}
                     placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
-                    className="w-full max-w-xs text-sm rounded-lg border px-3 py-2 border-border bg-surface text-foreground" />
+                    className="w-full max-w-xs text-sm"
+                  />
                   <p className="text-xs text-secondary mt-1">
                     {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
                   </p>
@@ -4474,23 +4417,22 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           <div className="flex flex-col h-full space-y-4">
             <div className="flex gap-1 border-b border-border shrink-0">
               {bootstrapTabs.map((tab) => (
-                <button
+                <Button
                   type="button"
                   key={tab.key}
+                  variant={bootstrapTab === tab.key ? 'default' : 'ghost'}
                   onClick={() => setBootstrapTab(tab.key)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors rounded-t-lg ${
-                    bootstrapTab === tab.key
-                      ? 'bg-primary-muted text-primary border-b-2 border-primary'
-                      : 'text-secondary hover:text-foreground hover:bg-surface-raised'
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+                    bootstrapTab === tab.key ? 'border-b-2 border-primary-foreground' : ''
                   }`}
                 >
                   {i18nService.t(tab.titleKey)}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex flex-col flex-1 min-h-0 space-y-2">
               <p className="text-xs text-secondary shrink-0">{i18nService.t(activeItem.hintKey)}</p>
-              <textarea
+              <Textarea
                 key={activeItem.key}
                 value={activeItem.value}
                 onChange={(e) => activeItem.setter(e.target.value)}
@@ -4585,17 +4527,19 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             {/* Footer */}
             <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center">
               <div className="flex items-center justify-center text-sm text-secondary">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     void handleExportLogs();
                   }}
                   disabled={isExportingLogs}
-                  className="bg-transparent border-none appearance-none px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-md cursor-pointer hover:text-primary dark:hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-secondary hover:text-primary"
                 >
                   {isExportingLogs ? i18nService.t('aboutExportingLogs') : i18nService.t('aboutExportLogs')}
-                </button>
+                </Button>
               </div>
 
             </div>
@@ -4620,18 +4564,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           </div>
           <nav className="flex flex-col gap-0.5 px-3 pb-4">
             {sidebarTabs.map((tab) => (
-              <button
+              <Button
+                type="button"
                 key={tab.key}
+                variant={activeTab === tab.key ? 'default' : 'ghost'}
                 onClick={() => handleTabChange(tab.key)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                  activeTab === tab.key
-                    ? 'bg-primary-muted text-primary'
-                    : 'text-secondary hover:text-foreground hover:bg-surface-raised'
-                }`}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium justify-start w-full"
               >
                 {tab.icon}
                 <span className="min-w-0 truncate">{tab.label}</span>
-              </button>
+              </Button>
             ))}
           </nav>
         </div>
@@ -4641,12 +4583,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           {/* Content header */}
           <div className="flex justify-between items-center gap-3 px-4 sm:px-6 pt-5 pb-3 shrink-0">
             <h3 className="text-lg font-semibold text-foreground">{activeTabLabel}</h3>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={onClose}
-              className="text-secondary hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg transition-colors"
+              className="text-secondary hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg"
             >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
+              <X className="h-5 w-5" />
+            </Button>
           </div>
 
           {noticeMessage && (
@@ -4679,20 +4624,19 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
             {/* Footer buttons */}
             <div className="flex flex-wrap justify-end gap-3 p-4 border-border border-t bg-background shrink-0">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={onClose}
-                className="px-4 py-2 text-foreground hover:bg-surface-raised rounded-xl transition-colors text-sm font-medium border border-border active:scale-[0.98]"
               >
                 {i18nService.t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={isSaving}
-                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
               >
                 {isSaving ? i18nService.t('saving') : i18nService.t('save')}
-              </button>
+              </Button>
             </div>
           </form>
 
@@ -4714,13 +4658,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 <h4 className="text-sm font-semibold text-foreground">
                   {i18nService.t('connectionTestResult')}
                 </h4>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setIsTestResultModalOpen(false)}
                   className="p-1 text-secondary hover:text-foreground rounded-md hover:bg-surface-raised"
                 >
-                  <XMarkIcon className="h-4 w-4" />
-                </button>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
 
               <div className="flex items-center gap-2 text-xs text-secondary">
@@ -4728,9 +4674,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 <span className="text-[11px]">•</span>
                 <span className={`inline-flex items-center gap-1 ${testResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {testResult.success ? (
-                    <CheckCircleIcon className="h-4 w-4" />
+                    <CheckCircle className="h-4 w-4" />
                   ) : (
-                    <XCircleIcon className="h-4 w-4" />
+                    <XCircle className="h-4 w-4" />
                   )}
                   {testResult.success ? i18nService.t('connectionSuccess') : i18nService.t('connectionFailed')}
                 </span>
@@ -4741,13 +4687,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               </p>
 
               <div className="mt-4 flex justify-end">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsTestResultModalOpen(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-xl border border-border text-foreground hover:bg-surface-raised transition-colors active:scale-[0.98]"
                 >
                   {i18nService.t('close')}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -4768,20 +4715,22 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('confirmDeleteCustomProvider')}
               </p>
               <div className="mt-4 flex justify-end gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setPendingDeleteProvider(null)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-xl border dark:border-claude-darkBorder border-claude-border dark:text-claude-darkText text-claude-text dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover transition-colors active:scale-[0.98]"
                 >
                   {i18nService.t('cancel')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="sm"
                   onClick={confirmDeleteCustomProvider}
-                  className="px-3 py-1.5 text-xs font-medium rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors active:scale-[0.98]"
                 >
                   {i18nService.t('deleteCustomProvider')}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -4804,13 +4753,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <h4 className="text-sm font-semibold text-foreground">
                     {isEditingModel ? i18nService.t('editModel') : i18nService.t('addNewModel')}
                   </h4>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={handleCancelModelEdit}
                     className="p-1 text-secondary hover:text-foreground rounded-md hover:bg-surface-raised"
                   >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
 
                 {modelFormError && (
@@ -4826,7 +4777,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         <label className="block text-xs font-medium text-secondary mb-1">
                           {i18nService.t('ollamaModelName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
-                        <input
+                        <Input
                           autoFocus
                           type="text"
                           value={newModelId}
@@ -4839,7 +4790,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               setModelFormError(null);
                             }
                           }}
-                          className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
+                          className="text-xs"
                           placeholder={i18nService.t('ollamaModelNamePlaceholder')}
                         />
                         <p className="mt-1 text-[11px] text-muted">
@@ -4850,7 +4801,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         <label className="block text-xs font-medium text-secondary mb-1">
                           {i18nService.t('ollamaDisplayName')}
                         </label>
-                        <input
+                        <Input
                           type="text"
                           value={newModelName === newModelId ? '' : newModelName}
                           onChange={(e) => {
@@ -4859,7 +4810,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               setModelFormError(null);
                             }
                           }}
-                          className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
+                          className="text-xs"
                           placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
                         />
                         <p className="mt-1 text-[11px] text-muted">
@@ -4873,7 +4824,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         <label className="block text-xs font-medium text-secondary mb-1">
                           {i18nService.t('modelName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
-                        <input
+                        <Input
                           autoFocus
                           type="text"
                           value={newModelName}
@@ -4883,7 +4834,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               setModelFormError(null);
                             }
                           }}
-                          className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
+                          className="text-xs"
                           placeholder="GPT-4"
                         />
                       </div>
@@ -4891,7 +4842,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         <label className="block text-xs font-medium text-secondary mb-1">
                           {i18nService.t('modelId')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
-                        <input
+                        <Input
                           type="text"
                           value={newModelId}
                           onChange={(e) => {
@@ -4900,19 +4851,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               setModelFormError(null);
                             }
                           }}
-                          className="block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs"
+                          className="text-xs"
                           placeholder="gpt-4"
                         />
                       </div>
                     </>
                   )}
                   <div className="flex items-center space-x-2">
-                    <input
+                    <Checkbox
                       id={`${activeProvider}-supportsImage`}
-                      type="checkbox"
                       checked={newModelSupportsImage}
-                      onChange={(e) => setNewModelSupportsImage(e.target.checked)}
-                      className="h-3.5 w-3.5 text-primary focus:ring-primary bg-surface border-border rounded"
+                      onCheckedChange={(checked) => setNewModelSupportsImage(checked === true)}
                     />
                     <label
                       htmlFor={`${activeProvider}-supportsImage`}
@@ -4924,20 +4873,21 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
 
                 <div className="flex justify-end space-x-2 mt-4">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={handleCancelModelEdit}
-                    className="px-3 py-1.5 text-xs text-foreground hover:bg-surface-raised rounded-xl border border-border"
                   >
                     {i18nService.t('cancel')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={handleSaveNewModel}
-                    className="px-3 py-1.5 text-xs text-white bg-primary hover:bg-primary-hover rounded-xl active:scale-[0.98]"
                   >
                     {i18nService.t('save')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -4968,7 +4918,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <label className="block text-xs font-medium text-secondary mb-1">
                     {i18nService.t('coworkMemoryCrudContentLabel')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                   </label>
-                  <textarea
+                  <Textarea
                     value={coworkMemoryDraftText}
                     onChange={(event) => setCoworkMemoryDraftText(event.target.value)}
                     placeholder={i18nService.t('coworkMemoryCrudTextPlaceholder')}
@@ -4978,21 +4928,22 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
 
                 <div className="flex justify-end space-x-2 px-5 pb-5">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={resetCoworkMemoryEditor}
-                    className="px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised rounded-xl border border-border transition-colors"
                   >
                     {i18nService.t('cancel')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={() => { void handleSaveCoworkMemoryEntry(); }}
                     disabled={!coworkMemoryDraftText.trim() || coworkMemoryListLoading}
-                    className="px-3 py-1.5 text-sm text-white bg-primary hover:bg-primary-hover rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
                   >
                     {coworkMemoryEditingId ? i18nService.t('save') : i18nService.t('coworkMemoryCrudCreate')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

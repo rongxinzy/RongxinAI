@@ -1,4 +1,5 @@
-import { FolderIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Folder, X } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -34,29 +35,32 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
             showFolderMenu ? 'text-foreground' : 'text-secondary'
           }`}
         >
-          <button
+          <Button
             ref={buttonRef}
             type="button"
+            variant="ghost"
             title={hasValue ? value : i18nService.t('noFolderSelected')}
             aria-label={i18nService.t('agentDefaultWorkingDirectory')}
             onClick={() => setShowFolderMenu((open) => !open)}
             className="inline-flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg pl-2.5 pr-2"
           >
-            <FolderIcon className="h-4 w-4 flex-shrink-0" />
+            <Folder className="h-4 w-4 flex-shrink-0" />
             <span className={`truncate ${hasValue ? 'text-foreground' : 'text-secondary'}`}>
               {truncatePath(value, 40)}
             </span>
-          </button>
+          </Button>
           {hasValue && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               aria-label={i18nService.t('clear')}
               title={i18nService.t('clear')}
               onClick={() => onChange('')}
-              className="h-full w-7 flex-shrink-0 inline-flex items-center justify-center rounded-lg text-secondary hover:text-foreground transition-colors"
+              className="h-full flex-shrink-0 inline-flex items-center justify-center rounded-lg text-secondary hover:text-foreground"
             >
-              <XMarkIcon className="h-3.5 w-3.5" />
-            </button>
+              <X className="h-3.5 w-3.5" />
+            </Button>
           )}
         </div>
         <FolderSelectorPopover
@@ -77,26 +81,29 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
         {i18nService.t('agentDefaultWorkingDirectory')}
       </label>
       <div className="flex items-center gap-2">
-        <button
+        <Button
           ref={buttonRef}
           type="button"
+          variant="outline"
           onClick={() => setShowFolderMenu((open) => !open)}
-          className="min-w-0 flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-transparent text-foreground text-sm hover:bg-surface-raised transition-colors"
+          className="min-w-0 flex-1 flex items-center gap-2 justify-start px-3 py-2 h-auto text-sm font-normal"
         >
-          <FolderIcon className="h-4 w-4 flex-shrink-0 text-secondary" />
+          <Folder className="h-4 w-4 flex-shrink-0 text-secondary" />
           <span className={`flex-1 truncate text-left ${value.trim() ? '' : 'text-secondary'}`}>
             {truncatePath(value)}
           </span>
-        </button>
+        </Button>
         {value.trim() && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             aria-label={i18nService.t('clear')}
             onClick={() => onChange('')}
-            className="h-10 w-10 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-border text-secondary hover:bg-surface-raised hover:text-foreground transition-colors"
+            className="h-10 w-10 flex-shrink-0 inline-flex items-center justify-center text-secondary hover:text-foreground"
           >
-            <XMarkIcon className="h-3.5 w-3.5 text-secondary" />
-          </button>
+            <X className="h-3.5 w-3.5 text-secondary" />
+          </Button>
         )}
       </div>
       <p className="mt-1 text-xs text-secondary/70">

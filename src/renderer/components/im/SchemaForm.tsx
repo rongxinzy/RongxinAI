@@ -3,8 +3,18 @@
  * Renders form fields dynamically from JSON Schema + uiHints
  */
 
-import { ChevronRightIcon,XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
+import { Switch } from '@shared/components/ui/switch';
+import { Textarea } from '@shared/components/ui/textarea';
+import { ChevronRight, Eye, EyeOff,XCircle } from 'lucide-react';
 import React from 'react';
 
 /** A single uiHint entry from the gateway */
@@ -118,18 +128,10 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
           <label className="text-xs font-medium text-secondary">
             {hint.label}
           </label>
-          <div
-            className={`w-10 h-5 rounded-full flex items-center transition-colors cursor-pointer ${
-              boolValue ? 'bg-green-500' : 'bg-border'
-            }`}
-            onClick={() => handleChange(!boolValue)}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform ${
-                boolValue ? 'translate-x-5' : 'translate-x-0.5'
-              }`}
-            />
-          </div>
+          <Switch
+            checked={boolValue}
+            onCheckedChange={(checked) => handleChange(checked)}
+          />
         </div>
       );
     }
@@ -141,18 +143,24 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
           <label className="block text-xs font-medium text-secondary">
             {hint.label}
           </label>
-          <select
+          <Select
             value={String(fieldValue || '')}
-            onChange={(e) => handleChange(e.target.value)}
-            onBlur={onBlur}
-            className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm transition-colors"
+            onValueChange={(value) => handleChange(value)}
+            onOpenChange={(open) => {
+              if (!open) onBlur?.();
+            }}
           >
-            {enumValues.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {enumValues.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       );
     }
@@ -167,32 +175,36 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
             {hint.label}
           </label>
           <div className="relative">
-            <input
+            <Input
               type={shown ? 'text' : 'password'}
               value={strValue}
               onChange={(e) => handleChange(e.target.value)}
               onBlur={onBlur}
-              className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 pr-16 text-sm transition-colors"
+              className="pr-16"
               placeholder="••••••••••••"
             />
             <div className="absolute right-2 inset-y-0 flex items-center gap-1">
               {strValue && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
                   onClick={() => handleChange('')}
-                  className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
                   title="Clear"
                 >
-                  <XCircleIconSolid className="h-4 w-4" />
-                </button>
+                  <XCircle className="h-4 w-4" />
+                </Button>
               )}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
                 onClick={() => onToggleSecret?.(path)}
-                className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
               >
-                {shown ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-              </button>
+                {shown ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </Button>
             </div>
           </div>
         </div>
@@ -208,23 +220,25 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
             {hint.label}
           </label>
           <div className="relative">
-            <input
+            <Input
               type="text"
               value={strValue}
               onChange={(e) => handleChange(e.target.value)}
               onBlur={onBlur}
-              className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 pr-8 text-sm transition-colors"
+              className="pr-8"
             />
             {strValue && (
               <div className="absolute right-2 inset-y-0 flex items-center">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
                   onClick={() => handleChange('')}
-                  className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
                   title="Clear"
                 >
-                  <XCircleIconSolid className="h-4 w-4" />
-                </button>
+                  <XCircle className="h-4 w-4" />
+                </Button>
               </div>
             )}
           </div>
@@ -240,14 +254,14 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
           <label className="block text-xs font-medium text-secondary">
             {hint.label}
           </label>
-          <textarea
+          <Textarea
             value={arrValue}
             onChange={(e) => {
               const lines = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
               handleChange(lines);
             }}
             onBlur={onBlur}
-            className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm transition-colors min-h-[60px] resize-y"
+            className="min-h-[60px] resize-y"
           />
         </div>
       );
@@ -261,12 +275,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
           <label className="block text-xs font-medium text-secondary">
             {hint.label}
           </label>
-          <input
+          <Input
             type="number"
             value={numValue}
             onChange={(e) => handleChange(e.target.value ? Number(e.target.value) : undefined)}
             onBlur={onBlur}
-            className="block w-full rounded-lg bg-surface border-border-subtle border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-sm transition-colors"
           />
         </div>
       );
@@ -286,7 +299,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     return (
       <details key={groupKey} className="group">
         <summary className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-secondary select-none py-1">
-          <ChevronRightIcon className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+          <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
           {groupHint.label}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">

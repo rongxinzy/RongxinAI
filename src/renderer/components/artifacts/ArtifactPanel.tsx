@@ -1,3 +1,5 @@
+import { Button } from '@shared/components/ui/button';
+import { Copy } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -19,7 +21,6 @@ import type { ArtifactType } from '@/types/artifact';
 import type { Artifact } from '@/types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
-import CopyIcon from '../icons/CopyIcon';
 import ArtifactRenderer from './ArtifactRenderer';
 import FileDirectoryView from './FileDirectoryView';
 import CodeRenderer from './renderers/CodeRenderer';
@@ -247,54 +248,66 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               <span className="text-sm font-medium truncate">{selectedArtifact.fileName || selectedArtifact.title}</span>
               <span className="flex-1" />
               {selectedArtifact.filePath && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleRefresh}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
                   title={t('artifactRefresh')}
                 >
                   <RefreshIcon />
-                </button>
+                </Button>
               )}
               {selectedArtifact.type !== 'document' && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleCopy}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
                   title={t('artifactCopyCode')}
                 >
-                  <CopyIcon className="h-3.5 w-3.5" />
-                </button>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
               )}
               {BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleOpenInBrowser}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
                   title={t('artifactOpenInBrowser')}
                 >
                   <BrowserIcon />
-                </button>
+                </Button>
               )}
               {SYSTEM_OPENABLE_TYPES.has(selectedArtifact.type) && selectedArtifact.filePath && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleOpenWithApp}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
                   title={t('artifactOpenWithApp')}
                 >
                   <OpenExternalIcon />
-                </button>
+                </Button>
               )}
               {selectedArtifact.filePath && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleRevealInFolder}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
                   title={t('artifactOpenFolder')}
                 >
                   <FolderIcon />
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 ref={toggleBtnRef}
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowFileList(v => !v)}
-                className={`p-1 rounded transition-colors ${
+                className={`h-8 w-8 rounded-lg transition-colors ${
                   showFileList
                     ? 'text-primary bg-primary/10'
                     : 'text-secondary hover:text-foreground hover:bg-surface'
@@ -302,31 +315,33 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 title={t('artifactFileList')}
               >
                 <FileListIcon />
-              </button>
+              </Button>
             </div>
 
             {/* Preview/Code tabs */}
             <div className="flex border-b border-border shrink-0">
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => dispatch(setActiveTab('preview'))}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-none h-8 transition-colors border-b-2 ${
                   activeTab === 'preview'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-secondary hover:text-foreground'
+                    ? 'border-primary text-primary hover:bg-transparent'
+                    : 'border-transparent text-secondary hover:text-foreground hover:bg-transparent'
                 }`}
               >
                 {t('artifactPreview')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => dispatch(setActiveTab('code'))}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-none h-8 transition-colors border-b-2 ${
                   activeTab === 'code'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-secondary hover:text-foreground'
+                    ? 'border-primary text-primary hover:bg-transparent'
+                    : 'border-transparent text-secondary hover:text-foreground hover:bg-transparent'
                 }`}
               >
                 {t('artifactCode')}
-              </button>
+              </Button>
             </div>
 
             {/* Render area */}
@@ -344,12 +359,14 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             <div className="h-10 flex items-center px-3 border-b border-border shrink-0">
               <span className="text-xs font-medium text-secondary">{t('artifactFiles')}</span>
               <span className="flex-1" />
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleClose}
-                className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
               >
                 <CloseIcon />
-              </button>
+              </Button>
             </div>
             <FileDirectoryView
               artifacts={previewableArtifacts}

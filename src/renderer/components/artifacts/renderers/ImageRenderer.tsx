@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import React, { useCallback,useState } from 'react';
 
 import type { Artifact } from '@/types/artifact';
@@ -49,12 +50,14 @@ const ImageRenderer: React.FC<ImageRendererProps> = ({ artifact }) => {
         />
       </div>
       {scale !== 1 && (
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={resetZoom}
-          className="absolute bottom-3 right-3 px-2 py-1 text-xs rounded bg-surface text-secondary hover:bg-surface-hover"
+          className="absolute bottom-3 right-3 px-2 py-1 text-xs rounded"
         >
           {Math.round(scale * 100)}%
-        </button>
+        </Button>
       )}
     </div>
   );

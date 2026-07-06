@@ -1,9 +1,5 @@
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  ShieldCheckIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { ChevronDown, ChevronRight, ShieldCheck, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -96,18 +92,20 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2.5">
-            <ShieldCheckIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
             <h3 className="text-base font-semibold text-foreground">
               {i18nService.t('securityScanTitle')}
             </h3>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onAction('cancel')}
-            className="p-1 rounded-lg hover:bg-surface-raised transition-colors"
+            className="rounded-lg hover:bg-surface-raised transition-colors"
           >
-            <XMarkIcon className="h-4 w-4 text-secondary" />
-          </button>
+            <X className="h-4 w-4 text-secondary" />
+          </Button>
         </div>
 
         {/* Summary - outside scroll area */}
@@ -127,16 +125,17 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
 
               return (
                 <div key={dimension} className="rounded-xlSecondary bg-backgroundSecondary overflow-hidden">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => toggleDimension(dimension)}
-                    className="w-full flex items-center justify-between px-3.5 py-2.5 hover:bg-surface-raised transition-colors"
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 h-auto hover:bg-surface-raised transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       {isExpanded ? (
-                        <ChevronDownIcon className="h-3.5 w-3.5 text-secondary" />
+                        <ChevronDown className="h-3.5 w-3.5 text-secondary" />
                       ) : (
-                        <ChevronRightIcon className="h-3.5 w-3.5 text-secondary" />
+                        <ChevronRight className="h-3.5 w-3.5 text-secondary" />
                       )}
                       <span className={`w-2 h-2 rounded-full ${SEVERITY_DOTS[maxSeverity] || SEVERITY_DOTS.warning}`} />
                       <span className="text-sm font-medium text-foreground">
@@ -146,7 +145,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                     <span className="text-xs text-secondary">
                       {findings.length}
                     </span>
-                  </button>
+                  </Button>
 
                   {isExpanded && (
                     <div className="px-3.5 pb-3 space-y-2">
@@ -180,31 +179,33 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
 
         {/* Actions */}
         <div className="flex items-center justify-between px-5 py-4 border-t border-border">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => onAction('cancel')}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium rounded-xl text-foreground hover:bg-surface-raised transition-colors border border-border active:scale-[0.98] disabled:opacity-50"
+            className="rounded-xl active:scale-[0.98]"
           >
             {i18nService.t('cancel')}
-          </button>
+          </Button>
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => onAction('installDisabled')}
               disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium rounded-xl bg-primary hover:bg-primary-hover text-white transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="rounded-xl active:scale-[0.98]"
             >
               {i18nService.t('securityInstallDisabled')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               onClick={() => onAction('install')}
               disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="rounded-xl active:scale-[0.98]"
             >
               {i18nService.t('securityInstallAnyway')}
-            </button>
+            </Button>
           </div>
         </div>
     </Modal>,

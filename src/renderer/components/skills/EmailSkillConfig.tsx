@@ -1,12 +1,8 @@
-import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import {
-  CheckCircleIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  SignalIcon,
-  SparklesIcon,
-  XCircleIcon,
-} from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Checkbox } from '@shared/components/ui/checkbox';
+import { Input } from '@shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import { CheckCircle, ChevronDown, ChevronUp, Eye, EyeOff, Signal, Sparkles, XCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -385,13 +381,15 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-foreground">{i18nService.t('emailConfig')}</h4>
         {onClose && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             className="text-xs text-secondary hover:text-primary transition-colors"
           >
             {i18nService.t('collapse')}
-          </button>
+          </Button>
         )}
       </div>
       <div className="min-h-[18px]">
@@ -407,19 +405,18 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
       {/* Provider Selection */}
       <div>
         <label className={labelClassName}>{i18nService.t('emailProvider')}</label>
-        <select
-          value={provider}
-          onChange={e => handleProviderChange(e.target.value)}
-          onBlur={queuePersist}
-          className={inputClassName}
-        >
-          <option value="">{i18nService.t('emailSelectProvider')}</option>
-          {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
-            <option key={key} value={key}>
-              {key === 'custom' ? i18nService.t('emailCustomProvider') : preset.label}
-            </option>
-          ))}
-        </select>
+        <Select value={provider} onValueChange={(value) => handleProviderChange(value ?? '')} onOpenChange={(open) => { if (!open) queuePersist(); }}>
+          <SelectTrigger className={inputClassName}>
+            <SelectValue placeholder={i18nService.t('emailSelectProvider')} />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
+              <SelectItem key={key} value={key}>
+                {key === 'custom' ? i18nService.t('emailCustomProvider') : preset.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Hint */}
@@ -433,7 +430,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
       <div>
         <label className={labelClassName}>{i18nService.t('emailAddress')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
         <div className="relative">
-          <input
+          <Input
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -443,17 +440,19 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
           />
           {email && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={() => {
                   setEmail('');
                   setTimeout(queuePersist, 0);
                 }}
-                className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                className="rounded text-secondary hover:text-primary transition-colors"
                 title={i18nService.t('clear') || 'Clear'}
               >
-                <XCircleIconSolid className="h-4 w-4" />
-              </button>
+                <XCircle className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </div>
@@ -463,7 +462,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
       <div>
         <label className={labelClassName}>{i18nService.t('emailPassword')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
         <div className="relative">
-          <input
+          <Input
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -473,49 +472,54 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {password && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={() => {
                   setPassword('');
                   setTimeout(queuePersist, 0);
                 }}
-                className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                className="rounded text-secondary hover:text-primary transition-colors"
                 title={i18nService.t('clear') || 'Clear'}
               >
-                <XCircleIconSolid className="h-4 w-4" />
-              </button>
+                <XCircle className="h-4 w-4" />
+              </Button>
             )}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={() => setShowPassword(!showPassword)}
-              className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+              className="rounded text-secondary hover:text-primary transition-colors"
               title={
                 showPassword ? i18nService.t('hide') || 'Hide' : i18nService.t('show') || 'Show'
               }
             >
               {showPassword ? (
-                <EyeIcon className="h-4 w-4" />
+                <Eye className="h-4 w-4" />
               ) : (
-                <EyeSlashIcon className="h-4 w-4" />
+                <EyeOff className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Advanced Settings Toggle */}
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setShowAdvanced(!showAdvanced)}
         className="flex items-center gap-1 text-xs text-secondary hover:text-primary transition-colors"
       >
         {showAdvanced ? (
-          <ChevronUpIcon className="h-3.5 w-3.5" />
+          <ChevronUp className="h-3.5 w-3.5" />
         ) : (
-          <ChevronDownIcon className="h-3.5 w-3.5" />
+          <ChevronDown className="h-3.5 w-3.5" />
         )}
         {i18nService.t('emailAdvancedSettings')}
-      </button>
+      </Button>
 
       {/* Advanced Settings */}
       {showAdvanced && (
@@ -524,7 +528,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <div>
               <label className={labelClassName}>IMAP Host<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
               <div className="relative">
-                <input
+                <Input
                   type="text"
                   value={imapHost}
                   onChange={e => setImapHost(e.target.value)}
@@ -534,17 +538,19 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                 />
                 {imapHost && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={() => {
                         setImapHost('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-secondary hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
-                      <XCircleIconSolid className="h-4 w-4" />
-                    </button>
+                      <XCircle className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -552,7 +558,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <div>
               <label className={labelClassName}>IMAP Port</label>
               <div className="relative">
-                <input
+                <Input
                   type="text"
                   value={imapPort}
                   onChange={e => setImapPort(e.target.value)}
@@ -562,17 +568,19 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                 />
                 {imapPort && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={() => {
                         setImapPort('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-secondary hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
-                      <XCircleIconSolid className="h-4 w-4" />
-                    </button>
+                      <XCircle className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -583,7 +591,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <div>
               <label className={labelClassName}>SMTP Host<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
               <div className="relative">
-                <input
+                <Input
                   type="text"
                   value={smtpHost}
                   onChange={e => setSmtpHost(e.target.value)}
@@ -593,17 +601,19 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                 />
                 {smtpHost && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={() => {
                         setSmtpHost('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-secondary hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
-                      <XCircleIconSolid className="h-4 w-4" />
-                    </button>
+                      <XCircle className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -611,7 +621,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <div>
               <label className={labelClassName}>SMTP Port</label>
               <div className="relative">
-                <input
+                <Input
                   type="text"
                   value={smtpPort}
                   onChange={e => setSmtpPort(e.target.value)}
@@ -621,17 +631,19 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                 />
                 {smtpPort && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={() => {
                         setSmtpPort('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-secondary hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
-                      <XCircleIconSolid className="h-4 w-4" />
-                    </button>
+                      <XCircle className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -640,22 +652,20 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-xs text-foreground">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={imapTls === 'true'}
-                onChange={e => setImapTls(e.target.checked ? 'true' : 'false')}
+                onCheckedChange={(checked) => setImapTls(checked === true ? 'true' : 'false')}
                 onBlur={queuePersist}
-                className="h-3.5 w-3.5 text-primary focus:ring-primary rounded"
+                className="h-3.5 w-3.5"
               />
               IMAP TLS
             </label>
             <label className="flex items-center gap-2 text-xs text-foreground">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={smtpSecure === 'true'}
-                onChange={e => setSmtpSecure(e.target.checked ? 'true' : 'false')}
+                onCheckedChange={(checked) => setSmtpSecure(checked === true ? 'true' : 'false')}
                 onBlur={queuePersist}
-                className="h-3.5 w-3.5 text-primary focus:ring-primary rounded"
+                className="h-3.5 w-3.5"
               />
               SMTP SSL
             </label>
@@ -663,14 +673,14 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
           <div>
             <label className="flex items-center gap-2 text-xs dark:text-claude-darkText text-claude-text">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={rejectUnauthorized === 'false'}
-                onChange={e => {
-                  setRejectUnauthorized(e.target.checked ? 'false' : 'true');
+                onCheckedChange={(checked) => {
+                  setRejectUnauthorized(checked === true ? 'false' : 'true');
                   setTimeout(queuePersist, 0);
                 }}
-                className="h-3.5 w-3.5 text-claude-accent focus:ring-claude-accent rounded"
+                onBlur={queuePersist}
+                className="h-3.5 w-3.5"
               />
               {i18nService.t('emailAllowInsecureCert')}
             </label>
@@ -682,7 +692,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
           <div>
             <label className={labelClassName}>{i18nService.t('emailMailbox')}</label>
             <div className="relative">
-              <input
+              <Input
                 type="text"
                 value={mailbox}
                 onChange={e => setMailbox(e.target.value)}
@@ -692,17 +702,19 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
               />
               {mailbox && (
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-xs"
                     onClick={() => {
                       setMailbox('');
                       setTimeout(queuePersist, 0);
                     }}
-                    className="p-0.5 rounded text-secondary hover:text-primary transition-colors"
+                    className="rounded text-secondary hover:text-primary transition-colors"
                     title={i18nService.t('clear') || 'Clear'}
                   >
-                    <XCircleIconSolid className="h-4 w-4" />
-                  </button>
+                    <XCircle className="h-4 w-4" />
+                  </Button>
                 </div>
               )}
             </div>
@@ -712,27 +724,27 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
       {/* Connectivity Test */}
       <div className="space-y-3 pt-1">
-        <button
+        <Button
           type="button"
           onClick={handleConnectivityTest}
           disabled={isTesting || !canTest}
           className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-xl border border-border text-foreground hover:bg-surface-raised disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
         >
-          <SignalIcon className="h-3.5 w-3.5 mr-1.5" />
+          <Signal className="h-3.5 w-3.5 mr-1.5" />
           {isTesting ? i18nService.t('imConnectivityTesting') : i18nService.t('imConnectivityTest')}
-        </button>
+        </Button>
 
         {connectivityError && (
           <div className="space-y-2">
             <div className="text-xs text-red-600 dark:text-red-400">{connectivityError}</div>
-            <button
+            <Button
               type="button"
               onClick={() => handleAskAI(null, connectivityError)}
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-claude-accent/50 text-claude-accent hover:bg-claude-accent/10 transition-colors active:scale-[0.98]"
             >
-              <SparklesIcon className="h-3 w-3" />
+              <Sparkles className="h-3 w-3" />
               {i18nService.t('emailConnectivityAskAI')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -742,9 +754,9 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
               className={`flex items-center gap-1 text-xs ${connectivityPassed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
             >
               {connectivityPassed ? (
-                <CheckCircleIcon className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4" />
               ) : (
-                <XCircleIcon className="h-4 w-4" />
+                <XCircle className="h-4 w-4" />
               )}
               <span>
                 {connectivityPassed
@@ -768,9 +780,9 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                       className={`flex items-center gap-1 text-xs font-medium ${checkPassed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
                     >
                       {checkPassed ? (
-                        <CheckCircleIcon className="h-3.5 w-3.5" />
+                        <CheckCircle className="h-3.5 w-3.5" />
                       ) : (
-                        <XCircleIcon className="h-3.5 w-3.5" />
+                        <XCircle className="h-3.5 w-3.5" />
                       )}
                       <span>{checkLabel}</span>
                     </div>
@@ -781,14 +793,14 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
               })}
             </div>
             {!connectivityPassed && (
-              <button
+              <Button
                 type="button"
                 onClick={() => handleAskAI(connectivityResult, null)}
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-claude-accent/50 text-claude-accent hover:bg-claude-accent/10 transition-colors active:scale-[0.98]"
               >
-                <SparklesIcon className="h-3 w-3" />
+                <Sparkles className="h-3 w-3" />
                 {i18nService.t('emailConnectivityAskAI')}
-              </button>
+              </Button>
             )}
           </div>
         )}

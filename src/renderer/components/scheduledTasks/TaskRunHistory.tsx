@@ -1,4 +1,5 @@
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -109,9 +110,11 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
           {STATUS_OPTIONS.map(s => {
             const isActive = filter.status === s;
             return (
-              <button
+              <Button
                 key={s}
                 type="button"
+                variant={isActive ? 'outline' : 'ghost'}
+                size="xs"
                 onClick={() => handleStatusToggle(s)}
                 className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                   isActive
@@ -120,7 +123,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
                 }`}
               >
                 {i18nService.t(statusLabelKeys[s])}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -141,14 +144,16 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
             placeholder={i18nService.t('scheduledTasksFilterEndDate')}
           />
           {hasActiveFilter && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={handleClearFilter}
               className="ml-0.5 p-0.5 rounded text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
               title={i18nService.t('scheduledTasksFilterClear')}
             >
-              <XMarkIcon className="h-3 w-3" />
-            </button>
+              <X className="h-3 w-3" />
+            </Button>
           )}
         </div>
       </div>
@@ -178,22 +183,26 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
                     <span className="text-xs text-secondary">{formatDuration(run.durationMs)}</span>
                   )}
                   {run.status === 'error' && run.error && (
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
+                      size="xs"
                       onClick={() => setViewingError(run)}
-                      className="text-xs text-primary hover:text-primary-hover transition-colors"
+                      className="text-xs text-primary hover:text-primary-hover transition-colors p-0 h-auto"
                     >
                       {i18nService.t('scheduledTasksViewFailureDetails')}
-                    </button>
+                    </Button>
                   )}
                   {(run.sessionId || run.sessionKey) && (
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
+                      size="xs"
                       onClick={() => setViewingRun(run)}
-                      className="text-xs text-primary hover:text-primary-hover transition-colors"
+                      className="text-xs text-primary hover:text-primary-hover transition-colors p-0 h-auto"
                     >
                       {i18nService.t('scheduledTasksViewSession')}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -203,13 +212,14 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
       )}
 
       {hasMore && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={handleLoadMore}
           className="w-full py-2 mt-2 text-sm text-primary hover:text-primary-hover transition-colors"
         >
           {i18nService.t('scheduledTasksLoadMore')}
-        </button>
+        </Button>
       )}
 
       {viewingRun && (

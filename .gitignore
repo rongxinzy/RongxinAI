@@ -38,6 +38,9 @@ SKILLs/**/.server.log
 SKILLs/**/.server.pid
 SKILLs/**/.venv/
 
+# Agent skills (installed via npx skills add)
+.agents/
+
 nul
 .work.env
 modelscope.tokens.local.json
@@ -60,7 +63,7 @@ openspec/
 .diagram/
 spec/
 specs/
-docs/
+docs/*
 localdocs/
 docker/
 llamacpp-oss-tools/

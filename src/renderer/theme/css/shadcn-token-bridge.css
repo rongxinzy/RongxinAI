@@ -1,0 +1,45 @@
+:root,
+[data-theme] {
+  --background: var(--lobster-background);
+  --foreground: var(--lobster-foreground);
+  --card: var(--lobster-surface);
+  --card-foreground: var(--lobster-surface-foreground);
+  --popover: var(--lobster-surface-overlay);
+  --popover-foreground: var(--lobster-foreground);
+  --primary: var(--lobster-primary);
+  --primary-foreground: var(--lobster-primary-foreground);
+  --secondary: var(--lobster-surface-raised);
+  --secondary-foreground: var(--lobster-foreground);
+  --muted: var(--lobster-surface-raised);
+  --muted-foreground: var(--lobster-text-secondary);
+  --accent: var(--lobster-accent);
+  --accent-foreground: var(--lobster-accent-foreground);
+  --destructive: var(--lobster-destructive);
+  --destructive-foreground: var(--lobster-destructive-foreground);
+  --border: var(--lobster-border);
+  --input: var(--lobster-input-border);
+  --ring: var(--lobster-primary);
+  --radius: var(--lobster-radius);
+  --radius-sm: calc(var(--lobster-radius) - 2px);
+  --radius-md: var(--lobster-radius);
+  --radius-lg: calc(var(--lobster-radius) + 2px);
+  --radius-xl: calc(var(--lobster-radius) + 6px);
+  --sidebar: var(--lobster-surface);
+  --sidebar-foreground: var(--lobster-foreground);
+  --sidebar-primary: var(--lobster-primary);
+  --sidebar-primary-foreground: var(--lobster-primary-foreground);
+  --sidebar-accent: var(--lobster-surface-raised);
+  --sidebar-accent-foreground: var(--lobster-foreground);
+  --sidebar-border: var(--lobster-border);
+  --sidebar-ring: var(--lobster-primary);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

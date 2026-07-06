@@ -1,4 +1,5 @@
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -172,11 +173,13 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
   return (
     <>
       {/* Trigger */}
-      <button
+      <Button
         ref={triggerRef}
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 text-xs rounded-md border border-border-subtle px-2 py-1 transition-colors ${
+        className={`flex items-center gap-1.5 text-xs rounded-md border border-border-subtle px-2 py-1 h-auto transition-colors ${
           open
             ? 'border-primary bg-surface text-foreground'
             : value
@@ -184,7 +187,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
               : 'bg-surface text-secondary hover:border-primary/50'
         }`}
       >
-        <CalendarIcon className="h-3 w-3 shrink-0 opacity-60" />
+        <Calendar className="h-3 w-3 shrink-0 opacity-60" />
         <span className={value ? '' : 'opacity-50'}>
           {displayText || placeholder || '----/--/--'}
         </span>
@@ -196,7 +199,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
             ×
           </span>
         )}
-      </button>
+      </Button>
 
       {/* Calendar dropdown — rendered via portal to avoid overflow clipping */}
       {open &&
@@ -208,23 +211,27 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
           >
             {/* Month/Year nav */}
             <div className="flex items-center justify-between mb-2">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={goPrev}
                 className="p-1 rounded text-secondary hover:bg-surface-raised transition-colors"
               >
-                <ChevronLeftIcon className="h-3.5 w-3.5" />
-              </button>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
               <span className="text-xs font-medium text-foreground">
                 {viewYear} / {pad(viewMonth)}
               </span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={goNext}
                 className="p-1 rounded text-secondary hover:bg-surface-raised transition-colors"
               >
-                <ChevronRightIcon className="h-3.5 w-3.5" />
-              </button>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
             </div>
 
             {/* Weekday headers */}
@@ -250,12 +257,14 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                 const isToday = dateStr === todayStr;
                 const disabled = isDisabled(day);
                 return (
-                  <button
+                  <Button
                     key={day}
                     type="button"
+                    variant="ghost"
+                    size="icon-xs"
                     disabled={disabled}
                     onClick={() => handleSelect(day)}
-                    className={`w-7 h-7 rounded text-xs transition-colors ${
+                    className={`w-7 h-7 rounded text-xs transition-colors p-0 ${
                       isSelected
                         ? 'bg-primary text-white font-medium'
                         : disabled
@@ -266,7 +275,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                     }`}
                   >
                     {day}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

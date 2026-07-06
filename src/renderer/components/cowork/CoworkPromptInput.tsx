@@ -1,5 +1,5 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { ArrowUpIcon, FolderIcon, StopIcon } from '@heroicons/react/24/solid';
+import { Button } from '@shared/components/ui/button';
+import { ArrowUp, Folder, Paperclip, Square, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
@@ -24,8 +24,6 @@ import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getCompactFolderName } from '../../utils/path';
-import PaperClipIcon from '../icons/PaperClipIcon';
-import XMarkIcon from '../icons/XMarkIcon';
 import ModelSelector from '../ModelSelector';
 import { ActiveSkillBadge,SkillsButton } from '../skills';
 import { resolveAgentModelSelection, resolveEffectiveModel, useAgentSelectedModel } from './agentModelSelection';
@@ -828,17 +826,13 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
       )}
       {imageVisionHint && (
         <div className="mb-2 flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-          <ExclamationTriangleIcon className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+          <TriangleAlert className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
           <span>
             {i18nService.t('imageVisionHint')}
           </span>
-          <button
-            type="button"
-            onClick={() => setImageVisionHint(false)}
-            className="ml-auto flex-shrink-0 rounded-full p-0.5 hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
-          >
-            <XMarkIcon className="h-3 w-3" />
-          </button>
+          <Button variant="ghost" size="icon-xs" className="ml-auto flex-shrink-0" onClick={() => setImageVisionHint(false)}>
+            <X className="h-3 w-3" />
+          </Button>
         </div>
       )}
       <div
@@ -872,17 +866,14 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                 {showFolderSelector && (
                   <>
                       <div className="flex items-center">
-                        <button
-                          ref={folderButtonRef as React.RefObject<HTMLButtonElement>}
-                          type="button"
+                        <Button
+                          ref={folderButtonRef as React.Ref<HTMLButtonElement>}
+                          variant="ghost"
+                          size="sm"
+                          className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
                           onClick={() => setShowFolderMenu(!showFolderMenu)}
-                          className={`flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg text-sm transition-colors ${
-                            showFolderRequiredWarning
-                              ? 'ring-1 ring-warning text-warning animate-shake'
-                              : 'text-secondary hover:bg-surface-raised hover:text-foreground'
-                          }`}
                         >
-                          <FolderIcon className="h-4 w-4 flex-shrink-0" />
+                          <Folder className="h-4 w-4 flex-shrink-0" />
                           <span className="max-w-[150px] truncate text-xs">
                             {truncatePath(workingDirectory)}
                           </span>
@@ -896,10 +887,10 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                               }}
                               className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                             >
-                              <XMarkIcon className="h-3 w-3" />
+                              <X className="h-3 w-3" />
                             </span>
                           )}
-                        </button>
+                        </Button>
                       </div>
                     <FolderSelectorPopover
                       isOpen={showFolderMenu}
@@ -984,16 +975,10 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                   </div>
                 )}
                 {!remoteManaged && (
-                  <button
-                    type="button"
-                    onClick={handleAddFile}
-                    className="flex items-center justify-center p-1.5 rounded-lg text-sm text-secondary hover:bg-surface-raised hover:text-foreground transition-colors"
-                    title={i18nService.t('coworkAddFile')}
-                    aria-label={i18nService.t('coworkAddFile')}
-                    disabled={disabled || isStreaming || isAddingFile}
-                  >
-                    <PaperClipIcon className="h-4 w-4" />
-                  </button>
+                  <Button variant="ghost" size="icon-sm" onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile}
+                    title={i18nService.t('coworkAddFile')} aria-label={i18nService.t('coworkAddFile')}>
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
                 )}
                 {!remoteManaged && (
                   <>
@@ -1007,29 +992,14 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
               </div>
               <div className="flex items-center gap-2">
                 {isStreaming ? (
-                  <button
-                    type="button"
-                    onClick={handleStopClick}
-                    className="p-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-all shadow-subtle hover:shadow-card active:scale-95"
-                    aria-label="Stop"
-                  >
-                    <StopIcon className="h-5 w-5" />
-                  </button>
+                  <Button variant="destructive" size="icon" onClick={handleStopClick} aria-label="Stop">
+                    <Square className="h-4 w-4" />
+                  </Button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={!canSubmit}
-                    className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
-                      canSubmit
-                        ? 'bg-neutral-950 text-white shadow-subtle hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200'
-                        : 'cursor-not-allowed bg-neutral-300 text-white dark:bg-neutral-700 dark:text-neutral-500'
-                    }`}
-                    aria-label={i18nService.t('sendMessage')}
-                    title={sendButtonTitle}
-                  >
-                    <ArrowUpIcon className="h-[18px] w-[18px]" />
-                  </button>
+                  <Button size="icon" onClick={handleSubmit} disabled={!canSubmit}
+                    aria-label={i18nService.t('sendMessage')} title={sendButtonTitle}>
+                    <ArrowUp className="h-[18px] w-[18px]" />
+                  </Button>
                 )}
               </div>
             </div>
@@ -1050,43 +1020,23 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
 
             {!remoteManaged && (
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handleAddFile}
-                  className="flex-shrink-0 p-1.5 rounded-lg text-secondary hover:bg-surface-raised hover:text-foreground transition-colors"
-                  title={i18nService.t('coworkAddFile')}
-                  aria-label={i18nService.t('coworkAddFile')}
+                <Button variant="ghost" size="icon-sm" onClick={handleAddFile}
                   disabled={disabled || isStreaming || isAddingFile}
-                >
-                  <PaperClipIcon className="h-4 w-4" />
-                </button>
+                  title={i18nService.t('coworkAddFile')} aria-label={i18nService.t('coworkAddFile')}>
+                  <Paperclip className="h-4 w-4" />
+                </Button>
               </div>
             )}
 
             {isStreaming ? (
-              <button
-                type="button"
-                onClick={handleStopClick}
-                className="flex-shrink-0 p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-all shadow-subtle hover:shadow-card active:scale-95"
-                aria-label="Stop"
-              >
-                <StopIcon className="h-4 w-4" />
-              </button>
+              <Button variant="destructive" size="icon" onClick={handleStopClick} aria-label="Stop">
+                <Square className="h-4 w-4" />
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!canSubmit}
-                className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition-all ${
-                  canSubmit
-                    ? 'bg-neutral-950 text-white shadow-subtle hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200'
-                    : 'cursor-not-allowed bg-neutral-300 text-white dark:bg-neutral-700 dark:text-neutral-500'
-                }`}
-                aria-label={i18nService.t('sendMessage')}
-                title={sendButtonTitle}
-              >
-                <ArrowUpIcon className="h-[17px] w-[17px]" />
-              </button>
+              <Button size="icon" onClick={handleSubmit} disabled={!canSubmit}
+                aria-label={i18nService.t('sendMessage')} title={sendButtonTitle}>
+                <ArrowUp className="h-[17px] w-[17px]" />
+              </Button>
             )}
           </>
         )}

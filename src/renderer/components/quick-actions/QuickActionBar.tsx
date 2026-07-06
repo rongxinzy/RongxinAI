@@ -1,11 +1,8 @@
+import { Button } from '@shared/components/ui/button';
+import { ChartColumn, Globe, GraduationCap, Presentation, Smartphone } from 'lucide-react';
 import React from 'react';
 
 import type { LocalizedQuickAction } from '../../types/quickAction';
-import AcademicCapIcon from '../icons/AcademicCapIcon';
-import ChartBarIcon from '../icons/ChartBarIcon';
-import DevicePhoneMobileIcon from '../icons/DevicePhoneMobileIcon';
-import GlobeAltIcon from '../icons/GlobeAltIcon';
-import PresentationChartBarIcon from '../icons/PresentationChartBarIcon';
 
 interface QuickActionBarProps {
   actions: LocalizedQuickAction[];
@@ -14,11 +11,11 @@ interface QuickActionBarProps {
 
 // 图标映射
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  PresentationChartBarIcon,
-  GlobeAltIcon,
-  DevicePhoneMobileIcon,
-  ChartBarIcon,
-  AcademicCapIcon,
+  Presentation,
+  Globe,
+  Smartphone,
+  ChartColumn,
+  GraduationCap,
 };
 
 const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect }) => {
@@ -32,17 +29,18 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
         const IconComponent = iconMap[action.icon];
 
         return (
-          <button
+          <Button
             key={action.id}
             type="button"
+            variant="outline"
             onClick={() => onActionSelect(action.id)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ease-out bg-surface border-border text-secondary hover:bg-surface-raised hover:border-primary/40"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ease-out bg-surface border-border text-secondary hover:bg-surface-raised hover:border-primary/40"
           >
             {IconComponent && (
               <IconComponent className="w-4 h-4 text-secondary" />
             )}
             <span>{action.label}</span>
-          </button>
+          </Button>
         );
       })}
     </div>

@@ -1,5 +1,8 @@
-import { Cog6ToothIcon, CpuChipIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { AgentId } from '@shared/agent';
+import { Button } from '@shared/components/ui/button';
+import { Checkbox } from '@shared/components/ui/checkbox';
+import { Cog, Cpu, TriangleAlert } from 'lucide-react';
+import { Clock, PanelLeft, Pencil, Plug, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -15,13 +18,6 @@ import type { CoworkSessionSummary } from '../types/cowork';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import Modal from './common/Modal';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
-import ClockIcon from './icons/ClockIcon';
-import ComposeIcon from './icons/ComposeIcon';
-import ConnectorIcon from './icons/ConnectorIcon';
-import PuzzleIcon from './icons/PuzzleIcon';
-import SearchIcon from './icons/SearchIcon';
-import SidebarToggleIcon from './icons/SidebarToggleIcon';
-import TrashIcon from './icons/TrashIcon';
 import LoginButton from './LoginButton';
 
 interface SidebarProps {
@@ -265,26 +261,30 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="pt-3 pb-3">
         <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
           <div className={`${isMac ? 'pl-[68px]' : ''}`}>{updateBadge}</div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onToggleCollapse}
-            className="non-draggable h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+            className="non-draggable h-8 w-8 rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
           >
-            <SidebarToggleIcon className="h-4 w-4" isCollapsed={isCollapsed} />
-          </button>
+            <PanelLeft className="h-4 w-4" />
+          </Button>
         </div>
         <div className="mt-[5px] space-y-0.5 px-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onNewChat}
             className={sidebarNavItemClassName}
           >
-            <ComposeIcon className={sidebarCreateIconClassName} />
+            <Pencil className={sidebarCreateIconClassName} />
             {i18nService.t('newChat')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setIsSearchOpen(false);
               onShowLocalInference();
@@ -292,22 +292,24 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={activeView === 'localInference' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
             aria-current={activeView === 'localInference' ? 'page' : undefined}
           >
-            <CpuChipIcon className="h-4 w-4 shrink-0" />
+            <Cpu className="h-4 w-4 shrink-0" />
             {i18nService.t('localInferenceTitle')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               onShowCowork();
               setIsSearchOpen(true);
             }}
             className={sidebarNavItemClassName}
           >
-            <SearchIcon className="h-4 w-4 shrink-0" />
+            <Search className="h-4 w-4 shrink-0" />
             {i18nService.t('search')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setIsSearchOpen(false);
               onShowScheduledTasks();
@@ -315,11 +317,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={activeView === 'scheduledTasks' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
             aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
           >
-            <ClockIcon className="h-4 w-4 shrink-0" />
+            <Clock className="h-4 w-4 shrink-0" />
             {i18nService.t('scheduledTasks')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setIsSearchOpen(false);
               onShowSkills();
@@ -327,11 +330,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={activeView === 'skills' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
             aria-current={activeView === 'skills' ? 'page' : undefined}
           >
-            <PuzzleIcon className="h-4 w-4 shrink-0" />
+            <Puzzle className="h-4 w-4 shrink-0" />
             {i18nService.t('skills')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setIsSearchOpen(false);
               onShowMcp();
@@ -339,9 +343,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={activeView === 'mcp' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
             aria-current={activeView === 'mcp' ? 'page' : undefined}
           >
-            <ConnectorIcon className="h-4 w-4 shrink-0" />
+            <Plug className="h-4 w-4 shrink-0" />
             {i18nService.t('mcpServers')}
-          </button>
+          </Button>
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
@@ -391,35 +395,34 @@ const Sidebar: React.FC<SidebarProps> = ({
       {isBatchMode ? (
         <div className="px-3 pb-3 pt-1 flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer text-sm text-secondary">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={selectedIds.size === allVisibleSessionIdsRef.current.length && allVisibleSessionIdsRef.current.length > 0}
-              onChange={handleSelectAll}
+              onCheckedChange={handleSelectAll}
               className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
             />
             {i18nService.t('batchSelectAll')}
           </label>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="destructive"
+              size="sm"
               onClick={handleBatchDeleteClick}
               disabled={selectedIds.size === 0}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                selectedIds.size > 0
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-              }`}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
             >
-              <TrashIcon className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
               {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={handleExitBatchMode}
               className="px-3 py-1.5 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             >
               {i18nService.t('batchCancel')}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -430,15 +433,16 @@ const Sidebar: React.FC<SidebarProps> = ({
               <LoginButton />
             </div>
           )}
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => onShowSettings()}
             className={`inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${hideLogin ? 'w-full' : 'shrink-0'}`}
             aria-label={i18nService.t('settings')}
           >
-            <Cog6ToothIcon className="h-4 w-4 shrink-0" />
+            <Cog className="h-4 w-4 shrink-0" />
             {i18nService.t('settings')}
-          </button>
+          </Button>
           </div>
         </div>
       )}
@@ -450,7 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="flex items-center gap-3 px-5 py-4">
             <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-500" />
+              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
             </div>
             <h2 className="text-base font-semibold text-foreground">
               {i18nService.t('batchDeleteConfirmTitle')}
@@ -464,18 +468,24 @@ const Sidebar: React.FC<SidebarProps> = ({
             </p>
           </div>
           <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setShowBatchDeleteConfirm(false)}
               className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             >
               {i18nService.t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
               onClick={handleBatchDelete}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
             >
               {i18nService.t('batchDelete')} ({selectedIds.size})
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

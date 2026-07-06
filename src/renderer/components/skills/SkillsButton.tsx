@@ -1,7 +1,8 @@
+import { Button } from '@shared/components/ui/button';
+import { Puzzle } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 
 import { Skill } from '../../types/skill';
-import PuzzleIcon from '../icons/PuzzleIcon';
 import SkillsPopover from './SkillsPopover';
 
 interface SkillsButtonProps {
@@ -28,15 +29,17 @@ const SkillsButton: React.FC<SkillsButtonProps> = ({
 
   return (
     <div className="relative">
-      <button
+      <Button
         ref={buttonRef}
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={handleButtonClick}
-        className={`p-2 rounded-xl bg-surface text-secondary hover:text-primary dark:hover:text-primary hover:bg-surface-raised transition-colors ${className}`}
+        className={`rounded-xl bg-surface text-secondary hover:text-primary dark:hover:text-primary hover:bg-surface-raised ${className}`}
         title="Skills"
       >
-        <PuzzleIcon className="h-5 w-5" />
-      </button>
+        <Puzzle className="h-5 w-5" />
+      </Button>
       <SkillsPopover
         isOpen={isPopoverOpen}
         onClose={handleClosePopover}

@@ -1,4 +1,5 @@
-import { ChatBubbleLeftRightIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { MessageCircle, TriangleAlert } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -96,12 +97,12 @@ const EngineStartupOverlay: React.FC = () => {
 
   const tone = isError
     ? {
-        Icon: ExclamationTriangleIcon,
+        Icon: TriangleAlert,
         iconClass: 'bg-red-500/15 text-red-500',
         messageClass: 'text-red-700 dark:text-red-200',
       }
     : {
-        Icon: ChatBubbleLeftRightIcon,
+        Icon: MessageCircle,
         iconClass: 'bg-primary/15 text-primary',
         messageClass: 'text-foreground',
       };
@@ -141,13 +142,9 @@ const EngineStartupOverlay: React.FC = () => {
 
         {isError && (
           <div className="flex justify-end gap-2 border-t border-border bg-surface/40 px-4 py-2">
-            <button
-              type="button"
-              onClick={retry}
-              className="inline-flex h-8 items-center rounded-lg bg-red-500/15 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/25 dark:text-red-400"
-            >
+            <Button variant="secondary" size="sm" onClick={retry}>
               {i18nService.t('retry') || '重试'}
-            </button>
+            </Button>
           </div>
         )}
       </div>

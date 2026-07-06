@@ -1,12 +1,12 @@
-import { CheckIcon } from '@heroicons/react/24/outline';
+import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
+import { Check, Puzzle, Search } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
-import PuzzleIcon from '../icons/PuzzleIcon';
-import SearchIcon from '../icons/SearchIcon';
 
 interface AgentSkillSelectorProps {
   selectedSkillIds: string[];
@@ -65,13 +65,13 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
 
       <div className="mb-3 shrink-0">
         <div className="relative min-w-0 flex-1">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary/45" />
-          <input
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary/45" />
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={i18nService.t('agentSkillsSearch')}
-            className="h-9 w-full rounded-md border border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-secondary/45 focus:border-border focus:bg-surface focus:outline-none"
+            className="h-9 w-full border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-secondary/45 focus-visible:border-border focus-visible:bg-surface"
           />
         </div>
       </div>
@@ -92,9 +92,10 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
                 : '';
 
               return (
-                <button
+                <Button
                   key={skill.id}
                   type="button"
+                  variant="outline"
                   onClick={() => toggle(skill.id)}
                   className={`group relative flex min-h-[96px] items-start gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-raised/50 ${
                     isSelected
@@ -103,7 +104,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
                   }`}
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-raised">
-                    <PuzzleIcon className="h-[18px] w-[18px] text-secondary" />
+                    <Puzzle className="h-[18px] w-[18px] text-secondary" />
                   </div>
                   <div className="min-w-0 flex-1 pr-8">
                     <div className="truncate text-sm font-medium leading-5 text-foreground">
@@ -122,9 +123,9 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
                         : 'border-border bg-surface group-hover:border-primary/50'
                     }`}
                   >
-                    {isSelected && <CheckIcon className="h-3.5 w-3.5 text-white" />}
+                    {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
                   </div>
-                </button>
+                </Button>
               );
             })}
           </div>
