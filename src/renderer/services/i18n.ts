@@ -269,6 +269,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceLoad: '加载',
     localInferenceConfigureLaunch: '配置启动',
     localInferenceUnload: '卸载',
+    localInferenceQuantization: '量化',
     localInferenceUnloading: '卸载中...',
     localInferenceUnloadingHint: '正在卸载这个模型，按钮已暂时锁定。',
     localInferenceInfer: '推理',
@@ -415,6 +416,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'localInferenceStatus_installed': '已安装',
     'localInferenceStatus_starting': '启动中',
     'localInferenceStatus_running': '运行中',
+    localInferenceContextShort: '上下文',
     'localInferenceStatus_stopped': '已停止',
     'localInferenceStatus_error': '异常',
 
@@ -2322,6 +2324,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceLoad: 'Load',
     localInferenceConfigureLaunch: 'Configure Launch',
     localInferenceUnload: 'Unload',
+    localInferenceQuantization: 'Quantization',
     localInferenceUnloading: 'Unloading...',
     localInferenceUnloadingHint: 'This model is unloading and its actions are temporarily locked.',
     localInferenceInfer: 'Infer',
@@ -2468,6 +2471,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'localInferenceStatus_installed': 'Installed',
     'localInferenceStatus_starting': 'Starting',
     'localInferenceStatus_running': 'Running',
+    localInferenceContextShort: 'context',
     'localInferenceStatus_stopped': 'Stopped',
     'localInferenceStatus_error': 'Error',
 
