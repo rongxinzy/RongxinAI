@@ -4552,9 +4552,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   };
 
   return (
-    <Modal onClose={onClose} overlayClassName="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3">
+    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 shadow-modal ring-border">
       <div
-        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-2xl border-border border shadow-modal overflow-hidden modal-content"
+        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content"
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
