@@ -917,13 +917,23 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async listLocalModels(): Promise<LlamaCppModel[]> {
+    const scannedModels = scanLocalGgufModels(this.getModelsDir());
     let routerModels: LlamaCppModel[] = [];
     try {
       routerModels = await (await this.client()).listModels();
     } catch (error) {
       console.warn('[LlamaCpp] failed to list router models, using local GGUF scan:', error);
     }
-    return mergeLocalModels(routerModels, scanLocalGgufModels(this.getModelsDir()));
+    const scannedPathSet = new Set(
+      scannedModels
+        .map(model => model.path?.trim())
+        .filter((value): value is string => Boolean(value))
+        .map(modelPath => path.resolve(modelPath)),
+    );
+    return mergeLocalModels(routerModels, scannedModels).filter(model => {
+      const modelPath = model.path?.trim();
+      return Boolean(modelPath && scannedPathSet.has(path.resolve(modelPath)));
+    });
   }
 
   async deleteModel(
@@ -961,6 +971,8 @@ export class LlamaCppManager extends EventEmitter {
     await (await this.client()).unloadModel(modelName).catch((): undefined => undefined);
     fs.rmSync(target, { force: true, recursive: true });
     removeEmptyParentDirs(path.dirname(target), root);
+    this.runtimeContextLengthByModel.delete(modelName);
+    this.clearLastLoadedModel(modelName);
     return { success: true, deleted: true, removedModelName: modelName };
   }
 
@@ -1000,6 +1012,35 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  async importModelFiles(filePaths: string[]): Promise<LlamaCppModel[]> {
+    const modelsDir = this.getModelsDir();
+    const importDir = path.join(modelsDir, 'imported');
+    fs.mkdirSync(importDir, { recursive: true });
+
+    const importedPaths: string[] = [];
+    for (const filePath of filePaths) {
+      const resolvedPath = path.resolve(filePath);
+      if (!resolvedPath.toLowerCase().endsWith('.gguf')) {
+        continue;
+      }
+
+      const targetPath = resolveImportedModelTargetPath(importDir, resolvedPath);
+      fs.copyFileSync(resolvedPath, targetPath);
+      importedPaths.push(targetPath);
+    }
+
+    await this.refreshModelsAfterInstall();
+
+    if (importedPaths.length === 0) {
+      return [];
+    }
+
+    const importedPathSet = new Set(importedPaths.map(targetPath => path.resolve(targetPath)));
+    return scanLocalGgufModels(modelsDir).filter(model =>
+      Boolean(model.path && importedPathSet.has(path.resolve(model.path))),
+    );
   }
 
   async shutdownForQuit(): Promise<LlamaCppStatusSnapshot> {
@@ -1158,6 +1199,21 @@ function normalizePositiveInteger(value: string | undefined): number | undefined
   if (!trimmed) return undefined;
   const parsed = Number.parseInt(trimmed, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function resolveImportedModelTargetPath(importDir: string, sourcePath: string): string {
+  const extension = path.extname(sourcePath) || '.gguf';
+  const baseName = path.basename(sourcePath, extension);
+  let attempt = 0;
+
+  while (true) {
+    const suffix = attempt === 0 ? '' : `-${attempt + 1}`;
+    const candidate = path.join(importDir, `${baseName}${suffix}${extension}`);
+    if (!fs.existsSync(candidate)) {
+      return candidate;
+    }
+    attempt += 1;
+  }
 }
 export {
   isPathInside,

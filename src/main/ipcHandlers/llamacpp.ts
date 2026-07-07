@@ -1,12 +1,17 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron';
+import fs from 'fs';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
+  LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModelLaunchInput,
+  LlamaCppModelPreference,
+  LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
   LlamaCppServiceConfig,
+  LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
@@ -39,6 +44,7 @@ import type { SqliteStore } from '../sqliteStore';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
+const LLAMACPP_MODEL_PREFERENCES_KEY = 'llamacpp_model_preferences';
 const LLAMACPP_UNLOAD_VRAM_POLL_TIMEOUT_MS = 5_000;
 const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
 const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
@@ -330,6 +336,20 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
+  ipcMain.handle(LlamaCppIpcChannel.SetModelsDir, async (_event, modelsDir: unknown) => {
+    const store = options.getStore();
+    const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {};
+    const trimmedModelsDir = typeof modelsDir === 'string' ? modelsDir.trim() : '';
+    if (trimmedModelsDir) {
+      fs.mkdirSync(trimmedModelsDir, { recursive: true });
+    }
+    const nextConfig = sanitizeLlamaCppServiceConfig({
+      ...currentConfig,
+      modelsDir: trimmedModelsDir || undefined,
+    });
+    store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
+    return manager.getModelsDir();
+  });
 
   ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
     return await manager.listLocalModels();
@@ -346,6 +366,11 @@ export function registerLlamaCppIpcHandlers(
     }
 
     const store = options.getStore();
+    const modelPreferences = getLlamaCppModelPreferences(store);
+    if (modelPreferences[result.removedModelName]) {
+      const { [result.removedModelName]: _removedPreference, ...nextPreferences } = modelPreferences;
+      store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
+    }
     const current = store.get<LlamaCppOpenClawAppConfig>('app_config');
     if (!current) return result;
 
@@ -362,9 +387,43 @@ export function registerLlamaCppIpcHandlers(
     const client = await manager.client();
     return await client.showModel(name);
   });
+  ipcMain.handle(LlamaCppIpcChannel.GetModelPreferences, async () => {
+    return getLlamaCppModelPreferences(options.getStore());
+  });
+  ipcMain.handle(LlamaCppIpcChannel.SetModelPreference, async (_event, input: unknown) => {
+    const store = options.getStore();
+    const current = getLlamaCppModelPreferences(store);
+    const next = sanitizeUpdatedModelPreferences(current, input);
+    store.set(LLAMACPP_MODEL_PREFERENCES_KEY, next);
+    return next;
+  });
+  ipcMain.handle(LlamaCppIpcChannel.ImportModelFiles, async (_event, input: unknown) => {
+    const paths = Array.isArray(input)
+      ? input.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [];
+    if (paths.length === 0) {
+      const result: LlamaCppImportModelFilesResult = {
+        success: true,
+        importedModels: [],
+        skippedPaths: [],
+      };
+      return result;
+    }
+    const importedModels = await manager.importModelFiles(paths);
+    const result: LlamaCppImportModelFilesResult = {
+      success: true,
+      importedModels,
+      skippedPaths: paths.filter(filePath => !filePath.trim().toLowerCase().endsWith('.gguf')),
+    };
+    return result;
+  });
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
+    const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(
+      options.getStore(),
+      input,
+    );
     const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
       modelsMax: getLlamaCppServiceConfig(options.getStore()).modelsMax,
       runningModels: await manager.listRunningModels(),
@@ -382,7 +441,7 @@ export function registerLlamaCppIpcHandlers(
       model => model.name === modelName || model.id === modelName,
     );
     const contextLimitViolation = getLlamaCppLaunchContextLimitViolation({
-      requestedContextLength: input.options?.ctxSize,
+      requestedContextLength: inputWithPreferences.options?.ctxSize,
       trainedContextLength:
         targetModel?.trained_context_length ?? targetModel?.details?.context_length,
     });
@@ -393,7 +452,7 @@ export function registerLlamaCppIpcHandlers(
           .replace('{trained}', String(contextLimitViolation.trainedContextLength)),
       );
     }
-    const result = await manager.loadModel({ ...input, model: modelName });
+    const result = await manager.loadModel({ ...inputWithPreferences, model: modelName });
     await refreshRunningModelBindings('llamacpp-model-loaded');
     return result;
   });
@@ -508,6 +567,12 @@ export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceCon
   );
 }
 
+export function getLlamaCppModelPreferences(store: SqliteStore): LlamaCppModelPreferences {
+  return sanitizeLlamaCppModelPreferences(
+    store.get<LlamaCppModelPreferences>(LLAMACPP_MODEL_PREFERENCES_KEY),
+  );
+}
+
 function migrateLegacyLlamaCppConfig(store: SqliteStore): void {
   migrateLegacyServiceConfig(store);
 }
@@ -525,6 +590,100 @@ function migrateLegacyServiceConfig(store: SqliteStore): void {
       device: legacy.cudaVisibleDevices,
     }),
   );
+}
+
+function applyStoredModelPreferencesToLaunchInput(
+  store: SqliteStore,
+  input: LlamaCppModelLaunchInput,
+): LlamaCppModelLaunchInput {
+  if (input.options?.ctxSize) {
+    return input;
+  }
+
+  const preference = getLlamaCppModelPreferences(store)[input.model.trim()];
+  if (!preference?.ctxSize) {
+    return input;
+  }
+
+  return {
+    ...input,
+    options: {
+      ...input.options,
+      ctxSize: preference.ctxSize,
+    },
+  };
+}
+
+function sanitizeLlamaCppModelPreferences(
+  preferences: LlamaCppModelPreferences | undefined,
+): LlamaCppModelPreferences {
+  if (!preferences || typeof preferences !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(preferences)
+      .map(([modelName, preference]) => {
+        const normalizedModelName = typeof modelName === 'string' ? modelName.trim() : '';
+        if (!normalizedModelName) return null;
+        const normalizedPreference = sanitizeLlamaCppModelPreference(preference);
+        if (!normalizedPreference) return null;
+        return [normalizedModelName, normalizedPreference] as const;
+      })
+      .filter((entry): entry is readonly [string, LlamaCppModelPreference] => Boolean(entry)),
+  );
+}
+
+function sanitizeUpdatedModelPreferences(
+  current: LlamaCppModelPreferences,
+  input: unknown,
+): LlamaCppModelPreferences {
+  if (!input || typeof input !== 'object') {
+    return current;
+  }
+
+  const candidate = input as LlamaCppSetModelPreferenceInput;
+  const modelName = typeof candidate.modelName === 'string' ? candidate.modelName.trim() : '';
+  if (!modelName) {
+    return current;
+  }
+
+  const normalizedPreference = sanitizeLlamaCppModelPreference(candidate.preference);
+  if (!normalizedPreference) {
+    const { [modelName]: _removedPreference, ...next } = current;
+    return next;
+  }
+
+  return {
+    ...current,
+    [modelName]: normalizedPreference,
+  };
+}
+
+function sanitizeLlamaCppModelPreference(preference: unknown): LlamaCppModelPreference | null {
+  if (!preference || typeof preference !== 'object') {
+    return null;
+  }
+
+  const candidate = preference as { ctxSize?: unknown };
+  const parsedCtxSize =
+    typeof candidate.ctxSize === 'number'
+      ? candidate.ctxSize
+      : typeof candidate.ctxSize === 'string'
+        ? Number.parseInt(candidate.ctxSize, 10)
+        : undefined;
+  const ctxSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
+
+  if (
+    typeof parsedCtxSize === 'number' &&
+    Number.isFinite(parsedCtxSize) &&
+    parsedCtxSize >= ctxSizeRange.min &&
+    parsedCtxSize <= ctxSizeRange.max
+  ) {
+    return { ctxSize: parsedCtxSize };
+  }
+
+  return null;
 }
 
 export function sanitizeLlamaCppServiceConfig(

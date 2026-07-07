@@ -517,6 +517,42 @@ test('mergeLocalModels ignores router aliases and non-GGUF paths in the local fi
   ]);
 });
 
+test('listLocalModels keeps the current models directory as the source of truth', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-list-local-'));
+  const currentModelPath = path.join(modelsDir, 'current-model.gguf');
+  fs.writeFileSync(currentModelPath, 'gguf');
+
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  manager.client = async () => ({
+    listModels: async () => ([
+      {
+        name: 'current-model',
+        id: 'current-model',
+        model: 'current-model',
+        path: currentModelPath,
+        size: 8,
+        status: 'loaded',
+      },
+      {
+        name: 'stale-model',
+        id: 'stale-model',
+        model: 'stale-model',
+        path: path.join(os.tmpdir(), 'stale-model.gguf'),
+        status: 'unloaded',
+      },
+    ]),
+  } as any);
+
+  await expect(manager.listLocalModels()).resolves.toEqual([
+    expect.objectContaining({
+      name: 'current-model',
+      path: currentModelPath,
+      size: 8,
+      status: 'loaded',
+    }),
+  ]);
+});
+
 test('extractModelScopeFilePaths reads nested ModelScope repo file payloads', () => {
   expect(extractModelScopeFilePaths({
     Data: {
@@ -608,7 +644,20 @@ test('deleteModel removes empty parent directories after deleting a GGUF file', 
   fs.mkdirSync(repoDir, { recursive: true });
   fs.writeFileSync(ggufPath, 'gguf');
 
-  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  const storage = new Map<string, unknown>([['llamacpp_last_loaded_model', 'Qwen3.5-0.8B-GGUF']]);
+  const manager = new LlamaCppManager(
+    () => ({ modelsDir }),
+    undefined,
+    {
+      get: <T>(key: string) => storage.get(key) as T | undefined,
+      set: <T>(key: string, value: T) => {
+        storage.set(key, value);
+      },
+      delete: (key: string) => {
+        storage.delete(key);
+      },
+    },
+  );
   manager.listLocalModels = async () => [{
     name: 'Qwen3.5-0.8B-GGUF',
     id: 'Qwen3.5-0.8B-GGUF',
@@ -630,6 +679,7 @@ test('deleteModel removes empty parent directories after deleting a GGUF file', 
   }));
   expect(fs.existsSync(ggufPath)).toBe(false);
   expect(fs.existsSync(repoDir)).toBe(false);
+  expect(storage.has('llamacpp_last_loaded_model')).toBe(false);
 });
 
 test('installModel cleans already-downloaded files when a later stage is cancelled', async () => {

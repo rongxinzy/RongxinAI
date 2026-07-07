@@ -1,10 +1,12 @@
-import { PanelLeft,Pencil } from 'lucide-react';
+import { Button } from '@shared/components/ui/button';
+import { PanelLeft, Pencil, Settings2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   LlamaCppInstallProgress,
   LlamaCppModel as OllamaModel,
   LlamaCppModelLaunchInput,
+  LlamaCppModelPreferences,
   LlamaCppRunningModel as OllamaRunningModel,
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
@@ -13,6 +15,8 @@ import { notifyLlamaCppRunningModelsChanged } from '../../services/availableMode
 import { i18nService } from '../../services/i18n';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
+import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
+import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
   LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS,
@@ -87,6 +91,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
+  const [modelsDir, setModelsDir] = useState('');
+  const [modelPreferences, setModelPreferences] = useState<LlamaCppModelPreferences>({});
+  const [librarySettingsOpen, setLibrarySettingsOpen] = useState(false);
+  const [draftModelsDir, setDraftModelsDir] = useState('');
+  const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
@@ -220,6 +229,19 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const models = await window.electron.llamacpp.listLocalModels();
     setLocalModels(models);
     return models;
+  }, []);
+
+  const refreshModelsDir = useCallback(async () => {
+    const nextModelsDir = await window.electron.llamacpp.modelsDir();
+    setModelsDir(nextModelsDir);
+    setDraftModelsDir(current => current || nextModelsDir);
+    return nextModelsDir;
+  }, []);
+
+  const refreshModelPreferences = useCallback(async () => {
+    const nextPreferences = await window.electron.llamacpp.getModelPreferences();
+    setModelPreferences(nextPreferences);
+    return nextPreferences;
   }, []);
 
   const refreshRunningModels = useCallback(async () => {
@@ -362,11 +384,20 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void runAction(async () => {
       const nextStatus = await refreshStatus();
       await refreshLocalModels();
+      await refreshModelsDir();
+      await refreshModelPreferences();
       if (nextStatus.status === 'running') {
         await refreshRunningModels();
       }
     });
-  }, [refreshLocalModels, refreshRunningModels, refreshStatus, runAction]);
+  }, [
+    refreshLocalModels,
+    refreshModelPreferences,
+    refreshModelsDir,
+    refreshRunningModels,
+    refreshStatus,
+    runAction,
+  ]);
 
   useEffect(() => {
     const unsubscribers = [
@@ -503,6 +534,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       await window.electron.llamacpp.deleteModel(modelName);
       await refreshLocalModels();
       await refreshRunningModels();
+      await refreshModelPreferences();
       setMarketplaceModels(prev =>
         prev.map(m => {
           const repoName = m.repoId.split('/').pop();
@@ -512,6 +544,56 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       notifyLlamaCppRunningModelsChanged();
     });
   };
+
+  const handlePickModelsDir = useCallback(async () => {
+    const result = await window.electron.dialog.selectDirectory();
+    if (result.success && result.path) {
+      setDraftModelsDir(result.path);
+    }
+  }, []);
+
+  const handleSaveModelsDir = useCallback(() => {
+    void runAction(async () => {
+      const nextModelsDir = await window.electron.llamacpp.setModelsDir(draftModelsDir);
+      setModelsDir(nextModelsDir);
+      setDraftModelsDir(nextModelsDir);
+      await refreshLocalModels();
+      const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
+      if (marketplaceHasSearchedRef.current && params) {
+        await searchMarketplace(params);
+      }
+      showToast(i18nService.t('localInferenceLibrarySaved'), LocalInferenceToastKind.Success);
+      setLibrarySettingsOpen(false);
+    });
+  }, [draftModelsDir, refreshLocalModels, runAction, searchMarketplace, showToast]);
+
+  const handleOpenModelsDir = useCallback(() => {
+    if (!modelsDir.trim()) return;
+    void window.electron.shell.openPath(modelsDir.trim());
+  }, [modelsDir]);
+
+  const handleSaveModelContext = useCallback(
+    (modelName: string, ctxSize?: number) => {
+      void runAction(async () => {
+        const nextPreferences = await window.electron.llamacpp.setModelPreference({
+          modelName,
+          preference: ctxSize ? { ctxSize } : {},
+        });
+        setModelPreferences(nextPreferences);
+        const runningModel = runningModels.find(
+          model => model.name === modelName || model.model === modelName,
+        );
+        showToast(
+          runningModel
+            ? i18nService.t('localInferenceContextSavedReloadRequired')
+            : i18nService.t('localInferenceContextSaved'),
+          LocalInferenceToastKind.Success,
+        );
+        setContextModel(null);
+      });
+    },
+    [runAction, runningModels, showToast],
+  );
 
   return (
     <div className="relative flex h-full flex-1 flex-col bg-background">
@@ -571,16 +653,32 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 </button>
               ))}
             </div>
-            <div
-              className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${
-                isRunning
-                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                  : 'border-border bg-surface text-foreground/80'
-              }`}
-            >
-              {isRunning
-                ? i18nService.t('localInferenceStatus_running')
-                : i18nService.t('localInferenceStatus_stopped')}
+            <div className="flex flex-wrap items-center gap-2">
+              {activeTab === 'models' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDraftModelsDir(modelsDir);
+                    setLibrarySettingsOpen(true);
+                  }}
+                >
+                  <Settings2 data-icon="inline-start" />
+                  {i18nService.t('localInferenceLibrarySettings')}
+                </Button>
+              ) : null}
+              <div
+                className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${
+                  isRunning
+                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                    : 'border-border bg-surface text-foreground/80'
+                }`}
+              >
+                {isRunning
+                  ? i18nService.t('localInferenceStatus_running')
+                  : i18nService.t('localInferenceStatus_stopped')}
+              </div>
             </div>
           </div>
 
@@ -590,11 +688,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               unloadingModelName={unloadingModelName}
               localModels={localModels}
               runningModels={runningModels}
+              modelPreferences={modelPreferences}
               onLoadModel={model => {
                 handleLoadModel(model);
               }}
               onUnload={handleUnload}
               onDelete={handleDelete}
+              onConfigureContext={model => {
+                setContextModel(model);
+              }}
             />
           ) : (
             <MarketplacePanel
@@ -614,6 +716,35 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           )}
         </div>
       </div>
+
+      <ModelLibrarySettingsModal
+        isOpen={librarySettingsOpen}
+        modelsDir={modelsDir}
+        draftModelsDir={draftModelsDir}
+        saving={loading}
+        onClose={() => setLibrarySettingsOpen(false)}
+        onChangeModelsDir={setDraftModelsDir}
+        onPickDirectory={handlePickModelsDir}
+        onOpenDirectory={handleOpenModelsDir}
+        onSave={handleSaveModelsDir}
+      />
+      <ModelContextSettingsModal
+        isOpen={Boolean(contextModel)}
+        model={contextModel}
+        savedContextSize={contextModel ? modelPreferences[contextModel.name]?.ctxSize : undefined}
+        runningContextSize={
+          contextModel
+            ? runningModels.find(
+              model => model.name === contextModel.name || model.model === contextModel.name,
+            )?.runtime_context_length
+            : undefined
+        }
+        onClose={() => setContextModel(null)}
+        onSave={ctxSize => {
+          if (!contextModel) return;
+          handleSaveModelContext(contextModel.name, ctxSize);
+        }}
+      />
     </div>
   );
 };
