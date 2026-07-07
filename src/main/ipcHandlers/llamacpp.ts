@@ -33,12 +33,18 @@ import {
   LlamaCppManager,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
+import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import {
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
   upsertLlamaCppProviderInAppConfig,
 } from '../libs/llamacppOpenClawBinding';
+import {
+  ensureLlamaCppServiceRunning,
+  getLlamaCppServiceStartupFailureI18nKey,
+  LlamaCppServiceStartupReason,
+} from '../libs/llamacppServiceStartup';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
 
@@ -255,6 +261,7 @@ export function registerLlamaCppIpcHandlers(
     broadcast(LlamaCppIpcChannel.StatusChanged, status);
   const sendProgress = (progress: LlamaCppInstallProgress) =>
     broadcast(LlamaCppIpcChannel.InstallProgress, progress);
+  const loadModelLock = new LlamaCppModelLoadLock();
 
   migrateLegacyLlamaCppConfig(options.getStore());
   manager.on('status', status => {
@@ -428,41 +435,53 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
-    const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(
-      options.getStore(),
-      input,
+    return await loadModelLock.runExclusive(
+      modelName,
+      async () => {
+        const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
+          reason: LlamaCppServiceStartupReason.LoadModel,
+        });
+        if (serviceStartupResult.success === false) {
+          throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
+        }
+        const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(
+          options.getStore(),
+          input,
+        );
+        const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
+          modelsMax: getLlamaCppServiceConfig(options.getStore()).modelsMax,
+          runningModels: await manager.listRunningModels(),
+          targetModelName: modelName,
+        });
+        if (loadLimitViolation) {
+          throw new Error(
+            t('llamacppLoadModelLimitReached')
+              .replace('{limit}', String(loadLimitViolation.limit))
+              .replace('{next}', String(loadLimitViolation.next)),
+          );
+        }
+        const localModels = await manager.listLocalModels();
+        const targetModel = localModels.find(
+          model => model.name === modelName || model.id === modelName,
+        );
+        const contextLimitViolation = getLlamaCppLaunchContextLimitViolation({
+          requestedContextLength: inputWithPreferences.options?.ctxSize,
+          trainedContextLength:
+            targetModel?.trained_context_length ?? targetModel?.details?.context_length,
+        });
+        if (contextLimitViolation) {
+          throw new Error(
+            t('llamacppLaunchContextExceedsTrainingLimit')
+              .replace('{requested}', String(contextLimitViolation.requestedContextLength))
+              .replace('{trained}', String(contextLimitViolation.trainedContextLength)),
+          );
+        }
+        const result = await manager.loadModel({ ...inputWithPreferences, model: modelName });
+        await refreshRunningModelBindings('llamacpp-model-loaded');
+        return result;
+      },
+      () => new Error(t('llamacppModelLoadInProgress')),
     );
-    const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
-      modelsMax: getLlamaCppServiceConfig(options.getStore()).modelsMax,
-      runningModels: await manager.listRunningModels(),
-      targetModelName: modelName,
-    });
-    if (loadLimitViolation) {
-      throw new Error(
-        t('llamacppLoadModelLimitReached')
-          .replace('{limit}', String(loadLimitViolation.limit))
-          .replace('{next}', String(loadLimitViolation.next)),
-      );
-    }
-    const localModels = await manager.listLocalModels();
-    const targetModel = localModels.find(
-      model => model.name === modelName || model.id === modelName,
-    );
-    const contextLimitViolation = getLlamaCppLaunchContextLimitViolation({
-      requestedContextLength: inputWithPreferences.options?.ctxSize,
-      trainedContextLength:
-        targetModel?.trained_context_length ?? targetModel?.details?.context_length,
-    });
-    if (contextLimitViolation) {
-      throw new Error(
-        t('llamacppLaunchContextExceedsTrainingLimit')
-          .replace('{requested}', String(contextLimitViolation.requestedContextLength))
-          .replace('{trained}', String(contextLimitViolation.trainedContextLength)),
-      );
-    }
-    const result = await manager.loadModel({ ...inputWithPreferences, model: modelName });
-    await refreshRunningModelBindings('llamacpp-model-loaded');
-    return result;
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
     const modelName = name.trim();
