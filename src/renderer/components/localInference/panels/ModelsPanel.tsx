@@ -9,20 +9,31 @@ import {
   CardTitle,
 } from '@shared/components/ui/card';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@shared/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
 import { Ellipsis, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 import type {
   LlamaCppModel,
+  LlamaCppModelPreference,
+  LlamaCppModelPreferences,
   LlamaCppRunningModel,
 } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
-import { EmptyState } from '../components/Common';
 import { localInferenceMutedTextClass } from '../constants';
 import { formatBytes, formatDate } from '../utils/progress';
 
@@ -31,19 +42,23 @@ type ModelsPanelProps = {
   unloadingModelName: string | null;
   localModels: LlamaCppModel[];
   runningModels: LlamaCppRunningModel[];
+  modelPreferences: LlamaCppModelPreferences;
   onLoadModel: (model: LlamaCppModel) => void;
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
+  onConfigureContext: (model: LlamaCppModel) => void;
 };
 
 type ModelCardProps = {
   model: LlamaCppModel;
   runningModel?: LlamaCppRunningModel;
+  preference?: LlamaCppModelPreference;
   loading: boolean;
   unloading: boolean;
   onLoadModel: () => void;
   onUnload: () => void;
-  onDelete: () => void;
+  onRequestDelete: () => void;
+  onConfigureContext: () => void;
 };
 
 export function ModelsPanel({
@@ -51,12 +66,27 @@ export function ModelsPanel({
   unloadingModelName,
   localModels,
   runningModels,
+  modelPreferences,
   onLoadModel,
   onUnload,
   onDelete,
+  onConfigureContext,
 }: ModelsPanelProps) {
-  const loadedModels = localModels.filter(model => findRunningModel(runningModels, model.name));
+  const [pendingDeleteModel, setPendingDeleteModel] = useState<LlamaCppModel | null>(null);
+  const loadedModels = runningModels.map(runningModel => ({
+    model: findModelByName(localModels, runningModel.name ?? runningModel.model ?? '')
+      ?? toModelCardModel(runningModel),
+    runningModel,
+  }));
   const installedModels = localModels.filter(model => !findRunningModel(runningModels, model.name));
+  const pendingDeleteRunningModel = pendingDeleteModel
+    ? findRunningModel(runningModels, pendingDeleteModel.name)
+    : undefined;
+  const pendingDeleteDisplayName = pendingDeleteModel
+    ? getModelDisplayName(pendingDeleteModel.name)
+    : '';
+  const pendingDeleteBusy =
+    loading || (!!pendingDeleteModel && unloadingModelName === pendingDeleteModel.name);
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,14 +98,16 @@ export function ModelsPanel({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {loadedModels.map(model => (
               <ModelCard
-                key={model.name}
-                model={model}
-                runningModel={findRunningModel(runningModels, model.name)}
+                key={model.runningModel.name ?? model.runningModel.model ?? model.model.name}
+                model={model.model}
+                runningModel={model.runningModel}
+                preference={modelPreferences[model.model.name]}
                 loading={loading}
-                unloading={unloadingModelName === model.name}
-                onLoadModel={() => onLoadModel(model)}
-                onUnload={() => onUnload(model.name)}
-                onDelete={() => onDelete(model.name)}
+                unloading={unloadingModelName === model.model.name}
+                onLoadModel={() => onLoadModel(model.model)}
+                onUnload={() => onUnload(model.model.name)}
+                onRequestDelete={() => setPendingDeleteModel(model.model)}
+                onConfigureContext={() => onConfigureContext(model.model)}
               />
             ))}
           </div>
@@ -86,24 +118,63 @@ export function ModelsPanel({
         <h2 className="text-sm font-semibold text-foreground">
           {i18nService.t('localInferenceRegisteredModels')}
         </h2>
-        {installedModels.length === 0 ? (
-          <EmptyState title={i18nService.t('localInferenceNoModels')} className="min-h-[160px]" />
-        ) : (
+        {installedModels.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {installedModels.map(model => (
               <ModelCard
                 key={model.name}
                 model={model}
+                preference={modelPreferences[model.name]}
                 loading={loading}
                 unloading={unloadingModelName === model.name}
                 onLoadModel={() => onLoadModel(model)}
                 onUnload={() => onUnload(model.name)}
-                onDelete={() => onDelete(model.name)}
+                onRequestDelete={() => setPendingDeleteModel(model)}
+                onConfigureContext={() => onConfigureContext(model)}
               />
             ))}
           </div>
-        )}
+        ) : null}
       </section>
+
+      <Dialog
+        open={Boolean(pendingDeleteModel)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteModel(null);
+        }}
+      >
+        <DialogContent className="max-w-sm" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{i18nService.t('confirmDelete')}</DialogTitle>
+            <DialogDescription>
+              {pendingDeleteRunningModel
+                ? i18nService.t('localInferenceDeleteRunningBlocked')
+                : i18nService.t('localInferenceDeleteConfirmMessage').replace('{name}', pendingDeleteDisplayName)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPendingDeleteModel(null)}
+            >
+              {i18nService.t('cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pendingDeleteBusy || Boolean(pendingDeleteRunningModel)}
+              onClick={() => {
+                if (!pendingDeleteModel || pendingDeleteRunningModel) return;
+                setPendingDeleteModel(null);
+                onDelete(pendingDeleteModel.name);
+              }}
+            >
+              {i18nService.t('delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -111,17 +182,19 @@ export function ModelsPanel({
 function ModelCard({
   model,
   runningModel,
+  preference,
   loading,
   unloading,
   onLoadModel,
   onUnload,
-  onDelete,
+  onRequestDelete,
+  onConfigureContext,
 }: ModelCardProps) {
   const isRunning = Boolean(runningModel);
   const buttonsDisabled = loading || unloading;
   const displayName = getModelDisplayName(model.name);
   const quantization = model.details?.quantization_level?.trim();
-  const contextValue = getPreferredContext(model, runningModel);
+  const contextValue = getPreferredContext(model, runningModel, preference);
   const details = getModelDetails(model);
 
   return (
@@ -142,27 +215,37 @@ function ModelCard({
       />
 
       <CardHeader className="gap-2 pb-0 pt-3">
-        <CardAction className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={i18nService.t('localInferenceMoreParams')}
-                className="text-foreground/45 hover:text-foreground"
-              >
-                <Ellipsis />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[112px]">
-              <DropdownMenuItem variant="destructive" onClick={onDelete}>
-                <Trash2 />
-                {i18nService.t('delete')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </CardAction>
+        {!isRunning ? (
+          <CardAction className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={i18nService.t('localInferenceMoreParams')}
+                  className="text-foreground/45 hover:text-foreground"
+                >
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[112px]">
+                <DropdownMenuItem disabled={buttonsDisabled} onClick={onConfigureContext}>
+                  {i18nService.t('localInferenceConfigureContext')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={buttonsDisabled}
+                  variant="destructive"
+                  onClick={onRequestDelete}
+                >
+                  <Trash2 />
+                  {i18nService.t('delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </CardAction>
+        ) : null}
 
         <div className="flex min-w-0 flex-col gap-1.5 pl-1">
           <CardTitle className="truncate text-[14px] font-semibold text-foreground">
@@ -170,9 +253,6 @@ function ModelCard({
           </CardTitle>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            {isRunning ? (
-              <Badge variant="secondary">{i18nService.t('localInferenceStatus_running')}</Badge>
-            ) : null}
             {quantization ? (
               <Badge variant="outline" className="font-mono text-[11px]">
                 {quantization}
@@ -290,15 +370,33 @@ function findRunningModel(
   return runningModels.find(item => matchesModelName(item, modelName));
 }
 
-function matchesModelName(model: LlamaCppRunningModel, modelName: string): boolean {
+function findModelByName(models: LlamaCppModel[], modelName: string): LlamaCppModel | undefined {
+  return models.find(model => matchesModelName(model, modelName));
+}
+
+function matchesModelName(
+  model: Pick<LlamaCppModel, 'name' | 'model'>,
+  modelName: string,
+): boolean {
   return model.name === modelName || model.model === modelName;
+}
+
+function toModelCardModel(runningModel: LlamaCppRunningModel): LlamaCppModel {
+  return {
+    ...runningModel,
+    name: runningModel.name || runningModel.model || 'unknown',
+    id: runningModel.id || runningModel.name || runningModel.model || 'unknown',
+    model: runningModel.model || runningModel.name || 'unknown',
+  };
 }
 
 function getPreferredContext(
   model: LlamaCppModel,
   runningModel?: LlamaCppRunningModel,
+  preference?: LlamaCppModelPreference,
 ): number | undefined {
   return runningModel?.runtime_context_length
+    ?? preference?.ctxSize
     ?? model.runtime_context_length
     ?? model.trained_context_length
     ?? model.details?.context_length;

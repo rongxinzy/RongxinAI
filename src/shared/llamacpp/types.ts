@@ -263,6 +263,12 @@ export type LlamaCppCancelInstallResult = {
   cancelled: boolean;
 };
 
+export type LlamaCppModelPreference = {
+  ctxSize?: number;
+};
+
+export type LlamaCppModelPreferences = Record<string, LlamaCppModelPreference>;
+
 export type LlamaCppModel = {
   name: string;
   id?: string;
@@ -333,4 +339,16 @@ export type LlamaCppInstallModelInput = {
   revision?: string;
   displayName?: string;
   downloadUrl?: string;
+};
+
+export type LlamaCppSetModelPreferenceInput = {
+  modelName: string;
+  preference: LlamaCppModelPreference;
+};
+
+export type LlamaCppImportModelFilesResult = {
+  success: boolean;
+  importedModels: LlamaCppModel[];
+  skippedPaths: string[];
+  error?: string;
 };

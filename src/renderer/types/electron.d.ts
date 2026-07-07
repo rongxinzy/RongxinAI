@@ -4,11 +4,13 @@ import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/a
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
   LlamaCppCancelInstallResult,
+  LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
+  LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
   LlamaCppRunningModel,
   LlamaCppRuntimeCapabilities,
@@ -16,6 +18,7 @@ import type {
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
   LlamaCppRuntimeUninstallResult,
+  LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
@@ -417,10 +420,14 @@ interface IElectronAPI {
     stop: () => Promise<LlamaCppStatusSnapshot>;
     restart: () => Promise<LlamaCppStatusSnapshot>;
     modelsDir: () => Promise<string>;
+    setModelsDir: (modelsDir: string) => Promise<string>;
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;
+    importModelFiles: (paths: string[]) => Promise<LlamaCppImportModelFilesResult>;
     deleteModel: (name: string) => Promise<{ success: boolean; deleted?: boolean; reason?: 'not-local-file' | 'not-app-managed'; error?: string; removedModelName?: string; clearedDefaultModel?: boolean }>;
     showModel: (name: string) => Promise<unknown>;
+    getModelPreferences: () => Promise<LlamaCppModelPreferences>;
+    setModelPreference: (input: LlamaCppSetModelPreferenceInput) => Promise<LlamaCppModelPreferences>;
     loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
     unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
     installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
