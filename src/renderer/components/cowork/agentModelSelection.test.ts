@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import { LlamaCppOpenClawEligibilityReason } from '../../../shared/llamacpp';
+import { OpenClawProviderId, ProviderName } from '../../../shared/providers';
 import type { Model } from '../../store/slices/modelSlice';
 import { resolveAgentModelSelection, resolveEffectiveModel } from './agentModelSelection';
 
@@ -12,6 +14,19 @@ const models: Model[] = [
 
 const visionModel: Model = { id: 'qwen3.5-plus', name: 'Qwen3.5 Plus', providerKey: 'qwen', supportsImage: true };
 const nonVisionModel: Model = { id: 'glm-5.1', name: 'GLM 5.1', providerKey: 'zhipu', supportsImage: false };
+const ineligibleLlamaCppModel: Model = {
+  id: 'qwen-local',
+  name: 'qwen-local',
+  providerKey: ProviderName.LlamaCpp,
+  llamaCppOpenClawEligibility: {
+    eligible: false,
+    reason: LlamaCppOpenClawEligibilityReason.RuntimeContextTooSmall,
+    requiredContextWindow: 32768,
+    runtimeContextWindow: 4096,
+    trainedContextWindow: 32768,
+    canIncreaseContextWindow: true,
+  },
+};
 
 describe('resolveAgentModelSelection', () => {
   test('uses explicit agent model when present', () => {
@@ -105,6 +120,20 @@ describe('resolveAgentModelSelection', () => {
     expect(result.selectedModel?.id).toBe('gpt-4o');
     expect(result.usesFallback).toBe(true);
     expect(result.hasInvalidExplicitModel).toBe(true);
+  });
+
+  test('keeps explicit llama.cpp selection but marks it ineligible for OpenClaw', () => {
+    const result = resolveAgentModelSelection({
+      agentModel: `${OpenClawProviderId.LlamaCpp}/qwen-local`,
+      availableModels: [...models, ineligibleLlamaCppModel],
+      fallbackModel: models[0],
+      engine: 'openclaw',
+    });
+
+    expect(result.selectedModel?.id).toBe('qwen-local');
+    expect(result.usesFallback).toBe(false);
+    expect(result.hasInvalidExplicitModel).toBe(false);
+    expect(result.hasIneligibleLlamaCppModel).toBe(true);
   });
 });
 

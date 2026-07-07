@@ -19,6 +19,7 @@ import type { Model } from '../../store/slices/modelSlice';
 import type { Agent } from '../../types/agent';
 import type { DingTalkInstanceConfig, DingTalkInstanceStatus, DiscordInstanceConfig, DiscordInstanceStatus, FeishuInstanceConfig, FeishuInstanceStatus, IMGatewayConfig, IMGatewayStatus, QQInstanceConfig, QQInstanceStatus, TelegramInstanceConfig, TelegramInstanceStatus, WecomInstanceConfig, WecomInstanceStatus } from '../../types/im';
 import { getAgentDisplayName, getAgentDisplayNameById, isDefaultAgentId } from '../../utils/agentDisplay';
+import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
@@ -509,6 +510,19 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     );
   };
 
+  const triageLightModel = triageOverride.lightModelRef
+    ? resolveOpenClawModelRef(triageOverride.lightModelRef, availableModels)
+    : null;
+  const triageHeavyModel = triageOverride.heavyModelRef
+    ? resolveOpenClawModelRef(triageOverride.heavyModelRef, availableModels)
+    : null;
+  const triageLightModelIneligible = Boolean(
+    triageLightModel && !isModelSelectableForOpenClaw(triageLightModel),
+  );
+  const triageHeavyModelIneligible = Boolean(
+    triageHeavyModel && !isModelSelectableForOpenClaw(triageHeavyModel),
+  );
+
   return (
     <>
       <Modal
@@ -678,10 +692,23 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                           <SelectItem value="">不指定（使用 Agent 默认模型）</SelectItem>
                           {availableModels.map((m) => {
                             const ref = `${m.providerKey || 'unknown'}/${m.id}`;
-                            return <SelectItem key={ref} value={ref}>{m.name || m.id}</SelectItem>;
+                            return (
+                              <SelectItem
+                                key={ref}
+                                value={ref}
+                                disabled={!isModelSelectableForOpenClaw(m)}
+                              >
+                                {m.name || m.id}
+                              </SelectItem>
+                            );
                           })}
                         </SelectContent>
                       </Select>
+                      {triageLightModelIneligible && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {i18nService.t('agentLlamaCppContextInsufficientHint')}
+                        </p>
+                      )}
                     </div>
 
                     {/* Heavy model */}
@@ -700,10 +727,23 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                           <SelectItem value="">不指定（使用 Agent 默认模型）</SelectItem>
                           {availableModels.map((m) => {
                             const ref = `${m.providerKey || 'unknown'}/${m.id}`;
-                            return <SelectItem key={ref} value={ref}>{m.name || m.id}</SelectItem>;
+                            return (
+                              <SelectItem
+                                key={ref}
+                                value={ref}
+                                disabled={!isModelSelectableForOpenClaw(m)}
+                              >
+                                {m.name || m.id}
+                              </SelectItem>
+                            );
                           })}
                         </SelectContent>
                       </Select>
+                      {triageHeavyModelIneligible && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {i18nService.t('agentLlamaCppContextInsufficientHint')}
+                        </p>
+                      )}
                     </div>
 
                     {/* Cross provider */}

@@ -60,7 +60,7 @@ test('collectAvailableModels does not expose running llama.cpp models when provi
 
 test('collectAvailableModels merges running llama.cpp models only when provider is user-enabled', async () => {
   const listRunningModels = vi.fn(async () => [
-    { name: 'qwen-local', runtime_context_length: 8192 },
+    { name: 'qwen-local', runtime_context_length: 8192, trained_context_length: 32768 },
   ]);
   vi.stubGlobal('window', {
     electron: {
@@ -81,7 +81,13 @@ test('collectAvailableModels merges running llama.cpp models only when provider 
   const models = await collectAvailableModels(config);
 
   expect(listRunningModels).toHaveBeenCalledTimes(1);
-  expect(models.some(model =>
+  const llamaCppModel = models.find(model =>
     model.providerKey === ProviderName.LlamaCpp && model.id === 'qwen-local',
-  )).toBe(true);
+  );
+  expect(llamaCppModel).toBeDefined();
+  expect(llamaCppModel?.llamaCppOpenClawEligibility).toMatchObject({
+    eligible: false,
+    runtimeContextWindow: 8192,
+    trainedContextWindow: 32768,
+  });
 });

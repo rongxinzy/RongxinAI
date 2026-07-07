@@ -3,6 +3,7 @@ import React from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { Model } from '../../store/slices/modelSlice';
+import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import ModelSelector from '../ModelSelector';
 import AgentWorkingDirectoryField from './AgentWorkingDirectoryField';
 
@@ -27,6 +28,7 @@ const AgentDetailToolbar: React.FC<AgentDetailToolbarProps> = ({
       <Box className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
       <ModelSelector
         dropdownDirection="up"
+        isModelSelectable={isModelSelectableForOpenClaw}
         value={model}
         onChange={onModelChange}
         defaultLabel={i18nService.t('agentUseDefaultModel')}

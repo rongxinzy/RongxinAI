@@ -202,7 +202,6 @@ function ModelCard({
   const quantization = model.details?.quantization_level?.trim();
   const contextValue = getPreferredContext(model, runningModel, preference);
   const details = getModelDetails(model);
-
   return (
     <Card
       size="sm"

@@ -1,10 +1,33 @@
-import type { LlamaCppRunningModel } from '../../shared/llamacpp';
+import {
+  assessLlamaCppOpenClawEligibility,
+  type LlamaCppOpenClawEligibility,
+  type LlamaCppRunningModel,
+} from '../../shared/llamacpp';
 import type { ProviderConfig } from '../../shared/providers';
 import { ApiFormat, ProviderName, ProviderRegistry } from '../../shared/providers';
+
+export type {
+  LlamaCppOpenClawEligibility,
+} from '../../shared/llamacpp';
+export {
+  assessLlamaCppOpenClawEligibility,
+  LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
+  LlamaCppOpenClawEligibilityReason,
+} from '../../shared/llamacpp';
 
 const LLAMACPP_MIN_OPENCLAW_MAX_TOKENS = 512;
 const LLAMACPP_MAX_OPENCLAW_MAX_TOKENS = 4096;
 const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
+
+export type LlamaCppRunningModelBinding = {
+  id: string;
+  name: string;
+  supportsImage: false;
+  contextWindow?: number;
+  contextTokens?: number;
+  maxTokens?: number;
+  openClawEligibility: LlamaCppOpenClawEligibility;
+};
 
 export type LlamaCppOpenClawAppConfig = {
   model?: {
@@ -33,7 +56,14 @@ function normalizeLlamaCppProviderModels(
   models: NonNullable<ProviderConfig['models']>,
 ): NonNullable<ProviderConfig['models']> {
   return models
-    .map(model => ({ ...model }))
+    .map(model => ({
+      id: model.id,
+      name: model.name,
+      supportsImage: model.supportsImage,
+      contextWindow: model.contextWindow,
+      contextTokens: model.contextTokens,
+      maxTokens: model.maxTokens,
+    }))
     .sort((modelA, modelB) => {
       const keyA = `${modelA.id.trim()}::${modelA.name.trim()}`;
       const keyB = `${modelB.id.trim()}::${modelB.name.trim()}`;
@@ -128,28 +158,41 @@ export function removeLlamaCppModelFromAppConfig(
   };
 }
 
+function normalizePositiveInteger(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export function buildLlamaCppRunningModelBinding(
-  model: Pick<LlamaCppRunningModel, 'name' | 'model' | 'id' | 'runtime_context_length'>,
-): {
-  id: string;
-  name: string;
-  supportsImage: false;
-  contextWindow: number;
-  contextTokens: number;
-  maxTokens: number;
-} | null {
+  model: Pick<
+    LlamaCppRunningModel,
+    'name' | 'model' | 'id' | 'runtime_context_length' | 'trained_context_length' | 'details'
+  >,
+): LlamaCppRunningModelBinding | null {
   const modelName = model.name?.trim() || model.model?.trim() || model.id?.trim() || '';
-  if (!modelName || !model.runtime_context_length) {
+  if (!modelName) {
     return null;
   }
-  const runtimeContextLength = model.runtime_context_length;
+  const runtimeContextLength = normalizePositiveInteger(model.runtime_context_length);
+  const trainedContextLength = normalizePositiveInteger(
+    model.trained_context_length ?? model.details?.context_length,
+  );
+  const openClawEligibility = assessLlamaCppOpenClawEligibility({
+    runtimeContextWindow: runtimeContextLength,
+    trainedContextWindow: trainedContextLength,
+  });
+
   return {
     id: modelName,
     name: modelName,
     supportsImage: false,
-    contextWindow: runtimeContextLength,
-    contextTokens: runtimeContextLength,
-    maxTokens: deriveLlamaCppOpenClawMaxTokens(runtimeContextLength),
+    ...(runtimeContextLength
+      ? {
+          contextWindow: runtimeContextLength,
+          contextTokens: runtimeContextLength,
+          maxTokens: deriveLlamaCppOpenClawMaxTokens(runtimeContextLength),
+        }
+      : {}),
+    openClawEligibility,
   };
 }
 

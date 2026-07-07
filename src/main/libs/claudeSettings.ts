@@ -8,6 +8,7 @@ import {
   getCoworkOpenAICompatProxyStatus,
   type OpenAICompatProxyTarget,
 } from './coworkOpenAICompatProxy';
+import type { LlamaCppOpenClawEligibility } from './llamacppOpenClawBinding';
 import { readOpenAICodexAuthFile } from './openaiCodexAuth';
 
 type LocalProviderConfig = Omit<ProviderConfig, 'apiFormat'> & { apiFormat?: ApiFormat | 'native' };
@@ -36,6 +37,7 @@ type ProviderModelConfig = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
+  openClawEligibility?: LlamaCppOpenClawEligibility;
 };
 
 type ProviderModelInputConfig = {
@@ -45,6 +47,7 @@ type ProviderModelInputConfig = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
+  openClawEligibility?: LlamaCppOpenClawEligibility;
 };
 
 export type ApiConfigResolution = {
@@ -131,6 +134,7 @@ function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
         contextWindow: model.contextWindow,
         contextTokens: model.contextTokens,
         maxTokens: model.maxTokens,
+        openClawEligibility: model.openClawEligibility,
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
@@ -145,19 +149,33 @@ export function updateLlamaCppRunningModels(models: ProviderModelInputConfig[]):
 }
 
 export function getLlamaCppRunningModels(): ProviderModelConfig[] {
-  return llamaCppRunningModelCache.map((model) => ({ ...model }));
+  return llamaCppRunningModelCache.map((model) => ({
+    ...model,
+    openClawEligibility: model.openClawEligibility
+      ? { ...model.openClawEligibility }
+      : undefined,
+  }));
+}
+
+function findLlamaCppRunningModel(modelId: string): ProviderModelConfig | undefined {
+  const normalized = modelId.trim();
+  if (!normalized) return undefined;
+  return llamaCppRunningModelCache.find((model) => model.id === normalized);
 }
 
 export function isLlamaCppModelRunning(modelId: string): boolean {
-  const normalized = modelId.trim();
-  if (!normalized) return false;
-  return llamaCppRunningModelCache.some((model) => model.id === normalized);
+  return Boolean(findLlamaCppRunningModel(modelId));
 }
 
 export function getLlamaCppModelContextWindow(modelId: string): number | undefined {
-  const normalized = modelId.trim();
-  if (!normalized) return undefined;
-  return llamaCppRunningModelCache.find((model) => model.id === normalized)?.contextWindow;
+  return findLlamaCppRunningModel(modelId)?.contextWindow;
+}
+
+export function getLlamaCppModelOpenClawEligibility(
+  modelId: string,
+): LlamaCppOpenClawEligibility | undefined {
+  const eligibility = findLlamaCppRunningModel(modelId)?.openClawEligibility;
+  return eligibility ? { ...eligibility } : undefined;
 }
 
 function buildServerFallbackModels(effectiveModelId: string): NonNullable<LocalProviderConfig['models']> {
@@ -198,6 +216,9 @@ function normalizeProviderModels(providerName: string, models?: ProviderModelInp
         : undefined,
       maxTokens: typeof model.maxTokens === 'number' && model.maxTokens > 0
         ? model.maxTokens
+        : undefined,
+      openClawEligibility: model.openClawEligibility
+        ? { ...model.openClawEligibility }
         : undefined,
     }));
 }
@@ -246,6 +267,17 @@ function getEffectiveProviderModels(
   return normalizeProviderModels(providerName, providerConfig.models);
 }
 
+function getOpenClawEligibleProviderModels(
+  providerName: string,
+  providerConfig: LocalProviderConfig,
+): ProviderModelConfig[] {
+  const models = getEffectiveProviderModels(providerName, providerConfig);
+  if (providerName !== ProviderName.LlamaCpp) {
+    return models;
+  }
+  return models.filter((model) => model.openClawEligibility?.eligible === true);
+}
+
 function shouldUseOpenAICodexOAuth(providerName: string, providerConfig: LocalProviderConfig): boolean {
   if (providerName !== ProviderName.OpenAI) {
     return false;
@@ -287,7 +319,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
     modelId: string;
   } | null => {
     for (const [providerName, providerConfig] of Object.entries(providers)) {
-      const models = getEffectiveProviderModels(providerName, providerConfig);
+      const models = getOpenClawEligibleProviderModels(providerName, providerConfig);
       if (!isProviderEnabled(providerName, providerConfig) || models.length === 0) {
         continue;
       }
@@ -469,6 +501,10 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
         providerName: matched.providerName,
         codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
         supportsImage: matched.supportsImage,
+        modelName: matched.modelName,
+        contextWindow: matched.contextWindow,
+        contextTokens: matched.contextTokens,
+        maxTokens: matched.maxTokens,
       },
     };
   }
@@ -506,6 +542,11 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
     providerMetadata: {
       providerName: matched.providerName,
       codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
+      supportsImage: matched.supportsImage,
+      modelName: matched.modelName,
+      contextWindow: matched.contextWindow,
+      contextTokens: matched.contextTokens,
+      maxTokens: matched.maxTokens,
     },
   };
 }
@@ -576,6 +617,9 @@ export function resolveRawApiConfig(): ApiConfigResolution {
       codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
       supportsImage: matched.supportsImage,
       modelName: matched.modelName,
+      contextWindow: matched.contextWindow,
+      contextTokens: matched.contextTokens,
+      maxTokens: matched.maxTokens,
     },
   };
 }
@@ -717,7 +761,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
     if (!effectiveBaseURL) continue;
 
-    const models = getEffectiveProviderModels(providerName, providerConfig);
+    const models = getOpenClawEligibleProviderModels(providerName, providerConfig);
     if (models.length === 0) continue;
 
     result.push({

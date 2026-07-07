@@ -413,13 +413,13 @@ test('continueSession allows new llama.cpp turns when only context window is cac
   setAvailabilityGuard(adapter, () => ({ available: true }));
   (adapter as unknown as { options: Record<string, unknown> }).options = {
     ...(adapter as unknown as { options: Record<string, unknown> }).options,
-    getModelContextWindow: () => 16384,
+    getModelContextWindow: () => 32768,
   };
   (adapter as unknown as {
     sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
   }).sessionTokenBudgetCache.set(
     'agent:main:lobsterai:session-1',
-    { contextTokens: 16384 },
+    { contextTokens: 32768 },
   );
 
   await adapter.continueSession('session-1', 'hello');
@@ -427,7 +427,7 @@ test('continueSession allows new llama.cpp turns when only context window is cac
   expect(requests.some((request) => request.method === 'chat.send')).toBe(true);
 });
 
-test('continueSession rejects llama.cpp turns when fresh total tokens exceed runtime window', async () => {
+test('continueSession rejects llama.cpp turns when the runtime context window is below the OpenClaw minimum', async () => {
   const { adapter, requests } = createRunTurnAdapter({
     agentModel: 'llamacpp/qwen-local',
   });
@@ -440,7 +440,28 @@ test('continueSession rejects llama.cpp turns when fresh total tokens exceed run
     sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
   }).sessionTokenBudgetCache.set(
     'agent:main:lobsterai:session-1',
-    { contextTokens: 4096, totalTokens: 4096, totalTokensFresh: true },
+    { contextTokens: 4096 },
+  );
+
+  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow('ctx-size');
+
+  expect(requests.some((request) => request.method === 'chat.send')).toBe(false);
+});
+
+test('continueSession rejects llama.cpp turns when fresh total tokens exceed runtime window', async () => {
+  const { adapter, requests } = createRunTurnAdapter({
+    agentModel: 'llamacpp/qwen-local',
+  });
+  setAvailabilityGuard(adapter, () => ({ available: true }));
+  (adapter as unknown as { options: Record<string, unknown> }).options = {
+    ...(adapter as unknown as { options: Record<string, unknown> }).options,
+    getModelContextWindow: () => 32768,
+  };
+  (adapter as unknown as {
+    sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
+  }).sessionTokenBudgetCache.set(
+    'agent:main:lobsterai:session-1',
+    { contextTokens: 32768, totalTokens: 30000, totalTokensFresh: true },
   );
 
   await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow(
