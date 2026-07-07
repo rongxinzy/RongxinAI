@@ -33,7 +33,7 @@ export const TOKEN_CONTRACT = {
 
   // ── Text hierarchy ──
   'text-primary':       '--lobster-text-primary',
-  'text-secondary':     '--lobster-text-secondary',
+  'text-muted-foreground':     '--lobster-text-secondary',
   'text-muted':         '--lobster-text-muted',
 
   // ── Borders ──

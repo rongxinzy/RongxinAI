@@ -120,7 +120,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={onToggleSidebar}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
               >
                 <PanelLeft className="h-4 w-4" />
               </Button>
@@ -129,7 +129,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={onNewChat}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -141,7 +141,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               variant="ghost"
               size="icon"
               onClick={handleBackToList}
-              className="non-draggable p-2 rounded-lg hover:bg-surface-raised text-secondary transition-colors"
+              className="non-draggable p-2 rounded-lg hover:bg-surface-raised text-muted-foreground transition-colors"
               aria-label={i18nService.t('back')}
             >
               <ArrowLeft className="h-5 w-5" />
@@ -254,13 +254,13 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             <h4 className="text-sm font-semibold text-foreground mb-2">
               {i18nService.t('taskFormUnsavedChanges')}
             </h4>
-            <p className="text-sm text-secondary mb-4">{i18nService.t('taskFormLeaveConfirm')}</p>
+            <p className="text-sm text-muted-foreground mb-4">{i18nService.t('taskFormLeaveConfirm')}</p>
             <div className="flex justify-end gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowLeaveConfirm(false)}
-                className="px-4 py-2 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors border border-border"
+                className="px-4 py-2 text-sm rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors border border-border"
               >
                 {i18nService.t('taskFormStay')}
               </Button>

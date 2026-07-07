@@ -28,7 +28,7 @@ export const rose: ThemeDefinition = {
     'chat-bot':           '#35141e',
     'chat-bot-foreground': '#ffe4e6',
     'text-primary':       '#fff1f2',
-    'text-secondary':     '#c49aa4',
+    'text-muted-foreground':     '#c49aa4',
     'text-muted':         '#8a5a64',
     'border':             'rgba(74,26,42,0.7)',
     'border-subtle':      'rgba(74,26,42,0.35)',

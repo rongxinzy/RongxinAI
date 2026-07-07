@@ -871,7 +871,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
       >
         {/* Modal header */}
         <div className="bg-surface-raised px-4 py-2 flex items-center justify-between border-b border-border flex-shrink-0">
-          <span className="font-mono text-xs text-secondary opacity-70">{lang ?? 'code'}</span>
+          <span className="font-mono text-xs text-muted-foreground opacity-70">{lang ?? 'code'}</span>
           <div className="flex items-center gap-0.5">
             <CodeBlockTooltip content={searchOpen ? t('codeBlockSearchClose') : t('codeBlockSearch')}>
               <HeaderButton
@@ -962,7 +962,7 @@ const HeaderButton: React.FC<{
       'h-7 w-7 rounded-md transition-colors transform-gpu',
       active
         ? 'bg-surface text-foreground'
-        : 'text-secondary hover:bg-surface hover:text-foreground',
+        : 'text-muted-foreground hover:bg-surface hover:text-foreground',
     ].join(' ')}
     aria-label={ariaLabel}
   >
@@ -1390,7 +1390,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               variant="ghost"
               size="icon"
               onClick={handleCopy}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-secondary hover:bg-surface-raised hover:text-foreground transition-colors transform-gpu"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors transform-gpu"
               aria-label={i18nService.t('copyToClipboard')}
             >
               {isCopied ? (
@@ -1429,7 +1429,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
         />
       )}
       {/* Header */}
-      <div className="bg-surface-raised/70 border-b border-border-subtle px-3.5 py-1.5 text-xs text-secondary font-medium flex items-center justify-between">
+      <div className="bg-surface-raised/70 border-b border-border-subtle px-3.5 py-1.5 text-xs text-muted-foreground font-medium flex items-center justify-between">
         <span className="font-mono opacity-70">{displayLang}</span>
         <div className="flex items-center gap-0.5">
           {/* Collapse / expand the entire code body */}

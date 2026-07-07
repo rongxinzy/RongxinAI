@@ -28,7 +28,7 @@ export const sunset: ThemeDefinition = {
     'chat-bot':           '#2c1a10',
     'chat-bot-foreground': '#ffedd5',
     'text-primary':       '#fff7ed',
-    'text-secondary':     '#c4a08a',
+    'text-muted-foreground':     '#c4a08a',
     'text-muted':         '#8a6a50',
     'border':             'rgba(61,36,20,0.7)',
     'border-subtle':      'rgba(61,36,20,0.35)',

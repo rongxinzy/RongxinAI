@@ -43,7 +43,7 @@ const AgentConfirmDialog: React.FC<AgentConfirmDialogProps> = ({
           <h2 className="text-base font-semibold text-foreground">
             {title}
           </h2>
-          <p className="mt-1.5 text-sm leading-5 text-secondary">
+          <p className="mt-1.5 text-sm leading-5 text-muted-foreground">
             {message}
           </p>
         </div>

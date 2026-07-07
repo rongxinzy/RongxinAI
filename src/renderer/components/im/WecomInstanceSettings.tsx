@@ -152,7 +152,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
             ? i18nService.t('imWecomQuickSetupPending')
             : i18nService.t('imWecomScanBtn')}
         </Button>
-        <p className="text-xs text-secondary">
+        <p className="text-xs text-muted-foreground">
           {i18nService.t('imWecomScanHint')}
         </p>
         {quickSetupStatus === 'success' && (
@@ -172,7 +172,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
       {/* Divider with "or manually enter" */}
       <div className="relative flex items-center">
         <div className="flex-1 border-t border-border-subtle" />
-        <span className="px-3 text-xs text-secondary whitespace-nowrap">
+        <span className="px-3 text-xs text-muted-foreground whitespace-nowrap">
           {i18nService.t('imWecomOrManual')}
         </span>
         <div className="flex-1 border-t border-border-subtle" />
@@ -180,7 +180,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
 
       {/* Guide */}
       <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-        <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
           <li>{i18nService.t('imWecomGuideStep1')}</li>
           <li>{i18nService.t('imWecomGuideStep2')}</li>
           <li>{i18nService.t('imWecomGuideStep3')}</li>
@@ -204,7 +204,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
 
       {/* Bot ID */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Bot ID
         </label>
         <div className="relative">
@@ -235,7 +235,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
 
       {/* Secret */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Secret
         </label>
         <div className="relative">
@@ -272,20 +272,20 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-secondary">
+        <p className="text-xs text-muted-foreground">
           {i18nService.t('imWecomCredentialHint')}
         </p>
       </div>
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               DM Policy
             </label>
             <Select
@@ -313,7 +313,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
 
           {/* Allow From */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Allow From (User IDs)
             </label>
             <div className="flex gap-2">
@@ -365,7 +365,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.allowFrom.filter((uid) => uid !== id);
                         onConfigChange({ allowFrom: newIds });
@@ -382,7 +382,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Policy
             </label>
             <Select
@@ -407,7 +407,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
           {/* Group Allow From */}
           {instance.groupPolicy === 'allowlist' && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Group Allow From (Group IDs)
               </label>
               <div className="flex gap-2">
@@ -459,7 +459,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                        className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                         onClick={() => {
                           const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
                           onConfigChange({ groupAllowFrom: newIds });
@@ -477,7 +477,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
 
           {/* Send Thinking Message */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-secondary">
+            <label className="text-xs font-medium text-muted-foreground">
               {i18nService.t('imSendThinkingMessage')}
             </label>
             <Switch

@@ -123,7 +123,7 @@ const AllRunsHistory: React.FC = () => {
                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                   isActive
                     ? cfg.activeColor
-                    : 'border-transparent text-secondary hover:bg-surface-raised'
+                    : 'border-transparent text-muted-foreground hover:bg-surface-raised'
                 }`}
               >
                 {i18nService.t(cfg.label)}
@@ -140,7 +140,7 @@ const AllRunsHistory: React.FC = () => {
             onChange={v => handleFilterChange({ ...filter, startDate: v || undefined })}
             placeholder={i18nService.t('scheduledTasksFilterStartDate')}
           />
-          <span className="text-xs text-secondary/50">–</span>
+          <span className="text-xs text-muted-foreground/50">–</span>
           <DateInput
             value={filter.endDate ?? ''}
             min={filter.startDate}
@@ -153,7 +153,7 @@ const AllRunsHistory: React.FC = () => {
               variant="ghost"
               size="icon-xs"
               onClick={handleClearFilter}
-              className="ml-1 p-0.5 rounded text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+              className="ml-1 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
               title={i18nService.t('scheduledTasksFilterClear')}
             >
               <X className="h-3.5 w-3.5" />
@@ -165,8 +165,8 @@ const AllRunsHistory: React.FC = () => {
       {/* Empty state */}
       {isEmpty && (
         <div className="flex flex-col items-center justify-center py-16 px-6">
-          <Clock className="h-12 w-12 text-secondary/40 mb-4" />
-          <p className="text-sm font-medium text-secondary">
+          <Clock className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <p className="text-sm font-medium text-muted-foreground">
             {hasActiveFilter
               ? i18nService.t('scheduledTasksFilterNoResults')
               : i18nService.t('scheduledTasksHistoryEmpty')}
@@ -177,13 +177,13 @@ const AllRunsHistory: React.FC = () => {
       {/* Column headers */}
       {!isEmpty && (
         <div className="grid grid-cols-[1fr_1fr_80px] items-center gap-3 px-4 py-2 border-b border-border-subtle">
-          <div className="text-xs font-medium text-secondary">
+          <div className="text-xs font-medium text-muted-foreground">
             {i18nService.t('scheduledTasksHistoryColTitle')}
           </div>
-          <div className="text-xs font-medium text-secondary">
+          <div className="text-xs font-medium text-muted-foreground">
             {i18nService.t('scheduledTasksHistoryColTime')}
           </div>
-          <div className="text-xs font-medium text-secondary">
+          <div className="text-xs font-medium text-muted-foreground">
             {i18nService.t('scheduledTasksHistoryColStatus')}
           </div>
         </div>
@@ -231,7 +231,7 @@ const AllRunsHistory: React.FC = () => {
             </div>
 
             {/* Run time + duration */}
-            <div className="text-sm text-secondary truncate">
+            <div className="text-sm text-muted-foreground truncate">
               {formatDateTime(new Date(run.startedAt))}
               {run.durationMs !== null && (
                 <span className="ml-1.5 text-xs opacity-70">

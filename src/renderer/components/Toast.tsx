@@ -23,7 +23,7 @@ const Toast: React.FC<ToastProps> = ({ message, onClose }) => {
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="shrink-0 text-secondary hover:text-foreground rounded-full p-1 hover:bg-surface-raised transition-colors"
+              className="shrink-0 text-muted-foreground hover:text-foreground rounded-full p-1 hover:bg-surface-raised transition-colors"
               aria-label="Close"
             >
               <X className="h-4 w-4" />

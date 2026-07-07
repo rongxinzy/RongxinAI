@@ -36,7 +36,7 @@ const PlatformGuide: React.FC<{
   guideUrl?: string;
 }> = ({ steps, guideUrl }) => (
   <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-    <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
       {steps.map((step, i) => (
         <li key={i}>{step}</li>
       ))}
@@ -82,7 +82,7 @@ const PairingSection: React.FC<{
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-secondary">
+      <label className="block text-xs font-medium text-muted-foreground">
         {i18nService.t('imPairingApproval')}
       </label>
       <div className="flex gap-2">
@@ -323,7 +323,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
             >
               {i18nService.t('dingtalkBotCreateWizardScanBtn')}
             </Button>
-            <p className="text-xs text-secondary">
+            <p className="text-xs text-muted-foreground">
               {i18nService.t('dingtalkBotCreateWizardScanHint')}
             </p>
           </>
@@ -348,7 +348,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
         {qrStatus === 'loading' && (
           <div className="flex flex-col items-center gap-2 py-2">
             <RefreshCw className="h-7 w-7 text-primary animate-spin" />
-            <span className="text-xs text-secondary">{i18nService.t('dingtalkBotCreateWizardGenerating')}</span>
+            <span className="text-xs text-muted-foreground">{i18nService.t('dingtalkBotCreateWizardGenerating')}</span>
           </div>
         )}
         {(qrStatus === 'showing' || qrStatus === 'expired') && qrUrl && (
@@ -370,13 +370,13 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
                 </div>
               )}
             </div>
-            <p className="text-xs text-secondary max-w-[240px]">
+            <p className="text-xs text-muted-foreground max-w-[240px]">
               {qrStatus === 'expired'
                 ? i18nService.t('dingtalkBotCreateWizardQrcodeExpired')
                 : i18nService.t('dingtalkBotCreateWizardQrcodeDesc')}
             </p>
             {qrStatus === 'showing' && (
-              <p className="text-xs text-secondary">{qrTimeLeft}s</p>
+              <p className="text-xs text-muted-foreground">{qrTimeLeft}s</p>
             )}
           </div>
         )}
@@ -391,7 +391,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
       {/* Divider */}
       <div className="relative flex items-center">
         <div className="flex-1 border-t border-border-subtle" />
-        <span className="px-3 text-xs text-secondary whitespace-nowrap">
+        <span className="px-3 text-xs text-muted-foreground whitespace-nowrap">
           {i18nService.t('dingtalkBotCreateWizardOrManual')}
         </span>
         <div className="flex-1 border-t border-border-subtle" />
@@ -410,7 +410,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
       {/* Client ID (AppKey) */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Client ID (AppKey)<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
         </label>
         <div className="relative">
@@ -441,7 +441,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
       {/* Client Secret (AppSecret) */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Client Secret (AppSecret)<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
         </label>
         <div className="relative">
@@ -482,13 +482,13 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               DM Policy
             </label>
             <Select
@@ -517,7 +517,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
           {/* Allow From (User IDs) */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Allow From (User IDs)
             </label>
             <div className="flex gap-2">
@@ -569,7 +569,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.allowFrom.filter((uid) => uid !== id);
                         onConfigChange({ allowFrom: newIds });
@@ -586,7 +586,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Policy
             </label>
             <Select
@@ -609,7 +609,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
           {/* Session Timeout (deprecated) */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary opacity-60">
+            <label className="block text-xs font-medium text-muted-foreground opacity-60">
               {i18nService.t('imSessionTimeout')}
             </label>
             <Input
@@ -629,7 +629,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
           </div>
 
           {/* Separate Session by Conversation */}
-          <label className="flex items-center gap-2 text-xs text-secondary">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <Checkbox
               checked={instance.separateSessionByConversation}
               onCheckedChange={(checked: boolean) => {
@@ -647,7 +647,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
           {/* Group Session Scope (only visible when separateSessionByConversation is on) */}
           {instance.separateSessionByConversation && (
             <div className="space-y-1.5 pl-4">
-              <label className="block text-xs font-medium text-secondary">
+              <label className="block text-xs font-medium text-muted-foreground">
                 {i18nService.t('imGroupSessionScope')}
               </label>
               <Select
@@ -670,7 +670,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
           )}
 
           {/* Shared Memory Across Conversations */}
-          <label className="flex items-center gap-2 text-xs text-secondary">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <Checkbox
               checked={instance.sharedMemoryAcrossConversations}
               onCheckedChange={(checked: boolean) => {
@@ -687,7 +687,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
 
           {/* Gateway Base URL */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               {i18nService.t('imGatewayBaseUrl')}
             </label>
             <Input
@@ -702,7 +702,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
           </div>
 
           {/* Debug */}
-          <label className="flex items-center gap-2 text-xs text-secondary">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <Checkbox
               checked={instance.debug}
               onCheckedChange={(checked: boolean) => {

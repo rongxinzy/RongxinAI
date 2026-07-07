@@ -2782,7 +2782,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('autoLaunch')}
               </h4>
               <label className="flex items-center justify-between">
-                <span className="text-sm text-secondary">
+                <span className="text-sm text-muted-foreground">
                   {i18nService.t('autoLaunchDescription')}
                 </span>
                 <Switch
@@ -2815,7 +2815,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('preventSleep')}
               </h4>
               <label className="flex items-center justify-between">
-                <span className="text-sm text-secondary">
+                <span className="text-sm text-muted-foreground">
                   {i18nService.t('preventSleepDescription')}
                 </span>
                 <Switch
@@ -2848,7 +2848,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('useSystemProxy')}
               </h4>
               <label className="flex items-center justify-between">
-                <span className="text-sm text-secondary">
+                <span className="text-sm text-muted-foreground">
                   {i18nService.t('useSystemProxyDescription')}
                 </span>
                 <Switch
@@ -2863,7 +2863,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('sqliteAutoBackupEnabled')}
               </h4>
               <label className="flex items-center justify-between">
-                <span className="text-sm text-secondary">
+                <span className="text-sm text-muted-foreground">
                   {i18nService.t('sqliteAutoBackupEnabledDescription')}
                 </span>
                 <Switch
@@ -2879,7 +2879,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 {i18nService.t('skipMissedJobs')}
               </h4>
               <label className="flex items-center justify-between">
-                <span className="text-sm text-secondary">
+                <span className="text-sm text-muted-foreground">
                   {i18nService.t('skipMissedJobsDescription')}
                 </span>
                 <Switch
@@ -2901,7 +2901,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       case 'coworkAgentEngine':
         return (
           <div className="space-y-6">
-            <p className="text-sm text-secondary">
+            <p className="text-sm text-muted-foreground">
               {i18nService.t('coworkEngineArchInfo')}
             </p>
             <div className="space-y-3">
@@ -2911,7 +2911,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <span className="block font-medium text-foreground">
                     Pi
                   </span>
-                  <span className="block text-xs text-secondary">
+                  <span className="block text-xs text-muted-foreground">
                     {i18nService.t('coworkEnginePiRole')}
                   </span>
                 </span>
@@ -2922,7 +2922,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <span className="block font-medium text-foreground">
                     OpenClaw
                   </span>
-                  <span className="block text-xs text-secondary">
+                  <span className="block text-xs text-muted-foreground">
                     {i18nService.t('coworkEngineOpenClawRole')}
                   </span>
                 </span>
@@ -2930,7 +2930,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             </div>
             {isOpenClawAgentEngine && (
               <div className="space-y-3 rounded-xl border px-4 py-4 border-border">
-                <div className="text-xs text-secondary">
+                <div className="text-xs text-muted-foreground">
                   {i18nService.t('coworkOpenClawInstallHint')}
                 </div>
                 <div className={`rounded-xl border px-4 py-3 text-sm ${openClawEngineStatus?.phase === 'error'
@@ -2968,7 +2968,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <div className="text-sm font-medium text-foreground">
                     {i18nService.t('coworkMemoryCrudTitle')}
                   </div>
-                  <div className="text-xs text-secondary">
+                  <div className="text-xs text-muted-foreground">
                     {i18nService.t('coworkMemoryManageHint')}
                   </div>
                 </div>
@@ -2982,7 +2982,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               </div>
 
               {coworkMemoryStats && (
-                <div className="text-xs text-secondary">
+                <div className="text-xs text-muted-foreground">
                   {`${i18nService.t('coworkMemoryTotalLabel')}: ${coworkMemoryStats.total}`}
                 </div>
               )}
@@ -2997,11 +2997,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
               <div className="rounded-lg border border-border">
                 {coworkMemoryListLoading ? (
-                  <div className="px-3 py-3 text-xs text-secondary">
+                  <div className="px-3 py-3 text-xs text-muted-foreground">
                     {i18nService.t('loading')}
                   </div>
                 ) : coworkMemoryEntries.length === 0 ? (
-                  <div className="px-3 py-3 text-xs text-secondary">
+                  <div className="px-3 py-3 text-xs text-muted-foreground">
                     {i18nService.t('coworkMemoryEmpty')}
                   </div>
                 ) : (
@@ -3205,7 +3205,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       variant="ghost"
                       size="icon"
                       onClick={() => void window.electron.shell.openExternal(ProviderRegistry.get(activeProvider)!.website!)}
-                      className="text-secondary hover:text-primary"
+                      className="text-muted-foreground hover:text-primary"
                       title={i18nService.t('visitOfficialSite')}
                       aria-label={i18nService.t('visitOfficialSite')}
                     >
@@ -3222,7 +3222,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
               {activeProvider === ProviderName.LlamaCpp && (
                 <div className="rounded-xl border border-border bg-surface px-3 py-2">
-                  <p className="text-xs text-secondary">
+                  <p className="text-xs text-muted-foreground">
                     {i18nService.t('llamaCppProviderSettingsTitle')}
                   </p>
                 </div>
@@ -3258,7 +3258,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           {!minimaxIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('minimaxOAuthTabApiKey')}</p>
-                        <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('minimaxAuthApiKeyDesc')}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{i18nService.t('minimaxAuthApiKeyDesc')}</p>
                       </Button>
                       <Button
                         type="button"
@@ -3278,7 +3278,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           {minimaxIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('minimaxOAuthTabOAuth')}</p>
-                        <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('minimaxAuthOAuthDesc')}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{i18nService.t('minimaxAuthOAuthDesc')}</p>
                       </Button>
                     </div>
                   </div>
@@ -3318,7 +3318,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               variant="ghost"
                               size="icon"
                               onClick={() => handleProviderConfigChange('minimax', 'apiKey', '')}
-                              className="text-secondary hover:text-primary"
+                              className="text-muted-foreground hover:text-primary"
                               title={i18nService.t('clear') || 'Clear'}
                             >
                               <XCircle className="h-4 w-4" />
@@ -3329,7 +3329,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowApiKey(!showApiKey)}
-                            className="text-secondary hover:text-primary"
+                            className="text-muted-foreground hover:text-primary"
                             title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
                           >
                             {showApiKey ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -3404,7 +3404,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           >
                             {i18nService.t('minimaxOAuthLogin')}
                           </Button>
-                          <p className="text-[11px] text-secondary">
+                          <p className="text-[11px] text-muted-foreground">
                             {i18nService.t('minimaxOAuthHint')}
                           </p>
                         </div>
@@ -3413,7 +3413,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       {/* Requesting code */}
                       {minimaxOAuthPhase.kind === 'requesting_code' && (
                         <div className="p-3 rounded-xl bg-surface-inset border border-border">
-                          <p className="text-xs text-secondary">
+                          <p className="text-xs text-muted-foreground">
                             {i18nService.t('minimaxOAuthLoggingIn')}
                           </p>
                         </div>
@@ -3426,7 +3426,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             {i18nService.t('minimaxOAuthOpenBrowserHint')}
                           </p>
                           <div>
-                            <span className="text-[11px] text-secondary">
+                            <span className="text-[11px] text-muted-foreground">
                               {i18nService.t('minimaxOAuthUserCode')}:&nbsp;
                             </span>
                             <code className="text-xs font-mono text-primary">
@@ -3440,7 +3440,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           >
                             {minimaxOAuthPhase.verificationUri}
                           </a>
-                          <p className="text-[11px] text-secondary">
+                          <p className="text-[11px] text-muted-foreground">
                             {i18nService.t('minimaxOAuthStatusPending')}
                           </p>
                           <Button
@@ -3529,7 +3529,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           {!openaiIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('openaiOAuthTabApiKey')}</p>
-                        <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('openaiAuthApiKeyDesc')}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{i18nService.t('openaiAuthApiKeyDesc')}</p>
                       </Button>
                       <Button
                         type="button"
@@ -3548,7 +3548,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           {openaiIsOAuthMode && <CheckCircle className="h-4 w-4 text-primary shrink-0" />}
                         </div>
                         <p className="text-xs font-semibold text-foreground mt-1.5">{i18nService.t('openaiOAuthTabOAuth')}</p>
-                        <p className="text-[11px] text-secondary mt-0.5 leading-relaxed">{i18nService.t('openaiAuthOAuthDesc')}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{i18nService.t('openaiAuthOAuthDesc')}</p>
                       </Button>
                     </div>
                   </div>
@@ -3596,7 +3596,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           >
                             {i18nService.t('openaiOAuthLogin')}
                           </Button>
-                          <p className="text-[11px] text-secondary">
+                          <p className="text-[11px] text-muted-foreground">
                             {i18nService.t('openaiOAuthHint')}
                           </p>
                         </div>
@@ -3608,7 +3608,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <p className="text-xs text-foreground font-medium">
                             {i18nService.t('openaiOAuthOpenBrowserHint')}
                           </p>
-                          <p className="text-[11px] text-secondary">
+                          <p className="text-[11px] text-muted-foreground">
                             {i18nService.t('openaiOAuthStatusPending')}
                           </p>
                           <Button
@@ -3706,7 +3706,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               variant="ghost"
                               size="icon"
                               onClick={() => handleProviderConfigChange(activeProvider, 'apiKey', '')}
-                              className="text-secondary hover:text-primary"
+                              className="text-muted-foreground hover:text-primary"
                               title={i18nService.t('clear') || 'Clear'}
                             >
                               <XCircle className="h-4 w-4" />
@@ -3717,7 +3717,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowApiKey(!showApiKey)}
-                            className="text-secondary hover:text-primary"
+                            className="text-muted-foreground hover:text-primary"
                             title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
                           >
                             {showApiKey ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -3762,7 +3762,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                               variant="ghost"
                               size="icon"
                               onClick={() => handleProviderConfigChange('qwen', 'apiKey', '')}
-                              className="text-secondary hover:text-primary"
+                              className="text-muted-foreground hover:text-primary"
                               title={i18nService.t('clear') || 'Clear'}
                             >
                               <XCircle className="h-4 w-4" />
@@ -3773,7 +3773,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowApiKey(!showApiKey)}
-                            className="text-secondary hover:text-primary"
+                            className="text-muted-foreground hover:text-primary"
                             title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
                           >
                             {showApiKey ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -3862,7 +3862,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           variant="ghost"
                           size="sm"
                           onClick={handleCopilotCancelAuth}
-                          className="h-auto px-0 py-0 text-xs text-secondary hover:text-red-500"
+                          className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-red-500"
                         >
                           {i18nService.t('cancel')}
                         </Button>
@@ -3885,7 +3885,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         variant="ghost"
                         size="sm"
                         onClick={handleCopilotSignOut}
-                        className="h-auto px-0 py-0 text-xs text-secondary hover:text-red-500"
+                        className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-red-500"
                       >
                         {i18nService.t('githubCopilotSignOut')}
                       </Button>
@@ -3948,7 +3948,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         variant="ghost"
                         size="icon"
                         onClick={() => handleProviderConfigChange(activeProvider, 'baseUrl', '')}
-                        className="text-secondary hover:text-primary"
+                        className="text-muted-foreground hover:text-primary"
                         title={i18nService.t('clear') || 'Clear'}
                       >
                         <XCircle className="h-4 w-4" />
@@ -3957,7 +3957,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   )}
                 </div>
                 {isCustomProvider(activeProvider) && (
-                <div className="mt-1.5 space-y-0.5 text-[11px] text-secondary">
+                <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
                   <p>
                     <span className="text-sm text-muted mr-1">•</span>
                     {i18nService.t('baseUrlHint1')}
@@ -4047,7 +4047,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       </div>
                     </RadioGroup>
                   </div>
-                  <p className="mt-1 text-xs text-secondary">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {i18nService.t('apiFormatHint')}
                   </p>
                 </div>
@@ -4065,7 +4065,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {i18nService.t('zhipuCodingPlanHint')}
                     </p>
                   </div>
@@ -4089,7 +4089,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         {i18nService.t('codingPlanSubscriptionBadge')}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {i18nService.t('qwenCodingPlanHint')}
                     </p>
                   </div>
@@ -4113,7 +4113,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {i18nService.t('volcengineCodingPlanHint')}
                     </p>
                   </div>
@@ -4137,7 +4137,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {i18nService.t('moonshotCodingPlanHint')}
                     </p>
                   </div>
@@ -4161,7 +4161,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {i18nService.t('qianfanCodingPlanHint')}
                     </p>
                   </div>
@@ -4185,7 +4185,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {i18nService.t('xiaomiCodingPlanHint')}
                     </p>
                   </div>
@@ -4243,7 +4243,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                             <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-green-400"></div>
                             <div className="min-w-0">
                               <div className="text-foreground font-medium text-[11px] truncate">{model.name}</div>
-                              <div className="text-[10px] text-secondary truncate">{model.id}</div>
+                              <div className="text-[10px] text-muted-foreground truncate">{model.id}</div>
                             </div>
                           </div>
                           <div className="flex items-center shrink-0 space-x-1">
@@ -4257,14 +4257,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                                 <button
                                   type="button"
                                   onClick={() => handleEditModel(model.id, model.name, model.supportsImage)}
-                                  className="p-0.5 text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="p-0.5 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteModel(model.id)}
-                                  className="p-0.5 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="p-0.5 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -4277,7 +4277,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
                     {(!providers[activeProvider].models || providers[activeProvider].models.length === 0) && (
                       <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
-                        <p className="text-[11px] text-secondary">{i18nService.t('noModelsAvailable')}</p>
+                        <p className="text-[11px] text-muted-foreground">{i18nService.t('noModelsAvailable')}</p>
                         {activeProvider !== ProviderName.LlamaCpp && (
                           <button
                             type="button"
@@ -4304,7 +4304,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <h3 className="text-sm font-medium text-foreground">
                 {i18nService.t('modelTriageTitle') || '自动模型路由'}
               </h3>
-              <p className="text-xs text-secondary mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 各 Agent 在 Agent 设置的「路由」tab 中分别启用和配置。此处为全局默认参数。
               </p>
             </div>
@@ -4316,7 +4316,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-sm text-foreground">冷却轮次</label>
-                  <p className="text-xs text-secondary mt-0.5">切换后需等待 N 轮才能再次切换，防止频繁抖动</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">切换后需等待 N 轮才能再次切换，防止频繁抖动</p>
                 </div>
                 <Input
                   type="number"
@@ -4336,10 +4336,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <div className="flex items-center justify-between">
                 <div>
                   <label className="text-sm text-foreground">对话路由上限</label>
-                  <p className="text-xs text-secondary mt-0.5">超过此轮数后视为深度对话，使用默认模型</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">超过此轮数后视为深度对话，使用默认模型</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-xs text-secondary">轮</span>
+                  <span className="text-xs text-muted-foreground">轮</span>
                   <Input
                     type="number"
                     min={1}
@@ -4360,14 +4360,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             {/* Local Model Classifier */}
             <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
               <h4 className="text-sm font-medium text-foreground">本地模型分类（实验性）</h4>
-              <p className="text-xs text-secondary">规则无法确定路由目标时，调用本地 llama.cpp 小模型进行分类</p>
+              <p className="text-xs text-muted-foreground">规则无法确定路由目标时，调用本地 llama.cpp 小模型进行分类</p>
 
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <span className="text-sm text-foreground">
                     {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
                   </span>
-                  <p className="text-xs text-secondary mt-0.5">需先在本地推理页启动 llama.cpp 并加载模型</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">需先在本地推理页启动 llama.cpp 并加载模型</p>
                 </div>
                 <Switch
                   checked={triageUseLocalModel}
@@ -4382,7 +4382,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
               {triageUseLocalModel && (
                 <div>
-                  <label className="text-xs font-medium text-secondary block mb-1">
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">
                     {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
                   </label>
                   <Input
@@ -4397,7 +4397,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     placeholder={i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'}
                     className="w-full max-w-xs text-sm"
                   />
-                  <p className="text-xs text-secondary mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {i18nService.t('modelTriageModelNameNote') || '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
                   </p>
                 </div>
@@ -4431,7 +4431,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               ))}
             </div>
             <div className="flex flex-col flex-1 min-h-0 space-y-2">
-              <p className="text-xs text-secondary shrink-0">{i18nService.t(activeItem.hintKey)}</p>
+              <p className="text-xs text-muted-foreground shrink-0">{i18nService.t(activeItem.hintKey)}</p>
               <Textarea
                 key={activeItem.key}
                 value={activeItem.value}
@@ -4489,15 +4489,15 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               className="w-16 h-16 mb-3 select-none"
             />
             <h3 className="text-lg font-semibold text-foreground">Leo</h3>
-            <span className="text-xs text-secondary mt-1">v{appVersion}</span>
-            <span className="text-xs text-secondary mt-0.5">开放源码，汇聚智慧</span>
+            <span className="text-xs text-muted-foreground mt-1">v{appVersion}</span>
+            <span className="text-xs text-muted-foreground mt-0.5">开放源码，汇聚智慧</span>
 
             {/* Info Card */}
             <div className="w-full mt-8 rounded-xl border border-border overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="text-sm text-foreground">{i18nService.t('aboutVersion')}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-secondary">{appVersion}</span>
+                  <span className="text-sm text-muted-foreground">{appVersion}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -4506,7 +4506,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   href="https://github.com/rongxinzy/RongxinAI"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-secondary hover:text-primary hover:underline transition-colors"
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
                 >
                   github.com/rongxinzy/RongxinAI
                 </a>
@@ -4517,7 +4517,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   href="http://www.rongxzy.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-secondary hover:text-primary hover:underline transition-colors"
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
                 >
                   北京容芯致远科技有限公司
                 </a>
@@ -4526,7 +4526,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
             {/* Footer */}
             <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center">
-              <div className="flex items-center justify-center text-sm text-secondary">
+              <div className="flex items-center justify-center text-sm text-muted-foreground">
                 <Button
                   type="button"
                   variant="ghost"
@@ -4536,7 +4536,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     void handleExportLogs();
                   }}
                   disabled={isExportingLogs}
-                  className="text-secondary hover:text-primary"
+                  className="text-muted-foreground hover:text-primary"
                 >
                   {isExportingLogs ? i18nService.t('aboutExportingLogs') : i18nService.t('aboutExportLogs')}
                 </Button>
@@ -4588,7 +4588,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-secondary hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg"
+              className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -4663,13 +4663,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsTestResultModalOpen(false)}
-                  className="p-1 text-secondary hover:text-foreground rounded-md hover:bg-surface-raised"
+                  className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-raised"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-secondary">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{ProviderRegistry.get(testResult.provider)?.label ?? testResult.provider}</span>
                 <span className="text-[11px]">•</span>
                 <span className={`inline-flex items-center gap-1 ${testResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -4758,7 +4758,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     variant="ghost"
                     size="icon"
                     onClick={handleCancelModelEdit}
-                    className="p-1 text-secondary hover:text-foreground rounded-md hover:bg-surface-raised"
+                    className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-raised"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -4774,7 +4774,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   {activeProvider === 'ollama' ? (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-secondary mb-1">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">
                           {i18nService.t('ollamaModelName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         <Input
@@ -4798,7 +4798,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         </p>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-secondary mb-1">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">
                           {i18nService.t('ollamaDisplayName')}
                         </label>
                         <Input
@@ -4821,7 +4821,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   ) : (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-secondary mb-1">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">
                           {i18nService.t('modelName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         <Input
@@ -4839,7 +4839,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-secondary mb-1">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">
                           {i18nService.t('modelId')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                         </label>
                         <Input
@@ -4865,7 +4865,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     />
                     <label
                       htmlFor={`${activeProvider}-supportsImage`}
-                      className="text-xs text-secondary"
+                      className="text-xs text-muted-foreground"
                     >
                       {i18nService.t('supportsImageInput')}
                     </label>
@@ -4911,11 +4911,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
                 <div className="px-5 py-4 space-y-4">
                   {coworkMemoryEditingId && (
-                    <div className="rounded-lg border px-2 py-1 text-xs border-border text-secondary">
+                    <div className="rounded-lg border px-2 py-1 text-xs border-border text-muted-foreground">
                       {i18nService.t('coworkMemoryEditingTag')}
                     </div>
                   )}
-                  <label className="block text-xs font-medium text-secondary mb-1">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
                     {i18nService.t('coworkMemoryCrudContentLabel')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
                   </label>
                   <Textarea

@@ -80,7 +80,7 @@ const CreditItemRow: React.FC<{ item: CreditItem; isEn: boolean }> = ({ item, is
             {label}
           </span>
         ) : (
-          <span className="text-xs text-secondary">
+          <span className="text-xs text-muted-foreground">
             {label}
           </span>
         )}
@@ -89,7 +89,7 @@ const CreditItemRow: React.FC<{ item: CreditItem; isEn: boolean }> = ({ item, is
         </span>
       </div>
       {expiresText && (
-        <span className="text-[10px] text-secondary pl-0.5">
+        <span className="text-[10px] text-muted-foreground pl-0.5">
           {expiresText}
         </span>
       )}
@@ -134,7 +134,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {user?.nickname || phoneSuffix}
         </div>
         {phoneSuffix && (
-          <div className="text-xs text-secondary mt-0.5">
+          <div className="text-xs text-muted-foreground mt-0.5">
             ****{phoneSuffix}
           </div>
         )}
@@ -148,7 +148,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           onClick={() => setCreditsExpanded(!creditsExpanded)}
           className="w-full px-4 py-2.5 flex items-center justify-between cursor-pointer hover:bg-surface-raised transition-colors h-auto"
         >
-          <span className="text-xs text-secondary">
+          <span className="text-xs text-muted-foreground">
             {i18nService.t('authCreditsRemaining')}
           </span>
           <div className="flex items-center gap-1.5">
@@ -165,7 +165,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`text-secondary transition-transform duration-200 ${creditsExpanded ? 'rotate-180' : ''}`}
+              className={`text-muted-foreground transition-transform duration-200 ${creditsExpanded ? 'rotate-180' : ''}`}
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
@@ -182,7 +182,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-secondary py-1">
+              <div className="text-xs text-muted-foreground py-1">
                 {i18nService.t('authZeroCredits')}
               </div>
             )}

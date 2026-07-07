@@ -28,7 +28,7 @@ export const dawn: ThemeDefinition = {
     'chat-bot':           '#f1f5f9',
     'chat-bot-foreground': '#0f172a',
     'text-primary':       '#0f172a',
-    'text-secondary':     '#475569',
+    'text-muted-foreground':     '#475569',
     'text-muted':         '#64748b',
     'border':             'rgba(203,213,225,0.6)',
     'border-subtle':      'rgba(203,213,225,0.3)',

@@ -119,7 +119,7 @@ export class ThemeManager {
         const electronAPI = (window as any).electronAPI ?? (window as any).electron;
         electronAPI?.theme?.updateTitleBar?.({
           bg: theme.tokens['surface'],
-          symbol: theme.tokens['text-secondary'],
+          symbol: theme.tokens['text-muted-foreground'],
           windowBg: theme.tokens['background'],
         });
       } catch { /* not in Electron */ }

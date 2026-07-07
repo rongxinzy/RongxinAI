@@ -44,7 +44,7 @@ const sidebarNavItemClassName =
   'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]';
 const activeSidebarNavItemClassName =
   `${sidebarNavItemClassName} bg-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
-const sidebarCreateIconClassName = 'h-4 w-4 shrink-0 text-secondary/40 dark:text-secondary/45';
+const sidebarCreateIconClassName = 'h-4 w-4 shrink-0 text-muted-foreground/40 dark:text-muted-foreground/45';
 
 const Sidebar: React.FC<SidebarProps> = ({
   onShowSettings,
@@ -266,7 +266,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             variant="ghost"
             size="icon"
             onClick={onToggleCollapse}
-            className="non-draggable h-8 w-8 rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+            className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
             aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
           >
             <PanelLeft className="h-4 w-4" />
@@ -394,7 +394,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       />
       {isBatchMode ? (
         <div className="px-3 pb-3 pt-1 flex items-center justify-between">
-          <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-secondary">
+          <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
             <Checkbox
               checked={selectedIds.size === allVisibleSessionIdsRef.current.length && allVisibleSessionIdsRef.current.length > 0}
               onCheckedChange={handleSelectAll}
@@ -419,7 +419,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               variant="outline"
               size="sm"
               onClick={handleExitBatchMode}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+              className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
             >
               {i18nService.t('batchCancel')}
             </Button>
@@ -461,7 +461,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </h2>
           </div>
           <div className="px-5 pb-4">
-            <p className="text-sm text-secondary">
+            <p className="text-sm text-muted-foreground">
               {i18nService
                 .t('batchDeleteConfirmMessage')
                 .replace('{count}', String(selectedIds.size))}
@@ -473,7 +473,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               variant="outline"
               size="sm"
               onClick={() => setShowBatchDeleteConfirm(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
             >
               {i18nService.t('cancel')}
             </Button>

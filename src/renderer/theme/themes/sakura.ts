@@ -28,7 +28,7 @@ export const sakura: ThemeDefinition = {
     'chat-bot':           '#fdf2f8',
     'chat-bot-foreground': '#1e1b2e',
     'text-primary':       '#1e1b2e',
-    'text-secondary':     '#6b5b7b',
+    'text-muted-foreground':     '#6b5b7b',
     'text-muted':         '#8b6fa0',
     'border':             'rgba(219,190,213,0.5)',
     'border-subtle':      'rgba(219,190,213,0.25)',

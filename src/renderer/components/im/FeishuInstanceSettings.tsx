@@ -35,7 +35,7 @@ const PlatformGuide: React.FC<{
   guideUrl?: string;
 }> = ({ steps, guideUrl }) => (
   <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-    <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
       {steps.map((step, i) => (
         <li key={i}>{step}</li>
       ))}
@@ -81,7 +81,7 @@ const PairingSection: React.FC<{
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-secondary">
+      <label className="block text-xs font-medium text-muted-foreground">
         {i18nService.t('imPairingApproval')}
       </label>
       <div className="flex gap-2">
@@ -323,7 +323,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
             >
               {i18nService.t('feishuBotCreateWizardScanBtn')}
             </Button>
-            <p className="text-xs text-secondary">
+            <p className="text-xs text-muted-foreground">
               {i18nService.t('feishuBotCreateWizardScanHint')}
             </p>
           </>
@@ -348,7 +348,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
         {qrStatus === 'loading' && (
           <div className="flex flex-col items-center gap-2 py-2">
             <RefreshCw className="h-7 w-7 text-primary animate-spin" />
-            <span className="text-xs text-secondary">{i18nService.t('feishuBotCreateWizardGenerating') || '正在生成二维码…'}</span>
+            <span className="text-xs text-muted-foreground">{i18nService.t('feishuBotCreateWizardGenerating') || '正在生成二维码…'}</span>
           </div>
         )}
         {(qrStatus === 'showing' || qrStatus === 'expired') && qrUrl && (
@@ -370,13 +370,13 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                 </div>
               )}
             </div>
-            <p className="text-xs text-secondary max-w-[240px]">
+            <p className="text-xs text-muted-foreground max-w-[240px]">
               {qrStatus === 'expired'
                 ? i18nService.t('feishuBotCreateWizardQrcodeExpired')
                 : i18nService.t('feishuBotCreateWizardQrcodeDesc')}
             </p>
             {qrStatus === 'showing' && (
-              <p className="text-xs text-secondary">{qrTimeLeft}s</p>
+              <p className="text-xs text-muted-foreground">{qrTimeLeft}s</p>
             )}
           </div>
         )}
@@ -391,7 +391,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
       {/* Divider */}
       <div className="relative flex items-center">
         <div className="flex-1 border-t border-border-subtle" />
-        <span className="px-3 text-xs text-secondary whitespace-nowrap">
+        <span className="px-3 text-xs text-muted-foreground whitespace-nowrap">
           {i18nService.t('feishuBotCreateWizardOrManual') || i18nService.t('or') || '或'}
         </span>
         <div className="flex-1 border-t border-border-subtle" />
@@ -408,7 +408,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
       {/* App ID */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           App ID<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
         </label>
         <div className="relative">
@@ -439,7 +439,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
       {/* App Secret */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           App Secret<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
         </label>
         <div className="relative">
@@ -480,7 +480,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
       {/* Domain */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Domain
         </label>
         <Select
@@ -503,13 +503,13 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               DM Policy
             </label>
             <Select
@@ -539,7 +539,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
           {/* Allow From (User IDs) */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Allow From (User IDs)
             </label>
             <div className="flex gap-2">
@@ -591,7 +591,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.allowFrom.filter((uid) => uid !== id);
                         onConfigChange({ allowFrom: newIds });
@@ -608,7 +608,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Policy
             </label>
             <Select
@@ -632,7 +632,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
           {/* Group Allow From */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Allow From (Chat IDs)
             </label>
             <div className="flex gap-2">
@@ -684,7 +684,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
                         onConfigChange({ groupAllowFrom: newIds });
@@ -703,7 +703,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div>
-                <label className="block text-xs font-medium text-secondary">
+                <label className="block text-xs font-medium text-muted-foreground">
                   {i18nService.t('imFeishuStreaming')}
                 </label>
                 <p className="text-[11px] text-tertiary mt-0.5">
@@ -725,7 +725,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
           {instance.streaming && (
             <div className="space-y-2 pl-3 border-l-2 border-primary/20">
               <div className="flex items-center justify-between">
-                <label className="text-xs text-secondary">
+                <label className="text-xs text-muted-foreground">
                   {i18nService.t('imFeishuFooterStatus')}
                 </label>
                 <Switch
@@ -740,7 +740,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                 />
               </div>
               <div className="flex items-center justify-between">
-                <label className="text-xs text-secondary">
+                <label className="text-xs text-muted-foreground">
                   {i18nService.t('imFeishuFooterElapsed')}
                 </label>
                 <Switch
@@ -759,7 +759,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
           {/* Reply Mode */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Reply Mode
             </label>
             <Select
@@ -786,7 +786,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-xs font-medium text-secondary">
+                  <label className="block text-xs font-medium text-muted-foreground">
                     {i18nService.t('imFeishuBlockStreaming')}
                   </label>
                   <p className="text-[11px] text-tertiary mt-0.5">
@@ -807,7 +807,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
           {/* History Limit */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               History Limit
             </label>
             <Input
@@ -822,7 +822,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
           {/* Media Max MB */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Media Max (MB)
             </label>
             <Input

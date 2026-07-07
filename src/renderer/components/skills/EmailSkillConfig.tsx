@@ -373,7 +373,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
   const labelClassName = 'block text-xs font-medium text-foreground mb-1';
 
   if (loading) {
-    return <div className="p-4 text-xs text-secondary">{i18nService.t('loading')}...</div>;
+    return <div className="p-4 text-xs text-muted-foreground">{i18nService.t('loading')}...</div>;
   }
 
   return (
@@ -386,7 +386,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="text-xs text-secondary hover:text-primary transition-colors"
+            className="text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             {i18nService.t('collapse')}
           </Button>
@@ -395,7 +395,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
       <div className="min-h-[18px]">
         {(persistError || (isPersisting && showPersisting)) && (
           <div
-            className={`text-xs ${persistError ? 'text-red-600 dark:text-red-400' : 'text-secondary'}`}
+            className={`text-xs ${persistError ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}
           >
             {persistError || `${i18nService.t('saving')}...`}
           </div>
@@ -421,7 +421,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
       {/* Hint */}
       {hintKey && (
-        <div className="text-xs text-secondary bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
+        <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
           {i18nService.t(hintKey)}
         </div>
       )}
@@ -448,7 +448,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                   setEmail('');
                   setTimeout(queuePersist, 0);
                 }}
-                className="rounded text-secondary hover:text-primary transition-colors"
+                className="rounded text-muted-foreground hover:text-primary transition-colors"
                 title={i18nService.t('clear') || 'Clear'}
               >
                 <XCircle className="h-4 w-4" />
@@ -480,7 +480,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                   setPassword('');
                   setTimeout(queuePersist, 0);
                 }}
-                className="rounded text-secondary hover:text-primary transition-colors"
+                className="rounded text-muted-foreground hover:text-primary transition-colors"
                 title={i18nService.t('clear') || 'Clear'}
               >
                 <XCircle className="h-4 w-4" />
@@ -491,7 +491,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
               variant="ghost"
               size="icon-xs"
               onClick={() => setShowPassword(!showPassword)}
-              className="rounded text-secondary hover:text-primary transition-colors"
+              className="rounded text-muted-foreground hover:text-primary transition-colors"
               title={
                 showPassword ? i18nService.t('hide') || 'Hide' : i18nService.t('show') || 'Show'
               }
@@ -511,7 +511,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
         type="button"
         variant="ghost"
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="flex items-center gap-1 text-xs text-secondary hover:text-primary transition-colors"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
       >
         {showAdvanced ? (
           <ChevronUp className="h-3.5 w-3.5" />
@@ -546,7 +546,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                         setImapHost('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-muted-foreground hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
                       <XCircle className="h-4 w-4" />
@@ -576,7 +576,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                         setImapPort('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-muted-foreground hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
                       <XCircle className="h-4 w-4" />
@@ -609,7 +609,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                         setSmtpHost('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-muted-foreground hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
                       <XCircle className="h-4 w-4" />
@@ -639,7 +639,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                         setSmtpPort('');
                         setTimeout(queuePersist, 0);
                       }}
-                      className="rounded text-secondary hover:text-primary transition-colors"
+                      className="rounded text-muted-foreground hover:text-primary transition-colors"
                       title={i18nService.t('clear') || 'Clear'}
                     >
                       <XCircle className="h-4 w-4" />
@@ -710,7 +710,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                       setMailbox('');
                       setTimeout(queuePersist, 0);
                     }}
-                    className="rounded text-secondary hover:text-primary transition-colors"
+                    className="rounded text-muted-foreground hover:text-primary transition-colors"
                     title={i18nService.t('clear') || 'Clear'}
                   >
                     <XCircle className="h-4 w-4" />
@@ -763,7 +763,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                   ? i18nService.t('connectionSuccess')
                   : i18nService.t('connectionFailed')}
               </span>
-              <span className="text-[11px] text-secondary">
+              <span className="text-[11px] text-muted-foreground">
                 {new Date(connectivityResult.testedAt).toLocaleString()}
               </span>
             </div>
@@ -786,8 +786,8 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                       )}
                       <span>{checkLabel}</span>
                     </div>
-                    <div className="mt-1 text-xs text-secondary">{check.message}</div>
-                    <div className="mt-1 text-[11px] text-secondary">{`${check.durationMs}ms`}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{check.message}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{`${check.durationMs}ms`}</div>
                   </div>
                 );
               })}

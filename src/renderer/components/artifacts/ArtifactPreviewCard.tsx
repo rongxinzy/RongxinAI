@@ -117,7 +117,7 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-foreground truncate">{title}</div>
-        <div className="text-xs text-secondary">{subtitle}</div>
+        <div className="text-xs text-muted-foreground">{subtitle}</div>
       </div>
       <div className="flex-shrink-0 flex items-center gap-1 text-primary text-sm font-medium">
         <ExternalLink className="w-4 h-4" />

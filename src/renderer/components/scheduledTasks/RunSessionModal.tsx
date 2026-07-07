@@ -161,7 +161,7 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="p-1 rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+            className="p-1 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
           >
             <X className="w-5 h-5" />
           </Button>
@@ -171,11 +171,11 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
         <div className="flex-1 overflow-y-auto">
           {loading && (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <svg className="w-5 h-5 animate-spin text-secondary" viewBox="0 0 24 24" fill="none">
+              <svg className="w-5 h-5 animate-spin text-muted-foreground" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
                 <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
               </svg>
-              <span className="text-sm text-secondary">
+              <span className="text-sm text-muted-foreground">
                 {retryCount > 0
                   ? `${i18nService.t('scheduledTasksSessionSyncing')} (${retryCount}/${MAX_RETRIES})`
                   : i18nService.t('loading')}
@@ -185,7 +185,7 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
 
           {error && (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <span className="text-sm text-secondary">{error}</span>
+              <span className="text-sm text-muted-foreground">{error}</span>
               <Button
                 type="button"
                 variant="outline"
@@ -201,7 +201,7 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
 
           {!loading && !error && turns.length === 0 && (
             <div className="flex items-center justify-center py-16">
-              <span className="text-sm text-secondary">
+              <span className="text-sm text-muted-foreground">
                 {i18nService.t('scheduledTasksNoRuns')}
               </span>
             </div>

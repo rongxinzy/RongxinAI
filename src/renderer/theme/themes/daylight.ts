@@ -28,7 +28,7 @@ export const daylight: ThemeDefinition = {
     'chat-bot':           '#fefce8',
     'chat-bot-foreground': '#1c1917',
     'text-primary':       '#1c1917',
-    'text-secondary':     '#57534e',
+    'text-muted-foreground':     '#57534e',
     'text-muted':         '#78716c',
     'border':             'rgba(214,211,209,0.6)',
     'border-subtle':      'rgba(214,211,209,0.3)',

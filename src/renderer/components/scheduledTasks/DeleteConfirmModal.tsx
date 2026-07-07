@@ -35,7 +35,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           <h3 className="text-sm font-semibold text-foreground mb-2">
             {i18nService.t('scheduledTasksDelete')}
           </h3>
-          <p className="text-sm text-secondary mb-5">
+          <p className="text-sm text-muted-foreground mb-5">
             {i18nService.t('scheduledTasksDeleteConfirm').replace('{name}', taskName)}
           </p>
           <div className="flex items-center gap-3 w-full">

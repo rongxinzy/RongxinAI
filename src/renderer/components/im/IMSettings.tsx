@@ -42,7 +42,7 @@ const PlatformGuide: React.FC<{
     {title && (
       <p className="text-xs text-foreground leading-relaxed mb-1.5 font-medium">{title}</p>
     )}
-    <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
       {steps.map((step, i) => (
         <li key={i}>{step}</li>
       ))}
@@ -753,7 +753,7 @@ const IMSettings: React.FC = () => {
 
   const renderPairingSection = (platform: string) => (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-secondary">
+      <label className="block text-xs font-medium text-muted-foreground">
         {i18nService.t('imPairingApproval')}
       </label>
       <div className="flex gap-2">
@@ -1212,7 +1212,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'dingtalk' && !activeDingTalkInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img src={PlatformRegistry.logo('dingtalk')} alt="DingTalk" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {config.dingtalk.instances.length === 0
                 ? (language === 'zh' ? '尚未添加钉钉实例，点击下方按钮添加' : 'No DingTalk instances yet. Click below to add one.')
                 : (language === 'zh' ? '请在左侧选择一个钉钉实例' : 'Select a DingTalk instance from the sidebar.')}
@@ -1283,7 +1283,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'feishu' && !activeFeishuInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img src={PlatformRegistry.logo('feishu')} alt="Feishu" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {config.feishu.instances.length === 0
                 ? (language === 'zh' ? '尚未添加飞书实例，点击下方按钮添加' : 'No Feishu instances yet. Click below to add one.')
                 : (language === 'zh' ? '请在左侧选择一个飞书实例' : 'Select a Feishu instance from the sidebar.')}
@@ -1354,7 +1354,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'qq' && !activeQQInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img src={PlatformRegistry.logo('qq')} alt="QQ" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {config.qq.instances.length === 0
                 ? (language === 'zh' ? '尚未添加 QQ 实例，点击下方按钮添加' : 'No QQ instances yet. Click below to add one.')
                 : (language === 'zh' ? '请在左侧选择一个 QQ 实例' : 'Select a QQ instance from the sidebar.')}
@@ -1425,7 +1425,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'telegram' && !activeTelegramInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img src={PlatformRegistry.logo('telegram')} alt="Telegram" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {config.telegram.instances.length === 0
                 ? (language === 'zh' ? '尚未添加 Telegram 实例，点击下方按钮添加' : 'No Telegram instances yet. Click below to add one.')
                 : (language === 'zh' ? '请在左侧选择一个 Telegram 实例' : 'Select a Telegram instance from the sidebar.')}
@@ -1496,7 +1496,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'discord' && !activeDiscordInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img src={PlatformRegistry.logo('discord')} alt="Discord" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {config.discord.instances.length === 0
                 ? (language === 'zh' ? '尚未添加 Discord 实例，点击下方按钮添加' : 'No Discord instances yet. Click below to add one.')
                 : (language === 'zh' ? '请在左侧选择一个 Discord 实例' : 'Select a Discord instance from the sidebar.')}
@@ -1576,7 +1576,7 @@ const IMSettings: React.FC = () => {
                   >
                     {i18nService.t('imWeixinScanBtn')}
                   </Button>
-                  <p className="text-xs text-secondary">
+                  <p className="text-xs text-muted-foreground">
                     {i18nService.t('imWeixinScanHint')}
                   </p>
                 </>
@@ -1600,7 +1600,7 @@ const IMSettings: React.FC = () => {
               {weixinQrStatus === 'loading' && (
                 <div className="flex items-center justify-center gap-2 py-4">
                   <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                  <span className="text-sm text-secondary">
+                  <span className="text-sm text-muted-foreground">
                     {i18nService.t('imWeixinQrLoading')}
                   </span>
                 </div>
@@ -1630,7 +1630,7 @@ const IMSettings: React.FC = () => {
                     )}
                   </div>
                   {weixinQrStatus === 'waiting' && (
-                    <div className="flex items-center justify-center gap-1.5 text-xs text-secondary">
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                       {i18nService.t('imWeixinQrWaiting') || 'Waiting for scan...'}
                     </div>
@@ -1676,13 +1676,13 @@ const IMSettings: React.FC = () => {
 
             {/* Advanced Settings (collapsible) */}
             <details className="group">
-              <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
                 {i18nService.t('imAdvancedSettings')}
               </summary>
               <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
                 {/* DM Policy */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-secondary">
+                  <label className="block text-xs font-medium text-muted-foreground">
                     DM Policy
                   </label>
                   <Select
@@ -1706,7 +1706,7 @@ const IMSettings: React.FC = () => {
 
                 {/* Allow From */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-secondary">
+                  <label className="block text-xs font-medium text-muted-foreground">
                     Allow From (User IDs)
                   </label>
                   <div className="flex gap-2">
@@ -1756,7 +1756,7 @@ const IMSettings: React.FC = () => {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                            className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                             onClick={() => {
                               const newIds = weixinOpenClawConfig.allowFrom.filter((uid) => uid !== id);
                               void imService.updateConfig({ weixin: { ...weixinOpenClawConfig, allowFrom: newIds } });
@@ -1847,7 +1847,7 @@ const IMSettings: React.FC = () => {
           return (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <img src={PlatformRegistry.logo('wecom')} alt="WeCom" className="w-12 h-12 object-contain rounded-md mb-4 opacity-50" />
-              <p className="text-sm text-secondary mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 {wecomMultiConfig.instances.length === 0
                   ? (language === 'zh' ? '尚未添加企业微信实例，点击下方按钮添加' : 'No WeCom instances yet. Click below to add one.')
                   : (language === 'zh' ? '请在左侧选择一个企业微信实例' : 'Select a WeCom instance from the sidebar.')}
@@ -1885,7 +1885,7 @@ const IMSettings: React.FC = () => {
                 size="icon"
                 aria-label={i18nService.t('close')}
                 onClick={() => setConnectivityModalPlatform(null)}
-                className="text-secondary"
+                className="text-muted-foreground"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -1893,7 +1893,7 @@ const IMSettings: React.FC = () => {
 
               <div className="p-4 max-h-[65vh] overflow-y-auto">
                 {testingPlatform === connectivityModalPlatform ? (
-                  <div className="text-sm text-secondary">
+                  <div className="text-sm text-muted-foreground">
                     {i18nService.t('imConnectivityTesting')}
                   </div>
                 ) : connectivityResults[connectivityModalPlatform] ? (
@@ -1909,7 +1909,7 @@ const IMSettings: React.FC = () => {
                         )}
                         {i18nService.t(`imConnectivityVerdict_${connectivityResults[connectivityModalPlatform]!.verdict}`)}
                       </div>
-                      <div className="text-[11px] text-secondary">
+                      <div className="text-[11px] text-muted-foreground">
                         {`${i18nService.t('imConnectivityLastChecked')}: ${formatTestTime(connectivityResults[connectivityModalPlatform]!.testedAt)}`}
                       </div>
                     </div>
@@ -1923,11 +1923,11 @@ const IMSettings: React.FC = () => {
                           <div className={`text-xs font-medium ${checkLevelColorClass[check.level]}`}>
                             {getCheckTitle(check.code)}
                           </div>
-                          <div className="mt-1 text-xs text-secondary">
+                          <div className="mt-1 text-xs text-muted-foreground">
                             {check.message}
                           </div>
                           {getCheckSuggestion(check) && (
-                            <div className="mt-1 text-[11px] text-secondary">
+                            <div className="mt-1 text-[11px] text-muted-foreground">
                               {`${i18nService.t('imConnectivitySuggestion')}: ${getCheckSuggestion(check)}`}
                             </div>
                           )}
@@ -1936,7 +1936,7 @@ const IMSettings: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-secondary">
+                  <div className="text-sm text-muted-foreground">
                     {i18nService.t('imConnectivityNoResult')}
                   </div>
                 )}

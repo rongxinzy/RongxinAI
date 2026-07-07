@@ -132,7 +132,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
       {/* Guide */}
       <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-        <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
           <li>{i18nService.t('imQQGuideStep1')}</li>
           <li>{i18nService.t('imQQGuideStep2')}</li>
           <li>{i18nService.t('imQQGuideStep3')}</li>
@@ -157,7 +157,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
       {/* AppID */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           AppID<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
         </label>
         <div className="relative">
@@ -188,7 +188,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
       {/* AppSecret */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           AppSecret<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
         </label>
         <div className="relative">
@@ -225,20 +225,20 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-secondary">
+        <p className="text-xs text-muted-foreground">
           {i18nService.t('imQQCredentialHint')}
         </p>
       </div>
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               DM Policy
             </label>
             <Select
@@ -262,7 +262,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* Allow From */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Allow From (User IDs)
             </label>
             <div className="flex gap-2">
@@ -314,7 +314,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.allowFrom.filter((uid) => uid !== id);
                         onConfigChange({ allowFrom: newIds });
@@ -331,7 +331,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Policy
             </label>
             <Select
@@ -356,7 +356,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
           {/* Group Allow From */}
           {instance.groupPolicy === 'allowlist' && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Group Allow From (Group IDs)
               </label>
               <div className="flex flex-wrap gap-1.5">
@@ -370,7 +370,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
                         onConfigChange({ groupAllowFrom: newIds });
@@ -387,7 +387,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* History Limit */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               History Limit
             </label>
             <Input
@@ -402,7 +402,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* Markdown Support */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-secondary">
+            <label className="text-xs font-medium text-muted-foreground">
               Markdown Support
             </label>
             <Switch
@@ -417,7 +417,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* Image Server Base URL */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Image Server Base URL
             </label>
             <Input
@@ -427,7 +427,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
               onBlur={() => void onSave()}
               placeholder="http://your-ip:18765"
             />
-            <p className="text-xs text-secondary">
+            <p className="text-xs text-muted-foreground">
               {i18nService.t('imQQImageServerHint')}
             </p>
           </div>

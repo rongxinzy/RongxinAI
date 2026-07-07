@@ -28,7 +28,7 @@ export const ocean: ThemeDefinition = {
     'chat-bot':           '#172032',
     'chat-bot-foreground': '#e0f2fe',
     'text-primary':       '#f0f9ff',
-    'text-secondary':     '#9ab8c8',
+    'text-muted-foreground':     '#9ab8c8',
     'text-muted':         '#627f8e',
     'border':             'rgba(30,48,72,0.7)',
     'border-subtle':      'rgba(30,48,72,0.35)',

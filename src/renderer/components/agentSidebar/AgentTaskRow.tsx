@@ -110,7 +110,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
           <span className="min-w-0 flex-1 truncate">{task.title}</span>
           {task.indicator === AgentSidebarIndicator.Running && (
             <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center transition-opacity group-hover:opacity-0" title={indicatorLabel}>
-              <Loader className="h-3 w-3 animate-spin text-secondary" />
+              <Loader className="h-3 w-3 animate-spin text-muted-foreground" />
             </span>
           )}
           {task.indicator === AgentSidebarIndicator.CompletedUnread && (
@@ -162,7 +162,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
             </div>
             <h2 className="text-base font-semibold">{i18nService.t('deleteTaskConfirmTitle')}</h2>
           </div>
-          <p className="text-sm text-secondary">{i18nService.t('deleteTaskConfirmMessage')}</p>
+          <p className="text-sm text-muted-foreground">{i18nService.t('deleteTaskConfirmMessage')}</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDelete(false)}>{i18nService.t('cancel')}</Button>
             <Button variant="destructive" onClick={() => { setShowConfirmDelete(false); void onDelete(); }}>{i18nService.t('deleteSession')}</Button>

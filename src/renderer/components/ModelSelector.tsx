@@ -79,7 +79,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   if (availableModels.length === 0) {
     return (
-      <div className="px-3 py-1.5 rounded-xl bg-surface text-secondary text-sm">
+      <div className="px-3 py-1.5 rounded-xl bg-surface text-muted-foreground text-sm">
         {i18nService.t('modelSelectorNoModels')}
       </div>
     );
@@ -111,7 +111,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
           )}
         </div>
         {model.provider && (
-          <span className="text-xs text-secondary truncate">{model.provider}</span>
+          <span className="text-xs text-muted-foreground truncate">{model.provider}</span>
         )}
       </div>
     </SelectItem>
@@ -147,12 +147,12 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
             )}
             {hasBothGroups ? (
               <>
-                <div className="px-4 py-1.5 text-xs font-medium text-secondary uppercase tracking-wider">
+                <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {i18nService.t('modelGroupServer')}
                 </div>
                 {serverModels.map(renderModelItem)}
                 <div className="my-1 border-t border-border" />
-                <div className="px-4 py-1.5 text-xs font-medium text-secondary uppercase tracking-wider">
+                <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {i18nService.t('modelGroupUser')}
                 </div>
                 {userModels.map(renderModelItem)}

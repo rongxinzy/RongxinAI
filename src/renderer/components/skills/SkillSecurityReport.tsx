@@ -104,13 +104,13 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
             onClick={() => onAction('cancel')}
             className="rounded-lg hover:bg-surface-raised transition-colors"
           >
-            <X className="h-4 w-4 text-secondary" />
+            <X className="h-4 w-4 text-muted-foreground" />
           </Button>
         </div>
 
         {/* Summary - outside scroll area */}
         <div className="px-5 pt-4 pb-3">
-          <p className="text-sm text-secondary">
+          <p className="text-sm text-muted-foreground">
             {i18nService.t('securityIssuesFound').replace('{name}', report.skillName)}
           </p>
         </div>
@@ -133,16 +133,16 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       {isExpanded ? (
-                        <ChevronDown className="h-3.5 w-3.5 text-secondary" />
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       ) : (
-                        <ChevronRight className="h-3.5 w-3.5 text-secondary" />
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                       )}
                       <span className={`w-2 h-2 rounded-full ${SEVERITY_DOTS[maxSeverity] || SEVERITY_DOTS.warning}`} />
                       <span className="text-sm font-medium text-foreground">
                         {dimLabel ? i18nService.t(dimLabel) : dimension}
                       </span>
                     </div>
-                    <span className="text-xs text-secondary">
+                    <span className="text-xs text-muted-foreground">
                       {findings.length}
                     </span>
                   </Button>
@@ -157,11 +157,11 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                               <p className="text-foreground">
                                 {i18nService.t(finding.description) || finding.description}
                               </p>
-                              <p className="text-secondary mt-0.5">
+                              <p className="text-muted-foreground mt-0.5">
                                 {finding.file}{finding.line ? `:${finding.line}` : ''}
                               </p>
                               {finding.matchedPattern && (
-                                <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] text-secondary break-all overflow-x-auto max-h-16">
+                                <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] text-muted-foreground break-all overflow-x-auto max-h-16">
                                   {finding.matchedPattern}
                                 </p>
                               )}

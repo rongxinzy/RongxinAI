@@ -125,7 +125,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const boolValue = Boolean(fieldValue);
       return (
         <div key={path} className="flex items-center justify-between py-1">
-          <label className="text-xs font-medium text-secondary">
+          <label className="text-xs font-medium text-muted-foreground">
             {hint.label}
           </label>
           <Switch
@@ -140,7 +140,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     if (type === 'string' && enumValues) {
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-secondary">
+          <label className="block text-xs font-medium text-muted-foreground">
             {hint.label}
           </label>
           <Select
@@ -171,7 +171,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const strValue = String(fieldValue || '');
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-secondary">
+          <label className="block text-xs font-medium text-muted-foreground">
             {hint.label}
           </label>
           <div className="relative">
@@ -216,7 +216,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const strValue = String(fieldValue || '');
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-secondary">
+          <label className="block text-xs font-medium text-muted-foreground">
             {hint.label}
           </label>
           <div className="relative">
@@ -251,7 +251,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const arrValue = Array.isArray(fieldValue) ? fieldValue.map(String).join('\n') : '';
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-secondary">
+          <label className="block text-xs font-medium text-muted-foreground">
             {hint.label}
           </label>
           <Textarea
@@ -272,7 +272,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const numValue = typeof fieldValue === 'number' ? fieldValue : '';
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-secondary">
+          <label className="block text-xs font-medium text-muted-foreground">
             {hint.label}
           </label>
           <Input
@@ -298,7 +298,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
     return (
       <details key={groupKey} className="group">
-        <summary className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-secondary select-none py-1">
+        <summary className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-muted-foreground select-none py-1">
           <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
           {groupHint.label}
         </summary>
