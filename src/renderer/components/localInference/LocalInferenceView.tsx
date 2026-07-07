@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { PanelLeft, Pencil, Settings2 } from 'lucide-react';
+import { Globe, PanelLeft, Pencil, Settings2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -15,6 +15,7 @@ import { notifyLlamaCppRunningModelsChanged } from '../../services/availableMode
 import { i18nService } from '../../services/i18n';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
+import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import {
@@ -26,6 +27,7 @@ import {
   localInferenceSoftTextClass,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
+import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
@@ -327,6 +329,32 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     },
     [dismissToast, showToast],
   );
+  const handleRestartStatus = useCallback((nextStatus: OllamaStatusSnapshot) => {
+    cachedStatus = nextStatus;
+    setStatus(nextStatus);
+  }, []);
+
+  const {
+    accessSettingsOpen,
+    draftAllowLanAccess,
+    currentHost,
+    currentPort,
+    exampleModelName,
+    refreshServiceConfig,
+    openAccessSettings,
+    closeAccessSettings,
+    saveAccessSettings,
+    setDraftAllowLanAccess,
+  } = useLocalInferenceAccessSettings({
+    isRunning,
+    localModels,
+    runningModels,
+    runAction,
+    refreshLocalModels,
+    refreshRunningModels,
+    onRestartStatus: handleRestartStatus,
+    showToast,
+  });
 
   useEffect(() => {
     marketplaceQueryRef.current = marketplaceQuery;
@@ -385,6 +413,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const nextStatus = await refreshStatus();
       await refreshLocalModels();
       await refreshModelsDir();
+      await refreshServiceConfig();
       await refreshModelPreferences();
       if (nextStatus.status === 'running') {
         await refreshRunningModels();
@@ -395,6 +424,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     refreshModelPreferences,
     refreshModelsDir,
     refreshRunningModels,
+    refreshServiceConfig,
     refreshStatus,
     runAction,
   ]);
@@ -655,18 +685,29 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {activeTab === 'models' ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setDraftModelsDir(modelsDir);
-                    setLibrarySettingsOpen(true);
-                  }}
-                >
-                  <Settings2 data-icon="inline-start" />
-                  {i18nService.t('localInferenceLibrarySettings')}
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={openAccessSettings}
+                  >
+                    <Globe data-icon="inline-start" />
+                    {i18nService.t('localInferenceAccessSettings')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDraftModelsDir(modelsDir);
+                      setLibrarySettingsOpen(true);
+                    }}
+                  >
+                    <Settings2 data-icon="inline-start" />
+                    {i18nService.t('localInferenceLibrarySettings')}
+                  </Button>
+                </>
               ) : null}
               <div
                 className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${
@@ -727,6 +768,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onPickDirectory={handlePickModelsDir}
         onOpenDirectory={handleOpenModelsDir}
         onSave={handleSaveModelsDir}
+      />
+      <LocalInferenceAccessSettingsDialog
+        isOpen={accessSettingsOpen}
+        saving={loading}
+        allowLanAccess={draftAllowLanAccess}
+        willRestartOnSave={isRunning}
+        currentHost={currentHost}
+        port={currentPort}
+        exampleModelName={exampleModelName}
+        onAllowLanAccessChange={setDraftAllowLanAccess}
+        onClose={closeAccessSettings}
+        onSave={saveAccessSettings}
       />
       <ModelContextSettingsModal
         isOpen={Boolean(contextModel)}

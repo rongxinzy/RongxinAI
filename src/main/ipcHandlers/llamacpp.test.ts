@@ -41,7 +41,8 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malfor
     chatTemplate: 'chatml',
     reasoningFormat: 'invalid' as 'auto',
   })).toEqual({
-    host: '0.0.0.0',
+    host: '127.0.0.1',
+    listenHost: '0.0.0.0',
     modelsDir: '/tmp/models',
     modelsMax: '2',
     modelsAutoload: false,
@@ -58,6 +59,27 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malfor
     splitMode: 'layer',
     reasoning: 'on',
     chatTemplate: 'chatml',
+  });
+});
+
+test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while keeping localhost client access', () => {
+  const store = {
+    get: () => ({ host: '0.0.0.0', port: '8080' }),
+  } as unknown as Parameters<typeof getLlamaCppServiceConfig>[0];
+
+  expect(getLlamaCppServiceConfig(store)).toEqual({
+    host: '127.0.0.1',
+    listenHost: '0.0.0.0',
+    port: '8080',
+    modelsMax: '0',
+    timeout: '120',
+    threadsHttp: '4',
+    cacheReuse: '256',
+    cacheRam: '8192',
+    parallel: '1',
+    batchSize: '512',
+    ubatchSize: '512',
+    gpuLayers: 'auto',
   });
 });
 

@@ -122,7 +122,9 @@ export class LlamaCppManager extends EventEmitter {
 
   getBaseUrl(): string {
     const config = this.getServiceConfig();
-    const host = config.host?.trim() || DEFAULT_HOST;
+    const host = config.host?.trim() === '0.0.0.0'
+      ? DEFAULT_HOST
+      : config.host?.trim() || DEFAULT_HOST;
     const port = config.port?.trim() || DEFAULT_PORT;
     return `http://${host}:${port}`;
   }

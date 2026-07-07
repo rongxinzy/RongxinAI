@@ -42,7 +42,7 @@ export function buildLlamaServerArgs(
 ): string[] {
   const args = [
     '--host',
-    config.host?.trim() || DEFAULT_HOST,
+    config.listenHost?.trim() || config.host?.trim() || DEFAULT_HOST,
     '--port',
     config.port?.trim() || DEFAULT_PORT,
     '--models-dir',
