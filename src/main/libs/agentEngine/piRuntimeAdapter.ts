@@ -493,7 +493,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
           const { text, thinking } = extractStreamingSnapshot(event.message);
           const finalThinking = thinking || active.thinkingText;
-          const finalAnswer = text || active.answerText;
+          let finalAnswer = text || active.answerText;
+
+          // Fallback: some Pi models emit the entire response inside thinking
+          // blocks and leave the visible text block empty. To avoid showing only
+          // a collapsed thinking step with no answer bubble, surface the
+          // thinking content as the final answer when no text was produced.
+          if (!finalAnswer.trim() && finalThinking.trim()) {
+            finalAnswer = finalThinking;
+          }
 
           // Finalize thinking bubble (if any) on its own id.
           if (finalThinking.trim()) {
