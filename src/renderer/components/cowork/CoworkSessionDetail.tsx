@@ -43,6 +43,10 @@ import { composeExportCanvas, domRectToCaptureRect, formatExportTimestamp, loadI
 import { buildConversationTurns, buildDisplayItems, hasRenderableAssistantContent } from './helpers/messageGrouping';
 // toolUtils helpers used in sub-components
 import { normalizeLocalPath, parseRootRelativePath,toAbsolutePathFromCwd } from './helpers/pathUtils';
+
+// Stable empty array reference to avoid unnecessary re-renders from useSelector
+const EMPTY_ARTIFACTS: Artifact[] = [];
+
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
   onContinue: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => boolean | void | Promise<boolean | void>;
@@ -157,7 +161,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const previousArtifactPanelOpenRef = useRef(isPanelOpen);
   const contentRowRef = useRef<HTMLDivElement>(null);
   const sessionArtifacts = useSelector((state: RootState) =>
-    sessionId ? selectSessionArtifacts(state, sessionId) : []
+    sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS
   );
 
   const loadedFileIdsRef = useRef<Set<string>>(new Set());
