@@ -39,6 +39,7 @@ import { formatBytes, formatDate } from '../utils/progress';
 
 type ModelsPanelProps = {
   loading: boolean;
+  loadingModelName: string | null;
   unloadingModelName: string | null;
   localModels: LlamaCppModel[];
   runningModels: LlamaCppRunningModel[];
@@ -54,6 +55,7 @@ type ModelCardProps = {
   runningModel?: LlamaCppRunningModel;
   preference?: LlamaCppModelPreference;
   loading: boolean;
+  loadingModel: boolean;
   unloading: boolean;
   onLoadModel: () => void;
   onUnload: () => void;
@@ -63,6 +65,7 @@ type ModelCardProps = {
 
 export function ModelsPanel({
   loading,
+  loadingModelName,
   unloadingModelName,
   localModels,
   runningModels,
@@ -103,6 +106,7 @@ export function ModelsPanel({
                 runningModel={model.runningModel}
                 preference={modelPreferences[model.model.name]}
                 loading={loading}
+                loadingModel={loadingModelName === model.model.name}
                 unloading={unloadingModelName === model.model.name}
                 onLoadModel={() => onLoadModel(model.model)}
                 onUnload={() => onUnload(model.model.name)}
@@ -126,6 +130,7 @@ export function ModelsPanel({
                 model={model}
                 preference={modelPreferences[model.name]}
                 loading={loading}
+                loadingModel={loadingModelName === model.name}
                 unloading={unloadingModelName === model.name}
                 onLoadModel={() => onLoadModel(model)}
                 onUnload={() => onUnload(model.name)}
@@ -184,6 +189,7 @@ function ModelCard({
   runningModel,
   preference,
   loading,
+  loadingModel,
   unloading,
   onLoadModel,
   onUnload,
@@ -204,7 +210,7 @@ function ModelCard({
         'relative h-full border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
-        unloading && 'border-primary/30 bg-muted/30',
+        (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
       )}
     >
       <div
@@ -276,11 +282,15 @@ function ModelCard({
           </div>
         </div>
 
-        {unloading ? (
+        {loadingModel || unloading ? (
           <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5">
             <div className="flex items-center gap-2 text-xs font-medium text-foreground">
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span>{i18nService.t('localInferenceUnloadingHint')}</span>
+              <span>
+                {loadingModel
+                  ? i18nService.t('localInferenceLoadingHint')
+                  : i18nService.t('localInferenceUnloadingHint')}
+              </span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/10">
               <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
@@ -317,8 +327,14 @@ function ModelCard({
             onClick={onLoadModel}
             className="w-full"
           >
-            <Play data-icon="inline-start" />
-            {i18nService.t('localInferenceLoad')}
+            {loadingModel ? (
+              <RefreshCw data-icon="inline-start" className="animate-spin" />
+            ) : (
+              <Play data-icon="inline-start" />
+            )}
+            {loadingModel
+              ? i18nService.t('localInferenceLoadingModel')
+              : i18nService.t('localInferenceLoad')}
           </Button>
         )}
       </CardFooter>

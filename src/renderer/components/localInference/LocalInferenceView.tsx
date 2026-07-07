@@ -97,6 +97,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [draftModelsDir, setDraftModelsDir] = useState('');
   const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingModelName, setLoadingModelName] = useState<string | null>(null);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [activePullName, setActivePullName] = useState<string | null>(null);
@@ -112,6 +113,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   useI18nLanguage();
   const marketplaceSearchRef = useRef<number>(0);
+  const loadingModelNameRef = useRef<string | null>(null);
   const marketplaceQueryRef = useRef(marketplaceQuery);
   const marketplaceHasSearchedRef = useRef(marketplaceHasSearched);
   const toastTimerRef = useRef<number | null>(null);
@@ -447,47 +449,24 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return () => window.clearInterval(timer);
   }, [isRunning, refreshRunningModels]);
 
-  const ensureLlamaCppRunning = useCallback(async () => {
-    let snapshot = status ?? await refreshStatus();
-    let nextAction = resolveLlamaCppServiceAction(snapshot);
-
-    if (nextAction === LlamaCppServiceAction.Install) {
-      const installResult = await window.electron.llamacpp.install();
-      if (!installResult?.success) {
-        throw new Error(installResult?.error || i18nService.t('localInferenceRuntimeMissing'));
-      }
-      showToast(i18nService.t('localInferenceRuntimeReady'), LocalInferenceToastKind.Success);
-      snapshot = await refreshStatus();
-      nextAction = resolveLlamaCppServiceAction(snapshot);
-    }
-
-    if (nextAction === LlamaCppServiceAction.Start) {
-      snapshot = await window.electron.llamacpp.start();
-      cachedStatus = snapshot;
-      setStatus(snapshot);
-    } else if (nextAction === LlamaCppServiceAction.Refresh) {
-      snapshot = await refreshStatus();
-    }
-
-    if (snapshot.status !== 'running') {
-      throw new Error(snapshot.error || i18nService.t('localInferenceLaunchRestartFailed'));
-    }
-
-    await refreshLocalModels().catch(() => undefined);
-    await refreshRunningModels().catch(() => undefined);
-    return snapshot;
-  }, [refreshLocalModels, refreshRunningModels, refreshStatus, showToast, status]);
-
   const handleLoadModel = (model: OllamaModel) => {
+    const modelName = model.name;
+    if (loadingModelNameRef.current) return;
+    loadingModelNameRef.current = modelName;
+    setLoadingModelName(modelName);
     void runAction(async () => {
-      await ensureLlamaCppRunning();
-      const input: LlamaCppModelLaunchInput = {
-        model: model.name,
-        ...(model.path ? { modelPath: model.path } : {}),
-      };
-      const result = await window.electron.llamacpp.loadModel(input);
-      setRunningModels(result.runningModels);
-      notifyLlamaCppRunningModelsChanged();
+      try {
+        const input: LlamaCppModelLaunchInput = {
+          model: modelName,
+          ...(model.path ? { modelPath: model.path } : {}),
+        };
+        const result = await window.electron.llamacpp.loadModel(input);
+        setRunningModels(result.runningModels);
+        notifyLlamaCppRunningModelsChanged();
+      } finally {
+        loadingModelNameRef.current = null;
+        setLoadingModelName(current => (current === modelName ? null : current));
+      }
     });
   };
 
@@ -668,23 +647,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   {i18nService.t('localInferenceLibrarySettings')}
                 </Button>
               ) : null}
-              <div
-                className={`inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium ${
-                  isRunning
-                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                    : 'border-border bg-surface text-foreground/80'
-                }`}
-              >
-                {isRunning
-                  ? i18nService.t('localInferenceStatus_running')
-                  : i18nService.t('localInferenceStatus_stopped')}
-              </div>
             </div>
           </div>
 
           {activeTab === 'models' ? (
             <ModelsPanel
               loading={loading}
+              loadingModelName={loadingModelName}
               unloadingModelName={unloadingModelName}
               localModels={localModels}
               runningModels={runningModels}
@@ -751,13 +720,20 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
 function getModelCardBusyState(input: {
   modelName: string;
+  loadingModelName: string | null;
   unloadingModelName: string | null;
   globalLoading: boolean;
 }): { cardBusy: boolean; buttonsDisabled: boolean } {
-  const cardBusy = Boolean(input.unloadingModelName && input.unloadingModelName === input.modelName);
+  const cardBusy = Boolean(
+    input.loadingModelName === input.modelName ||
+    input.unloadingModelName === input.modelName,
+  );
+  const anotherModelLoading = Boolean(
+    input.loadingModelName && input.loadingModelName !== input.modelName,
+  );
   return {
     cardBusy,
-    buttonsDisabled: input.globalLoading || cardBusy,
+    buttonsDisabled: input.globalLoading || cardBusy || anotherModelLoading,
   };
 }
 
@@ -802,6 +778,7 @@ export const __test__getInstallableMarketplaceModels = (
 ) => getInstallableMarketplaceModels(models, installedModelPathMap);
 export const __test__getModelCardBusyState = (input: {
   modelName: string;
+  loadingModelName: string | null;
   unloadingModelName: string | null;
   globalLoading: boolean;
 }) => getModelCardBusyState(input);
