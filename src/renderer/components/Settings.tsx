@@ -11,6 +11,7 @@ import {
 } from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
 import { Textarea } from '@shared/components/ui/textarea';
+import { cn } from '@shared/lib/utils';
 import { ArrowLeftRight, Box, Brain, CheckCircle, Cpu, ExternalLink, Eye, EyeOff, Info, Key, Mail, MessageCircle, Pencil, PlusCircle, ShieldCheck, Signal, Sun, Trash2, UserCircle, X, XCircle } from 'lucide-react';
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -4567,9 +4568,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               <Button
                 type="button"
                 key={tab.key}
-                variant={activeTab === tab.key ? 'default' : 'ghost'}
+                variant="ghost"
                 onClick={() => handleTabChange(tab.key)}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium justify-start w-full"
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium justify-start w-full',
+                  activeTab === tab.key
+                    ? 'bg-surface shadow-elevated text-foreground hover:bg-surface'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-surface-raised'
+                )}
               >
                 {tab.icon}
                 <span className="min-w-0 truncate">{tab.label}</span>
