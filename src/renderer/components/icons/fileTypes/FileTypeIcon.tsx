@@ -14,7 +14,7 @@ interface FileTypeIconProps {
 const FileTypeIcon: React.FC<FileTypeIconProps> = ({ fileName, className }) => {
   const { icon: Icon, color } = getFileTypeInfo(fileName);
   return (
-    <span style={{ color }}>
+    <span className={color}>
       <Icon className={className} />
     </span>
   );
