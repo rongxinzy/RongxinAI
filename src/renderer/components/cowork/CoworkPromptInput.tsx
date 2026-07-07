@@ -150,7 +150,6 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
     const [value, setValue] = useState(draftPrompt);
-    const [showFolderMenu, setShowFolderMenu] = useState(false);
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
     const [isDraggingFiles, setIsDraggingFiles] = useState(false);
     const [isAddingFile, setIsAddingFile] = useState(false);
@@ -158,7 +157,6 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const [isPatchingModel, setIsPatchingModel] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const folderButtonRef = useRef<HTMLButtonElement>(null);
     const dragDepthRef = useRef(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const modelPatchRequestIdRef = useRef(0);
@@ -865,39 +863,31 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
               <div className="flex items-center gap-2 relative">
                 {showFolderSelector && (
                   <>
-                      <div className="flex items-center">
-                        <Button
-                          ref={folderButtonRef as React.Ref<HTMLButtonElement>}
-                          variant="ghost"
-                          size="sm"
-                          className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
-                          onClick={() => setShowFolderMenu(!showFolderMenu)}
-                        >
-                          <Folder className="h-4 w-4 flex-shrink-0" />
-                          <span className="max-w-[150px] truncate text-xs">
-                            {truncatePath(workingDirectory)}
+                    <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                      >
+                        <Folder className="h-4 w-4 flex-shrink-0" />
+                        <span className="max-w-[150px] truncate text-xs">
+                          {truncatePath(workingDirectory)}
+                        </span>
+                        {workingDirectory && (
+                          <span
+                            role="button"
+                            tabIndex={-1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFolderSelect('');
+                            }}
+                            className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
                           </span>
-                          {workingDirectory && (
-                            <span
-                              role="button"
-                              tabIndex={-1}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFolderSelect('');
-                              }}
-                              className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                            >
-                              <X className="h-3 w-3" />
-                            </span>
-                          )}
-                        </Button>
-                      </div>
-                    <FolderSelectorPopover
-                      isOpen={showFolderMenu}
-                      onClose={() => setShowFolderMenu(false)}
-                      onSelectFolder={handleFolderSelect}
-                      anchorRef={folderButtonRef as React.RefObject<HTMLElement>}
-                    />
+                        )}
+                      </Button>
+                    </FolderSelectorPopover>
                     {showFolderRequiredWarning && (
                       <div className="absolute left-0 top-full mt-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
                         {i18nService.t('coworkSelectFolderFirst')}

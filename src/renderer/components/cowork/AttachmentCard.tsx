@@ -1,11 +1,11 @@
 import { Button } from '@shared/components/ui/button';
-import { X } from 'lucide-react';
+import { FileImage, X } from 'lucide-react';
 import React, { useEffect,useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { DraftAttachment } from '../../store/slices/coworkSlice';
 import FileTypeIcon from '../icons/fileTypes/FileTypeIcon';
-import { getFileTypeInfo,ImageFileIcon } from '../icons/fileTypes/index';
+import { getFileTypeInfo } from '../icons/fileTypes/index';
 
 interface AttachmentCardProps {
   attachment: DraftAttachment;
@@ -68,11 +68,11 @@ const ImageCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
       {/* Thumbnail or fallback */}
       {loading ? (
         <div className="flex h-full w-full items-center justify-center">
-          <ImageFileIcon className="h-6 w-6 text-blue-400 animate-pulse" />
+          <FileImage className="h-6 w-6 text-blue-400 animate-pulse" />
         </div>
       ) : showFallback ? (
         <div className="flex h-full w-full items-center justify-center">
-          <ImageFileIcon className="h-6 w-6 text-blue-400" />
+          <FileImage className="h-6 w-6 text-blue-400" />
         </div>
       ) : (
         <img
