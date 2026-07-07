@@ -18,6 +18,7 @@ import type {
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeListDevicesResult,
   LlamaCppRuntimeUninstallResult,
+  LlamaCppServiceConfig,
   LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
@@ -419,6 +420,8 @@ interface IElectronAPI {
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
     restart: () => Promise<LlamaCppStatusSnapshot>;
+    getServiceConfig: () => Promise<LlamaCppServiceConfig>;
+    setServiceConfig: (config: LlamaCppServiceConfig) => Promise<LlamaCppServiceConfig>;
     modelsDir: () => Promise<string>;
     setModelsDir: (modelsDir: string) => Promise<string>;
     listLocalModels: () => Promise<LlamaCppModel[]>;

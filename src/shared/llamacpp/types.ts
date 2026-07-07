@@ -210,6 +210,7 @@ export type LlamaCppInstallProgress = {
 
 export type LlamaCppServiceConfig = {
   host?: string;
+  listenHost?: string;
   port?: string;
   modelsDir?: string;
   runtimeVersion?: string;

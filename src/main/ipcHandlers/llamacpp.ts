@@ -335,6 +335,14 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
+  ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
+    getLlamaCppServiceConfig(options.getStore()),
+  );
+  ipcMain.handle(LlamaCppIpcChannel.SetServiceConfig, async (_event, config: LlamaCppServiceConfig) => {
+    const sanitized = sanitizeLlamaCppServiceConfig(config);
+    options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
+    return sanitized;
+  });
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
   ipcMain.handle(LlamaCppIpcChannel.SetModelsDir, async (_event, modelsDir: unknown) => {
     const store = options.getStore();
@@ -707,6 +715,7 @@ export function sanitizeLlamaCppServiceConfig(
   const threadsBatchRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsBatch];
   const mainGpuRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.MainGpu];
   const host = config?.host?.trim();
+  const listenHost = config?.listenHost?.trim();
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
   const runtimeVersion = config?.runtimeVersion?.trim();
@@ -788,7 +797,13 @@ export function sanitizeLlamaCppServiceConfig(
   });
   const reasoningBudget = normalizeSignedIntegerString(config?.reasoningBudget);
 
-  if (host) next.host = host;
+  if (host === '0.0.0.0' && !listenHost) {
+    next.host = DEFAULT_LLAMACPP_SERVICE_CONFIG.host ?? '127.0.0.1';
+    next.listenHost = host;
+  } else if (host) {
+    next.host = host;
+  }
+  if (listenHost) next.listenHost = listenHost;
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
   if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion)) next.runtimeVersion = runtimeVersion;
