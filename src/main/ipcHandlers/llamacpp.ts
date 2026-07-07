@@ -29,22 +29,22 @@ import {
 import { isProviderEnabled, ProviderName } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import {
   LlamaCppManager,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
-import {
-  ensureLlamaCppServiceRunning,
-  getLlamaCppServiceStartupFailureI18nKey,
-  LlamaCppServiceStartupReason,
-} from '../libs/llamacppServiceStartup';
+import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import {
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
   upsertLlamaCppProviderInAppConfig,
 } from '../libs/llamacppOpenClawBinding';
+import {
+  ensureLlamaCppServiceRunning,
+  getLlamaCppServiceStartupFailureI18nKey,
+  LlamaCppServiceStartupReason,
+} from '../libs/llamacppServiceStartup';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
 
