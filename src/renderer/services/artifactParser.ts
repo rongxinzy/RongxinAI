@@ -318,3 +318,85 @@ export function parseToolArtifact(
     createdAt: toolUseMsg.timestamp || Date.now(),
   };
 }
+
+export interface DetectedArtifact {
+  artifact: Artifact;
+  /** If true, the artifact references a file that should be loaded from disk. */
+  needsFileLoad: boolean;
+}
+
+/**
+ * Detect artifacts from a list of Cowork messages.
+ *
+ * This is a pure function designed to run in a Web Worker. It does not touch
+ * the filesystem or Redux — callers are responsible for loading file contents
+ * and dispatching artifacts.
+ */
+export function detectArtifactsFromMessages(
+  messages: CoworkMessage[],
+  sessionId: string,
+): DetectedArtifact[] {
+  const detected: DetectedArtifact[] = [];
+  const seenFilePaths = new Set<string>();
+
+  for (const msg of messages) {
+    if (msg.type === 'assistant' && !msg.metadata?.isThinking && msg.content) {
+      const codeBlockArtifacts = parseCodeBlockArtifacts(msg.content, msg.id, sessionId);
+      for (const artifact of codeBlockArtifacts) {
+        detected.push({ artifact, needsFileLoad: false });
+      }
+
+      const fileLinks = parseFileLinksFromMessage(msg.content, msg.id, sessionId);
+      for (const fl of fileLinks) {
+        const normalized = fl.filePath ? normalizeFilePathForDedup(fl.filePath) : '';
+        if (fl.filePath && !seenFilePaths.has(normalized)) {
+          seenFilePaths.add(normalized);
+          detected.push({ artifact: fl, needsFileLoad: true });
+        }
+      }
+
+      const contentWithoutFileLinks = stripFileLinksFromText(msg.content);
+      const pathArtifacts = parseFilePathsFromText(contentWithoutFileLinks, msg.id, sessionId);
+      for (const pa of pathArtifacts) {
+        const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
+        if (pa.filePath && !seenFilePaths.has(normalized)) {
+          seenFilePaths.add(normalized);
+          detected.push({ artifact: pa, needsFileLoad: true });
+        }
+      }
+    }
+
+    if (msg.type === 'tool_result' && msg.content) {
+      const pathArtifacts = parseFilePathsFromText(msg.content, msg.id, sessionId, 'artifact-toolresult');
+      for (const pa of pathArtifacts) {
+        const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
+        if (pa.filePath && !seenFilePaths.has(normalized)) {
+          seenFilePaths.add(normalized);
+          detected.push({ artifact: pa, needsFileLoad: true });
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.type === 'tool_use') {
+      const toolUseId = msg.metadata?.toolUseId;
+      const toolResult = toolUseId
+        ? messages.find(m => m.type === 'tool_result' && m.metadata?.toolUseId === toolUseId)
+        : messages[i + 1]?.type === 'tool_result' ? messages[i + 1] : undefined;
+      const toolArtifact = parseToolArtifact(msg, toolResult, sessionId);
+      if (toolArtifact && toolArtifact.filePath) {
+        const normalized = normalizeFilePathForDedup(toolArtifact.filePath);
+        if (!seenFilePaths.has(normalized)) {
+          seenFilePaths.add(normalized);
+          detected.push({ artifact: toolArtifact, needsFileLoad: true });
+        }
+      } else if (toolArtifact && !toolArtifact.filePath) {
+        detected.push({ artifact: toolArtifact, needsFileLoad: false });
+      }
+    }
+  }
+
+  return detected;
+}

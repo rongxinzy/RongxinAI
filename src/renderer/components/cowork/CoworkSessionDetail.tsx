@@ -5,7 +5,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo,useRef, useStat
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { getArtifactTypeFromExtension, normalizeFilePathForDedup, parseCodeBlockArtifacts, parseFileLinksFromMessage, parseFilePathsFromText, parseToolArtifact, stripFileLinksFromText } from '../../services/artifactParser';
+import { ArtifactDetectionService } from '../../services/artifactDetectionService';
+import { getArtifactTypeFromExtension, normalizeFilePathForDedup } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
@@ -164,7 +165,35 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS
   );
 
-  const loadedFileIdsRef = useRef<Set<string>>(new Set());
+  const artifactDetectionServiceRef = useRef<ArtifactDetectionService | null>(null);
+
+  // Initialize/replace artifact detection service when session changes
+  useEffect(() => {
+    if (!sessionId) {
+      artifactDetectionServiceRef.current?.terminate();
+      artifactDetectionServiceRef.current = null;
+      return undefined;
+    }
+
+    const service = new ArtifactDetectionService(
+      (detected) => {
+        for (const { artifact } of detected) {
+          if (!artifact.filePath) {
+            dispatch(addArtifact({ sessionId, artifact }));
+          }
+        }
+      },
+      (artifact) => {
+        dispatch(addArtifact({ sessionId, artifact }));
+      },
+      (absPath) => window.electron.dialog.readFileAsDataUrl(absPath),
+    );
+    artifactDetectionServiceRef.current = service;
+
+    return () => {
+      service.terminate();
+    };
+  }, [sessionId, dispatch]);
 
   useEffect(() => {
     let animationFrame: number | undefined;
@@ -235,137 +264,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   useEffect(() => {
     dispatch(selectArtifact(null));
     dispatch(closePanel());
-    loadedFileIdsRef.current = new Set();
   }, [sessionId, dispatch]);
 
   useEffect(() => {
     if (!sessionId || !currentSession?.messages?.length) return;
     if (isStreaming) return;
 
-    try {
-      const messages = currentSession.messages;
-      const detected: Artifact[] = [];
-      const seenFilePaths = new Set<string>();
+    const service = artifactDetectionServiceRef.current;
+    if (!service) return;
 
-      for (const msg of messages) {
-        if (msg.type === 'assistant' && !msg.metadata?.isThinking && msg.content) {
-          const codeBlockArtifacts = parseCodeBlockArtifacts(msg.content, msg.id, sessionId);
-          detected.push(...codeBlockArtifacts);
-
-          const fileLinks = parseFileLinksFromMessage(msg.content, msg.id, sessionId);
-          for (const fl of fileLinks) {
-            const normalized = fl.filePath ? normalizeFilePathForDedup(fl.filePath) : '';
-            if (fl.filePath && !seenFilePaths.has(normalized)) {
-              seenFilePaths.add(normalized);
-              detected.push(fl);
-            }
-          }
-
-          const contentWithoutFileLinks = stripFileLinksFromText(msg.content);
-          const pathArtifacts = parseFilePathsFromText(contentWithoutFileLinks, msg.id, sessionId);
-          for (const pa of pathArtifacts) {
-            const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
-            if (pa.filePath && !seenFilePaths.has(normalized)) {
-              seenFilePaths.add(normalized);
-              detected.push(pa);
-            }
-          }
-        }
-
-        if (msg.type === 'tool_result' && msg.content) {
-          const pathArtifacts = parseFilePathsFromText(msg.content, msg.id, sessionId, 'artifact-toolresult');
-          for (const pa of pathArtifacts) {
-            const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
-            if (pa.filePath && !seenFilePaths.has(normalized)) {
-              seenFilePaths.add(normalized);
-              detected.push(pa);
-            }
-          }
-        }
-      }
-
-      for (let i = 0; i < messages.length; i++) {
-        const msg = messages[i];
-        if (msg.type === 'tool_use') {
-          const toolUseId = msg.metadata?.toolUseId;
-          const toolResult = toolUseId
-            ? messages.find(m => m.type === 'tool_result' && m.metadata?.toolUseId === toolUseId)
-            : messages[i + 1]?.type === 'tool_result' ? messages[i + 1] : undefined;
-          const toolArtifact = parseToolArtifact(msg, toolResult, sessionId);
-          if (toolArtifact && toolArtifact.filePath) {
-            const normalized = normalizeFilePathForDedup(toolArtifact.filePath);
-            if (!seenFilePaths.has(normalized)) {
-              seenFilePaths.add(normalized);
-              detected.push(toolArtifact);
-            }
-          } else if (toolArtifact && !toolArtifact.filePath) {
-            detected.push(toolArtifact);
-          }
-        }
-      }
-
-      for (const a of detected) {
-        if (!a.filePath) {
-          dispatch(addArtifact({ sessionId, artifact: a }));
-        }
-      }
-
-      const cwd = currentSession.cwd;
-      const toLoad = detected.filter(a => a.filePath && !loadedFileIdsRef.current.has(a.id));
-      if (toLoad.length === 0) return;
-
-      const loadFiles = async () => {
-        for (const artifact of toLoad) {
-          let rawPath = artifact.filePath!;
-          if (rawPath.startsWith('file:///')) {
-            rawPath = rawPath.slice(7);
-          } else if (rawPath.startsWith('file://')) {
-            rawPath = rawPath.slice(7);
-          } else if (rawPath.startsWith('file:/')) {
-            rawPath = rawPath.slice(5);
-          }
-          // Strip leading / before Windows drive letter
-          if (/^\/[A-Za-z]:/.test(rawPath)) {
-            rawPath = rawPath.slice(1);
-          }
-          const absPath = rawPath.startsWith('/')
-            ? rawPath
-            : (/^[A-Za-z]:/.test(rawPath) ? rawPath : `${cwd}/${rawPath}`);
-          try {
-            const result = await window.electron.dialog.readFileAsDataUrl(absPath);
-            if (result?.success && result.dataUrl) {
-              const isTextType = artifact.type !== 'image' && artifact.type !== 'document';
-              let content = result.dataUrl;
-              if (isTextType) {
-                try {
-                  const base64 = result.dataUrl.split(',')[1] || '';
-                  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-                  content = new TextDecoder('utf-8').decode(bytes);
-                } catch {
-                  content = result.dataUrl;
-                }
-              }
-              loadedFileIdsRef.current.add(artifact.id);
-              dispatch(addArtifact({
-                sessionId,
-                artifact: { ...artifact, content, filePath: absPath },
-              }));
-            } else {
-              // File does not exist or is unreadable — mark as loaded to avoid retrying
-              loadedFileIdsRef.current.add(artifact.id);
-            }
-          } catch {
-            // File unreadable or missing — mark as loaded to avoid retrying
-            loadedFileIdsRef.current.add(artifact.id);
-          }
-        }
-      };
-      loadFiles();
-    } catch (err) {
+    service.processMessages(currentSession.messages, sessionId, currentSession.cwd).catch((err) => {
       console.error('[ArtifactDetection] failed:', err);
-    }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- uses messagesLength as stable proxy for currentSession.messages
-  }, [sessionId, messagesLength, isStreaming, dispatch]);
+  }, [sessionId, messagesLength, isStreaming]);
 
   // Intercept clicks on artifact-compatible file links → open in panel
   useEffect(() => {
