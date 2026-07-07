@@ -1,6 +1,17 @@
-import { PromptInputProvider, PromptInputTextarea, usePromptInputController } from '@shared/components/ai-elements/prompt-input';
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputButton,
+  PromptInputFooter,
+  PromptInputProvider,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  usePromptInputController,
+} from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
-import { ArrowUp, Folder, Paperclip, Square, TriangleAlert, X } from 'lucide-react';
+import { cn } from '@shared/lib/utils';
+import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
@@ -86,20 +97,7 @@ const buildInlinedSkillPrompt = (skill: Skill): string => {
   ].join('\n');
 };
 
-const SEND_SHORTCUT_OPTIONS = [
-  { value: 'Enter', label: 'Enter', labelMac: 'Enter' },
-  { value: 'Shift+Enter', label: 'Shift+Enter', labelMac: 'Shift+Enter' },
-  { value: 'Ctrl+Enter', label: 'Ctrl+Enter', labelMac: 'Cmd+Enter' },
-  { value: 'Alt+Enter', label: 'Alt+Enter', labelMac: 'Option+Enter' },
-] as const;
-
 const isMacPlatform = navigator.platform.includes('Mac');
-
-const getSendShortcutLabel = (value: string): string => {
-  const option = SEND_SHORTCUT_OPTIONS.find(o => o.value === value);
-  if (!option) return value;
-  return isMacPlatform ? option.labelMac : option.label;
-};
 
 export interface CoworkPromptInputRef {
   /** 设置输入框值 */
@@ -488,20 +486,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     }
   };
 
-  const handleStopClick = () => {
-    if (onStop) {
-      onStop();
-    }
-  };
-
-  const containerClass = isLarge
-    ? 'relative rounded-2xl border border-border bg-surface shadow-card'
-    : 'relative flex items-end gap-2 p-3 rounded-xl border border-border bg-surface';
-
-  const textareaClass = isLarge
-    ? `w-full px-4 pt-2.5 pb-2 text-foreground placeholder:dark:text-foregroundSecondary/60 placeholder:text-muted-foreground/60 text-[15px] leading-[23px] min-h-[${minHeight}px] max-h-[${maxHeight}px]`
-    : 'flex-1 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed min-h-[24px] max-h-[200px]';
-
   const truncatePath = (path: string, maxLength = 30): string => {
     if (!path) return i18nService.t('noFolderSelected');
     return getCompactFolderName(path, maxLength) || i18nService.t('noFolderSelected');
@@ -757,7 +741,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     return Array.from(dataTransfer.types).includes('Files');
   };
 
-  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragEnter = (event: React.DragEvent<HTMLElement>) => {
     if (!hasFileTransfer(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -767,14 +751,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     }
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
     if (!hasFileTransfer(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = disabled || isStreaming ? 'none' : 'copy';
   };
 
-  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (event: React.DragEvent<HTMLElement>) => {
     if (!hasFileTransfer(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -784,7 +768,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     }
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
     if (!hasFileTransfer(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -802,26 +786,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     void handleIncomingFiles(files);
   }, [disabled, handleIncomingFiles, isStreaming]);
 
-  const [isGatewayReady, setIsGatewayReady] = useState(true);
-  useEffect(() => {
-    coworkService.getOpenClawEngineStatus().then((s) => {
-      setIsGatewayReady(!s || s.phase === 'running');
-    });
-    return coworkService.onOpenClawEngineStatus((s) => {
-      setIsGatewayReady(s.phase === 'running');
-    });
-  }, []);
-  const canSubmit = isGatewayReady && !disabled && !isPatchingModel && !agentModelIsInvalid && !hasUnavailableLlamaCppModel && (!!value.trim() || attachments.length > 0);
   const invalidModelLabel = invalidExplicitModelRef?.split('/').pop() || invalidExplicitModelRef || '';
-
-  const enhancedContainerClass = isDraggingFiles
-    ? `${containerClass} ring-2 ring-primary/50 border-primary/60`
-    : containerClass;
 
   const [currentSendShortcut, setCurrentSendShortcut] = useState(
     () => configService.getConfig().shortcuts?.sendMessage ?? 'Enter'
   );
-  const sendButtonTitle = `${i18nService.t('sendMessage')} (${getSendShortcutLabel(currentSendShortcut)})`;
 
   // Sync when config is updated elsewhere (e.g. Settings panel)
   useEffect(() => {
@@ -856,204 +825,156 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           </Button>
         </div>
       )}
-      <div
-        className={enhancedContainerClass}
+      <PromptInput
+        multiple
+        className={cn(
+          'shadow-elevated rounded-2xl transition-shadow focus-within:shadow-[0_4px_16px_rgba(59,130,246,0.25)] [&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:has-[:focus-visible]:border-input [&_[data-slot=input-group]]:has-[:focus-visible]:ring-0',
+          isDraggingFiles && 'ring-2 ring-primary'
+        )}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onSubmit={handleSubmit}
       >
         {isDraggingFiles && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] bg-primary/10 text-xs font-medium text-primary">
             {i18nService.t('coworkDropFileHint')}
           </div>
         )}
-        {isLarge ? (
-          <>
-            <PromptInputTextarea
-              ref={textareaRef}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={placeholder}
-              disabled={disabled}
-              rows={isLarge ? 2 : 1}
-              className={textareaClass}
-              style={{ minHeight: `${minHeight}px` }}
-            />
-            <div className="flex items-center justify-between px-4 pb-2 pt-1.5">
-              <div className="flex items-center gap-2 relative">
-                {showFolderSelector && (
-                  <>
-                    <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
-                      >
-                        <Folder className="h-4 w-4 flex-shrink-0" />
-                        <span className="max-w-[150px] truncate text-xs">
-                          {truncatePath(workingDirectory)}
-                        </span>
-                        {workingDirectory && (
-                          <span
-                            role="button"
-                            tabIndex={-1}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFolderSelect('');
-                            }}
-                            className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                          >
-                            <X className="h-3 w-3" />
-                          </span>
-                        )}
-                      </Button>
-                    </FolderSelectorPopover>
-                    {showFolderRequiredWarning && (
-                      <div className="absolute left-0 top-full mt-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
-                        {i18nService.t('coworkSelectFolderFirst')}
-                      </div>
-                    )}
-                  </>
-                )}
-                {showModelSelector && (
-                  <div className="flex flex-col items-start gap-1">
-                    <ModelSelector
-                      dropdownDirection="up"
-                      disabled={isPatchingModel || isPersistingAgentModel}
-                      value={(agentModelIsInvalid && invalidExplicitModelRef)
-                        ? { id: '__invalid__', name: invalidModelLabel } as Model
-                        : agentSelectedModel}
-                      onChange={async (nextModel) => {
-                        if (isPatchingModel || isPersistingAgentModel) return;
-                        if (!nextModel) return;
-                        const modelRef = toOpenClawModelRef(nextModel);
-                        if (sessionId) {
-                          const requestId = modelPatchRequestIdRef.current + 1;
-                          modelPatchRequestIdRef.current = requestId;
-                          const previousModelOverride = currentSession?.id === sessionId
-                            ? currentSession.modelOverride
-                            : '';
-
-                          setIsPatchingModel(true);
-                          dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
-
-                          try {
-                            const patchedSession = await coworkService.patchSession(sessionId, { model: modelRef });
-                            if (requestId !== modelPatchRequestIdRef.current) return;
-
-                            if (!patchedSession) {
-                              dispatch(updateCurrentSessionModelOverride({
-                                sessionId,
-                                modelOverride: previousModelOverride,
-                              }));
-                              window.dispatchEvent(new CustomEvent('app:showToast', {
-                                detail: i18nService.t('coworkModelSwitchFailed'),
-                              }));
-                              return;
-                            }
-
-                            if (currentAgent && agentModelIsInvalid) {
-                              void agentService.updateAgent(currentAgent.id, { model: modelRef });
-                            }
-                          } catch {
-                            if (requestId === modelPatchRequestIdRef.current) {
-                              dispatch(updateCurrentSessionModelOverride({
-                                sessionId,
-                                modelOverride: previousModelOverride,
-                              }));
-                              window.dispatchEvent(new CustomEvent('app:showToast', {
-                                detail: i18nService.t('coworkModelSwitchFailed'),
-                              }));
-                            }
-                          } finally {
-                            if (requestId === modelPatchRequestIdRef.current) {
-                              setIsPatchingModel(false);
-                            }
-                          }
-                          return;
-                        }
-                        await persistAgentModelSelection(nextModel);
-                      }}
-                    />
-                    {agentModelIsInvalid && (
-                      <span className="max-w-60 text-[11px] leading-4 text-red-500">
-                        {hasUnavailableLlamaCppModel
-                          ? i18nService.t('agentLlamaCppModelNotRunningHint')
-                          : i18nService.t('agentModelInvalidHint')}
+        <PromptInputBody>
+          <PromptInputTextarea
+            ref={textareaRef}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={placeholder}
+            disabled={disabled}
+          />
+        </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              {showFolderSelector && (
+                <>
+                  <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
+                    <PromptInputButton
+                      className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                    >
+                      <Folder className="h-4 w-4 flex-shrink-0" />
+                      <span className="max-w-[150px] truncate text-xs">
+                        {truncatePath(workingDirectory)}
                       </span>
-                    )}
-                  </div>
-                )}
-                {!remoteManaged && (
-                  <Button variant="ghost" size="icon-sm" onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile}
-                    title={i18nService.t('coworkAddFile')} aria-label={i18nService.t('coworkAddFile')}>
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                )}
-                {!remoteManaged && (
-                  <>
-                    <SkillsButton
-                      onSelectSkill={handleSelectSkill}
-                      onManageSkills={handleManageSkills}
-                    />
-                    <ActiveSkillBadge />
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {isStreaming ? (
-                  <Button variant="destructive" size="icon" onClick={handleStopClick} aria-label="Stop">
-                    <Square className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button size="icon" onClick={handleSubmit} disabled={!canSubmit}
-                    aria-label={i18nService.t('sendMessage')} title={sendButtonTitle}>
-                    <ArrowUp className="h-[18px] w-[18px]" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <PromptInputTextarea
-              ref={textareaRef}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={placeholder}
-              disabled={disabled}
-              rows={1}
-              className={textareaClass}
-            />
+                      {workingDirectory && (
+                        <span
+                          role="button"
+                          tabIndex={-1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFolderSelect('');
+                          }}
+                          className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </span>
+                      )}
+                    </PromptInputButton>
+                  </FolderSelectorPopover>
+                  {showFolderRequiredWarning && (
+                    <div className="absolute left-0 top-full mt-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
+                      {i18nService.t('coworkSelectFolderFirst')}
+                    </div>
+                  )}
+                </>
+              )}
+              {showModelSelector && (
+                <div className="flex flex-col items-start gap-1">
+                  <ModelSelector
+                    dropdownDirection="up"
+                    disabled={isPatchingModel || isPersistingAgentModel}
+                    value={(agentModelIsInvalid && invalidExplicitModelRef)
+                      ? { id: '__invalid__', name: invalidModelLabel } as Model
+                      : agentSelectedModel}
+                    onChange={async (nextModel) => {
+                      if (isPatchingModel || isPersistingAgentModel) return;
+                      if (!nextModel) return;
+                      const modelRef = toOpenClawModelRef(nextModel);
+                      if (sessionId) {
+                        const requestId = modelPatchRequestIdRef.current + 1;
+                        modelPatchRequestIdRef.current = requestId;
+                        const previousModelOverride = currentSession?.id === sessionId
+                          ? currentSession.modelOverride
+                          : '';
 
-            {!remoteManaged && (
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon-sm" onClick={handleAddFile}
-                  disabled={disabled || isStreaming || isAddingFile}
-                  title={i18nService.t('coworkAddFile')} aria-label={i18nService.t('coworkAddFile')}>
+                        setIsPatchingModel(true);
+                        dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
+
+                        try {
+                          const patchedSession = await coworkService.patchSession(sessionId, { model: modelRef });
+                          if (requestId !== modelPatchRequestIdRef.current) return;
+
+                          if (!patchedSession) {
+                            dispatch(updateCurrentSessionModelOverride({
+                              sessionId,
+                              modelOverride: previousModelOverride,
+                            }));
+                            window.dispatchEvent(new CustomEvent('app:showToast', {
+                              detail: i18nService.t('coworkModelSwitchFailed'),
+                            }));
+                            return;
+                          }
+
+                          if (currentAgent && agentModelIsInvalid) {
+                            void agentService.updateAgent(currentAgent.id, { model: modelRef });
+                          }
+                        } catch {
+                          if (requestId === modelPatchRequestIdRef.current) {
+                            dispatch(updateCurrentSessionModelOverride({
+                              sessionId,
+                              modelOverride: previousModelOverride,
+                            }));
+                            window.dispatchEvent(new CustomEvent('app:showToast', {
+                              detail: i18nService.t('coworkModelSwitchFailed'),
+                            }));
+                          }
+                        } finally {
+                          if (requestId === modelPatchRequestIdRef.current) {
+                            setIsPatchingModel(false);
+                          }
+                        }
+                        return;
+                      }
+                      await persistAgentModelSelection(nextModel);
+                    }}
+                  />
+                  {agentModelIsInvalid && (
+                    <span className="max-w-60 text-[11px] leading-4 text-red-500">
+                      {hasUnavailableLlamaCppModel
+                        ? i18nService.t('agentLlamaCppModelNotRunningHint')
+                        : i18nService.t('agentModelInvalidHint')}
+                    </span>
+                  )}
+                </div>
+              )}
+              {!remoteManaged && (
+                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile}>
                   <Paperclip className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-
-            {isStreaming ? (
-              <Button variant="destructive" size="icon" onClick={handleStopClick} aria-label="Stop">
-                <Square className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button size="icon" onClick={handleSubmit} disabled={!canSubmit}
-                aria-label={i18nService.t('sendMessage')} title={sendButtonTitle}>
-                <ArrowUp className="h-[17px] w-[17px]" />
-              </Button>
-            )}
-          </>
-        )}
-      </div>
+                </PromptInputButton>
+              )}
+              {!remoteManaged && (
+                <>
+                  <SkillsButton
+                    onSelectSkill={handleSelectSkill}
+                    onManageSkills={handleManageSkills}
+                  />
+                  <ActiveSkillBadge />
+                </>
+              )}
+            </PromptInputTools>
+            <PromptInputSubmit
+              status={isStreaming ? 'streaming' : 'ready'}
+              onStop={isStreaming ? onStop : undefined}
+            />
+          </PromptInputFooter>
+        </PromptInput>
     </div>
   );
   }
