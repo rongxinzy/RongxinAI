@@ -1,8 +1,24 @@
 import fs from 'fs';
+import http from 'http';
 import os from 'os';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ZipFile } from 'yazl';
+
+vi.mock('./llamacppManager', () => ({
+  listLlamaCppRuntimeDevices: vi.fn(async (input: { executablePath: string }) => ({
+    success: true,
+    executablePath: input.executablePath,
+    devices: [{ id: 'CPU', name: 'CPU', backend: 'cpu' }],
+  })),
+}));
+
+vi.mock('electron', () => ({
+  app: {
+    isPackaged: false,
+  },
+}));
 
 import {
   buildFallbackManifest,
@@ -66,6 +82,101 @@ async function createBackendZipArchive(zipPath: string, entries: Array<{ name: s
       .on('close', resolve)
       .on('error', reject);
   });
+}
+
+async function createArchiveServer(input: {
+  archiveBytes: Buffer;
+  failFirstGet?: boolean;
+  closeFirstFullGetAfterBytes?: number;
+}): Promise<{
+  baseUrl: string;
+  requests: Array<{ method?: string; range?: string }>;
+  close: () => Promise<void>;
+}> {
+  const requests: Array<{ method?: string; range?: string }> = [];
+  let failedGet = false;
+  let closedFullGet = false;
+
+  const server = http.createServer((req, res) => {
+    requests.push({
+      method: req.method,
+      range: typeof req.headers.range === 'string' ? req.headers.range : undefined,
+    });
+    const total = input.archiveBytes.length;
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', 'application/zip');
+
+    if (req.method === 'HEAD') {
+      res.statusCode = 200;
+      res.setHeader('Content-Length', String(total));
+      res.end();
+      return;
+    }
+
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.end();
+      return;
+    }
+
+    if (input.failFirstGet && !failedGet) {
+      failedGet = true;
+      res.statusCode = 500;
+      res.end('retry');
+      return;
+    }
+
+    const rangeHeader = req.headers.range;
+    const range = typeof rangeHeader === 'string'
+      ? /^bytes=(\d+)-$/.exec(rangeHeader)
+      : null;
+    if (range) {
+      const start = Number(range[1]);
+      const chunk = input.archiveBytes.subarray(start);
+      res.statusCode = 206;
+      res.setHeader('Content-Length', String(chunk.length));
+      res.setHeader('Content-Range', `bytes ${start}-${total - 1}/${total}`);
+      res.end(chunk);
+      return;
+    }
+
+    if (input.closeFirstFullGetAfterBytes && !closedFullGet) {
+      closedFullGet = true;
+      res.statusCode = 200;
+      res.setHeader('Content-Length', String(total));
+      res.write(input.archiveBytes.subarray(0, input.closeFirstFullGetAfterBytes));
+      res.destroy();
+      return;
+    }
+
+    res.statusCode = 200;
+    res.setHeader('Content-Length', String(total));
+    res.end(input.archiveBytes);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Failed to start archive server.');
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close(error => {
+        if (error) reject(error);
+        else resolve();
+      });
+    }),
+  };
 }
 
 describe('llamacpp backend manager', () => {
@@ -320,6 +431,59 @@ describe('llamacpp backend manager', () => {
     }
   });
 
+  test('reads bundled backend manifest and injects local archive URLs when available', async () => {
+    const originalCwd = process.cwd();
+    const originalFetch = global.fetch;
+    const originalPlatform = process.platform;
+    const projectRoot = createRuntimeRoot();
+    const manifestDir = path.join(projectRoot, 'build', 'win-lite');
+    const archiveDir = path.join(projectRoot, 'build', 'win-full');
+    fs.mkdirSync(manifestDir, { recursive: true });
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(manifestDir, 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        defaultVersion: 'b9244',
+        releaseBaseUrl: 'https://example.com/llamacpp/b9244',
+        backends: [
+          {
+            version: 'b9244',
+            backend: 'win-x64',
+            platform: 'win32',
+            arch: 'x64',
+            accelerator: 'cpu',
+            archive: { assetName: 'llama-b9244-bin-win-cpu-x64.zip' },
+          },
+        ],
+      }),
+      'utf8',
+    );
+    fs.writeFileSync(path.join(archiveDir, 'llama-b9244-bin-win-cpu-x64.zip'), 'zip');
+    vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('fetch should not be called');
+    }) as typeof fetch);
+
+    try {
+      const manifest = await fetchLlamaCppBackendManifest({});
+
+      expect(manifest.defaultVersion).toBe('b9244');
+      expect(manifest.backends[0]?.archive?.url).toMatch(/^file:\/\//);
+      expect(manifest.backends[0]?.archive?.url).toContain('llama-b9244-bin-win-cpu-x64.zip');
+    } finally {
+      global.fetch = originalFetch;
+      vi.restoreAllMocks();
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+      });
+      process.chdir(originalCwd);
+    }
+  });
+
   test('rejects a locally installed backend when platform or architecture does not match', async () => {
     const runtimeRoot = createRuntimeRoot();
     const ref = toBackendRef('b9518', 'win-arm64');
@@ -357,26 +521,36 @@ describe('llamacpp backend manager', () => {
   });
 
   test('lists installed backend and current selection', async () => {
+    const originalPlatform = process.platform;
     const runtimeRoot = createRuntimeRoot();
     const manifest = buildFallbackManifest('b9505');
-    const ref = toBackendRef('b9505', 'mac-arm64');
-    writeInstalledBackend(runtimeRoot, ref.version, ref.backend, 'darwin');
+    const ref = toBackendRef('b9505', 'win-x64');
+    writeInstalledBackend(runtimeRoot, ref.version, ref.backend, 'win32');
     syncCurrentBackend(runtimeRoot, ref);
-
-    const result = await listLlamaCppBackends({
-      runtimeRoot,
-      manifest,
-      platform: 'darwin',
-      arch: 'arm64',
-      hasNvidiaGpu: false,
+    Object.defineProperty(process, 'platform', {
+      value: 'linux',
     });
 
-    expect(result.selection?.versionBackend).toBe('b9505/mac-arm64');
-    expect(readCurrentBackendRef(runtimeRoot)?.versionBackend).toBe('b9505/mac-arm64');
-    expect(result.backends.find(backend => backend.versionBackend === 'b9505/mac-arm64')).toMatchObject({
-      installed: true,
-      current: true,
-    });
+    try {
+      const result = await listLlamaCppBackends({
+        runtimeRoot,
+        manifest,
+        platform: 'win32',
+        arch: 'x64',
+        hasNvidiaGpu: false,
+      });
+
+      expect(result.selection?.versionBackend).toBe('b9505/win-x64');
+      expect(readCurrentBackendRef(runtimeRoot)?.versionBackend).toBe('b9505/win-x64');
+      expect(result.backends.find(backend => backend.versionBackend === 'b9505/win-x64')).toMatchObject({
+        installed: true,
+        current: true,
+      });
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+      });
+    }
   });
 
   test('uninstalls the selected backend and clears current', async () => {
@@ -415,34 +589,96 @@ describe('llamacpp backend manager', () => {
     expect(result.error).toContain('CUDA companion');
   });
 
-  test('imports an extracted backend directory and infers version/backend', async () => {
+  test('imports an extracted Windows backend directory and infers version/backend', async () => {
     const runtimeRoot = createRuntimeRoot();
     const sourceDir = path.join(runtimeRoot, 'llama-b9518');
     fs.mkdirSync(path.join(sourceDir, 'bin'), { recursive: true });
-    fs.writeFileSync(path.join(sourceDir, 'bin', 'llama-server'), '');
-    fs.writeFileSync(path.join(sourceDir, 'bin', 'libggml.dylib'), '');
+    fs.writeFileSync(path.join(sourceDir, 'bin', 'llama-server.exe'), '');
+    fs.writeFileSync(path.join(sourceDir, 'bin', 'ggml.dll'), '');
 
     const result = await importLlamaCppBackendPath({
       runtimeRoot,
       sourcePath: sourceDir,
-      platform: 'darwin',
-      arch: 'arm64',
+      platform: 'win32',
+      arch: 'x64',
       hasNvidiaGpu: false,
     });
 
     expect(result.success).toBe(true);
-    expect(result.backend?.versionBackend).toBe('b9518/mac-arm64');
-    expect(readCurrentBackendRef(runtimeRoot)?.versionBackend).toBe('b9518/mac-arm64');
-    expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'darwin'))).toBe(true);
+    expect(result.backend?.versionBackend).toBe('b9518/win-x64');
+    expect(readCurrentBackendRef(runtimeRoot)?.versionBackend).toBe('b9518/win-x64');
+    expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'win32'))).toBe(true);
+  });
+
+  test('installs backend from a bundled file archive URL', async () => {
+    const runtimeRoot = createRuntimeRoot();
+    const ref = toBackendRef('b9518', 'win-x64');
+    const archivePath = path.join(runtimeRoot, 'llama-b9518-bin-win-cpu-x64.zip');
+    await createBackendZipArchive(archivePath, [
+      { name: 'build/bin/llama-server.exe', content: 'binary' },
+      { name: 'build/bin/ggml.dll', content: 'dll' },
+    ]);
+    const archiveBytes = fs.readFileSync(archivePath);
+    const manifest = {
+      schemaVersion: 1 as const,
+      defaultVersion: 'b9518',
+      backends: [
+        {
+          version: 'b9518',
+          backend: 'win-x64',
+          platform: 'win32' as const,
+          arch: 'x64',
+          accelerator: 'cpu' as const,
+          archive: {
+            assetName: path.basename(archivePath),
+            url: pathToFileURL(archivePath).href,
+          },
+        },
+      ],
+    };
+    const progressEvents: any[] = [];
+
+    const result = await installLlamaCppBackend({
+      runtimeRoot,
+      ref,
+      platform: 'win32',
+      arch: 'x64',
+      hasNvidiaGpu: false,
+      manifest,
+      onProgress: progress => {
+        progressEvents.push(progress);
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'win32'))).toBe(true);
+    expect(progressEvents.some(progress =>
+      progress.phase === 'downloading-progress' &&
+      progress.total === archiveBytes.length
+    )).toBe(true);
   });
 
   test('reports real download progress for backend installation', async () => {
     const runtimeRoot = createRuntimeRoot();
     const ref = toBackendRef('b9518', 'win-x64');
+
+    const archivePath = path.join(runtimeRoot, 'llama-b9518-bin-win-cpu-x64.zip');
+    await createBackendZipArchive(archivePath, [
+      { name: 'build/bin/llama-server.exe', content: 'binary' },
+      { name: 'build/bin/ggml.dll', content: 'dll' },
+    ]);
+    const archiveBytes = fs.readFileSync(archivePath);
+    fs.rmSync(archivePath, { force: true });
+
+    const partialSize = Math.max(1, Math.floor(archiveBytes.length / 2));
+    const server = await createArchiveServer({
+      archiveBytes,
+      failFirstGet: true,
+    });
     const manifest = {
       schemaVersion: 1 as const,
       defaultVersion: 'b9518',
-      releaseBaseUrl: 'https://example.com/llamacpp/b9518',
+      releaseBaseUrl: server.baseUrl,
       backends: [
         {
           version: 'b9518',
@@ -455,38 +691,20 @@ describe('llamacpp backend manager', () => {
       ],
     };
 
-    const archivePath = path.join(runtimeRoot, 'llama-b9518-bin-win-cpu-x64.zip');
-    await createBackendZipArchive(archivePath, [
-      { name: 'build/bin/llama-server.exe', content: 'binary' },
-      { name: 'build/bin/ggml.dll', content: 'dll' },
-    ]);
-    const archiveBytes = fs.readFileSync(archivePath);
-    fs.rmSync(archivePath, { force: true });
-
-    const originalFetch = global.fetch;
-    const originalDateNow = Date.now;
     const progressEvents: any[] = [];
-    let now = 1_000;
 
     try {
-      Date.now = () => now;
-      global.fetch = vi.fn(async () => {
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            const halfway = Math.max(1, Math.floor(archiveBytes.length / 2));
-            controller.enqueue(archiveBytes.subarray(0, halfway));
-            now += 500;
-            controller.enqueue(archiveBytes.subarray(halfway));
-            now += 500;
-            controller.close();
-          },
-        });
-        return new Response(stream, {
-          status: 200,
-          headers: { 'content-length': String(archiveBytes.length) },
-        });
-      }) as typeof fetch;
-
+      const originalMkdtempSync = fs.mkdtempSync;
+      const installTempDir = originalMkdtempSync(path.join(os.tmpdir(), 'llamacpp-backend-resume-'));
+      tempDirs.push(installTempDir);
+      fs.writeFileSync(
+        path.join(installTempDir, 'llama-b9518-bin-win-cpu-x64.zip'),
+        archiveBytes.subarray(0, partialSize),
+      );
+      const mkdtempSpy = vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix, options) => {
+        if (String(prefix).includes('llamacpp-backend-')) return installTempDir;
+        return originalMkdtempSync(prefix, options);
+      });
       const result = await installLlamaCppBackend({
         runtimeRoot,
         ref,
@@ -498,6 +716,7 @@ describe('llamacpp backend manager', () => {
           progressEvents.push(progress);
         },
       });
+      mkdtempSpy.mockRestore();
 
       expect(result.success).toBe(true);
       const downloadEvents = progressEvents.filter(
@@ -510,9 +729,11 @@ describe('llamacpp backend manager', () => {
       expect(progressEvents.some(progress => progress.phase === 'installing')).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'detecting')).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'done')).toBe(true);
+      expect(server.requests.some(request => request.method === 'GET')).toBe(true);
+      expect(server.requests.some(request => request.range === `bytes=${partialSize}-`)).toBe(true);
     } finally {
-      global.fetch = originalFetch;
-      Date.now = originalDateNow;
+      vi.restoreAllMocks();
+      await server.close();
     }
   });
 });

@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { existsSync, readdirSync, statSync, mkdirSync, readFileSync, rmSync, cpSync, lstatSync } = require('fs');
+const { existsSync, readdirSync, statSync, mkdirSync, readFileSync, rmSync, cpSync, lstatSync, writeFileSync, linkSync } = require('fs');
 const { spawnSync } = require('child_process');
 const asar = require('@electron/asar');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
@@ -9,6 +9,45 @@ const { ensurePortableUvRuntime, checkRuntimeHealth: checkUvRuntimeHealth } = re
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const { DIST_DIFFS_EXTENSION_DIR, DIST_EXTENSIONS_DIR, summarizeGatewayAsarEntries } = require('./openclaw-runtime-packaging.cjs');
+
+const WindowsLlamaCppBackendBundleMode = {
+  Lite: 'lite',
+  Full: 'full',
+  None: 'none',
+};
+const LLAMACPP_BACKEND_RESOURCES_DIR = 'llamacpp-backends';
+const LLAMACPP_NSIS_HELPER_RESOURCES_DIR = 'llamacpp-nsis-helper';
+const LLAMACPP_NSIS_HELPER_SCRIPT = 'install-llamacpp-backend-nsis.cjs';
+
+const LlamaCppNsisHelperRuntimePackage = {
+  ExtractZip: 'extract-zip',
+  NodeDownloaderHelper: 'node-downloader-helper',
+};
+
+const LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES = [
+  LlamaCppNsisHelperRuntimePackage.ExtractZip,
+  LlamaCppNsisHelperRuntimePackage.NodeDownloaderHelper,
+];
+
+const DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR = 'C:\\Users\\Administrator\\Downloads';
+
+function resolveWindowsLlamaCppBackendDownloadDir(env = process.env) {
+  return env.RONGXINAI_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
+    || env.WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
+    || DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR;
+}
+
+function resolveLlamaCppBackendSourcePath(projectRoot, relativePath, downloadDir) {
+  const buildPath = path.join(projectRoot, 'build', relativePath);
+  if (existsSync(buildPath)) {
+    return buildPath;
+  }
+  const downloadPath = path.join(downloadDir, relativePath);
+  if (existsSync(downloadPath)) {
+    return downloadPath;
+  }
+  return buildPath;
+}
 
 function isWindowsTarget(context) {
   return context?.electronPlatformName === 'win32';
@@ -129,6 +168,202 @@ function resolveOpenClawRuntimeTargetId(context) {
   }
 
   return null;
+}
+
+function resolveWindowsLlamaCppBackendBundleMode(env = process.env) {
+  const raw = (env.RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE || env.WIN_LLAMACPP_BACKEND_BUNDLE || '').trim().toLowerCase();
+  if (!raw) return WindowsLlamaCppBackendBundleMode.Lite;
+  if (raw === WindowsLlamaCppBackendBundleMode.Full) return WindowsLlamaCppBackendBundleMode.Full;
+  if (raw === WindowsLlamaCppBackendBundleMode.None) return WindowsLlamaCppBackendBundleMode.None;
+  if (raw === WindowsLlamaCppBackendBundleMode.Lite) return WindowsLlamaCppBackendBundleMode.Lite;
+  throw new Error(
+    '[electron-builder-hooks] Invalid Windows llama.cpp backend bundle mode: '
+    + raw
+    + '. Expected lite, full, or none.',
+  );
+}
+
+function prepareWindowsLlamaCppBackendResources(mode, env = process.env) {
+  const projectRoot = path.join(__dirname, '..');
+  const downloadDir = resolveWindowsLlamaCppBackendDownloadDir(env);
+
+  if (mode === WindowsLlamaCppBackendBundleMode.None) {
+    const stagingDir = path.join(projectRoot, 'build-tar', LLAMACPP_BACKEND_RESOURCES_DIR);
+    rmSync(stagingDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    return null;
+  }
+
+  const manifestSourcePath = resolveLlamaCppBackendSourcePath(
+    projectRoot,
+    path.join('win-lite', 'manifest.json'),
+    downloadDir,
+  );
+  if (!existsSync(manifestSourcePath)) {
+    throw new Error(
+      '[electron-builder-hooks] Missing Windows llama.cpp backend manifest. '
+      + 'Expected at build/win-lite/manifest.json or '
+      + path.join(downloadDir, 'win-lite', 'manifest.json'),
+    );
+  }
+
+  const stagingDir = createCleanWindowsLlamaCppBackendStagingDir(projectRoot);
+  const manifest = JSON.parse(readFileSync(manifestSourcePath, 'utf8'));
+  writeFileSync(path.join(stagingDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+
+  if (mode === WindowsLlamaCppBackendBundleMode.Full) {
+    const archiveNames = Array.from(new Set(
+      (Array.isArray(manifest.backends) ? manifest.backends : [])
+        .flatMap((entry) => [
+          entry?.archive?.assetName,
+          ...(entry?.archive?.parts ?? []).map((part) => part?.assetName),
+          ...(entry?.companions ?? []).flatMap((companion) => [
+            companion?.assetName,
+            ...(companion?.parts ?? []).map((part) => part?.assetName),
+          ]),
+        ])
+        .filter((assetName) => typeof assetName === 'string' && assetName.trim())
+        .map((assetName) => assetName.trim()),
+    ));
+
+    for (const archiveName of archiveNames) {
+      const sourcePath = resolveLlamaCppBackendSourcePath(
+        projectRoot,
+        path.join('win-full', archiveName),
+        downloadDir,
+      );
+      if (!existsSync(sourcePath)) {
+        throw new Error(
+          '[electron-builder-hooks] Missing Windows llama.cpp backend archive: '
+          + sourcePath,
+        );
+      }
+      const targetPath = path.join(stagingDir, archiveName);
+      try {
+        linkSync(sourcePath, targetPath);
+      } catch {
+        cpSync(sourcePath, targetPath);
+      }
+    }
+  }
+
+  return {
+    label: `llama.cpp backends (${mode})`,
+    dir: stagingDir,
+    prefix: LLAMACPP_BACKEND_RESOURCES_DIR,
+  };
+}
+
+function createCleanWindowsLlamaCppBackendStagingDir(projectRoot) {
+  const baseDir = path.join(projectRoot, 'build-tar');
+  const stagingDir = path.join(baseDir, LLAMACPP_BACKEND_RESOURCES_DIR);
+  try {
+    rmSync(stagingDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    mkdirSync(stagingDir, { recursive: true });
+    return stagingDir;
+  } catch (error) {
+    const fallbackDir = path.join(baseDir, `${LLAMACPP_BACKEND_RESOURCES_DIR}-${process.pid}-${Date.now()}`);
+    console.warn(
+      '[electron-builder-hooks] Could not clean previous llama.cpp backend staging directory, using a fresh one:',
+      error,
+    );
+    mkdirSync(fallbackDir, { recursive: true });
+    return fallbackDir;
+  }
+}
+
+function prepareWindowsLlamaCppNsisHelperResources() {
+  const projectRoot = path.join(__dirname, '..');
+  const helperSourcePath = path.join(__dirname, LLAMACPP_NSIS_HELPER_SCRIPT);
+  if (!existsSync(helperSourcePath)) {
+    throw new Error(
+      '[electron-builder-hooks] Missing llama.cpp NSIS helper script: '
+      + helperSourcePath,
+    );
+  }
+
+  const stagingDir = createCleanWindowsLlamaCppNsisHelperStagingDir(projectRoot);
+  cpSync(helperSourcePath, path.join(stagingDir, LLAMACPP_NSIS_HELPER_SCRIPT));
+
+  const packageEntries = collectRuntimePackageClosure(
+    LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES,
+    projectRoot,
+  );
+  const nodeModulesDir = path.join(stagingDir, 'node_modules');
+  mkdirSync(nodeModulesDir, { recursive: true });
+  for (const [packageName, entry] of packageEntries) {
+    copyNodePackageToStaging(packageName, entry.root, nodeModulesDir);
+  }
+
+  writeFileSync(
+    path.join(stagingDir, 'package-closure.json'),
+    `${JSON.stringify({
+      script: LLAMACPP_NSIS_HELPER_SCRIPT,
+      packages: [...packageEntries.keys()].sort(),
+    }, null, 2)}\n`,
+    'utf8',
+  );
+
+  return {
+    label: 'llama.cpp NSIS helper',
+    dir: stagingDir,
+    prefix: LLAMACPP_NSIS_HELPER_RESOURCES_DIR,
+  };
+}
+
+function createCleanWindowsLlamaCppNsisHelperStagingDir(projectRoot) {
+  const baseDir = path.join(projectRoot, 'build-tar');
+  const stagingDir = path.join(baseDir, LLAMACPP_NSIS_HELPER_RESOURCES_DIR);
+  try {
+    rmSync(stagingDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    mkdirSync(stagingDir, { recursive: true });
+    return stagingDir;
+  } catch (error) {
+    const fallbackDir = path.join(baseDir, `${LLAMACPP_NSIS_HELPER_RESOURCES_DIR}-${process.pid}-${Date.now()}`);
+    console.warn(
+      '[electron-builder-hooks] Could not clean previous llama.cpp NSIS helper staging directory, using a fresh one:',
+      error,
+    );
+    mkdirSync(fallbackDir, { recursive: true });
+    return fallbackDir;
+  }
+}
+
+function collectRuntimePackageClosure(packageNames, projectRoot) {
+  const collected = new Map();
+
+  function visit(packageName, searchRoot = projectRoot) {
+    if (collected.has(packageName)) return;
+    const packageRoot = resolveNodePackageRoot(packageName, searchRoot, projectRoot);
+    const packageJsonPath = path.join(packageRoot, 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+    collected.set(packageName, {
+      root: packageRoot,
+      dependencies: Object.keys(packageJson.dependencies || {}),
+    });
+    for (const dependencyName of Object.keys(packageJson.dependencies || {})) {
+      visit(dependencyName, packageRoot);
+    }
+  }
+
+  for (const packageName of packageNames) {
+    visit(packageName);
+  }
+
+  return collected;
+}
+
+function resolveNodePackageRoot(packageName, searchRoot, projectRoot) {
+  const packageJsonPath = require.resolve(`${packageName}/package.json`, {
+    paths: [searchRoot, projectRoot],
+  });
+  return path.dirname(packageJsonPath);
+}
+
+function copyNodePackageToStaging(packageName, packageRoot, nodeModulesDir) {
+  const targetRoot = path.join(nodeModulesDir, ...packageName.split('/'));
+  mkdirSync(path.dirname(targetRoot), { recursive: true });
+  rmSync(targetRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  cpSync(packageRoot, targetRoot, { recursive: true });
 }
 
 function readRuntimeBuildInfo(runtimeRoot) {
@@ -634,6 +869,11 @@ async function beforePack(context) {
 
     const outputTar = path.join(buildTarDir, 'win-resources.tar');
     const manifestPath = path.join(buildTarDir, 'win-resources.manifest.json');
+    const llamaCppBackendBundleMode = resolveWindowsLlamaCppBackendBundleMode();
+    const llamaCppBackendResources = prepareWindowsLlamaCppBackendResources(llamaCppBackendBundleMode, process.env);
+    const llamaCppNsisHelperResources = llamaCppBackendBundleMode === WindowsLlamaCppBackendBundleMode.None
+      ? null
+      : prepareWindowsLlamaCppNsisHelperResources();
     const sources = [
       {
         label: 'OpenClaw runtime',
@@ -655,9 +895,13 @@ async function beforePack(context) {
         dir: path.join(__dirname, '..', 'resources', 'uv-win'),
         prefix: 'uv-win',
       },
-    ];
+    ].concat(
+      llamaCppBackendResources ? [llamaCppBackendResources] : [],
+      llamaCppNsisHelperResources ? [llamaCppNsisHelperResources] : [],
+    );
 
     console.log(`[electron-builder-hooks] Packing combined Windows tar: ${outputTar}`);
+    console.log(`[electron-builder-hooks] Windows llama.cpp backend bundle mode: ${llamaCppBackendBundleMode}`);
 
     const canReuseCachedTar = existsSync(outputTar)
       && statSync(outputTar).size > 0
@@ -703,6 +947,16 @@ async function afterPack(context) {
 }
 
 module.exports = {
+  LLAMACPP_BACKEND_RESOURCES_DIR,
+  LLAMACPP_NSIS_HELPER_RESOURCES_DIR,
+  LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES,
+  LLAMACPP_NSIS_HELPER_SCRIPT,
+  WindowsLlamaCppBackendBundleMode,
   beforePack,
   afterPack,
-};
+  collectRuntimePackageClosure,
+  prepareWindowsLlamaCppBackendResources,
+  prepareWindowsLlamaCppNsisHelperResources,
+  resolveWindowsLlamaCppBackendBundleMode,
+  resolveWindowsLlamaCppBackendDownloadDir,
+}

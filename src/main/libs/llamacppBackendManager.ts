@@ -1,9 +1,11 @@
 import crypto from 'crypto';
 import extractZip from 'extract-zip';
 import fs from 'fs';
+import { DownloaderHelper } from 'node-downloader-helper';
 import os from 'os';
 import path from 'path';
 import * as tar from 'tar';
+import { fileURLToPath } from 'url';
 
 import type {
   LlamaCppBackendArchivePart,
@@ -19,6 +21,7 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
+import { readBundledLlamaCppBackendManifest } from './llamacppBackendResources';
 import {
   listLlamaCppRuntimeDevices,
 } from './llamacppManager';
@@ -93,6 +96,12 @@ export async function fetchLlamaCppBackendManifest(
 ): Promise<LlamaCppBackendManifest> {
   const explicitUrl = env.LLAMACPP_BACKEND_MANIFEST_URL?.trim();
   const version = env.LLAMACPP_RUNTIME_VERSION?.trim() || DEFAULT_RUNTIME_VERSION;
+  if (!explicitUrl) {
+    const bundledManifest = readBundledLlamaCppBackendManifest();
+    if (bundledManifest?.backends.length) {
+      return normalizeManifest(bundledManifest, resolveBundledManifestUrl());
+    }
+  }
   const manifestUrl = explicitUrl || `${DEFAULT_RELEASE_BASE_URL}/manifest.json`;
   try {
     const manifest = await fetchManifestFromUrl(manifestUrl);
@@ -107,6 +116,10 @@ export async function fetchLlamaCppBackendManifest(
     }
     return buildFallbackManifest(version);
   }
+}
+
+function resolveBundledManifestUrl(): string {
+  return 'file://llamacpp-backends/manifest.json';
 }
 
 async function fetchManifestFromUrl(manifestUrl: string): Promise<LlamaCppBackendManifest> {
@@ -243,7 +256,7 @@ export async function listLlamaCppBackends(input: {
   manifest?: LlamaCppBackendManifest;
 }): Promise<{ backends: LlamaCppBackendInfo[]; selection?: LlamaCppBackendRef; recommended?: LlamaCppBackendRef }> {
   const manifest = input.manifest ?? await fetchLlamaCppBackendManifest();
-  const installed = listInstalledBackendRefs(input.runtimeRoot);
+  const installed = listInstalledBackendRefs(input.runtimeRoot, input.platform);
   const installedKeys = new Set(installed.map(ref => ref.versionBackend));
   const selection = readCurrentBackendRef(input.runtimeRoot);
   const recommended = recommendLlamaCppBackend({
@@ -778,7 +791,10 @@ export function syncCurrentBackend(runtimeRoot: string, ref: LlamaCppBackendRef)
   fs.symlinkSync(backendDir, currentDir, process.platform === 'win32' ? 'junction' : 'dir');
 }
 
-export function listInstalledBackendRefs(runtimeRoot: string): LlamaCppBackendRef[] {
+export function listInstalledBackendRefs(
+  runtimeRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): LlamaCppBackendRef[] {
   const backendsRoot = getLlamaCppBackendsRoot(runtimeRoot);
   if (!fs.existsSync(backendsRoot)) return [];
   const refs: LlamaCppBackendRef[] = [];
@@ -787,7 +803,11 @@ export function listInstalledBackendRefs(runtimeRoot: string): LlamaCppBackendRe
     for (const backendEntry of fs.readdirSync(path.join(backendsRoot, versionEntry.name), { withFileTypes: true })) {
       if (!backendEntry.isDirectory()) continue;
       const ref = toBackendRef(versionEntry.name, backendEntry.name);
-      if (hasManagedBackendExecutable(path.join(backendsRoot, ref.version, ref.backend))) {
+      const executablePath = resolveManagedBackendExecutablePath(
+        path.join(backendsRoot, ref.version, ref.backend),
+        platform,
+      );
+      if (fs.existsSync(executablePath)) {
         refs.push(ref);
       }
     }
@@ -896,11 +916,6 @@ async function validateImportedBackendDevices(input: {
   ref: LlamaCppBackendRef;
   platform: NodeJS.Platform;
 }): Promise<string | undefined> {
-  const requiredBackend = backendRequiresDeviceValidation(input.ref.backend);
-  if (!requiredBackend) {
-    return undefined;
-  }
-
   const executablePath = getLlamaCppCurrentExecutablePath(input.runtimeRoot, input.platform);
   const devicesResult = await listLlamaCppRuntimeDevices({
     executablePath,
@@ -910,7 +925,8 @@ async function validateImportedBackendDevices(input: {
     return `Failed to detect devices: ${devicesResult.error || 'unknown error'}`;
   }
   const detectedBackends = new Set(devicesResult.devices.map(device => device.backend));
-  if (!detectedBackends.has(requiredBackend)) {
+  const requiredBackend = backendRequiresDeviceValidation(input.ref.backend);
+  if (requiredBackend && !detectedBackends.has(requiredBackend)) {
     const detected = Array.from(detectedBackends).filter(Boolean).join(', ') || 'none';
     return `The selected backend requires ${requiredBackend}, but only ${detected} devices were detected.`;
   }
@@ -1013,56 +1029,106 @@ async function downloadFile(
   outputPath: string,
   onProgress?: (completed: number, total?: number, speed?: number) => void,
 ): Promise<void> {
+  if (url.startsWith('file:')) {
+    await copyLocalFileWithProgress(fileURLToPath(url), outputPath, onProgress);
+    return;
+  }
+
   const urls = url.includes('gitee.com/')
     ? [url, url.replace(DEFAULT_RELEASE_BASE_URL, GITHUB_RELEASE_BASE_URL)]
     : [url];
   const errors: string[] = [];
   for (const attemptUrl of urls) {
-    const response = await fetch(attemptUrl, {
-      headers: { 'User-Agent': 'RongxinAI/llamacpp-backend-manager' },
-    });
-    if (!response.ok || !response.body) {
-      errors.push(`HTTP ${response.status} ${response.statusText} (${attemptUrl})`);
-      continue;
-    }
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    const tempPath = `${outputPath}.download`;
-    const file = fs.createWriteStream(tempPath, { flags: 'w' });
-    const totalHeader = response.headers.get('content-length');
-    const total = totalHeader ? Number(totalHeader) : undefined;
-    const reader = response.body.getReader();
-    let completed = 0;
-    let speedWindowBytes = 0;
-    let speedWindowStartedAt = Date.now();
-    const emitProgress = () => {
-      const now = Date.now();
-      const elapsedMs = Math.max(1, now - speedWindowStartedAt);
-      const speed = speedWindowBytes > 0 ? (speedWindowBytes / elapsedMs) * 1000 : undefined;
-      onProgress?.(completed, Number.isFinite(total) ? total : undefined, speed);
-      if (speedWindowBytes > 0 || elapsedMs >= 1000) {
-        speedWindowBytes = 0;
-        speedWindowStartedAt = now;
-      }
-    };
     try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        completed += value.byteLength;
-        speedWindowBytes += value.byteLength;
-        if (!file.write(Buffer.from(value))) {
-          await new Promise<void>(resolve => file.once('drain', resolve));
-        }
-        emitProgress();
-      }
-    } finally {
-      await new Promise<void>(resolve => file.end(resolve));
-      void reader.cancel();
+      await downloadFileWithHelper(attemptUrl, outputPath, onProgress);
+      return;
+    } catch (error) {
+      errors.push(`${error instanceof Error ? error.message : String(error)} (${attemptUrl})`);
     }
-    fs.renameSync(tempPath, outputPath);
-    return;
   }
   throw new Error(`Download failed: ${errors.join('; ')}`);
+}
+
+async function downloadFileWithHelper(
+  url: string,
+  outputPath: string,
+  onProgress?: (completed: number, total?: number, speed?: number) => void,
+): Promise<void> {
+  const outputDir = path.dirname(outputPath);
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.rmSync(`${outputPath}.download`, { force: true });
+
+  const downloader = new DownloaderHelper(url, outputDir, {
+    fileName: path.basename(outputPath),
+    headers: { 'User-Agent': 'RongxinAI/llamacpp-backend-manager' },
+    override: true,
+    removeOnFail: false,
+    resumeIfFileExists: true,
+    resumeOnIncomplete: true,
+    resumeOnIncompleteMaxRetry: 3,
+    retry: { maxRetries: 3, delay: 1000 },
+  });
+
+  downloader.on('progress.throttled', stats => {
+    onProgress?.(
+      stats.downloaded,
+      stats.total > 0 ? stats.total : undefined,
+      stats.speed > 0 ? stats.speed : undefined,
+    );
+  });
+  downloader.on('end', stats => {
+    onProgress?.(
+      stats.downloadedSize,
+      stats.totalSize && stats.totalSize > 0 ? stats.totalSize : undefined,
+      undefined,
+    );
+  });
+  downloader.on('error', () => undefined);
+
+  await downloader.start();
+}
+
+async function copyLocalFileWithProgress(
+  sourcePath: string,
+  outputPath: string,
+  onProgress?: (completed: number, total?: number, speed?: number) => void,
+): Promise<void> {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  const tempPath = `${outputPath}.download`;
+  fs.rmSync(tempPath, { force: true });
+
+  const total = fs.statSync(sourcePath).size;
+  let completed = 0;
+  let speedWindowBytes = 0;
+  let speedWindowStartedAt = Date.now();
+  const emitProgress = () => {
+    const now = Date.now();
+    const elapsedMs = Math.max(1, now - speedWindowStartedAt);
+    const speed = speedWindowBytes > 0 ? (speedWindowBytes / elapsedMs) * 1000 : undefined;
+    onProgress?.(completed, total, speed);
+    if (speedWindowBytes > 0 || elapsedMs >= 1000) {
+      speedWindowBytes = 0;
+      speedWindowStartedAt = now;
+    }
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const reader = fs.createReadStream(sourcePath);
+    const writer = fs.createWriteStream(tempPath);
+
+    reader.on('data', chunk => {
+      completed += chunk.length;
+      speedWindowBytes += chunk.length;
+      emitProgress();
+    });
+    reader.on('error', reject);
+    writer.on('error', reject);
+    writer.on('finish', resolve);
+    reader.pipe(writer);
+  });
+
+  fs.renameSync(tempPath, outputPath);
+  onProgress?.(completed, total, undefined);
 }
 
 function verifySha256(filePath: string, expected: string): void {
@@ -1336,15 +1402,6 @@ function resolveManagedBackendExecutablePath(runtimeDir: string, platform: NodeJ
   const rootPath = path.join(runtimeDir, executableName);
   if (fs.existsSync(rootPath)) return rootPath;
   return buildBinPath;
-}
-
-function hasManagedBackendExecutable(runtimeDir: string): boolean {
-  for (const executableName of ['llama-server', 'llama-server.exe']) {
-    if (fs.existsSync(path.join(runtimeDir, 'build', 'bin', executableName))) return true;
-    if (fs.existsSync(path.join(runtimeDir, 'bin', executableName))) return true;
-    if (fs.existsSync(path.join(runtimeDir, executableName))) return true;
-  }
-  return false;
 }
 
 function removeCurrentBackendLink(runtimeRoot: string): void {

@@ -316,6 +316,87 @@
     Abort
   RuntimeVerifyDone:
 
+  DetailPrint "[Installer] Installing llama.cpp backend"
+  IfFileExists "$INSTDIR\resources\llamacpp-backends\manifest.json" LlamaCppBackendResourcesPresent LlamaCppBackendResourcesMissing
+
+  LlamaCppBackendResourcesMissing:
+    IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendManifestMissing LlamaCppBackendInstallSkip
+
+  LlamaCppBackendInstallSkip:
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=no-bundled-resources$\r$\n"
+    FileClose $2
+    DetailPrint "[Installer] Skipping llama.cpp backend installation"
+    Goto LlamaCppBackendInstallDone
+
+  LlamaCppBackendManifestMissing:
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-manifest$\r$\n"
+    FileClose $2
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend manifest is missing from the installer resources. Please reinstall RongxinAI with a valid installer package."
+    Abort
+
+  LlamaCppBackendResourcesPresent:
+    IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallRun LlamaCppBackendHelperMissing
+
+  LlamaCppBackendHelperMissing:
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-helper$\r$\n"
+    FileClose $2
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installer helper is missing from the installer resources. Please reinstall RongxinAI with a valid installer package."
+    Abort
+
+  LlamaCppBackendInstallRun:
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  !insertmacro GetTimestamp $8
+  FileWrite $2 "$8 phase=llamacpp-backend-install-start helper=$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs manifest=$INSTDIR\resources\llamacpp-backends\manifest.json$\r$\n"
+  FileClose $2
+  System::Call 'kernel32::GetTickCount()i .r7'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "\
+    $$env:ELECTRON_RUN_AS_NODE = \"1\";\
+    $$electron = \"$INSTDIR\RongxinAI.exe\";\
+    $$helper = \"$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs\";\
+    $$manifest = \"$INSTDIR\resources\llamacpp-backends\manifest.json\";\
+    $$resources = \"$INSTDIR\resources\llamacpp-backends\";\
+    $$appData = \"$APPDATA\RongxinAI\";\
+    $$log = \"$APPDATA\RongxinAI\install-llamacpp.log\";\
+    if (-not (Test-Path $$electron)) { Write-Output \"missing:electron-runtime\"; exit 20 };\
+    if (-not (Test-Path $$helper)) { Write-Output \"missing:llamacpp-helper\"; exit 21 };\
+    if (-not (Test-Path $$manifest)) { Write-Output \"missing:llamacpp-manifest\"; exit 22 };\
+    & $$electron $$helper --manifest $$manifest --resources-dir $$resources --app-data-dir $$appData --log-path $$log;\
+    if ($$LASTEXITCODE -eq $$null) { exit 0 };\
+    exit $$LASTEXITCODE"'
+  Pop $0
+  Pop $1
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $5 $6 - $7
+  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  !insertmacro GetTimestamp $8
+  FileWrite $2 "$8 phase=llamacpp-backend-install-complete exit=$0 elapsed_ms=$5 output=$1$\r$\n"
+  FileClose $2
+  DetailPrint "Install llama.cpp backend: $5 ms"
+  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileWrite $R9 "  Install llama.cpp backend: $5 ms$\r$\n"
+  FileClose $R9
+  StrCmp $0 "error" LlamaCppBackendInstallFailed
+  IntCmp $0 0 LlamaCppBackendInstallDone LlamaCppBackendInstallNonZero LlamaCppBackendInstallNonZero
+
+  LlamaCppBackendInstallNonZero:
+    IntCmp $0 16 LlamaCppBackendInstallNetworkFailed LlamaCppBackendInstallFailed LlamaCppBackendInstallFailed
+
+  LlamaCppBackendInstallNetworkFailed:
+    MessageBox MB_OK|MB_ICONSTOP "The llama.cpp backend download failed after automatic resume/retry. Please check your network, proxy, or firewall settings and run the installer again. See %APPDATA%\RongxinAI\install-llamacpp.log for details."
+    Abort
+
+  LlamaCppBackendInstallFailed:
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installation failed (exit code $0). See %APPDATA%\RongxinAI\install-llamacpp.log and %APPDATA%\RongxinAI\install-timing.log for details."
+    Abort
+
+  LlamaCppBackendInstallDone:
+
   IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 SkipVcRedistInstall
     DetailPrint "[Installer] Installing bundled dependency: Microsoft Visual C++ Runtime"
     DetailPrint "[Installer] Installing Microsoft Visual C++ Redistributable"
