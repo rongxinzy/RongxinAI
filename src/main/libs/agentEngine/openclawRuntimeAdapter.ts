@@ -18,6 +18,7 @@ import type {
 import { t } from '../../i18n';
 import { getCommandDangerLevel, isDeleteCommand } from '../commandSafety';
 import { setCoworkProxySessionId } from '../coworkOpenAICompatProxy';
+import { LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW } from '../llamacppOpenClawBinding';
 import { formatCorrelationId } from '../logCorrelation';
 import { parsePrimaryModelRef } from '../openclawAgentModels';
 import { extractOpenClawAssistantStreamText } from '../openclawAssistantText';
@@ -1043,6 +1044,13 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     if (!runtimeContextWindow) {
       throw new Error(t('coworkLlamaCppContextWindowUnknown'));
     }
+    if (runtimeContextWindow < LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW) {
+      throw new Error(
+        t('coworkLlamaCppContextWindowTooSmall')
+          .replace('{current}', String(runtimeContextWindow))
+          .replace('{required}', String(LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW)),
+      );
+    }
 
     let tokenBudget = this.sessionTokenBudgetCache.get(options.sessionKey);
     if (!tokenBudget) {
@@ -2020,6 +2028,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     // ── End Model Triage ────────────────────────────────────────────────
 
     try {
+      this.assertModelAvailableForSession(effectiveModel);
       await this.ensureSessionModelForTurn({
         sessionId,
         sessionKey,

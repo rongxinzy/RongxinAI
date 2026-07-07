@@ -1,7 +1,11 @@
+import { Badge } from '@shared/components/ui/badge';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
@@ -18,22 +22,15 @@ import {
 
 interface ModelSelectorProps {
   dropdownDirection?: 'up' | 'down' | 'auto';
-  /**
-   * Controlled mode: the currently selected Model (or `null` for "default").
-   * When provided, the component does NOT read/write Redux global state.
-   */
   value?: Model | null;
-  /** Controlled mode callback. `null` means the user picked "default". */
   onChange?: (model: Model | null) => void;
-  /** Show a "default" option at the top of the dropdown (controlled mode only). */
   defaultLabel?: string;
-  /** Disable interaction while the selected model is being persisted. */
   disabled?: boolean;
-  /** Render the dropdown outside the local stacking context. */
+  isModelSelectable?: (model: Model) => boolean;
   portal?: boolean;
 }
 
-const DROPDOWN_MAX_HEIGHT = 256; // matches max-h-64
+const DROPDOWN_MAX_HEIGHT = 256;
 
 const ModelSelector: React.FC<ModelSelectorProps> = ({
   dropdownDirection = 'auto',
@@ -41,6 +38,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   onChange,
   defaultLabel,
   disabled = false,
+  isModelSelectable,
 }) => {
   const dispatch = useDispatch();
   const controlled = onChange !== undefined;
@@ -70,16 +68,20 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
 
     const model = availableModels.find((m) => getModelIdentityKey(m) === key) ?? null;
+    if (!model || (isModelSelectable && !isModelSelectable(model))) {
+      return;
+    }
+
     if (controlled) {
       onChange(model);
-    } else if (model) {
+    } else {
       dispatch(setSelectedModel({ agentId: currentAgentId, model }));
     }
   };
 
   if (availableModels.length === 0) {
     return (
-      <div className="px-3 py-1.5 rounded-xl bg-surface text-muted-foreground text-sm">
+      <div className="rounded-xl bg-surface px-3 py-1.5 text-sm text-muted-foreground">
         {i18nService.t('modelSelectorNoModels')}
       </div>
     );
@@ -88,34 +90,35 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   const serverModels = availableModels.filter((m) => m.isServerModel);
   const userModels = availableModels.filter((m) => !m.isServerModel);
   const hasBothGroups = serverModels.length > 0 && userModels.length > 0;
-
   const currentKey = selectedModel ? getModelIdentityKey(selectedModel) : '__default__';
   const triggerLabel = selectedModel?.name ?? defaultLabel ?? '';
-
   const side: 'top' | 'bottom' =
     dropdownDirection === 'up' ? 'top' : dropdownDirection === 'down' ? 'bottom' : resolvedSide;
 
-  const renderModelItem = (model: Model) => (
-    <SelectItem
-      key={getModelIdentityKey(model)}
-      value={getModelIdentityKey(model)}
-      className="w-full px-4 py-2.5 text-left dark:text-claude-darkText text-claude-text dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover flex items-center justify-between transition-colors"
-    >
-      <div className="flex flex-col min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm truncate">{model.name}</span>
-          {model.supportsImage && (
-            <span className="text-[10px] leading-none px-1.5 py-0.5 rounded-md bg-primary/10 text-primary whitespace-nowrap">
-              {i18nService.t('imageInput')}
-            </span>
-          )}
+  const renderModelItem = (model: Model) => {
+    const selectable = isModelSelectable ? isModelSelectable(model) : true;
+
+    return (
+      <SelectItem
+        key={getModelIdentityKey(model)}
+        value={getModelIdentityKey(model)}
+        disabled={!selectable}
+        className="items-start px-3 py-2.5"
+      >
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-foreground">{model.name}</span>
+            {model.supportsImage ? (
+              <Badge variant="outline">{i18nService.t('imageInput')}</Badge>
+            ) : null}
+          </div>
+          {model.provider ? (
+            <span className="truncate text-xs text-muted-foreground">{model.provider}</span>
+          ) : null}
         </div>
-        {model.provider && (
-          <span className="text-xs text-muted-foreground truncate">{model.provider}</span>
-        )}
-      </div>
-    </SelectItem>
-  );
+      </SelectItem>
+    );
+  };
 
   return (
     <div ref={containerRef} className={`relative ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}>
@@ -126,41 +129,38 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         disabled={disabled}
       >
         <SelectTrigger
-          className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl hover:bg-surface-raised text-foreground transition-colors max-w-[280px] disabled:opacity-70 disabled:cursor-wait h-auto border-none shadow-none bg-transparent ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}
+          className={`h-auto max-w-[320px] border-none bg-transparent px-3 py-1.5 shadow-none transition-colors hover:bg-surface-raised disabled:cursor-wait disabled:opacity-70 ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}
         >
           <SelectValue placeholder={defaultLabel}>
-            <span className="font-medium text-sm truncate">{triggerLabel}</span>
+            <span className="truncate text-sm font-medium text-foreground">{triggerLabel}</span>
           </SelectValue>
         </SelectTrigger>
-        <SelectContent
-          side={side}
-          className="w-60 bg-surface rounded-xl popover-enter shadow-popover z-50 border-border border overflow-hidden"
-        >
-          <div className="max-h-64 overflow-y-auto">
-            {defaultLabel && (
-              <SelectItem
-                value="__default__"
-                className="w-full px-4 py-2.5 text-left dark:text-claude-darkText text-claude-text dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover flex items-center justify-between transition-colors"
-              >
+        <SelectContent side={side} className="w-72">
+          {defaultLabel ? (
+            <SelectGroup>
+              <SelectItem value="__default__" className="px-3 py-2">
                 <span className="text-sm">{defaultLabel}</span>
               </SelectItem>
-            )}
-            {hasBothGroups ? (
-              <>
-                <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {i18nService.t('modelGroupServer')}
-                </div>
+            </SelectGroup>
+          ) : null}
+          {defaultLabel && hasBothGroups ? <SelectSeparator /> : null}
+          {hasBothGroups ? (
+            <>
+              <SelectGroup>
+                <SelectLabel>{i18nService.t('modelGroupServer')}</SelectLabel>
                 {serverModels.map(renderModelItem)}
-                <div className="my-1 border-t border-border" />
-                <div className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {i18nService.t('modelGroupUser')}
-                </div>
+              </SelectGroup>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel>{i18nService.t('modelGroupUser')}</SelectLabel>
                 {userModels.map(renderModelItem)}
-              </>
-            ) : (
-              availableModels.map(renderModelItem)
-            )}
-          </div>
+              </SelectGroup>
+            </>
+          ) : (
+            <SelectGroup>
+              {availableModels.map(renderModelItem)}
+            </SelectGroup>
+          )}
         </SelectContent>
       </Select>
     </div>

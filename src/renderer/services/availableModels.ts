@@ -2,6 +2,7 @@ import type { LlamaCppRunningModel } from '../../shared/llamacpp';
 import { isProviderEnabled, ProviderName, ProviderRegistry } from '../../shared/providers';
 import { type AppConfig, getProviderDisplayName } from '../config';
 import type { Model } from '../store/slices/modelSlice';
+import { getRunningModelOpenClawEligibility } from '../utils/llamacppOpenClawEligibility';
 
 export const LLAMACPP_RUNNING_MODELS_CHANGED_EVENT = 'llamacpp:running-models-changed';
 
@@ -61,6 +62,7 @@ export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]
     if (!name) {
       return;
     }
+    const eligibility = getRunningModelOpenClawEligibility(model);
     models.push({
       id: name,
       name,
@@ -68,6 +70,9 @@ export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]
       providerKey: ProviderName.LlamaCpp,
       openClawProviderId: ProviderRegistry.getOpenClawProviderId(ProviderName.LlamaCpp),
       supportsImage: false,
+      llamaCppOpenClawEligibility: eligibility,
+      llamaCppRuntimeContextWindow: eligibility.runtimeContextWindow,
+      llamaCppTrainedContextWindow: eligibility.trainedContextWindow,
     });
   });
 

@@ -5,6 +5,7 @@ import { OpenClawProviderId } from '../../../shared/providers';
 import type { RootState } from '../../store';
 import { type Model,selectAgentSelectedModel } from '../../store/slices/modelSlice';
 import type { CoworkAgentEngine } from '../../types/cowork';
+import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
 
 type ResolveAgentModelSelectionInput = {
@@ -21,6 +22,7 @@ type ResolveAgentModelSelectionResult = {
   hasInvalidExplicitModel: boolean;
   invalidExplicitModelRef: string | null;
   hasUnavailableLlamaCppModel: boolean;
+  hasIneligibleLlamaCppModel: boolean;
 };
 
 export function isLlamaCppModelRef(modelRef: string): boolean {
@@ -66,6 +68,7 @@ export function resolveAgentModelSelection({
         hasInvalidExplicitModel: false,
         invalidExplicitModelRef: null,
         hasUnavailableLlamaCppModel: false,
+        hasIneligibleLlamaCppModel: !isModelSelectableForOpenClaw(explicitSessionModel),
       };
     }
 
@@ -75,6 +78,7 @@ export function resolveAgentModelSelection({
       hasInvalidExplicitModel: true,
       invalidExplicitModelRef: normalizedSessionModel,
       hasUnavailableLlamaCppModel: isLlamaCppModelRef(normalizedSessionModel),
+      hasIneligibleLlamaCppModel: false,
     };
   }
 
@@ -88,6 +92,7 @@ export function resolveAgentModelSelection({
         hasInvalidExplicitModel: false,
         invalidExplicitModelRef: null,
         hasUnavailableLlamaCppModel: false,
+        hasIneligibleLlamaCppModel: !isModelSelectableForOpenClaw(explicitModel),
       };
     }
 
@@ -97,6 +102,7 @@ export function resolveAgentModelSelection({
       hasInvalidExplicitModel: false,
       invalidExplicitModelRef: normalizedAgentModel,
       hasUnavailableLlamaCppModel: isLlamaCppModelRef(normalizedAgentModel),
+      hasIneligibleLlamaCppModel: false,
     };
   }
 
@@ -106,6 +112,7 @@ export function resolveAgentModelSelection({
     hasInvalidExplicitModel: false,
     invalidExplicitModelRef: null,
     hasUnavailableLlamaCppModel: false,
+    hasIneligibleLlamaCppModel: false,
   };
 }
 

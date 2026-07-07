@@ -2,8 +2,11 @@ import { expect, test } from 'vitest';
 
 import { ProviderName } from '../../shared/providers';
 import {
+  assessLlamaCppOpenClawEligibility,
   buildLlamaCppRunningModelBinding,
   deriveLlamaCppOpenClawMaxTokens,
+  LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
+  LlamaCppOpenClawEligibilityReason,
   removeLlamaCppModelFromAppConfig,
   upsertLlamaCppProviderInAppConfig,
 } from './llamacppOpenClawBinding';
@@ -48,6 +51,14 @@ test('buildLlamaCppRunningModelBinding uses runtime context length for OpenClaw 
     contextWindow: 32768,
     contextTokens: 32768,
     maxTokens: 4096,
+    openClawEligibility: {
+      eligible: true,
+      reason: LlamaCppOpenClawEligibilityReason.Eligible,
+      requiredContextWindow: LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
+      runtimeContextWindow: 32768,
+      trainedContextWindow: 32768,
+      canIncreaseContextWindow: false,
+    },
   });
 });
 
@@ -58,17 +69,29 @@ test('buildLlamaCppRunningModelBinding caps OpenClaw maxTokens below the runtime
   expect(deriveLlamaCppOpenClawMaxTokens(32768)).toBe(4096);
 });
 
-test('buildLlamaCppRunningModelBinding returns null when runtime context length is unknown', () => {
+test('buildLlamaCppRunningModelBinding keeps running models with unknown runtime context but marks them ineligible for OpenClaw', () => {
   expect(buildLlamaCppRunningModelBinding({
     name: 'qwen-local',
     details: { context_length: 32768 },
     trained_context_length: 32768,
-  })).toBeNull();
+  })).toEqual({
+    id: 'qwen-local',
+    name: 'qwen-local',
+    supportsImage: false,
+    openClawEligibility: {
+      eligible: false,
+      reason: LlamaCppOpenClawEligibilityReason.RuntimeContextUnknown,
+      requiredContextWindow: LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
+      trainedContextWindow: 32768,
+      canIncreaseContextWindow: false,
+    },
+  });
 });
 
-test('buildLlamaCppRunningModelBinding accepts smaller runtime contexts for llama.cpp running models', () => {
+test('buildLlamaCppRunningModelBinding keeps smaller runtime contexts but marks them fixable for OpenClaw', () => {
   expect(buildLlamaCppRunningModelBinding({
     name: 'qwen-local',
+    trained_context_length: 32768,
     runtime_context_length: 4096,
   })).toEqual({
     id: 'qwen-local',
@@ -77,6 +100,28 @@ test('buildLlamaCppRunningModelBinding accepts smaller runtime contexts for llam
     contextWindow: 4096,
     contextTokens: 4096,
     maxTokens: 1024,
+    openClawEligibility: {
+      eligible: false,
+      reason: LlamaCppOpenClawEligibilityReason.RuntimeContextTooSmall,
+      requiredContextWindow: LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
+      runtimeContextWindow: 4096,
+      trainedContextWindow: 32768,
+      canIncreaseContextWindow: true,
+    },
+  });
+});
+
+test('assessLlamaCppOpenClawEligibility rejects models whose trained window is below the OpenClaw minimum', () => {
+  expect(assessLlamaCppOpenClawEligibility({
+    runtimeContextWindow: 4096,
+    trainedContextWindow: 8192,
+  })).toEqual({
+    eligible: false,
+    reason: LlamaCppOpenClawEligibilityReason.TrainedContextTooSmall,
+    requiredContextWindow: LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
+    runtimeContextWindow: 4096,
+    trainedContextWindow: 8192,
+    canIncreaseContextWindow: false,
   });
 });
 

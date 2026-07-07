@@ -51,6 +51,7 @@ import {
   getAllServerModelMetadata,
   getCurrentApiConfig,
   getLlamaCppModelContextWindow,
+  getLlamaCppModelOpenClawEligibility,
   isLlamaCppModelRunning,
   resolveAllEnabledProviderConfigs,
   resolveAllProviderApiKeys,
@@ -74,6 +75,7 @@ import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUt
 import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
+import { LlamaCppOpenClawEligibilityReason } from './libs/llamacppOpenClawBinding';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
@@ -349,7 +351,33 @@ const validateSessionModelAvailability = (modelRef: string): { available: boolea
     };
   }
 
-  if (!getLlamaCppModelContextWindow(parsed.modelId)) {
+  const eligibility = getLlamaCppModelOpenClawEligibility(parsed.modelId);
+  if (!eligibility) {
+    return {
+      available: false,
+      message: t('coworkLlamaCppContextWindowUnknown'),
+    };
+  }
+
+  if (!eligibility.eligible) {
+    if (eligibility.reason === LlamaCppOpenClawEligibilityReason.TrainedContextTooSmall) {
+      return {
+        available: false,
+        message: t('coworkLlamaCppTrainingContextTooSmall')
+          .replace('{trained}', String(eligibility.trainedContextWindow ?? 0))
+          .replace('{required}', String(eligibility.requiredContextWindow)),
+      };
+    }
+
+    if (eligibility.reason === LlamaCppOpenClawEligibilityReason.RuntimeContextTooSmall) {
+      return {
+        available: false,
+        message: t('coworkLlamaCppContextWindowTooSmall')
+          .replace('{current}', String(eligibility.runtimeContextWindow ?? 0))
+          .replace('{required}', String(eligibility.requiredContextWindow)),
+      };
+    }
+
     return {
       available: false,
       message: t('coworkLlamaCppContextWindowUnknown'),
