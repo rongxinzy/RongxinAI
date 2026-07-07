@@ -318,7 +318,10 @@ class CoworkService {
     const result = await cowork.startSession(options);
     if (result.success && result.session) {
       store.dispatch(addSession(result.session));
-      if (result.session.status !== 'running') {
+      // Only clear streaming for terminal statuses, not transitional 'idle'.
+      // 'idle' means the session was created but the agent hasn't started yet;
+      // streaming will be cleared by the complete/error stream events.
+      if (result.session.status === 'completed' || result.session.status === 'error') {
         store.dispatch(setStreaming(false));
       }
       return { session: result.session };
@@ -545,7 +548,14 @@ class CoworkService {
         return result.session;
       }
       store.dispatch(setCurrentSession(result.session));
-      store.dispatch(setStreaming(result.session.status === 'running'));
+      // Only restore streaming for running sessions — never clear it here.
+      // Clearing is the responsibility of complete/error stream events.
+      // loadSession can be called reactively (onSessionsChanged) while a task
+      // is still executing; the backend may report a transitional 'idle' status
+      // that would prematurely hide the stop button.
+      if (result.session.status === 'running') {
+        store.dispatch(setStreaming(true));
+      }
 
       // Restore skill selection from session record
       if (result.session.activeSkillIds?.length) {

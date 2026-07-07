@@ -1,3 +1,4 @@
+import { PromptInputProvider, PromptInputTextarea, usePromptInputController } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import { ArrowUp, Folder, Paperclip, Square, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
@@ -35,6 +36,9 @@ import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 // so that attachment state survives view switches (cowork ↔ skills, etc.)
 type CoworkAttachment = DraftAttachment;
 
+// Stable empty array reference to avoid unnecessary re-renders from useSelector
+// returning a new [] on every call (when draftAttachments[draftKey] is undefined).
+const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.ico', '.avif']);
 
@@ -123,7 +127,7 @@ interface CoworkPromptInputProps {
   remoteManaged?: boolean;
 }
 
-const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
+const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
   (props, ref) => {
     const {
       onSubmit,
@@ -141,15 +145,34 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
       remoteManaged = false,
     } = props;
     const dispatch = useDispatch();
+    const controller = usePromptInputController();
+
     const draftKey = sessionId || '__home__';
     const draftPrompt = useSelector((state: RootState) => selectDraftPrompts(state)[draftKey] || '');
-    const attachments = useSelector((state: RootState) => state.cowork.draftAttachments[draftKey] || []) as CoworkAttachment[];
+
+    const attachments = (useSelector((state: RootState) => state.cowork.draftAttachments[draftKey]) || EMPTY_ATTACHMENTS) as CoworkAttachment[];
     const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
     const agents = useSelector((state: RootState) => state.agent.agents);
     const coworkAgentEngine = useSelector((state: RootState) => state.cowork.config.agentEngine);
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
     const [value, setValue] = useState(draftPrompt);
+
+    // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
+    // Without this, every controller reference change triggers a re-render cascade
+    // which can cause OOM when switching to sessions with large message histories.
+    const controllerRef = useRef(controller);
+    controllerRef.current = controller;
+
+    // Sync local value to PromptInputTextarea's controller on all changes
+    // (clear on submit, external setValue, session switch, etc.)
+    useEffect(() => {
+      const ctrl = controllerRef.current;
+      if (ctrl.textInput.value !== value) {
+        ctrl.textInput.setInput(value);
+      }
+    }, [value]);
+
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
     const [isDraggingFiles, setIsDraggingFiles] = useState(false);
     const [isAddingFile, setIsAddingFile] = useState(false);
@@ -476,8 +499,8 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     : 'relative flex items-end gap-2 p-3 rounded-xl border border-border bg-surface';
 
   const textareaClass = isLarge
-    ? `w-full resize-none bg-transparent px-4 pt-2.5 pb-2 text-foreground placeholder:dark:text-foregroundSecondary/60 placeholder:text-muted-foreground/60 focus:outline-none text-[15px] leading-[23px] min-h-[${minHeight}px] max-h-[${maxHeight}px]`
-    : 'flex-1 resize-none bg-transparent text-foreground placeholder:placeholder:text-muted-foreground focus:outline-none text-sm leading-relaxed min-h-[24px] max-h-[200px]';
+    ? `w-full px-4 pt-2.5 pb-2 text-foreground placeholder:dark:text-foregroundSecondary/60 placeholder:text-muted-foreground/60 text-[15px] leading-[23px] min-h-[${minHeight}px] max-h-[${maxHeight}px]`
+    : 'flex-1 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed min-h-[24px] max-h-[200px]';
 
   const truncatePath = (path: string, maxLength = 30): string => {
     if (!path) return i18nService.t('noFolderSelected');
@@ -847,7 +870,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
         )}
         {isLarge ? (
           <>
-            <textarea
+            <PromptInputTextarea
               ref={textareaRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -996,7 +1019,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
           </>
         ) : (
           <>
-            <textarea
+            <PromptInputTextarea
               ref={textareaRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -1034,6 +1057,16 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     </div>
   );
   }
+);
+
+CoworkPromptInputInner.displayName = 'CoworkPromptInputInner';
+
+const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
+  (props, ref) => (
+    <PromptInputProvider>
+      <CoworkPromptInputInner {...props} ref={ref} />
+    </PromptInputProvider>
+  )
 );
 
 CoworkPromptInput.displayName = 'CoworkPromptInput';
