@@ -29,17 +29,11 @@ import {
 import { isProviderEnabled, ProviderName } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import {
   LlamaCppManager,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
-import {
-  ensureLlamaCppServiceRunning,
-  getLlamaCppServiceStartupFailureI18nKey,
-  LlamaCppServiceStartupReason,
-} from '../libs/llamacppServiceStartup';
 import {
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
