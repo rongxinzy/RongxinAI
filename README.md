@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/rongxinzy-rongxinai-badge.png)](https://mseep.ai/app/rongxinzy-rongxinai)
+
 # RongxinAI
 
 <p align="center">
