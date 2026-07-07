@@ -472,3 +472,25 @@ When using Claude Code with this repository, it reads `CLAUDE.md` (which points 
 - `rongxinai-ui-adapter` — RongxinAI-specific constraints and lobster theme mapping.
 
 These global skills complement, not replace, the conventions in this file.
+
+> **CRITICAL: Color Format Incompatibility**
+>
+> shadcn/ui components expect HSL color values in CSS variables (e.g., `--primary: 217 91% 60%`), and Tailwind generates classes like `bg-primary` as `hsl(var(--primary))`. However, RongxinAI's lobster theme stores colors as **hex values** (`--lobster-primary: #3B82F6`), and the bridge maps them one-to-one (`--primary: var(--lobster-primary)`).
+>
+> This means `hsl(var(--primary))` → `hsl(#3B82F6)` → **invalid CSS** — the browser silently drops the declaration. Any shadcn component using `bg-primary`, `bg-input`, `bg-secondary`, `text-primary`, etc. may appear to have no color at all.
+>
+> **When debugging invisible component styles:**
+> 1. Open DevTools and check if the element has a `background-color` or `color` set to `hsl(...)` with a hex value inside — this is the root cause.
+> 2. Fix by writing a CSS rule that reads `var(--lobster-*)` directly without the `hsl()` wrapper.
+> 3. Do NOT add className overrides on the component — `className` is for layout only per the shadcn skill. Always fix color issues in the global CSS file (`src/renderer/index.css`).
+>
+> Example fix for Switch component:
+> ```css
+> /* index.css */
+> [data-slot="switch"][data-unchecked] {
+>   background-color: var(--lobster-surface-raised);
+> }
+> [data-slot="switch"][data-checked] {
+>   background-color: var(--lobster-primary);
+> }
+> ```

@@ -300,3 +300,26 @@ select::-ms-expand {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Switch: shadcn uses hsl(var(--primary)) → hsl(#3B82F6) = invalid CSS with lobster hex values.
+   Define track colors and transition directly, bypassing the broken hsl() wrapper.
+   !important required — base-ui may strip transition classes at runtime. */
+[data-slot="switch"] {
+  transition: background-color 200ms ease, box-shadow 200ms ease !important;
+}
+[data-slot="switch"][data-unchecked] {
+  background-color: var(--lobster-surface-raised);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+}
+[data-slot="switch"][data-checked] {
+  background-color: var(--lobster-primary);
+}
+[data-slot="switch-thumb"] {
+  transition: transform 200ms ease !important;
+}
+[data-slot="switch-thumb"][data-unchecked] {
+  transform: translateX(0);
+}
+[data-slot="switch-thumb"][data-checked] {
+  transform: translateX(calc(100% - 2px));
+}

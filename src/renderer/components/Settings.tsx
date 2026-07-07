@@ -3066,7 +3066,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         return (
           <div className="flex h-full">
             {/* Provider List - Left Side */}
-            <div className="w-2/5 border-r border-border pr-3 space-y-1.5 overflow-y-auto">
+            <div className="w-2/5 border-r border-border px-2 space-y-1.5 overflow-y-auto">
               <div className="flex items-center justify-between mb-2 px-1">
                 <h3 className="text-sm font-medium text-foreground">
                   {i18nService.t('modelProviders')}
@@ -3115,11 +3115,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <div
                     key={provider}
                     onClick={() => handleProviderChange(providerKey)}
-                    className={`group flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                    className={cn(
+                      'group flex items-center p-2 rounded-xl cursor-pointer transition-colors border',
                       activeProvider === provider
-                        ? 'bg-primary-muted border border-primary shadow-subtle'
-                        : 'bg-surface hover:bg-surface-raised border border-transparent'
-                    }`}
+                        ? 'bg-surface shadow-elevated border-border'
+                        : 'bg-surface hover:bg-surface-raised border-transparent'
+                    )}
                   >
                     <div className="flex flex-1 items-center min-w-0">
                       <div className="mr-2 flex h-7 w-7 items-center justify-center shrink-0">
@@ -3128,11 +3129,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         </span>
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className={`text-sm font-medium truncate ${
-                          activeProvider === provider
-                            ? 'text-primary'
-                            : 'text-foreground'
-                        }`}>
+                        <span className="text-sm font-medium truncate text-foreground">
                           {displayLabel}
                         </span>
                         {isCustom && (
@@ -3165,7 +3162,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           toggleProviderEnabled(providerKey);
                         }}
                         disabled={!canToggleProvider}
-                        className="data-[disabled]:cursor-not-allowed"
                       />
                     </div>
                   </div>
