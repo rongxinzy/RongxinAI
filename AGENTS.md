@@ -456,3 +456,19 @@ chore: bump version to 2026.3.18
 
 - PRs should include a concise description, linked issue if applicable, and screenshots for UI changes.
 - Call out any Electron-specific behavior changes (IPC, storage, windowing) in the PR description.
+
+## Agent-specific notes
+
+### Built-in skills
+
+The `SKILLs/` directory contains OpenClaw skill definitions used by the Cowork runtime. Do not confuse these with IDE/agent plugin skills.
+
+### Claude Code
+
+When using Claude Code with this repository, it reads `CLAUDE.md` (which points to this file) for context. For UI work, you may also use the following global Claude skills installed for this project:
+
+- `shadcn/ui` — shadcn/ui component usage and styling rules.
+- `vercel/ai-elements` — AI Elements chat components.
+- `rongxinai-ui-adapter` — RongxinAI-specific constraints and lobster theme mapping.
+
+These global skills complement, not replace, the conventions in this file.
