@@ -66,11 +66,12 @@ test('marketplace only keeps installable models in the visible list', async () =
   ).toEqual(['a']);
 });
 
-test('model card busy state only locks the unloading model card', async () => {
+test('model card busy state locks the loading or unloading model card', async () => {
   const module = await import('./LocalInferenceView');
   const getModelCardBusyState = (module as {
     __test__getModelCardBusyState?: (input: {
       modelName: string;
+      loadingModelName: string | null;
       unloadingModelName: string | null;
       globalLoading: boolean;
     }) => { cardBusy: boolean; buttonsDisabled: boolean };
@@ -82,6 +83,7 @@ test('model card busy state only locks the unloading model card', async () => {
   expect(
     getModelCardBusyState({
       modelName: 'model-a',
+      loadingModelName: null,
       unloadingModelName: 'model-a',
       globalLoading: false,
     }),
@@ -93,6 +95,7 @@ test('model card busy state only locks the unloading model card', async () => {
   expect(
     getModelCardBusyState({
       modelName: 'model-b',
+      loadingModelName: null,
       unloadingModelName: 'model-a',
       globalLoading: false,
     }),
@@ -104,8 +107,33 @@ test('model card busy state only locks the unloading model card', async () => {
   expect(
     getModelCardBusyState({
       modelName: 'model-b',
+      loadingModelName: null,
       unloadingModelName: null,
       globalLoading: true,
+    }),
+  ).toEqual({
+    cardBusy: false,
+    buttonsDisabled: true,
+  });
+
+  expect(
+    getModelCardBusyState({
+      modelName: 'model-a',
+      loadingModelName: 'model-a',
+      unloadingModelName: null,
+      globalLoading: false,
+    }),
+  ).toEqual({
+    cardBusy: true,
+    buttonsDisabled: true,
+  });
+
+  expect(
+    getModelCardBusyState({
+      modelName: 'model-b',
+      loadingModelName: 'model-a',
+      unloadingModelName: null,
+      globalLoading: false,
     }),
   ).toEqual({
     cardBusy: false,
