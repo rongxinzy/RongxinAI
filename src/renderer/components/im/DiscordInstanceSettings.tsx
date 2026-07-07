@@ -151,7 +151,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
       {/* Guide */}
       <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-        <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
           <li>{i18nService.t('imDiscordGuideStep1')}</li>
           <li>{i18nService.t('imDiscordGuideStep2')}</li>
           <li>{i18nService.t('imDiscordGuideStep3')}</li>
@@ -178,7 +178,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
       {/* Bot Token */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Bot Token
         </label>
         <div className="relative">
@@ -215,20 +215,20 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-secondary">
+        <p className="text-xs text-muted-foreground">
           {i18nService.t('imDiscordTokenHint')}
         </p>
       </div>
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               DM Policy
             </label>
             <Select
@@ -253,7 +253,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Allow From (User IDs) */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Allow From (User IDs)
             </label>
             <div className="flex gap-2">
@@ -305,7 +305,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.allowFrom.filter((uid) => uid !== id);
                         onConfigChange({ allowFrom: newIds });
@@ -322,7 +322,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Policy
             </label>
             <Select
@@ -347,7 +347,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
           {/* Group Allow From (Server IDs) */}
           {instance.groupPolicy === 'allowlist' && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Group Allow From (Server IDs)
               </label>
               <div className="flex gap-2">
@@ -399,7 +399,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                        className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                         onClick={() => {
                           const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
                           onConfigChange({ groupAllowFrom: newIds });
@@ -417,7 +417,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Per-Guild Settings */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               {language === 'zh' ? 'Guild 独立配置' : 'Per-Guild Settings'}
             </label>
             <div className="flex gap-2">
@@ -470,7 +470,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                        className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                         onClick={() => handleRemoveGuild(guildId)}
                       >
                         <X className="w-3.5 h-3.5" />
@@ -478,7 +478,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                     </div>
                     {/* requireMention toggle */}
                     <div className="flex items-center justify-between">
-                      <label className="text-xs text-secondary">
+                      <label className="text-xs text-muted-foreground">
                         Require @mention
                       </label>
                       <Switch
@@ -488,7 +488,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                     </div>
                     {/* Guild-level systemPrompt */}
                     <div className="space-y-1">
-                      <label className="text-xs text-secondary">
+                      <label className="text-xs text-muted-foreground">
                         {language === 'zh' ? '系统提示词' : 'System Prompt'}
                       </label>
                       <Textarea
@@ -511,7 +511,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Streaming */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Streaming
             </label>
             <Select
@@ -536,7 +536,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Proxy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Proxy
             </label>
             <Input
@@ -550,7 +550,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* History Limit */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               History Limit
             </label>
             <Input
@@ -565,7 +565,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Media Max MB */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Media Max MB
             </label>
             <Input
@@ -580,7 +580,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Debug */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-secondary">
+            <label className="text-xs font-medium text-muted-foreground">
               Debug
             </label>
             <Switch

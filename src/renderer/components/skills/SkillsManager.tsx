@@ -583,7 +583,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-sm text-secondary">
+        <p className="text-sm text-muted-foreground">
           {i18nService.t('skillsDescription')}
         </p>
       </div>
@@ -600,7 +600,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
         {/* Search + Add button */}
         <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder={i18nService.t('searchSkills')}
@@ -614,7 +614,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               variant="ghost"
               size="icon-xs"
               onClick={() => setSkillSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded text-secondary hover:text-primary transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded text-muted-foreground hover:text-primary transition-colors"
             >
               <XCircle className="h-4 w-4" />
             </Button>
@@ -647,7 +647,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 disabled={isDownloadingSkill}
                 className="w-full flex items-center justify-start gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50 rounded-none"
               >
-                <Upload className="h-4 w-4 text-secondary" />
+                <Upload className="h-4 w-4 text-muted-foreground" />
                 <span>{i18nService.t('uploadSkillZip')}</span>
               </Button>
               <Button
@@ -657,7 +657,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 disabled={isDownloadingSkill}
                 className="w-full flex items-center justify-start gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50 rounded-none"
               >
-                <FolderOpen className="h-4 w-4 text-secondary" />
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
                 <span>{i18nService.t('uploadSkillFolder')}</span>
               </Button>
               <Button
@@ -666,7 +666,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 onClick={handleOpenRemoteImport}
                 className="w-full flex items-center justify-start gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-surface-raised transition-colors rounded-none"
               >
-                <Link className="h-4 w-4 text-secondary" />
+                <Link className="h-4 w-4 text-muted-foreground" />
                 <span>{i18nService.t('remoteImport')}</span>
               </Button>
               <Button
@@ -675,7 +675,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 onClick={handleCreateByChat}
                 className="w-full flex items-center justify-start gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-surface-raised transition-colors rounded-none"
               >
-                <Pencil className="h-4 w-4 text-secondary" />
+                <Pencil className="h-4 w-4 text-muted-foreground" />
                 <span>{i18nService.t('createSkillByChat')}</span>
               </Button>
             </div>
@@ -747,7 +747,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
       <>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {filteredSkills.length === 0 ? (
-          <div className="col-span-2 text-center py-8 text-sm text-secondary">
+          <div className="col-span-2 text-center py-8 text-sm text-muted-foreground">
             {i18nService.t('noSkillsAvailable')}
           </div>
         ) : (
@@ -760,7 +760,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
-                    <Puzzle className="h-4 w-4 text-secondary" />
+                    <Puzzle className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <span className="text-sm font-medium text-foreground truncate">
                     {resolveSkillName(skill.id, skill.name)}
@@ -773,7 +773,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                       variant="ghost"
                       size="icon"
                       onClick={(e) => { e.stopPropagation(); handleRequestDeleteSkill(skill); }}
-                      className="rounded-lg text-secondary hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                      className="rounded-lg text-muted-foreground hover:text-red-500 dark:hover:text-red-400 transition-colors"
                       title={i18nService.t('deleteSkill')}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -787,11 +787,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 </div>
               </div>
 
-              <p className="text-xs text-secondary line-clamp-2 mb-2">
+              <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
                 {skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}
               </p>
 
-              <div className="flex items-center justify-between text-[10px] text-secondary">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                 <div className="flex items-center gap-2">
                 {skill.isOfficial && (
                   <>
@@ -821,7 +821,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
 
       {activeTab === 'marketplace' && (
         isLoadingMarketplace ? (
-          <div className="text-center py-12 text-sm text-secondary">
+          <div className="text-center py-12 text-sm text-muted-foreground">
             {i18nService.t('downloadingSkill')}
           </div>
         ) : (
@@ -831,7 +831,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 <div className="text-sm font-medium text-foreground">
                   {i18nService.t('skillMarketplaceFeaturedTitle')}
                 </div>
-                <p className="mt-1 text-xs text-secondary">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {i18nService.t('skillMarketplaceFeaturedDescription')}
                 </p>
               </div>
@@ -847,7 +847,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               </Button>
             </div>
             {filteredMarketplaceSkills.length === 0 ? (
-              <div className="text-center py-12 text-sm text-secondary">
+              <div className="text-center py-12 text-sm text-muted-foreground">
                 {i18nService.t('skillMarketplaceEmpty')}
               </div>
             ) : (
@@ -862,7 +862,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
-                      <Puzzle className="h-4 w-4 text-secondary" />
+                      <Puzzle className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm font-medium text-foreground truncate">
                       {resolveSkillName(skill.id, skill.name)}
@@ -895,11 +895,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                   </div>
                 </div>
 
-                <p className="text-xs text-secondary line-clamp-2 mb-2">
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
                   {resolveLocalizedText(skill.description)}
                 </p>
 
-                <div className="flex items-center gap-2 text-[10px] text-secondary">
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   {skill.source?.from && (
                     <>
                       <span className="px-1.5 py-0.5 rounded bg-surface-raised font-medium">
@@ -928,7 +928,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               ))}
             </div>
             {filteredMarketplaceSkills.length > marketplacePageSize && (
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-secondary">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Button
                   type="button"
                   variant="outline"
@@ -953,7 +953,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                         {item}
                       </Button>
                     ) : (
-                      <span key={item} className="px-1 text-secondary">
+                      <span key={item} className="px-1 text-muted-foreground">
                         ...
                       </span>
                     )
@@ -983,7 +983,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
-                  <Puzzle className="h-5 w-5 text-secondary" />
+                  <Puzzle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-base font-semibold text-foreground truncate">
@@ -996,20 +996,20 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => setSelectedMarketplaceSkill(null)}
-                className="rounded-lg text-secondary hover:text-foreground hover:bg-surface-raised transition-colors flex-shrink-0"
+                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors flex-shrink-0"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {resolveLocalizedText(selectedMarketplaceSkill.description)}
             </p>
 
             <div className="space-y-2 mb-5">
               {selectedMarketplaceSkill.version && (
                 <div className="flex items-center text-xs">
-                  <span className="w-16 flex-shrink-0 text-secondary">{i18nService.t('skillDetailVersion')}</span>
+                  <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailVersion')}</span>
                   <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
                     v{selectedMarketplaceSkill.version}
                   </span>
@@ -1017,7 +1017,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               )}
               {selectedMarketplaceSkill.source?.from && (
                 <div className="flex items-center text-xs">
-                  <span className="w-16 flex-shrink-0 text-secondary">{i18nService.t('skillDetailSource')}</span>
+                  <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
                   <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
                     {selectedMarketplaceSkill.source.from}
                   </span>
@@ -1030,7 +1030,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               )}
               {selectedMarketplaceSkill.source?.url && (
                 <div className="flex items-start text-xs">
-                  <span className="w-16 flex-shrink-0 text-secondary pt-0.5">URL</span>
+                  <span className="w-16 flex-shrink-0 text-muted-foreground pt-0.5">URL</span>
                   <Button
                     type="button"
                     variant="link"
@@ -1073,7 +1073,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
-                  <Puzzle className="h-5 w-5 text-secondary" />
+                  <Puzzle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-base font-semibold text-foreground truncate">
@@ -1086,13 +1086,13 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => setSelectedSkill(null)}
-                className="rounded-lg text-secondary hover:text-foreground hover:bg-surface-raised transition-colors flex-shrink-0"
+                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors flex-shrink-0"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            <p className="text-sm text-secondary mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {skillService.getLocalizedSkillDescription(selectedSkill.id, selectedSkill.name, selectedSkill.description)}
             </p>
 
@@ -1103,7 +1103,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                   <>
                     {selectedSkill.isOfficial && (
                       <div className="flex items-center text-xs">
-                        <span className="w-16 flex-shrink-0 text-secondary">{i18nService.t('skillDetailSource')}</span>
+                        <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
                         <span className="px-1.5 py-0.5 rounded bg-primary-muted text-primary font-medium">
                           {i18nService.t('official')}
                         </span>
@@ -1116,7 +1116,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                     )}
                     {!selectedSkill.isOfficial && mp?.source?.from && (
                       <div className="flex items-center text-xs">
-                        <span className="w-16 flex-shrink-0 text-secondary">{i18nService.t('skillDetailSource')}</span>
+                        <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
                         <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
                           {mp.source.from}
                         </span>
@@ -1129,7 +1129,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                     )}
                     {mp?.source?.url && (
                       <div className="flex items-start text-xs">
-                        <span className="w-16 flex-shrink-0 text-secondary pt-0.5">URL</span>
+                        <span className="w-16 flex-shrink-0 text-muted-foreground pt-0.5">URL</span>
                         <Button
                           type="button"
                           variant="link"
@@ -1178,7 +1178,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
             <div className="text-lg font-semibold text-foreground">
               {i18nService.t('deleteSkill')}
             </div>
-            <p className="mt-2 text-sm text-secondary">
+            <p className="mt-2 text-sm text-muted-foreground">
               {i18nService.t('skillDeleteConfirm').replace('{name}', skillPendingDelete.name)}
             </p>
             {skillActionError && (
@@ -1222,7 +1222,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => { setIsRemoteImportOpen(false); setSkillActionError(''); }}
-                className="rounded-lg text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -1246,10 +1246,10 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
             </div>
 
             <div className="mt-4 space-y-3">
-              <p className="text-sm text-secondary">
+              <p className="text-sm text-muted-foreground">
                 {i18nService.t(importTabConfig[importTab].descriptionKey)}
               </p>
-              <div className="text-xs font-semibold tracking-wide text-secondary">
+              <div className="text-xs font-semibold tracking-wide text-muted-foreground">
                 {i18nService.t(importTabConfig[importTab].urlLabelKey)}
               </div>
               <Input
@@ -1260,7 +1260,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 placeholder={i18nService.t(importTabConfig[importTab].placeholderKey)}
                 className="w-full px-3 py-2.5 text-sm rounded-xl bg-background text-foreground placeholder-secondary border border-border focus-visible:ring-2 focus-visible:ring-primary"
               />
-              <p className="text-xs text-secondary">
+              <p className="text-xs text-muted-foreground">
                 {i18nService.t(importTabConfig[importTab].examplesKey)}
               </p>
               {skillActionError && (

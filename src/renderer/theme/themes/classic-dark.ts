@@ -28,7 +28,7 @@ export const classicDark: ThemeDefinition = {
     'chat-bot':           '#1A1D27',
     'chat-bot-foreground': '#E4E5E9',
     'text-primary':       '#E4E5E9',
-    'text-secondary':     '#8B8FA3',
+    'text-muted-foreground':     '#8B8FA3',
     'text-muted':         '#6B7280',
     'border':             'rgba(42,46,56,0.6)',
     'border-subtle':      'rgba(42,46,56,0.3)',

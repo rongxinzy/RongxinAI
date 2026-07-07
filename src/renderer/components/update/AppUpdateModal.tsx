@@ -68,7 +68,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
         <h3 className={`text-base font-semibold ${isError ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
           {title}
         </h3>
-        <p className="mt-1.5 text-xs text-secondary">
+        <p className="mt-1.5 text-xs text-muted-foreground">
           v{latestVersion}{date ? ` · ${date}` : ''}
         </p>
 
@@ -81,7 +81,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
         {currentLog.content.length > 0 && (
           <ul className="mt-2 space-y-1.5 max-h-40 overflow-y-auto pl-2">
             {currentLog.content.map((item, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm text-secondary">
+              <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
                 <span className="mt-2 h-1 w-1 flex-shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
                 <span>{item}</span>
               </li>
@@ -102,7 +102,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
               )}
             </div>
 
-            <div className="mt-2 flex items-center justify-between text-xs text-secondary">
+            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 {updateState.progress
                   ? updateState.progress.total != null
@@ -124,7 +124,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
 
         {updateState.errorMessage && (
-          <p className="mt-4 text-sm text-secondary break-words">
+          <p className="mt-4 text-sm text-muted-foreground break-words">
             {updateState.errorMessage}
           </p>
         )}

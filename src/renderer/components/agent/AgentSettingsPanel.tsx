@@ -341,7 +341,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
   ) => (
     <div className="flex h-full min-h-0 flex-col gap-2">
       {hint && (
-        <p className="shrink-0 text-xs leading-5 text-secondary">
+        <p className="shrink-0 text-xs leading-5 text-muted-foreground">
           {hint}
         </p>
       )}
@@ -350,7 +350,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-secondary/45 focus-visible:ring-0"
+        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-muted-foreground/45 focus-visible:ring-0"
       />
     </div>
   );
@@ -389,12 +389,12 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               <div className="text-sm font-medium text-foreground">
                 {i18nService.t(platform)}
               </div>
-              <div className="text-xs text-secondary/50">
+              <div className="text-xs text-muted-foreground/50">
                 {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
               </div>
             </div>
           </div>
-          <span className="text-xs text-secondary/50">
+          <span className="text-xs text-muted-foreground/50">
             {i18nService.t('agentIMNotConfigured') || 'Not configured'}
           </span>
         </div>
@@ -485,7 +485,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               {i18nService.t(platform)}
             </div>
             {!configured && (
-              <div className="text-xs text-secondary/50">
+              <div className="text-xs text-muted-foreground/50">
                 {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
               </div>
             )}
@@ -500,7 +500,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
           {configured ? (
             boundToOther ? <div className="w-9 h-5" /> : renderToggle(isBound)
           ) : (
-            <span className="text-xs text-secondary/50">
+            <span className="text-xs text-muted-foreground/50">
               {i18nService.t('agentIMNotConfigured') || 'Not configured'}
             </span>
           )}
@@ -529,7 +529,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                 }}
                 placeholder={i18nService.t('agentNamePlaceholder')}
                 aria-label={i18nService.t('agentName')}
-                className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-secondary/40 focus-visible:ring-0"
+                className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0"
               />
               <Input
                 type="text"
@@ -537,12 +537,12 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={i18nService.t('agentDescriptionPlaceholder')}
                 aria-label={i18nService.t('agentDescription')}
-                className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-secondary placeholder:text-secondary/50 focus-visible:ring-0"
+                className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
               />
             </div>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={handleClose} className="mt-1">
-            <X className="h-5 w-5 text-secondary" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
 
@@ -557,7 +557,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'text-foreground'
-                  : 'text-secondary hover:text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {tab.label}
@@ -622,7 +622,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                     <span className="text-sm font-medium text-foreground">
                       {i18nService.t('agentTriageEnable')}
                     </span>
-                    <p className="mt-0.5 text-xs text-secondary">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('agentTriageEnableHint')}
                     </p>
                   </div>
@@ -643,19 +643,19 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       <div className="space-y-2">
                         <div className="flex items-start gap-2">
                           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-green-500/15 text-[10px] font-medium text-green-600">轻</span>
-                          <div className="text-xs text-secondary">
+                          <div className="text-xs text-muted-foreground">
                             {i18nService.t('agentTriageLightModelHint')}
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-500/15 text-[10px] font-medium text-blue-600">标</span>
-                          <div className="text-xs text-secondary">
+                          <div className="text-xs text-muted-foreground">
                             {i18nService.t('agentTriageStandardNote')}
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500/15 text-[10px] font-medium text-red-600">强</span>
-                          <div className="text-xs text-secondary">
+                          <div className="text-xs text-muted-foreground">
                             {i18nService.t('agentTriageHeavyModelHint')}
                           </div>
                         </div>

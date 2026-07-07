@@ -96,14 +96,14 @@ const AgentsView: React.FC<AgentsViewProps> = ({
       <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-gutter:stable]">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Subtitle */}
-          <p className="text-sm text-secondary mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             {i18nService.t('agentsSubtitle')}
           </p>
 
           {/* Preset Agents Section */}
           {(presetAgents.length > 0 || uninstalledPresets.length > 0) && (
             <div className="mb-8">
-              <h2 className="text-sm font-medium text-secondary mb-3">
+              <h2 className="text-sm font-medium text-muted-foreground mb-3">
                 {i18nService.t('presetAgents')}
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -138,7 +138,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
 
           {/* Custom Agents Section */}
           <div>
-            <h2 className="text-sm font-medium text-secondary mb-3">
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">
               {i18nService.t('myCustomAgents')}
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -211,7 +211,7 @@ const AgentCard: React.FC<{
         {name}
       </div>
       {description && (
-        <div className="text-xs text-secondary mt-0.5 line-clamp-2">
+        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
           {description}
         </div>
       )}
@@ -240,7 +240,7 @@ const UninstalledPresetCard: React.FC<{
         {name}
       </div>
       {description && (
-        <div className="text-xs text-secondary mt-0.5 line-clamp-2">
+        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
           {description}
         </div>
       )}

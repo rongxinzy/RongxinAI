@@ -47,7 +47,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
               {i18nService.t('scheduledTasksFailureDetailTitle')}
             </h3>
             {taskName && (
-              <p className="text-xs text-secondary mt-0.5">{taskName}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{taskName}</p>
             )}
           </div>
           <Button
@@ -55,7 +55,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="p-1 rounded-md text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -66,7 +66,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
           {/* Run time */}
           {runTime && (
             <div>
-              <div className="text-xs font-medium text-secondary mb-1">
+              <div className="text-xs font-medium text-muted-foreground mb-1">
                 {i18nService.t('scheduledTasksHistoryColTime')}
               </div>
               <div className="text-sm text-foreground">{runTime}</div>
@@ -75,7 +75,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
 
           {/* Input command */}
           <div>
-            <div className="text-xs font-medium text-secondary mb-1">
+            <div className="text-xs font-medium text-muted-foreground mb-1">
               {i18nService.t('scheduledTasksInputCommand')}
             </div>
             <div className="text-sm text-foreground bg-surface-raised rounded-lg p-3 whitespace-pre-wrap break-words border border-border/50">

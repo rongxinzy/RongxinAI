@@ -28,7 +28,7 @@ export const midnight: ThemeDefinition = {
     'chat-bot':           '#1e293b',
     'chat-bot-foreground': '#e2e8f0',
     'text-primary':       '#f1f5f9',
-    'text-secondary':     '#94a3b8',
+    'text-muted-foreground':     '#94a3b8',
     'text-muted':         '#64748b',
     'border':             'rgba(51,65,85,0.6)',
     'border-subtle':      'rgba(51,65,85,0.3)',

@@ -135,7 +135,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
       {/* Guide */}
       <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-        <ol className="text-xs text-secondary space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
           <li>{i18nService.t('imTelegramGuideStep1')}</li>
           <li>{i18nService.t('imTelegramGuideStep2')}</li>
           <li>{i18nService.t('imTelegramGuideStep3')}</li>
@@ -159,7 +159,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
       {/* Bot Token */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-secondary">
+        <label className="block text-xs font-medium text-muted-foreground">
           Bot Token
         </label>
         <div className="relative">
@@ -196,20 +196,20 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-secondary">
+        <p className="text-xs text-muted-foreground">
           {i18nService.t('imTelegramTokenHint')}
         </p>
       </div>
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
-        <summary className="cursor-pointer text-xs font-medium text-secondary hover:text-primary transition-colors">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               DM Policy
             </label>
             <Select
@@ -234,7 +234,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Allow From */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Allow From (User IDs)
             </label>
             <div className="flex gap-2">
@@ -286,7 +286,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
                         const newIds = instance.allowFrom.filter((uid) => uid !== id);
                         onConfigChange({ allowFrom: newIds });
@@ -303,7 +303,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Group Policy
             </label>
             <Select
@@ -328,7 +328,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
           {/* Group Allow From */}
           {instance.groupPolicy === 'allowlist' && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Group Allow From (Group IDs)
               </label>
               <div className="flex gap-2">
@@ -380,7 +380,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-5 w-5 text-secondary hover:text-red-500 dark:hover:text-red-400"
+                        className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                         onClick={() => {
                           const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
                           onConfigChange({ groupAllowFrom: newIds });
@@ -398,7 +398,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Streaming */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Streaming
             </label>
             <Select
@@ -423,7 +423,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Proxy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Proxy
             </label>
             <Input
@@ -437,7 +437,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Reply-to Mode */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Reply-to Mode
             </label>
             <Select
@@ -461,7 +461,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* History Limit */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               History Limit
             </label>
             <Input
@@ -476,7 +476,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Media Max MB */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Media Max MB
             </label>
             <Input
@@ -491,7 +491,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Link Preview */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-secondary">
+            <label className="text-xs font-medium text-muted-foreground">
               Link Preview
             </label>
             <Switch
@@ -506,7 +506,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Webhook URL */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-secondary">
+            <label className="block text-xs font-medium text-muted-foreground">
               Webhook URL
             </label>
             <Input
@@ -521,7 +521,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
           {/* Webhook Secret (shown only when webhookUrl is non-empty) */}
           {instance.webhookUrl && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-secondary">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Webhook Secret
               </label>
               <div className="relative">
@@ -563,7 +563,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
 
           {/* Debug */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-secondary">
+            <label className="text-xs font-medium text-muted-foreground">
               Debug
             </label>
             <Switch

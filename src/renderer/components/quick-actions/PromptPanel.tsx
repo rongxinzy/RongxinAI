@@ -31,7 +31,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
     <div className="w-full animate-fade-in-up">
       {/* 标题 */}
       <div className="mb-2.5 px-0.5">
-        <span className="text-xs font-medium text-secondary">
+        <span className="text-xs font-medium text-muted-foreground">
           {action.label}
         </span>
       </div>
@@ -68,7 +68,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
                     ${
                       isPromptSelected
                         ? 'text-primary translate-x-0 opacity-100'
-                        : 'text-secondary -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
+                        : 'text-muted-foreground -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
                     }
                   `}
                 />
@@ -76,7 +76,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
 
               {/* 描述 */}
               {prompt.description && (
-                <p className="text-xs text-secondary line-clamp-2">
+                <p className="text-xs text-muted-foreground line-clamp-2">
                   {prompt.description}
                 </p>
               )}

@@ -28,7 +28,7 @@ export const paper: ThemeDefinition = {
     'chat-bot':           '#fafaf9',
     'chat-bot-foreground': '#18181b',
     'text-primary':       '#18181b',
-    'text-secondary':     '#52525b',
+    'text-muted-foreground':     '#52525b',
     'text-muted':         '#71717a',
     'border':             'rgba(212,212,216,0.6)',
     'border-subtle':      'rgba(212,212,216,0.3)',

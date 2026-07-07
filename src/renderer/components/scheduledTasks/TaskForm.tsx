@@ -468,7 +468,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
 
   const labelClass = 'block text-[14px] font-normal leading-5 text-foreground/85 mb-1';
   const errorClass = 'text-xs text-red-500 mt-1';
-  const hintClass = 'text-xs text-secondary mt-0.5';
+  const hintClass = 'text-xs text-muted-foreground mt-0.5';
 
   const selectedModelValue: Model | null = form.modelId
     ? (availableModels.find(m => toOpenClawModelRef(m) === form.modelId) ?? null)
@@ -568,7 +568,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             {/* Field labels */}
             <div className="grid grid-cols-5 gap-1.5">
               {(['minute', 'hour', 'dom', 'month', 'dow'] as const).map(field => (
-                <div key={field} className="text-center text-xs text-secondary font-medium">
+                <div key={field} className="text-center text-xs text-muted-foreground font-medium">
                   {i18nService.t(
                     `scheduledTasksFormCronField_${field}` as Parameters<typeof i18nService.t>[0],
                   )}
@@ -675,12 +675,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             </div>
             {/* Generated expression preview */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-secondary font-mono bg-surface px-2 py-1 rounded border border-border flex-1 truncate">
+              <span className="text-xs text-muted-foreground font-mono bg-surface px-2 py-1 rounded border border-border flex-1 truncate">
                 {currentExpr}
               </span>
               {cronPreview !== null && (
                 <span
-                  className={`text-xs shrink-0 ${cronPreview.ok ? 'text-secondary' : 'text-red-500'}`}
+                  className={`text-xs shrink-0 ${cronPreview.ok ? 'text-muted-foreground' : 'text-red-500'}`}
                 >
                   {cronPreview.ok
                     ? cronPreview.label
@@ -714,7 +714,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             {/* Live preview */}
             {form.cronExpr.trim() && cronPreview !== null && (
               <div
-                className={`mt-2 flex items-center gap-1.5 text-xs ${cronPreview.ok ? 'text-secondary' : 'text-red-500'}`}
+                className={`mt-2 flex items-center gap-1.5 text-xs ${cronPreview.ok ? 'text-muted-foreground' : 'text-red-500'}`}
               >
                 {cronPreview.ok ? (
                   <>
@@ -739,7 +739,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
 
         {/* Quick pick chips */}
         <div>
-          <p className="text-xs text-secondary mb-1">
+          <p className="text-xs text-muted-foreground mb-1">
             {i18nService.t(
               'scheduledTasksFormCronQuickTitle' as Parameters<typeof i18nService.t>[0],
             )}
@@ -763,7 +763,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                   className={`px-2 py-0.5 rounded-md text-xs border transition-colors ${
                     active
                       ? 'bg-primary/10 border-primary/40 text-primary font-medium'
-                      : 'bg-surface border-border text-secondary hover:bg-surface-raised hover:text-foreground'
+                      : 'bg-surface border-border text-muted-foreground hover:bg-surface-raised hover:text-foreground'
                   }`}
                 >
                   {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
@@ -778,7 +778,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
         <div>
           <label className="text-xs font-medium text-foreground block mb-1">
             {i18nService.t('scheduledTasksFormCronTimezone' as Parameters<typeof i18nService.t>[0])}
-            <span className="ml-1 text-secondary font-normal">
+            <span className="ml-1 text-muted-foreground font-normal">
               {i18nService.t('scheduledTasksFormOptional')}
             </span>
           </label>
@@ -805,7 +805,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
         <div>
           <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
           <div className="rounded-lg bg-surface-raised/30 p-3 border border-border/50">
-            <p className="text-sm text-secondary">{formatScheduleLabel(task!.schedule)}</p>
+            <p className="text-sm text-muted-foreground">{formatScheduleLabel(task!.schedule)}</p>
             {existingExpr && (
               <div className="flex items-center justify-end mt-2">
                 <Button
@@ -911,7 +911,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                 ))}
               </SelectContent>
             </Select>
-            <span className="shrink-0 text-sm text-secondary">
+            <span className="shrink-0 text-sm text-muted-foreground">
               {i18nService.t('scheduledTasksFormHourlyMinuteSuffix')}
             </span>
           </div>
@@ -975,7 +975,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                   className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
                     selected
                       ? 'bg-primary text-white'
-                      : 'border border-border text-secondary hover:bg-surface-raised'
+                      : 'border border-border text-muted-foreground hover:bg-surface-raised'
                   }`}
                 >
                   {i18nService.t(key)}
@@ -1319,7 +1319,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
             <label className={labelClass} style={{ marginBottom: 0 }}>
               {i18nService.t('scheduledTasksFormPayloadTextAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
             </label>
-            <span className="text-xs text-secondary tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {i18nService
                 .t('scheduledTasksFormCharCount' as Parameters<typeof i18nService.t>[0])
                 .replace('{count}', String(payloadCharCount))}
@@ -1351,7 +1351,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           {/* Prompt templates -- shown when textarea is empty */}
           {!form.payloadText.trim() && (
             <div className="mt-1.5">
-              <p className="text-xs text-secondary mb-1">
+              <p className="text-xs text-muted-foreground mb-1">
                 {i18nService.t(
                   'scheduledTasksFormPromptTemplateTitle' as Parameters<typeof i18nService.t>[0],
                 )}
@@ -1368,7 +1368,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                         payloadText: i18nService.t(textKey as Parameters<typeof i18nService.t>[0]),
                       })
                     }
-                    className="px-2 py-0.5 rounded-md text-xs border border-border bg-surface text-secondary hover:bg-surface-raised hover:text-foreground transition-colors"
+                    className="px-2 py-0.5 rounded-md text-xs border border-border bg-surface text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors"
                   >
                     {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
                   </Button>
@@ -1416,7 +1416,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
           type="button"
           variant="ghost"
           onClick={onCancel}
-          className="px-3 py-1.5 text-sm rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+          className="px-3 py-1.5 text-sm rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
         >
           {i18nService.t('cancel')}
         </Button>

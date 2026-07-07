@@ -31,7 +31,7 @@ export const cyber: ThemeDefinition = {
     'chat-bot':           '#15152a',
     'chat-bot-foreground': '#e0e7ff',
     'text-primary':       '#f0f0ff',
-    'text-secondary':     '#c084fc',
+    'text-muted-foreground':     '#c084fc',
     'text-muted':         '#818cf8',
     'border':             'rgba(30,30,58,0.7)',
     'border-subtle':      'rgba(30,30,58,0.35)',

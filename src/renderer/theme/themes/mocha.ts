@@ -28,7 +28,7 @@ export const mocha: ThemeDefinition = {
     'chat-bot':           '#2c2018',
     'chat-bot-foreground': '#fef3c7',
     'text-primary':       '#fffbeb',
-    'text-secondary':     '#bfa888',
+    'text-muted-foreground':     '#bfa888',
     'text-muted':         '#7a6a50',
     'border':             'rgba(61,44,30,0.7)',
     'border-subtle':      'rgba(61,44,30,0.35)',

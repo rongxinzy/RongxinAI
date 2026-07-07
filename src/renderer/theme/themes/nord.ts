@@ -31,7 +31,7 @@ export const nord: ThemeDefinition = {
     'chat-bot':           '#3b4252',
     'chat-bot-foreground': '#eceff4',
     'text-primary':       '#eceff4',
-    'text-secondary':     '#d8dee9',
+    'text-muted-foreground':     '#d8dee9',
     'text-muted':         '#81a1c1',
     'border':             'rgba(67,76,94,0.7)',
     'border-subtle':      'rgba(67,76,94,0.35)',

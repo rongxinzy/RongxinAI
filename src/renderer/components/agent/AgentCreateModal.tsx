@@ -294,7 +294,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
     hint: string,
   ) => (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <p className="shrink-0 text-xs leading-5 text-secondary">
+      <p className="shrink-0 text-xs leading-5 text-muted-foreground">
         {hint}
       </p>
       <Textarea
@@ -302,7 +302,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-secondary/45 focus-visible:ring-0"
+        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-muted-foreground/45 focus-visible:ring-0"
       />
     </div>
   );
@@ -333,7 +333,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
               onChange={(e) => setName(e.target.value)}
               placeholder={i18nService.t('agentNamePlaceholder')}
               aria-label={i18nService.t('agentName')}
-              className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-secondary/40 focus-visible:ring-0"
+              className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0"
               autoFocus
             />
             <Input
@@ -342,7 +342,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder={i18nService.t('agentDescriptionPlaceholder')}
               aria-label={i18nService.t('agentDescription')}
-              className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-secondary placeholder:text-secondary/50 focus-visible:ring-0"
+              className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
             />
           </div>
         </div>
@@ -361,7 +361,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
             size="icon"
             onClick={handleClose}
           >
-            <X className="h-5 w-5 text-secondary" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
       </div>
@@ -377,7 +377,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
             className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'text-foreground'
-                : 'text-secondary hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {tab.label}
@@ -443,12 +443,12 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                               <div className="text-sm font-medium text-foreground">
                                 {i18nService.t(platform)}
                               </div>
-                              <div className="text-xs text-secondary/50">
+                              <div className="text-xs text-muted-foreground/50">
                                 {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
                               </div>
                             </div>
                           </div>
-                          <span className="text-xs text-secondary/50">
+                          <span className="text-xs text-muted-foreground/50">
                             {i18nService.t('agentIMNotConfigured') || 'Not configured'}
                           </span>
                         </div>
@@ -529,7 +529,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                             {i18nService.t(platform)}
                           </div>
                           {!configured && (
-                            <div className="text-xs text-secondary/50">
+                            <div className="text-xs text-muted-foreground/50">
                               {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
                             </div>
                           )}
@@ -544,7 +544,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                         {configured ? (
                           boundToOther ? <div className="w-9 h-5" /> : renderToggle(bound)
                         ) : (
-                          <span className="text-xs text-secondary/50">
+                          <span className="text-xs text-muted-foreground/50">
                             {i18nService.t('agentIMNotConfigured') || 'Not configured'}
                           </span>
                         )}
@@ -658,18 +658,18 @@ const AgentTemplatePickerModal: React.FC<{
             size="icon"
             onClick={onClose}
           >
-            <X className="h-5 w-5 text-secondary" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
         {loading ? (
-          <div className="flex h-40 items-center justify-center text-sm text-secondary">
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
             {i18nService.t('loading')}
           </div>
         ) : presets.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-sm text-secondary">
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
             {i18nService.t('agentTemplateEmpty')}
           </div>
         ) : (

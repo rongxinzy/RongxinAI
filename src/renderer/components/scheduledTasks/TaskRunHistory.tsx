@@ -119,7 +119,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
                 className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                   isActive
                     ? statusPillColors[s]
-                    : 'border-transparent text-secondary hover:bg-surface-raised'
+                    : 'border-transparent text-muted-foreground hover:bg-surface-raised'
                 }`}
               >
                 {i18nService.t(statusLabelKeys[s])}
@@ -136,7 +136,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
             onChange={v => handleFilterChange({ ...filter, startDate: v || undefined })}
             placeholder={i18nService.t('scheduledTasksFilterStartDate')}
           />
-          <span className="text-xs text-secondary/50">–</span>
+          <span className="text-xs text-muted-foreground/50">–</span>
           <DateInput
             value={filter.endDate ?? ''}
             min={filter.startDate}
@@ -149,7 +149,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
               variant="ghost"
               size="icon-xs"
               onClick={handleClearFilter}
-              className="ml-0.5 p-0.5 rounded text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
+              className="ml-0.5 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
               title={i18nService.t('scheduledTasksFilterClear')}
             >
               <X className="h-3 w-3" />
@@ -159,7 +159,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
       </div>
 
       {displayedRuns.length === 0 ? (
-        <div className="text-center py-6 text-sm text-secondary">
+        <div className="text-center py-6 text-sm text-muted-foreground">
           {hasActiveFilter
             ? i18nService.t('scheduledTasksFilterNoResults')
             : i18nService.t('scheduledTasksNoRuns')}
@@ -180,7 +180,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
                 </div>
                 <div className="flex items-center gap-3 shrink-0 ml-2">
                   {run.durationMs !== null && (
-                    <span className="text-xs text-secondary">{formatDuration(run.durationMs)}</span>
+                    <span className="text-xs text-muted-foreground">{formatDuration(run.durationMs)}</span>
                   )}
                   {run.status === 'error' && run.error && (
                     <Button

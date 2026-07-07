@@ -184,7 +184,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
             ? 'border-primary bg-surface text-foreground'
             : value
               ? 'bg-surface text-foreground hover:border-primary/50'
-              : 'bg-surface text-secondary hover:border-primary/50'
+              : 'bg-surface text-muted-foreground hover:border-primary/50'
         }`}
       >
         <Calendar className="h-3 w-3 shrink-0 opacity-60" />
@@ -216,7 +216,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                 variant="ghost"
                 size="icon-xs"
                 onClick={goPrev}
-                className="p-1 rounded text-secondary hover:bg-surface-raised transition-colors"
+                className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
@@ -228,7 +228,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                 variant="ghost"
                 size="icon-xs"
                 onClick={goNext}
-                className="p-1 rounded text-secondary hover:bg-surface-raised transition-colors"
+                className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
@@ -237,7 +237,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
             {/* Weekday headers */}
             <div className="grid grid-cols-7 gap-0.5 mb-1">
               {WEEKDAY_KEYS.map(key => (
-                <div key={key} className="text-center text-[10px] text-secondary py-0.5">
+                <div key={key} className="text-center text-[10px] text-muted-foreground py-0.5">
                   {i18nService.t(key)}
                 </div>
               ))}
@@ -268,7 +268,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                       isSelected
                         ? 'bg-primary text-white font-medium'
                         : disabled
-                          ? 'text-secondary/30 cursor-not-allowed'
+                          ? 'text-muted-foreground/30 cursor-not-allowed'
                           : isToday
                             ? 'text-primary font-medium hover:bg-surface-raised'
                             : 'text-foreground hover:bg-surface-raised'

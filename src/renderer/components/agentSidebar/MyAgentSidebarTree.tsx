@@ -193,7 +193,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
 
       {agentNodes.length === 0 ? (
         <div className="px-3 py-6 text-center">
-          <p className="text-xs font-medium text-secondary">
+          <p className="text-xs font-medium text-muted-foreground">
             {i18nService.t('myAgentSidebarNoAgents')}
           </p>
           <Button

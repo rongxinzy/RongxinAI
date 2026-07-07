@@ -49,18 +49,18 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
       onClick={() => dispatch(selectTask(task.id))}
     >
       <div className="min-w-0">
-        <div className={`text-sm truncate ${task.enabled ? 'text-foreground' : 'text-secondary'}`}>
+        <div className={`text-sm truncate ${task.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
           {task.name}
         </div>
         {task.description && (
-          <div className="text-xs truncate text-secondary">{task.description}</div>
+          <div className="text-xs truncate text-muted-foreground">{task.description}</div>
         )}
       </div>
 
       <div className="min-w-0">
-        <div className="text-sm truncate text-secondary">{formatScheduleLabel(task.schedule)}</div>
+        <div className="text-sm truncate text-muted-foreground">{formatScheduleLabel(task.schedule)}</div>
         {task.enabled && task.state.nextRunAtMs !== null && (
-          <div className="text-xs truncate text-secondary/60 mt-0.5">
+          <div className="text-xs truncate text-muted-foreground/60 mt-0.5">
             {formatNextRunRelative(task.state.nextRunAtMs)}
           </div>
         )}
@@ -86,7 +86,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
               event.stopPropagation();
               setShowMenu(value => !value);
             }}
-            className="p-1.5 rounded-md text-secondary hover:bg-surface-raised transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:bg-surface-raised transition-colors"
           >
             <EllipsisVertical className="w-5 h-5" />
           </Button>
@@ -158,7 +158,7 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="text-secondary">{i18nService.t('loading')}</div>
+        <div className="text-muted-foreground">{i18nService.t('loading')}</div>
       </div>
     );
   }
@@ -166,11 +166,11 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6">
-        <Clock className="h-12 w-12 text-secondary/40 mb-4" />
-        <p className="text-sm font-medium text-secondary mb-1">
+        <Clock className="h-12 w-12 text-muted-foreground/40 mb-4" />
+        <p className="text-sm font-medium text-muted-foreground mb-1">
           {i18nService.t('scheduledTasksEmptyState')}
         </p>
-        <p className="text-xs text-secondary/70 text-center">
+        <p className="text-xs text-muted-foreground/70 text-center">
           {i18nService.t('scheduledTasksEmptyHint')}
         </p>
       </div>
@@ -180,16 +180,16 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   return (
     <div>
       <div className="grid grid-cols-[1.2fr_1fr_110px_40px] items-center gap-3 px-4 py-2 border-b border-border-subtle">
-        <div className="text-xs font-medium text-secondary">
+        <div className="text-xs font-medium text-muted-foreground">
           {i18nService.t('scheduledTasksListColTitle')}
         </div>
-        <div className="text-xs font-medium text-secondary">
+        <div className="text-xs font-medium text-muted-foreground">
           {i18nService.t('scheduledTasksListColSchedule')}
         </div>
-        <div className="text-xs font-medium text-secondary">
+        <div className="text-xs font-medium text-muted-foreground">
           {i18nService.t('scheduledTasksListColStatus')}
         </div>
-        <div className="text-xs font-medium text-secondary text-center">
+        <div className="text-xs font-medium text-muted-foreground text-center">
           {i18nService.t('scheduledTasksListColMore')}
         </div>
       </div>

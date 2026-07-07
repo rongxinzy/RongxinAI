@@ -56,8 +56,8 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-4 flex items-center gap-2 text-xs leading-5 text-secondary/60">
-        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-secondary/30 text-secondary/60">
+      <div className="mb-4 flex items-center gap-2 text-xs leading-5 text-muted-foreground/60">
+        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-secondary/30 text-muted-foreground/60">
           <span className="text-[10px] font-medium leading-none">i</span>
         </div>
         <span>{i18nService.t('agentSkillsHint')}</span>
@@ -65,20 +65,20 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
 
       <div className="mb-3 shrink-0">
         <div className="relative min-w-0 flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary/45" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/45" />
           <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={i18nService.t('agentSkillsSearch')}
-            className="h-9 w-full border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-secondary/45 focus-visible:border-border focus-visible:bg-surface"
+            className="h-9 w-full border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus-visible:border-border focus-visible:bg-surface"
           />
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {filteredSkills.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-secondary/60">
+          <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground/60">
             {enabledSkills.length === 0
               ? i18nService.t('agentSkillsNoInstalled')
               : i18nService.t('agentSkillsNoMatches')}
@@ -104,14 +104,14 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
                   }`}
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-raised">
-                    <Puzzle className="h-[18px] w-[18px] text-secondary" />
+                    <Puzzle className="h-[18px] w-[18px] text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1 pr-8">
                     <div className="truncate text-sm font-medium leading-5 text-foreground">
                       {skill.name}
                     </div>
                     {description && (
-                      <div className="mt-1 line-clamp-2 text-xs leading-[18px] text-secondary/80">
+                      <div className="mt-1 line-clamp-2 text-xs leading-[18px] text-muted-foreground/80">
                         {description}
                       </div>
                     )}

@@ -457,7 +457,7 @@ export function getStatusTone(status: TaskLastStatus): string {
   if (status === 'error') return 'text-red-500';
   if (status === 'skipped') return 'text-yellow-500';
   if (status === 'running') return 'text-blue-500';
-  return 'text-secondary';
+  return 'text-muted-foreground';
 }
 
 export function getStatusLabelKey(status: TaskLastStatus): string {

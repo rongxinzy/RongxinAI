@@ -147,7 +147,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
                 </Button>
               )}
               {agent.isLoadingTasks && agent.tasks.length === 0 && (
-                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-secondary">{i18nService.t('loading')}</div>
+                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
               )}
               {!agent.isLoadingTasks && !agent.hasLoadError && agent.tasks.length === 0 && (
                 <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-foreground opacity-[0.28]">{i18nService.t('myAgentSidebarNoTasks')}</div>

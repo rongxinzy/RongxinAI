@@ -28,7 +28,7 @@ export const emerald: ThemeDefinition = {
     'chat-bot':           '#14352a',
     'chat-bot-foreground': '#d1fae5',
     'text-primary':       '#ecfdf5',
-    'text-secondary':     '#8cb8a2',
+    'text-muted-foreground':     '#8cb8a2',
     'text-muted':         '#5e8a72',
     'border':             'rgba(26,74,58,0.7)',
     'border-subtle':      'rgba(26,74,58,0.35)',

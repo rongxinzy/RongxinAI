@@ -230,7 +230,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             className="absolute top-10 right-2 z-20 w-[240px] max-h-[60%] bg-background border border-border rounded-lg shadow-lg flex flex-col overflow-hidden"
           >
             <div className="h-9 flex items-center px-3 border-b border-border shrink-0">
-              <span className="text-xs font-medium text-secondary">{t('artifactFileList')}</span>
+              <span className="text-xs font-medium text-muted-foreground">{t('artifactFileList')}</span>
             </div>
             <FileDirectoryView
               artifacts={previewableArtifacts}
@@ -252,7 +252,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleRefresh}
-                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
                   title={t('artifactRefresh')}
                 >
                   <RefreshIcon />
@@ -263,7 +263,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleCopy}
-                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
                   title={t('artifactCopyCode')}
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -274,7 +274,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleOpenInBrowser}
-                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
                   title={t('artifactOpenInBrowser')}
                 >
                   <BrowserIcon />
@@ -285,7 +285,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleOpenWithApp}
-                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
                   title={t('artifactOpenWithApp')}
                 >
                   <OpenExternalIcon />
@@ -296,7 +296,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleRevealInFolder}
-                  className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
                   title={t('artifactOpenFolder')}
                 >
                   <FolderIcon />
@@ -310,7 +310,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 className={`h-8 w-8 rounded-lg transition-colors ${
                   showFileList
                     ? 'text-primary bg-primary/10'
-                    : 'text-secondary hover:text-foreground hover:bg-surface'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-surface'
                 }`}
                 title={t('artifactFileList')}
               >
@@ -326,7 +326,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 className={`px-3 py-1.5 text-xs font-medium rounded-none h-8 transition-colors border-b-2 ${
                   activeTab === 'preview'
                     ? 'border-primary text-primary hover:bg-transparent'
-                    : 'border-transparent text-secondary hover:text-foreground hover:bg-transparent'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent'
                 }`}
               >
                 {t('artifactPreview')}
@@ -337,7 +337,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 className={`px-3 py-1.5 text-xs font-medium rounded-none h-8 transition-colors border-b-2 ${
                   activeTab === 'code'
                     ? 'border-primary text-primary hover:bg-transparent'
-                    : 'border-transparent text-secondary hover:text-foreground hover:bg-transparent'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent'
                 }`}
               >
                 {t('artifactCode')}
@@ -357,13 +357,13 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           /* No artifact selected: show full-width file list */
           <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div className="h-10 flex items-center px-3 border-b border-border shrink-0">
-              <span className="text-xs font-medium text-secondary">{t('artifactFiles')}</span>
+              <span className="text-xs font-medium text-muted-foreground">{t('artifactFiles')}</span>
               <span className="flex-1" />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleClose}
-                className="h-8 w-8 rounded-lg text-secondary hover:text-foreground hover:bg-surface"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
               >
                 <CloseIcon />
               </Button>

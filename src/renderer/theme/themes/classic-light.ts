@@ -28,7 +28,7 @@ export const classicLight: ThemeDefinition = {
     'chat-bot':           '#F0F1F4',
     'chat-bot-foreground': '#1A1D23',
     'text-primary':       '#1A1D23',
-    'text-secondary':     '#6B7280',
+    'text-muted-foreground':     '#6B7280',
     'text-muted':         '#9CA3AF',
     'border':             'rgba(224,226,231,0.6)',
     'border-subtle':      'rgba(224,226,231,0.3)',

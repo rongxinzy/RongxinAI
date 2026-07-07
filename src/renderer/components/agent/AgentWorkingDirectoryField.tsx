@@ -38,7 +38,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
               className="inline-flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg pl-2.5 pr-2"
             >
               <Folder className="h-4 w-4 flex-shrink-0" />
-              <span className={`truncate ${hasValue ? 'text-foreground' : 'text-secondary'}`}>
+              <span className={`truncate ${hasValue ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {truncatePath(value, 40)}
               </span>
             </Button>
@@ -51,7 +51,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
               aria-label={i18nService.t('clear')}
               title={i18nService.t('clear')}
               onClick={() => onChange('')}
-              className="h-full flex-shrink-0 inline-flex items-center justify-center rounded-lg text-secondary hover:text-foreground"
+              className="h-full flex-shrink-0 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -63,7 +63,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium text-secondary mb-1">
+      <label className="block text-sm font-medium text-muted-foreground mb-1">
         {i18nService.t('agentDefaultWorkingDirectory')}
       </label>
       <div className="flex items-center gap-2">
@@ -73,8 +73,8 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
             variant="outline"
             className="min-w-0 flex-1 flex items-center gap-2 justify-start px-3 py-2 h-auto text-sm font-normal"
           >
-            <Folder className="h-4 w-4 flex-shrink-0 text-secondary" />
-            <span className={`flex-1 truncate text-left ${value.trim() ? '' : 'text-secondary'}`}>
+            <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            <span className={`flex-1 truncate text-left ${value.trim() ? '' : 'text-muted-foreground'}`}>
               {truncatePath(value)}
             </span>
           </Button>
@@ -86,13 +86,13 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
             size="icon"
             aria-label={i18nService.t('clear')}
             onClick={() => onChange('')}
-            className="h-10 w-10 flex-shrink-0 inline-flex items-center justify-center text-secondary hover:text-foreground"
+            className="h-10 w-10 flex-shrink-0 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
           >
-            <X className="h-3.5 w-3.5 text-secondary" />
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         )}
       </div>
-      <p className="mt-1 text-xs text-secondary/70">
+      <p className="mt-1 text-xs text-muted-foreground/70">
         {i18nService.t('agentDefaultWorkingDirectoryHint')}
       </p>
     </div>

@@ -55,7 +55,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
 
   const sectionClass = 'rounded-lg border border-border p-4';
   const sectionTitleClass = 'text-sm font-semibold text-foreground mb-3';
-  const labelClass = 'text-xs text-secondary';
+  const labelClass = 'text-xs text-muted-foreground';
   const valueClass = 'text-sm text-foreground';
 
   return (
@@ -66,7 +66,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
             {task.name}
           </h2>
           {task.description && (
-            <p className="mt-1 text-sm text-secondary whitespace-pre-wrap">
+            <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
               {task.description}
             </p>
           )}
@@ -77,7 +77,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
             variant="ghost"
             size="icon"
             onClick={() => dispatch(setViewMode('edit'))}
-            className="p-2 rounded-lg text-secondary hover:bg-surface-raised transition-colors"
+            className="p-2 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
             title={i18nService.t('scheduledTasksEdit')}
           >
             <Pencil className="w-4 h-4" />
@@ -99,7 +99,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
               variant="ghost"
               size="icon"
               onClick={() => void scheduledTaskService.runManually(task.id)}
-              className="p-2 rounded-lg text-secondary hover:bg-surface-raised hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              className="p-2 rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               title={i18nService.t('scheduledTasksRunPreemptWarning')}
             >
               <Play className="w-4 h-4" />
@@ -170,7 +170,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
             <div className={`${valueClass} ${statusTone}`}>
               {statusLabel}
               {task.state.lastRunAtMs && (
-                <span className="ml-1 text-xs text-secondary">
+                <span className="ml-1 text-xs text-muted-foreground">
                   ({formatDateTime(new Date(task.state.lastRunAtMs))})
                 </span>
               )}

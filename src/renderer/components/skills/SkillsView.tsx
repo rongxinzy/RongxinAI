@@ -28,7 +28,7 @@ const SkillsView: React.FC<SkillsViewProps> = ({ isSidebarCollapsed, onToggleSid
                 variant="ghost"
                 size="icon"
                 onClick={onToggleSidebar}
-                className="h-8 w-8 rounded-lg text-secondary hover:bg-surface-raised"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised"
               >
                 <PanelLeft className="h-4 w-4" />
               </Button>
@@ -37,7 +37,7 @@ const SkillsView: React.FC<SkillsViewProps> = ({ isSidebarCollapsed, onToggleSid
                 variant="ghost"
                 size="icon"
                 onClick={onNewChat}
-                className="h-8 w-8 rounded-lg text-secondary hover:bg-surface-raised"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
