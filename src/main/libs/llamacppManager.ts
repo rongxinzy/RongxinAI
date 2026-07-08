@@ -891,15 +891,15 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
-    const modelName = input.model.trim();
+    const resolvedInput = await this.resolveModelLoadInput(input);
+    const modelName = resolvedInput.model.trim();
     if (!modelName) throw new Error('Model name is required');
-    await this.writeModelPreset({ ...input, model: modelName });
+    await this.writeModelPreset(resolvedInput);
     const client = await this.client();
     await client.listModels();
-    const result = await client.loadModel({ ...input, model: modelName });
+    const result = await client.loadModel(resolvedInput);
     this.persistLastLoadedModel(modelName);
-    const resolvedRuntimeContextLength =
-      input.options?.ctxSize ?? normalizePositiveInteger(this.getServiceConfig().ctxSize);
+    const resolvedRuntimeContextLength = resolvedInput.options?.ctxSize;
     if (resolvedRuntimeContextLength) {
       this.runtimeContextLengthByModel.set(modelName, resolvedRuntimeContextLength);
     }
@@ -1097,6 +1097,53 @@ export class LlamaCppManager extends EventEmitter {
     });
     fs.mkdirSync(path.dirname(this.getPresetPath()), { recursive: true });
     fs.writeFileSync(this.getPresetPath(), next, 'utf-8');
+  }
+
+  private async resolveModelLoadInput(
+    input: LlamaCppModelLaunchInput,
+  ): Promise<LlamaCppModelLaunchInput> {
+    const modelName = input.model.trim();
+    if (!modelName) throw new Error('Model name is required');
+
+    const explicitContextSize = input.options?.ctxSize;
+    if (typeof explicitContextSize === 'number' && explicitContextSize > 0) {
+      return {
+        ...input,
+        model: modelName,
+      };
+    }
+
+    const resolvedContextSize = await this.resolveDefaultModelContextSize();
+    if (!resolvedContextSize) {
+      return {
+        ...input,
+        model: modelName,
+      };
+    }
+
+    return {
+      ...input,
+      model: modelName,
+      options: {
+        ...input.options,
+        ctxSize: resolvedContextSize,
+      },
+    };
+  }
+
+  private async resolveDefaultModelContextSize(): Promise<number | undefined> {
+    const configuredContextSize = normalizePositiveInteger(this.getServiceConfig().ctxSize);
+    if (configuredContextSize) {
+      return configuredContextSize;
+    }
+
+    const nvidiaSnapshot = process.platform === 'win32'
+      ? await getNvidiaSmiSnapshot().catch((): null => null)
+      : null;
+    const runtimeConfig = applyAutomaticLlamaCppServiceDefaults(this.getServiceConfig(), {
+      nvidiaSnapshot,
+    });
+    return normalizePositiveInteger(runtimeConfig.ctxSize);
   }
 
   private async isHealthy(): Promise<boolean> {

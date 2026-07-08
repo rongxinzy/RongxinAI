@@ -438,16 +438,16 @@ export function registerLlamaCppIpcHandlers(
     return await loadModelLock.runExclusive(
       modelName,
       async () => {
+        const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(
+          options.getStore(),
+          input,
+        );
         const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
           reason: LlamaCppServiceStartupReason.LoadModel,
         });
         if (serviceStartupResult.success === false) {
           throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
         }
-        const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(
-          options.getStore(),
-          input,
-        );
         const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
           modelsMax: getLlamaCppServiceConfig(options.getStore()).modelsMax,
           runningModels: await manager.listRunningModels(),

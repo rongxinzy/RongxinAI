@@ -159,8 +159,6 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
     '--checkpoint-every-n-tokens',
     '4096',
     '--no-cache-prompt',
-    '--ctx-size',
-    '8192',
     '--parallel',
     '2',
     '--batch-size',
@@ -635,6 +633,30 @@ test('loadModel reloads the router catalog after writing a new model preset', as
     'reload-after-preset',
     'load',
   ]);
+});
+
+test('loadModel applies the default context size through model presets instead of router startup args', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-load-default-ctx-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  const ggufPath = path.join(modelsDir, 'Qwen3-0.6B', 'Qwen3-0.6B-Q4_K_M.gguf');
+  fs.mkdirSync(path.dirname(ggufPath), { recursive: true });
+  fs.writeFileSync(ggufPath, 'gguf');
+
+  const manager = new LlamaCppManager(() => ({ modelsDir, ctxSize: '16384' }));
+  manager.getPresetPath = () => presetPath;
+  manager.client = async () => ({
+    listModels: async () => [],
+    loadModel: async (input: any) => {
+      expect(input.options?.ctxSize).toBe(16384);
+      return { success: true, runningModels: [] };
+    },
+  } as any);
+
+  await manager.loadModel({
+    model: 'Qwen3-0.6B',
+  });
+
+  expect(fs.readFileSync(presetPath, 'utf-8')).toContain('ctx-size = 16384');
 });
 
 test('deleteModel removes empty parent directories after deleting a GGUF file', async () => {
