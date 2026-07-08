@@ -849,6 +849,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             ref={textareaRef}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
+            onChange={(e) => setValue(e.currentTarget.value)}
             placeholder={placeholder}
             disabled={disabled}
           />
