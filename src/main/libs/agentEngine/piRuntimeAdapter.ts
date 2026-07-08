@@ -21,9 +21,14 @@ import path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
+import { isLocalProviderName,ProviderName } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
-import { getCurrentApiConfig } from '../claudeSettings';
+import {
+  type ApiConfigResolution,
+  resolveRawApiConfig,
+  resolveRawApiConfigForModelRef,
+} from '../claudeSettings';
 import type { McpServerManager } from '../mcpServerManager';
 import type {
   CoworkContinueOptions,
@@ -79,6 +84,7 @@ interface ActivePiSession {
   sessionId: string;
   piSession: PiSession;
   abortController: AbortController;
+  authStorage: PiAuthStorage | null;
   /** Message id for the visible answer (text) bubble of the current turn. */
   assistantMessageId: string | null;
   /** Message id for the thinking bubble of the current turn. */
@@ -98,11 +104,27 @@ interface ActivePiSession {
 interface PiModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
   getModel: (provider: string, modelId: string) => unknown;
+  AuthStorage: {
+    inMemory: () => PiAuthStorage;
+  };
   completeSimple: (
     model: unknown,
     context: { messages: Array<{ role: string; content: string }> },
+    options?: { apiKey?: string },
   ) => Promise<{ content: Array<{ text: string }> }>;
 }
+
+interface PiAuthStorage {
+  setRuntimeApiKey(provider: string, apiKey: string): void;
+}
+
+type PiResolvedModel = {
+  model: Record<string, unknown>;
+  authStorage: PiAuthStorage | null;
+  requestOptions?: {
+    apiKey?: string;
+  };
+};
 
 let _piModules: PiModules | null = null;
 
@@ -116,6 +138,7 @@ async function getPiModules(): Promise<PiModules> {
       const compat = await import('@earendil-works/pi-ai/compat');
       _piModules = {
         createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
+        AuthStorage: codingAgent.AuthStorage as PiModules['AuthStorage'],
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
         completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
@@ -244,14 +267,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         sessionOptions.customTools = [mcpProxyTool];
       }
 
-      // Resolve provider and model from RongxinAI's current API config.
-      // The config stores apiType (anthropic/openai) + model, but Pi needs a provider name.
-      // We infer the provider from which API keys are set in the environment.
-      const apiConfig = getCurrentApiConfig('local');
-      const modelId = apiConfig?.model || 'claude-sonnet-4-6';
-      const provider = resolvePiProvider();
-      console.log('[PiRuntime] Starting session with provider:', provider, 'model:', modelId);
-      sessionOptions.model = pi.getModel(provider, modelId);
+      const resolvedModel = resolvePiModel(pi, options.modelOverride);
+      sessionOptions.model = resolvedModel.model;
+      if (resolvedModel.authStorage) {
+        sessionOptions.authStorage = resolvedModel.authStorage;
+      }
 
       // Chat mode: disable all built-in tools for direct LLM access
       if (options.confirmationMode === 'text') {
@@ -265,6 +285,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         sessionId,
         piSession: session,
         abortController,
+        authStorage: resolvedModel.authStorage,
         assistantMessageId: null,
         thinkingMessageId: null,
         answerText: '',
@@ -347,8 +368,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     try {
       const pi = await getPiModules();
-      const provider = resolvePiProvider();
-      const model = pi.getModel(provider, patch.model);
+      const resolvedModel = resolvePiModel(pi, patch.model, active.authStorage);
+      if (resolvedModel.authStorage) {
+        active.authStorage = resolvedModel.authStorage;
+      }
+      const model = resolvedModel.model;
       await active.piSession.setModel(model);
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
     } catch (err) {
@@ -410,11 +434,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    */
   async chatDirect(prompt: string, modelId?: string): Promise<string> {
     const pi = await getPiModules();
-    const provider = resolvePiProvider();
-    const model = pi.getModel(provider, modelId || 'claude-sonnet-4-6');
-    const result = await pi.completeSimple(model, {
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const resolvedModel = resolvePiModel(pi, modelId);
+    const result = await pi.completeSimple(
+      resolvedModel.model,
+      { messages: [{ role: 'user', content: prompt }] },
+      resolvedModel.requestOptions,
+    );
     return result.content
       .filter((c): c is { text: string } => 'text' in c)
       .map((c) => c.text)
@@ -1003,16 +1028,117 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
  * RongxinAI stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
  * Pi SDK looks up providers by name (deepseek, anthropic, openai, etc.).
  */
-function resolvePiProvider(): string {
-  const candidates = ['deepseek', 'anthropic', 'openai', 'google'];
-  for (const provider of candidates) {
-    const envKey = `${provider.toUpperCase()}_API_KEY`;
-    if (process.env[envKey]) {
-      return provider;
-    }
+const DEFAULT_PI_CONTEXT_WINDOW = 32768;
+const DEFAULT_PI_MAX_TOKENS = 4096;
+
+const PI_BUILTIN_PROVIDER_ID = {
+  [ProviderName.OpenAI]: 'openai',
+  [ProviderName.Anthropic]: 'anthropic',
+  [ProviderName.Gemini]: 'google',
+  [ProviderName.DeepSeek]: 'deepseek',
+  [ProviderName.Moonshot]: 'moonshotai-cn',
+  [ProviderName.Zhipu]: 'zai',
+  [ProviderName.Minimax]: 'minimax-cn',
+  [ProviderName.Xiaomi]: 'xiaomi',
+  [ProviderName.OpenRouter]: 'openrouter',
+  [ProviderName.Copilot]: 'github-copilot',
+} as const;
+
+function resolvePiBuiltinProviderId(providerName?: string): string | null {
+  if (!providerName) return null;
+  return PI_BUILTIN_PROVIDER_ID[providerName as keyof typeof PI_BUILTIN_PROVIDER_ID] ?? null;
+}
+
+function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unknown> {
+  const config = resolution.config;
+  const providerMetadata = resolution.providerMetadata;
+  if (!config || !providerMetadata) {
+    throw new Error(resolution.error || 'Pi model configuration is unavailable.');
   }
-  // Fallback: try any provider (Pi will error if the key is missing)
-  return 'anthropic';
+
+  return {
+    id: config.model,
+    name: providerMetadata.modelName || config.model,
+    api: config.apiType === 'anthropic' ? 'anthropic-messages' : 'openai-completions',
+    provider: providerMetadata.providerName,
+    baseUrl: config.baseURL,
+    reasoning: false,
+    input: providerMetadata.supportsImage ? ['text', 'image'] : ['text'],
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+    contextWindow: providerMetadata.contextWindow
+      || providerMetadata.contextTokens
+      || DEFAULT_PI_CONTEXT_WINDOW,
+    maxTokens: providerMetadata.maxTokens || DEFAULT_PI_MAX_TOKENS,
+  };
+}
+
+function resolvePiAuthStorage(
+  pi: PiModules,
+  resolution: ApiConfigResolution,
+  existingAuthStorage?: PiAuthStorage | null,
+): PiAuthStorage | null {
+  const config = resolution.config;
+  const providerMetadata = resolution.providerMetadata;
+  if (!config?.apiKey || !providerMetadata?.providerName) {
+    return existingAuthStorage ?? null;
+  }
+
+  const authStorage = existingAuthStorage ?? pi.AuthStorage.inMemory();
+  authStorage.setRuntimeApiKey(providerMetadata.providerName, config.apiKey);
+  return authStorage;
+}
+
+function buildPiBuiltinModel(
+  pi: PiModules,
+  resolution: ApiConfigResolution,
+): Record<string, unknown> | null {
+  const config = resolution.config;
+  const providerMetadata = resolution.providerMetadata;
+  if (!config || !providerMetadata || isLocalProviderName(providerMetadata.providerName)) {
+    return null;
+  }
+
+  const providerId = resolvePiBuiltinProviderId(providerMetadata.providerName);
+  if (!providerId) {
+    return null;
+  }
+
+  try {
+    const builtinModel = pi.getModel(providerId, config.model);
+    return builtinModel && typeof builtinModel === 'object'
+      ? builtinModel as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePiModel(
+  pi: PiModules,
+  modelRef?: string,
+  existingAuthStorage?: PiAuthStorage | null,
+): PiResolvedModel {
+  const normalizedModelRef = modelRef?.trim() || '';
+  const resolution = normalizedModelRef
+    ? resolveRawApiConfigForModelRef(normalizedModelRef)
+    : resolveRawApiConfig();
+
+  if (!resolution.config || !resolution.providerMetadata) {
+    throw new Error(resolution.error || 'Pi model configuration is unavailable.');
+  }
+
+  const builtinModel = buildPiBuiltinModel(pi, resolution);
+
+  return {
+    model: builtinModel ?? buildPiCustomModel(resolution),
+    authStorage: resolvePiAuthStorage(pi, resolution, existingAuthStorage),
+    requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
+  };
 }
 
 // ── Text extraction helpers ──

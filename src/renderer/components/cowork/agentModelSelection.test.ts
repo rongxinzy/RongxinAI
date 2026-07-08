@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 
-import { LlamaCppOpenClawEligibilityReason } from '../../../shared/llamacpp';
 import { OpenClawProviderId, ProviderName } from '../../../shared/providers';
 import type { Model } from '../../store/slices/modelSlice';
 import { resolveAgentModelSelection, resolveEffectiveModel } from './agentModelSelection';
@@ -18,14 +17,6 @@ const ineligibleLlamaCppModel: Model = {
   id: 'qwen-local',
   name: 'qwen-local',
   providerKey: ProviderName.LlamaCpp,
-  llamaCppOpenClawEligibility: {
-    eligible: false,
-    reason: LlamaCppOpenClawEligibilityReason.RuntimeContextTooSmall,
-    requiredContextWindow: 32768,
-    runtimeContextWindow: 4096,
-    trainedContextWindow: 32768,
-    canIncreaseContextWindow: true,
-  },
 };
 
 describe('resolveAgentModelSelection', () => {
@@ -122,7 +113,7 @@ describe('resolveAgentModelSelection', () => {
     expect(result.hasInvalidExplicitModel).toBe(true);
   });
 
-  test('keeps explicit llama.cpp selection but marks it ineligible for OpenClaw', () => {
+  test('keeps explicit llama.cpp selection for work chat', () => {
     const result = resolveAgentModelSelection({
       agentModel: `${OpenClawProviderId.LlamaCpp}/qwen-local`,
       availableModels: [...models, ineligibleLlamaCppModel],
@@ -133,7 +124,7 @@ describe('resolveAgentModelSelection', () => {
     expect(result.selectedModel?.id).toBe('qwen-local');
     expect(result.usesFallback).toBe(false);
     expect(result.hasInvalidExplicitModel).toBe(false);
-    expect(result.hasIneligibleLlamaCppModel).toBe(true);
+    expect(result.hasIneligibleLlamaCppModel).toBe(false);
   });
 });
 

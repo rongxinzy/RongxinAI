@@ -51,6 +51,7 @@ export type CoworkStartOptions = {
   confirmationMode?: 'modal' | 'text';
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
+  modelOverride?: string;
 };
 
 export type CoworkContinueOptions = {

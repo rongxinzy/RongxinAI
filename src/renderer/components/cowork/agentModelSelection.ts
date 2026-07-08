@@ -5,7 +5,6 @@ import { OpenClawProviderId } from '../../../shared/providers';
 import type { RootState } from '../../store';
 import { type Model,selectAgentSelectedModel } from '../../store/slices/modelSlice';
 import type { CoworkAgentEngine } from '../../types/cowork';
-import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
 
 type ResolveAgentModelSelectionInput = {
@@ -68,7 +67,7 @@ export function resolveAgentModelSelection({
         hasInvalidExplicitModel: false,
         invalidExplicitModelRef: null,
         hasUnavailableLlamaCppModel: false,
-        hasIneligibleLlamaCppModel: !isModelSelectableForOpenClaw(explicitSessionModel),
+        hasIneligibleLlamaCppModel: false,
       };
     }
 
@@ -92,7 +91,7 @@ export function resolveAgentModelSelection({
         hasInvalidExplicitModel: false,
         invalidExplicitModelRef: null,
         hasUnavailableLlamaCppModel: false,
-        hasIneligibleLlamaCppModel: !isModelSelectableForOpenClaw(explicitModel),
+        hasIneligibleLlamaCppModel: false,
       };
     }
 

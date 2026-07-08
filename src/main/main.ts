@@ -3363,6 +3363,7 @@ if (!gotTheLock) {
         confirmationMode: 'modal',
         imageAttachments: options.imageAttachments,
         agentId: options.agentId,
+        modelOverride: options.modelOverride,
       }).catch(error => {
         console.error('[Cowork] session error:', error);
         try {

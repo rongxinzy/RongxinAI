@@ -310,6 +310,168 @@ function tryLobsteraiServerFallback(modelId?: string): MatchedProvider | null {
   };
 }
 
+function resolveMatchedProviderFromSelection(
+  providerName: string,
+  storedProviderConfig: LocalProviderConfig,
+  modelId: string,
+): { matched: MatchedProvider | null; error?: string } {
+  const providerConfig = shouldUseOpenAICodexOAuth(providerName, storedProviderConfig)
+    ? { ...storedProviderConfig, authType: 'oauth' as const }
+    : storedProviderConfig;
+  const normalizedProviderModels = getEffectiveProviderModels(providerName, providerConfig);
+
+  // MiniMax OAuth mode guard: if OAuth is selected but login has not been completed
+  // (no access token), do not use the stale API key as an OAuth token.
+  if (
+    providerName === ProviderName.Minimax
+    && (providerConfig as any).authType === 'oauth'
+    && !(providerConfig as any).oauthAccessToken
+  ) {
+    const serverFallback = tryLobsteraiServerFallback(modelId);
+    if (serverFallback) return { matched: serverFallback };
+    return { matched: null, error: 'MiniMax OAuth mode selected but login not completed.' };
+  }
+
+  let apiFormat = getEffectiveProviderApiFormat(providerName, providerConfig.apiFormat);
+  let baseURL = providerConfig.baseUrl?.trim();
+
+  if (providerConfig.codingPlanEnabled) {
+    const resolved = resolveCodingPlanBaseUrl(providerName, true, apiFormat, baseURL ?? '');
+    baseURL = resolved.baseUrl;
+    apiFormat = resolved.effectiveFormat;
+  }
+
+  if (!baseURL) {
+    const serverFallback = tryLobsteraiServerFallback(modelId);
+    if (serverFallback) return { matched: serverFallback };
+    return { matched: null, error: `Provider ${providerName} is missing base URL.` };
+  }
+
+  const hasApiKey = providerConfig.apiKey?.trim();
+  const hasOAuthCreds =
+    (providerName === ProviderName.Minimax
+      && (providerConfig as any).authType === 'oauth'
+      && !!(providerConfig as any).oauthAccessToken?.trim())
+    || shouldUseOpenAICodexOAuth(providerName, providerConfig);
+  if (
+    apiFormat === 'anthropic'
+    && providerRequiresApiKey(providerName)
+    && !providerConfig.apiKey?.trim()
+    && !hasApiKey
+    && !hasOAuthCreds
+  ) {
+    const serverFallback = tryLobsteraiServerFallback(modelId);
+    if (serverFallback) return { matched: serverFallback };
+    return {
+      matched: null,
+      error: `Provider ${providerName} requires API key for Anthropic-compatible mode.`,
+    };
+  }
+
+  const matchedModel = normalizedProviderModels.find((m) => m.id === modelId);
+  if (!matchedModel) {
+    const serverFallback = tryLobsteraiServerFallback(modelId);
+    if (serverFallback) return { matched: serverFallback };
+    return { matched: null, error: `No enabled provider found for model: ${modelId}` };
+  }
+
+  return {
+    matched: {
+      providerName,
+      providerConfig: {
+        ...providerConfig,
+        models: normalizedProviderModels,
+      },
+      modelId,
+      apiFormat,
+      baseURL,
+      supportsImage: matchedModel.supportsImage,
+      modelName: matchedModel.name,
+      contextWindow: matchedModel.contextWindow,
+      contextTokens: matchedModel.contextTokens,
+      maxTokens: matchedModel.maxTokens,
+    },
+  };
+}
+
+function resolveMatchedProviderForModelRef(
+  appConfig: AppConfig,
+  modelRef: string,
+): { matched: MatchedProvider | null; error?: string } {
+  const normalizedRef = modelRef.trim();
+  if (!normalizedRef) {
+    return { matched: null, error: 'Model ref is empty.' };
+  }
+  const slashIndex = normalizedRef.indexOf('/');
+  if (slashIndex <= 0 || slashIndex === normalizedRef.length - 1) {
+    return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
+  }
+
+  const providerName = normalizedRef.slice(0, slashIndex);
+  const modelId = normalizedRef.slice(slashIndex + 1).trim();
+  if (!modelId) {
+    return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
+  }
+
+  if (providerName === ProviderName.LobsteraiServer) {
+    const serverMatch = tryLobsteraiServerFallback(modelId);
+    if (serverMatch) return { matched: serverMatch };
+    return { matched: null, error: `No enabled provider found for model: ${modelId}` };
+  }
+
+  const storedProviderConfig = appConfig.providers?.[providerName];
+  if (!storedProviderConfig || !isProviderEnabled(providerName, storedProviderConfig)) {
+    return { matched: null, error: `Provider ${providerName} is not enabled.` };
+  }
+
+  return resolveMatchedProviderFromSelection(providerName, storedProviderConfig, modelId);
+}
+
+function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigResolution {
+  let apiKey = matched.providerConfig.apiKey?.trim() || '';
+  let effectiveBaseURL = matched.baseURL;
+  let effectiveApiFormat = matched.apiFormat;
+
+  // Handle MiniMax OAuth: use oauthAccessToken and oauthBaseUrl (independent of apiKey)
+  if (
+    matched.providerName === ProviderName.Minimax
+    && (matched.providerConfig as any).authType === 'oauth'
+  ) {
+    const oauthToken = (matched.providerConfig as any).oauthAccessToken?.trim();
+    const oauthBaseUrl = (matched.providerConfig as any).oauthBaseUrl?.trim();
+    if (oauthToken) {
+      apiKey = oauthToken;
+      if (oauthBaseUrl) effectiveBaseURL = oauthBaseUrl;
+      effectiveApiFormat = 'anthropic';
+    }
+  }
+
+  console.log('[ClaudeSettings] resolved raw API config:', JSON.stringify({
+    ...matched,
+    providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
+  }));
+  const effectiveApiKey =
+    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+  return {
+    config: {
+      apiKey: effectiveApiKey,
+      baseURL: effectiveBaseURL,
+      model: matched.modelId,
+      apiType: effectiveApiFormat === 'anthropic' ? 'anthropic' : 'openai',
+    },
+    providerMetadata: {
+      providerName: matched.providerName,
+      authType: matched.providerConfig.authType,
+      codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
+      supportsImage: matched.supportsImage,
+      modelName: matched.modelName,
+      contextWindow: matched.contextWindow,
+      contextTokens: matched.contextTokens,
+      maxTokens: matched.maxTokens,
+    },
+  };
+}
+
 function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvider | null; error?: string } {
   const providers = appConfig.providers ?? {};
 
@@ -395,64 +557,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   }
 
   const [providerName, storedProviderConfig] = providerEntry;
-  const providerConfig = shouldUseOpenAICodexOAuth(providerName, storedProviderConfig)
-    ? { ...storedProviderConfig, authType: 'oauth' as const }
-    : storedProviderConfig;
-  const normalizedProviderModels = getEffectiveProviderModels(providerName, providerConfig);
-
-  // MiniMax OAuth mode guard: if OAuth is selected but login has not been completed
-  // (no access token), do not use the stale API key as an OAuth token.
-  if (providerName === ProviderName.Minimax && (providerConfig as any).authType === 'oauth' && !(providerConfig as any).oauthAccessToken) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
-    return { matched: null, error: 'MiniMax OAuth mode selected but login not completed.' };
-  }
-
-  let apiFormat = getEffectiveProviderApiFormat(providerName, providerConfig.apiFormat);
-  let baseURL = providerConfig.baseUrl?.trim();
-
-  if (providerConfig.codingPlanEnabled) {
-    const resolved = resolveCodingPlanBaseUrl(providerName, true, apiFormat, baseURL ?? '');
-    baseURL = resolved.baseUrl;
-    apiFormat = resolved.effectiveFormat;
-  }
-
-  if (!baseURL) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
-    return { matched: null, error: `Provider ${providerName} is missing base URL.` };
-  }
-
-   // Check for API key or OAuth credentials
-  const hasApiKey = providerConfig.apiKey?.trim();
-  const hasOAuthCreds =
-    (providerName === ProviderName.Minimax && (providerConfig as any).authType === 'oauth' && !!(providerConfig as any).oauthAccessToken?.trim())
-    || shouldUseOpenAICodexOAuth(providerName, providerConfig);
-  if (apiFormat === 'anthropic' && providerRequiresApiKey(providerName) && !providerConfig.apiKey?.trim() && !hasApiKey && !hasOAuthCreds) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
-    return { matched: null, error: `Provider ${providerName} requires API key for Anthropic-compatible mode.` };
-  }
-
-  const matchedModel = normalizedProviderModels.find((m) => m.id === modelId);
-
-  return {
-    matched: {
-      providerName,
-      providerConfig: {
-        ...providerConfig,
-        models: normalizedProviderModels,
-      },
-      modelId,
-      apiFormat,
-      baseURL,
-      supportsImage: matchedModel?.supportsImage,
-      modelName: matchedModel?.name,
-      contextWindow: matchedModel?.contextWindow,
-      contextTokens: matchedModel?.contextTokens,
-      maxTokens: matchedModel?.maxTokens,
-    },
-  };
+  return resolveMatchedProviderFromSelection(providerName, storedProviderConfig, modelId);
 }
 
 export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local'): ApiConfigResolution {
@@ -622,6 +727,22 @@ export function resolveRawApiConfig(): ApiConfigResolution {
       maxTokens: matched.maxTokens,
     },
   };
+}
+
+export function resolveRawApiConfigForModelRef(modelRef: string): ApiConfigResolution {
+  const sqliteStore = getStore();
+  if (!sqliteStore) {
+    return { config: null, error: 'Store is not initialized.' };
+  }
+  const appConfig = sqliteStore.get<AppConfig>('app_config');
+  if (!appConfig) {
+    return { config: null, error: 'Application config not found.' };
+  }
+  const { matched, error } = resolveMatchedProviderForModelRef(appConfig, modelRef);
+  if (!matched) {
+    return { config: null, error };
+  }
+  return buildRawApiResolutionFromMatched(matched);
 }
 
   /**
