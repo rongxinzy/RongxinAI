@@ -70,7 +70,6 @@ export function buildLlamaServerArgs(
   if (typeof config.cachePrompt === 'boolean') {
     args.push(config.cachePrompt ? '--cache-prompt' : '--no-cache-prompt');
   }
-  appendArg(args, '--ctx-size', config.ctxSize);
   appendArg(args, '--parallel', config.parallel);
   appendArg(args, '--batch-size', config.batchSize);
   appendArg(args, '--ubatch-size', config.ubatchSize);
