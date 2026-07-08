@@ -279,7 +279,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         }`}
       >
         <DropdownMenu>
-          <DropdownMenuTrigger>
+          <DropdownMenuTrigger render={
             <Button ref={actionButtonRef as React.Ref<HTMLButtonElement>} variant="ghost" size="icon-sm" aria-label={actionLabel}>
               {session.pinned ? (
                 <span className="relative block h-4 w-4">
@@ -290,7 +290,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                 <Ellipsis className="h-4 w-4" />
               )}
             </Button>
-          </DropdownMenuTrigger>
+          } />
           <DropdownMenuContent align="end" className="min-w-[124px]">
             {menuItems.map((item) => (
               <DropdownMenuItem key={item.key} onClick={item.onClick}>

@@ -5,6 +5,8 @@ import { useDispatch,useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { agentService } from '../../services/agent';
+import { apiService } from '../../services/api';
+import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
@@ -14,7 +16,7 @@ import {
   selectCurrentSession,
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
-import { addMessage, clearCurrentSession, setCurrentSession, setStreaming, updateSessionStatus } from '../../store/slices/coworkSlice';
+import { addMessage, addSession, clearCurrentSession, setCurrentSession, setStreaming, updateSessionStatus } from '../../store/slices/coworkSlice';
 import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
@@ -56,6 +58,27 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const startRequestIdRef = useRef(0);
   // Ref for CoworkPromptInput
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
+
+  const [workMode, setWorkMode] = useState<'work' | 'chat'>(
+    () => configService.getConfig().workMode ?? 'work'
+  );
+
+  useEffect(() => {
+    const handler = () => setWorkMode(configService.getConfig().workMode ?? 'work');
+    window.addEventListener('config-updated', handler);
+    return () => window.removeEventListener('config-updated', handler);
+  }, []);
+
+  // Load persisted chat sessions on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('chat_sessions');
+      if (stored) {
+        const chatSessions: CoworkSession[] = JSON.parse(stored);
+        chatSessions.forEach(s => { dispatch(addSession(s)); });
+      }
+    } catch { /* ignore */ }
+  }, [dispatch]);
 
   const currentSession = useSelector(selectCurrentSession);
   const isStreaming = useSelector(selectIsStreaming);
@@ -239,6 +262,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         title: fallbackTitle,
         claudeSessionId: null,
         status: 'running',
+        mode: workMode,
         pinned: false,
         createdAt: now,
         updatedAt: now,
@@ -273,6 +297,59 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       // Clear quick action selection after starting session
       dispatch(clearSelection());
 
+      // Chat mode: direct LLM via apiService, skip PI/OpenClaw
+      if (workMode === 'chat') {
+        try {
+          await apiService.chat(
+            prompt,
+            (chunk) => {
+              dispatch(addMessage({
+                sessionId: tempSessionId,
+                message: {
+                  id: `msg-${now}-assistant`,
+                  type: 'assistant',
+                  content: chunk,
+                  timestamp: Date.now(),
+                },
+              }));
+            },
+            [],
+          );
+          if (isPendingStartCancelled()) {
+            dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'idle' }));
+            dispatch(setStreaming(false));
+            return;
+          }
+          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
+          const savedSession = { ...tempSession, status: 'completed' as const, updatedAt: Date.now() };
+          dispatch(addSession(savedSession));
+          // Persist chat session to localStorage
+          try {
+            const chatSessions = JSON.parse(localStorage.getItem('chat_sessions') || '[]');
+            const idx = chatSessions.findIndex((s: CoworkSession) => s.id === savedSession.id);
+            if (idx >= 0) chatSessions[idx] = savedSession;
+            else chatSessions.push(savedSession);
+            localStorage.setItem('chat_sessions', JSON.stringify(chatSessions));
+          } catch { /* ignore storage errors */ }
+        } catch (error) {
+          dispatch(addMessage({
+            sessionId: tempSessionId,
+            message: {
+              id: `error-${Date.now()}`,
+              type: 'system',
+              content: i18nService.t('chatErrorMessage').replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
+              timestamp: Date.now(),
+            },
+          }));
+          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
+        } finally {
+          dispatch(setStreaming(false));
+          isStartingRef.current = false;
+        }
+        return;
+      }
+
+      // Work mode: use coworkService (PI/OpenClaw engines)
       // Combine skill prompt with system prompt.
       // OpenClaw loads skills natively via skills.load.extraDirs, so skip the
       // auto-routing prompt to avoid injecting Claude SDK tool-calling instructions
@@ -329,6 +406,51 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const handleContinueSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => {
     if (!currentSession) return;
     if (isContinuingRef.current) return;
+
+    // Chat mode: direct LLM via apiService
+    if (workMode === 'chat') {
+      isContinuingRef.current = true;
+      try {
+        const history = (currentSession.messages || [])
+          .filter(m => m.type === 'user' || m.type === 'assistant')
+          .map(m => ({ role: m.type as 'user' | 'assistant', content: m.content || '' }));
+
+        dispatch(setStreaming(true));
+        await apiService.chat(
+          prompt,
+          (chunk) => {
+            dispatch(addMessage({
+              sessionId: currentSession.id,
+              message: {
+                id: `msg-${Date.now()}-assistant`,
+                type: 'assistant',
+                content: chunk,
+                timestamp: Date.now(),
+              },
+            }));
+          },
+          history,
+        );
+        dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
+      } catch (error) {
+        dispatch(addMessage({
+          sessionId: currentSession.id,
+          message: {
+            id: `error-${Date.now()}`,
+            type: 'system',
+            content: i18nService.t('chatErrorMessage').replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
+            timestamp: Date.now(),
+          },
+        }));
+        dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
+      } finally {
+        dispatch(setStreaming(false));
+        isContinuingRef.current = false;
+      }
+      return;
+    }
+
+    // Work mode: use coworkService
     if (openClawStatus && !isOpenClawReadyForSession(openClawStatus)) {
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkErrorEngineNotReady') }));
       return false;
@@ -355,6 +477,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
   const handleStopSession = async () => {
     if (!currentSession) return;
+    if (workMode === 'chat') {
+      dispatch(setStreaming(false));
+      return;
+    }
     if (currentSession.id.startsWith('temp-') && pendingStartRef.current) {
       pendingStartRef.current.cancelled = true;
       pendingStartRef.current.cancellationAction = 'stop';
@@ -571,13 +697,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 onStop={handleStopSession}
                 isStreaming={isStreaming}
                 disabled={!isEngineReady}
-                placeholder={i18nService.t('coworkPlaceholder')}
+                placeholder={workMode === 'chat' ? i18nService.t('chatPlaceholder') : i18nService.t('coworkPlaceholder')}
                 size="large"
                 workingDirectory={currentAgentWorkingDirectory}
                 onWorkingDirectoryChange={async (dir: string) => {
                   await agentService.updateAgent(currentAgentId, { workingDirectory: dir });
                 }}
-                showFolderSelector={true}
+                showFolderSelector={workMode !== 'chat'}
                 onManageSkills={() => onShowSkills?.()}
               />
             </div>

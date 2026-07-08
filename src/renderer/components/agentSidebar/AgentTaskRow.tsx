@@ -125,12 +125,13 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
 
       {!isBatchMode && !isRenaming && (
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger>
+          <DropdownMenuTrigger render={
             <Button variant="ghost" size="icon-xs"
               className={`absolute right-1 top-1/2 -translate-y-1/2 ${menuOpen ? 'opacity-[0.46]' : 'opacity-0 group-hover:opacity-[0.3]'}`}
               aria-label={i18nService.t('coworkSessionActions')}>
               <Ellipsis className="h-4 w-4" />
             </Button>
+          }>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[124px]">
             {showBatchOption && (

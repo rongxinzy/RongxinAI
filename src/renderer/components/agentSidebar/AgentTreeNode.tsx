@@ -101,11 +101,11 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
 
         <div className={`absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 transition-opacity ${menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-            <DropdownMenuTrigger>
+            <DropdownMenuTrigger render={
               <Button variant="ghost" size="icon-xs" className="opacity-[0.3] hover:opacity-[0.46]" aria-label={i18nService.t('coworkSessionActions')}>
                 <Ellipsis className="h-3.5 w-3.5" />
               </Button>
-            </DropdownMenuTrigger>
+            } />
             <DropdownMenuContent align="end" className="min-w-[104px]">
               <DropdownMenuItem onClick={handleEditAgent}><Pencil className="h-3.5 w-3.5" /> {i18nService.t('edit')}</DropdownMenuItem>
               <DropdownMenuItem onClick={handleToggleAgentPin}><Pin className="h-3.5 w-3.5" /> {agent.pinned ? i18nService.t('agentUnpin') : i18nService.t('agentPin')}</DropdownMenuItem>

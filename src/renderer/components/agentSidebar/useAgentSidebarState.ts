@@ -23,6 +23,10 @@ import type {
   AgentSidebarTaskNode,
 } from './types';
 
+interface UseAgentSidebarStateOptions {
+  workMode?: 'work' | 'chat';
+}
+
 const normalizeAgentId = (agentId?: string) => agentId?.trim() || 'main';
 
 const hasSessionChanged = (
@@ -123,11 +127,16 @@ export const collapseAgentSidebarTaskList = (
     : expandedTaskListAgentIds;
 };
 
-export const useAgentSidebarState = () => {
+export const useAgentSidebarState = (options?: UseAgentSidebarStateOptions) => {
+  const workMode = options?.workMode ?? 'work';
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const currentSessionId = useSelector(selectCurrentSessionId);
-  const sessions = useSelector(selectCoworkSessions);
+  const allSessions = useSelector(selectCoworkSessions);
+  // Filter sessions by workMode — existing sessions (no mode) default to work
+  const sessions = workMode === 'chat'
+    ? allSessions.filter(s => s.mode === 'chat')
+    : allSessions.filter(s => s.mode !== 'chat');
   const unreadSessionIdsRaw = useSelector(selectUnreadSessionIds);
   // Defer tree recalculation caused by unread badge changes so the
   // conversation view renders uninterrupted — background cron-task
@@ -467,7 +476,10 @@ export const useAgentSidebarState = () => {
 
   const agentNodes = useMemo<AgentSidebarAgentNode[]>(() => {
     return sortedEnabledAgents.map((agent) => {
-      const taskPreviews = taskPreviewsByAgentId[agent.id] ?? [];
+      const rawTaskPreviews = taskPreviewsByAgentId[agent.id] ?? [];
+      const taskPreviews = rawTaskPreviews.filter(s =>
+        workMode === 'chat' ? s.mode === 'chat' : s.mode !== 'chat'
+      );
       const sortedTaskPreviews = sortAgentSidebarTasks(taskPreviews);
       const isTaskListExpanded = expandedTaskListAgentIdSet.has(agent.id);
       const hasMoreLoadedTasks = sortedTaskPreviews.length > AgentSidebarPageSize.Preview;
@@ -503,6 +515,7 @@ export const useAgentSidebarState = () => {
     sortedEnabledAgents,
     taskPreviewsByAgentId,
     unreadSessionIdSet,
+    workMode,
   ]);
 
   return {

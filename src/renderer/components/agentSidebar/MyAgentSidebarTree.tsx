@@ -23,6 +23,7 @@ interface MyAgentSidebarTreeProps {
   onEnterBatchMode: (sessionId: string) => void;
   /** 上报当前侧边栏树中所有可见 session ID，供批量全选使用 */
   onVisibleSessionsChange?: (ids: string[]) => void;
+  workMode?: 'work' | 'chat';
 }
 
 const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
@@ -32,6 +33,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   onToggleSelection,
   onEnterBatchMode,
   onVisibleSessionsChange,
+  workMode = 'work',
 }) => {
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -44,7 +46,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     loadMoreTasks,
     collapseTasks,
     toggleAgentExpanded,
-  } = useAgentSidebarState();
+  } = useAgentSidebarState({ workMode });
 
   useEffect(() => {
     void agentService.loadAgents();
