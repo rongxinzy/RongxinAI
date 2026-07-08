@@ -16,7 +16,13 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import type { Model } from '../../store/slices/modelSlice';
+import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
+import {
+  buildOpenClawModelValidationTargets,
+  resolveFirstUnsupportedOpenClawModel,
+  resolveOpenClawModelSupportMessageKey,
+} from '../../utils/openclawModelSupport';
 import ModelSelector from '../ModelSelector';
 import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 
@@ -258,6 +264,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
   const [form, setForm] = useState<FormState>(() => createFormState(task));
   const initialFormRef = useRef<string>(JSON.stringify(createFormState(task)));
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
+  const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const agents = useSelector((state: RootState) => state.agent.agents);
 
   const [channelOptions, setChannelOptions] = useState<ScheduledTaskChannelOption[]>(() => {
@@ -419,6 +426,28 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
 
   const handleSubmit = async () => {
     if (!validate()) return;
+
+    let agentRecord: Awaited<ReturnType<NonNullable<typeof window.electron>['agents']['get']>> | null = null;
+    if (form.agentId) {
+      try {
+        agentRecord = await window.electron?.agents?.get(form.agentId);
+      } catch {
+        agentRecord = null;
+      }
+    }
+    const defaultModelRef = defaultSelectedModel ? toOpenClawModelRef(defaultSelectedModel) : '';
+    const unsupportedModel = resolveFirstUnsupportedOpenClawModel(
+      buildOpenClawModelValidationTargets({
+        primaryModelRef: form.modelId || agentRecord?.model || selectedAgent?.model || '',
+        fallbackModelRef: defaultModelRef,
+        triageOverride: form.modelId ? null : (agentRecord?.triageOverride ?? null),
+      }),
+      availableModels,
+    );
+    if (unsupportedModel) {
+      setSubmitError(i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)));
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -1339,6 +1368,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
                 value={selectedModelValue}
                 onChange={handleModelChange}
                 defaultLabel={modelDefaultLabel}
+                isModelSelectable={isModelSelectableForOpenClaw}
               />
             </div>
           </div>

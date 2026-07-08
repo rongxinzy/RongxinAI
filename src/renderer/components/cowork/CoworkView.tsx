@@ -18,7 +18,6 @@ import { addMessage, clearCurrentSession, setCurrentSession, setStreaming, updat
 import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
-import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import ModelSelector from '../ModelSelector';
 import { PromptPanel,QuickActionBar } from '../quick-actions';
@@ -469,7 +468,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         )}
         <ModelSelector
           disabled={isPersistingAgentModel}
-          isModelSelectable={isModelSelectableForOpenClaw}
           value={currentAgentSelectedModel}
           onChange={async (nextModel) => {
             if (!nextModel) return;

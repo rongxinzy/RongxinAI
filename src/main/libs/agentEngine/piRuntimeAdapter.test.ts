@@ -6,22 +6,108 @@
 
 import { beforeEach,describe, expect, it, vi } from 'vitest';
 
+const hoisted = vi.hoisted(() => {
+  const mockSession = {
+    prompt: vi.fn().mockResolvedValue(undefined),
+    abort: vi.fn().mockResolvedValue(undefined),
+    setModel: vi.fn().mockResolvedValue(undefined),
+    subscribe: vi.fn().mockReturnValue(() => {}),
+  };
+
+  return {
+    mockSession,
+    mockCreateAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
+    mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
+    mockGetModel: vi.fn((provider: string, modelId: string) => ({ provider, id: modelId })),
+    mockAuthStorage: {
+      setRuntimeApiKey: vi.fn(),
+    },
+    mockResolveRawApiConfig: vi.fn(() => ({
+      config: {
+        apiKey: 'sk-test',
+        baseURL: 'http://127.0.0.1:11434/v1',
+        model: 'qwen-local',
+        apiType: 'openai' as const,
+      },
+      providerMetadata: {
+        providerName: 'llamacpp',
+        codingPlanEnabled: false,
+        supportsImage: false,
+        modelName: 'qwen-local',
+        contextWindow: 32768,
+        contextTokens: 32768,
+        maxTokens: 4096,
+      },
+    })),
+    mockResolveRawApiConfigForModelRef: vi.fn((modelRef: string) => {
+      const [providerName = 'llamacpp', modelName = modelRef] = modelRef.includes('/')
+        ? modelRef.split('/')
+        : ['llamacpp', modelRef];
+
+      if (providerName === 'openai') {
+        return {
+          config: {
+            apiKey: 'sk-openai',
+            baseURL: 'https://api.openai.com/v1',
+            model: modelName,
+            apiType: 'openai' as const,
+          },
+          providerMetadata: {
+            providerName: 'openai',
+            codingPlanEnabled: false,
+            supportsImage: true,
+            modelName,
+            contextWindow: 272000,
+            contextTokens: 272000,
+            maxTokens: 16384,
+          },
+        };
+      }
+
+      return {
+        config: {
+          apiKey: 'sk-test',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          model: modelName,
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName,
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName,
+          contextWindow: 32768,
+          contextTokens: 32768,
+          maxTokens: 4096,
+        },
+      };
+    }),
+  };
+});
+
 // ── Mocks ──
 
-const mockSession = {
-  prompt: vi.fn().mockResolvedValue(undefined),
-  abort: vi.fn().mockResolvedValue(undefined),
-  setModel: vi.fn().mockResolvedValue(undefined),
-  subscribe: vi.fn().mockReturnValue(() => {}),
-};
+const mockSession = hoisted.mockSession;
+const mockCreateAgentSession = hoisted.mockCreateAgentSession;
+const mockGetModel = hoisted.mockGetModel;
+const mockAuthStorage = hoisted.mockAuthStorage;
+const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
-  createAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
+  createAgentSession: hoisted.mockCreateAgentSession,
+  AuthStorage: {
+    inMemory: vi.fn(() => hoisted.mockAuthStorage),
+  },
 }));
 
 vi.mock('@earendil-works/pi-ai/compat', () => ({
-  getModel: vi.fn().mockReturnValue({ provider: 'anthropic', id: 'claude-sonnet-4-6' }),
-  completeSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
+  getModel: hoisted.mockGetModel,
+  completeSimple: hoisted.mockCompleteSimple,
+}));
+
+vi.mock('../claudeSettings', () => ({
+  resolveRawApiConfig: hoisted.mockResolveRawApiConfig,
+  resolveRawApiConfigForModelRef: hoisted.mockResolveRawApiConfigForModelRef,
 }));
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
@@ -41,6 +127,35 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello Pi');
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
+    });
+
+    it('should resolve the explicit model override for a new session', async () => {
+      await adapter.startSession('test', 'Hello Pi', { modelOverride: 'llamacpp/qwen-local' });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('llamacpp/qwen-local');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(expect.objectContaining({
+        model: expect.objectContaining({
+          provider: 'llamacpp',
+          id: 'qwen-local',
+          baseUrl: 'http://127.0.0.1:11434/v1',
+        }),
+      }));
+      expect(mockGetModel).not.toHaveBeenCalled();
+      expect(mockAuthStorage.setRuntimeApiKey).toHaveBeenCalledWith('llamacpp', 'sk-test');
+    });
+
+    it('should keep supported remote models on the Pi built-in path', async () => {
+      await adapter.startSession('test', 'Hello Pi', { modelOverride: 'openai/gpt-5.2' });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('openai/gpt-5.2');
+      expect(mockGetModel).toHaveBeenCalledWith('openai', 'gpt-5.2');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(expect.objectContaining({
+        model: expect.objectContaining({
+          provider: 'openai',
+          id: 'gpt-5.2',
+        }),
+      }));
+      expect(mockAuthStorage.setRuntimeApiKey).toHaveBeenCalledWith('openai', 'sk-openai');
     });
 
     it('should make session active after start', async () => {
@@ -129,8 +244,9 @@ describe('PiRuntimeAdapter', () => {
   describe('patchSession', () => {
     it('should call setModel when model is provided', async () => {
       await adapter.startSession('test', 'Hello');
-      await adapter.patchSession('test', { model: 'claude-opus-4-5' });
+      await adapter.patchSession('test', { model: 'llamacpp/qwen-local-2' });
       expect(mockSession.setModel).toHaveBeenCalled();
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('llamacpp/qwen-local-2');
     });
 
     it('should not call setModel when no model in patch', async () => {

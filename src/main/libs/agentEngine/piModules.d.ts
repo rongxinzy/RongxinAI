@@ -8,6 +8,11 @@
  */
 
 declare module '@earendil-works/pi-coding-agent' {
+  export const AuthStorage: {
+    inMemory(): {
+      setRuntimeApiKey(provider: string, apiKey: string): void;
+    };
+  };
   export function createAgentSession(options?: Record<string, unknown>): Promise<{
     session: {
       prompt(text: string): Promise<void>;
@@ -32,5 +37,6 @@ declare module '@earendil-works/pi-ai/compat' {
   export function completeSimple(
     model: unknown,
     context: { messages: Array<{ role: string; content: string }> },
+    options?: { apiKey?: string },
   ): Promise<{ content: Array<{ text: string }> }>;
 }

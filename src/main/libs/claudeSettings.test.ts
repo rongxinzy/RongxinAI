@@ -11,6 +11,7 @@ import {
   resolveAllEnabledProviderConfigs,
   resolveCurrentApiConfig,
   resolveRawApiConfig,
+  resolveRawApiConfigForModelRef,
   setStoreGetter,
   updateLlamaCppRunningModels,
 } from './claudeSettings';
@@ -139,5 +140,37 @@ test('resolveCurrentApiConfig still resolves a running llama.cpp model even when
     contextWindow: 4096,
     contextTokens: 4096,
     maxTokens: 1024,
+  });
+});
+
+test('resolveRawApiConfigForModelRef resolves an explicit llama.cpp model ref', () => {
+  const runningModel = buildLlamaCppRunningModelBinding({
+    name: 'qwen-explicit',
+    trained_context_length: 32768,
+    runtime_context_length: 32768,
+  });
+  expect(runningModel).not.toBeNull();
+  updateLlamaCppRunningModels([runningModel!]);
+
+  setStoreGetter(() => ({
+    get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-local') : undefined),
+  } as never));
+
+  const result = resolveRawApiConfigForModelRef('llamacpp/qwen-explicit');
+  expect(result.config).toEqual({
+    apiKey: 'sk-lobsterai-local',
+    baseURL: 'http://127.0.0.1:8080/v1',
+    model: 'qwen-explicit',
+    apiType: 'openai',
+  });
+  expect(result.providerMetadata).toEqual({
+    providerName: ProviderName.LlamaCpp,
+    authType: undefined,
+    codingPlanEnabled: false,
+    supportsImage: false,
+    modelName: 'qwen-explicit',
+    contextWindow: 32768,
+    contextTokens: 32768,
+    maxTokens: 4096,
   });
 });

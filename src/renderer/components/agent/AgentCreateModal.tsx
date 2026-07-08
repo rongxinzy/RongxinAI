@@ -18,6 +18,12 @@ import type { PresetAgent } from '../../types/agent';
 import type { DingTalkInstanceConfig, DiscordInstanceConfig, FeishuInstanceConfig, IMGatewayConfig, QQInstanceConfig, WecomInstanceConfig } from '../../types/im';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import {
+  buildOpenClawModelValidationTargets,
+  resolveDraftOpenClawModelRef,
+  resolveFirstUnsupportedOpenClawModel,
+  resolveOpenClawModelSupportMessageKey,
+} from '../../utils/openclawModelSupport';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
 import AgentAvatarIcon from './AgentAvatarIcon';
@@ -61,6 +67,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [activeTab, setActiveTab] = useState<AgentDetailTab>(AgentDetailTab.Prompt);
   const globalSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
+  const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const coworkConfig = useSelector((state: RootState) => state.cowork.config);
@@ -180,6 +187,25 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    const selectedModelRef = resolveDraftOpenClawModelRef(model, initialModelRef.current);
+    const defaultModelRef = globalSelectedModel
+      ? toOpenClawModelRef(globalSelectedModel)
+      : initialModelRef.current;
+    if (boundKeys.size > 0) {
+      const unsupportedModel = resolveFirstUnsupportedOpenClawModel(
+        buildOpenClawModelValidationTargets({
+          primaryModelRef: selectedModelRef,
+          fallbackModelRef: defaultModelRef,
+        }),
+        availableModels,
+      );
+      if (unsupportedModel) {
+        window.dispatchEvent(new CustomEvent('app:showToast', {
+          detail: i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)),
+        }));
+        return;
+      }
+    }
 
     // 禁止使用保留名称
     const reservedNames = ['主 Agent', 'Primary Agent'];
@@ -216,7 +242,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         description: description.trim(),
         systemPrompt: systemPrompt.trim(),
         identity: identity.trim(),
-        model: model ? toOpenClawModelRef(model) : '',
+        model: selectedModelRef,
         workingDirectory: workingDirectory.trim(),
         icon: icon.trim() || undefined,
         skillIds,

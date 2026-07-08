@@ -34,7 +34,6 @@ import type { Model } from '../../store/slices/modelSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
-import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getCompactFolderName } from '../../utils/path';
 import ModelSelector from '../ModelSelector';
@@ -226,7 +225,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     hasInvalidExplicitModel: agentModelIsInvalid,
     invalidExplicitModelRef,
     hasUnavailableLlamaCppModel,
-    hasIneligibleLlamaCppModel,
   } = resolveAgentModelSelection({
     sessionModel: currentSession && currentSession.id === sessionId ? currentSession.modelOverride : '',
     agentModel: currentAgent?.model ?? '',
@@ -893,7 +891,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   <ModelSelector
                     dropdownDirection="up"
                     disabled={isPatchingModel || isPersistingAgentModel}
-                    isModelSelectable={isModelSelectableForOpenClaw}
                     value={(agentModelIsInvalid && invalidExplicitModelRef)
                       ? { id: '__invalid__', name: invalidModelLabel } as Model
                       : agentSelectedModel}
@@ -954,11 +951,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       {hasUnavailableLlamaCppModel
                         ? i18nService.t('agentLlamaCppModelNotRunningHint')
                         : i18nService.t('agentModelInvalidHint')}
-                    </span>
-                  )}
-                  {!agentModelIsInvalid && hasIneligibleLlamaCppModel && (
-                    <span className="max-w-60 text-[11px] leading-4 text-red-500">
-                      {i18nService.t('agentLlamaCppContextInsufficientHint')}
                     </span>
                   )}
                 </div>

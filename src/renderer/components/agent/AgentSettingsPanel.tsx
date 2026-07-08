@@ -20,7 +20,15 @@ import type { Agent } from '../../types/agent';
 import type { DingTalkInstanceConfig, DingTalkInstanceStatus, DiscordInstanceConfig, DiscordInstanceStatus, FeishuInstanceConfig, FeishuInstanceStatus, IMGatewayConfig, IMGatewayStatus, QQInstanceConfig, QQInstanceStatus, TelegramInstanceConfig, TelegramInstanceStatus, WecomInstanceConfig, WecomInstanceStatus } from '../../types/im';
 import { getAgentDisplayName, getAgentDisplayNameById, isDefaultAgentId } from '../../utils/agentDisplay';
 import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
-import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import {
+  buildOpenClawModelValidationTargets,
+  OpenClawModelSupportReason,
+  resolveDraftOpenClawModelRef,
+  resolveFirstUnsupportedOpenClawModel,
+  resolveOpenClawModelSupportMessageKey,
+  resolveOpenClawModelSupportResult,
+} from '../../utils/openclawModelSupport';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
 import { isLlamaCppModelRef } from '../cowork/agentModelSelection';
@@ -48,6 +56,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
   const agents = useSelector((state: RootState) => state.agent.agents);
   const imStatus = useSelector((state: RootState) => state.im.status);
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
+  const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const [, setAgent] = useState<Agent | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -122,7 +131,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       setIdentity(nextIdentity);
       setUserInfo(nextUserInfo);
       setIcon(a.icon);
-      const resolvedModel = resolveOpenClawModelRef(a.model, availableModels) ?? null;
+      const resolvedModel = a.model
+        ? availableModels.find((candidate) => toOpenClawModelRef(candidate) === a.model) ?? null
+        : null;
       setModel(resolvedModel ?? (isLlamaCppModelRef(a.model)
         ? { id: '__invalid__', name: a.model.split('/').pop() || a.model } as Model
         : null));
@@ -207,6 +218,24 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
 
   const handleSave = async () => {
     if (!name.trim()) return;
+    const selectedModelRef = resolveDraftOpenClawModelRef(model, initialValuesRef.current.model);
+    const defaultModelRef = defaultSelectedModel ? toOpenClawModelRef(defaultSelectedModel) : '';
+    if (boundKeys.size > 0) {
+      const unsupportedModel = resolveFirstUnsupportedOpenClawModel(
+        buildOpenClawModelValidationTargets({
+          primaryModelRef: selectedModelRef,
+          fallbackModelRef: defaultModelRef,
+          triageOverride: triageCustom ? triageOverride : null,
+        }),
+        availableModels,
+      );
+      if (unsupportedModel) {
+        window.dispatchEvent(new CustomEvent('app:showToast', {
+          detail: i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)),
+        }));
+        return;
+      }
+    }
     setSaving(true);
     try {
       const result = await agentService.updateAgent(agentId, {
@@ -214,7 +243,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         description: description.trim(),
         systemPrompt: systemPrompt.trim(),
         identity: identity.trim(),
-        model: model ? toOpenClawModelRef(model) : '',
+        model: selectedModelRef,
         workingDirectory: workingDirectory.trim(),
         icon: icon.trim(),
         skillIds,
@@ -510,18 +539,18 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     );
   };
 
-  const triageLightModel = triageOverride.lightModelRef
-    ? resolveOpenClawModelRef(triageOverride.lightModelRef, availableModels)
-    : null;
-  const triageHeavyModel = triageOverride.heavyModelRef
-    ? resolveOpenClawModelRef(triageOverride.heavyModelRef, availableModels)
-    : null;
-  const triageLightModelIneligible = Boolean(
-    triageLightModel && !isModelSelectableForOpenClaw(triageLightModel),
+  const triageLightModelSupport = resolveOpenClawModelSupportResult(
+    triageOverride.lightModelRef ?? '',
+    availableModels,
   );
-  const triageHeavyModelIneligible = Boolean(
-    triageHeavyModel && !isModelSelectableForOpenClaw(triageHeavyModel),
+  const triageHeavyModelSupport = resolveOpenClawModelSupportResult(
+    triageOverride.heavyModelRef ?? '',
+    availableModels,
   );
+  const triageLightModelIneligible =
+    triageLightModelSupport.reason !== OpenClawModelSupportReason.Supported;
+  const triageHeavyModelIneligible =
+    triageHeavyModelSupport.reason !== OpenClawModelSupportReason.Supported;
 
   return (
     <>
@@ -706,7 +735,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       </Select>
                       {triageLightModelIneligible && (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {i18nService.t('agentLlamaCppContextInsufficientHint')}
+                          {i18nService.t(
+                            resolveOpenClawModelSupportMessageKey(triageLightModelSupport.reason),
+                          )}
                         </p>
                       )}
                     </div>
@@ -741,7 +772,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       </Select>
                       {triageHeavyModelIneligible && (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {i18nService.t('agentLlamaCppContextInsufficientHint')}
+                          {i18nService.t(
+                            resolveOpenClawModelSupportMessageKey(triageHeavyModelSupport.reason),
+                          )}
                         </p>
                       )}
                     </div>
