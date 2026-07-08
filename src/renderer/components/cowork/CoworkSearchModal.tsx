@@ -1,6 +1,6 @@
 import { AgentId } from '@shared/agent';
-import { Command, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
-import { Dialog, DialogContent } from '@shared/components/ui/dialog';
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
+import { Spinner } from '@shared/components/ui/spinner';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -22,15 +22,22 @@ interface CoworkSearchModalProps {
   sessions: CoworkSessionSummary[];
   currentSessionId: string | null;
   onSelectSession: (session: CoworkSessionSummary) => void | Promise<void>;
+  workMode?: 'work' | 'chat';
 }
 
 const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
-  isOpen, onClose, sessions, currentSessionId, onSelectSession,
+  isOpen, onClose, sessions, currentSessionId: _currentSessionId, onSelectSession, workMode = 'work',
 }) => {
   const agents = useSelector((state: RootState) => state.agent.agents);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSessions, setSearchSessions] = useState<CoworkSessionSummary[]>(sessions);
   const [isLoading, setIsLoading] = useState(false);
+
+  const modeFilteredSessions = useMemo(() => {
+    return searchSessions.filter(s =>
+      workMode === 'chat' ? s.mode === 'chat' : s.mode !== 'chat'
+    );
+  }, [searchSessions, workMode]);
 
   const agentNameBySessionId = useMemo(() => {
     const names = new Map<string, string>();
@@ -43,12 +50,12 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
 
   const filteredSessions = useMemo(() => {
     const trimmedQuery = searchQuery.trim().toLowerCase();
-    if (!trimmedQuery) return searchSessions;
-    return searchSessions.filter((session) => {
+    if (!trimmedQuery) return modeFilteredSessions;
+    return modeFilteredSessions.filter((session) => {
       const agentName = agentNameBySessionId.get(session.id) ?? '';
       return session.title.toLowerCase().includes(trimmedQuery) || agentName.toLowerCase().includes(trimmedQuery);
     });
-  }, [agentNameBySessionId, searchQuery, searchSessions]);
+  }, [agentNameBySessionId, searchQuery, modeFilteredSessions]);
 
   useEffect(() => { if (!isOpen) setSearchQuery(''); }, [isOpen]);
   useEffect(() => { if (!isOpen) setSearchSessions(sessions); }, [isOpen, sessions]);
@@ -72,26 +79,29 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-[520px] p-0" showCloseButton={false}>
-        <Command shouldFilter={false}>
-          <CommandInput
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            placeholder={i18nService.t('searchConversations')}
-            className="h-12 text-[13px] border-0"
-          />
-          <CommandList className="max-h-[320px] px-2 pb-2">
-            <div className="px-2 pb-1 text-[12px] text-muted-foreground pt-1">
-              {i18nService.t('searchRecentTasks')}
+    <CommandDialog
+      open={isOpen}
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      title={i18nService.t('searchConversations')}
+      description={i18nService.t('searchRecentTasks')}
+      className="ring-0"
+    >
+      <Command shouldFilter={false}>
+        <CommandInput
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          placeholder={i18nService.t('searchConversations')}
+        />
+        <CommandList>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Spinner />
             </div>
-            {filteredSessions.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                {isLoading ? i18nService.t('loading') : i18nService.t('searchNoResults')}
-              </div>
-            ) : (
-              filteredSessions.map((session) => {
-                const isSelected = session.id === currentSessionId;
+          ) : filteredSessions.length === 0 ? (
+            <CommandEmpty>{i18nService.t('searchNoResults')}</CommandEmpty>
+          ) : (
+            <CommandGroup heading={i18nService.t('searchRecentTasks')}>
+              {filteredSessions.map((session) => {
                 const isRunning = session.status === CoworkSessionStatusValue.Running;
                 const agentName = agentNameBySessionId.get(session.id) ?? getSessionAgentId(session);
                 return (
@@ -99,24 +109,18 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                     key={session.id}
                     value={session.title}
                     onSelect={() => void handleSelectSession(session)}
-                    className={`group flex h-8 gap-2 text-[13px] ${isSelected ? 'bg-accent' : ''}`}
                   >
-                    {isRunning && (
-                      <svg className="h-3 w-3 animate-spin text-primary shrink-0" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                      </svg>
-                    )}
-                    <span className="min-w-0 flex-1 truncate font-medium">{session.title}</span>
-                    <span className="max-w-[136px] shrink-0 truncate text-[12px] text-muted-foreground/75">{agentName}</span>
+                    {isRunning && <Spinner />}
+                    <span className="flex-1 truncate">{session.title}</span>
+                    <span className="text-xs text-muted-foreground">{agentName}</span>
                   </CommandItem>
                 );
-              })
-            )}
-          </CommandList>
-        </Command>
-      </DialogContent>
-    </Dialog>
+              })}
+            </CommandGroup>
+          )}
+        </CommandList>
+      </Command>
+    </CommandDialog>
   );
 };
 
