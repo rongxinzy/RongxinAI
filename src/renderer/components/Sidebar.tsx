@@ -1,12 +1,15 @@
 import { AgentId } from '@shared/agent';
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
+import { Switch } from '@shared/components/ui/switch';
+import { cn } from '@shared/lib/utils';
 import { Cog, Cpu, TriangleAlert } from 'lucide-react';
-import { Clock, PanelLeft, Pencil, Plug, Puzzle, Search, Trash2 } from 'lucide-react';
+import { Briefcase, Clock, MessageCircle, PanelLeft, Pencil, Plug, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { agentService } from '../services/agent';
+import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
 import { RootState } from '../store';
@@ -70,6 +73,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [agentScrollEdges, setAgentScrollEdges] = useState({ top: false, bottom: false });
+  const [workMode, setWorkMode] = useState<'work' | 'chat'>(
+    () => configService.getConfig().workMode ?? 'work'
+  );
+
+  const handleWorkModeChange = useCallback((checked: boolean) => {
+    const mode = checked ? 'chat' : 'work';
+    setWorkMode(mode);
+    void configService.updateConfig({ workMode: mode });
+  }, []);
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
@@ -273,6 +285,31 @@ const Sidebar: React.FC<SidebarProps> = ({
           </Button>
         </div>
         <div className="mt-[5px] space-y-0.5 px-3">
+          <div className="relative h-7 w-full cursor-pointer" onClick={() => handleWorkModeChange(workMode !== 'chat')}>
+            <Switch
+              checked={workMode === 'chat'}
+              onCheckedChange={handleWorkModeChange}
+              data-mode="work-chat"
+            />
+            <span className={cn(
+              'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
+              workMode === 'work'
+                ? 'font-semibold text-foreground scale-125'
+                : 'font-normal text-muted-foreground opacity-50'
+            )} style={{ left: '25%', transform: 'translate(-50%, -50%)' }}>
+              <Briefcase className="size-3.5" />
+              <span className="text-sm">{i18nService.t('workMode')}</span>
+            </span>
+            <span className={cn(
+              'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
+              workMode === 'chat'
+                ? 'font-semibold text-foreground scale-125'
+                : 'font-normal text-muted-foreground opacity-50'
+            )} style={{ left: '75%', transform: 'translate(-50%, -50%)' }}>
+              <MessageCircle className="size-3.5" />
+              <span className="text-sm">{i18nService.t('chatMode')}</span>
+            </span>
+          </div>
           <Button
             type="button"
             variant="ghost"
