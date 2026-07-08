@@ -56,6 +56,7 @@ interface CoworkSessionDetailProps {
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
+  workMode?: 'work' | 'chat';
 }
 
 const NAV_SCROLL_LOCK_DURATION = 800;
@@ -107,6 +108,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onToggleSidebar,
   onNewChat,
   updateBadge,
+  workMode = 'work',
 }) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
@@ -1220,7 +1222,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             onSubmit={onContinue}
             onStop={onStop}
             isStreaming={isStreaming}
-            placeholder={i18nService.t(remoteManaged ? 'coworkRemoteManagedPlaceholder' : 'coworkContinuePlaceholder')}
+            placeholder={i18nService.t(remoteManaged ? 'coworkRemoteManagedPlaceholder' : workMode === 'chat' ? 'chatPlaceholder' : 'coworkContinuePlaceholder')}
             disabled={remoteManaged}
             size="large"
             remoteManaged={remoteManaged}

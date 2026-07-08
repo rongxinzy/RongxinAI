@@ -86,6 +86,7 @@ const toSessionSummary = (session: CoworkSession): CoworkSessionSummary => ({
   id: session.id,
   title: session.title,
   status: session.status,
+  mode: session.mode,
   pinned: session.pinned ?? false,
   pinOrder: session.pinOrder ?? null,
   agentId: session.agentId,
@@ -188,7 +189,12 @@ const coworkSlice = createSlice({
 
     addSession(state, action: PayloadAction<CoworkSession>) {
       const summary = toSessionSummary(action.payload);
-      state.sessions.unshift(summary);
+      const existingIndex = state.sessions.findIndex(s => s.id === summary.id);
+      if (existingIndex !== -1) {
+        state.sessions[existingIndex] = { ...state.sessions[existingIndex], ...summary };
+      } else {
+        state.sessions.unshift(summary);
+      }
       state.currentSession = {
         ...action.payload,
         messagesOffset: action.payload.messagesOffset ?? 0,
