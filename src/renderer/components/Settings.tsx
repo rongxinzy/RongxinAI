@@ -4549,9 +4549,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   };
 
   return (
-    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 shadow-modal ring-border">
+    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 !ring-0 bg-transparent">
       <div
-        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content"
+        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content bg-surface shadow-modal border border-border"
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
