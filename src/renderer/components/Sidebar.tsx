@@ -6,7 +6,7 @@ import { cn } from '@shared/lib/utils';
 import { Cog, Cpu, TriangleAlert } from 'lucide-react';
 import { Briefcase, Clock, MessageCircle, PanelLeft, Pencil, Plug, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { agentService } from '../services/agent';
 import { configService } from '../services/config';
@@ -16,12 +16,15 @@ import { RootState } from '../store';
 import {
   selectCoworkSessions,
   selectCurrentSessionId,
+  selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
-import type { CoworkSessionSummary } from '../types/cowork';
+import { setCurrentSession } from '../store/slices/coworkSlice';
+import type { CoworkSession, CoworkSessionSummary } from '../types/cowork';
+import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
+import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import Modal from './common/Modal';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
-import CoworkSessionList from './cowork/CoworkSessionList';
 import LoginButton from './LoginButton';
 
 interface SidebarProps {
@@ -64,9 +67,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   updateBadge,
   hideLogin,
 }) => {
+  const dispatch = useDispatch();
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const allSessions = useSelector(selectCoworkSessions);
   const currentSessionId = useSelector(selectCurrentSessionId);
+  const unreadSessionIds = useSelector(selectUnreadSessionIds);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -90,6 +95,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       ? allSessions.filter(s => s.mode === 'chat')
       : allSessions.filter(s => s.mode !== 'chat'),
   [allSessions, workMode]);
+
+  // Chat mode: map sessions to AgentSidebarTaskNode for AgentTaskRow rendering
+  const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
+  const chatTaskNodes = React.useMemo(() => {
+    if (workMode !== 'chat') return [];
+    const sorted = sortAgentSidebarTasks(sessions);
+    return sorted.map(s => toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet));
+  }, [workMode, sessions, currentSessionId, unreadSessionIdSet]);
 
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
@@ -121,6 +134,30 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     const agentId = session.agentId?.trim() || AgentId.Main;
+
+    // Chat sessions live in localStorage, not the SQLite backend.
+    // Load them directly instead of going through coworkService.
+    if (session.mode === 'chat') {
+      if (agentId !== currentAgentId) {
+        agentService.switchAgent(agentId);
+      }
+      onShowCowork();
+      try {
+        const stored = localStorage.getItem('chat_sessions');
+        if (stored) {
+          const chatSessions: CoworkSession[] = JSON.parse(stored);
+          const found = chatSessions.find(s => s.id === session.id);
+          if (found) {
+            dispatch(setCurrentSession(found));
+            return;
+          }
+        }
+      } catch { /* fall through to backend load */ }
+      // Fallback: try loading from backend anyway
+      await coworkService.loadSession(session.id);
+      return;
+    }
+
     if (agentId !== currentAgentId) {
       agentService.switchAgent(agentId);
       await coworkService.loadSessions(agentId);
@@ -331,15 +368,17 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-sm">{i18nService.t('chatMode')}</span>
             </span>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onNewChat}
-            className={sidebarNavItemClassName}
-          >
-            <Pencil className={sidebarCreateIconClassName} />
-            {i18nService.t('newChat')}
-          </Button>
+          <div className="!mt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onNewChat}
+              className={sidebarNavItemClassName}
+            >
+              <Pencil className={sidebarCreateIconClassName} />
+              {i18nService.t('newChat')}
+            </Button>
+          </div>
           {workMode !== 'chat' && (
             <Button
               type="button"
@@ -427,23 +466,55 @@ const Sidebar: React.FC<SidebarProps> = ({
               workMode={workMode}
             />
           ) : (
-            <CoworkSessionList
-              sessions={sessions}
-              currentSessionId={currentSessionId}
-              isBatchMode={isBatchMode}
-              selectedIds={selectedIds}
-              emptyLabel={i18nService.t('chatNoSessions')}
-              emptyHint={i18nService.t('chatNoSessionsHint')}
-              onSelectSession={(sessionId) => {
-                const session = allSessions.find(s => s.id === sessionId);
-                if (session) void handleSelectSession(session);
-              }}
-              onDeleteSession={handleDeleteSession}
-              onTogglePin={handleToggleSessionPin}
-              onRenameSession={handleRenameSession}
-              onToggleSelection={handleToggleSelection}
-              onEnterBatchMode={handleEnterBatchMode}
-            />
+            <>
+              <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
+                <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+                  {i18nService.t('chatRecentTitle')}
+                </h2>
+              </div>
+              {chatTaskNodes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 px-4">
+                  <MessageCircle className="size-10 text-muted-foreground mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground mb-1">
+                    {i18nService.t('chatNoSessions')}
+                  </p>
+                  <p className="text-xs text-muted-foreground text-center">
+                    {i18nService.t('chatNoSessionsHint')}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {chatTaskNodes.map((task) => (
+                    <AgentTaskRow
+                  key={task.id}
+                  task={task}
+                  isBatchMode={isBatchMode}
+                  isSelected={selectedIds.has(task.id)}
+                  onSelect={() => {
+                    const session = allSessions.find(s => s.id === task.id);
+                    if (session) void handleSelectSession(session);
+                  }}
+                  onDelete={() => handleDeleteSession(task.id)}
+                  onShare={async () => {
+                    const session = allSessions.find(s => s.id === task.id);
+                    if (session) {
+                      await handleSelectSession(session);
+                      window.setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('cowork:open-share-options', {
+                          detail: { sessionId: task.id },
+                        }));
+                      }, 0);
+                    }
+                  }}
+                  onTogglePin={(pinned) => handleToggleSessionPin(task.id, pinned)}
+                  onRename={(title) => handleRenameSession(task.id, title)}
+                  onToggleSelection={() => handleToggleSelection(task.id)}
+                  onEnterBatchMode={() => handleEnterBatchMode(task.id)}
+                />
+              ))}
+                </div>
+              )}
+            </>
           )}
         </div>
         <div

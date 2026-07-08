@@ -16,7 +16,7 @@ import {
   selectCurrentSession,
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
-import { addMessage, addSession, clearCurrentSession, setCurrentSession, setStreaming, updateSessionStatus } from '../../store/slices/coworkSlice';
+import { addMessage, addSession, clearCurrentSession, setCurrentSession, setStreaming, updateMessageContent, updateSessionStatus } from '../../store/slices/coworkSlice';
 import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
@@ -68,18 +68,22 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     return () => window.removeEventListener('config-updated', handler);
   }, []);
 
-  // Load persisted chat sessions on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('chat_sessions');
-      if (stored) {
-        const chatSessions: CoworkSession[] = JSON.parse(stored);
-        chatSessions.forEach(s => { dispatch(addSession(s)); });
-      }
-    } catch { /* ignore */ }
-  }, [dispatch]);
+  // Chat sessions are loaded inside the init useEffect below, after
+  // coworkService.init() completes, to avoid loadSessions() overwriting them.
 
   const currentSession = useSelector(selectCurrentSession);
+
+  // Clear session when workMode changes and current session mode doesn't match
+  const prevWorkModeRef = useRef(workMode);
+  useEffect(() => {
+    if (prevWorkModeRef.current !== workMode) {
+      prevWorkModeRef.current = workMode;
+      if (currentSession?.mode && currentSession.mode !== workMode) {
+        dispatch(clearCurrentSession());
+      }
+    }
+  }, [workMode, currentSession?.mode, dispatch]);
+
   const isStreaming = useSelector(selectIsStreaming);
   const config = useSelector(selectCoworkConfig);
 
@@ -179,6 +183,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         console.error('Failed to check cowork API config:', error);
       }
       setIsInitialized(true);
+
+      // Load persisted chat sessions AFTER init completes so that
+      // loadSessions() has already populated the Redux sessions list.
+      // This prevents setSessions() from wiping out localStorage-only sessions.
+      try {
+        const stored = localStorage.getItem('chat_sessions');
+        if (stored) {
+          const chatSessions: CoworkSession[] = JSON.parse(stored);
+          chatSessions.forEach(s => { dispatch(addSession(s)); });
+        }
+      } catch { /* ignore */ }
     };
     init();
 
@@ -209,7 +224,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       count: imageAttachments?.length ?? 0,
       details: imageAttachments?.map(a => ({ name: a.name, mimeType: a.mimeType, base64Length: a.base64Data?.length ?? 0 })) ?? [],
     });
-    if (openClawStatus && !isOpenClawReadyForSession(openClawStatus)) {
+    if (workMode !== 'chat' && openClawStatus && !isOpenClawReadyForSession(openClawStatus)) {
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkErrorEngineNotReady') }));
       return false;
     }
@@ -298,19 +313,32 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
       // Chat mode: direct LLM via apiService, skip PI/OpenClaw
       if (workMode === 'chat') {
+        const assistantMsgId = `msg-${now}-assistant`;
+        let assistantContent = '';
+        let assistantMessageAdded = false;
         try {
           await apiService.chat(
             prompt,
             (chunk) => {
-              dispatch(addMessage({
-                sessionId: tempSessionId,
-                message: {
-                  id: `msg-${now}-assistant`,
-                  type: 'assistant',
+              assistantContent = chunk;  // chunk is accumulated full content
+              if (!assistantMessageAdded) {
+                dispatch(addMessage({
+                  sessionId: tempSessionId,
+                  message: {
+                    id: assistantMsgId,
+                    type: 'assistant',
+                    content: chunk,
+                    timestamp: Date.now(),
+                  },
+                }));
+                assistantMessageAdded = true;
+              } else {
+                dispatch(updateMessageContent({
+                  sessionId: tempSessionId,
+                  messageId: assistantMsgId,
                   content: chunk,
-                  timestamp: Date.now(),
-                },
-              }));
+                }));
+              }
             },
             [],
           );
@@ -319,8 +347,20 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             dispatch(setStreaming(false));
             return;
           }
+          // Build the final session with complete messages (user + assistant)
+          // so that addSession does not overwrite currentSession with stale data.
+          const finalMessages = [
+            { id: `msg-${now}`, type: 'user' as const, content: prompt, timestamp: now },
+            ...(assistantContent ? [{ id: assistantMsgId, type: 'assistant' as const, content: assistantContent, timestamp: Date.now() }] : []),
+          ];
+          const savedSession: CoworkSession = {
+            ...tempSession,
+            status: 'completed' as const,
+            updatedAt: Date.now(),
+            messages: finalMessages,
+            totalMessages: finalMessages.length,
+          };
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
-          const savedSession = { ...tempSession, status: 'completed' as const, updatedAt: Date.now() };
           dispatch(addSession(savedSession));
           // Persist chat session to localStorage
           try {
@@ -331,6 +371,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             localStorage.setItem('chat_sessions', JSON.stringify(chatSessions));
           } catch { /* ignore storage errors */ }
         } catch (error) {
+          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
           dispatch(addMessage({
             sessionId: tempSessionId,
             message: {
@@ -340,7 +381,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
               timestamp: Date.now(),
             },
           }));
-          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
         } finally {
           dispatch(setStreaming(false));
           isStartingRef.current = false;
@@ -409,7 +449,21 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     // Chat mode: direct LLM via apiService
     if (workMode === 'chat') {
       isContinuingRef.current = true;
+      const assistantMsgId = `msg-${Date.now()}-assistant`;
+      let assistantMessageAdded = false;
       try {
+        // Add user message to session first
+        const userMsgId = `msg-${Date.now()}`;
+        dispatch(addMessage({
+          sessionId: currentSession.id,
+          message: {
+            id: userMsgId,
+            type: 'user',
+            content: prompt,
+            timestamp: Date.now(),
+          },
+        }));
+
         const history = (currentSession.messages || [])
           .filter(m => m.type === 'user' || m.type === 'assistant')
           .map(m => ({ role: m.type as 'user' | 'assistant', content: m.content || '' }));
@@ -418,20 +472,30 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         await apiService.chat(
           prompt,
           (chunk) => {
-            dispatch(addMessage({
-              sessionId: currentSession.id,
-              message: {
-                id: `msg-${Date.now()}-assistant`,
-                type: 'assistant',
+            if (!assistantMessageAdded) {
+              dispatch(addMessage({
+                sessionId: currentSession.id,
+                message: {
+                  id: assistantMsgId,
+                  type: 'assistant',
+                  content: chunk,
+                  timestamp: Date.now(),
+                },
+              }));
+              assistantMessageAdded = true;
+            } else {
+              dispatch(updateMessageContent({
+                sessionId: currentSession.id,
+                messageId: assistantMsgId,
                 content: chunk,
-                timestamp: Date.now(),
-              },
-            }));
+              }));
+            }
           },
           history,
         );
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
       } catch (error) {
+        dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
         dispatch(addMessage({
           sessionId: currentSession.id,
           message: {
@@ -649,6 +713,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           onToggleSidebar={onToggleSidebar}
           onNewChat={onNewChat}
           updateBadge={updateBadge}
+          workMode={workMode}
         />
       </div>
     );
@@ -694,7 +759,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 onSubmit={handleStartSession}
                 onStop={handleStopSession}
                 isStreaming={isStreaming}
-                disabled={!isEngineReady}
+                disabled={workMode === 'chat' ? false : !isEngineReady}
                 placeholder={workMode === 'chat' ? i18nService.t('chatPlaceholder') : i18nService.t('coworkPlaceholder')}
                 size="large"
                 workingDirectory={currentAgentWorkingDirectory}
