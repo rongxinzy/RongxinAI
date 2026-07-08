@@ -1,11 +1,10 @@
 import { Button } from '@shared/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@shared/components/ui/dropdown-menu';
-import { Bot, Ellipsis, Pencil, Pin, Trash2 } from 'lucide-react';
+import { Ellipsis, Folder, Pencil, Pin, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import { getAgentDisplayName, isDefaultAgentId, shouldUseDefaultAgentIcon } from '../../utils/agentDisplay';
-import AgentAvatarIcon from '../agent/AgentAvatarIcon';
+import { getAgentDisplayName, isDefaultAgentId } from '../../utils/agentDisplay';
 import AgentConfirmDialog from '../agent/AgentConfirmDialog';
 import { AgentConfirmDialogVariant } from '../agent/constants';
 import AgentTaskRow from './AgentTaskRow';
@@ -36,12 +35,11 @@ interface AgentTreeNodeProps {
 
 const AGENT_TASKS_TRANSITION_MS = 200;
 
-const AgentAvatar: React.FC<{ agent: AgentSidebarAgentNode }> = ({ agent }) => {
-  if (shouldUseDefaultAgentIcon(agent)) return <Bot className="h-4 w-4" />;
-  return (
-    <AgentAvatarIcon value={agent.icon} className="h-4 w-4" iconClassName="h-4 w-4"
-      fallbackText={getAgentDisplayName(agent).trim().slice(0, 1).toUpperCase() || 'A'} />
-  );
+const ProjectIcon: React.FC = () => {
+  // All projects use the Folder icon from lucide-react.
+  // The agent.icon field is preserved in the data model but no longer
+  // rendered in the sidebar — we show a unified Folder icon for all projects.
+  return <Folder className="size-4" />;
 };
 
 const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
@@ -95,7 +93,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
           onClick={() => onToggleExpanded(agent.id)}
           role="treeitem" aria-level={1} aria-expanded={agent.isExpanded}
         >
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center"><AgentAvatar agent={agent} /></span>
+          <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground"><ProjectIcon /></span>
           <span className="min-w-0 flex-1 truncate opacity-[0.76]">{agentName}</span>
         </Button>
 
@@ -150,7 +148,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
                 <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
               )}
               {!agent.isLoadingTasks && !agent.hasLoadError && agent.tasks.length === 0 && (
-                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-foreground opacity-[0.28]">{i18nService.t('myAgentSidebarNoTasks')}</div>
+                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('myAgentSidebarNoTasks')}</div>
               )}
               {agent.tasks.map((task) => (
                 <AgentTaskRow key={task.id} task={task} isBatchMode={isBatchMode} isSelected={selectedIds.has(task.id)}

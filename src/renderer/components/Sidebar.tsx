@@ -21,6 +21,7 @@ import type { CoworkSessionSummary } from '../types/cowork';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import Modal from './common/Modal';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
+import CoworkSessionList from './cowork/CoworkSessionList';
 import LoginButton from './LoginButton';
 
 interface SidebarProps {
@@ -127,6 +128,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     onShowCowork();
     await coworkService.loadSession(session.id);
   };
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    await coworkService.deleteSession(sessionId);
+  }, []);
+
+  const handleToggleSessionPin = useCallback(async (sessionId: string, pinned: boolean) => {
+    await coworkService.setSessionPinned(sessionId, pinned);
+  }, []);
+
+  const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
+    await coworkService.renameSession(sessionId, title);
+  }, []);
 
   const handleEnterBatchMode = useCallback((sessionId: string) => {
     setIsBatchMode(true);
@@ -403,15 +416,35 @@ const Sidebar: React.FC<SidebarProps> = ({
           className="scrollbar-hidden h-full overflow-y-auto px-2.5 pb-10"
           onScroll={handleAgentScroll}
         >
-          <MyAgentSidebarTree
-            isBatchMode={isBatchMode}
-            selectedIds={selectedIds}
-            onShowCowork={onShowCowork}
-            onToggleSelection={handleToggleSelection}
-            onEnterBatchMode={handleEnterBatchMode}
-            onVisibleSessionsChange={handleVisibleSessionsChange}
-            workMode={workMode}
-          />
+          {workMode !== 'chat' ? (
+            <MyAgentSidebarTree
+              isBatchMode={isBatchMode}
+              selectedIds={selectedIds}
+              onShowCowork={onShowCowork}
+              onToggleSelection={handleToggleSelection}
+              onEnterBatchMode={handleEnterBatchMode}
+              onVisibleSessionsChange={handleVisibleSessionsChange}
+              workMode={workMode}
+            />
+          ) : (
+            <CoworkSessionList
+              sessions={sessions}
+              currentSessionId={currentSessionId}
+              isBatchMode={isBatchMode}
+              selectedIds={selectedIds}
+              emptyLabel={i18nService.t('chatNoSessions')}
+              emptyHint={i18nService.t('chatNoSessionsHint')}
+              onSelectSession={(sessionId) => {
+                const session = allSessions.find(s => s.id === sessionId);
+                if (session) void handleSelectSession(session);
+              }}
+              onDeleteSession={handleDeleteSession}
+              onTogglePin={handleToggleSessionPin}
+              onRenameSession={handleRenameSession}
+              onToggleSelection={handleToggleSelection}
+              onEnterBatchMode={handleEnterBatchMode}
+            />
+          )}
         </div>
         <div
           className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
