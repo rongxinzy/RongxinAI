@@ -240,6 +240,13 @@ select::-ms-expand {
   animation: scale-in 0.2s ease-out;
 }
 
+/* Command palette InputGroup — suppress blue focus ring from InputGroup base class */
+[data-slot="command-input-group"]:has([data-slot="input-group-control"]:focus-visible) {
+  --tw-ring-shadow: 0 0 #0000;
+  box-shadow: 0 0 #0000;
+  border-color: var(--lobster-input-border);
+}
+
 /* Popover entrance */
 .popover-enter {
   animation: fade-in-down 0.2s ease-out;
