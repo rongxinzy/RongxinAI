@@ -1,6 +1,8 @@
 import { DefaultAgentAvatarIcon } from '@shared/agent/avatar';
 import { Button } from '@shared/components/ui/button';
+import { DialogFooter, DialogHeader } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { Textarea } from '@shared/components/ui/textarea';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
@@ -349,102 +351,101 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
 
   const content = (
     <>
-      <div className="flex shrink-0 items-start justify-between gap-4 px-7 py-5">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <AgentAvatarPicker value={icon} onChange={setIcon} />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={i18nService.t('agentNamePlaceholder')}
-              aria-label={i18nService.t('agentName')}
-              className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0"
-              autoFocus
-            />
-            <Input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={i18nService.t('agentDescriptionPlaceholder')}
-              aria-label={i18nService.t('agentDescription')}
-              className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
-            />
+      <DialogHeader className="shrink-0 px-7 py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <AgentAvatarPicker value={icon} onChange={setIcon} />
+            <div className="min-w-0 flex-1 pt-0.5">
+              <Input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={i18nService.t('agentNamePlaceholder')}
+                aria-label={i18nService.t('agentName')}
+                className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0"
+                autoFocus
+              />
+              <Input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={i18nService.t('agentDescriptionPlaceholder')}
+                aria-label={i18nService.t('agentDescription')}
+                className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
+              />
+            </div>
+          </div>
+          <div className="mt-1 flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowTemplatePicker(true)}
+              className="h-8 px-3 text-sm font-medium"
+            >
+              {i18nService.t('agentUseTemplate')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+            >
+              <X className="h-5 w-5 text-muted-foreground" />
+            </Button>
           </div>
         </div>
-        <div className="mt-1 flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowTemplatePicker(true)}
-            className="h-8 px-3 text-sm font-medium"
-          >
-            {i18nService.t('agentUseTemplate')}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-          >
-            <X className="h-5 w-5 text-muted-foreground" />
-          </Button>
-        </div>
-      </div>
+      </DialogHeader>
 
       {/* Tab bar */}
-      <div className="flex shrink-0 border-b border-border px-7">
-        {tabs.map((tab) => (
-          <Button
-            key={tab.key}
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab(tab.key)}
-            className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-            {activeTab === tab.key && (
-              <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-foreground rounded-full" />
-            )}
-          </Button>
-        ))}
-      </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as AgentDetailTab)}
+        className="flex flex-col flex-1 min-h-0"
+      >
+        <TabsList variant="line" className="shrink-0 w-full justify-start gap-0 rounded-none border-b border-border px-7">
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.key} value={tab.key}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* Tab content */}
-      <div className="px-7 py-7 overflow-hidden flex-1 min-h-0">
-        {activeTab === AgentDetailTab.Prompt && renderTextEditor(
-          systemPrompt,
-          setSystemPrompt,
-          i18nService.t('coworkBootstrapPlaceholder'),
-          i18nService.t('coworkBootstrapSoulTitle'),
-          i18nService.t('coworkBootstrapSoulHint'),
-        )}
+        {/* Tab content */}
+        <TabsContent value={AgentDetailTab.Prompt} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+          {renderTextEditor(
+            systemPrompt,
+            setSystemPrompt,
+            i18nService.t('coworkBootstrapPlaceholder'),
+            i18nService.t('coworkBootstrapSoulTitle'),
+            i18nService.t('coworkBootstrapSoulHint'),
+          )}
+        </TabsContent>
 
-        {activeTab === AgentDetailTab.Identity && renderTextEditor(
-          identity,
-          setIdentity,
-          i18nService.t('coworkBootstrapPlaceholder'),
-          i18nService.t('coworkBootstrapIdentityTitle'),
-          i18nService.t('coworkBootstrapIdentityHint'),
-        )}
+        <TabsContent value={AgentDetailTab.Identity} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+          {renderTextEditor(
+            identity,
+            setIdentity,
+            i18nService.t('coworkBootstrapPlaceholder'),
+            i18nService.t('coworkBootstrapIdentityTitle'),
+            i18nService.t('coworkBootstrapIdentityHint'),
+          )}
+        </TabsContent>
 
-        {activeTab === AgentDetailTab.User && renderTextEditor(
-          userInfo,
-          setUserInfo,
-          i18nService.t('coworkBootstrapPlaceholder'),
-          i18nService.t('coworkBootstrapUserTitle'),
-          i18nService.t('coworkBootstrapUserHint'),
-        )}
+        <TabsContent value={AgentDetailTab.User} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+          {renderTextEditor(
+            userInfo,
+            setUserInfo,
+            i18nService.t('coworkBootstrapPlaceholder'),
+            i18nService.t('coworkBootstrapUserTitle'),
+            i18nService.t('coworkBootstrapUserHint'),
+          )}
+        </TabsContent>
 
-        {activeTab === AgentDetailTab.Skills && (
+        <TabsContent value={AgentDetailTab.Skills} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
           <AgentSkillSelector selectedSkillIds={skillIds} onChange={setSkillIds} />
-        )}
+        </TabsContent>
 
-        {activeTab === AgentDetailTab.Im && (
+        <TabsContent value={AgentDetailTab.Im} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
           <div className="h-full overflow-y-auto">
             <div className="space-y-1">
               {PlatformRegistry.platforms
@@ -580,11 +581,11 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                 })}
             </div>
           </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Footer */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-t border-border">
+      <DialogFooter className="shrink-0 mx-0 mb-0 flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-border rounded-none bg-transparent">
         <AgentDetailToolbar
           model={model}
           onModelChange={setModel}
@@ -601,14 +602,14 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
             {creating ? i18nService.t('creating') : i18nService.t('create')}
           </Button>
         </div>
-      </div>
+      </DialogFooter>
     </>
   );
 
   return (
     <>
       {presentation === 'page' ? (
-        <div className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-surface shadow-sm">
+        <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-surface shadow-sm">
           {content}
         </div>
       ) : (
@@ -616,7 +617,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           isOpen={isOpen}
           onClose={handleClose}
           overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-          className="w-[calc(100vw-56px)] max-w-[854px] h-[82vh] max-h-[664px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface border border-border/80 flex flex-col overflow-hidden"
+          className="w-[calc(100vw-56px)] !max-w-[854px] h-[88vh] max-h-[720px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface ring-0 p-0 gap-0 flex flex-col overflow-hidden"
         >
           {content}
         </Modal>

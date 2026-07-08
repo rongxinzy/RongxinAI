@@ -89,7 +89,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
       <div className={`group sticky top-10 ${menuOpen ? 'z-50' : 'z-20'} -ml-[6px] h-7 w-[calc(100%+12px)] bg-surface-raised`}>
         <Button
           variant="ghost"
-          className="flex h-full w-full items-center justify-start text-left gap-2 rounded-md py-0 pl-1.5 pr-12 text-[14px] font-normal text-foreground"
+          className="flex h-full w-full items-center justify-start text-left gap-2 rounded-md py-0 pl-3 pr-12 text-[14px] font-normal text-foreground"
           onClick={() => onToggleExpanded(agent.id)}
           role="treeitem" aria-level={1} aria-expanded={agent.isExpanded}
         >

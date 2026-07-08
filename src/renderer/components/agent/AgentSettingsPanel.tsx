@@ -557,7 +557,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       <Modal
         onClose={handleClose}
         overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-        className="w-[calc(100vw-56px)] max-w-[854px] h-[82vh] max-h-[664px] flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
+        className="w-[calc(100vw-56px)] !max-w-[854px] h-[88vh] max-h-[720px] flex flex-col overflow-hidden rounded-xl bg-background shadow-2xl p-0 gap-0 ring-0"
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
           <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -612,7 +612,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         </div>
 
         {/* Tab content */}
-        <div className="px-4 py-3 overflow-hidden flex-1 min-h-0">
+        <div className="px-4 py-3 overflow-y-auto flex-1 min-h-0">
           {activeTab === AgentDetailTab.Prompt && renderTextEditor(
             systemPrompt,
             setSystemPrompt,
