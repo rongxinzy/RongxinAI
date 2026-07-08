@@ -182,7 +182,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
     if (!name.trim()) return;
 
     // 禁止使用保留名称
-    const reservedNames = ['主 Agent', 'Primary Agent'];
+    const reservedNames = ['主项目', 'Primary Project'];
     if (reservedNames.includes(name.trim())) {
       window.dispatchEvent(new CustomEvent('app:showToast', {
         detail: { message: i18nService.t('agentNameReserved'), autoClose: false },
