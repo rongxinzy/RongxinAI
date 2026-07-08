@@ -73,12 +73,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
   const currentSession = useSelector(selectCurrentSession);
 
-  // Clear session when workMode changes and current session mode doesn't match
+  // Clear session when workMode changes and current session mode doesn't match.
+  // Sessions without an explicit mode field (legacy) are treated as work mode.
   const prevWorkModeRef = useRef(workMode);
   useEffect(() => {
     if (prevWorkModeRef.current !== workMode) {
       prevWorkModeRef.current = workMode;
-      if (currentSession?.mode && currentSession.mode !== workMode) {
+      const sessionMode = currentSession?.mode || 'work';
+      if (sessionMode !== workMode) {
         dispatch(clearCurrentSession());
       }
     }
