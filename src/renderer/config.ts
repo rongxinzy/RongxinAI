@@ -34,6 +34,8 @@ export interface AppConfig {
     isDevelopment: boolean;
 
   };
+  // 工作模式 ('work' | 'chat')
+  workMode?: 'work' | 'chat';
   // 快捷键配置
   shortcuts?: {
     newChat: string;
@@ -78,6 +80,7 @@ export const defaultConfig: AppConfig = {
   providers: buildDefaultProviders(),
   theme: 'system',
   language: 'zh',
+  workMode: 'work',
   useSystemProxy: false,
   sqliteAutoBackupEnabled: false,
   app: {

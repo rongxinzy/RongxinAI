@@ -643,6 +643,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // 快捷键
     keyboardShortcuts: '键盘快捷键',
     shortcutNotSet: '未设置',
+    workMode: '工作',
+    chatMode: '对话',
     newChat: '新建任务',
     search: '搜索任务',
     openSettings: '打开设置',
@@ -2765,6 +2767,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Shortcuts
     keyboardShortcuts: 'Keyboard Shortcuts',
     shortcutNotSet: 'Not set',
+    workMode: 'Work',
+    chatMode: 'Chat',
     newChat: 'New Task',
     search: 'Search Tasks',
     openSettings: 'Open Settings',

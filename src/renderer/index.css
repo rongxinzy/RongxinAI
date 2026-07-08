@@ -323,3 +323,51 @@ select::-ms-expand {
 [data-slot="switch-thumb"][data-checked] {
   transform: translateX(calc(100% - 2px));
 }
+
+/* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
+[data-mode="work-chat"][data-slot="switch"] {
+  width: 100% !important;
+  height: 28px !important;
+}
+/* Work/Chat toggle — track color token (darker than sidebar bg-surface-raised #F0F1F4) */
+:root {
+  --work-chat-track-bg: #E5E7EB;
+}
+.dark {
+  --work-chat-track-bg: #2D3039;
+}
+
+/* Track: bordered to distinguish from sidebar bg, relative for absolute thumb */
+[data-mode="work-chat"][data-slot="switch"][data-unchecked],
+[data-mode="work-chat"][data-slot="switch"][data-checked] {
+  background-color: var(--work-chat-track-bg) !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.10) !important;
+  border-color: var(--lobster-border) !important;
+  position: relative !important;
+}
+/* Track: allow thumb overflow */
+[data-mode="work-chat"][data-slot="switch"] {
+  overflow: visible !important;
+}
+/* Thumb: glass, centered at 25%/75%, crosses track center */
+[data-mode="work-chat"] [data-slot="switch-thumb"] {
+  width: calc(50% + 12px) !important;
+  height: calc(100% + 8px) !important;
+  border-radius: 9999px !important;
+  background: color-mix(in srgb, var(--lobster-background) 22%, transparent) !important;
+  box-shadow:
+    0 4px 14px rgba(0,0,0,0.16),
+    0 1px 3px rgba(0,0,0,0.06) !important;
+  position: absolute !important;
+  transition: left 200ms ease !important;
+}
+[data-mode="work-chat"] [data-slot="switch-thumb"][data-unchecked] {
+  left: -6px;
+  top: -4px;
+  transform: none;
+}
+[data-mode="work-chat"] [data-slot="switch-thumb"][data-checked] {
+  left: calc(50% - 6px);
+  top: -4px;
+  transform: none;
+}
