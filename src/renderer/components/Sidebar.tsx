@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   hideLogin,
 }) => {
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
-  const sessions = useSelector(selectCoworkSessions);
+  const allSessions = useSelector(selectCoworkSessions);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -82,6 +82,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     setWorkMode(mode);
     void configService.updateConfig({ workMode: mode });
   }, []);
+
+  // Filter sessions by workMode — chat sessions only visible in chat mode
+  const sessions = React.useMemo(() =>
+    workMode === 'chat'
+      ? allSessions.filter(s => s.mode === 'chat')
+      : allSessions.filter(s => s.mode !== 'chat'),
+  [allSessions, workMode]);
+
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
@@ -319,19 +327,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             <Pencil className={sidebarCreateIconClassName} />
             {i18nService.t('newChat')}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setIsSearchOpen(false);
-              onShowLocalInference();
-            }}
-            className={activeView === 'localInference' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-            aria-current={activeView === 'localInference' ? 'page' : undefined}
-          >
-            <Cpu className="h-4 w-4 shrink-0" />
-            {i18nService.t('localInferenceTitle')}
-          </Button>
+          {workMode !== 'chat' && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setIsSearchOpen(false);
+                onShowLocalInference();
+              }}
+              className={activeView === 'localInference' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
+              aria-current={activeView === 'localInference' ? 'page' : undefined}
+            >
+              <Cpu className="h-4 w-4 shrink-0" />
+              {i18nService.t('localInferenceTitle')}
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -344,19 +354,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             <Search className="h-4 w-4 shrink-0" />
             {i18nService.t('search')}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setIsSearchOpen(false);
-              onShowScheduledTasks();
-            }}
-            className={activeView === 'scheduledTasks' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-            aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
-          >
-            <Clock className="h-4 w-4 shrink-0" />
-            {i18nService.t('scheduledTasks')}
-          </Button>
+          {workMode !== 'chat' && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setIsSearchOpen(false);
+                onShowScheduledTasks();
+              }}
+              className={activeView === 'scheduledTasks' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
+              aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
+            >
+              <Clock className="h-4 w-4 shrink-0" />
+              {i18nService.t('scheduledTasks')}
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -398,6 +410,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onToggleSelection={handleToggleSelection}
             onEnterBatchMode={handleEnterBatchMode}
             onVisibleSessionsChange={handleVisibleSessionsChange}
+            workMode={workMode}
           />
         </div>
         <div

@@ -76,6 +76,8 @@ export interface CoworkSession {
   title: string;
   claudeSessionId: string | null;
   status: CoworkSessionStatus;
+  /** Session mode: 'work' (PI/OpenClaw) or 'chat' (direct LLM via apiService) */
+  mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
   cwd: string;
@@ -207,6 +209,7 @@ export interface CoworkSessionSummary {
   id: string;
   title: string;
   status: CoworkSessionStatus;
+  mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
   agentId?: string;

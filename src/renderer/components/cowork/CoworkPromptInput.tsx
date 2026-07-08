@@ -52,6 +52,9 @@ type CoworkAttachment = DraftAttachment;
 // returning a new [] on every call (when draftAttachments[draftKey] is undefined).
 const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
 
+/** Skills available in Chat mode (no local filesystem access) */
+const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx']);
+
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.ico', '.avif']);
 
 const isImagePath = (filePath: string): boolean => {
@@ -250,7 +253,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
   useEffect(() => {
     const loadSkills = async () => {
       const loadedSkills = await skillService.loadSkills();
-      dispatch(setSkills(loadedSkills));
+      const workMode = configService.getConfig().workMode ?? 'work';
+      dispatch(setSkills(
+        workMode === 'chat'
+          ? loadedSkills.filter(s => CHAT_SKILL_IDS.has(s.id))
+          : loadedSkills
+      ));
     };
     loadSkills();
   }, [dispatch]);
@@ -258,7 +266,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
   useEffect(() => {
     const unsubscribe = skillService.onSkillsChanged(async () => {
       const loadedSkills = await skillService.loadSkills();
-      dispatch(setSkills(loadedSkills));
+      const workMode = configService.getConfig().workMode ?? 'work';
+      dispatch(setSkills(
+        workMode === 'chat'
+          ? loadedSkills.filter(s => CHAT_SKILL_IDS.has(s.id))
+          : loadedSkills
+      ));
     });
     return () => {
       unsubscribe();

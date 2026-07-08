@@ -223,7 +223,7 @@ function ModelCard({
         {!isRunning ? (
           <CardAction className="flex items-center gap-2">
             <DropdownMenu>
-              <DropdownMenuTrigger>
+              <DropdownMenuTrigger render={
                 <Button
                   type="button"
                   variant="ghost"
@@ -233,7 +233,7 @@ function ModelCard({
                 >
                   <Ellipsis />
                 </Button>
-              </DropdownMenuTrigger>
+              } />
               <DropdownMenuContent align="end" className="min-w-[112px]">
                 <DropdownMenuItem disabled={buttonsDisabled} onClick={onConfigureContext}>
                   {i18nService.t('localInferenceConfigureContext')}
