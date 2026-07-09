@@ -52,6 +52,8 @@ export type CoworkStartOptions = {
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
   modelOverride?: string;
+  /** Previous conversation to restore (user/assistant pairs), injected into PI session state */
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 };
 
 export type CoworkContinueOptions = {
