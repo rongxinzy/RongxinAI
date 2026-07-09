@@ -925,6 +925,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                             <CommandItem
                               key={m.id}
                               value={m.name}
+                              className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                               onSelect={() => {
                                 handleModelSelect(m);
                                 setModelSelectorOpen(false);

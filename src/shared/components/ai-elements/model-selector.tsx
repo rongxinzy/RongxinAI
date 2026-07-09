@@ -46,6 +46,7 @@ export const ModelSelectorContent = ({
       "outline! border-none! p-0 outline-border! outline-solid!",
       className
     )}
+    data-slot="model-selector-content"
     {...props}
   >
     <DialogTitle className="sr-only">{title}</DialogTitle>

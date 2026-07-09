@@ -247,6 +247,11 @@ select::-ms-expand {
   border-color: var(--lobster-input-border);
 }
 
+/* ModelSelector — hide dialog overlay so list appears as a dropdown */
+[data-slot="dialog-portal"]:has([data-slot="model-selector-content"]) [data-slot="dialog-overlay"] {
+  display: none;
+}
+
 /* Popover entrance */
 .popover-enter {
   animation: fade-in-down 0.2s ease-out;

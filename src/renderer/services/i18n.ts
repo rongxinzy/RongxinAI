@@ -825,7 +825,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // 模型选择
     selectModel: '选择模型',
     searchModels: '搜索模型...',
-    serverModels: '服务商模型',
+    serverModels: '可选模型',
 
     // 错误提示
     errorOccurred: '发生错误',
@@ -2965,7 +2965,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Model Selection
     selectModel: 'Select model',
     searchModels: 'Search models...',
-    serverModels: 'Server Models',
+    serverModels: 'Available models',
 
     // Error Messages
     errorOccurred: 'An error occurred',
