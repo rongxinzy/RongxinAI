@@ -404,7 +404,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={sidebarNavItemClassName}
           >
             <Search className="h-4 w-4 shrink-0" />
-            {i18nService.t('search')}
+            {i18nService.t(workMode === 'chat' ? 'searchChats' : 'search')}
           </Button>
           {workMode !== 'chat' && (
             <Button
@@ -483,7 +483,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 [&_[role=treeitem]]:!pl-3">
                   {chatTaskNodes.map((task) => (
                     <AgentTaskRow
                   key={task.id}

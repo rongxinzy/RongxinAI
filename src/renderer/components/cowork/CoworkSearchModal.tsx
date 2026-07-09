@@ -66,12 +66,34 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
     setIsLoading(true);
     void coworkService.listSessionsForSearch(SEARCH_SESSION_LIMIT, 0)
       .then((result) => {
-        if (cancelled || !result.success || !result.sessions) return;
-        setSearchSessions(result.sessions);
+        if (cancelled) return;
+        const backendSessions = result?.success ? result.sessions ?? [] : [];
+        // Chat sessions live in localStorage, not the backend. Merge them in.
+        if (workMode === 'chat') {
+          try {
+            const stored = localStorage.getItem('chat_sessions');
+            if (stored) {
+              const chatSessions: CoworkSessionSummary[] = JSON.parse(stored)
+                .map((s: CoworkSessionSummary) => ({
+                  ...s,
+                  pinned: s.pinned ?? false,
+                  pinOrder: s.pinOrder ?? null,
+                  agentId: s.agentId ?? 'main',
+                  mode: s.mode ?? 'chat',
+                }));
+              // Dedup: localStorage sessions replace backend ones with same ID
+              const backendIds = new Set(backendSessions.map((s: CoworkSessionSummary) => s.id));
+              const uniqueChat = chatSessions.filter((s: CoworkSessionSummary) => !backendIds.has(s.id));
+              setSearchSessions([...uniqueChat, ...backendSessions]);
+              return;
+            }
+          } catch { /* fall through to backend-only results */ }
+        }
+        setSearchSessions(backendSessions);
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [isOpen]);
+  }, [isOpen, workMode]);
 
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     await onSelectSession(session);
@@ -82,25 +104,25 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
     <CommandDialog
       open={isOpen}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title={i18nService.t('searchConversations')}
-      description={i18nService.t('searchRecentTasks')}
-      className="ring-0"
+      title={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
+      description={i18nService.t(workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks')}
+      className="ring-0 bg-background"
     >
-      <Command shouldFilter={false}>
+      <Command shouldFilter={false} className="bg-background">
         <CommandInput
           value={searchQuery}
           onValueChange={setSearchQuery}
-          placeholder={i18nService.t('searchConversations')}
+          placeholder={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
         />
-        <CommandList>
+        <CommandList className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-2">
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
               <Spinner />
             </div>
           ) : filteredSessions.length === 0 ? (
-            <CommandEmpty>{i18nService.t('searchNoResults')}</CommandEmpty>
+            <CommandEmpty>{i18nService.t(workMode === 'chat' ? 'searchChatNoResults' : 'searchNoResults')}</CommandEmpty>
           ) : (
-            <CommandGroup heading={i18nService.t('searchRecentTasks')}>
+            <CommandGroup heading={i18nService.t(workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks')}>
               {filteredSessions.map((session) => {
                 const isRunning = session.status === CoworkSessionStatusValue.Running;
                 const agentName = agentNameBySessionId.get(session.id) ?? getSessionAgentId(session);
@@ -109,10 +131,11 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                     key={session.id}
                     value={session.title}
                     onSelect={() => void handleSelectSession(session)}
+                    className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                   >
                     {isRunning && <Spinner />}
-                    <span className="flex-1 truncate">{session.title}</span>
-                    <span className="text-xs text-muted-foreground">{agentName}</span>
+                    <span className="min-w-0 flex-1 truncate">{session.title}</span>
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{agentName}</span>
                   </CommandItem>
                 );
               })}

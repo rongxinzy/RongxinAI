@@ -11,7 +11,7 @@ import {
 } from "@shared/components/ui/input-group"
 import { cn } from "@shared/lib/utils"
 import { Command as CommandPrimitive } from "cmdk"
-import { CheckIcon,SearchIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import * as React from "react"
 
 function Command({
@@ -69,7 +69,7 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-transparent shadow-none! *:data-[slot=input-group-addon]:pl-2!" data-slot="command-input-group">
+      <InputGroup className="h-8! rounded-lg! border-input/30 bg-surface-raised shadow-none! *:data-[slot=input-group-addon]:pl-2!" data-slot="command-input-group">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
@@ -159,7 +159,6 @@ function CommandItem({
       {...props}
     >
       {children}
-      <CheckIcon className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
     </CommandPrimitive.Item>
   )
 }
