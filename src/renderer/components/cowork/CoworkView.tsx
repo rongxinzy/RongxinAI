@@ -16,7 +16,7 @@ import {
   selectCurrentSession,
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
-import { addMessage, clearCurrentSession, setCurrentSession, setStreaming, updateMessageContent, updateSessionStatus } from '../../store/slices/coworkSlice';
+import { addMessage, addSession, clearCurrentSession, setCurrentSession, setStreaming, updateMessageContent, updateSessionStatus } from '../../store/slices/coworkSlice';
 import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
@@ -26,7 +26,6 @@ import { PromptPanel,QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
-import AIChatView from './AIChatView';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionDetail from './CoworkSessionDetail';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
@@ -299,6 +298,112 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
       // Clear quick action selection after starting session
       dispatch(clearSelection());
+
+      // Chat mode: direct LLM via apiService, skip PI/OpenClaw
+      if (workMode === 'chat') {
+        const assistantMsgId = `msg-${now}-assistant`;
+        const thinkingMsgId = `msg-${now}-thinking`;
+        let assistantContent = '';
+        let thinkingContent = '';
+        let assistantMessageAdded = false;
+        let thinkingMessageAdded = false;
+        try {
+          await apiService.chat(
+            prompt,
+            (content, reasoning) => {
+              // Update thinking/reasoning content
+              if (reasoning) {
+                thinkingContent = reasoning;
+                if (!thinkingMessageAdded) {
+                  dispatch(addMessage({
+                    sessionId: tempSessionId,
+                    message: {
+                      id: thinkingMsgId,
+                      type: 'assistant',
+                      content: reasoning,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                    },
+                  }));
+                  thinkingMessageAdded = true;
+                } else {
+                  dispatch(updateMessageContent({
+                    sessionId: tempSessionId,
+                    messageId: thinkingMsgId,
+                    content: reasoning,
+                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                  }));
+                }
+              }
+              // Update answer content
+              if (content) {
+                assistantContent = content;
+                if (!assistantMessageAdded) {
+                  dispatch(addMessage({
+                    sessionId: tempSessionId,
+                    message: {
+                      id: assistantMsgId,
+                      type: 'assistant',
+                      content: content,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false },
+                    },
+                  }));
+                  assistantMessageAdded = true;
+                } else {
+                  dispatch(updateMessageContent({
+                    sessionId: tempSessionId,
+                    messageId: assistantMsgId,
+                    content: content,
+                    metadata: { isStreaming: true, isFinal: false },
+                  }));
+                }
+              }
+            },
+            [],
+          );
+          if (isPendingStartCancelled()) {
+            dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'idle' }));
+            dispatch(setStreaming(false));
+            return;
+          }
+          // Build the final session with complete messages (user + thinking + assistant)
+          // so that addSession does not overwrite currentSession with stale data.
+          const finalMessages = [
+            { id: `msg-${now}`, type: 'user' as const, content: prompt, timestamp: now },
+            ...(thinkingContent ? [{ id: thinkingMsgId, type: 'assistant' as const, content: thinkingContent, timestamp: Date.now(), metadata: { isStreaming: false, isFinal: true, isThinking: true } }] : []),
+            ...(assistantContent ? [{ id: assistantMsgId, type: 'assistant' as const, content: assistantContent, timestamp: Date.now(), metadata: { isStreaming: false, isFinal: true } }] : []),
+          ];
+          const savedSession: CoworkSession = {
+            ...tempSession,
+            status: 'completed' as const,
+            updatedAt: Date.now(),
+            messages: finalMessages,
+            totalMessages: finalMessages.length,
+          };
+          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
+          dispatch(addSession(savedSession));
+          // Persist chat session to SQLite via IPC
+          coworkService.saveChatSession(savedSession).catch(err =>
+            console.error('[CoworkView] Failed to persist chat session:', err)
+          );
+        } catch (error) {
+          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
+          dispatch(addMessage({
+            sessionId: tempSessionId,
+            message: {
+              id: `error-${Date.now()}`,
+              type: 'system',
+              content: i18nService.t('chatErrorMessage').replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
+              timestamp: Date.now(),
+            },
+          }));
+        } finally {
+          dispatch(setStreaming(false));
+          isStartingRef.current = false;
+        }
+        return;
+      }
 
       // Work mode: use coworkService (PI/OpenClaw engines)
       // Combine skill prompt with system prompt.
@@ -659,15 +764,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     );
   }
 
-  // Chat mode home — AI SDK-driven
-  if (workMode === 'chat') {
-    return (
-      <div className="flex-1 flex flex-col bg-background h-full">
-        <AIChatView />
-      </div>
-    );
-  }
-
   // Home view - no current session
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
@@ -708,14 +804,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 onSubmit={handleStartSession}
                 onStop={handleStopSession}
                 isStreaming={isStreaming}
-                disabled={!isEngineReady}
-                placeholder={i18nService.t('coworkPlaceholder')}
+                disabled={workMode === 'chat' ? false : !isEngineReady}
+                placeholder={workMode === 'chat' ? i18nService.t('chatPlaceholder') : i18nService.t('coworkPlaceholder')}
                 size="large"
                 workingDirectory={currentAgentWorkingDirectory}
                 onWorkingDirectoryChange={async (dir: string) => {
                   await agentService.updateAgent(currentAgentId, { workingDirectory: dir });
                 }}
-                showFolderSelector
+                showFolderSelector={workMode !== 'chat'}
                 onManageSkills={() => onShowSkills?.()}
               />
             </div>
