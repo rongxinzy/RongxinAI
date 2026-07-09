@@ -1,3 +1,4 @@
+import { ModelSelectorLogo, ModelSelectorName } from '@shared/components/ai-elements/model-selector';
 import {
   PromptInput,
   PromptInputBody,
@@ -10,6 +11,8 @@ import {
   usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { cn } from '@shared/lib/utils';
 import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
@@ -36,7 +39,6 @@ import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getCompactFolderName } from '../../utils/path';
-import ModelSelector from '../ModelSelector';
 import { ActiveSkillBadge,SkillsButton } from '../skills';
 import { resolveAgentModelSelection, resolveEffectiveModel, useAgentSelectedModel } from './agentModelSelection';
 import AttachmentCard from './AttachmentCard';
@@ -179,6 +181,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const [isAddingFile, setIsAddingFile] = useState(false);
     const [imageVisionHint, setImageVisionHint] = useState(false);
     const [isPatchingModel, setIsPatchingModel] = useState(false);
+    const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const dragDepthRef = useRef(0);
@@ -223,10 +226,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     agentId: currentAgentId,
     syncDefaultModel: currentAgentId === 'main' || currentAgent?.isDefault === true,
   });
+
   const {
     selectedModel: agentSelectedModel,
     hasInvalidExplicitModel: agentModelIsInvalid,
-    invalidExplicitModelRef,
     hasUnavailableLlamaCppModel,
   } = resolveAgentModelSelection({
     sessionModel: currentSession && currentSession.id === sessionId ? currentSession.modelOverride : '',
@@ -235,6 +238,35 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     fallbackModel: currentAgentSelectedModel,
     engine: coworkAgentEngine,
   });
+
+  const handleModelSelect = useCallback(async (nextModel: Model) => {
+    if (isPatchingModel || isPersistingAgentModel) return;
+    const modelRef = toOpenClawModelRef(nextModel);
+    if (sessionId) {
+      const reqId = modelPatchRequestIdRef.current + 1;
+      modelPatchRequestIdRef.current = reqId;
+      const prev = currentSession?.id === sessionId ? currentSession.modelOverride : '';
+      setIsPatchingModel(true);
+      dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
+      try {
+        const ok = await coworkService.patchSession(sessionId, { model: modelRef });
+        if (reqId !== modelPatchRequestIdRef.current) return;
+        if (!ok) {
+          dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));
+          window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkModelSwitchFailed') }));
+        } else if (currentAgent && agentModelIsInvalid) {
+          void agentService.updateAgent(currentAgent.id, { model: modelRef });
+        }
+      } catch {
+        if (reqId === modelPatchRequestIdRef.current)
+          dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));
+      } finally {
+        if (reqId === modelPatchRequestIdRef.current) setIsPatchingModel(false);
+      }
+      return;
+    }
+    await persistAgentModelSelection(nextModel);
+  }, [isPatchingModel, isPersistingAgentModel, sessionId, currentSession, dispatch, currentAgent, agentModelIsInvalid, persistAgentModelSelection]);
 
   const isLarge = size === 'large';
   const minHeight = isLarge ? 60 : 24;
@@ -799,8 +831,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     void handleIncomingFiles(files);
   }, [disabled, handleIncomingFiles, isStreaming]);
 
-  const invalidModelLabel = invalidExplicitModelRef?.split('/').pop() || invalidExplicitModelRef || '';
-
   const [currentSendShortcut, setCurrentSendShortcut] = useState(
     () => configService.getConfig().shortcuts?.sendMessage ?? 'Enter'
   );
@@ -868,79 +898,54 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <PromptInputFooter>
             <PromptInputTools>
               {showModelSelector && (
-                <div className="flex flex-col items-start gap-1">
-                  <ModelSelector
-                    dropdownDirection="up"
-                    disabled={isPatchingModel || isPersistingAgentModel}
-                    value={(agentModelIsInvalid && invalidExplicitModelRef)
-                      ? { id: '__invalid__', name: invalidModelLabel } as Model
-                      : agentSelectedModel}
-                    onChange={async (nextModel) => {
-                      if (isPatchingModel || isPersistingAgentModel) return;
-                      if (!nextModel) return;
-                      const modelRef = toOpenClawModelRef(nextModel);
-                      if (sessionId) {
-                        const requestId = modelPatchRequestIdRef.current + 1;
-                        modelPatchRequestIdRef.current = requestId;
-                        const previousModelOverride = currentSession?.id === sessionId
-                          ? currentSession.modelOverride
-                          : '';
-
-                        setIsPatchingModel(true);
-                        dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
-
-                        try {
-                          const patchedSession = await coworkService.patchSession(sessionId, { model: modelRef });
-                          if (requestId !== modelPatchRequestIdRef.current) return;
-
-                          if (!patchedSession) {
-                            dispatch(updateCurrentSessionModelOverride({
-                              sessionId,
-                              modelOverride: previousModelOverride,
-                            }));
-                            window.dispatchEvent(new CustomEvent('app:showToast', {
-                              detail: i18nService.t('coworkModelSwitchFailed'),
-                            }));
-                            return;
-                          }
-
-                          if (currentAgent && agentModelIsInvalid) {
-                            void agentService.updateAgent(currentAgent.id, { model: modelRef });
-                          }
-                        } catch {
-                          if (requestId === modelPatchRequestIdRef.current) {
-                            dispatch(updateCurrentSessionModelOverride({
-                              sessionId,
-                              modelOverride: previousModelOverride,
-                            }));
-                            window.dispatchEvent(new CustomEvent('app:showToast', {
-                              detail: i18nService.t('coworkModelSwitchFailed'),
-                            }));
-                          }
-                        } finally {
-                          if (requestId === modelPatchRequestIdRef.current) {
-                            setIsPatchingModel(false);
-                          }
-                        }
-                        return;
-                      }
-                      await persistAgentModelSelection(nextModel);
-                    }}
-                  />
-                  {agentModelIsInvalid && (
-                    <span className="max-w-60 text-[11px] leading-4 text-red-500">
-                      {hasUnavailableLlamaCppModel
-                        ? i18nService.t('agentLlamaCppModelNotRunningHint')
-                        : i18nService.t('agentModelInvalidHint')}
+                <Popover open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
+                  <PopoverTrigger>
+                    <span className="inline-flex items-center gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] max-w-[200px] [&_span]:flex-none cursor-pointer">
+                      {agentSelectedModel ? (
+                        <>
+                          <ModelSelectorLogo provider={effectiveSelectedModel?.providerKey || effectiveSelectedModel?.provider || 'openai'} />
+                          <ModelSelectorName>{agentSelectedModel.name}</ModelSelectorName>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
+                      )}
                     </span>
-                  )}
-                </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-72 p-0 bg-background border ring-0 !rounded-md"
+                    side="top"
+                    align="start"
+                    sideOffset={4}
+                  >
+                    <Command className="bg-background !rounded-md [&_[data-slot=input-group]]:bg-transparent [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:px-2">
+                      <CommandInput placeholder={i18nService.t('searchModels')} />
+                      <CommandList>
+                        <CommandGroup heading={i18nService.t('serverModels')}>
+                          {availableModels.map(m => (
+                            <CommandItem
+                              key={m.id}
+                              value={m.name}
+                              className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                              onSelect={() => {
+                                handleModelSelect(m);
+                                setModelSelectorOpen(false);
+                              }}
+                            >
+                              <ModelSelectorLogo provider={m.providerKey || m.provider || 'openai'} />
+                              <ModelSelectorName>{m.name}</ModelSelectorName>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
               {showFolderSelector && (
                 <>
                   <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
                     <PromptInputButton
-                      className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                      className={`gap-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
                     >
                       <Folder className="h-4 w-4 flex-shrink-0" />
                       <span className="max-w-[150px] truncate text-xs">
@@ -969,7 +974,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 </>
               )}
               {!remoteManaged && (
-                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile}>
+                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile} className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
                   <Paperclip className="h-4 w-4" />
                 </PromptInputButton>
               )}
