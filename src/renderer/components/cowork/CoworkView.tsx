@@ -302,30 +302,62 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       // Chat mode: direct LLM via apiService, skip PI/OpenClaw
       if (workMode === 'chat') {
         const assistantMsgId = `msg-${now}-assistant`;
+        const thinkingMsgId = `msg-${now}-thinking`;
         let assistantContent = '';
+        let thinkingContent = '';
         let assistantMessageAdded = false;
+        let thinkingMessageAdded = false;
         try {
           await apiService.chat(
             prompt,
-            (chunk) => {
-              assistantContent = chunk;  // chunk is accumulated full content
-              if (!assistantMessageAdded) {
-                dispatch(addMessage({
-                  sessionId: tempSessionId,
-                  message: {
-                    id: assistantMsgId,
-                    type: 'assistant',
-                    content: chunk,
-                    timestamp: Date.now(),
-                  },
-                }));
-                assistantMessageAdded = true;
-              } else {
-                dispatch(updateMessageContent({
-                  sessionId: tempSessionId,
-                  messageId: assistantMsgId,
-                  content: chunk,
-                }));
+            (content, reasoning) => {
+              // Update thinking/reasoning content
+              if (reasoning) {
+                thinkingContent = reasoning;
+                if (!thinkingMessageAdded) {
+                  dispatch(addMessage({
+                    sessionId: tempSessionId,
+                    message: {
+                      id: thinkingMsgId,
+                      type: 'assistant',
+                      content: reasoning,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                    },
+                  }));
+                  thinkingMessageAdded = true;
+                } else {
+                  dispatch(updateMessageContent({
+                    sessionId: tempSessionId,
+                    messageId: thinkingMsgId,
+                    content: reasoning,
+                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                  }));
+                }
+              }
+              // Update answer content
+              if (content) {
+                assistantContent = content;
+                if (!assistantMessageAdded) {
+                  dispatch(addMessage({
+                    sessionId: tempSessionId,
+                    message: {
+                      id: assistantMsgId,
+                      type: 'assistant',
+                      content: content,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false },
+                    },
+                  }));
+                  assistantMessageAdded = true;
+                } else {
+                  dispatch(updateMessageContent({
+                    sessionId: tempSessionId,
+                    messageId: assistantMsgId,
+                    content: content,
+                    metadata: { isStreaming: true, isFinal: false },
+                  }));
+                }
               }
             },
             [],
@@ -335,11 +367,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             dispatch(setStreaming(false));
             return;
           }
-          // Build the final session with complete messages (user + assistant)
+          // Build the final session with complete messages (user + thinking + assistant)
           // so that addSession does not overwrite currentSession with stale data.
           const finalMessages = [
             { id: `msg-${now}`, type: 'user' as const, content: prompt, timestamp: now },
-            ...(assistantContent ? [{ id: assistantMsgId, type: 'assistant' as const, content: assistantContent, timestamp: Date.now() }] : []),
+            ...(thinkingContent ? [{ id: thinkingMsgId, type: 'assistant' as const, content: thinkingContent, timestamp: Date.now(), metadata: { isStreaming: false, isFinal: true, isThinking: true } }] : []),
+            ...(assistantContent ? [{ id: assistantMsgId, type: 'assistant' as const, content: assistantContent, timestamp: Date.now(), metadata: { isStreaming: false, isFinal: true } }] : []),
           ];
           const savedSession: CoworkSession = {
             ...tempSession,
@@ -434,7 +467,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     if (workMode === 'chat') {
       isContinuingRef.current = true;
       const assistantMsgId = `msg-${Date.now()}-assistant`;
+      const thinkingMsgId = `msg-${Date.now()}-thinking`;
       let assistantMessageAdded = false;
+      let thinkingMessageAdded = false;
       try {
         // Add user message to session first
         const userMsgId = `msg-${Date.now()}`;
@@ -455,24 +490,50 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         dispatch(setStreaming(true));
         await apiService.chat(
           prompt,
-          (chunk) => {
-            if (!assistantMessageAdded) {
-              dispatch(addMessage({
-                sessionId: currentSession.id,
-                message: {
-                  id: assistantMsgId,
-                  type: 'assistant',
-                  content: chunk,
-                  timestamp: Date.now(),
-                },
-              }));
-              assistantMessageAdded = true;
-            } else {
-              dispatch(updateMessageContent({
-                sessionId: currentSession.id,
-                messageId: assistantMsgId,
-                content: chunk,
-              }));
+          (content, reasoning) => {
+            if (reasoning) {
+              if (!thinkingMessageAdded) {
+                dispatch(addMessage({
+                  sessionId: currentSession.id,
+                  message: {
+                    id: thinkingMsgId,
+                    type: 'assistant',
+                    content: reasoning,
+                    timestamp: Date.now(),
+                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                  },
+                }));
+                thinkingMessageAdded = true;
+              } else {
+                dispatch(updateMessageContent({
+                  sessionId: currentSession.id,
+                  messageId: thinkingMsgId,
+                  content: reasoning,
+                  metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                }));
+              }
+            }
+            if (content) {
+              if (!assistantMessageAdded) {
+                dispatch(addMessage({
+                  sessionId: currentSession.id,
+                  message: {
+                    id: assistantMsgId,
+                    type: 'assistant',
+                    content: content,
+                    timestamp: Date.now(),
+                    metadata: { isStreaming: true, isFinal: false },
+                  },
+                }));
+                assistantMessageAdded = true;
+              } else {
+                dispatch(updateMessageContent({
+                  sessionId: currentSession.id,
+                  messageId: assistantMsgId,
+                  content: content,
+                  metadata: { isStreaming: true, isFinal: false },
+                }));
+              }
             }
           },
           history,
