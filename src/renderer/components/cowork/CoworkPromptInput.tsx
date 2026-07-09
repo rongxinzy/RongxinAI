@@ -1,14 +1,6 @@
-import {
-  ModelSelector,
-  ModelSelectorContent,
-  ModelSelectorGroup,
-  ModelSelectorInput,
-  ModelSelectorItem,
-  ModelSelectorList,
-  ModelSelectorLogo,
-  ModelSelectorName,
-  ModelSelectorTrigger,
-} from '@shared/components/ai-elements/model-selector';
+import { ModelSelectorLogo, ModelSelectorName } from '@shared/components/ai-elements/model-selector';
+import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
 import {
   PromptInput,
   PromptInputBody,
@@ -906,37 +898,47 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <PromptInputFooter>
             <PromptInputTools>
               {showModelSelector && (
-                <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
-                  <ModelSelectorTrigger className="gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] max-w-[200px] [&_span]:flex-none">
-                    {agentSelectedModel ? (
-                      <>
-                        <ModelSelectorLogo provider={effectiveSelectedModel?.providerKey || effectiveSelectedModel?.provider || 'openai'} />
-                        <ModelSelectorName>{agentSelectedModel.name}</ModelSelectorName>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">Select model</span>
-                    )}
-                  </ModelSelectorTrigger>
-                  <ModelSelectorContent>
-                    <ModelSelectorInput placeholder="Search models..." />
-                    <ModelSelectorList>
-                      <ModelSelectorGroup heading="Server Models">
-                        {availableModels.filter(m => m.isServerModel).map(m => (
-                          <ModelSelectorItem
-                            key={m.id}
-                            onSelect={() => {
-                              handleModelSelect(m);
-                              setModelSelectorOpen(false);
-                            }}
-                          >
-                            <ModelSelectorLogo provider={m.providerKey || m.provider || 'openai'} />
-                            <ModelSelectorName>{m.name}</ModelSelectorName>
-                          </ModelSelectorItem>
-                        ))}
-                      </ModelSelectorGroup>
-                    </ModelSelectorList>
-                  </ModelSelectorContent>
-                </ModelSelector>
+                <Popover open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
+                  <PopoverTrigger>
+                    <span className="inline-flex items-center gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] max-w-[200px] [&_span]:flex-none cursor-pointer">
+                      {agentSelectedModel ? (
+                        <>
+                          <ModelSelectorLogo provider={effectiveSelectedModel?.providerKey || effectiveSelectedModel?.provider || 'openai'} />
+                          <ModelSelectorName>{agentSelectedModel.name}</ModelSelectorName>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
+                      )}
+                    </span>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-72 p-0 bg-background border ring-0 rounded-md"
+                    side="top"
+                    align="start"
+                    sideOffset={4}
+                  >
+                    <Command className="bg-background [&_[data-slot=input-group]]:bg-transparent">
+                      <CommandInput placeholder={i18nService.t('searchModels')} />
+                      <CommandList>
+                        <CommandGroup heading={i18nService.t('serverModels')}>
+                          {availableModels.filter(m => m.isServerModel).map(m => (
+                            <CommandItem
+                              key={m.id}
+                              value={m.name}
+                              onSelect={() => {
+                                handleModelSelect(m);
+                                setModelSelectorOpen(false);
+                              }}
+                            >
+                              <ModelSelectorLogo provider={m.providerKey || m.provider || 'openai'} />
+                              <ModelSelectorName>{m.name}</ModelSelectorName>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
               {showFolderSelector && (
                 <>

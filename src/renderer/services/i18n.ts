@@ -824,6 +824,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // 模型选择
     selectModel: '选择模型',
+    searchModels: '搜索模型...',
+    serverModels: '服务商模型',
 
     // 错误提示
     errorOccurred: '发生错误',
@@ -2961,7 +2963,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imageInputNotSupported: 'Current model does not support images',
 
     // Model Selection
-    selectModel: 'Select Model',
+    selectModel: 'Select model',
+    searchModels: 'Search models...',
+    serverModels: 'Server Models',
 
     // Error Messages
     errorOccurred: 'An error occurred',
