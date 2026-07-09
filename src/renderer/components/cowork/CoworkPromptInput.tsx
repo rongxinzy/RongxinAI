@@ -1,6 +1,4 @@
 import { ModelSelectorLogo, ModelSelectorName } from '@shared/components/ai-elements/model-selector';
-import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
 import {
   PromptInput,
   PromptInputBody,
@@ -13,6 +11,8 @@ import {
   usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { cn } from '@shared/lib/utils';
 import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
