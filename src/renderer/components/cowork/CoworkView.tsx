@@ -21,14 +21,12 @@ import { clearSelection,selectAction, setActions } from '../../store/slices/quic
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
-import ModelSelector from '../ModelSelector';
 import { PromptPanel,QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionDetail from './CoworkSessionDetail';
-import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -96,13 +94,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const currentAgentWorkingDirectory = currentAgent?.workingDirectory?.trim() || config.workingDirectory || '';
 
   const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
-  const {
-    isPersistingAgentModel,
-    persistAgentModelSelection,
-  } = usePersistAgentModelSelection({
-    agentId: currentAgentId,
-    syncDefaultModel: currentAgentId === 'main' || currentAgent?.isDefault === true,
-  });
 
   const buildApiConfigNotice = (error?: string): { noticeI18nKey: string; noticeExtra?: string } => {
     const key = 'coworkModelSettingsRequired';
@@ -693,14 +684,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             {updateBadge}
           </div>
         )}
-        <ModelSelector
-          disabled={isPersistingAgentModel}
-          value={currentAgentSelectedModel}
-          onChange={async (nextModel) => {
-            if (!nextModel) return;
-            await persistAgentModelSelection(nextModel);
-          }}
-        />
       </div>
       <div className="non-draggable flex items-center">
         <div className="flex items-center gap-1.5 mr-2 px-2.5 py-1">
@@ -804,6 +787,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                   await agentService.updateAgent(currentAgentId, { workingDirectory: dir });
                 }}
                 showFolderSelector={workMode !== 'chat'}
+                showModelSelector
                 onManageSkills={() => onShowSkills?.()}
               />
             </div>
