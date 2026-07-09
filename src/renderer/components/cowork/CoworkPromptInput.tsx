@@ -907,7 +907,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             <PromptInputTools>
               {showModelSelector && (
                 <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
-                  <ModelSelectorTrigger className="gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                  <ModelSelectorTrigger className="gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] max-w-[200px] [&_span]:flex-none">
                     {agentSelectedModel ? (
                       <>
                         <ModelSelectorLogo provider={effectiveSelectedModel?.providerKey || effectiveSelectedModel?.provider || 'openai'} />
