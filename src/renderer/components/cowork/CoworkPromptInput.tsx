@@ -912,16 +912,16 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     </span>
                   </PopoverTrigger>
                   <PopoverContent
-                    className="w-72 p-0 bg-background border ring-0 rounded-md"
+                    className="w-72 p-0 bg-background border ring-0 !rounded-md"
                     side="top"
                     align="start"
                     sideOffset={4}
                   >
-                    <Command className="bg-background [&_[data-slot=input-group]]:bg-transparent">
+                    <Command className="bg-background !rounded-md [&_[data-slot=input-group]]:bg-transparent [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:px-2">
                       <CommandInput placeholder={i18nService.t('searchModels')} />
                       <CommandList>
                         <CommandGroup heading={i18nService.t('serverModels')}>
-                          {availableModels.filter(m => m.isServerModel).map(m => (
+                          {availableModels.map(m => (
                             <CommandItem
                               key={m.id}
                               value={m.name}
