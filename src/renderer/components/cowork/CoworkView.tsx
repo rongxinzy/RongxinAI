@@ -5,7 +5,7 @@ import { useDispatch,useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { agentService } from '../../services/agent';
-import { apiService } from '../../services/api';
+import { ChatChatTransport } from '../../services/chatChatTransport';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -308,60 +308,54 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
         try {
-          await apiService.chat(
-            prompt,
-            (content, reasoning) => {
-              // Update thinking/reasoning content
-              if (reasoning) {
-                thinkingContent = reasoning;
-                if (!thinkingMessageAdded) {
-                  dispatch(addMessage({
-                    sessionId: tempSessionId,
-                    message: {
-                      id: thinkingMsgId,
-                      type: 'assistant',
-                      content: reasoning,
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                    },
-                  }));
-                  thinkingMessageAdded = true;
-                } else {
-                  dispatch(updateMessageContent({
-                    sessionId: tempSessionId,
-                    messageId: thinkingMsgId,
-                    content: reasoning,
-                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                  }));
-                }
-              }
-              // Update answer content
-              if (content) {
-                assistantContent = content;
+          const transport = new ChatChatTransport();
+          const stream = await transport.sendMessages({
+            trigger: 'submit-message',
+            chatId: tempSessionId,
+            messageId: undefined,
+            messages: [{ id: `msg-${now}`, role: 'user', parts: [{ type: 'text', text: prompt }] }],
+            abortSignal: undefined,
+          });
+          const reader = stream.getReader();
+          while (true) {
+            const { done, value: chunk } = await reader.read();
+            if (done || isPendingStartCancelled()) break;
+            if (!chunk) continue;
+            switch (chunk.type) {
+              case 'text-start':
                 if (!assistantMessageAdded) {
-                  dispatch(addMessage({
-                    sessionId: tempSessionId,
-                    message: {
-                      id: assistantMsgId,
-                      type: 'assistant',
-                      content: content,
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false },
-                    },
-                  }));
+                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: assistantMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
+                  assistantMessageAdded = true;
+                }
+                break;
+              case 'text-delta':
+                assistantContent += chunk.delta;
+                if (!assistantMessageAdded) {
+                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: assistantMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
                   assistantMessageAdded = true;
                 } else {
-                  dispatch(updateMessageContent({
-                    sessionId: tempSessionId,
-                    messageId: assistantMsgId,
-                    content: content,
-                    metadata: { isStreaming: true, isFinal: false },
-                  }));
+                  dispatch(updateMessageContent({ sessionId: tempSessionId, messageId: assistantMsgId, content: assistantContent, metadata: { isStreaming: true, isFinal: false } }));
                 }
-              }
-            },
-            [],
-          );
+                break;
+              case 'reasoning-start':
+                if (!thinkingMessageAdded) {
+                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: thinkingMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                  thinkingMessageAdded = true;
+                }
+                break;
+              case 'reasoning-delta':
+                thinkingContent += chunk.delta;
+                if (!thinkingMessageAdded) {
+                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: thinkingMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                  thinkingMessageAdded = true;
+                } else {
+                  dispatch(updateMessageContent({ sessionId: tempSessionId, messageId: thinkingMsgId, content: thinkingContent, metadata: { isStreaming: true, isFinal: false, isThinking: true } }));
+                }
+                break;
+              case 'error':
+                throw new Error(chunk.errorText);
+            }
+          }
           if (isPendingStartCancelled()) {
             dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'idle' }));
             dispatch(setStreaming(false));
@@ -483,61 +477,59 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           },
         }));
 
-        const history = (currentSession.messages || [])
-          .filter(m => m.type === 'user' || m.type === 'assistant')
-          .map(m => ({ role: m.type as 'user' | 'assistant', content: m.content || '' }));
-
         dispatch(setStreaming(true));
-        await apiService.chat(
-          prompt,
-          (content, reasoning) => {
-            if (reasoning) {
-              if (!thinkingMessageAdded) {
-                dispatch(addMessage({
-                  sessionId: currentSession.id,
-                  message: {
-                    id: thinkingMsgId,
-                    type: 'assistant',
-                    content: reasoning,
-                    timestamp: Date.now(),
-                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                  },
-                }));
-                thinkingMessageAdded = true;
-              } else {
-                dispatch(updateMessageContent({
-                  sessionId: currentSession.id,
-                  messageId: thinkingMsgId,
-                  content: reasoning,
-                  metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                }));
-              }
-            }
-            if (content) {
+        const transport = new ChatChatTransport();
+        const stream = await transport.sendMessages({
+          trigger: 'submit-message',
+          chatId: currentSession.id,
+          messageId: undefined,
+          messages: (currentSession.messages || []).filter(m => m.type === 'user' || m.type === 'assistant').map(m => ({
+            id: m.id, role: m.type as 'user' | 'assistant', parts: [{ type: 'text' as const, text: m.content }],
+          })).concat({ id: userMsgId, role: 'user' as const, parts: [{ type: 'text' as const, text: prompt }] }),
+          abortSignal: undefined,
+        });
+        const reader = stream.getReader();
+        let assistantContent = '';
+        let thinkingContent = '';
+        while (true) {
+          const { done, value: chunk } = await reader.read();
+          if (done) break;
+          if (!chunk) continue;
+          switch (chunk.type) {
+            case 'text-start':
               if (!assistantMessageAdded) {
-                dispatch(addMessage({
-                  sessionId: currentSession.id,
-                  message: {
-                    id: assistantMsgId,
-                    type: 'assistant',
-                    content: content,
-                    timestamp: Date.now(),
-                    metadata: { isStreaming: true, isFinal: false },
-                  },
-                }));
+                dispatch(addMessage({ sessionId: currentSession.id, message: { id: assistantMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
+                assistantMessageAdded = true;
+              }
+              break;
+            case 'text-delta':
+              assistantContent += chunk.delta;
+              if (!assistantMessageAdded) {
+                dispatch(addMessage({ sessionId: currentSession.id, message: { id: assistantMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
                 assistantMessageAdded = true;
               } else {
-                dispatch(updateMessageContent({
-                  sessionId: currentSession.id,
-                  messageId: assistantMsgId,
-                  content: content,
-                  metadata: { isStreaming: true, isFinal: false },
-                }));
+                dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: assistantMsgId, content: assistantContent, metadata: { isStreaming: true, isFinal: false } }));
               }
-            }
-          },
-          history,
-        );
+              break;
+            case 'reasoning-start':
+              if (!thinkingMessageAdded) {
+                dispatch(addMessage({ sessionId: currentSession.id, message: { id: thinkingMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                thinkingMessageAdded = true;
+              }
+              break;
+            case 'reasoning-delta':
+              thinkingContent += chunk.delta;
+              if (!thinkingMessageAdded) {
+                dispatch(addMessage({ sessionId: currentSession.id, message: { id: thinkingMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                thinkingMessageAdded = true;
+              } else {
+                dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: thinkingMsgId, content: thinkingContent, metadata: { isStreaming: true, isFinal: false, isThinking: true } }));
+              }
+              break;
+            case 'error':
+              throw new Error(chunk.errorText);
+          }
+        }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
       } catch (error) {
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
