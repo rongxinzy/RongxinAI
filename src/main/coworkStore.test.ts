@@ -40,6 +40,7 @@ function setupDb(): void {
       title TEXT NOT NULL,
       claude_session_id TEXT,
       status TEXT NOT NULL DEFAULT 'idle',
+      mode TEXT NOT NULL DEFAULT 'work',
       pinned INTEGER NOT NULL DEFAULT 0,
       pin_order INTEGER,
       cwd TEXT NOT NULL,
@@ -116,8 +117,8 @@ function setupDb(): void {
 function insertSession(id: string): void {
   const now = Date.now();
   db.prepare(
-    `INSERT INTO cowork_sessions (id, title, claude_session_id, status, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, agent_id, created_at, updated_at)
-     VALUES (?, 'test', NULL, 'idle', 0, NULL, '/tmp', '', 'local', '[]', 'main', ?, ?)`,
+    `INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, agent_id, created_at, updated_at)
+     VALUES (?, 'test', NULL, 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', 'main', ?, ?)`,
   ).run(id, now, now);
 }
 
