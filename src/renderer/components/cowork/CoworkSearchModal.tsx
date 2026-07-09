@@ -93,7 +93,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [isOpen]);
+  }, [isOpen, workMode]);
 
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     await onSelectSession(session);
