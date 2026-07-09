@@ -281,6 +281,28 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
 
+      // Restore conversation history if provided (e.g. from continueSession fallback).
+      // The PI SDK has no public API for this — we inject directly into the
+      // internal agent state so the model sees the full conversation context.
+      const history = options.conversationHistory;
+      if (history && history.length > 0) {
+        try {
+          const agent = (session as unknown as Record<string, unknown>).agent as Record<string, unknown> | undefined;
+          const state = agent?.state as Record<string, unknown> | undefined;
+          if (state && Array.isArray(state.messages)) {
+            // Convert our simplified format to PI's internal message format.
+            // The PI SDK expects messages with `role` and `content` (string).
+            state.messages = history.map(m => ({
+              role: m.role,
+              content: m.content,
+              timestamp: Date.now(),
+            }));
+          }
+        } catch (e) {
+          console.warn('[PiRuntime] failed to restore conversation history:', e);
+        }
+      }
+
       const active: ActivePiSession = {
         sessionId,
         piSession: session,
@@ -325,8 +347,21 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   ): Promise<void> {
     const active = this.activeSessions.get(sessionId);
     if (!active) {
-      console.log(`[PiRuntime] continueSession: session ${sessionId} not active, falling back to startSession`);
-      return this.startSession(sessionId, prompt, options);
+      console.log(`[PiRuntime] continueSession: session ${sessionId} not active, restoring history from store`);
+      // Load previous messages from SQLite so the new PI session has full context.
+      const history = this.store?.getSession(sessionId)?.messages ?? [];
+      // Filter to user/assistant messages only, drop system/tool messages
+      const conversationHistory = history
+        .filter(m => m.type === 'user' || m.type === 'assistant')
+        .map(m => ({
+          role: m.type === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.content,
+        }));
+      // Start session with history restoration
+      return this.startSession(sessionId, prompt, {
+        ...options,
+        conversationHistory,
+      });
     }
 
     // Reset turn state
