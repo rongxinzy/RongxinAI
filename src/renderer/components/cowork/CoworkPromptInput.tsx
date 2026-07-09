@@ -867,38 +867,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         </PromptInputBody>
           <PromptInputFooter>
             <PromptInputTools>
-              {showFolderSelector && (
-                <>
-                  <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
-                    <PromptInputButton
-                      className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
-                    >
-                      <Folder className="h-4 w-4 flex-shrink-0" />
-                      <span className="max-w-[150px] truncate text-xs">
-                        {truncatePath(workingDirectory)}
-                      </span>
-                      {workingDirectory && (
-                        <span
-                          role="button"
-                          tabIndex={-1}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleFolderSelect('');
-                          }}
-                          className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                        >
-                          <X className="h-3 w-3" />
-                        </span>
-                      )}
-                    </PromptInputButton>
-                  </FolderSelectorPopover>
-                  {showFolderRequiredWarning && (
-                    <div className="absolute left-0 top-full mt-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
-                      {i18nService.t('coworkSelectFolderFirst')}
-                    </div>
-                  )}
-                </>
-              )}
               {showModelSelector && (
                 <div className="flex flex-col items-start gap-1">
                   <ModelSelector
@@ -967,6 +935,38 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     </span>
                   )}
                 </div>
+              )}
+              {showFolderSelector && (
+                <>
+                  <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
+                    <PromptInputButton
+                      className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                    >
+                      <Folder className="h-4 w-4 flex-shrink-0" />
+                      <span className="max-w-[150px] truncate text-xs">
+                        {truncatePath(workingDirectory)}
+                      </span>
+                      {workingDirectory && (
+                        <span
+                          role="button"
+                          tabIndex={-1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFolderSelect('');
+                          }}
+                          className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </span>
+                      )}
+                    </PromptInputButton>
+                  </FolderSelectorPopover>
+                  {showFolderRequiredWarning && (
+                    <div className="absolute left-0 top-full mt-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
+                      {i18nService.t('coworkSelectFolderFirst')}
+                    </div>
+                  )}
+                </>
               )}
               {!remoteManaged && (
                 <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile}>
