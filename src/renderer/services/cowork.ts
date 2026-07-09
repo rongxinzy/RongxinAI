@@ -34,6 +34,7 @@ import type {
   CoworkPermissionResult,
   CoworkSession,
   CoworkSessionListResult,
+  CoworkSessionResult,
   CoworkStartOptions,
   CoworkUserMemoryEntry,
   OpenClawEngineStatus,
@@ -415,6 +416,13 @@ class CoworkService {
 
     console.error('Failed to stop session:', result.error);
     return false;
+  }
+
+  async saveChatSession(session: CoworkSession): Promise<CoworkSessionResult> {
+    const cowork: Record<string, unknown> = window.electron?.cowork as unknown as Record<string, unknown> || {};
+    const saveSession = cowork.saveSession as ((s: Record<string, unknown>) => Promise<CoworkSessionResult>) | undefined;
+    if (!saveSession) return { success: false, error: 'saveSession API unavailable' };
+    return saveSession(session as unknown as Record<string, unknown>);
   }
 
   async deleteSession(sessionId: string): Promise<boolean> {

@@ -410,6 +410,7 @@ export interface CoworkSession {
   title: string;
   claudeSessionId: string | null;
   status: CoworkSessionStatus;
+  mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
   cwd: string;
@@ -431,6 +432,7 @@ export interface CoworkSessionSummary {
   id: string;
   title: string;
   status: CoworkSessionStatus;
+  mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
   agentId: string;
@@ -596,7 +598,8 @@ export class CoworkStore {
     executionMode: CoworkExecutionMode = 'local',
     activeSkillIds: string[] = [],
     agentId: string = 'main',
-    modelOverride: string = ''
+    modelOverride: string = '',
+    mode: 'work' | 'chat' = 'work',
   ): CoworkSession {
     const id = uuidv4();
     const now = Date.now();
@@ -604,13 +607,14 @@ export class CoworkStore {
     this.db
       .prepare(
         `
-      INSERT INTO cowork_sessions (id, title, claude_session_id, status, cwd, system_prompt, model_override, execution_mode, active_skill_ids, agent_id, pinned, created_at, updated_at)
-      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, 0, ?, ?)
+      INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, agent_id, pinned, created_at, updated_at)
+      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
     `,
       )
       .run(
         id,
         title,
+        mode,
         cwd,
         systemPrompt,
         modelOverride,
@@ -626,6 +630,7 @@ export class CoworkStore {
       title,
       claudeSessionId: null,
       status: 'idle',
+      mode,
       pinned: false,
       pinOrder: null,
       cwd,
@@ -648,6 +653,7 @@ export class CoworkStore {
       title: string;
       claude_session_id: string | null;
       status: string;
+      mode: string | null;
       pinned?: number | null;
       pin_order?: number | null;
       cwd: string;
@@ -662,7 +668,7 @@ export class CoworkStore {
 
     const row = this.getOne<SessionRow>(
       `
-      SELECT id, title, claude_session_id, status, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, agent_id, created_at, updated_at
+      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, agent_id, created_at, updated_at
       FROM cowork_sessions
       WHERE id = ?
     `,
@@ -693,6 +699,7 @@ export class CoworkStore {
       title: row.title,
       claudeSessionId: row.claude_session_id,
       status: row.status as CoworkSessionStatus,
+      mode: (row.mode as 'work' | 'chat') || 'work',
       pinned: Boolean(row.pinned),
       pinOrder: row.pin_order ?? null,
       cwd: row.cwd,
@@ -849,6 +856,7 @@ export class CoworkStore {
       id: string;
       title: string;
       status: string;
+      mode: string | null;
       pinned: number | null;
       pin_order: number | null;
       agent_id: string | null;
@@ -860,7 +868,7 @@ export class CoworkStore {
     if (agentId) {
       rows = this.getAll<SessionSummaryRow>(
         `
-        SELECT id, title, status, pinned, pin_order, agent_id, created_at, updated_at
+        SELECT id, title, status, mode, pinned, pin_order, agent_id, created_at, updated_at
         FROM cowork_sessions
         WHERE agent_id = ?
         ORDER BY pinned DESC,
@@ -874,7 +882,7 @@ export class CoworkStore {
     } else {
       rows = this.getAll<SessionSummaryRow>(
         `
-        SELECT id, title, status, pinned, pin_order, agent_id, created_at, updated_at
+        SELECT id, title, status, mode, pinned, pin_order, agent_id, created_at, updated_at
         FROM cowork_sessions
         ORDER BY pinned DESC,
           CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
@@ -890,6 +898,7 @@ export class CoworkStore {
       id: row.id,
       title: row.title,
       status: row.status as CoworkSessionStatus,
+      mode: (row.mode as 'work' | 'chat') || 'work',
       pinned: Boolean(row.pinned),
       pinOrder: row.pin_order ?? null,
       agentId: row.agent_id || 'main',

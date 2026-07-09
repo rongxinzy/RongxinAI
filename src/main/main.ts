@@ -19,7 +19,7 @@ import { ProviderName } from '../shared/providers';
 import { AgentManager } from './agentManager';
 import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
-import { CoworkStore } from './coworkStore';
+import { type CoworkExecutionMode, type CoworkMessageType, type CoworkSessionStatus,CoworkStore } from './coworkStore';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
 import {
@@ -3483,6 +3483,48 @@ if (!gotTheLock) {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to stop session',
       };
+    }
+  });
+
+  ipcMain.handle('cowork:session:save', async (_event, session: {
+    id: string; title: string; status: string; mode: 'work' | 'chat';
+    cwd: string; systemPrompt: string; modelOverride: string;
+    executionMode: string; activeSkillIds: string[]; agentId: string;
+    messages: Array<{ id: string; type: string; content: string; timestamp: number; metadata?: Record<string, unknown> }>;
+  }) => {
+    try {
+      const existing = coworkStore.getSession(session.id);
+      if (existing) {
+        // Session already exists in DB, just update status
+        coworkStore.updateSession(session.id, { status: session.status as CoworkSessionStatus });
+        return { success: true, session: existing };
+      }
+      // Create new session in SQLite
+      const newSession = coworkStore.createSession(
+        session.title,
+        session.cwd,
+        session.systemPrompt || '',
+        (session.executionMode as CoworkExecutionMode) || 'local',
+        session.activeSkillIds || [],
+        session.agentId || 'main',
+        session.modelOverride || '',
+        session.mode || 'work',
+      );
+      // Save messages
+      for (const msg of session.messages || []) {
+        coworkStore.addMessage(newSession.id, {
+          type: msg.type as CoworkMessageType,
+          content: msg.content,
+          metadata: msg.metadata,
+        });
+      }
+      // Update status
+      coworkStore.updateSession(newSession.id, { status: session.status as CoworkSessionStatus });
+      const saved = coworkStore.getSession(newSession.id);
+      return { success: true, session: saved };
+    } catch (error) {
+      console.error('[Cowork] Failed to save session:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   });
 

@@ -278,6 +278,12 @@ export class SqliteStore {
         );
         this.didRunMigration = true;
       }
+      if (!sessionColNames.includes('mode')) {
+        this.db.exec(
+          "ALTER TABLE cowork_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'work';",
+        );
+        this.didRunMigration = true;
+      }
     } catch {
       // Column already exists or migration not needed.
     }

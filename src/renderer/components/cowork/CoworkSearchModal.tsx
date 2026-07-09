@@ -67,29 +67,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
     void coworkService.listSessionsForSearch(SEARCH_SESSION_LIMIT, 0)
       .then((result) => {
         if (cancelled) return;
-        const backendSessions = result?.success ? result.sessions ?? [] : [];
-        // Chat sessions live in localStorage, not the backend. Merge them in.
-        if (workMode === 'chat') {
-          try {
-            const stored = localStorage.getItem('chat_sessions');
-            if (stored) {
-              const chatSessions: CoworkSessionSummary[] = JSON.parse(stored)
-                .map((s: CoworkSessionSummary) => ({
-                  ...s,
-                  pinned: s.pinned ?? false,
-                  pinOrder: s.pinOrder ?? null,
-                  agentId: s.agentId ?? 'main',
-                  mode: s.mode ?? 'chat',
-                }));
-              // Dedup: localStorage sessions replace backend ones with same ID
-              const backendIds = new Set(backendSessions.map((s: CoworkSessionSummary) => s.id));
-              const uniqueChat = chatSessions.filter((s: CoworkSessionSummary) => !backendIds.has(s.id));
-              setSearchSessions([...uniqueChat, ...backendSessions]);
-              return;
-            }
-          } catch { /* fall through to backend-only results */ }
-        }
-        setSearchSessions(backendSessions);
+        setSearchSessions(result?.success ? result.sessions ?? [] : []);
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
@@ -135,7 +113,9 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                   >
                     {isRunning && <Spinner />}
                     <span className="min-w-0 flex-1 truncate">{session.title}</span>
-                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{agentName}</span>
+                    {workMode !== 'chat' && (
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{agentName}</span>
+                    )}
                   </CommandItem>
                 );
               })}

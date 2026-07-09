@@ -371,6 +371,8 @@ contextBridge.exposeInMainWorld('electron', {
 
     stopSession: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.Stop, sessionId),
+    saveSession: (session: Record<string, unknown>) =>
+      ipcRenderer.invoke(CoworkSessionIpc.Save, session),
     deleteSession: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.Delete, sessionId),
     deleteSessions: (sessionIds: string[]) =>
