@@ -907,7 +907,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             <PromptInputTools>
               {showModelSelector && (
                 <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
-                  <ModelSelectorTrigger className="gap-1.5 text-xs">
+                  <ModelSelectorTrigger className="gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
                     {agentSelectedModel ? (
                       <>
                         <ModelSelectorLogo provider={effectiveSelectedModel?.providerKey || effectiveSelectedModel?.provider || 'openai'} />
@@ -942,7 +942,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 <>
                   <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
                     <PromptInputButton
-                      className={`gap-1.5 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                      className={`gap-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
                     >
                       <Folder className="h-4 w-4 flex-shrink-0" />
                       <span className="max-w-[150px] truncate text-xs">
@@ -971,7 +971,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 </>
               )}
               {!remoteManaged && (
-                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile}>
+                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile} className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
                   <Paperclip className="h-4 w-4" />
                 </PromptInputButton>
               )}
