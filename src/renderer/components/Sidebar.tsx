@@ -6,7 +6,7 @@ import { cn } from '@shared/lib/utils';
 import { Cog, Cpu, TriangleAlert } from 'lucide-react';
 import { Briefcase, Clock, MessageCircle, PanelLeft, Pencil, Plug, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import { agentService } from '../services/agent';
 import { configService } from '../services/config';
@@ -18,8 +18,7 @@ import {
   selectCurrentSessionId,
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
-import { setCurrentSession } from '../store/slices/coworkSlice';
-import type { CoworkSession, CoworkSessionSummary } from '../types/cowork';
+import type { CoworkSessionSummary } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -67,7 +66,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   updateBadge,
   hideLogin,
 }) => {
-  const dispatch = useDispatch();
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const allSessions = useSelector(selectCoworkSessions);
   const currentSessionId = useSelector(selectCurrentSessionId);
@@ -134,29 +132,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     const agentId = session.agentId?.trim() || AgentId.Main;
-
-    // Chat sessions live in localStorage, not the SQLite backend.
-    // Load them directly instead of going through coworkService.
-    if (session.mode === 'chat') {
-      if (agentId !== currentAgentId) {
-        agentService.switchAgent(agentId);
-      }
-      onShowCowork();
-      try {
-        const stored = localStorage.getItem('chat_sessions');
-        if (stored) {
-          const chatSessions: CoworkSession[] = JSON.parse(stored);
-          const found = chatSessions.find(s => s.id === session.id);
-          if (found) {
-            dispatch(setCurrentSession(found));
-            return;
-          }
-        }
-      } catch { /* fall through to backend load */ }
-      // Fallback: try loading from backend anyway
-      await coworkService.loadSession(session.id);
-      return;
-    }
 
     if (agentId !== currentAgentId) {
       agentService.switchAgent(agentId);

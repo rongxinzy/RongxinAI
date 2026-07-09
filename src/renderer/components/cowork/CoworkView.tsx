@@ -68,9 +68,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     return () => window.removeEventListener('config-updated', handler);
   }, []);
 
-  // Chat sessions are loaded inside the init useEffect below, after
-  // coworkService.init() completes, to avoid loadSessions() overwriting them.
-
   const currentSession = useSelector(selectCurrentSession);
 
   // Clear session when workMode changes and current session mode doesn't match.
@@ -185,17 +182,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         console.error('Failed to check cowork API config:', error);
       }
       setIsInitialized(true);
-
-      // Load persisted chat sessions AFTER init completes so that
-      // loadSessions() has already populated the Redux sessions list.
-      // This prevents setSessions() from wiping out localStorage-only sessions.
-      try {
-        const stored = localStorage.getItem('chat_sessions');
-        if (stored) {
-          const chatSessions: CoworkSession[] = JSON.parse(stored);
-          chatSessions.forEach(s => { dispatch(addSession(s)); });
-        }
-      } catch { /* ignore */ }
     };
     init();
 
@@ -364,14 +350,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           };
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
           dispatch(addSession(savedSession));
-          // Persist chat session to localStorage
-          try {
-            const chatSessions = JSON.parse(localStorage.getItem('chat_sessions') || '[]');
-            const idx = chatSessions.findIndex((s: CoworkSession) => s.id === savedSession.id);
-            if (idx >= 0) chatSessions[idx] = savedSession;
-            else chatSessions.push(savedSession);
-            localStorage.setItem('chat_sessions', JSON.stringify(chatSessions));
-          } catch { /* ignore storage errors */ }
+          // Persist chat session to SQLite via IPC
+          coworkService.saveChatSession(savedSession).catch(err =>
+            console.error('[CoworkView] Failed to persist chat session:', err)
+          );
         } catch (error) {
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
           dispatch(addMessage({

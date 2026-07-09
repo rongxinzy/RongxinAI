@@ -557,6 +557,7 @@ interface IElectronAPI {
       engineStatus?: OpenClawEngineStatus;
     }>;
     stopSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    saveSession: (session: Record<string, unknown>) => Promise<CoworkSessionResult>;
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     deleteSessions: (sessionIds: string[]) => Promise<{ success: boolean; error?: string }>;
     setSessionPinned: (options: {
