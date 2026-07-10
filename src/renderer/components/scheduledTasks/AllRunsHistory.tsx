@@ -1,4 +1,14 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { Spinner } from '@shared/components/ui/spinner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@shared/components/ui/table';
 import { Clock, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -14,27 +24,18 @@ import { formatDateTime, formatDuration } from './utils';
 
 const STATUS_OPTIONS = ['success', 'error', 'skipped', 'running'] as const;
 
-const statusConfig: Record<string, { label: string; color: string; activeColor: string }> = {
-  success: {
-    label: 'scheduledTasksStatusSuccess',
-    color: 'text-green-600 dark:text-green-400',
-    activeColor: 'bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400',
-  },
-  error: {
-    label: 'scheduledTasksStatusError',
-    color: 'text-red-500',
-    activeColor: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400',
-  },
-  skipped: {
-    label: 'scheduledTasksStatusSkipped',
-    color: 'text-yellow-500',
-    activeColor: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400',
-  },
-  running: {
-    label: 'scheduledTasksStatusRunning',
-    color: 'text-blue-500',
-    activeColor: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
-  },
+const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  success: 'default',
+  error: 'destructive',
+  skipped: 'outline',
+  running: 'secondary',
+};
+
+const statusLabelKeys: Record<string, string> = {
+  success: 'scheduledTasksStatusSuccess',
+  error: 'scheduledTasksStatusError',
+  skipped: 'scheduledTasksStatusSkipped',
+  running: 'scheduledTasksStatusRunning',
 };
 
 function applyClientFilter(
@@ -108,31 +109,22 @@ const AllRunsHistory: React.FC = () => {
     <div>
       {/* Filter area */}
       <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-        {/* Status pills */}
         <div className="flex items-center gap-1.5">
           {STATUS_OPTIONS.map(s => {
-            const cfg = statusConfig[s];
             const isActive = filter.status === s;
             return (
-              <Button
+              <Badge
                 key={s}
-                type="button"
-                variant={isActive ? 'outline' : 'ghost'}
-                size="xs"
+                variant={isActive ? statusVariant[s] : 'ghost'}
+                className="cursor-pointer"
                 onClick={() => handleStatusToggle(s)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                  isActive
-                    ? cfg.activeColor
-                    : 'border-transparent text-muted-foreground hover:bg-surface-raised'
-                }`}
               >
-                {i18nService.t(cfg.label)}
-              </Button>
+                {i18nService.t(statusLabelKeys[s])}
+              </Badge>
             );
           })}
         </div>
 
-        {/* Date range */}
         <div className="flex items-center gap-1.5 ml-auto">
           <DateInput
             value={filter.startDate ?? ''}
@@ -140,7 +132,7 @@ const AllRunsHistory: React.FC = () => {
             onChange={v => handleFilterChange({ ...filter, startDate: v || undefined })}
             placeholder={i18nService.t('scheduledTasksFilterStartDate')}
           />
-          <span className="text-xs text-muted-foreground/50">–</span>
+          <span className="text-xs text-muted-foreground">–</span>
           <DateInput
             value={filter.endDate ?? ''}
             min={filter.startDate}
@@ -151,12 +143,12 @@ const AllRunsHistory: React.FC = () => {
             <Button
               type="button"
               variant="ghost"
-              size="icon-xs"
+              size="icon"
               onClick={handleClearFilter}
-              className="ml-1 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
+              className="size-6"
               title={i18nService.t('scheduledTasksFilterClear')}
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3" />
             </Button>
           )}
         </div>
@@ -165,7 +157,7 @@ const AllRunsHistory: React.FC = () => {
       {/* Empty state */}
       {isEmpty && (
         <div className="flex flex-col items-center justify-center py-16 px-6">
-          <Clock className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <Clock className="size-12 text-muted-foreground/40 mb-4" />
           <p className="text-sm font-medium text-muted-foreground">
             {hasActiveFilter
               ? i18nService.t('scheduledTasksFilterNoResults')
@@ -174,85 +166,64 @@ const AllRunsHistory: React.FC = () => {
         </div>
       )}
 
-      {/* Column headers */}
+      {/* Run rows */}
       {!isEmpty && (
-        <div className="grid grid-cols-[1fr_1fr_80px] items-center gap-3 px-4 py-2 border-b border-border-subtle">
-          <div className="text-xs font-medium text-muted-foreground">
-            {i18nService.t('scheduledTasksHistoryColTitle')}
-          </div>
-          <div className="text-xs font-medium text-muted-foreground">
-            {i18nService.t('scheduledTasksHistoryColTime')}
-          </div>
-          <div className="text-xs font-medium text-muted-foreground">
-            {i18nService.t('scheduledTasksHistoryColStatus')}
-          </div>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{i18nService.t('scheduledTasksHistoryColTitle')}</TableHead>
+              <TableHead>{i18nService.t('scheduledTasksHistoryColTime')}</TableHead>
+              <TableHead className="w-24">{i18nService.t('scheduledTasksHistoryColStatus')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayedRuns.map(run => {
+              const hasSession = run.sessionId || run.sessionKey;
+              const isClickable = hasSession || (run.status === 'error' && run.error);
+              return (
+                <TableRow
+                  key={run.id}
+                  className={isClickable ? 'cursor-pointer' : ''}
+                  onClick={() => handleRowClick(run)}
+                >
+                  <TableCell className="max-w-[240px] min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm text-foreground truncate">
+                        {run.taskName}
+                      </span>
+                      {run.status === 'running' && (
+                        <Spinner className="size-3 text-blue-500" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">
+                      {formatDateTime(new Date(run.startedAt))}
+                    </span>
+                    {run.durationMs !== null && (
+                      <span className="ml-1.5 text-xs text-muted-foreground/70">
+                        ({formatDuration(run.durationMs)})
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant[run.status] || 'outline'}>
+                      {i18nService.t(statusLabelKeys[run.status] || '')}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
 
-      {/* Run rows */}
-      {displayedRuns.map(run => {
-        const cfg = statusConfig[run.status] || { label: '', color: '' };
-        const hasSession = run.sessionId || run.sessionKey;
-        const isClickable = hasSession || (run.status === 'error' && run.error);
-        return (
-          <div
-            key={run.id}
-            className={`grid grid-cols-[1fr_1fr_80px] items-center gap-3 px-4 py-3 border-b border-border-subtle transition-colors ${
-              isClickable ? 'hover:bg-surface-raised/50 cursor-pointer' : ''
-            }`}
-            onClick={() => handleRowClick(run)}
-          >
-            {/* Task title */}
-            <div className="text-sm text-foreground truncate">
-              {run.taskName}
-              {run.status === 'running' && (
-                <svg
-                  className="inline-block w-3 h-3 ml-1.5 animate-spin text-blue-500"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    className="opacity-25"
-                  />
-                  <path
-                    d="M4 12a8 8 0 018-8"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    className="opacity-75"
-                  />
-                </svg>
-              )}
-            </div>
-
-            {/* Run time + duration */}
-            <div className="text-sm text-muted-foreground truncate">
-              {formatDateTime(new Date(run.startedAt))}
-              {run.durationMs !== null && (
-                <span className="ml-1.5 text-xs opacity-70">
-                  ({formatDuration(run.durationMs)})
-                </span>
-              )}
-            </div>
-
-            {/* Status */}
-            <div className={`text-sm font-medium ${cfg.color}`}>{i18nService.t(cfg.label)}</div>
-          </div>
-        );
-      })}
-
-      {/* Load more */}
       {allRunsHasMore && (
         <Button
           type="button"
           variant="ghost"
           onClick={handleLoadMore}
-          className="w-full py-3 text-sm text-primary hover:text-primary-hover transition-colors"
+          className="w-full py-3"
         >
           {i18nService.t('scheduledTasksLoadMore')}
         </Button>

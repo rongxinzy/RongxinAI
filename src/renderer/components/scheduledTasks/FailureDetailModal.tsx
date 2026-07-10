@@ -1,6 +1,12 @@
 import { Button } from '@shared/components/ui/button';
-import { X } from 'lucide-react';
-import React, { useEffect, useRef } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@shared/components/ui/dialog';
+import React from 'react';
 
 import { i18nService } from '../../services/i18n';
 
@@ -19,51 +25,21 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
   runTime,
   onClose,
 }) => {
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
-  };
-
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={handleOverlayClick}
-    >
-      <div className="bg-surface rounded-xl shadow-popover border border-border w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">
+            <DialogTitle>
               {i18nService.t('scheduledTasksFailureDetailTitle')}
-            </h3>
+            </DialogTitle>
             {taskName && (
               <p className="text-xs text-muted-foreground mt-0.5">{taskName}</p>
             )}
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+        </DialogHeader>
 
-        {/* Body */}
-        <div className="px-4 py-4 space-y-4 overflow-y-auto">
-          {/* Run time */}
+        <div className="flex flex-col gap-4">
           {runTime && (
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">
@@ -73,40 +49,36 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
             </div>
           )}
 
-          {/* Input command */}
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-1">
               {i18nService.t('scheduledTasksInputCommand')}
             </div>
-            <div className="text-sm text-foreground bg-surface-raised rounded-lg p-3 whitespace-pre-wrap break-words border border-border/50">
+            <div className="text-sm text-foreground bg-secondary rounded-lg p-3 whitespace-pre-wrap break-words border border-border">
               {inputCommand || '-'}
             </div>
           </div>
 
-          {/* Failure reason */}
           <div>
-            <div className="text-xs font-medium text-red-500 mb-1">
+            <div className="text-xs font-medium text-destructive mb-1">
               {i18nService.t('scheduledTasksFailureReason')}
             </div>
-            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded-lg p-3 whitespace-pre-wrap break-words border border-red-200 dark:border-red-800">
+            <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3 whitespace-pre-wrap break-words border border-destructive/20">
               {error || '-'}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-border flex justify-end">
+        <DialogFooter>
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-foreground bg-surface-raised hover:bg-surface-overlay rounded-md border border-border transition-colors"
           >
             {i18nService.t('close')}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
