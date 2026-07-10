@@ -3,7 +3,6 @@ import { Button } from '@shared/components/ui/button';
 import {
   Card,
   CardAction,
-  CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -317,6 +316,12 @@ function ModelCard({
           isRunning && 'bg-primary/70',
         )}
       />
+      {isRunning ? (
+        <span
+          aria-label={i18nService.t('localInferenceStatus_running')}
+          className="absolute right-3 top-3 size-2 rounded-full bg-[var(--lobster-success)] animate-pulse"
+        />
+      ) : null}
 
       <CardHeader className="gap-2 pb-0 pt-3">
         {!isRunning ? (
@@ -391,24 +396,6 @@ function ModelCard({
         </div>
       </CardHeader>
 
-      {loadingModel || unloading ? (
-        <CardContent className="flex flex-col gap-2.5 pt-2">
-          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5">
-            <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span>
-                {loadingModel
-                  ? i18nService.t('localInferenceLoadingHint')
-                  : i18nService.t('localInferenceUnloadingHint')}
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/10">
-              <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
-            </div>
-          </div>
-        </CardContent>
-      ) : null}
-
       <CardFooter className="border-t border-border/70 bg-muted/20 px-3 py-2">
         {isRunning ? (
           <Button
@@ -420,7 +407,7 @@ function ModelCard({
             className="w-full"
           >
             {unloading ? (
-              <RefreshCw data-icon="inline-start" className="animate-spin" />
+              <RefreshCw data-icon="inline-start" className="animate-spin [animation-duration:1.8s]" />
             ) : (
               <Square data-icon="inline-start" />
             )}
@@ -438,7 +425,7 @@ function ModelCard({
             className="w-full"
           >
             {loadingModel ? (
-              <RefreshCw data-icon="inline-start" className="animate-spin" />
+              <RefreshCw data-icon="inline-start" className="animate-spin [animation-duration:1.8s]" />
             ) : (
               <Play data-icon="inline-start" />
             )}

@@ -9,6 +9,17 @@ type LlamaCppClientOptions = {
   loadTimeoutMs?: number;
 };
 
+const LlamaCppModelStatus = {
+  Loaded: 'loaded',
+  Loading: 'loading',
+  Unloaded: 'unloaded',
+  Sleeping: 'sleeping',
+  Error: 'error',
+} as const;
+
+const LLAMACPP_MODEL_LOAD_TIMEOUT_MS = 300_000;
+const LLAMACPP_MODEL_READY_POLL_INTERVAL_MS = 250;
+
 type LlamaCppRouterModel = {
   id?: string;
   path?: string;
@@ -61,7 +72,9 @@ export class LlamaCppClient {
     const models = await this.listModelsWithTimeout(timeoutMs);
     return models.filter(
       model =>
-        model.status === 'loaded' || model.status === 'loading' || model.status === 'sleeping',
+        model.status === LlamaCppModelStatus.Loaded ||
+        model.status === LlamaCppModelStatus.Loading ||
+        model.status === LlamaCppModelStatus.Sleeping,
     );
   }
 
@@ -75,15 +88,19 @@ export class LlamaCppClient {
 
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
     const modelName = input.model.trim();
+    const timeoutMs = this.loadTimeoutMs ?? LLAMACPP_MODEL_LOAD_TIMEOUT_MS;
     await this.requestJson('/models/load', {
       method: 'POST',
-      timeoutMs: this.loadTimeoutMs ?? 300_000,
+      timeoutMs,
       body: JSON.stringify({ model: input.model }),
     });
     if (typeof input.options?.ctxSize === 'number' && input.options.ctxSize > 0) {
       this.lastLoadRuntimeContextByModel.set(modelName, input.options.ctxSize);
     }
-    return { success: true, runningModels: await this.runningModels() };
+    return {
+      success: true,
+      runningModels: await this.waitForModelReady(modelName, timeoutMs),
+    };
   }
 
   async unloadModel(name: string, timeoutMs = 120_000): Promise<void> {
@@ -105,6 +122,31 @@ export class LlamaCppClient {
         this.lastLoadRuntimeContextByModel.get((model.id || model.path || 'unknown').trim()),
       ),
     );
+  }
+
+  private async waitForModelReady(
+    modelName: string,
+    timeoutMs: number,
+  ): Promise<LlamaCppRunningModel[]> {
+    const deadline = Date.now() + timeoutMs;
+    while (true) {
+      const models = await this.listModelsWithTimeout(timeoutMs);
+      const targetModel = models.find(model => matchesModelName(model, modelName));
+      if (
+        targetModel?.status === LlamaCppModelStatus.Loaded ||
+        targetModel?.status === LlamaCppModelStatus.Sleeping
+      ) {
+        return models.filter(isRunningModel);
+      }
+      if (targetModel?.status === LlamaCppModelStatus.Error) {
+        throw new Error(`llama.cpp could not load model ${modelName}`);
+      }
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        throw new Error(`llama.cpp model ${modelName} did not become ready before timeout`);
+      }
+      await waitFor(Math.min(LLAMACPP_MODEL_READY_POLL_INTERVAL_MS, remainingMs));
+    }
   }
 
   private async requestJson<T>(
@@ -157,8 +199,8 @@ function toLlamaCppModel(
   fallbackRuntimeContextLength?: number,
 ): LlamaCppModel {
   const name = model.id || model.path || 'unknown';
-  const statusValue = model.status?.failed ? 'error' : model.status?.value;
-  const status = isLlamaCppModelStatus(statusValue) ? statusValue : 'unloaded';
+  const statusValue = model.status?.failed ? LlamaCppModelStatus.Error : model.status?.value;
+  const status = isLlamaCppModelStatus(statusValue) ? statusValue : LlamaCppModelStatus.Unloaded;
   const trainedContextLength = model.meta?.n_ctx_train;
   const runtimeContextLength =
     parseRuntimeContextLength(model.status?.args) ?? fallbackRuntimeContextLength;
@@ -210,12 +252,28 @@ function parseRuntimeContextLength(args: string[] | undefined): number | undefin
 
 function isLlamaCppModelStatus(value: unknown): value is LlamaCppModel['status'] {
   return (
-    value === 'loaded' ||
-    value === 'loading' ||
-    value === 'unloaded' ||
-    value === 'sleeping' ||
-    value === 'error'
+    value === LlamaCppModelStatus.Loaded ||
+    value === LlamaCppModelStatus.Loading ||
+    value === LlamaCppModelStatus.Unloaded ||
+    value === LlamaCppModelStatus.Sleeping ||
+    value === LlamaCppModelStatus.Error
   );
+}
+
+function isRunningModel(model: LlamaCppModel): model is LlamaCppRunningModel {
+  return (
+    model.status === LlamaCppModelStatus.Loaded ||
+    model.status === LlamaCppModelStatus.Loading ||
+    model.status === LlamaCppModelStatus.Sleeping
+  );
+}
+
+function matchesModelName(model: LlamaCppModel, modelName: string): boolean {
+  return [model.name, model.id, model.model, model.path].some(value => value === modelName);
+}
+
+function waitFor(delayMs: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
 function formatParameterCount(value: number): string {
