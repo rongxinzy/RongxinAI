@@ -88,12 +88,14 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
           <Badge variant="outline" className={displayStatus ? statusTextClass[displayStatus] || 'text-muted-foreground' : 'text-muted-foreground'}>
             {statusLabel}
           </Badge>
-          <Switch
-            checked={task.enabled}
-            onCheckedChange={(checked: boolean) => {
-              void scheduledTaskService.toggleTask(task.id, checked);
-            }}
-          />
+          <span onClick={(e) => e.stopPropagation()}>
+            <Switch
+              checked={task.enabled}
+              onCheckedChange={(checked: boolean) => {
+                void scheduledTaskService.toggleTask(task.id, checked);
+              }}
+            />
+          </span>
         </div>
       </TableCell>
 
