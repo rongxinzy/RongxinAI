@@ -27,7 +27,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
 }) => {
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent>
+      <DialogContent className="bg-card">
         <DialogHeader>
           <div>
             <DialogTitle>

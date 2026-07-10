@@ -143,14 +143,14 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0">
+      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0 bg-card overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <DialogTitle className="text-sm font-semibold truncate">
             {session?.title || i18nService.t('scheduledTasksViewSession')}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-card">
           {loading && (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Spinner />
