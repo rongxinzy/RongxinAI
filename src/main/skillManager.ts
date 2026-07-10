@@ -1,4 +1,4 @@
-import { execSync, spawn, spawnSync } from 'child_process';
+﻿import { execSync, spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
 import { app, BrowserWindow, session } from 'electron';
 import extractZip from 'extract-zip';
@@ -9,6 +9,8 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { t } from './i18n';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
+import { parseModelScopeSkillUrl, resolveModelScopeSkillInstallSource } from './libs/modelscopeSkillMarketplace';
+import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { mergeReports,scanMultipleSkillDirs } from './libs/skillSecurity/skillSecurityScanner';
 import type { SecurityReportAction,SkillSecurityReport } from './libs/skillSecurity/skillSecurityTypes';
@@ -207,9 +209,8 @@ function buildSkillEnv(): Record<string, string | undefined> {
   // Normalize PATH key casing on Windows to avoid duplicate PATH/Path issues
   normalizePathKey(env);
 
-  // Ensure HOME is available for tools (e.g. clawhub CLI) that persist state
-  // under the user's home directory. Without this, some runtimes may resolve
-  // to root ("/.clawhub") in packaged apps.
+  // Ensure HOME is available for skill subprocesses that persist state
+  // under the user's home directory instead of resolving to the filesystem root.
   if (!env.HOME) {
     env.HOME = app.getPath('home');
     console.debug('[skills] HOME was unset; using Electron user home directory');
@@ -527,57 +528,8 @@ const resolveGitCommand = (): { command: string; env?: NodeJS.ProcessEnv } => {
 };
 
 /**
- * On Windows, ensure a Node.js --require init script that monkey-patches
- * child_process so all descendant processes inherit windowsHide: true.
- * Returns the script path, or null on non-Windows / failure.
+ * Run a command and reject with stderr when it exits non-zero.
  */
-const WINDOWS_HIDE_SCRIPT = [
-  "'use strict';",
-  'if (process.platform === "win32") {',
-  '  const cp = require("child_process");',
-  '  const hide = (o) => {',
-  '    if (o == null) return { windowsHide: true };',
-  '    if (typeof o !== "object") return o;',
-  '    if (Object.prototype.hasOwnProperty.call(o, "windowsHide")) return o;',
-  '    return { ...o, windowsHide: true };',
-  '  };',
-  '  for (const fn of ["spawn", "spawnSync", "exec", "execFile", "fork"]) {',
-  '    const orig = cp[fn];',
-  '    if (typeof orig !== "function") continue;',
-  '    cp[fn] = function (...a) {',
-  '      const optsIdx = fn === "exec" ? 1 : fn === "fork" || fn === "spawn" || fn === "spawnSync" || fn === "execFile" ? 2 : 1;',
-  '      if (a.length > optsIdx && typeof a[optsIdx] === "object" && a[optsIdx] !== null) {',
-  '        a[optsIdx] = hide(a[optsIdx]);',
-  '      } else if (a.length === optsIdx) {',
-  '        a.push(hide(undefined));',
-  '      }',
-  '      return orig.apply(this, a);',
-  '    };',
-  '  }',
-  '}',
-].join('\n');
-
-let _windowsHideScriptPath: string | null | undefined;
-
-const ensureWindowsHideScript = (): string | null => {
-  if (process.platform !== 'win32') return null;
-  if (_windowsHideScriptPath !== undefined) return _windowsHideScriptPath;
-  try {
-    const dir = path.join(app.getPath('userData'), 'bin');
-    fs.mkdirSync(dir, { recursive: true });
-    const scriptPath = path.join(dir, 'skill_windows_hide.cjs');
-    const existing = fs.existsSync(scriptPath) ? fs.readFileSync(scriptPath, 'utf8') : '';
-    if (existing !== WINDOWS_HIDE_SCRIPT) {
-      fs.writeFileSync(scriptPath, WINDOWS_HIDE_SCRIPT, 'utf8');
-    }
-    _windowsHideScriptPath = scriptPath;
-    return scriptPath;
-  } catch {
-    _windowsHideScriptPath = null;
-    return null;
-  }
-};
-
 const runCommand = (
   command: string,
   args: string[],
@@ -975,111 +927,6 @@ const isNpmPackageSpec = (source: string): boolean => {
 };
 
 /**
- * Parse a clawhub.ai URL and extract the skill name.
- * Supports: /skills/{owner}/{name} and /skills/{name}
- */
-const parseClawhubUrl = (source: string): { name: string } | null => {
-  try {
-    const url = new URL(source);
-    if (url.hostname !== 'clawhub.ai' && url.hostname !== 'www.clawhub.ai') return null;
-    const segments = url.pathname.split('/').filter(Boolean);
-    // Format: /skills/{owner}/{name}
-    if (segments.length >= 3 && segments[0] === 'skills') {
-      return { name: segments[2] };
-    }
-    // Format: /skills/{name}
-    if (segments.length >= 2 && segments[0] === 'skills') {
-      return { name: segments[1] };
-    }
-    // Format: /{owner}/{name} (no /skills/ prefix)
-    if (segments.length >= 2) {
-      return { name: segments[1] };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Resolve the bundled npx-cli.js path for running npx commands
- * without requiring a system Node.js installation.
- */
-const resolveNpxCliJs = (): string | null => {
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npx-cli.js')]
-    : [
-        path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', 'npx-cli.js'),
-        path.join(process.cwd(), 'node_modules', 'npm', 'bin', 'npx-cli.js'),
-      ];
-  return candidates.find(c => fs.existsSync(c)) || null;
-};
-
-/**
- * Download a skill from ClawHub using `npx clawhub@latest install {name}`.
- * Prefers the bundled npx (via Electron runtime) so it works in packaged
- * apps where system Node.js is not installed.
- */
-const downloadClawhubSkill = async (
-  skillName: string,
-  targetDir: string,
-  env: NodeJS.ProcessEnv
-): Promise<void> => {
-  fs.mkdirSync(targetDir, { recursive: true });
-  const npxCliJs = resolveNpxCliJs();
-  const electronPath = getElectronNodeRuntimePath();
-
-  let command: string;
-  let args: string[];
-  if (npxCliJs) {
-    console.log(
-      `[downloadClawhubSkill] cwd="${targetDir}" skill="${skillName}" `
-      + `electron="${electronPath}" npxCliJs="${npxCliJs}"`,
-    );
-    command = electronPath;
-    args = [npxCliJs, 'clawhub@latest', 'install', skillName, '--dir', targetDir, '--no-input', '--force'];
-    // Inject --require script to hide CMD windows from all descendant processes
-    const hideScript = ensureWindowsHideScript();
-    if (hideScript) {
-      args = ['--require', hideScript, ...args];
-    }
-  } else {
-    const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-    console.log(
-      `[downloadClawhubSkill] cwd="${targetDir}" skill="${skillName}" `
-      + `bundled npx not found, falling back to system "${npxCommand}"`,
-    );
-    if (!hasCommand(npxCommand, env)) {
-      throw new Error('npx is not available. Please install Node.js from https://nodejs.org/');
-    }
-    command = npxCommand;
-    args = ['clawhub@latest', 'install', skillName, '--dir', targetDir, '--no-input', '--force'];
-  }
-
-  try {
-    await runCommand(command, args, {
-      cwd: targetDir,
-      env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-    });
-  } catch (error) {
-    const raw = error instanceof Error ? error.message : String(error);
-    // Strip ANSI escape codes and decode URL-encoded characters
-    const cleaned = raw
-       
-      .replace(/\x1b\[[0-9;]*m/g, '')
-      .replace(/%[0-9A-Fa-f]{2}/g, (match) => {
-        try { return decodeURIComponent(match); } catch { return match; }
-      })
-      .trim();
-
-    if (/skill not found/i.test(cleaned)) {
-      throw new Error(t('skillErrClawhubNotFound'));
-    }
-    throw new Error(t('skillErrClawhubDownloadFailed') + '\n' + cleaned);
-  }
-};
-
-/**
  * Resolve the bundled npm-cli.js path for running npm commands.
  */
 const resolveNpmCliJs = (): string | null => {
@@ -1094,7 +941,7 @@ const resolveNpmCliJs = (): string | null => {
 
 /**
  * Download and extract an npm package using `npm pack`.
- * Similar to openclaw's plugin install: npm pack → extract .tgz → return path.
+ * Similar to openclaw's plugin install: npm pack 鈫?extract .tgz 鈫?return path.
  */
 const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<string> => {
   const npmCliJs = resolveNpmCliJs();
@@ -1354,6 +1201,13 @@ export class SkillManager {
 
   constructor(private getStore: () => SqliteStore) {}
 
+  private getModelScopeApiToken(): string | null {
+    const userToken = this.getStore().get<string>(ModelScopeStoreKey.ApiToken);
+    return createModelScopeTokenPool({
+      extraTokens: userToken ? [userToken] : [],
+    }).nextToken();
+  }
+
   getSkillsRoot(): string {
     return path.resolve(app.getPath('userData'), SKILLS_DIR_NAME);
   }
@@ -1388,7 +1242,7 @@ export class SkillManager {
             fs.rmSync(backupDir, { recursive: true, force: true });
           } else {
             // Upgrade was interrupted, roll back
-            console.log(`[SkillManager] rolling back interrupted upgrade: ${entry} → ${originalName}`);
+            console.log(`[SkillManager] rolling back interrupted upgrade: ${entry} 鈫?${originalName}`);
             if (fs.existsSync(originalDir)) {
               fs.rmSync(originalDir, { recursive: true, force: true });
             }
@@ -1628,7 +1482,7 @@ export class SkillManager {
       '- If exactly one skill clearly applies: read its SKILL.md at <location> with the Read tool, then follow it.',
       '- If multiple could apply: choose the most specific one, then read/follow it.',
       '- If none clearly apply: do not read any SKILL.md.',
-      '- IMPORTANT: If a description contains "Do NOT use" constraints, strictly respect them. If the user\'s request falls into a "Do NOT" category, treat that skill as non-matching — do NOT read its SKILL.md.',
+      '- IMPORTANT: If a description contains "Do NOT use" constraints, strictly respect them. If the user\'s request falls into a "Do NOT" category, treat that skill as non-matching 鈥?do NOT read its SKILL.md.',
       '- For the selected skill, treat <location> as the canonical SKILL.md path.',
       '- Resolve relative paths mentioned by that SKILL.md against its directory (dirname(<location>)), not the workspace root.',
       'Constraints: never read more than one skill up front; only read additional skills if the first one explicitly references them.',
@@ -1750,6 +1604,20 @@ export class SkillManager {
     }
   }
 
+  private async resolveMarketplaceSkillSource(source: string): Promise<string | null> {
+    const parsedModelScopeSkill = parseModelScopeSkillUrl(source);
+    if (!parsedModelScopeSkill) {
+      return source;
+    }
+
+    const resolvedSource = await resolveModelScopeSkillInstallSource(source, {
+      token: this.getModelScopeApiToken(),
+      fetchImpl: (input, init) =>
+        session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<typeof fetch>,
+    });
+    return resolvedSource;
+  }
+
   async downloadSkill(source: string): Promise<{
     success: boolean;
     skills?: SkillRecord[];
@@ -1764,9 +1632,14 @@ export class SkillManager {
         return { success: false, error: 'Missing skill source' };
       }
 
-      console.log(`[SkillManager] downloadSkill: source="${trimmed}"`);
+      const resolvedSource = await this.resolveMarketplaceSkillSource(trimmed);
+      if (!resolvedSource) {
+        return { success: false, error: t('skillErrModelScopeInstallUnavailable') };
+      }
+
+      console.log(`[SkillManager] downloadSkill: source="${trimmed}" resolved="${resolvedSource}"`);
       const root = this.ensureSkillsRoot();
-      let localSource = trimmed;
+      let localSource = resolvedSource;
       if (fs.existsSync(localSource)) {
         const stat = fs.statSync(localSource);
         if (stat.isFile()) {
@@ -1785,27 +1658,19 @@ export class SkillManager {
         } else {
           console.log('[SkillManager] downloadSkill: detected local directory');
         }
-      } else if (isRemoteZipUrl(trimmed)) {
+      } else if (isRemoteZipUrl(resolvedSource)) {
         console.log('[SkillManager] downloadSkill: detected remote zip URL');
         const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
         cleanupPath = tempRoot;
-        localSource = await downloadZipUrl(trimmed, tempRoot);
-      } else if (isNpmPackageSpec(trimmed)) {
-        console.log(`[SkillManager] downloadSkill: detected npm package spec "${trimmed}"`);
+        localSource = await downloadZipUrl(resolvedSource, tempRoot);
+      } else if (isNpmPackageSpec(resolvedSource)) {
+        console.log(`[SkillManager] downloadSkill: detected npm package spec "${resolvedSource}"`);
         const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-npm-'));
         cleanupPath = tempRoot;
-        localSource = await downloadNpmPackage(trimmed, tempRoot);
+        localSource = await downloadNpmPackage(resolvedSource, tempRoot);
         console.log(`[SkillManager] downloadSkill: npm package extracted to ${localSource}`);
-      } else if (parseClawhubUrl(trimmed)) {
-        const clawhubParsed = parseClawhubUrl(trimmed)!;
-        console.log(`[SkillManager] downloadSkill: detected ClawHub URL, skill name="${clawhubParsed.name}"`);
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-clawhub-'));
-        cleanupPath = tempRoot;
-        const env = buildSkillEnv();
-        await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
-        localSource = tempRoot;
       } else {
-        const normalized = this.normalizeGitSource(trimmed);
+        const normalized = this.normalizeGitSource(resolvedSource);
         if (!normalized) {
           return { success: false, error: t('skillErrInvalidSource') };
         }
@@ -1824,7 +1689,7 @@ export class SkillManager {
           try {
             downloadedSourceRoot = await downloadGithubArchive(githubSource, tempRoot, normalized.ref);
             downloaded = true;
-            console.log(`[SkillManager] downloadSkill: GitHub HTTP download succeeded → ${downloadedSourceRoot}`);
+            console.log(`[SkillManager] downloadSkill: GitHub HTTP download succeeded 鈫?${downloadedSourceRoot}`);
           } catch (err) {
             console.log(`[SkillManager] downloadSkill: GitHub HTTP download failed: ${err instanceof Error ? err.message : err}, falling back to git clone`);
           }
@@ -1889,7 +1754,7 @@ export class SkillManager {
         if (auditReport) {
           console.log(`[SkillManager] Security scan complete: riskLevel=${auditReport.riskLevel}, score=${auditReport.riskScore}, findings=${auditReport.findings.length}, duration=${auditReport.scanDurationMs}ms`);
           for (const f of auditReport.findings) {
-            console.log(`[SkillManager]   [${f.severity}] ${f.dimension} | ${f.ruleId} → ${f.file}${f.line ? ':' + f.line : ''}`);
+            console.log(`[SkillManager]   [${f.severity}] ${f.dimension} | ${f.ruleId} 鈫?${f.file}${f.line ? ':' + f.line : ''}`);
           }
         }
       } catch (err) {
@@ -1924,7 +1789,7 @@ export class SkillManager {
         };
       }
 
-      // Safe or scan failed — install directly
+      // Safe or scan failed 鈥?install directly
       console.log(`[SkillManager] Skill is safe (or scan failed), installing directly`);
       for (const skillDir of skillDirs) {
         const folderName = normalizeFolderName(path.basename(skillDir));
@@ -1995,7 +1860,12 @@ export class SkillManager {
     pendingInstallId?: string;
   }> {    let cleanupPath: string | null = null;
     try {
-      console.log(`[SkillManager] starting upgrade for skill "${skillId}"`);
+      const resolvedDownloadUrl = await this.resolveMarketplaceSkillSource(downloadUrl);
+      if (!resolvedDownloadUrl) {
+        return { success: false, error: t('skillErrModelScopeInstallUnavailable') };
+      }
+
+      console.log(`[SkillManager] starting upgrade for skill "${skillId}" via "${resolvedDownloadUrl}"`);
       const root = this.ensureSkillsRoot();
 
       // Download new version (reuse downloadSkill's download logic)
@@ -2003,16 +1873,10 @@ export class SkillManager {
       cleanupPath = tempRoot;
 
       let localSource: string;
-      if (isRemoteZipUrl(downloadUrl)) {
-        localSource = await downloadZipUrl(downloadUrl, tempRoot);
-      } else if (parseClawhubUrl(downloadUrl)) {
-        const clawhubParsed = parseClawhubUrl(downloadUrl)!;
-        console.log(`[SkillManager] upgrade detected ClawHub URL, skill="${clawhubParsed.name}"`);
-        const env = buildSkillEnv();
-        await downloadClawhubSkill(clawhubParsed.name, tempRoot, env);
-        localSource = tempRoot;
+      if (isRemoteZipUrl(resolvedDownloadUrl)) {
+        localSource = await downloadZipUrl(resolvedDownloadUrl, tempRoot);
       } else {
-        const normalized = this.normalizeGitSource(downloadUrl);
+        const normalized = this.normalizeGitSource(resolvedDownloadUrl);
         if (!normalized) {
           cleanupPathSafely(cleanupPath);
           return { success: false, error: 'Invalid download URL' };
@@ -2035,10 +1899,10 @@ export class SkillManager {
         if (!downloaded) {
           const gitRuntime = resolveGitCommand();
           // For upgrades, prefer the installed skill's git remote URL over the
-          // marketplace URL — the latter may trigger HTTP redirects (e.g. ClawHub
-          // moving a skill from /skills/{slug} to /{user}/{slug}) that git cannot
-          // safely follow.  The installed repo's .git/config already points at the
-          // correct, working remote.
+          // marketplace URL. The installed repo's .git/config already points at
+          // the correct remote that git can fetch from directly.
+
+
           let cloneUrl = normalized.repoUrl;
           if (fs.existsSync(path.join(existingSkillDir, '.git'))) {
             try {
@@ -2063,7 +1927,7 @@ export class SkillManager {
           } catch (cloneErr: unknown) {
             const cloneMsg = cloneErr instanceof Error ? cloneErr.message : String(cloneErr);
             // If clone fails with a redirect error, fall back to fetching inside the
-            // existing repo — its on-disk remote URL may survive a redirect that a
+            // existing repo 鈥?its on-disk remote URL may survive a redirect that a
             // fresh clone cannot handle.
             if (/unable to update url base from redirection/i.test(cloneMsg) || /redirect/i.test(cloneMsg)) {
               console.log(`[SkillManager] clone redirect fallback, fetching in existing repo for "${skillId}"`);
@@ -2145,7 +2009,7 @@ export class SkillManager {
         return { success: true, auditReport, pendingInstallId: pendingId };
       }
 
-      // Safe — perform upgrade
+      // Safe 鈥?perform upgrade
       this.performSkillUpgrade(matchingSkillDir, existingSkillDir);
 
       cleanupPathSafely(cleanupPath);
@@ -2297,7 +2161,7 @@ export class SkillManager {
       // On Windows, fs.watch (ReadDirectoryChangesW) frequently reports null
       // filenames for unrelated filesystem activity (AV scans, search indexing,
       // timestamp updates).  Ignoring null filenames avoids false
-      // skills-changed → syncOpenClawConfig chains that can trigger unwanted
+      // skills-changed 鈫?syncOpenClawConfig chains that can trigger unwanted
       // Gateway restarts.  Legitimate skill changes always go through explicit
       // code paths (installSkill, deleteSkill, etc.) that call
       // notifySkillsChanged directly.
@@ -2940,6 +2804,5 @@ export const __skillManagerTestUtils = {
   parseFrontmatter,
   isTruthy,
   extractDescription,
-  parseClawhubUrl,
   isWindowsDeletePermissionError,
 };
