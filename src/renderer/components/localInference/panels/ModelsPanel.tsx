@@ -23,9 +23,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@shared/components/ui/hover-card';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Box, Ellipsis, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { type ComponentType, useState } from 'react';
 
 import type {
   LlamaCppModel,
@@ -33,9 +38,40 @@ import type {
   LlamaCppModelPreferences,
   LlamaCppRunningModel,
 } from '../../../../shared/llamacpp';
+import { ProviderName } from '../../../../shared/providers';
 import { i18nService } from '../../../services/i18n';
+import {
+  AnthropicIcon,
+  DeepSeekIcon,
+  GeminiIcon,
+  MiniMaxIcon,
+  MoonshotIcon,
+  OpenAIIcon,
+  QianfanIcon,
+  QwenIcon,
+  StepfunIcon,
+  VolcengineIcon,
+  XiaomiIcon,
+  ZhipuIcon,
+} from '../../icons/providers';
 import { localInferenceMutedTextClass } from '../constants';
+import { resolveLocalModelProvider } from '../utils/modelProvider';
 import { formatBytes, formatDate } from '../utils/progress';
+
+const modelProviderIconMap = {
+  [ProviderName.Anthropic]: AnthropicIcon,
+  [ProviderName.DeepSeek]: DeepSeekIcon,
+  [ProviderName.Gemini]: GeminiIcon,
+  [ProviderName.Minimax]: MiniMaxIcon,
+  [ProviderName.Moonshot]: MoonshotIcon,
+  [ProviderName.OpenAI]: OpenAIIcon,
+  [ProviderName.Qianfan]: QianfanIcon,
+  [ProviderName.Qwen]: QwenIcon,
+  [ProviderName.StepFun]: StepfunIcon,
+  [ProviderName.Volcengine]: VolcengineIcon,
+  [ProviderName.Xiaomi]: XiaomiIcon,
+  [ProviderName.Zhipu]: ZhipuIcon,
+} satisfies Record<string, ComponentType<{ className?: string }>>;
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -98,7 +134,7 @@ export function ModelsPanel({
           <h2 className="text-sm font-semibold text-foreground">
             {i18nService.t('localInferenceStatus_running')}
           </h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] items-start gap-4">
             {loadedModels.map(model => (
               <ModelCard
                 key={model.runningModel.name ?? model.runningModel.model ?? model.model.name}
@@ -123,7 +159,7 @@ export function ModelsPanel({
           {i18nService.t('localInferenceRegisteredModels')}
         </h2>
         {installedModels.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] items-start gap-4">
             {installedModels.map(model => (
               <ModelCard
                 key={model.name}
@@ -199,14 +235,16 @@ function ModelCard({
   const isRunning = Boolean(runningModel);
   const buttonsDisabled = loading || unloading;
   const displayName = getModelDisplayName(model.name);
+  const provider = resolveLocalModelProvider(model);
+  const ProviderIcon = provider ? modelProviderIconMap[provider] : Box;
   const quantization = model.details?.quantization_level?.trim();
   const contextValue = getPreferredContext(model, runningModel, preference);
-  const details = getModelDetails(model);
+  const details = getModelDetails(model, quantization);
   return (
     <Card
       size="sm"
       className={cn(
-        'relative h-full border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200',
+        'relative border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
         (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
@@ -252,36 +290,48 @@ function ModelCard({
           </CardAction>
         ) : null}
 
-        <div className="flex min-w-0 flex-col gap-1.5 pl-1">
-          <CardTitle className="truncate text-[14px] font-semibold text-foreground">
-            {displayName}
-          </CardTitle>
+        <div className="flex min-w-0 items-start gap-2 pl-1">
+          <span aria-hidden="true" className="mt-0.5 flex size-5 shrink-0 items-center justify-center">
+            <ProviderIcon className="size-5 text-muted-foreground" />
+          </span>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <CardTitle className="truncate text-[14px] font-semibold text-foreground">
+              {displayName}
+            </CardTitle>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {quantization ? (
-              <Badge variant="outline" className="font-mono text-[11px]">
-                {quantization}
-              </Badge>
-            ) : null}
-            {contextValue ? (
-              <Badge variant="outline" className="text-[11px]">
-                {formatContextValue(contextValue)} {i18nService.t('localInferenceContextShort')}
-              </Badge>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {details.length > 0 ? (
+                <HoverCard>
+                  <HoverCardTrigger
+                    delay={200}
+                    closeDelay={100}
+                    render={
+                      <Badge variant="outline" className="cursor-default text-[11px]">
+                        {i18nService.t('localInferenceDetails')}
+                      </Badge>
+                    }
+                  />
+                  <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
+                    <div className="flex flex-col gap-2">
+                      {details.map(item => (
+                        <MetadataRow key={item.label} label={item.label} value={item.value} />
+                      ))}
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              ) : null}
+              {contextValue ? (
+                <Badge variant="outline" className="text-[11px]">
+                  {formatContextValue(contextValue)} {i18nService.t('localInferenceContextShort')}
+                </Badge>
+              ) : null}
+            </div>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-1 flex-col gap-2.5 pt-2">
-        <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-          <div className="grid gap-2">
-            {details.map(item => (
-              <MetadataRow key={item.label} label={item.label} value={item.value} />
-            ))}
-          </div>
-        </div>
-
-        {loadingModel || unloading ? (
+      {loadingModel || unloading ? (
+        <CardContent className="flex flex-col gap-2.5 pt-2">
           <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5">
             <div className="flex items-center gap-2 text-xs font-medium text-foreground">
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -295,8 +345,8 @@ function ModelCard({
               <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
             </div>
           </div>
-        ) : null}
-      </CardContent>
+        </CardContent>
+      ) : null}
 
       <CardFooter className="border-t border-border/70 bg-muted/20 px-3 py-2">
         {isRunning ? (
@@ -354,8 +404,17 @@ function MetadataRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getModelDetails(model: LlamaCppModel): Array<{ label: string; value: string }> {
+function getModelDetails(
+  model: LlamaCppModel,
+  quantization?: string,
+): Array<{ label: string; value: string }> {
   return [
+    quantization
+      ? {
+          label: i18nService.t('localInferenceQuantization'),
+          value: quantization,
+        }
+      : null,
     model.size
       ? {
           label: i18nService.t('localInferenceSize'),
