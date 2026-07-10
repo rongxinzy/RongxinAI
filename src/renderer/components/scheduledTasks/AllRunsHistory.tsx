@@ -1,5 +1,5 @@
-import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { ButtonGroup } from '@shared/components/ui/button-group';
 import { Spinner } from '@shared/components/ui/spinner';
 import {
   Table,
@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@shared/components/ui/table';
+import { Badge } from '@shared/components/ui/badge';
 import { Clock, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -21,15 +22,6 @@ import DateInput from './DateInput';
 import FailureDetailModal from './FailureDetailModal';
 import RunSessionModal from './RunSessionModal';
 import { formatDateTime, formatDuration } from './utils';
-
-const STATUS_OPTIONS = ['success', 'error', 'skipped', 'running'] as const;
-
-const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  success: 'default',
-  error: 'destructive',
-  skipped: 'outline',
-  running: 'secondary',
-};
 
 const statusLabelKeys: Record<string, string> = {
   success: 'scheduledTasksStatusSuccess',
@@ -84,13 +76,6 @@ const AllRunsHistory: React.FC = () => {
     handleFilterChange(EMPTY_FILTER);
   };
 
-  const handleStatusToggle = (status: string) => {
-    handleFilterChange({
-      ...filter,
-      status: filter.status === status ? undefined : status,
-    });
-  };
-
   const handleLoadMore = () => {
     scheduledTaskService.loadAllRuns(50, allRuns.length, filter);
   };
@@ -109,21 +94,22 @@ const AllRunsHistory: React.FC = () => {
     <div>
       {/* Filter area */}
       <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-1.5">
-          {STATUS_OPTIONS.map(s => {
-            const isActive = filter.status === s;
-            return (
-              <Badge
-                key={s}
-                variant={isActive ? statusVariant[s] : 'ghost'}
-                className="cursor-pointer"
-                onClick={() => handleStatusToggle(s)}
-              >
-                {i18nService.t(statusLabelKeys[s])}
-              </Badge>
-            );
-          })}
-        </div>
+        <ButtonGroup>
+          {(['success', 'error', 'skipped', 'running'] as const).map(s => (
+            <Button
+              key={s}
+              variant="outline"
+              size="sm"
+              className={filter.status === s ? 'bg-secondary text-foreground' : 'bg-card text-muted-foreground'}
+              onClick={() => handleFilterChange({
+                ...filter,
+                status: filter.status === s ? undefined : s,
+              })}
+            >
+              {i18nService.t(statusLabelKeys[s])}
+            </Button>
+          ))}
+        </ButtonGroup>
 
         <div className="flex items-center gap-1.5 ml-auto">
           <DateInput
@@ -171,9 +157,9 @@ const AllRunsHistory: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{i18nService.t('scheduledTasksHistoryColTitle')}</TableHead>
-              <TableHead>{i18nService.t('scheduledTasksHistoryColTime')}</TableHead>
-              <TableHead className="w-24">{i18nService.t('scheduledTasksHistoryColStatus')}</TableHead>
+              <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksHistoryColTitle')}</TableHead>
+              <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksHistoryColTime')}</TableHead>
+              <TableHead className="text-muted-foreground w-24">{i18nService.t('scheduledTasksHistoryColStatus')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -207,7 +193,12 @@ const AllRunsHistory: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant[run.status] || 'outline'}>
+                    <Badge variant="outline" className={
+                      run.status === 'success' ? 'text-[var(--lobster-success)]' :
+                      run.status === 'error' ? 'text-destructive' :
+                      run.status === 'running' ? 'text-primary' :
+                      'text-muted-foreground'
+                    }>
                       {i18nService.t(statusLabelKeys[run.status] || '')}
                     </Badge>
                   </TableCell>

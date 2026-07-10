@@ -1937,6 +1937,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksFilterStatusAll: '全部状态',
     scheduledTasksFilterStartDate: '开始日期',
     scheduledTasksFilterEndDate: '结束日期',
+    scheduledTasksFilterAll: '全部',
     scheduledTasksFilterClear: '清除筛选',
     scheduledTasksFilterNoResults: '当前筛选条件下暂无记录',
     scheduledTasksSessionNotSynced: '会话记录同步失败，请稍后重试',

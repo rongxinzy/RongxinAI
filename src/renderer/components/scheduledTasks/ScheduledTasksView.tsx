@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { Card } from '@shared/components/ui/card';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
+import { Separator } from '@shared/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { ArrowLeft, PanelLeft, Pencil, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -203,6 +203,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         </TabsList>
         </div>
 
+        <div className="max-w-2xl mx-auto w-full px-4">
+          <Separator />
+        </div>
+
         <TabsContent value="create" className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-2xl mx-auto w-full px-4">
           {creatingTask ? (
@@ -251,13 +255,11 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           </div>
         </TabsContent>
 
-        <TabsContent value="history" className="flex-1 min-h-0">
-          <div className="max-w-2xl mx-auto w-full px-4 py-4 h-full">
-            <Card className="h-full flex flex-col">
-              <ScrollArea className="flex-1">
-                <AllRunsHistory />
-              </ScrollArea>
-            </Card>
+        <TabsContent value="history" className="flex-1 min-h-0 overflow-y-auto">
+          <div className="max-w-2xl mx-auto w-full px-4">
+            <ScrollArea className="h-[500px] rounded-lg border border-border bg-card p-4">
+              <AllRunsHistory />
+            </ScrollArea>
           </div>
         </TabsContent>
       </Tabs>
