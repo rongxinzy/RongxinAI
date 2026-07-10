@@ -105,13 +105,14 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
           >
             <EllipsisVertical />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="bg-card">
             {task.state.runningAtMs ? (
               <DropdownMenuItem disabled>
                 {i18nService.t('scheduledTasksStatusRunning')}
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
+                className="text-muted-foreground"
                 onClick={(e: React.MouseEvent) => {
                   e.stopPropagation();
                   void scheduledTaskService.runManually(task.id);
@@ -121,6 +122,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
+              className="text-muted-foreground"
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 dispatch(selectTask(task.id));
