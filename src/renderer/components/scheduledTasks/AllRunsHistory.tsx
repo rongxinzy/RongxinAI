@@ -169,7 +169,7 @@ const AllRunsHistory: React.FC = () => {
               return (
                 <TableRow
                   key={run.id}
-                  className={isClickable ? 'cursor-pointer' : ''}
+                  className={isClickable ? 'cursor-pointer hover:bg-muted' : 'hover:bg-muted'}
                   onClick={() => handleRowClick(run)}
                 >
                   <TableCell className="max-w-[240px] min-w-0">

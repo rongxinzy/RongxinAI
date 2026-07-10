@@ -167,7 +167,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
           </TableHeader>
           <TableBody>
             {displayedRuns.map(run => (
-              <TableRow key={run.id}>
+              <TableRow key={run.id} className="hover:bg-muted">
                 <TableCell>
                   {run.status === 'running' ? (
                     <Spinner className="size-3.5" />

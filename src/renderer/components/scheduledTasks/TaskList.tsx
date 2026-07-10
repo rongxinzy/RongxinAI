@@ -57,7 +57,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
 
   return (
     <TableRow
-      className="cursor-pointer"
+      className="cursor-pointer hover:bg-muted"
       onClick={() => dispatch(selectTask(task.id))}
     >
       <TableCell className="max-w-[240px] min-w-0">
