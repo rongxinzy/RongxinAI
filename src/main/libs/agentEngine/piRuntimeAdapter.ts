@@ -457,6 +457,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
   onSessionDeleted(sessionId: string): void {
     this.stopSession(sessionId);
+    this.activeSessions.delete(sessionId);
   }
 
   // ── Chat mode: direct LLM without agent loop ──
