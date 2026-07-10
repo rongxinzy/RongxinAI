@@ -61,7 +61,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
   const valueClass = 'text-sm text-foreground';
 
   return (
-    <div className="p-4 flex flex-col gap-4 max-w-3xl mx-auto">
+    <div className="py-4 flex flex-col gap-4 max-w-3xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-foreground truncate" title={task.name}>

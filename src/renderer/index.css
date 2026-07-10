@@ -382,3 +382,19 @@ select::-ms-expand {
   top: -4px;
   transform: none;
 }
+
+/* ButtonGroup: joined buttons — Tailwind v3.4-compatible CSS.
+   Uses explicit selectors instead of Tailwind v4 *:data-slot: variant chain. */
+[data-slot="button-group"] > [data-slot] {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+[data-slot="button-group"] > [data-slot]:not(:has(~ [data-slot])) {
+  border-top-right-radius: var(--lobster-radius) !important;
+  border-bottom-right-radius: var(--lobster-radius) !important;
+}
+[data-slot="button-group"] > [data-slot] ~ [data-slot] {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-left-width: 0 !important;
+}
