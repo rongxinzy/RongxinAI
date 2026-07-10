@@ -1,19 +1,26 @@
-export type LlamaCppLaunchContextLimitViolation = {
-  requestedContextLength: number;
-  trainedContextLength: number;
-};
-
-export function getLlamaCppLaunchContextLimitViolation(input: {
+export type LlamaCppLaunchContextResolution = {
+  effectiveContextLength?: number;
   requestedContextLength?: number;
   trainedContextLength?: number;
-}): LlamaCppLaunchContextLimitViolation | null {
+  clamped: boolean;
+};
+
+export function resolveLlamaCppLaunchContext(input: {
+  requestedContextLength?: number;
+  trainedContextLength?: number;
+}): LlamaCppLaunchContextResolution {
   const requestedContextLength = normalizePositiveInteger(input.requestedContextLength);
   const trainedContextLength = normalizePositiveInteger(input.trainedContextLength);
-  if (!requestedContextLength || !trainedContextLength) return null;
-  if (requestedContextLength <= trainedContextLength) return null;
+  const clamped = Boolean(
+    requestedContextLength
+      && trainedContextLength
+      && requestedContextLength > trainedContextLength,
+  );
   return {
+    effectiveContextLength: clamped ? trainedContextLength : requestedContextLength,
     requestedContextLength,
     trainedContextLength,
+    clamped,
   };
 }
 

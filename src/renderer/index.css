@@ -336,6 +336,21 @@ select::-ms-expand {
   transform: translateX(calc(100% - 2px));
 }
 
+/* Slider: lobster theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
+[data-slot="slider-track"] {
+  background-color: var(--lobster-surface-raised);
+}
+[data-slot="slider-indicator"] {
+  background-color: var(--lobster-primary);
+}
+[data-slot="slider-thumb"] {
+  background-color: var(--lobster-surface);
+  border-color: var(--lobster-primary);
+}
+[data-slot="slider-thumb"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--lobster-primary-muted);
+}
+
 /* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
 [data-mode="work-chat"][data-slot="switch"] {
   width: 100% !important;

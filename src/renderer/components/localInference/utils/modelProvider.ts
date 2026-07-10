@@ -1,7 +1,7 @@
 import type { LlamaCppModel } from '../../../../shared/llamacpp';
 import { ProviderName, type ProviderName as ProviderNameType } from '../../../../shared/providers';
 
-type LocalModelProvider = Extract<
+export type LocalModelProvider = Extract<
   ProviderNameType,
   | typeof ProviderName.Anthropic
   | typeof ProviderName.DeepSeek

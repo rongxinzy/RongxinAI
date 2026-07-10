@@ -21,7 +21,10 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
-import { applyAutomaticLlamaCppServiceDefaults } from '../../shared/llamacpp';
+import {
+  applyAutomaticLlamaCppServiceDefaults,
+  resolveLlamaCppLaunchContext,
+} from '../../shared/llamacpp';
 import {
   fetchLlamaCppBackendManifest,
   getLlamaCppBackendCompatibilityError,
@@ -891,10 +894,11 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
-    const resolvedInput = await this.resolveModelLoadInput(input);
+    const localModels = await this.listLocalModels().catch(() => [] as LlamaCppModel[]);
+    const resolvedInput = await this.resolveModelLoadInput(input, localModels);
     const modelName = resolvedInput.model.trim();
     if (!modelName) throw new Error('Model name is required');
-    await this.writeModelPreset(resolvedInput);
+    await this.writeModelPreset(resolvedInput, localModels);
     const client = await this.client();
     await client.listModels();
     const result = await client.loadModel(resolvedInput);
@@ -1084,8 +1088,10 @@ export class LlamaCppManager extends EventEmitter {
     });
   }
 
-  private async writeModelPreset(input: LlamaCppModelLaunchInput): Promise<void> {
-    const models = await this.listLocalModels().catch(() => [] as LlamaCppModel[]);
+  private async writeModelPreset(
+    input: LlamaCppModelLaunchInput,
+    models: LlamaCppModel[],
+  ): Promise<void> {
     const model = models.find(item => item.name === input.model || item.id === input.model);
     const modelPath = input.modelPath || model?.path;
     const existing = fs.existsSync(this.getPresetPath())
@@ -1101,19 +1107,38 @@ export class LlamaCppManager extends EventEmitter {
 
   private async resolveModelLoadInput(
     input: LlamaCppModelLaunchInput,
+    models: LlamaCppModel[],
   ): Promise<LlamaCppModelLaunchInput> {
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
 
     const explicitContextSize = input.options?.ctxSize;
-    if (typeof explicitContextSize === 'number' && explicitContextSize > 0) {
+    const requestedContextSize =
+      typeof explicitContextSize === 'number' && explicitContextSize > 0
+        ? explicitContextSize
+        : await this.resolveDefaultModelContextSize();
+    if (!requestedContextSize) {
       return {
         ...input,
         model: modelName,
       };
     }
 
-    const resolvedContextSize = await this.resolveDefaultModelContextSize();
+    const targetModel = models.find(
+      model => model.name === modelName || model.id === modelName || model.model === modelName,
+    );
+    const contextResolution = resolveLlamaCppLaunchContext({
+      requestedContextLength: requestedContextSize,
+      trainedContextLength:
+        targetModel?.trained_context_length ?? targetModel?.details?.context_length,
+    });
+    if (contextResolution.clamped) {
+      console.warn(
+        `[LlamaCpp] clamped requested context ${contextResolution.requestedContextLength} to training limit ${contextResolution.trainedContextLength} for ${modelName}`,
+      );
+    }
+
+    const resolvedContextSize = contextResolution.effectiveContextLength;
     if (!resolvedContextSize) {
       return {
         ...input,

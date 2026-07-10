@@ -35,6 +35,24 @@ test('local model provider can identify a model from its GGUF file name', () => 
   ).toBe(ProviderName.Qwen);
 });
 
+test('local model provider handles mixed case and GGUF file separators', () => {
+  expect(
+    resolveLocalModelProvider(model({
+      name: 'local-model',
+      path: 'D:\\models\\QwEn3_32B.Q4_K_M.gguf',
+    })),
+  ).toBe(ProviderName.Qwen);
+});
+
+test('local model provider prioritizes family metadata over a conflicting model name', () => {
+  expect(
+    resolveLocalModelProvider(model({
+      name: 'deepseek-r1-distill-qwen-32b',
+      details: { family: 'Qwen2.5' },
+    })),
+  ).toBe(ProviderName.Qwen);
+});
+
 test('local model provider leaves unsupported model families unbranded', () => {
   expect(resolveLocalModelProvider(model({ name: 'Meta-Llama-3.1-8B-Instruct' }))).toBeNull();
 });
