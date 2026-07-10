@@ -60,7 +60,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
       className="cursor-pointer hover:bg-muted"
       onClick={() => dispatch(selectTask(task.id))}
     >
-      <TableCell className="max-w-[240px] min-w-0">
+      <TableCell className="max-w-[180px] min-w-0">
         <div className={cn(
           'text-sm truncate',
           task.enabled ? 'text-foreground' : 'text-muted-foreground',
@@ -105,13 +105,14 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
           >
             <EllipsisVertical />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="bg-card">
             {task.state.runningAtMs ? (
               <DropdownMenuItem disabled>
                 {i18nService.t('scheduledTasksStatusRunning')}
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
+                className="text-muted-foreground"
                 onClick={(e: React.MouseEvent) => {
                   e.stopPropagation();
                   void scheduledTaskService.runManually(task.id);
@@ -121,6 +122,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
+              className="text-muted-foreground"
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 dispatch(selectTask(task.id));
