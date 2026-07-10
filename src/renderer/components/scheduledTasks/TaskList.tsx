@@ -57,7 +57,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
 
   return (
     <TableRow
-      className="cursor-pointer"
+      className="cursor-pointer hover:bg-muted"
       onClick={() => dispatch(selectTask(task.id))}
     >
       <TableCell className="max-w-[240px] min-w-0">
@@ -83,7 +83,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
         )}
       </TableCell>
 
-      <TableCell className="w-28">
+      <TableCell className="w-28" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2">
           <Badge variant="outline" className={displayStatus ? statusTextClass[displayStatus] || 'text-muted-foreground' : 'text-muted-foreground'}>
             {statusLabel}
