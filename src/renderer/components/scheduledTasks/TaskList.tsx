@@ -1,4 +1,6 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { Card } from '@shared/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@shared/components/ui/table';
+import { cn } from '@shared/lib/utils';
 import { Clock, EllipsisVertical } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -27,8 +30,18 @@ import {
   formatNextRunRelative,
   formatScheduleLabel,
   getStatusLabelKey,
-  getStatusTone,
 } from './utils';
+
+// ── Status to text color mapping ──
+
+const statusTextClass: Record<string, string> = {
+  success: 'text-[var(--lobster-success)]',
+  error: 'text-destructive',
+  running: 'text-primary',
+  skipped: 'text-muted-foreground',
+};
+
+// ── TaskListItem ──
 
 interface TaskListItemProps {
   task: ScheduledTask;
@@ -41,7 +54,6 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
   const statusLabel = i18nService.t(getStatusLabelKey(displayStatus));
-  const statusTone = getStatusTone(displayStatus);
 
   return (
     <TableRow
@@ -49,7 +61,10 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
       onClick={() => dispatch(selectTask(task.id))}
     >
       <TableCell className="max-w-[240px] min-w-0">
-        <div className={`text-sm truncate ${task.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+        <div className={cn(
+          'text-sm truncate',
+          task.enabled ? 'text-foreground' : 'text-muted-foreground',
+        )}>
           {task.name}
         </div>
         {task.description && (
@@ -70,7 +85,9 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
 
       <TableCell className="w-28">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-xs font-medium ${statusTone}`}>{statusLabel}</span>
+          <Badge variant="outline" className={displayStatus ? statusTextClass[displayStatus] || 'text-muted-foreground' : 'text-muted-foreground'}>
+            {statusLabel}
+          </Badge>
           <Switch
             checked={task.enabled}
             onCheckedChange={(checked: boolean) => {
@@ -128,6 +145,8 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
   );
 };
 
+// ── TaskList ──
+
 interface TaskListProps {
   onRequestDelete: (taskId: string, taskName: string) => void;
 }
@@ -159,21 +178,23 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{i18nService.t('scheduledTasksListColTitle')}</TableHead>
-          <TableHead>{i18nService.t('scheduledTasksListColSchedule')}</TableHead>
-          <TableHead className="w-28">{i18nService.t('scheduledTasksListColStatus')}</TableHead>
-          <TableHead className="w-10">{i18nService.t('scheduledTasksListColMore')}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {tasks.map(task => (
-          <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
-        ))}
-      </TableBody>
-    </Table>
+    <Card className="bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksListColTitle')}</TableHead>
+            <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksListColSchedule')}</TableHead>
+            <TableHead className="text-muted-foreground w-28">{i18nService.t('scheduledTasksListColStatus')}</TableHead>
+            <TableHead className="text-muted-foreground w-10">{i18nService.t('scheduledTasksListColMore')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tasks.map(task => (
+            <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   );
 };
 
