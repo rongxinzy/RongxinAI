@@ -493,6 +493,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         const result = await window.electron.llamacpp.loadModel(input);
         setRunningModels(result.runningModels);
         notifyLlamaCppRunningModelsChanged();
+        if (result.warning) {
+          showToast(result.warning, LocalInferenceToastKind.Info);
+        }
       } finally {
         loadingModelNameRef.current = null;
         setLoadingModelName(current => (current === modelName ? null : current));

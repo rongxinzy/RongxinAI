@@ -17,7 +17,6 @@ import type {
 import {
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
   getLlamaCppAcceleratorDevices,
-  getLlamaCppLaunchContextLimitViolation,
   getLlamaCppModelsMaxLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
@@ -25,6 +24,7 @@ import {
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppStructuredServiceFieldKey,
+  resolveLlamaCppLaunchContext,
 } from '../../shared/llamacpp';
 import { isProviderEnabled, ProviderName } from '../../shared/providers';
 import { t } from '../i18n';
@@ -464,21 +464,30 @@ export function registerLlamaCppIpcHandlers(
         const targetModel = localModels.find(
           model => model.name === modelName || model.id === modelName,
         );
-        const contextLimitViolation = getLlamaCppLaunchContextLimitViolation({
+        const contextResolution = resolveLlamaCppLaunchContext({
           requestedContextLength: inputWithPreferences.options?.ctxSize,
           trainedContextLength:
             targetModel?.trained_context_length ?? targetModel?.details?.context_length,
         });
-        if (contextLimitViolation) {
-          throw new Error(
-            t('llamacppLaunchContextExceedsTrainingLimit')
-              .replace('{requested}', String(contextLimitViolation.requestedContextLength))
-              .replace('{trained}', String(contextLimitViolation.trainedContextLength)),
-          );
-        }
-        const result = await manager.loadModel({ ...inputWithPreferences, model: modelName });
+        const resolvedLoadInput = contextResolution.clamped
+          ? {
+              ...inputWithPreferences,
+              options: {
+                ...inputWithPreferences.options,
+                ctxSize: contextResolution.effectiveContextLength,
+              },
+            }
+          : inputWithPreferences;
+        const result = await manager.loadModel({ ...resolvedLoadInput, model: modelName });
         await refreshRunningModelBindings('llamacpp-model-loaded');
-        return result;
+        if (!contextResolution.clamped) return result;
+        return {
+          ...result,
+          warning: t('llamacppLaunchContextClampedToTrainingLimit')
+            .replace('{requested}', String(contextResolution.requestedContextLength))
+            .replace('{trained}', String(contextResolution.trainedContextLength))
+            .replace('{effective}', String(contextResolution.effectiveContextLength)),
+        };
       },
       () => new Error(t('llamacppModelLoadInProgress')),
     );

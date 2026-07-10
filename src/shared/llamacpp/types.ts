@@ -324,6 +324,7 @@ export type LlamaCppModelLaunchInput = {
 export type LlamaCppModelLaunchResult = {
   success: true;
   runningModels: LlamaCppRunningModel[];
+  warning?: string;
 };
 
 export type LlamaCppModelUnloadResult = {

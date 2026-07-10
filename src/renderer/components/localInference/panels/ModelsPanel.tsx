@@ -30,7 +30,7 @@ import {
 } from '@shared/components/ui/hover-card';
 import { cn } from '@shared/lib/utils';
 import { Box, Ellipsis, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
-import { type ComponentType, useState } from 'react';
+import { type ComponentType, type DragEvent, useEffect, useMemo, useState } from 'react';
 
 import type {
   LlamaCppModel,
@@ -55,7 +55,16 @@ import {
   ZhipuIcon,
 } from '../../icons/providers';
 import { localInferenceMutedTextClass } from '../constants';
-import { resolveLocalModelProvider } from '../utils/modelProvider';
+import {
+  readLocalModelOrder,
+  reconcileLocalModelOrder,
+  reorderLocalModelOrder,
+  writeLocalModelOrder,
+} from '../utils/modelOrder';
+import {
+  type LocalModelProvider,
+  resolveLocalModelProvider,
+} from '../utils/modelProvider';
 import { formatBytes, formatDate } from '../utils/progress';
 
 const modelProviderIconMap = {
@@ -71,7 +80,7 @@ const modelProviderIconMap = {
   [ProviderName.Volcengine]: VolcengineIcon,
   [ProviderName.Xiaomi]: XiaomiIcon,
   [ProviderName.Zhipu]: ZhipuIcon,
-} satisfies Record<string, ComponentType<{ className?: string }>>;
+} satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -97,6 +106,16 @@ type ModelCardProps = {
   onUnload: () => void;
   onRequestDelete: () => void;
   onConfigureContext: () => void;
+  dragging: boolean;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+};
+
+type ModelCardEntry = {
+  model: LlamaCppModel;
+  runningModel?: LlamaCppRunningModel;
 };
 
 export function ModelsPanel({
@@ -112,12 +131,37 @@ export function ModelsPanel({
   onConfigureContext,
 }: ModelsPanelProps) {
   const [pendingDeleteModel, setPendingDeleteModel] = useState<LlamaCppModel | null>(null);
-  const loadedModels = runningModels.map(runningModel => ({
-    model: findModelByName(localModels, runningModel.name ?? runningModel.model ?? '')
-      ?? toModelCardModel(runningModel),
-    runningModel,
-  }));
-  const installedModels = localModels.filter(model => !findRunningModel(runningModels, model.name));
+  const [modelOrder, setModelOrder] = useState<string[]>(readLocalModelOrder);
+  const [draggedModelName, setDraggedModelName] = useState<string | null>(null);
+  const availableModels = useMemo(
+    () => mergeVisibleModels(localModels, runningModels),
+    [localModels, runningModels],
+  );
+  const availableModelNames = useMemo(
+    () => availableModels.map(model => model.name),
+    [availableModels],
+  );
+  const orderedModelNames = useMemo(
+    () => reconcileLocalModelOrder(availableModelNames, modelOrder),
+    [availableModelNames, modelOrder],
+  );
+  const modelCards = useMemo<ModelCardEntry[]>(() => {
+    const modelsByName = new Map(availableModels.map(model => [model.name, model]));
+    return orderedModelNames.flatMap(name => {
+      const model = modelsByName.get(name);
+      return model ? [{ model, runningModel: findRunningModel(runningModels, model.name) }] : [];
+    });
+  }, [availableModels, orderedModelNames, runningModels]);
+
+  useEffect(() => {
+    setModelOrder(currentOrder => {
+      const nextOrder = reconcileLocalModelOrder(availableModelNames, currentOrder);
+      if (sameModelOrder(currentOrder, nextOrder)) return currentOrder;
+      writeLocalModelOrder(nextOrder);
+      return nextOrder;
+    });
+  }, [availableModelNames]);
+
   const pendingDeleteRunningModel = pendingDeleteModel
     ? findRunningModel(runningModels, pendingDeleteModel.name)
     : undefined;
@@ -127,43 +171,44 @@ export function ModelsPanel({
   const pendingDeleteBusy =
     loading || (!!pendingDeleteModel && unloadingModelName === pendingDeleteModel.name);
 
+  const handleCardDragStart = (event: DragEvent<HTMLDivElement>, modelName: string) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', modelName);
+    setDraggedModelName(modelName);
+  };
+
+  const handleCardDrop = (event: DragEvent<HTMLDivElement>, targetModelName: string) => {
+    event.preventDefault();
+    const sourceModelName = event.dataTransfer.getData('text/plain') || draggedModelName;
+    if (sourceModelName) {
+      setModelOrder(currentOrder => {
+        const currentVisibleOrder = reconcileLocalModelOrder(availableModelNames, currentOrder);
+        const nextOrder = reorderLocalModelOrder(
+          currentVisibleOrder,
+          sourceModelName,
+          targetModelName,
+        );
+        writeLocalModelOrder(nextOrder);
+        return nextOrder;
+      });
+    }
+    setDraggedModelName(null);
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      {loadedModels.length > 0 ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold text-foreground">
-            {i18nService.t('localInferenceStatus_running')}
-          </h2>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] items-start gap-4">
-            {loadedModels.map(model => (
-              <ModelCard
-                key={model.runningModel.name ?? model.runningModel.model ?? model.model.name}
-                model={model.model}
-                runningModel={model.runningModel}
-                preference={modelPreferences[model.model.name]}
-                loading={loading}
-                loadingModel={loadingModelName === model.model.name}
-                unloading={unloadingModelName === model.model.name}
-                onLoadModel={() => onLoadModel(model.model)}
-                onUnload={() => onUnload(model.model.name)}
-                onRequestDelete={() => setPendingDeleteModel(model.model)}
-                onConfigureContext={() => onConfigureContext(model.model)}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-foreground">
           {i18nService.t('localInferenceRegisteredModels')}
         </h2>
-        {installedModels.length > 0 ? (
+        {modelCards.length > 0 ? (
           <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] items-start gap-4">
-            {installedModels.map(model => (
+            {modelCards.map(({ model, runningModel }) => (
               <ModelCard
                 key={model.name}
                 model={model}
+                runningModel={runningModel}
                 preference={modelPreferences[model.name]}
                 loading={loading}
                 loadingModel={loadingModelName === model.name}
@@ -172,6 +217,11 @@ export function ModelsPanel({
                 onUnload={() => onUnload(model.name)}
                 onRequestDelete={() => setPendingDeleteModel(model)}
                 onConfigureContext={() => onConfigureContext(model)}
+                dragging={draggedModelName === model.name}
+                onDragStart={event => handleCardDragStart(event, model.name)}
+                onDragOver={event => event.preventDefault()}
+                onDrop={event => handleCardDrop(event, model.name)}
+                onDragEnd={() => setDraggedModelName(null)}
               />
             ))}
           </div>
@@ -231,6 +281,11 @@ function ModelCard({
   onUnload,
   onRequestDelete,
   onConfigureContext,
+  dragging,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: ModelCardProps) {
   const isRunning = Boolean(runningModel);
   const buttonsDisabled = loading || unloading;
@@ -243,11 +298,17 @@ function ModelCard({
   return (
     <Card
       size="sm"
+      draggable={!loadingModel && !unloading}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       className={cn(
-        'relative border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200',
+        'relative cursor-grab select-none border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
         (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
+        dragging && 'opacity-50',
       )}
     >
       <div
@@ -444,8 +505,21 @@ function findRunningModel(
   return runningModels.find(item => matchesModelName(item, modelName));
 }
 
-function findModelByName(models: LlamaCppModel[], modelName: string): LlamaCppModel | undefined {
-  return models.find(model => matchesModelName(model, modelName));
+function mergeVisibleModels(
+  localModels: LlamaCppModel[],
+  runningModels: LlamaCppRunningModel[],
+): LlamaCppModel[] {
+  const modelsByName = new Map(localModels.map(model => [model.name, model]));
+  for (const runningModel of runningModels) {
+    const modelName = runningModel.name || runningModel.model || '';
+    if (!modelName || localModels.some(model => matchesModelName(model, modelName))) continue;
+    modelsByName.set(modelName, toModelCardModel(runningModel));
+  }
+  return Array.from(modelsByName.values());
+}
+
+function sameModelOrder(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function matchesModelName(

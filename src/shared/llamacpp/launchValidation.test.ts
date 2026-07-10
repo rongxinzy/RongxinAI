@@ -1,35 +1,57 @@
 import { expect, test } from 'vitest';
 
-import { getLlamaCppLaunchContextLimitViolation } from './launchValidation';
+import { resolveLlamaCppLaunchContext } from './launchValidation';
 
-test('getLlamaCppLaunchContextLimitViolation returns null when requested context fits training limit', () => {
-  expect(getLlamaCppLaunchContextLimitViolation({
+test('launch context keeps a request that fits the training limit', () => {
+  expect(resolveLlamaCppLaunchContext({
     requestedContextLength: 32768,
     trainedContextLength: 32768,
-  })).toBeNull();
+  })).toEqual({
+    effectiveContextLength: 32768,
+    requestedContextLength: 32768,
+    trainedContextLength: 32768,
+    clamped: false,
+  });
 
-  expect(getLlamaCppLaunchContextLimitViolation({
+  expect(resolveLlamaCppLaunchContext({
     requestedContextLength: 16384,
     trainedContextLength: 32768,
-  })).toBeNull();
-});
-
-test('getLlamaCppLaunchContextLimitViolation reports overflow when requested context exceeds training limit', () => {
-  expect(getLlamaCppLaunchContextLimitViolation({
-    requestedContextLength: 32769,
-    trainedContextLength: 32768,
   })).toEqual({
-    requestedContextLength: 32769,
+    effectiveContextLength: 16384,
+    requestedContextLength: 16384,
     trainedContextLength: 32768,
+    clamped: false,
   });
 });
 
-test('getLlamaCppLaunchContextLimitViolation ignores incomplete context metadata', () => {
-  expect(getLlamaCppLaunchContextLimitViolation({
+test('launch context clamps a request that exceeds the training limit', () => {
+  expect(resolveLlamaCppLaunchContext({
     requestedContextLength: 32769,
-  })).toBeNull();
-
-  expect(getLlamaCppLaunchContextLimitViolation({
     trainedContextLength: 32768,
-  })).toBeNull();
+  })).toEqual({
+    effectiveContextLength: 32768,
+    requestedContextLength: 32769,
+    trainedContextLength: 32768,
+    clamped: true,
+  });
+});
+
+test('launch context keeps a request when training metadata is incomplete', () => {
+  expect(resolveLlamaCppLaunchContext({
+    requestedContextLength: 32769,
+  })).toEqual({
+    effectiveContextLength: 32769,
+    requestedContextLength: 32769,
+    trainedContextLength: undefined,
+    clamped: false,
+  });
+
+  expect(resolveLlamaCppLaunchContext({
+    trainedContextLength: 32768,
+  })).toEqual({
+    effectiveContextLength: undefined,
+    requestedContextLength: undefined,
+    trainedContextLength: 32768,
+    clamped: false,
+  });
 });
