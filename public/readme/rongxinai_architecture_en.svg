@@ -48,7 +48,7 @@
 
   <rect x="755" y="165" width="280" height="110" rx="16" fill="#111827" stroke="#A78BFA" stroke-width="3"/>
   <text x="785" y="205" class="labelPurple">Skill / MCP Manager</text>
-  <text x="785" y="235" class="bodyBlue">Built-in skills, ClawHub, external tools</text>
+  <text x="785" y="235" class="bodyBlue">Built-in skills, skill marketplace, external tools</text>
 
   <rect x="85" y="300" width="300" height="70" rx="14" fill="#10231F" stroke="#22C55E" stroke-width="2.5"/>
   <text x="115" y="329" class="label">SQLite Storage</text>

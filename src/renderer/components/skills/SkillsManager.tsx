@@ -11,21 +11,18 @@ import { i18nService } from '../../services/i18n';
 import { resolveLocalizedText, skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { setSkills } from '../../store/slices/skillSlice';
-import { MarketplaceSkill, MarketTag,Skill } from '../../types/skill';
+import { MarketplaceSkill, Skill } from '../../types/skill';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import SkillSecurityReport from './SkillSecurityReport';
 
 type SkillTab = 'installed' | 'marketplace';
-type ImportSourceType = 'github' | 'clawhub';
 type DirectImportSource = 'zip' | 'folder' | 'remote';
 
-const importSourceTypes: ImportSourceType[] = ['github', 'clawhub'];
 const MARKETPLACE_MIN_PAGE_SIZE = 8;
 const MARKETPLACE_MAX_PAGE_SIZE = 40;
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 20;
 const MARKETPLACE_PAGE_WINDOW = 2;
-const MARKETPLACE_RETRYABLE_ERROR_CODES = new Set(['clawhub_not_found']);
 
 type MarketplacePageItem = number | 'ellipsis-left' | 'ellipsis-right';
 
@@ -75,29 +72,6 @@ const getMarketplacePageItems = (currentPage: number, pageCount: number): Market
   return items;
 };
 
-const importTabConfig: Record<ImportSourceType, {
-  tabLabelKey: string;
-  descriptionKey: string;
-  urlLabelKey: string;
-  placeholderKey: string;
-  examplesKey: string;
-}> = {
-  github: {
-    tabLabelKey: 'githubTabLabel',
-    descriptionKey: 'githubImportDescription',
-    urlLabelKey: 'githubImportUrlLabel',
-    placeholderKey: 'githubSkillPlaceholder',
-    examplesKey: 'githubImportExamples',
-  },
-  clawhub: {
-    tabLabelKey: 'clawhubTabLabel',
-    descriptionKey: 'clawhubImportDescription',
-    urlLabelKey: 'clawhubImportUrlLabel',
-    placeholderKey: 'clawhubSkillPlaceholder',
-    examplesKey: 'clawhubImportExamples',
-  },
-};
-
 interface SkillsManagerProps {
   readOnly?: boolean;
   onCreateByChat?: () => void;
@@ -113,11 +87,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
   const [isDownloadingSkill, setIsDownloadingSkill] = useState(false);
   const [isAddSkillMenuOpen, setIsAddSkillMenuOpen] = useState(false);
   const [isRemoteImportOpen, setIsRemoteImportOpen] = useState(false);
-  const [importTab, setImportTab] = useState<ImportSourceType>('github');
   const [activeTab, setActiveTab] = useState<SkillTab>('installed');
   const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
-  const [marketTags, setMarketTags] = useState<MarketTag[]>([]);
-  const [activeMarketTag, setActiveMarketTag] = useState('all');
   const [marketplacePage, setMarketplacePage] = useState(1);
   const [marketplacePageSize, setMarketplacePageSize] = useState(estimateMarketplacePageSize);
   const [isLoadingMarketplace, setIsLoadingMarketplace] = useState(false);
@@ -139,8 +110,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     setIsLoadingMarketplace(true);
     try {
       const data = await skillService.fetchMarketplaceSkills({ forceRefresh });
-      setMarketplaceSkills(data.skills);
-      setMarketTags(data.tags);
+      setMarketplaceSkills(data);
       return data;
     } finally {
       setIsLoadingMarketplace(false);
@@ -173,30 +143,15 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
   }, [dispatch]);
 
   useEffect(() => {
-    let isActive = true;
-    refreshMarketplace(false).then((data) => {
-      if (!isActive) return;
-      setMarketplaceSkills(data.skills);
-      setMarketTags(data.tags);
-    });
-    return () => { isActive = false; };
+    refreshMarketplace(false).catch(() => undefined);
   }, [refreshMarketplace]);
 
   useEffect(() => {
     if (activeTab !== 'marketplace') return;
 
-    let isActive = true;
-    refreshMarketplace(true).then((data) => {
-      if (!isActive) return;
-      setMarketplaceSkills(data.skills);
-      setMarketTags(data.tags);
-    }).catch(() => {
+    refreshMarketplace(true).catch(() => {
       // The refresh helper already keeps the current list if fetch fails.
     });
-
-    return () => {
-      isActive = false;
-    };
   }, [activeTab, refreshMarketplace]);
 
   useEffect(() => {
@@ -263,7 +218,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     return () => {
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isRemoteImportOpen, importTab]);
+  }, [isRemoteImportOpen]);
 
   useEffect(() => {
     const hasOpenDialog = selectedSkill || selectedMarketplaceSkill;
@@ -311,11 +266,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           || resolveLocalizedText(skill.description).toLowerCase().includes(query);
       });
     }
-    if (activeMarketTag !== 'all') {
-      results = results.filter(skill => skill.tags?.includes(activeMarketTag));
-    }
     return results;
-  }, [marketplaceSkills, skillSearchQuery, activeMarketTag]);
+  }, [marketplaceSkills, skillSearchQuery]);
 
   const marketplacePageCount = Math.max(1, Math.ceil(filteredMarketplaceSkills.length / marketplacePageSize));
   const marketplacePageItems = useMemo(() => {
@@ -329,7 +281,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
 
   useEffect(() => {
     setMarketplacePage(1);
-  }, [skillSearchQuery, activeMarketTag, activeTab]);
+  }, [skillSearchQuery, activeTab]);
 
   useEffect(() => {
     if (marketplacePage > marketplacePageCount) {
@@ -476,24 +428,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     const trimmed = skillDownloadSource.trim();
     if (!trimmed) return;
 
-    // Validate URL matches the selected tab
     try {
-      const url = new URL(trimmed);
-      const host = url.hostname.toLowerCase();
-      if (importTab === 'clawhub' && host !== 'clawhub.ai' && host !== 'www.clawhub.ai') {
-        setSkillActionError(i18nService.t('importSourceMismatchClawhub'));
-        return;
-      }
-      if (importTab === 'github' && !host.includes('github.com') && !host.includes('github.io')) {
-        setSkillActionError(i18nService.t('importSourceMismatchGithub'));
-        return;
-      }
+      new URL(trimmed);
     } catch {
       // Not a URL (e.g. "owner/repo" shorthand for GitHub) — only allow on GitHub tab
-      if (importTab === 'clawhub') {
-        setSkillActionError(i18nService.t('importSourceMismatchClawhub'));
-        return;
-      }
+      // Allow non-URL sources such as owner/repo and npm package specs.
     }
 
     await handleAddSkillFromSource(trimmed, 'remote');
@@ -511,20 +450,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
     setInstallingSkillId(skill.id);
     setSkillActionError('');
     try {
-      let result = await skillService.downloadSkill(installSource);
-      if (!result.success && MARKETPLACE_RETRYABLE_ERROR_CODES.has(result.errorCode || '')) {
-        const latestMarketplace = await refreshMarketplace(true);
-        const latestSkill = latestMarketplace.skills.find(item => item.id === skill.id);
-        if (!latestSkill) {
-          setSkillActionError(i18nService.t('skillDownloadFailedNotFound'));
-          return;
-        }
-        if (!latestSkill.installSource) {
-          setSkillActionError(i18nService.t('skillDownloadFailedNotFound'));
-          return;
-        }
-        result = await skillService.downloadSkill(latestSkill.installSource);
-      }
+      const result = await skillService.downloadSkill(installSource);
       if (!result.success) {
         setSkillActionError(result.error || i18nService.t('skillInstallFailed'));
         return;
@@ -547,14 +473,21 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
   };
 
   const handleSecurityReportAction = async (action: 'install' | 'installDisabled' | 'cancel') => {
+    if (action === 'cancel') {
+      setSecurityReport(null);
+      setPendingInstallId(null);
+      setPendingImportSource(null);
+      setSkillActionError('');
+      return;
+    }
     if (!pendingInstallId) return;
     setIsConfirmingInstall(true);
-    let shouldCloseSecurityReport = action === 'cancel';
+    let shouldCloseSecurityReport = false;
     try {
       const result = await skillService.confirmInstall(pendingInstallId, action);
       if (result.success && result.skills) {
         dispatch(setSkills(result.skills));
-        if (action !== 'cancel' && pendingImportSource) {
+        if (pendingImportSource) {
           showToast(i18nService.t('skillImportSuccess'));
         }
         shouldCloseSecurityReport = true;
@@ -714,32 +647,6 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           </Button>
         </div>
 
-        {/* Tag filter pills (Marketplace only) */}
-        {activeTab === 'marketplace' && !isLoadingMarketplace && marketTags.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Button
-              type="button"
-              variant={activeMarketTag === 'all' ? 'default' : 'outline'}
-              size="xs"
-              onClick={() => setActiveMarketTag('all')}
-              className="px-2.5 py-1 text-xs rounded-lg transition-colors"
-            >
-              {i18nService.t('skillCategoryAll')}
-            </Button>
-            {marketTags.map((tag) => (
-              <Button
-                key={tag.id}
-                type="button"
-                variant={activeMarketTag === tag.id ? 'default' : 'outline'}
-                size="xs"
-                onClick={() => setActiveMarketTag(tag.id)}
-                className="px-2.5 py-1 text-xs rounded-lg transition-colors"
-              >
-                {resolveLocalizedText(tag)}
-              </Button>
-            ))}
-          </div>
-        )}
       </div>
 
       <div>
@@ -839,11 +746,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => void window.electron.shell.openExternal('https://clawhub.ai/skills')}
+                onClick={() => void window.electron.shell.openExternal('https://modelscope.cn/skills')}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
               >
                 <Link className="h-3.5 w-3.5" />
-                {i18nService.t('skillMarketplaceOpenClawHub')}
+                {i18nService.t('skillMarketplaceOpenExternal')}
               </Button>
             </div>
             {filteredMarketplaceSkills.length === 0 ? (
@@ -879,7 +786,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                           </span>
                         );
                       }
-                      return !readOnly ? (
+                      return !readOnly && skill.installSource ? (
                         <Button
                           type="button"
                           size="xs"
@@ -1053,7 +960,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                   </div>
                 );
               }
-              return !readOnly ? (
+              return !readOnly && selectedMarketplaceSkill.installSource ? (
                 <Button
                   type="button"
                   onClick={() => handleInstallMarketplaceSkill(selectedMarketplaceSkill)}
@@ -1228,40 +1135,23 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               </Button>
             </div>
 
-            <div className="mt-4 flex items-center gap-1 border-b border-border">
-              {importSourceTypes.map((type) => (
-                <Button
-                  key={type}
-                  type="button"
-                  variant={importTab === type ? 'default' : 'ghost'}
-                  onClick={() => { setImportTab(type); setSkillDownloadSource(''); setSkillActionError(''); }}
-                  className="px-3 py-1.5 text-sm font-medium transition-colors relative rounded-none"
-                >
-                  {i18nService.t(importTabConfig[type].tabLabelKey)}
-                  {importTab === type && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                  )}
-                </Button>
-              ))}
-            </div>
-
             <div className="mt-4 space-y-3">
               <p className="text-sm text-muted-foreground">
-                {i18nService.t(importTabConfig[importTab].descriptionKey)}
+                {i18nService.t('remoteSkillImportDescription')}
               </p>
               <div className="text-xs font-semibold tracking-wide text-muted-foreground">
-                {i18nService.t(importTabConfig[importTab].urlLabelKey)}
+                {i18nService.t('remoteSkillImportUrlLabel')}
               </div>
               <Input
                 ref={importInputRef}
                 type="text"
                 value={skillDownloadSource}
                 onChange={(e) => setSkillDownloadSource(e.target.value)}
-                placeholder={i18nService.t(importTabConfig[importTab].placeholderKey)}
+                placeholder={i18nService.t('remoteSkillImportPlaceholder')}
                 className="w-full px-3 py-2.5 text-sm rounded-xl bg-background text-foreground placeholder-secondary border border-border focus-visible:ring-2 focus-visible:ring-primary"
               />
               <p className="text-xs text-muted-foreground">
-                {i18nService.t(importTabConfig[importTab].examplesKey)}
+                {i18nService.t('remoteSkillImportExamples')}
               </p>
               {skillActionError && (
                 <div className="text-xs text-red-500">
@@ -1285,6 +1175,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           report={securityReport}
           onAction={handleSecurityReportAction}
           isLoading={isConfirmingInstall}
+          error={skillActionError}
         />
       )}
 

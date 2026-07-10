@@ -93,10 +93,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Skill manager errors
     skillErrNoSkillMd: '来源中未找到 SKILL.md',
     skillErrInvalidSource:
-      '无效的技能来源。支持 owner/repo、仓库链接、npm 包名、ClawHub 链接或 GitHub tree/blob 链接。',
+      '无效的技能来源。支持 owner/repo、仓库链接、npm 包名、ModelScope 技能链接或 GitHub tree/blob 链接。',
+    skillErrModelScopeInstallUnavailable: '此 ModelScope 技能未提供可安装的源码或压缩包链接，请在 ModelScope 页面查看安装说明。',
     skillErrAlreadyInstalled: '技能 {name} 已安装。如需覆盖安装，请先删除旧版本后重试。',
-    skillErrClawhubNotFound: '在 ClawHub 上未找到该技能，请检查链接是否正确。',
-    skillErrClawhubDownloadFailed: '从 ClawHub 下载技能失败，请稍后重试。',
 
     // Gateway startup phases
     gatewayStartupPrecompiling: '正在预编译网关模块...',
@@ -371,10 +370,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Skill manager errors
     skillErrNoSkillMd: 'No SKILL.md found in source',
     skillErrInvalidSource:
-      'Invalid skill source. Use owner/repo, repo URL, npm package spec, ClawHub URL, or a GitHub tree/blob URL.',
+      'Invalid skill source. Use owner/repo, repo URL, npm package spec, a ModelScope skill URL, or a GitHub tree/blob URL.',
+    skillErrModelScopeInstallUnavailable: 'This ModelScope skill does not provide an installable source or archive. Check its ModelScope page for installation instructions.',
     skillErrAlreadyInstalled: 'Skill {name} is already installed. Remove the existing version and try again.',
-    skillErrClawhubNotFound: 'Skill not found on ClawHub. Please check the URL.',
-    skillErrClawhubDownloadFailed: 'Failed to download skill from ClawHub. Please try again later.',
 
     // Gateway startup phases
     gatewayStartupPrecompiling: 'Pre-compiling gateway bundle...',

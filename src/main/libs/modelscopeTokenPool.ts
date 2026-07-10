@@ -12,6 +12,10 @@ export type ModelScopeTokenPool = {
 
 const TOKEN_RESOURCE_FILE = 'modelscope.tokens.local.json';
 
+export const ModelScopeStoreKey = {
+  ApiToken: 'marketplace_modelscope_token',
+} as const;
+
 export function createModelScopeTokenPool(options: {
   env?: NodeJS.ProcessEnv;
   cwd?: string;

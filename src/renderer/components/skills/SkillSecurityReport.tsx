@@ -29,6 +29,7 @@ interface SkillSecurityReportProps {
   report: SkillSecurityReport;
   onAction: (action: 'install' | 'installDisabled' | 'cancel') => void;
   isLoading?: boolean;
+  error?: string;
 }
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -54,6 +55,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
   report,
   onAction,
   isLoading,
+  error,
 }) => {
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set());
 
@@ -113,6 +115,11 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
           <p className="text-sm text-muted-foreground">
             {i18nService.t('securityIssuesFound').replace('{name}', report.skillName)}
           </p>
+          {error && (
+            <p className="mt-2 text-xs text-red-500" role="alert">
+              {error}
+            </p>
+          )}
         </div>
 
         {/* Findings - scrollable area */}

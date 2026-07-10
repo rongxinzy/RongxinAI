@@ -11,8 +11,7 @@ import { migrateScheduledTaskRunsToOpenclaw, migrateScheduledTasksToOpenclaw } f
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
-import { CoworkStreamIpc } from '../shared/ipc/channels';
-import { McpIpc } from '../shared/ipc/channels';
+import { CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
@@ -72,7 +71,7 @@ import { saveCoworkApiConfig } from './libs/coworkConfigStore';
 import { getCoworkLogPath } from './libs/coworkLogger';
 import { registerProxyTokenRefresher, startCoworkOpenAICompatProxy, stopCoworkOpenAICompatProxy } from './libs/coworkOpenAICompatProxy';
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
-import { getMcpMarketplaceUrl, getServerApiBaseUrl, getSkillStoreUrl, refreshEndpointsTestMode } from './libs/endpoints';
+import { getMcpMarketplaceUrl, getServerApiBaseUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import { mergeEnterpriseOpenclawConfig, resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { LlamaCppOpenClawEligibilityReason } from './libs/llamacppOpenClawBinding';
@@ -82,6 +81,8 @@ import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { validateMcpServerConfig, validateStoredMcpServerConfig } from './libs/mcpCommandValidation';
 import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import { McpServerManager } from './libs/mcpServerManager';
+import { fetchModelScopeSkillMarketplace } from './libs/modelscopeSkillMarketplace';
+import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { OllamaManager } from './libs/ollamaManager';
 import { parsePrimaryModelRef, resolveQualifiedAgentModelRef } from './libs/openclawAgentModels';
@@ -111,12 +112,6 @@ import { startOpenClawTokenProxy, stopOpenClawTokenProxy } from './libs/openclaw
 import { migrateMainAgentWorkspace } from './libs/openclawWorkspaceMigration';
 import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
-import {
-  buildClawHubSkillInstallSource,
-  buildClawHubSkillPageUrl,
-  findAmbiguousClawHubSkillSlugs,
-  mergeClawHubSkillDetail,
-} from './libs/skillMarketplace';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
 import {
@@ -168,7 +163,6 @@ const IPC_MAX_KEYS = 80;
 const IPC_MAX_ITEMS = 40;
 const MAX_INLINE_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 import { ENGINE_NOT_READY_CODE } from '../common/coworkError';
-const HIDDEN_SKILL_MARKETPLACE_IDS = new Set(['youdaonote', 'youdao-note', 'youdao_note']);
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
 } as const;
@@ -200,43 +194,6 @@ function sanitizeOptionalPatchValue(
     throw new Error('Session patch value is too long.');
   }
   return trimmed;
-}
-
-function isHiddenSkillMarketplaceItem(item: Record<string, unknown>): boolean {
-  const values = [
-    item.slug,
-    item.id,
-    item.name,
-    item.displayName,
-  ].map((value) => String(value ?? '').trim().toLowerCase());
-  return values.some((value) => HIDDEN_SKILL_MARKETPLACE_IDS.has(value) || value.includes('youdaonote'));
-}
-
-function readSkillMarketplaceSlug(item: Record<string, unknown>): string | null {
-  const value = typeof item.slug === 'string' ? item.slug.trim() : '';
-  return value || null;
-}
-
-async function enrichSkillMarketplaceItem(
-  apiUrl: string,
-  item: Record<string, unknown>,
-): Promise<Record<string, unknown> | null> {
-  const slug = readSkillMarketplaceSlug(item);
-  if (!slug) return item;
-
-  const detailUrl = `${apiUrl.replace(/\/+$/, '')}/${encodeURIComponent(slug)}`;
-  try {
-    const response = await fetch(detailUrl, { signal: AbortSignal.timeout(5000) });
-    if (!response.ok) {
-      console.warn(`[SkillMarketplace] failed to fetch detail for "${slug}": HTTP ${response.status}`);
-      return null;
-    }
-    const detailPayload = await response.json();
-    return mergeClawHubSkillDetail(item, detailPayload);
-  } catch (error) {
-    console.warn(`[SkillMarketplace] failed to enrich "${slug}", using list item only:`, error);
-    return item;
-  }
 }
 
 function sanitizeOpenClawSessionPatch(input: unknown): OpenClawSessionPatch {
@@ -2934,75 +2891,19 @@ if (!gotTheLock) {
     return getSkillManager().testEmailConnectivity(skillId, config);
   });
 
-  ipcMain.handle('skills:fetchMarketplace', async () => {
-    const url = getSkillStoreUrl();
-    const clawhubBase = 'https://clawhub.ai/api/v1/skills';
-    const apiUrl = url || clawhubBase;
-    console.log(`[SkillMarketplace] fetching from: ${apiUrl}`);
+  ipcMain.handle(SkillsIpc.FetchMarketplace, async () => {
     try {
-      const FEATURED_LIMIT = 40;
-      const separator = apiUrl.includes('?') ? '&' : '?';
-      const pageUrl = `${apiUrl}${separator}limit=${FEATURED_LIMIT}&sort=stars`;
-      const pageResponse = await fetch(pageUrl, { signal: AbortSignal.timeout(8000) });
-      if (!pageResponse.ok) {
-        throw new Error(`ClawHub returned HTTP ${pageResponse.status}`);
-      }
-      const pageData = await pageResponse.json() as {
-        items?: Array<Record<string, unknown>>;
-      };
-      const allItems = (pageData.items ?? [])
-        .filter((item) => !isHiddenSkillMarketplaceItem(item))
-        .sort((left, right) => {
-        const leftStats = left.stats as Record<string, number> | undefined;
-        const rightStats = right.stats as Record<string, number> | undefined;
-        const leftScore =
-          (leftStats?.stars ?? 0) * 1000 +
-          (leftStats?.installsAllTime ?? 0) * 10 +
-          (leftStats?.downloads ?? 0);
-        const rightScore =
-          (rightStats?.stars ?? 0) * 1000 +
-          (rightStats?.installsAllTime ?? 0) * 10 +
-          (rightStats?.downloads ?? 0);
-        return rightScore - leftScore;
+      const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
+      const token = createModelScopeTokenPool({
+        extraTokens: userToken ? [userToken] : [],
+      }).nextToken();
+      console.log('[SkillMarketplace] fetching skills from ModelScope OpenAPI');
+      const data = await fetchModelScopeSkillMarketplace({
+        token,
+        fetchImpl: (input, init) =>
+          session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<typeof fetch>,
       });
-
-      console.log(`[SkillMarketplace] fetched ${allItems.length} featured skills`);
-
-      const enrichedItems = (await Promise.all(allItems.map((item) => enrichSkillMarketplaceItem(apiUrl, item))))
-        .filter((item): item is Record<string, unknown> => item !== null);
-      const ambiguousSlugs = findAmbiguousClawHubSkillSlugs(enrichedItems);
-      const installableItems = enrichedItems.filter((item) => {
-        const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
-        return slug && !ambiguousSlugs.has(slug);
-      });
-
-      console.log(`[SkillMarketplace] fetched ${allItems.length} featured skills, ${installableItems.length} remain after installability validation`);
-
-      const marketplace = installableItems
-        .map((item) => {
-        const skillUrl = buildClawHubSkillPageUrl('https://clawhub.ai', item);
-        const installSource = buildClawHubSkillInstallSource(item);
-        const sourceUrl = 'https://clawhub.ai';
-        return {
-          id: item.slug || item.id,
-          name: item.displayName || item.name,
-          description: item.summary || item.description || '',
-          tags: item.tags ? Object.keys(item.tags as Record<string, unknown>) : [],
-          stats: item.stats,
-          url: skillUrl,
-          installSource,
-          version: ((item.tags as Record<string, string> | undefined)?.latest) || '1.0.0',
-          source: {
-            from: 'ClawHub',
-            url: sourceUrl,
-            author: ((item.owner as Record<string, unknown> | undefined)?.displayName as string) ?? '',
-          },
-        };
-      })
-        .filter((item) => typeof item.installSource === 'string' && item.installSource.length > 0);
-
-      const result = JSON.stringify({ data: { value: { marketplace, marketTags: [], localSkill: [] } } });
-      return { success: true, data: result };
+      return { success: true, data };
     } catch (error) {
       console.error('[SkillMarketplace] fetch error:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Failed to fetch skill marketplace' };
