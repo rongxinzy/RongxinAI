@@ -133,9 +133,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     const agentId = session.agentId?.trim() || AgentId.Main;
 
-    if (agentId !== currentAgentId) {
-      agentService.switchAgent(agentId);
-      await coworkService.loadSessions(agentId);
+    // Chat sessions are not scoped to agents — skip loadSessions
+    // to avoid replacing the full sessions list with a filtered subset.
+    if (session.mode !== 'chat') {
+      if (agentId !== currentAgentId) {
+        agentService.switchAgent(agentId);
+        await coworkService.loadSessions(agentId);
+      }
     }
     onShowCowork();
     await coworkService.loadSession(session.id);
