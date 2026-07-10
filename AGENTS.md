@@ -494,3 +494,24 @@ These global skills complement, not replace, the conventions in this file.
 >   background-color: var(--lobster-primary);
 > }
 > ```
+>
+> **CRITICAL: Tailwind v3 vs v4 Variant Syntax**
+>
+> This project uses **Tailwind v3.4**. shadcn components installed via CLI may use **Tailwind v4 shorthand syntax** that Tailwind v3 does not recognize, causing variant classes to silently fail — the class is written to the DOM but no CSS is generated.
+>
+> | Variant | Tailwind v4 (shorthand) | Tailwind v3.4 (full syntax) |
+> |---------|------------------------|---------------------------|
+> | `data-*` attribute | `data-active:bg-background` | `data-[active]:bg-background` |
+> | `data-*` with value | `data-checked:bg-primary` | `data-[checked]:bg-primary` |
+> | `data-*` boolean | `data-disabled:opacity-50` | `data-[disabled]:opacity-50` |
+>
+> **How to detect**: Search the compiled CSS for the shorthand variant. If `data-active:bg-background` is in the component source but no matching rule in `dist/assets/index-*.css`, it hasn't been generated.
+>
+> **How to fix**: In the shadcn component file (`src/shared/components/ui/<component>.tsx`), find-and-replace all shorthand `data-<attr>:` with full syntax `data-[<attr>]:`. For example:
+>
+> ```diff
+> - data-active:bg-background data-active:text-foreground
+> + data-[active]:bg-background data-[active]:text-foreground
+> ```
+>
+> **Affected components** (known): `tabs.tsx` — all `data-active:` variants, `data-horizontal:` on Tabs root.

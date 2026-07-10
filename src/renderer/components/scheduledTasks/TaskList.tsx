@@ -1,5 +1,19 @@
 import { Button } from '@shared/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@shared/components/ui/table';
 import { Clock, EllipsisVertical } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -23,20 +37,6 @@ interface TaskListItemProps {
 
 const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) => {
   const dispatch = useDispatch();
-  const [showMenu, setShowMenu] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMenu]);
 
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
@@ -44,106 +44,87 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
   const statusTone = getStatusTone(displayStatus);
 
   return (
-    <div
-      className="grid grid-cols-[1.2fr_1fr_110px_40px] items-center gap-3 px-4 py-3 border-b border-border-subtle hover:bg-surface-raised/50 cursor-pointer transition-colors"
+    <TableRow
+      className="cursor-pointer"
       onClick={() => dispatch(selectTask(task.id))}
     >
-      <div className="min-w-0">
+      <TableCell className="max-w-[240px] min-w-0">
         <div className={`text-sm truncate ${task.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
           {task.name}
         </div>
         {task.description && (
           <div className="text-xs truncate text-muted-foreground">{task.description}</div>
         )}
-      </div>
+      </TableCell>
 
-      <div className="min-w-0">
-        <div className="text-sm truncate text-muted-foreground">{formatScheduleLabel(task.schedule)}</div>
+      <TableCell>
+        <div className="text-sm truncate text-muted-foreground">
+          {formatScheduleLabel(task.schedule)}
+        </div>
         {task.enabled && task.state.nextRunAtMs !== null && (
           <div className="text-xs truncate text-muted-foreground/60 mt-0.5">
             {formatNextRunRelative(task.state.nextRunAtMs)}
           </div>
         )}
-      </div>
+      </TableCell>
 
-      <div className="flex items-center justify-between gap-2">
-        <span className={`text-xs font-medium ${statusTone}`}>{statusLabel}</span>
-        <Switch
-          checked={task.enabled}
-          onCheckedChange={(checked: boolean) => {
-            void scheduledTaskService.toggleTask(task.id, checked);
-          }}
-        />
-      </div>
-
-      <div className="flex justify-center">
-        <div className="relative" ref={menuRef}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={event => {
-              event.stopPropagation();
-              setShowMenu(value => !value);
+      <TableCell className="w-28">
+        <div className="flex items-center justify-between gap-2">
+          <span className={`text-xs font-medium ${statusTone}`}>{statusLabel}</span>
+          <Switch
+            checked={task.enabled}
+            onCheckedChange={(checked: boolean) => {
+              void scheduledTaskService.toggleTask(task.id, checked);
             }}
-            className="p-1.5 rounded-md text-muted-foreground hover:bg-surface-raised transition-colors"
-          >
-            <EllipsisVertical className="w-5 h-5" />
-          </Button>
-          {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-32 rounded-lg shadow-lg bg-surface border border-border z-50 py-1">
-              {task.state.runningAtMs ? (
-                <span className="block w-full text-left px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400">
-                  {i18nService.t('scheduledTasksStatusRunning')}
-                </span>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={event => {
-                    event.stopPropagation();
-                    setShowMenu(false);
-                    void scheduledTaskService.runManually(task.id);
-                  }}
-                  className="w-full justify-start text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
-                  title={i18nService.t('scheduledTasksRunPreemptWarning')}
-                >
-                  {i18nService.t('scheduledTasksRun')}
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={event => {
-                  event.stopPropagation();
-                  setShowMenu(false);
-                  dispatch(selectTask(task.id));
-                  dispatch(setViewMode('edit'));
-                }}
-                className="w-full justify-start text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-raised"
-              >
-                {i18nService.t('scheduledTasksEdit')}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={event => {
-                  event.stopPropagation();
-                  setShowMenu(false);
-                  onRequestDelete(task.id, task.name);
-                }}
-                className="w-full justify-start text-left px-3 py-1.5 text-sm text-red-500 hover:bg-surface-raised"
-              >
-                {i18nService.t('scheduledTasksDelete')}
-              </Button>
-            </div>
-          )}
+          />
         </div>
-      </div>
-    </div>
+      </TableCell>
+
+      <TableCell className="w-10 text-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon" />}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <EllipsisVertical />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {task.state.runningAtMs ? (
+              <DropdownMenuItem disabled>
+                {i18nService.t('scheduledTasksStatusRunning')}
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  void scheduledTaskService.runManually(task.id);
+                }}
+              >
+                {i18nService.t('scheduledTasksRun')}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                dispatch(selectTask(task.id));
+                dispatch(setViewMode('edit'));
+              }}
+            >
+              {i18nService.t('scheduledTasksEdit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onRequestDelete(task.id, task.name);
+              }}
+            >
+              {i18nService.t('scheduledTasksDelete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
   );
 };
 
@@ -166,7 +147,7 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6">
-        <Clock className="h-12 w-12 text-muted-foreground/40 mb-4" />
+        <Clock className="size-12 text-muted-foreground/40 mb-4" />
         <p className="text-sm font-medium text-muted-foreground mb-1">
           {i18nService.t('scheduledTasksEmptyState')}
         </p>
@@ -178,25 +159,21 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-[1.2fr_1fr_110px_40px] items-center gap-3 px-4 py-2 border-b border-border-subtle">
-        <div className="text-xs font-medium text-muted-foreground">
-          {i18nService.t('scheduledTasksListColTitle')}
-        </div>
-        <div className="text-xs font-medium text-muted-foreground">
-          {i18nService.t('scheduledTasksListColSchedule')}
-        </div>
-        <div className="text-xs font-medium text-muted-foreground">
-          {i18nService.t('scheduledTasksListColStatus')}
-        </div>
-        <div className="text-xs font-medium text-muted-foreground text-center">
-          {i18nService.t('scheduledTasksListColMore')}
-        </div>
-      </div>
-      {tasks.map(task => (
-        <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
-      ))}
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{i18nService.t('scheduledTasksListColTitle')}</TableHead>
+          <TableHead>{i18nService.t('scheduledTasksListColSchedule')}</TableHead>
+          <TableHead className="w-28">{i18nService.t('scheduledTasksListColStatus')}</TableHead>
+          <TableHead className="w-10">{i18nService.t('scheduledTasksListColMore')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {tasks.map(task => (
+          <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
+        ))}
+      </TableBody>
+    </Table>
   );
 };
 

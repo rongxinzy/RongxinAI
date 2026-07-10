@@ -1,4 +1,14 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { Spinner } from '@shared/components/ui/spinner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@shared/components/ui/table';
 import { X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -18,29 +28,18 @@ interface TaskRunHistoryProps {
   taskPrompt?: string;
 }
 
-// 单个任务同时只能运行一个实例，\"运行中\"状态在任务列表头已展示，
-// 历史记录页面不需要此过滤选项。如需恢复：取消注释并加回 STATUS_OPTIONS。
 const STATUS_OPTIONS = ['success', 'error', 'skipped'] as const;
+
+const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  success: 'default',
+  error: 'destructive',
+  skipped: 'outline',
+};
 
 const statusLabelKeys: Record<string, string> = {
   success: 'scheduledTasksStatusSuccess',
   error: 'scheduledTasksStatusError',
   skipped: 'scheduledTasksStatusSkipped',
-  // running: 'scheduledTasksStatusRunning',
-};
-
-const statusPillColors: Record<string, string> = {
-  success: 'bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400',
-  error: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400',
-  skipped: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400',
-  // running: 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400',
-};
-
-const statusIcons: Record<string, { icon: string; color: string }> = {
-  success: { icon: '✓', color: 'text-green-500' },
-  error: { icon: '✗', color: 'text-red-500' },
-  skipped: { icon: '↷', color: 'text-yellow-500' },
-  // running: { icon: '●', color: 'text-blue-500' },
 };
 
 function applyClientFilter(runs: ScheduledTaskRun[], filter: RunFilter): ScheduledTaskRun[] {
@@ -103,32 +102,24 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
 
   return (
     <div>
-      {/* Filter: status pills + date range, compact inline */}
+      {/* Filter: status pills + date range */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3">
-        {/* Status pills */}
         <div className="flex items-center gap-1">
           {STATUS_OPTIONS.map(s => {
             const isActive = filter.status === s;
             return (
-              <Button
+              <Badge
                 key={s}
-                type="button"
-                variant={isActive ? 'outline' : 'ghost'}
-                size="xs"
+                variant={isActive ? statusVariant[s] : 'ghost'}
+                className="cursor-pointer"
                 onClick={() => handleStatusToggle(s)}
-                className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                  isActive
-                    ? statusPillColors[s]
-                    : 'border-transparent text-muted-foreground hover:bg-surface-raised'
-                }`}
               >
                 {i18nService.t(statusLabelKeys[s])}
-              </Button>
+              </Badge>
             );
           })}
         </div>
 
-        {/* Date range + clear */}
         <div className="flex items-center gap-1.5 ml-auto">
           <DateInput
             value={filter.startDate ?? ''}
@@ -136,7 +127,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
             onChange={v => handleFilterChange({ ...filter, startDate: v || undefined })}
             placeholder={i18nService.t('scheduledTasksFilterStartDate')}
           />
-          <span className="text-xs text-muted-foreground/50">–</span>
+          <span className="text-xs text-muted-foreground">–</span>
           <DateInput
             value={filter.endDate ?? ''}
             min={filter.startDate}
@@ -147,12 +138,12 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
             <Button
               type="button"
               variant="ghost"
-              size="icon-xs"
+              size="icon"
               onClick={handleClearFilter}
-              className="ml-0.5 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
+              className="size-6"
               title={i18nService.t('scheduledTasksFilterClear')}
             >
-              <X className="h-3 w-3" />
+              <X className="size-3" />
             </Button>
           )}
         </div>
@@ -165,50 +156,71 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
             : i18nService.t('scheduledTasksNoRuns')}
         </div>
       ) : (
-        <div className="divide-y divide-border/50">
-          {displayedRuns.map(run => {
-            const statusInfo = statusIcons[run.status] || { icon: '?', color: '' };
-            return (
-              <div key={run.id} className="flex items-center justify-between py-2.5 px-1">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`text-sm font-bold ${statusInfo.color}`}>{statusInfo.icon}</span>
-                  <div className="min-w-0">
-                    <span className="text-sm text-foreground">
-                      {formatDateTime(new Date(run.startedAt))}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-8" />
+              <TableHead>{i18nService.t('scheduledTasksHistoryColTime')}</TableHead>
+              <TableHead>{i18nService.t('scheduledTasksHistoryColStatus')}</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayedRuns.map(run => (
+              <TableRow key={run.id}>
+                <TableCell>
+                  {run.status === 'running' ? (
+                    <Spinner className="size-3.5" />
+                  ) : (
+                    <span className={`text-sm font-bold ${
+                      run.status === 'success' ? 'text-green-500' :
+                      run.status === 'error' ? 'text-destructive' :
+                      'text-yellow-500'
+                    }`}>
+                      {run.status === 'success' ? '✓' : run.status === 'error' ? '✗' : '↷'}
                     </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0 ml-2">
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-foreground">
+                    {formatDateTime(new Date(run.startedAt))}
+                  </span>
+                </TableCell>
+                <TableCell>
                   {run.durationMs !== null && (
-                    <span className="text-xs text-muted-foreground">{formatDuration(run.durationMs)}</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {formatDuration(run.durationMs)}
+                    </span>
                   )}
-                  {run.status === 'error' && run.error && (
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="xs"
-                      onClick={() => setViewingError(run)}
-                      className="text-xs text-primary hover:text-primary-hover transition-colors p-0 h-auto"
-                    >
-                      {i18nService.t('scheduledTasksViewFailureDetails')}
-                    </Button>
-                  )}
-                  {(run.sessionId || run.sessionKey) && (
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="xs"
-                      onClick={() => setViewingRun(run)}
-                      className="text-xs text-primary hover:text-primary-hover transition-colors p-0 h-auto"
-                    >
-                      {i18nService.t('scheduledTasksViewSession')}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {run.status === 'error' && run.error && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setViewingError(run)}
+                      >
+                        {i18nService.t('scheduledTasksViewFailureDetails')}
+                      </Button>
+                    )}
+                    {(run.sessionId || run.sessionKey) && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setViewingRun(run)}
+                      >
+                        {i18nService.t('scheduledTasksViewSession')}
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {hasMore && (
@@ -216,7 +228,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
           type="button"
           variant="ghost"
           onClick={handleLoadMore}
-          className="w-full py-2 mt-2 text-sm text-primary hover:text-primary-hover transition-colors"
+          className="w-full py-2 mt-2"
         >
           {i18nService.t('scheduledTasksLoadMore')}
         </Button>
