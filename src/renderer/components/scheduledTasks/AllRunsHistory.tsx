@@ -172,7 +172,7 @@ const AllRunsHistory: React.FC = () => {
                   className={isClickable ? 'cursor-pointer hover:bg-muted' : 'hover:bg-muted'}
                   onClick={() => handleRowClick(run)}
                 >
-                  <TableCell className="max-w-[240px] min-w-0">
+                  <TableCell className="max-w-[180px] min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm text-foreground truncate">
                         {run.taskName}

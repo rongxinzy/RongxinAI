@@ -60,7 +60,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
       className="cursor-pointer hover:bg-muted"
       onClick={() => dispatch(selectTask(task.id))}
     >
-      <TableCell className="max-w-[240px] min-w-0">
+      <TableCell className="max-w-[180px] min-w-0">
         <div className={cn(
           'text-sm truncate',
           task.enabled ? 'text-foreground' : 'text-muted-foreground',
