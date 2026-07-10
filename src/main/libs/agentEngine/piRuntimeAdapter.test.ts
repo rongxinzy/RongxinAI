@@ -193,10 +193,12 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('stopSession', () => {
-    it('should deactivate session', async () => {
+    it('should keep session active (preserves history for continueSession)', async () => {
       await adapter.startSession('test', 'Hello');
       adapter.stopSession('test');
-      expect(adapter.isSessionActive('test')).toBe(false);
+      // Session stays active so continueSession can find it and preserve history
+      expect(adapter.isSessionActive('test')).toBe(true);
+      expect(mockSession.abort).toHaveBeenCalled();
     });
 
     it('should be safe to call on unknown session', () => {
@@ -206,12 +208,13 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('stopAllSessions', () => {
-    it('should deactivate all sessions', async () => {
+    it('should keep all sessions active (preserves history)', async () => {
       await adapter.startSession('s1', 'A');
       await adapter.startSession('s2', 'B');
       adapter.stopAllSessions();
-      expect(adapter.isSessionActive('s1')).toBe(false);
-      expect(adapter.isSessionActive('s2')).toBe(false);
+      // Sessions stay active so continueSession can find them
+      expect(adapter.isSessionActive('s1')).toBe(true);
+      expect(adapter.isSessionActive('s2')).toBe(true);
     });
   });
 

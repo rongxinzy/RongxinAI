@@ -419,12 +419,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const active = this.activeSessions.get(sessionId);
     if (!active) return;
 
+    // Only abort the current turn — keep the session alive in activeSessions
+    // so continueSession can find it and preserve conversation history.
     active.abortController.abort();
-    active.unsubscribe();
     void active.piSession.abort();
-    this.activeSessions.delete(sessionId);
-    this.clearApprovalsBySession(sessionId);
-    this.clearThrottleStateBySession(sessionId);
     this.emit('sessionStopped', sessionId);
   }
 
@@ -459,6 +457,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
   onSessionDeleted(sessionId: string): void {
     this.stopSession(sessionId);
+    this.activeSessions.delete(sessionId);
   }
 
   // ── Chat mode: direct LLM without agent loop ──
