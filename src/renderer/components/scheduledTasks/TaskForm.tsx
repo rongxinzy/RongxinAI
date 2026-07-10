@@ -24,11 +24,13 @@ import {
   resolveOpenClawModelSupportMessageKey,
 } from '../../utils/openclawModelSupport';
 import ModelSelector from '../ModelSelector';
+import type { TaskTemplateValues } from './TaskTemplateGallery';
 import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 
 interface TaskFormProps {
   mode: 'create' | 'edit';
   task?: ScheduledTask;
+  prefill?: TaskTemplateValues;
   onCancel: () => void;
   onSaved: (newTaskId?: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -147,8 +149,24 @@ function isIMChannel(channel: string): boolean {
   return PlatformRegistry.isIMChannel(channel);
 }
 
-function createFormState(task?: ScheduledTask): FormState {
-  if (!task) return { ...DEFAULT_FORM_STATE, ...nowDefaults() };
+function createFormState(task?: ScheduledTask, prefill?: TaskTemplateValues): FormState {
+  if (!task) {
+    const defaults = { ...DEFAULT_FORM_STATE, ...nowDefaults() };
+    if (prefill) {
+      const parsedBuilder = exprToCronBuilder(prefill.schedule.expr) ?? { ...DEFAULT_CRON_BUILDER };
+      return {
+        ...defaults,
+        name: prefill.name,
+        description: prefill.description,
+        planType: 'cron',
+        cronExpr: prefill.schedule.expr,
+        cronMode: 'builder',
+        cronBuilder: parsedBuilder,
+        payloadText: prefill.promptText,
+      };
+    }
+    return defaults;
+  }
 
   const planInfo = scheduleToPlanInfo(task.schedule);
   const rawCronExpr =
@@ -246,9 +264,9 @@ function previewCron(expr: string): { ok: true; label: string } | { ok: false } 
   }
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDirtyChange }) => {
-  const [form, setForm] = useState<FormState>(() => createFormState(task));
-  const initialFormRef = useRef<string>(JSON.stringify(createFormState(task)));
+const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSaved, onDirtyChange }) => {
+  const [form, setForm] = useState<FormState>(() => createFormState(task, prefill));
+  const initialFormRef = useRef<string>(JSON.stringify(createFormState(task, prefill)));
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const agents = useSelector((state: RootState) => state.agent.agents);
@@ -283,10 +301,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
   const showConversationSelector = isIMChannel(form.notifyChannel);
 
   useEffect(() => {
-    const nextForm = createFormState(task);
+    const nextForm = createFormState(task, prefill);
     initialFormRef.current = JSON.stringify(nextForm);
     setForm(nextForm);
-  }, [task]);
+  }, [task, prefill]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1108,8 +1126,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
   return (
     <div className="flex flex-col min-h-0 h-full">
       {/* Scrollable form body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 min-h-0">
-        <h2 className="text-[14px] font-normal leading-5 text-foreground/85">
+      <div className="flex-1 overflow-y-auto py-3 min-h-0">
+        <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full">
+          <h2 className="text-[14px] font-normal leading-5 text-foreground/85">
           {mode === 'create'
             ? i18nService.t('scheduledTasksFormCreate')
             : i18nService.t('scheduledTasksFormUpdate')}
@@ -1233,11 +1252,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
 
         {/* Notification */}
         {renderNotifyRow()}
+        </div>
       </div>
 
       {/* Submit error */}
       {submitError && (
-        <div className="mx-4 mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
+        <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
           <span className="text-xs text-red-600 dark:text-red-400 break-words min-w-0">
             {i18nService.t('scheduledTasksFormSubmitError')}
             {submitError}
@@ -1262,7 +1282,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, onCancel, onSaved, onDi
       )}
 
       {/* Footer */}
-      <div className="shrink-0 flex items-center justify-end gap-2 px-4 py-2.5 border-t border-border">
+      <div className="shrink-0 flex items-center justify-end gap-2 py-2.5 border-t border-border">
         <Button
           type="button"
           variant="ghost"

@@ -108,7 +108,7 @@ const AllRunsHistory: React.FC = () => {
   return (
     <div>
       {/* Filter area */}
-      <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-1.5">
           {STATUS_OPTIONS.map(s => {
             const isActive = filter.status === s;
