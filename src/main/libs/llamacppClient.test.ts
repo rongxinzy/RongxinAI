@@ -51,6 +51,23 @@ describe('LlamaCppClient', () => {
     await expect(client.loadModel({ model: 'missing' })).rejects.toThrow('HTTP 404');
   });
 
+  test('waits for the target model to become ready after requesting a load', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/models/load')) return jsonResponse({});
+      return jsonResponse({
+        data: [{
+          id: 'qwen3:8b',
+          status: { value: 'error' },
+        }],
+      });
+    }));
+    const client = new LlamaCppClient();
+
+    await expect(client.loadModel({ model: 'qwen3:8b' })).rejects.toThrow(
+      'llama.cpp could not load model qwen3:8b',
+    );
+  });
+
   test('falls back to cached launch context when router args do not expose runtime ctx-size', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url.endsWith('/models/load')) {
