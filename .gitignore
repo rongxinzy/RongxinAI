@@ -69,3 +69,6 @@ docker/
 llamacpp-oss-tools/
 .agents/
 skills-lock.json
+generate-ppt.mjs
+ppt-assets/
+*.pptx

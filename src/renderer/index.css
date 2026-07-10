@@ -366,7 +366,6 @@ select::-ms-expand {
   width: calc(50% + 12px) !important;
   height: calc(100% + 8px) !important;
   border-radius: 9999px !important;
-  background: color-mix(in srgb, var(--lobster-background) 22%, transparent) !important;
   box-shadow:
     0 4px 14px rgba(0,0,0,0.16),
     0 1px 3px rgba(0,0,0,0.06) !important;
