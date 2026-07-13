@@ -114,7 +114,7 @@ const DEFAULT_FORM_STATE: FormState = {
   cronMode: 'builder',
   cronBuilder: { ...DEFAULT_CRON_BUILDER },
   notifyAccountId: undefined,
-  agentId: '',
+  agentId: 'main',
   modelId: '',
 };
 
@@ -124,22 +124,6 @@ const CRON_QUICK_PICKS: Array<{ labelKey: string; expr: string }> = [
   { labelKey: 'scheduledTasksFormCronQuickWeekday', expr: '0 9 * * 1-5' },
   { labelKey: 'scheduledTasksFormCronQuickEveryHour', expr: '0 * * * *' },
   { labelKey: 'scheduledTasksFormCronQuickEvery15min', expr: '*/15 * * * *' },
-];
-
-// Prompt template quick-picks: [label key, text key]
-const PROMPT_TEMPLATES: Array<{ labelKey: string; textKey: string }> = [
-  {
-    labelKey: 'scheduledTasksFormPromptTemplateDailySummary',
-    textKey: 'scheduledTasksFormPromptTemplateDailySummaryText',
-  },
-  {
-    labelKey: 'scheduledTasksFormPromptTemplateDataCheck',
-    textKey: 'scheduledTasksFormPromptTemplateDataCheckText',
-  },
-  {
-    labelKey: 'scheduledTasksFormPromptTemplateCodeReview',
-    textKey: 'scheduledTasksFormPromptTemplateCodeReviewText',
-  },
 ];
 
 function isIMChannel(channel: string): boolean {
@@ -375,8 +359,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
     if (!form.name.trim()) {
       nextErrors.name = i18nService.t('scheduledTasksFormValidationNameRequired');
     }
-    if (!form.agentId) {
-      nextErrors.agentId = i18nService.t('scheduledTasksFormValidationAgentRequired');
+    if (!form.modelId) {
+      nextErrors.modelId = i18nService.t('scheduledTasksFormValidationModelRequired');
     }
     if (!form.payloadText.trim()) {
       nextErrors.payloadText = i18nService.t('scheduledTasksFormValidationPromptRequired');
@@ -1104,8 +1088,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
     </div>
   );
 
-  const payloadCharCount = form.payloadText.length;
-
   return (
     <div className="flex flex-col min-h-0 h-full">
       {/* Scrollable form body */}
@@ -1131,32 +1113,32 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
           {errors.name && <p className={errorClass}>{errors.name}</p>}
         </div>
 
-        {/* Agent binding */}
+        {/* Model binding */}
         <div>
           <label className={labelClass}>
-            {i18nService.t('scheduledTasksFormAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+            {i18nService.t('scheduledTasksFormModel')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
           </label>
           <Select
-            value={form.agentId}
+            value={form.modelId}
             onValueChange={value => {
-              updateForm({ agentId: value ?? '', modelId: '' });
+              updateForm({ modelId: value ?? '' });
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={i18nService.t('scheduledTasksFormAgentPlaceholder')} />
+              <SelectValue placeholder={i18nService.t('scheduledTasksFormModelPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="" disabled>
-                {i18nService.t('scheduledTasksFormAgentPlaceholder')}
+                {i18nService.t('scheduledTasksFormModelPlaceholder')}
               </SelectItem>
-              {agents.map(agent => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.name}
+              {availableModels.map(m => (
+                <SelectItem key={m.id} value={toOpenClawModelRef(m)}>
+                  {m.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.agentId && <p className={errorClass}>{errors.agentId}</p>}
+          {errors.modelId && <p className={errorClass}>{errors.modelId}</p>}
         </div>
 
         {/* Schedule */}
@@ -1171,11 +1153,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
             <label className={labelClass} style={{ marginBottom: 0 }}>
               {i18nService.t('scheduledTasksFormPayloadTextAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
             </label>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {i18nService
-                .t('scheduledTasksFormCharCount' as Parameters<typeof i18nService.t>[0])
-                .replace('{count}', String(payloadCharCount))}
-            </span>
           </div>
           <div className="rounded-lg border border-border bg-[var(--lobster-surface)]">
             <Textarea
@@ -1191,35 +1168,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               'scheduledTasksFormPayloadTextAgentHint' as Parameters<typeof i18nService.t>[0],
             )}
           </p>
-
-          {/* Prompt templates -- shown when textarea is empty */}
-          {!form.payloadText.trim() && (
-            <div className="mt-1.5">
-              <p className="text-xs text-muted-foreground mb-1">
-                {i18nService.t(
-                  'scheduledTasksFormPromptTemplateTitle' as Parameters<typeof i18nService.t>[0],
-                )}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {PROMPT_TEMPLATES.map(({ labelKey, textKey }) => (
-                  <Button
-                    key={labelKey}
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={() =>
-                      updateForm({
-                        payloadText: i18nService.t(textKey as Parameters<typeof i18nService.t>[0]),
-                      })
-                    }
-                    className="px-2 py-0.5 rounded-md text-xs border border-border bg-surface text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors"
-                  >
-                    {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {errors.payloadText && <p className={errorClass}>{errors.payloadText}</p>}
         </div>
