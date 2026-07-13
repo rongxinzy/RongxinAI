@@ -17,6 +17,7 @@ default:
   image: rongxinai-ci:latest
   before_script:
     - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
     - npm install --prefer-offline --no-audit --ignore-scripts
 
 stages:
@@ -26,6 +27,8 @@ stages:
   - build-platforms
 
 variables:
+  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+  NODEJS_ORG_MIRROR: "https://npmmirror.com/mirrors/node"
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
   ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
   ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
@@ -37,6 +40,7 @@ lint:
   stage: lint
   before_script:
     - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
     - npm install --prefer-offline --no-audit --ignore-scripts
   variables:
     GIT_DEPTH: 0
