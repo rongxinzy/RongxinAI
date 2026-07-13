@@ -300,10 +300,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             // Reset token counters so PI SDK recalculates from the injected history.
             // Without this, internal counters (totalTokens, usage, etc.) go stale
             // and cause "Cannot read properties of undefined (reading 'totalTokens')".
-            if (typeof (state as any).totalTokens === 'number') {
-              (state as any).totalTokens = 0;
-            }
-            if ((state as any).usage && typeof (state as any).usage.totalTokens === 'number') {
+            if ((state as any).usage === undefined) {
+              (state as any).usage = { input: 0, output: 0, totalTokens: 0 };
+            } else if (typeof (state as any).usage.totalTokens !== 'number') {
               (state as any).usage.totalTokens = 0;
             }
           }
