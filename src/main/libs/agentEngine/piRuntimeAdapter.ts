@@ -297,6 +297,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               content: m.content,
               timestamp: Date.now(),
             }));
+            // Reset token counters so PI SDK recalculates from the injected history.
+            // Without this, internal counters (totalTokens, usage, etc.) go stale
+            // and cause "Cannot read properties of undefined (reading 'totalTokens')".
+            if (typeof (state as any).totalTokens === 'number') {
+              (state as any).totalTokens = 0;
+            }
+            if ((state as any).usage && typeof (state as any).usage.totalTokens === 'number') {
+              (state as any).usage.totalTokens = 0;
+            }
           }
         } catch (e) {
           console.warn('[PiRuntime] failed to restore conversation history:', e);
