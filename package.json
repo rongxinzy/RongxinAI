@@ -62,7 +62,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:tsc && npm run build:vite",
+    "build:tsc": "tsc",
+    "build:vite": "vite build",
     "lint": "eslint src/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
