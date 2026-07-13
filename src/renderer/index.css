@@ -445,3 +445,12 @@ select::-ms-expand {
   border-bottom-left-radius: 0 !important;
   border-left-width: 0 !important;
 }
+
+/* Select: match dropdown width to trigger. Tailwind v3.4 doesn't process
+   var() inside arbitrary values (min-w-[var(--anchor-width)] → not compiled),
+   so use a plain CSS rule targeting the base-ui popup via data-slot. */
+[data-slot="select-content"] {
+  width: var(--anchor-width) !important;
+  max-height: var(--available-height) !important;
+  transform-origin: var(--transform-origin) !important;
+}
