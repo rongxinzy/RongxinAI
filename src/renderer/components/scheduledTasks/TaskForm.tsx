@@ -1194,7 +1194,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
                 .replace('{count}', String(payloadCharCount))}
             </span>
           </div>
-          <div className="rounded-lg border border-border bg-card focus-within:ring-2 focus-within:ring-primary/50">
+          <div className="rounded-lg border border-border bg-[var(--lobster-surface)] focus-within:ring-2 focus-within:ring-primary/50">
             <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}
