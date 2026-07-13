@@ -351,11 +351,10 @@ select::-ms-expand {
   box-shadow: 0 0 0 2px var(--lobster-primary-muted);
 }
 
-/* Base UI dialog and button colors must bypass shadcn's hsl() token wrapper. */
+/* Dialog shadow — provides elevated depth for all dialogs.
+   Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
+   via the Tailwind plugin which uses var(--lobster-*) directly. */
 [data-slot="dialog-content"] {
-  background-color: var(--lobster-surface);
-  color: var(--lobster-foreground);
-  outline: 1px solid var(--lobster-border);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 }
 [data-slot="dialog-footer"] {

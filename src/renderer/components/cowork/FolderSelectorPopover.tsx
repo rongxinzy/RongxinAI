@@ -91,9 +91,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger>
-        {children}
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger render={children as React.ReactElement} />
       <DropdownMenuContent side={side} align={align} className="w-56">
         {/* Add Folder option */}
         <DropdownMenuItem onClick={handleAddFolder}>
