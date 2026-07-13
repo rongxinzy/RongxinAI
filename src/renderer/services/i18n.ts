@@ -1767,26 +1767,26 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksNewTask: '新建任务',
     taskTemplateSectionTitle: '快速创建定时任务',
     taskTemplateSectionDesc: '选择一个预设模板快速上手，或从零开始自定义配置',
-    taskTemplateDailyReportName: '每日工作汇报',
-    taskTemplateDailyReportDesc: '每日自动汇总工作进展、问题和明日计划',
-    taskTemplateDailyReportSchedule: '每天 18:00',
-    taskTemplateDailyReportPrompt:
-      '请总结今天的工作进展，列出已完成的事项、遇到的问题以及明日待办清单。',
-    taskTemplateCodeReviewName: '代码审查',
-    taskTemplateCodeReviewDesc: '每日自动审查最近提交，发现潜在问题',
-    taskTemplateCodeReviewSchedule: '每天 10:00',
-    taskTemplateCodeReviewPrompt:
-      '对最近提交的代码进行审查，指出潜在的 Bug、性能问题和不符合最佳实践的写法。',
-    taskTemplateDataInspectionName: '系统巡检',
-    taskTemplateDataInspectionDesc: '每小时检查日志和运行状态，异常及时报告',
-    taskTemplateDataInspectionSchedule: '每小时',
-    taskTemplateDataInspectionPrompt:
-      '检查项目中的最新日志和运行状态，如发现异常请给出简要报告和修复建议。',
-    taskTemplateWeeklyReportName: '周报生成',
-    taskTemplateWeeklyReportDesc: '每周五自动生成本周工作总结报告',
-    taskTemplateWeeklyReportSchedule: '每周五 17:00',
-    taskTemplateWeeklyReportPrompt:
-      '请生成本周工作总结报告，包含本周完成的工作、关键进展、遇到的问题及下周计划。',
+    taskTemplateFinanceNewsName: '财经新闻',
+    taskTemplateFinanceNewsDesc: '每日自动获取并摘要全球财经要闻和市场动态',
+    taskTemplateFinanceNewsSchedule: '每天 9:00',
+    taskTemplateFinanceNewsPrompt:
+      '使用 web-search 技能搜索今日全球财经要闻，结合 stock-analyzer 分析主要股指走势，用简洁的要点摘要形式呈现：主要股指变动、重大经济政策、科技公司动态。',
+    taskTemplateWeatherName: '天气预报',
+    taskTemplateWeatherDesc: '每日定时获取本地天气预报和空气质量信息',
+    taskTemplateWeatherSchedule: '每天 7:00',
+    taskTemplateWeatherPrompt:
+      '使用 weather 技能查询今日天气（无需 API key，基于 wttr.in），报告温度范围、降水概率、空气质量指数和出行建议。',
+    taskTemplateNewsBriefingName: '新闻简报',
+    taskTemplateNewsBriefingDesc: '每日聚合国内外重要新闻，快速了解时事',
+    taskTemplateNewsBriefingSchedule: '每天 8:00',
+    taskTemplateNewsBriefingPrompt:
+      '使用 daily-trending 技能获取今日多平台热搜话题，结合 web-search 技能搜索对应新闻详情，按类别（时政、科技、社会、国际）分类摘要，每条不超过两句话。',
+    taskTemplateKnowledgePushName: '知识推送',
+    taskTemplateKnowledgePushDesc: '每日推送一个有趣的知识点或冷知识',
+    taskTemplateKnowledgePushSchedule: '每天 12:00',
+    taskTemplateKnowledgePushPrompt:
+      '使用 web-search 技能搜索一个有趣的冷知识或科普话题（科学、历史、文化、技术等），用通俗易懂的语言解释，控制在 200 字以内。',
     taskTemplateCustomName: '自定义任务',
     taskTemplateCustomDesc: '从零开始配置任务名称、执行计划、提示词和通知方式',
     scheduledTasksEmptyState: '暂无定时任务',
@@ -3981,26 +3981,26 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksNewTask: 'New Task',
     taskTemplateSectionTitle: 'Quick Setup',
     taskTemplateSectionDesc: 'Choose a preset template to get started, or build from scratch',
-    taskTemplateDailyReportName: 'Daily Report',
-    taskTemplateDailyReportDesc: 'Auto-summarize daily progress, issues, and next-day plans',
-    taskTemplateDailyReportSchedule: 'Daily at 18:00',
-    taskTemplateDailyReportPrompt:
-      'Please summarize today\'s work progress, including completed items, issues encountered, and tomorrow\'s to-do list.',
-    taskTemplateCodeReviewName: 'Code Review',
-    taskTemplateCodeReviewDesc: 'Daily automated review of recent commits for potential issues',
-    taskTemplateCodeReviewSchedule: 'Daily at 10:00',
-    taskTemplateCodeReviewPrompt:
-      'Review the recently committed code and identify potential bugs, performance issues, and deviations from best practices.',
-    taskTemplateDataInspectionName: 'System Inspection',
-    taskTemplateDataInspectionDesc: 'Hourly log and health check with anomaly reporting',
-    taskTemplateDataInspectionSchedule: 'Every hour',
-    taskTemplateDataInspectionPrompt:
-      'Check the latest logs and service health status. Report anomalies with a brief analysis and fix recommendations.',
-    taskTemplateWeeklyReportName: 'Weekly Report',
-    taskTemplateWeeklyReportDesc: 'Auto-generate weekly summary every Friday',
-    taskTemplateWeeklyReportSchedule: 'Every Friday at 17:00',
-    taskTemplateWeeklyReportPrompt:
-      'Generate a weekly work summary report covering completed work, key milestones, challenges, and next week\'s plan.',
+    taskTemplateFinanceNewsName: 'Financial News',
+    taskTemplateFinanceNewsDesc: 'Daily summary of global financial headlines and market trends',
+    taskTemplateFinanceNewsSchedule: 'Daily at 9:00',
+    taskTemplateFinanceNewsPrompt:
+      'Use the web-search skill to find today\'s global financial news, combined with stock-analyzer for major index movements. Summarize key economic policies and tech company updates in concise bullet points.',
+    taskTemplateWeatherName: 'Weather Forecast',
+    taskTemplateWeatherDesc: 'Daily weather forecast and air quality report',
+    taskTemplateWeatherSchedule: 'Daily at 7:00',
+    taskTemplateWeatherPrompt:
+      'Use the weather skill (based on wttr.in, no API key required) to check today\'s forecast, including temperature range, precipitation probability, air quality index, and outdoor recommendations.',
+    taskTemplateNewsBriefingName: 'News Briefing',
+    taskTemplateNewsBriefingDesc: 'Daily curated news headlines across categories',
+    taskTemplateNewsBriefingSchedule: 'Daily at 8:00',
+    taskTemplateNewsBriefingPrompt:
+      'Use the daily-trending skill to get today\'s trending topics across platforms, then use web-search to find details. Organize by category (politics, technology, society, world) with one to two sentence summaries each.',
+    taskTemplateKnowledgePushName: 'Knowledge Push',
+    taskTemplateKnowledgePushDesc: 'Daily interesting fact or knowledge tidbit',
+    taskTemplateKnowledgePushSchedule: 'Daily at 12:00',
+    taskTemplateKnowledgePushPrompt:
+      'Use the web-search skill to find an interesting fact or piece of knowledge from science, history, culture, or technology. Explain in simple language and keep under 200 words.',
     taskTemplateCustomName: 'Custom Task',
     taskTemplateCustomDesc: 'Configure task name, schedule, prompt, and notification from scratch',
     scheduledTasksEmptyState: 'No scheduled tasks',
