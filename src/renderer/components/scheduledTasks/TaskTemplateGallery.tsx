@@ -95,7 +95,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
         {TEMPLATES.map((tpl) => (
           <Card
             key={tpl.id}
-            className="cursor-pointer hover:shadow-md transition-all shadow-sm"
+            className="cursor-pointer hover:shadow-md transition-all shadow-sm h-full"
             onClick={() =>
               onSelectTemplate({
                 name: i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0]),
@@ -119,7 +119,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
                 {i18nService.t(tpl.descKey as Parameters<typeof i18nService.t>[0])}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="mt-auto">
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-md px-2 py-1">
                 <CalendarClock className="size-3" />
                 {i18nService.t(tpl.scheduleLabelKey as Parameters<typeof i18nService.t>[0])}

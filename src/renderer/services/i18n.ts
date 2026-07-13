@@ -1770,22 +1770,22 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskTemplateFinanceNewsDesc: '每日自动获取并摘要全球财经要闻和市场动态',
     taskTemplateFinanceNewsSchedule: '每天 9:00',
     taskTemplateFinanceNewsPrompt:
-      '请搜索并摘要今日全球财经要闻，包括主要股指变动、重大经济政策、科技公司动态等，用简洁的要点形式呈现。',
+      '使用 web-search 技能搜索今日全球财经要闻，结合 stock-analyzer 分析主要股指走势，用简洁的要点摘要形式呈现：主要股指变动、重大经济政策、科技公司动态。',
     taskTemplateWeatherName: '天气预报',
     taskTemplateWeatherDesc: '每日定时获取本地天气预报和空气质量信息',
     taskTemplateWeatherSchedule: '每天 7:00',
     taskTemplateWeatherPrompt:
-      '请查询今日天气预报，包括温度范围、降水概率、空气质量指数和出行建议。',
+      '使用 weather 技能查询今日天气（无需 API key，基于 wttr.in），报告温度范围、降水概率、空气质量指数和出行建议。',
     taskTemplateNewsBriefingName: '新闻简报',
     taskTemplateNewsBriefingDesc: '每日聚合国内外重要新闻，快速了解时事',
     taskTemplateNewsBriefingSchedule: '每天 8:00',
     taskTemplateNewsBriefingPrompt:
-      '请搜索并整理今日国内外重要新闻，按类别（时政、科技、社会、国际）分类摘要，每条不超过两句话。',
+      '使用 daily-trending 技能获取今日多平台热搜话题，结合 web-search 技能搜索对应新闻详情，按类别（时政、科技、社会、国际）分类摘要，每条不超过两句话。',
     taskTemplateKnowledgePushName: '知识推送',
     taskTemplateKnowledgePushDesc: '每日推送一个有趣的知识点或冷知识',
     taskTemplateKnowledgePushSchedule: '每天 12:00',
     taskTemplateKnowledgePushPrompt:
-      '请分享一个有趣的知识点或冷知识，可以涵盖科学、历史、文化、技术等领域，用通俗易懂的语言解释，控制在 200 字以内。',
+      '使用 web-search 技能搜索一个有趣的冷知识或科普话题（科学、历史、文化、技术等），用通俗易懂的语言解释，控制在 200 字以内。',
     taskTemplateCustomName: '自定义任务',
     taskTemplateCustomDesc: '从零开始配置任务名称、执行计划、提示词和通知方式',
     scheduledTasksEmptyState: '暂无定时任务',
@@ -3983,22 +3983,22 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskTemplateFinanceNewsDesc: 'Daily summary of global financial headlines and market trends',
     taskTemplateFinanceNewsSchedule: 'Daily at 9:00',
     taskTemplateFinanceNewsPrompt:
-      'Search and summarize today\'s global financial news, including major index movements, key economic policies, and tech company updates. Present in concise bullet points.',
+      'Use the web-search skill to find today\'s global financial news, combined with stock-analyzer for major index movements. Summarize key economic policies and tech company updates in concise bullet points.',
     taskTemplateWeatherName: 'Weather Forecast',
     taskTemplateWeatherDesc: 'Daily weather forecast and air quality report',
     taskTemplateWeatherSchedule: 'Daily at 7:00',
     taskTemplateWeatherPrompt:
-      'Check today\'s weather forecast, including temperature range, precipitation probability, air quality index, and outdoor recommendations.',
+      'Use the weather skill (based on wttr.in, no API key required) to check today\'s forecast, including temperature range, precipitation probability, air quality index, and outdoor recommendations.',
     taskTemplateNewsBriefingName: 'News Briefing',
     taskTemplateNewsBriefingDesc: 'Daily curated news headlines across categories',
     taskTemplateNewsBriefingSchedule: 'Daily at 8:00',
     taskTemplateNewsBriefingPrompt:
-      'Search and compile today\'s top news stories, organized by category (politics, technology, society, world). Summarize each item in one to two sentences.',
+      'Use the daily-trending skill to get today\'s trending topics across platforms, then use web-search to find details. Organize by category (politics, technology, society, world) with one to two sentence summaries each.',
     taskTemplateKnowledgePushName: 'Knowledge Push',
     taskTemplateKnowledgePushDesc: 'Daily interesting fact or knowledge tidbit',
     taskTemplateKnowledgePushSchedule: 'Daily at 12:00',
     taskTemplateKnowledgePushPrompt:
-      'Share an interesting fact or piece of knowledge from science, history, culture, or technology. Explain in simple language and keep under 200 words.',
+      'Use the web-search skill to find an interesting fact or piece of knowledge from science, history, culture, or technology. Explain in simple language and keep under 200 words.',
     taskTemplateCustomName: 'Custom Task',
     taskTemplateCustomDesc: 'Configure task name, schedule, prompt, and notification from scratch',
     scheduledTasksEmptyState: 'No scheduled tasks',
