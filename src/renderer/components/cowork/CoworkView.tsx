@@ -10,7 +10,7 @@ import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
-import { RootState } from '../../store';
+import { RootState, store } from '../../store';
 import {
   selectCoworkConfig,
   selectCurrentSession,
@@ -522,6 +522,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           }
         }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
+        // Persist updated session (with new messages) to SQLite
+        const state = store.getState();
+        const updatedSession = state.cowork.currentSession;
+        if (updatedSession) {
+          coworkService.saveChatSession(updatedSession).catch(err =>
+            console.error('[CoworkView] Failed to persist chat continue:', err)
+          );
+        }
       } catch (error) {
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
         dispatch(addMessage({
