@@ -64,7 +64,7 @@
     "dev": "vite",
     "build": "npm run build:tsc && npm run build:vite",
     "build:tsc": "tsc",
-    "build:vite": "vite build",
+    "build:vite": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "lint": "eslint src/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
