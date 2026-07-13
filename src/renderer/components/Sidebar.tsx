@@ -87,12 +87,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     void configService.updateConfig({ workMode: mode });
   }, []);
 
-  // Filter sessions by workMode — chat sessions only visible in chat mode
-  const sessions = React.useMemo(() =>
-    workMode === 'chat'
-      ? allSessions.filter(s => s.mode === 'chat')
-      : allSessions.filter(s => s.mode !== 'chat'),
-  [allSessions, workMode]);
+  // Mode column was added via migration (DEFAULT 'work'), so pre-existing
+  // chat sessions also have mode='work' — we can't distinguish reliably.
+  // Show all sessions in both modes until migration data is corrected.
+  const sessions = allSessions;
 
   // Chat mode: map sessions to AgentSidebarTaskNode for AgentTaskRow rendering
   const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
