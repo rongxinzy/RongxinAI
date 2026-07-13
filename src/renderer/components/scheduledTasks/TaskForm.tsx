@@ -499,7 +499,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
     }
   };
 
-  const labelClass = 'block text-[14px] font-normal leading-5 text-foreground/85 mb-1';
+  const labelClass = 'block text-[14px] font-normal leading-5 text-muted-foreground mb-1';
   const errorClass = 'text-xs text-red-500 mt-1';
   const hintClass = 'text-xs text-muted-foreground mt-0.5';
 
@@ -809,7 +809,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
 
         {/* Optional timezone */}
         <div>
-          <label className="text-xs font-medium text-foreground block mb-1">
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
             {i18nService.t('scheduledTasksFormCronTimezone' as Parameters<typeof i18nService.t>[0])}
             <span className="ml-1 text-muted-foreground font-normal">
               {i18nService.t('scheduledTasksFormOptional')}
@@ -1128,7 +1128,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
       {/* Scrollable form body */}
       <div className="flex-1 overflow-y-auto py-3 min-h-0">
         <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full">
-          <h2 className="text-[14px] font-normal leading-5 text-foreground/85">
+          <h2 className="text-[14px] font-normal leading-5 text-muted-foreground">
           {mode === 'create'
             ? i18nService.t('scheduledTasksFormCreate')
             : i18nService.t('scheduledTasksFormUpdate')}
@@ -1194,7 +1194,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
                 .replace('{count}', String(payloadCharCount))}
             </span>
           </div>
-          <div className="rounded-lg border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/50">
+          <div className="rounded-lg border border-border bg-card focus-within:ring-2 focus-within:ring-primary/50">
             <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}
