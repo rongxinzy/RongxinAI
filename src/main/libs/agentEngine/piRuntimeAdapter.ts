@@ -323,7 +323,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       this.activeSessions.set(sessionId, active);
 
       // Send the prompt (may include conversation history for restart restores)
-      await session.prompt((options as any)._piPromptOverride || prompt);
+      await session.prompt(options._piPromptOverride || prompt);
 
     } catch (error) {
       this.activeSessions.delete(sessionId);
