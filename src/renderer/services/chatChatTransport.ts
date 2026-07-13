@@ -24,6 +24,12 @@ function extractText(message: UIMessage): string {
  * just text + reasoning streaming.
  */
 export class ChatChatTransport implements ChatTransport<UIMessage> {
+  private modelId: string | undefined;
+
+  constructor(modelId?: string) {
+    this.modelId = modelId;
+  }
+
   getSessionId(): null {
     return null;
   }
@@ -52,6 +58,8 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         history.push({ role: msg.role, content: extractText(msg) });
       }
     }
+
+    const modelId = this.modelId;
 
     return new ReadableStream<UIMessageChunk>({
       start(controller) {
@@ -109,6 +117,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             }
           },
           history,
+          modelId,
         ).then(() => {
           close();
         }).catch((error: Error) => {

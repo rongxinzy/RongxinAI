@@ -318,13 +318,17 @@ class ApiService {
   async chat(
     message: string | ChatUserMessageInput,
     onProgress?: (content: string, reasoning?: string) => void,
-    history: ChatMessagePayload[] = []
+    history: ChatMessagePayload[] = [],
+    modelId?: string,
   ): Promise<{ content: string; reasoning?: string }> {
     if (!this.config) {
       throw new ApiError('API configuration not set. Please configure your API settings in the settings menu.');
     }
 
-    const selectedModel = store.getState().model.defaultSelectedModel;
+    const state = store.getState().model;
+    const selectedModel = modelId
+      ? (state.availableModels.find(m => m.id === modelId || `${m.provider}/${m.id}` === modelId) ?? state.defaultSelectedModel)
+      : state.defaultSelectedModel;
     const provider = this.detectProvider(
       selectedModel.id,
       selectedModel.providerKey ?? selectedModel.provider
