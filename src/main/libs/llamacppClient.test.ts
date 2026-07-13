@@ -68,6 +68,55 @@ describe('LlamaCppClient', () => {
     );
   });
 
+  test('waits for a loading model to become ready by its file name', async () => {
+    let modelListRequests = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/models/load') || url.endsWith('/v1/chat/completions')) {
+        return jsonResponse({});
+      }
+      modelListRequests += 1;
+      return jsonResponse({
+        data: [{
+          id: '/models/qwen3.gguf',
+          status: { value: modelListRequests === 1 ? 'loading' : 'loaded' },
+        }],
+      });
+    }));
+    const client = new LlamaCppClient();
+
+    await expect(client.loadModel({ model: 'qwen3.gguf' })).resolves.toEqual({
+      success: true,
+      runningModels: [expect.objectContaining({ name: '/models/qwen3.gguf', status: 'loaded' })],
+    });
+  });
+
+  test('unloads the model when the inference probe fails', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/models/load') || url.endsWith('/models/unload')) return jsonResponse({});
+      if (url.endsWith('/v1/chat/completions')) {
+        return {
+          ok: false,
+          status: 500,
+          text: async () => 'inference failed',
+        } as Response;
+      }
+      return jsonResponse({
+        data: [{
+          id: 'qwen3:8b',
+          status: { value: 'loaded' },
+        }],
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new LlamaCppClient();
+
+    await expect(client.loadModel({ model: 'qwen3:8b' })).rejects.toThrow('HTTP 500');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8080/models/unload',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   test('falls back to cached launch context when router args do not expose runtime ctx-size', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url.endsWith('/models/load')) {
@@ -123,8 +172,23 @@ describe('LlamaCppClient', () => {
     await client.listModels();
     await client.loadModel({ model: 'qwen3:8b' });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 123_000);
+    expect(timeoutSpy).toHaveBeenCalledWith(
+      expect.any(Function),
+      10_000,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8080/v1/chat/completions',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          model: 'qwen3:8b',
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1,
+          stream: false,
+        }),
+      }),
+    );
   });
 });
 

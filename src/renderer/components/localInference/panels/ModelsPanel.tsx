@@ -3,7 +3,6 @@ import { Button } from '@shared/components/ui/button';
 import {
   Card,
   CardAction,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@shared/components/ui/card';
@@ -27,8 +26,9 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@shared/components/ui/hover-card';
+import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Box, Ellipsis, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { Box, Ellipsis, Play, Square, Trash2 } from 'lucide-react';
 import { type ComponentType, type DragEvent, useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -303,7 +303,7 @@ function ModelCard({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-        'relative cursor-grab select-none border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+        'relative cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
         (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
@@ -322,8 +322,22 @@ function ModelCard({
           className="absolute right-3 top-3 size-2 rounded-full bg-[var(--lobster-success)] animate-pulse"
         />
       ) : null}
+      {loadingModel || unloading ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
+          <Button type="button" disabled size="sm" variant={unloading ? 'outline' : 'default'}>
+            <Spinner
+              aria-label={i18nService.t(
+                unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading',
+              )}
+              data-icon="inline-start"
+              className="[animation-duration:2s]"
+            />
+            {i18nService.t(unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading')}
+          </Button>
+        </div>
+      ) : null}
 
-      <CardHeader className="gap-2 pb-0 pt-3">
+      <CardHeader className="gap-2 pb-2 pt-3">
         {!isRunning ? (
           <CardAction className="flex items-center gap-2">
             <DropdownMenu>
@@ -365,76 +379,60 @@ function ModelCard({
               {displayName}
             </CardTitle>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              {details.length > 0 ? (
-                <HoverCard>
-                  <HoverCardTrigger
-                    delay={200}
-                    closeDelay={100}
-                    render={
-                      <Badge variant="outline" className="cursor-default text-[11px]">
-                        {i18nService.t('localInferenceDetails')}
-                      </Badge>
-                    }
-                  />
-                  <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
-                    <div className="flex flex-col gap-2">
-                      {details.map(item => (
-                        <MetadataRow key={item.label} label={item.label} value={item.value} />
-                      ))}
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
-              ) : null}
-              {contextValue ? (
-                <Badge variant="outline" className="text-[11px]">
-                  {formatContextValue(contextValue)} {i18nService.t('localInferenceContextShort')}
-                </Badge>
-              ) : null}
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                {details.length > 0 ? (
+                  <HoverCard>
+                    <HoverCardTrigger
+                      delay={200}
+                      closeDelay={100}
+                      render={
+                        <Badge variant="outline" className="cursor-default text-[11px]">
+                          {i18nService.t('localInferenceDetails')}
+                        </Badge>
+                      }
+                    />
+                    <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
+                      <div className="flex flex-col gap-2">
+                        {details.map(item => (
+                          <MetadataRow key={item.label} label={item.label} value={item.value} />
+                        ))}
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
+                ) : null}
+                {contextValue ? (
+                  <Badge variant="outline" className="text-[11px]">
+                    {formatContextValue(contextValue)} {i18nService.t('localInferenceContextShort')}
+                  </Badge>
+                ) : null}
             </div>
           </div>
         </div>
       </CardHeader>
-
-      <CardFooter className="border-t border-border/70 bg-muted/20 px-3 py-2">
+      <div className="flex justify-end px-3 pb-3">
         {isRunning ? (
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="sm"
             disabled={buttonsDisabled}
             onClick={onUnload}
-            className="w-full"
           >
-            {unloading ? (
-              <RefreshCw data-icon="inline-start" className="animate-spin [animation-duration:1.8s]" />
-            ) : (
-              <Square data-icon="inline-start" />
-            )}
-            {unloading
-              ? i18nService.t('localInferenceUnloading')
-              : i18nService.t('localInferenceUnload')}
+            <Square data-icon="inline-start" />
+            {i18nService.t('close')}
           </Button>
         ) : (
           <Button
             type="button"
-            variant="default"
             size="sm"
             disabled={buttonsDisabled}
             onClick={onLoadModel}
-            className="w-full"
           >
-            {loadingModel ? (
-              <RefreshCw data-icon="inline-start" className="animate-spin [animation-duration:1.8s]" />
-            ) : (
-              <Play data-icon="inline-start" />
-            )}
-            {loadingModel
-              ? i18nService.t('localInferenceLoadingModel')
-              : i18nService.t('localInferenceLoad')}
+            <Play data-icon="inline-start" />
+            {i18nService.t('start')}
           </Button>
         )}
-      </CardFooter>
+      </div>
     </Card>
   );
 }

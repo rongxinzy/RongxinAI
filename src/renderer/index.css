@@ -351,6 +351,38 @@ select::-ms-expand {
   box-shadow: 0 0 0 2px var(--lobster-primary-muted);
 }
 
+/* Base UI dialog and button colors must bypass shadcn's hsl() token wrapper. */
+[data-slot="dialog-content"] {
+  background-color: var(--lobster-surface);
+  color: var(--lobster-foreground);
+  outline: 1px solid var(--lobster-border);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+}
+[data-slot="dialog-footer"] {
+  background-color: var(--lobster-surface);
+  border-top-color: var(--lobster-border);
+}
+[data-slot="button"].bg-primary {
+  background-color: var(--lobster-primary);
+  color: var(--lobster-primary-foreground);
+}
+[data-slot="button"].bg-primary:hover {
+  background-color: var(--lobster-primary-hover);
+}
+[data-slot="button"].border-border {
+  border-color: var(--lobster-border);
+}
+[data-slot="button"].bg-background {
+  background-color: var(--lobster-surface);
+}
+[data-slot="button"].bg-secondary {
+  background-color: var(--lobster-surface-raised);
+  color: var(--lobster-foreground);
+}
+[data-slot="button"].text-destructive {
+  color: var(--lobster-destructive);
+}
+
 /* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
 [data-mode="work-chat"][data-slot="switch"] {
   width: 100% !important;
