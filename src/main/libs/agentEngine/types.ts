@@ -54,6 +54,8 @@ export type CoworkStartOptions = {
   modelOverride?: string;
   /** Previous conversation to restore (user/assistant pairs), injected into PI session state */
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  /** Internal: override prompt text sent to PI, while UI shows original prompt */
+  _piPromptOverride?: string;
 };
 
 export type CoworkContinueOptions = {
