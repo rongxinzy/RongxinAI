@@ -15,15 +15,12 @@ import type {
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import type { Model } from '../../store/slices/modelSlice';
-import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
-import { resolveOpenClawModelRef, toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import {
   buildOpenClawModelValidationTargets,
   resolveFirstUnsupportedOpenClawModel,
   resolveOpenClawModelSupportMessageKey,
 } from '../../utils/openclawModelSupport';
-import ModelSelector from '../ModelSelector';
 import type { TaskTemplateValues } from './TaskTemplateGallery';
 import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 
@@ -503,22 +500,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
   const errorClass = 'text-xs text-red-500 mt-1';
   const hintClass = 'text-xs text-muted-foreground mt-0.5';
 
-  const selectedModelValue: Model | null = form.modelId
-    ? (availableModels.find(m => toOpenClawModelRef(m) === form.modelId) ?? null)
-    : null;
-
-  const handleModelChange = (model: Model | null) => {
-    updateForm({ modelId: model ? toOpenClawModelRef(model) : '' });
-  };
-
   // Resolve the selected agent's configured model for display
   const selectedAgent = agents.find(a => a.id === form.agentId) ?? null;
-  const agentModelLabel = selectedAgent
-    ? (resolveOpenClawModelRef(selectedAgent.model, availableModels)?.name ?? selectedAgent.model)
-    : '';
-  const modelDefaultLabel = form.agentId
-    ? `${i18nService.t('scheduledTasksFormModelFollowAgent')}: ${agentModelLabel}`
-    : i18nService.t('scheduledTasksFormModelSelectAgentFirst');
 
   const timeValue = `${String(form.hour).padStart(2, '0')}:${String(form.minute).padStart(2, '0')}`;
   const handleTimeChange = (value: string) => {
@@ -1194,7 +1177,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
                 .replace('{count}', String(payloadCharCount))}
             </span>
           </div>
-          <div className="rounded-lg border border-border bg-[var(--lobster-surface)] focus-within:ring-2 focus-within:ring-primary/50">
+          <div className="rounded-lg border border-border bg-[var(--lobster-surface)]">
             <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}
@@ -1202,15 +1185,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               style={{ minHeight: '80px', height: '120px' }}
               placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
             />
-            <div className="flex items-center px-2 py-1 border-t border-border/40">
-              <ModelSelector
-                dropdownDirection="up"
-                value={selectedModelValue}
-                onChange={handleModelChange}
-                defaultLabel={modelDefaultLabel}
-                isModelSelectable={isModelSelectableForOpenClaw}
-              />
-            </div>
           </div>
           <p className={hintClass}>
             {i18nService.t(
