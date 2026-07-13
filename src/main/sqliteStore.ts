@@ -282,15 +282,6 @@ export class SqliteStore {
         this.db.exec(
           "ALTER TABLE cowork_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'work';",
         );
-        // Fix pre-existing chat sessions: any session without tool messages
-        // was created via chat mode (direct LLM, no tool execution).
-        this.db.exec(
-          `UPDATE cowork_sessions SET mode = 'chat'
-           WHERE id NOT IN (
-             SELECT DISTINCT session_id FROM cowork_messages
-             WHERE type IN ('tool_use', 'tool_result')
-           )`,
-        );
         this.didRunMigration = true;
       }
     } catch {
