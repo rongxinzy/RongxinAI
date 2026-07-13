@@ -322,8 +322,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
       this.activeSessions.set(sessionId, active);
 
-      // Send the prompt
-      await session.prompt(prompt);
+      // Send the prompt (may include conversation history for restart restores)
+      await session.prompt((options as any)._piPromptOverride || prompt);
 
     } catch (error) {
       this.activeSessions.delete(sessionId);
@@ -345,17 +345,19 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const active = this.activeSessions.get(sessionId);
     if (!active) {
       console.log(`[PiRuntime] continueSession: session ${sessionId} not active, restoring context via prompt`);
-      // Load previous messages and embed them as context in the prompt.
-      // agent.state.messages injection crashes PI SDK (totalTokens),
-      // so we wrap history as inline text instead of hacking internal state.
+      // Load previous messages and embed them as context prepended to the PI prompt.
+      // The user message saved/emitted to the renderer stays the clean original prompt.
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       const contextParts = history
         .filter(m => m.type === 'user' || m.type === 'assistant')
         .map(m => `${m.type === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
-      const contextualPrompt = contextParts.length > 0
+      const piPrompt = contextParts.length > 0
         ? `${contextParts.join('\n\n')}\n\nUser: ${prompt}`
         : prompt;
-      return this.startSession(sessionId, contextualPrompt, options);
+      return this.startSession(sessionId, prompt, {
+        ...options,
+        _piPromptOverride: piPrompt,
+      });
     }
 
     // Reset turn state
