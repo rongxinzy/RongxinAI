@@ -1126,7 +1126,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
   return (
     <div className="flex flex-col min-h-0 h-full">
       {/* Scrollable form body */}
-      <div className="flex-1 overflow-y-auto py-3 min-h-0">
+      <div className="flex-1 overflow-y-auto py-3 min-h-0 bg-[var(--lobster-surface)]">
         <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full">
           <h2 className="text-[14px] font-normal leading-5 text-muted-foreground">
           {mode === 'create'
@@ -1194,7 +1194,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
                 .replace('{count}', String(payloadCharCount))}
             </span>
           </div>
-          <div className="rounded-lg border border-border bg-card focus-within:ring-2 focus-within:ring-primary/50">
+          <div className="rounded-lg border border-border bg-[var(--lobster-surface)] focus-within:ring-2 focus-within:ring-primary/50">
             <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}
