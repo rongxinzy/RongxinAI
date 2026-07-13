@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { cn } from '@shared/lib/utils';
-import { BetweenHorizonalEnd, CalendarClock, Code, FileSearch } from 'lucide-react';
+import { CalendarClock, CloudSun, Lightbulb, Newspaper, TrendingUp } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -27,44 +27,44 @@ interface TaskTemplate {
 
 const TEMPLATES: TaskTemplate[] = [
   {
-    id: 'daily-report',
-    icon: CalendarClock,
-    nameKey: 'taskTemplateDailyReportName',
-    descKey: 'taskTemplateDailyReportDesc',
-    scheduleLabelKey: 'taskTemplateDailyReportSchedule',
-    promptTextKey: 'taskTemplateDailyReportPrompt',
-    colorClass: 'text-blue-500 bg-blue-500/10',
-    schedule: { kind: 'cron', expr: '0 18 * * *' },
-  },
-  {
-    id: 'code-review',
-    icon: Code,
-    nameKey: 'taskTemplateCodeReviewName',
-    descKey: 'taskTemplateCodeReviewDesc',
-    scheduleLabelKey: 'taskTemplateCodeReviewSchedule',
-    promptTextKey: 'taskTemplateCodeReviewPrompt',
-    colorClass: 'text-purple-500 bg-purple-500/10',
-    schedule: { kind: 'cron', expr: '0 10 * * *' },
-  },
-  {
-    id: 'data-inspection',
-    icon: FileSearch,
-    nameKey: 'taskTemplateDataInspectionName',
-    descKey: 'taskTemplateDataInspectionDesc',
-    scheduleLabelKey: 'taskTemplateDataInspectionSchedule',
-    promptTextKey: 'taskTemplateDataInspectionPrompt',
+    id: 'finance-news',
+    icon: TrendingUp,
+    nameKey: 'taskTemplateFinanceNewsName',
+    descKey: 'taskTemplateFinanceNewsDesc',
+    scheduleLabelKey: 'taskTemplateFinanceNewsSchedule',
+    promptTextKey: 'taskTemplateFinanceNewsPrompt',
     colorClass: 'text-emerald-500 bg-emerald-500/10',
-    schedule: { kind: 'cron', expr: '0 * * * *' },
+    schedule: { kind: 'cron', expr: '0 9 * * *' },
   },
   {
-    id: 'weekly-report',
-    icon: BetweenHorizonalEnd,
-    nameKey: 'taskTemplateWeeklyReportName',
-    descKey: 'taskTemplateWeeklyReportDesc',
-    scheduleLabelKey: 'taskTemplateWeeklyReportSchedule',
-    promptTextKey: 'taskTemplateWeeklyReportPrompt',
-    colorClass: 'text-orange-500 bg-orange-500/10',
-    schedule: { kind: 'cron', expr: '0 17 * * 5' },
+    id: 'weather',
+    icon: CloudSun,
+    nameKey: 'taskTemplateWeatherName',
+    descKey: 'taskTemplateWeatherDesc',
+    scheduleLabelKey: 'taskTemplateWeatherSchedule',
+    promptTextKey: 'taskTemplateWeatherPrompt',
+    colorClass: 'text-sky-500 bg-sky-500/10',
+    schedule: { kind: 'cron', expr: '0 7 * * *' },
+  },
+  {
+    id: 'news-briefing',
+    icon: Newspaper,
+    nameKey: 'taskTemplateNewsBriefingName',
+    descKey: 'taskTemplateNewsBriefingDesc',
+    scheduleLabelKey: 'taskTemplateNewsBriefingSchedule',
+    promptTextKey: 'taskTemplateNewsBriefingPrompt',
+    colorClass: 'text-blue-500 bg-blue-500/10',
+    schedule: { kind: 'cron', expr: '0 8 * * *' },
+  },
+  {
+    id: 'knowledge-push',
+    icon: Lightbulb,
+    nameKey: 'taskTemplateKnowledgePushName',
+    descKey: 'taskTemplateKnowledgePushDesc',
+    scheduleLabelKey: 'taskTemplateKnowledgePushSchedule',
+    promptTextKey: 'taskTemplateKnowledgePushPrompt',
+    colorClass: 'text-amber-500 bg-amber-500/10',
+    schedule: { kind: 'cron', expr: '0 12 * * *' },
   },
 ];
 
