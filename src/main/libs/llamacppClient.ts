@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import type {
   LlamaCppModel,
   LlamaCppModelLaunchInput,
@@ -19,6 +21,12 @@ const LlamaCppModelStatus = {
 
 const LLAMACPP_MODEL_LOAD_TIMEOUT_MS = 300_000;
 const LLAMACPP_MODEL_READY_POLL_INTERVAL_MS = 250;
+const LLAMACPP_MODEL_READY_POLL_REQUEST_TIMEOUT_MS = 10_000;
+const LLAMACPP_MODEL_INFERENCE_PROBE_TIMEOUT_MS = 30_000;
+const LlamaCppInferenceProbeMessage = {
+  Role: 'user',
+  Content: 'ping',
+} as const;
 
 type LlamaCppRouterModel = {
   id?: string;
@@ -70,12 +78,7 @@ export class LlamaCppClient {
 
   async runningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
     const models = await this.listModelsWithTimeout(timeoutMs);
-    return models.filter(
-      model =>
-        model.status === LlamaCppModelStatus.Loaded ||
-        model.status === LlamaCppModelStatus.Loading ||
-        model.status === LlamaCppModelStatus.Sleeping,
-    );
+    return models.filter(isRunningModel);
   }
 
   async showModel(name: string): Promise<unknown> {
@@ -97,9 +100,17 @@ export class LlamaCppClient {
     if (typeof input.options?.ctxSize === 'number' && input.options.ctxSize > 0) {
       this.lastLoadRuntimeContextByModel.set(modelName, input.options.ctxSize);
     }
+    const runningModels = await this.waitForModelReady(modelName, timeoutMs);
+    try {
+      await this.probeModelInference(modelName);
+    } catch (error) {
+      // Treat a failed inference probe as a failed load so UI and server state stay aligned.
+      await this.unloadModel(modelName).catch((): undefined => undefined);
+      throw error;
+    }
     return {
       success: true,
-      runningModels: await this.waitForModelReady(modelName, timeoutMs),
+      runningModels,
     };
   }
 
@@ -124,13 +135,22 @@ export class LlamaCppClient {
     );
   }
 
+  /**
+   * Poll with short requests so an unresponsive router cannot consume the full load deadline.
+   */
   private async waitForModelReady(
     modelName: string,
     timeoutMs: number,
   ): Promise<LlamaCppRunningModel[]> {
     const deadline = Date.now() + timeoutMs;
     while (true) {
-      const models = await this.listModelsWithTimeout(timeoutMs);
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        throw new Error(`llama.cpp model ${modelName} did not become ready before timeout`);
+      }
+      const models = await this.listModelsWithTimeout(
+        Math.min(remainingMs, LLAMACPP_MODEL_READY_POLL_REQUEST_TIMEOUT_MS),
+      );
       const targetModel = models.find(model => matchesModelName(model, modelName));
       if (
         targetModel?.status === LlamaCppModelStatus.Loaded ||
@@ -141,12 +161,35 @@ export class LlamaCppClient {
       if (targetModel?.status === LlamaCppModelStatus.Error) {
         throw new Error(`llama.cpp could not load model ${modelName}`);
       }
-      const remainingMs = deadline - Date.now();
-      if (remainingMs <= 0) {
+      const nextWaitMs = deadline - Date.now();
+      if (nextWaitMs <= 0) {
         throw new Error(`llama.cpp model ${modelName} did not become ready before timeout`);
       }
-      await waitFor(Math.min(LLAMACPP_MODEL_READY_POLL_INTERVAL_MS, remainingMs));
+      await waitFor(Math.min(LLAMACPP_MODEL_READY_POLL_INTERVAL_MS, nextWaitMs));
     }
+  }
+
+  /**
+   * A loaded router entry does not prove the model can complete a request.
+   * Run a minimal OpenAI-compatible request before exposing it as ready.
+   */
+  private async probeModelInference(modelName: string): Promise<void> {
+    await this.requestJson('/v1/chat/completions', {
+      method: 'POST',
+      timeoutMs: Math.min(
+        this.loadTimeoutMs ?? LLAMACPP_MODEL_LOAD_TIMEOUT_MS,
+        LLAMACPP_MODEL_INFERENCE_PROBE_TIMEOUT_MS,
+      ),
+      body: JSON.stringify({
+        model: modelName,
+        messages: [{
+          role: LlamaCppInferenceProbeMessage.Role,
+          content: LlamaCppInferenceProbeMessage.Content,
+        }],
+        max_tokens: 1,
+        stream: false,
+      }),
+    });
   }
 
   private async requestJson<T>(
@@ -269,7 +312,12 @@ function isRunningModel(model: LlamaCppModel): model is LlamaCppRunningModel {
 }
 
 function matchesModelName(model: LlamaCppModel, modelName: string): boolean {
-  return [model.name, model.id, model.model, model.path].some(value => value === modelName);
+  const normalizedModelName = modelName.trim();
+  const targetBaseName = path.basename(normalizedModelName);
+  return [model.name, model.id, model.model, model.path].some(value => {
+    const candidate = value?.trim();
+    return candidate === normalizedModelName || path.basename(candidate ?? '') === targetBaseName;
+  });
 }
 
 function waitFor(delayMs: number): Promise<void> {
