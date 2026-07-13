@@ -600,8 +600,9 @@ export class CoworkStore {
     agentId: string = 'main',
     modelOverride: string = '',
     mode: 'work' | 'chat' = 'work',
+    id?: string,
   ): CoworkSession {
-    const id = uuidv4();
+    const sessionId = id || uuidv4();
     const now = Date.now();
 
     this.db
@@ -612,7 +613,7 @@ export class CoworkStore {
     `,
       )
       .run(
-        id,
+        sessionId,
         title,
         mode,
         cwd,
@@ -626,7 +627,7 @@ export class CoworkStore {
       );
 
     return {
-      id,
+      id: sessionId,
       title,
       claudeSessionId: null,
       status: 'idle',

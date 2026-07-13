@@ -152,8 +152,16 @@ const coworkSlice = createSlice({
         }
 
         // Ensure pagination fields are always present (guard against stale IPC data).
+        // If the in-memory session is still streaming, preserve its messages.
+        // The DB snapshot may be stale (messages not yet persisted). Replacing
+        // messages would cause streaming content and user messages to vanish
+        // when switching sessions and coming back.
+        const preserveMessages = state.currentSession?.status === 'running' &&
+          state.currentSession.id === session.id;
+
         state.currentSession = {
           ...session,
+          messages: preserveMessages ? state.currentSession!.messages : session.messages,
           messagesOffset: session.messagesOffset ?? 0,
           totalMessages: session.totalMessages ?? session.messages.length,
         };
