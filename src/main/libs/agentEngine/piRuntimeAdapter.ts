@@ -281,34 +281,23 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
 
-      // Restore conversation history if provided (e.g. from continueSession fallback).
-      // The PI SDK has no public API for this — we inject directly into the
-      // internal agent state so the model sees the full conversation context.
+      // Restore conversation history via system prompt append.
+      // Directly injecting into agent.state.messages crashes the PI SDK
+      // ("Cannot read properties of undefined (reading 'totalTokens')")
+      // because internal token counters go out of sync. Instead, format the
+      // history as a plain-text context block in the system prompt which
+      // the LLM can read but the PI SDK treats as immutable system text.
       const history = options.conversationHistory;
       if (history && history.length > 0) {
-        try {
-          const agent = (session as unknown as Record<string, unknown>).agent as Record<string, unknown> | undefined;
-          const state = agent?.state as Record<string, unknown> | undefined;
-          if (state && Array.isArray(state.messages)) {
-            // Convert our simplified format to PI's internal message format.
-            // The PI SDK expects messages with `role` and `content` (string).
-            state.messages = history.map(m => ({
-              role: m.role,
-              content: m.content,
-              timestamp: Date.now(),
-            }));
-            // Reset token counters so PI SDK recalculates from the injected history.
-            // Without this, internal counters (totalTokens, usage, etc.) go stale
-            // and cause "Cannot read properties of undefined (reading 'totalTokens')".
-            if ((state as any).usage === undefined) {
-              (state as any).usage = { input: 0, output: 0, totalTokens: 0 };
-            } else if (typeof (state as any).usage.totalTokens !== 'number') {
-              (state as any).usage.totalTokens = 0;
-            }
-          }
-        } catch (e) {
-          console.warn('[PiRuntime] failed to restore conversation history:', e);
-        }
+        const historyBlock = [
+          '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
+          ...history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
+          '=== END PREVIOUS CONVERSATION ===',
+        ].join('\n');
+        const currentSystem = (sessionOptions.systemPrompt as string) || '';
+        sessionOptions.systemPrompt = currentSystem
+          ? `${currentSystem}\n\n${historyBlock}`
+          : historyBlock;
       }
 
       const active: ActivePiSession = {
