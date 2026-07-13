@@ -344,21 +344,18 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   ): Promise<void> {
     const active = this.activeSessions.get(sessionId);
     if (!active) {
-      console.log(`[PiRuntime] continueSession: session ${sessionId} not active, restoring history from store`);
-      // Load previous messages from SQLite so the new PI session has full context.
+      console.log(`[PiRuntime] continueSession: session ${sessionId} not active, restoring context via prompt`);
+      // Load previous messages and embed them as context in the prompt.
+      // agent.state.messages injection crashes PI SDK (totalTokens),
+      // so we wrap history as inline text instead of hacking internal state.
       const history = this.store?.getSession(sessionId)?.messages ?? [];
-      // Filter to user/assistant messages only, drop system/tool messages
-      const conversationHistory = history
+      const contextParts = history
         .filter(m => m.type === 'user' || m.type === 'assistant')
-        .map(m => ({
-          role: m.type === 'user' ? 'user' as const : 'assistant' as const,
-          content: m.content,
-        }));
-      // Start session with history restoration
-      return this.startSession(sessionId, prompt, {
-        ...options,
-        conversationHistory,
-      });
+        .map(m => `${m.type === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
+      const contextualPrompt = contextParts.length > 0
+        ? `${contextParts.join('\n\n')}\n\nUser: ${prompt}`
+        : prompt;
+      return this.startSession(sessionId, contextualPrompt, options);
     }
 
     // Reset turn state
