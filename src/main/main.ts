@@ -3422,6 +3422,7 @@ if (!gotTheLock) {
         session.agentId || 'main',
         session.modelOverride || '',
         session.mode || 'work',
+        session.id,
       );
       // Save messages
       for (const msg of session.messages || []) {
