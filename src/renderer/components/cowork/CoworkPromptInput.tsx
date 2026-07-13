@@ -33,7 +33,7 @@ import {
   setDraftPrompt,
   updateCurrentSessionModelOverride,
 } from '../../store/slices/coworkSlice';
-import type { Model } from '../../store/slices/modelSlice';
+import { type Model,setSelectedModel } from '../../store/slices/modelSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
@@ -242,6 +242,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
   const handleModelSelect = useCallback(async (nextModel: Model) => {
     if (isPatchingModel || isPersistingAgentModel) return;
     const modelRef = toOpenClawModelRef(nextModel);
+    // Always update the agent-level model selection so that CoworkView's
+    // currentAgentSelectedModel (used to build ChatChatTransport) reflects
+    // the user's latest choice — even when switching model inside a session.
+    dispatch(setSelectedModel({ agentId: currentAgentId, model: nextModel }));
     if (sessionId) {
       const reqId = modelPatchRequestIdRef.current + 1;
       modelPatchRequestIdRef.current = reqId;
@@ -266,7 +270,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       return;
     }
     await persistAgentModelSelection(nextModel);
-  }, [isPatchingModel, isPersistingAgentModel, sessionId, currentSession, dispatch, currentAgent, agentModelIsInvalid, persistAgentModelSelection]);
+  }, [isPatchingModel, isPersistingAgentModel, sessionId, currentSession, currentAgentId, dispatch, currentAgent, agentModelIsInvalid, persistAgentModelSelection]);
 
   const isLarge = size === 'large';
   const minHeight = isLarge ? 60 : 24;
