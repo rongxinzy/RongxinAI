@@ -299,7 +299,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
         try {
-          const transport = new ChatChatTransport();
+          const transport = new ChatChatTransport(currentAgentSelectedModel?.id);
           const stream = await transport.sendMessages({
             trigger: 'submit-message',
             chatId: tempSessionId,
@@ -469,7 +469,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         }));
 
         dispatch(setStreaming(true));
-        const transport = new ChatChatTransport();
+        const transport = new ChatChatTransport(currentAgentSelectedModel?.id);
         const stream = await transport.sendMessages({
           trigger: 'submit-message',
           chatId: currentSession.id,
