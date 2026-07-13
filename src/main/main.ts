@@ -3396,9 +3396,21 @@ if (!gotTheLock) {
     try {
       const existing = coworkStore.getSession(session.id);
       if (existing) {
-        // Session already exists in DB, just update status
+        // Session already exists — update status and sync new messages
         coworkStore.updateSession(session.id, { status: session.status as CoworkSessionStatus });
-        return { success: true, session: existing };
+        const existingMessages = existing.messages ?? [];
+        const existingIds = new Set(existingMessages.map((m: { id: string }) => m.id));
+        for (const msg of session.messages || []) {
+          if (!existingIds.has(msg.id)) {
+            coworkStore.addMessage(session.id, {
+              type: msg.type as CoworkMessageType,
+              content: msg.content,
+              metadata: msg.metadata,
+            });
+          }
+        }
+        const updated = coworkStore.getSession(session.id);
+        return { success: true, session: updated };
       }
       // Create new session in SQLite
       const newSession = coworkStore.createSession(

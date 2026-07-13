@@ -654,7 +654,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     chatNoSessions: '暂无对话记录',
     chatNoSessionsHint: '在输入框中开始你的第一次对话',
     chatErrorMessage: '请求失败: {error}',
-    newChat: '新建任务',
+    newChat: '新建对话',
     search: '搜索任务',
     openSettings: '打开设置',
     restartApp: '重新启动',
