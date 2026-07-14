@@ -119,6 +119,16 @@ if (-not (Test-Path "$pythonDir\python.exe")) {
 & "$pythonDir\python.exe" --version
 & "$pythonDir\python.exe" -m pip --version
 
+# electron-builder beforePack 钩子需要 portable uv 运行时。
+# GitHub 在 CI 环境不可达，因此优先使用 Runner 本地缓存。
+$uvArchive = 'C:\ci-cache\uv-x86_64-pc-windows-msvc-0.8.4.zip'
+if (Test-Path $uvArchive) {
+  $env:LOBSTERAI_PORTABLE_UV_ARCHIVE = $uvArchive
+  Write-Host "Using cached uv runtime archive: $uvArchive"
+} else {
+  Write-Warning "Cached uv archive not found at $uvArchive; build will try to download from GitHub"
+}
+
 # CI 中跳过了 Electron postinstall 下载，因此在 electron-builder 运行前
 # 需要手动确保 Windows Electron 二进制文件存在。
 $electronVersion = $env:ELECTRON_VERSION
@@ -153,12 +163,12 @@ if (-not $isRelease) {
   Write-Host "Release build: version=$packageVersion"
 }
 
-# 优先从本地下载目录同步 llama.cpp backend 资源到 build/win-lite 与 build/win-full，
+# 优先从 Runner 本地缓存目录同步 llama.cpp backend 资源到 build/win-lite 与 build/win-full，
 # 使 electron-builder-hooks 既能使用 CI cache，也能在本地开发/Runner 直接读取下载目录。
 $llamaCppBackendDownloadDir = if ($env:RONGXINAI_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR) {
   $env:RONGXINAI_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
 } else {
-  'C:\Users\Administrator\Downloads'
+  'C:\ci-cache'
 }
 
 function Sync-BackendResourceDirectory {
