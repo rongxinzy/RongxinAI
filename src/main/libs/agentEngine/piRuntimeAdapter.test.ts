@@ -10,6 +10,7 @@ const hoisted = vi.hoisted(() => {
   const mockSession = {
     prompt: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
+    abortBash: vi.fn(),
     setModel: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn().mockReturnValue(() => {}),
   };
