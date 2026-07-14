@@ -8,6 +8,7 @@ import {
 } from '@shared/components/ai-elements/queue';
 import { useMemo } from 'react';
 
+import { i18nService } from '../../services/i18n';
 import { extractTodosFromMessages } from '../../utils/todoParser';
 
 interface TodoQueueProps {
@@ -28,12 +29,18 @@ export function TodoQueue({ messages }: TodoQueueProps) {
   const total = todos.length;
 
   return (
-    <Queue className="mx-auto max-h-[150px] w-[95%] overflow-y-auto rounded-b-none border-input border-b-0">
+    <Queue className="mx-auto max-h-[150px] w-[95%] rounded-b-none border-input border-b-0 overflow-y-auto group
+      [&::-webkit-scrollbar]:w-1
+      [&::-webkit-scrollbar-thumb]:rounded-full
+      [&::-webkit-scrollbar-thumb]:bg-transparent
+      [&::-webkit-scrollbar-track]:bg-transparent
+      group-hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/20
+    ">
       <QueueSection>
         <QueueSectionContent>
           <div className="flex items-center gap-2 px-1 py-0.5 text-xs text-muted-foreground">
             <span>
-              {completed}/{total} completed
+              {completed}/{total} {i18nService.t('coworkTodoCompleted')}
             </span>
           </div>
           {todos.map((todo) => (
