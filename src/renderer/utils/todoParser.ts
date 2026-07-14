@@ -42,9 +42,9 @@ export function parseTodosFromText(content: string): QueueTodo[] {
 
 /**
  * Extract todos from a session's messages.
- * Walks backwards to find the latest assistant ANSWER message,
- * skipping thinking messages (metadata.isThinking) to avoid showing
- * internal planning as user-facing todos.
+ * Walks backwards through all assistant messages (skipping thinking),
+ * and returns the first checklist found. This keeps the todo-list visible
+ * during later turns when the current answer hasn't output a checklist yet.
  */
 export function extractTodosFromMessages(
   messages: Array<{ type: string; content: string; metadata?: Record<string, unknown> }>,
@@ -53,7 +53,8 @@ export function extractTodosFromMessages(
     const msg = messages[i];
     if (msg.type !== 'assistant') continue;
     if (msg.metadata?.isThinking) continue;
-    return parseTodosFromText(msg.content);
+    const todos = parseTodosFromText(msg.content);
+    if (todos.length > 0) return todos;
   }
   return [];
 }
