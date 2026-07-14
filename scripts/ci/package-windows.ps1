@@ -125,6 +125,13 @@ $uvArchive = 'C:\ci-cache\uv-x86_64-pc-windows-msvc-0.8.4.zip'
 if (Test-Path $uvArchive) {
   $env:LOBSTERAI_PORTABLE_UV_ARCHIVE = $uvArchive
   Write-Host "Using cached uv runtime archive: $uvArchive"
+  # 提前在脚本主流程中运行一次，让 uv 解压错误在 electron-builder 外部暴露。
+  Write-Host '[package-windows] Preparing uv runtime before electron-builder...'
+  & node scripts/setup-uv-runtime.js --required
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error 'FATAL: setup-uv-runtime.js failed'
+    exit $LASTEXITCODE
+  }
 } else {
   Write-Warning "Cached uv archive not found at $uvArchive; build will try to download from GitHub"
 }
