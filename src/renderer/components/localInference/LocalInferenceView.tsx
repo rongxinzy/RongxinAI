@@ -352,7 +352,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     runningModels,
     runAction,
     refreshLocalModels,
-    refreshRunningModels,
     onRestartStatus: handleRestartStatus,
     showToast,
   });
@@ -569,14 +568,20 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       setModelsDir(nextModelsDir);
       setDraftModelsDir(nextModelsDir);
       await refreshLocalModels();
+      setRunningModels([]);
       const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
       if (marketplaceHasSearchedRef.current && params) {
         await searchMarketplace(params);
       }
-      showToast(i18nService.t('localInferenceLibrarySaved'), LocalInferenceToastKind.Success);
+      showToast(
+        isRunning
+          ? i18nService.t('localInferenceLibrarySavedRestarted')
+          : i18nService.t('localInferenceLibrarySaved'),
+        LocalInferenceToastKind.Success,
+      );
       setLibrarySettingsOpen(false);
     });
-  }, [draftModelsDir, refreshLocalModels, runAction, searchMarketplace, showToast]);
+  }, [draftModelsDir, isRunning, refreshLocalModels, runAction, searchMarketplace, showToast]);
 
   const handleOpenModelsDir = useCallback(() => {
     if (!modelsDir.trim()) return;

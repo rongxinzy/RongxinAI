@@ -58,13 +58,14 @@ export function ModelLibrarySettingsModal({
             value={draftModelsDir}
             onChange={event => onChangeModelsDir(event.target.value)}
             placeholder={modelsDir}
+            disabled={saving}
           />
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onPickDirectory}>
+            <Button type="button" variant="outline" size="sm" onClick={onPickDirectory} disabled={saving}>
               <FolderOpen data-icon="inline-start" />
               {i18nService.t('localInferenceChangeDirectory')}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onOpenDirectory}>
+            <Button type="button" variant="outline" size="sm" onClick={onOpenDirectory} disabled={saving}>
               <FolderUp data-icon="inline-start" />
               {i18nService.t('localInferenceOpenLibraryDirectory')}
             </Button>
@@ -72,7 +73,7 @@ export function ModelLibrarySettingsModal({
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
             {i18nService.t('cancel')}
           </Button>
           <Button type="button" size="sm" onClick={onSave} disabled={saving || !draftModelsDir.trim()}>

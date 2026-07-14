@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import type { MarketplaceModel } from '../../shared/marketplace';
@@ -567,6 +567,33 @@ test('listRunningModels refreshes GGUF thinking capabilities when the cache is c
   ]);
 });
 
+test('listRunningModels tolerates a transient router connection failure after startup', async () => {
+  const manager = new LlamaCppManager(() => ({}));
+  let attempts = 0;
+  manager.client = async () => ({
+    runningModels: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new TypeError('fetch failed');
+      return [{ name: 'qwen-local' }];
+    },
+  } as any);
+
+  await expect(manager.listRunningModels()).resolves.toEqual([
+    expect.objectContaining({ name: 'qwen-local' }),
+  ]);
+  expect(attempts).toBe(2);
+});
+
+test('listRunningModels bounds each router readiness request to a short timeout', async () => {
+  const manager = new LlamaCppManager(() => ({}));
+  const runningModels = vi.fn(async () => []);
+  manager.client = async () => ({ runningModels } as any);
+
+  await manager.listRunningModels();
+
+  expect(runningModels).toHaveBeenCalledWith(2_000);
+});
+
 test('extractModelScopeFilePaths reads nested ModelScope repo file payloads', () => {
   expect(extractModelScopeFilePaths({
     Data: {
@@ -717,6 +744,27 @@ test('deleteModel removes empty parent directories after deleting a GGUF file', 
   }));
   expect(fs.existsSync(ggufPath)).toBe(false);
   expect(fs.existsSync(repoDir)).toBe(false);
+  expect(storage.has('llamacpp_last_loaded_model')).toBe(false);
+});
+
+test('clearLastLoadedModel prevents a service restart from restoring the old model', () => {
+  const storage = new Map<string, unknown>([['llamacpp_last_loaded_model', 'old-model']]);
+  const manager = new LlamaCppManager(
+    () => ({}),
+    undefined,
+    {
+      get: <T>(key: string) => storage.get(key) as T | undefined,
+      set: <T>(key: string, value: T) => {
+        storage.set(key, value);
+      },
+      delete: (key: string) => {
+        storage.delete(key);
+      },
+    },
+  );
+
+  manager.clearPersistedLastLoadedModel();
+
   expect(storage.has('llamacpp_last_loaded_model')).toBe(false);
 });
 

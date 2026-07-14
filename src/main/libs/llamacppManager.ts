@@ -56,6 +56,7 @@ import {
   refreshInstallInputFromMarketplace,
   resolveManagedModelInstallDir,
 } from './llamacppModelInstallation';
+import { retryLlamaCppReadRequest } from './llamacppRequestRetry';
 import {
   createLlamaCppRuntimeInstallPlan,
   executeLlamaCppRuntimeInstallPlan,
@@ -84,6 +85,7 @@ import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = '8080';
 const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 120_000;
+const LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS = 2_000;
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
 const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
@@ -899,6 +901,10 @@ export class LlamaCppManager extends EventEmitter {
     }
   }
 
+  clearPersistedLastLoadedModel(): void {
+    this.clearLastLoadedModel();
+  }
+
   async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
     const localModels = await this.listLocalModels().catch(() => [] as LlamaCppModel[]);
     const resolvedInput = await this.resolveModelLoadInput(input, localModels);
@@ -919,8 +925,13 @@ export class LlamaCppManager extends EventEmitter {
     };
   }
 
-  async listRunningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
-    const runningModels = await (await this.client()).runningModels(timeoutMs);
+  async listRunningModels(
+    timeoutMs = LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS,
+  ): Promise<LlamaCppRunningModel[]> {
+    const client = await this.client();
+    const runningModels = await retryLlamaCppReadRequest(
+      () => client.runningModels(timeoutMs),
+    );
     if (this.needsThinkingToggleSupportRefresh(runningModels)) {
       this.refreshThinkingToggleSupport();
     }

@@ -53,6 +53,8 @@ import {
   getLlamaCppServiceStartupFailureI18nKey,
   LlamaCppServiceStartupReason,
 } from '../libs/llamacppServiceStartup';
+import { applyLlamaCppServiceTransition } from '../libs/llamacppServiceTransition';
+import { LlamaCppServiceTransitionLock } from '../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
 
@@ -257,9 +259,14 @@ export function registerLlamaCppIpcHandlers(
   const refreshRunningModelBindings = async (
     reason = 'llamacpp-model-visibility-refresh',
   ): Promise<void> => {
+    if (bindingRefreshSuppressed) return;
+    const refreshGeneration = bindingRefreshGeneration;
     try {
-      await updateRunningModelBindings(await manager.listRunningModels(), reason);
+      const runningModels = await manager.listRunningModels();
+      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
+      await updateRunningModelBindings(runningModels, reason);
     } catch {
+      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
       await updateRunningModelBindings([], reason);
     }
   };
@@ -275,6 +282,14 @@ export function registerLlamaCppIpcHandlers(
   const sendProgress = (progress: LlamaCppInstallProgress) =>
     broadcast(LlamaCppIpcChannel.InstallProgress, progress);
   const loadModelLock = new LlamaCppModelLoadLock();
+  const serviceTransitionLock = new LlamaCppServiceTransitionLock();
+  const runServiceTransition = async <T>(action: () => Promise<T>): Promise<T> =>
+    await serviceTransitionLock.runExclusive(
+      action,
+      () => new Error(t('llamacppLoadModelServiceUnavailable')),
+    );
+  let bindingRefreshSuppressed = false;
+  let bindingRefreshGeneration = 0;
 
   migrateLegacyLlamaCppConfig(options.getStore());
   manager.on('status', status => {
@@ -354,7 +369,22 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
-  ipcMain.handle(LlamaCppIpcChannel.Restart, async () => manager.restart());
+  ipcMain.handle(LlamaCppIpcChannel.Restart, async () => await runServiceTransition(async () => {
+    const wasRunning = manager.getStatus().status === 'running';
+    const nextStatus = await applyLlamaCppServiceTransition({
+      wasRunning,
+      stop: () => manager.stop(),
+      start: () => manager.start(),
+      applyConfig: () => undefined,
+      clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
+      refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
+      setBindingRefreshSuppressed: suppressed => {
+        bindingRefreshSuppressed = suppressed;
+        if (suppressed) bindingRefreshGeneration += 1;
+      },
+    });
+    return nextStatus ?? manager.getStatus();
+  }));
   ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
     getLlamaCppServiceConfig(options.getStore()),
   );
@@ -364,28 +394,55 @@ export function registerLlamaCppIpcHandlers(
     return sanitized;
   });
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
-  ipcMain.handle(LlamaCppIpcChannel.SetModelsDir, async (_event, modelsDir: unknown) => {
+  ipcMain.handle(LlamaCppIpcChannel.SetModelsDir, async (_event, modelsDir: unknown) => await runServiceTransition(async () => {
     const store = options.getStore();
     const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {};
     const trimmedModelsDir = typeof modelsDir === 'string' ? modelsDir.trim() : '';
-    if (trimmedModelsDir) {
-      fs.mkdirSync(trimmedModelsDir, { recursive: true });
-    }
     const nextConfig = sanitizeLlamaCppServiceConfig({
       ...currentConfig,
       modelsDir: trimmedModelsDir || undefined,
     });
-    store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
+    const modelsDirChanged = (currentConfig.modelsDir?.trim() || '') !== (nextConfig.modelsDir?.trim() || '');
+    if (!modelsDirChanged) return manager.getModelsDir();
+
+    const wasRunning = manager.getStatus().status === 'running';
+    const nextStatus = await applyLlamaCppServiceTransition({
+      wasRunning,
+      stop: () => manager.stop(),
+      start: () => manager.start(),
+      applyConfig: () => {
+        if (trimmedModelsDir) {
+          fs.mkdirSync(trimmedModelsDir, { recursive: true });
+        }
+        store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
+      },
+      clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
+      refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
+      setBindingRefreshSuppressed: suppressed => {
+        bindingRefreshSuppressed = suppressed;
+        if (suppressed) bindingRefreshGeneration += 1;
+      },
+    });
+    if (wasRunning && nextStatus?.status !== 'running') {
+      throw new Error(t('llamacppServiceStartupUnknown'));
+    }
     return manager.getModelsDir();
-  });
+  }));
 
   ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
     return await manager.listLocalModels();
   });
   ipcMain.handle(LlamaCppIpcChannel.ListRunningModels, async () => {
-    const runningModels = await manager.listRunningModels();
-    await updateRunningModelBindings(runningModels, 'llamacpp-model-visibility-refresh');
-    return runningModels;
+    try {
+      const runningModels = await manager.listRunningModels();
+      if (!bindingRefreshSuppressed) {
+        await updateRunningModelBindings(runningModels, 'llamacpp-model-visibility-refresh');
+      }
+      return runningModels;
+    } catch (error) {
+      if (manager.getStatus().status !== 'running') return [];
+      throw error;
+    }
   });
   ipcMain.handle(LlamaCppIpcChannel.DeleteModel, async (_event, name: string) => {
     const result = await manager.deleteModel(name);
@@ -448,6 +505,9 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     if (!modelName) throw new Error(t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)));
+    if (serviceTransitionLock.isActive()) {
+      throw new Error(t('llamacppLoadModelServiceUnavailable'));
+    }
     return await loadModelLock.runExclusive(
       modelName,
       async () => {
