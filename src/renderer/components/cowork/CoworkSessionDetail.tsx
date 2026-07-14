@@ -1222,9 +1222,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       {isStreaming && <StreamingBar messages={currentSession.messages} />}
 
       {/* Input Area */}
+      <TodoQueue messages={currentSession.messages} />
       <div className="px-4 pb-4 shrink-0">
         <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
-          <TodoQueue messages={currentSession.messages} />
           <CoworkPromptInput
             ref={promptInputRef}
             onSubmit={onContinue}
