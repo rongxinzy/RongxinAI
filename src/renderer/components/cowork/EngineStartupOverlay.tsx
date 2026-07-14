@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { Progress, ProgressValue } from '@shared/components/ui/progress';
 import { MessageCircle, TriangleAlert } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -122,14 +123,10 @@ const EngineStartupOverlay: React.FC = () => {
           <div className={`min-w-0 flex-1 text-sm leading-6 ${tone.messageClass}`}>
             <div>{resolveEngineStatusText(displayStatus)}</div>
             {progressPercent !== null && isStarting && (
-              <div className="mt-1 flex items-center gap-2">
-                <div className="h-1 flex-1 rounded-full bg-primary/15 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground">{progressPercent}%</span>
+              <div className="mt-1">
+                <Progress value={progressPercent}>
+                  <ProgressValue />
+                </Progress>
               </div>
             )}
             {isError && (
