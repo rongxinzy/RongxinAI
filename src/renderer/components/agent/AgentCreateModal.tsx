@@ -378,14 +378,6 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           <div className="mt-1 flex shrink-0 items-center gap-2">
             <Button
               type="button"
-              variant="outline"
-              onClick={() => setShowTemplatePicker(true)}
-              className="h-8 px-3 text-sm font-medium"
-            >
-              {i18nService.t('agentUseTemplate')}
-            </Button>
-            <Button
-              type="button"
               variant="ghost"
               size="icon"
               onClick={handleClose}

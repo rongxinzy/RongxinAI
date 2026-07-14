@@ -12,7 +12,7 @@ import {
 import { Switch } from '@shared/components/ui/switch';
 import { Textarea } from '@shared/components/ui/textarea';
 import { cn } from '@shared/lib/utils';
-import { ArrowLeftRight, Box, Brain, CheckCircle, Cpu, ExternalLink, Eye, EyeOff, Info, Key, Mail, MessageCircle, Pencil, PlusCircle, ShieldCheck, Signal, Sun, Trash2, UserCircle, X, XCircle } from 'lucide-react';
+import { Box, Brain, CheckCircle, Cpu, ExternalLink, Eye, EyeOff, Info, Key, Mail, MessageCircle, Pencil, PlusCircle, ShieldCheck, Signal, Sun, Trash2, UserCircle, X, XCircle } from 'lucide-react';
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -2553,7 +2553,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       { key: 'appearance' as TabType,     label: i18nService.t('appearance'),     icon: <Sun className="h-5 w-5" /> },
       { key: 'coworkAgentEngine' as TabType, label: i18nService.t('coworkAgentEngine'), icon: <Cpu className="h-5 w-5" /> },
       { key: 'model' as TabType,          label: i18nService.t('model'),          icon: <Box className="h-5 w-5" /> },
-      { key: 'triage' as TabType,         label: i18nService.t('triageTab'),      icon: <ArrowLeftRight className="h-5 w-5" /> },
       { key: 'im' as TabType,             label: i18nService.t('imBot'),          icon: <MessageCircle className="h-5 w-5" /> },
       { key: 'email' as TabType,          label: i18nService.t('emailTab'),       icon: <Mail className="h-5 w-5" /> },
       { key: 'coworkMemory' as TabType,   label: i18nService.t('coworkMemoryTitle'), icon: <Brain className="h-5 w-5" /> },
