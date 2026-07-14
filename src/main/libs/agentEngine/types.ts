@@ -42,6 +42,11 @@ export type CoworkImageAttachment = {
   base64Data: string;
 };
 
+export type CoworkConversationHistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export type CoworkStartOptions = {
   skipInitialUserMessage?: boolean;
   skillIds?: string[];
@@ -53,7 +58,7 @@ export type CoworkStartOptions = {
   agentId?: string;
   modelOverride?: string;
   /** Previous conversation to restore (user/assistant pairs), injected into PI session state */
-  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  conversationHistory?: CoworkConversationHistoryMessage[];
   /** Internal: override prompt text sent to PI, while UI shows original prompt */
   _piPromptOverride?: string;
 };

@@ -118,6 +118,7 @@ function resolveOfficialRuntimeCompanionAssetNames(targetId, env = process.env) 
 
 function resolveArchiveExtension(archiveName) {
   if (archiveName.endsWith('.tar.gz')) return '.tar.gz';
+  if (archiveName.endsWith('.zip')) return '.zip';
   throw new Error(`Unsupported runtime archive format: ${archiveName}`);
 }
 
@@ -341,7 +342,7 @@ function extractArchiveSync(archivePath, extractDir) {
       "const tar=require('tar');",
       "const [archive,dir]=process.argv.slice(1);",
       "(async()=>{",
-      "if(archive.endsWith('.tar.gz')) await extractZip(archive,{dir});",
+      "if(archive.endsWith('.zip')) await extractZip(archive,{dir});",
       "else if(archive.endsWith('.tar.gz')) await tar.x({file:archive,cwd:dir});",
       "else throw new Error('Unsupported archive '+archive);",
       "})().catch(e=>{console.error(e.message);process.exit(1);});",

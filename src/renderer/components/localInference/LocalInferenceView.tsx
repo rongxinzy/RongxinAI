@@ -38,6 +38,7 @@ import type {
   LocalInferenceToastKind as LocalInferenceToastKindType,
 } from './types';
 import { LocalInferenceToastKind } from './types';
+import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
 import {
   buildMarketplaceSearchParams,
   getInstallableMarketplaceModels,
@@ -197,9 +198,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
-        setMarketplaceError(
-          searchError instanceof Error ? searchError.message : String(searchError),
-        );
+        setMarketplaceError(getLocalInferenceUserFacingErrorMessage(searchError));
       }
     } finally {
       if (id === marketplaceSearchRef.current) {
@@ -306,7 +305,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         );
       } catch (installError) {
         showToast(
-          installError instanceof Error ? installError.message : String(installError),
+          getLocalInferenceUserFacingErrorMessage(installError),
           LocalInferenceToastKind.Error,
         );
       }
@@ -322,7 +321,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         await action();
       } catch (actionError) {
         showToast(
-          actionError instanceof Error ? actionError.message : String(actionError),
+          getLocalInferenceUserFacingErrorMessage(actionError),
           LocalInferenceToastKind.Error,
         );
       } finally {

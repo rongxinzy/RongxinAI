@@ -40,20 +40,18 @@
   },
   "llamacpp": {
     "runtimeRepo": "https://github.com/ggml-org/llama.cpp.git",
-    "runtimeReleaseTag": "b9505",
+    "runtimeReleaseTag": "b9244",
     "runtimeAssets": {
       "mac-arm64": "llama-{tag}-bin-macos-arm64.tar.gz",
       "mac-x64": "llama-{tag}-bin-macos-x64.tar.gz",
-      "win-x64": "llama-{tag}-bin-win-cpu-x64.tar.gz",
-      "win-x64-cuda-12": "llama-{tag}-bin-win-cuda-12.4-x64.tar.gz",
-      "win-arm64": "llama-{tag}-bin-win-cpu-arm64.tar.gz",
+      "win-x64": "llama-{tag}-bin-win-cpu-x64.zip",
+      "win-x64-cuda-12": "llama-{tag}-bin-win-cuda-12.4-x64.zip",
+      "win-arm64": "llama-{tag}-bin-win-cpu-arm64.zip",
       "linux-x64": "llama-{tag}-bin-ubuntu-x64.tar.gz",
       "linux-arm64": "llama-{tag}-bin-ubuntu-arm64.tar.gz"
     },
     "runtimeCompanionAssets": {
-      "win-x64-cuda-12": [
-        "cudart-llama-bin-win-cuda-12.4-x64.tar.gz"
-      ]
+      "win-x64-cuda-12": []
     }
   },
   "main": "dist-electron/main.js",

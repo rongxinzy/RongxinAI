@@ -10,7 +10,7 @@ test('llama.cpp service defaults are explicit and stable', () => {
   expect(DEFAULT_LLAMACPP_SERVICE_CONFIG).toEqual({
     host: '127.0.0.1',
     port: '8080',
-    modelsMax: '0',
+    modelsMax: '3',
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',

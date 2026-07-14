@@ -4,11 +4,13 @@ import { describe, expect, test } from 'vitest';
 const scriptPath = path.resolve(process.cwd(), 'scripts', 'download-llamacpp-runtime.cjs');
 const {
   formatDownloadFailureMessage,
+  resolveArchiveExtension,
   resolveRuntimeDownloadSource,
   resolveRuntimeDownloadSources,
   resolveRuntimeCompanionDownloadSources,
   resolveRuntimeReleaseTag,
 } = require(scriptPath) as {
+  resolveArchiveExtension: (archiveName: string) => string;
   formatDownloadFailureMessage: (
     status: number,
     statusText: string,
@@ -35,26 +37,23 @@ describe('llamacpp runtime download script', () => {
   test('defaults to the configured Cloudflare asset with GitHub fallback', () => {
     const rootDir = process.cwd();
 
-    expect(resolveRuntimeReleaseTag(rootDir, {})).toBe('b9505');
+    expect(resolveRuntimeReleaseTag(rootDir, {})).toBe('b9244');
     expect(resolveRuntimeDownloadSource('win-x64', { rootDir, env: {} })).toBe(
-      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9244/llama-b9244-bin-win-cpu-x64.zip',
     );
     expect(resolveRuntimeDownloadSources('win-x64', { rootDir, env: {} })).toEqual([
-      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
-      'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9244/llama-b9244-bin-win-cpu-x64.zip',
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip',
     ]);
     expect(resolveRuntimeDownloadSource('win-x64-cuda-12', { rootDir, env: {} })).toBe(
-      'https://rongxinai.krli.org/llamacpp/b9505/llama-b9505-bin-win-cuda-12.4-x64.tar.gz',
+      'https://rongxinai.krli.org/llamacpp/b9244/llama-b9244-bin-win-cuda-12.4-x64.zip',
     );
-    expect(resolveRuntimeCompanionDownloadSources('win-x64-cuda-12', { rootDir, env: {} })).toEqual([
-      {
-        assetName: 'cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
-        urls: [
-          'https://rongxinai.krli.org/llamacpp/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
-          'https://github.com/ggml-org/llama.cpp/releases/download/b9505/cudart-llama-bin-win-cuda-12.4-x64.tar.gz',
-        ],
-      },
-    ]);
+    expect(resolveRuntimeCompanionDownloadSources('win-x64-cuda-12', { rootDir, env: {} })).toEqual([]);
+  });
+
+  test('supports zip and tar.gz runtime archives', () => {
+    expect(resolveArchiveExtension('llama-b9244-bin-win-cpu-x64.zip')).toBe('.zip');
+    expect(resolveArchiveExtension('llama-b9244-bin-ubuntu-x64.tar.gz')).toBe('.tar.gz');
   });
 
   test('maps the official asset names per target', () => {
@@ -80,18 +79,18 @@ describe('llamacpp runtime download script', () => {
       },
     });
 
-    expect(url).toBe('https://mirror.example.com/mac-arm64/llama-b9505-bin-macos-arm64.tar.gz');
+    expect(url).toBe('https://mirror.example.com/mac-arm64/llama-b9244-bin-macos-arm64.tar.gz');
   });
 
   test('formats GitHub 404 failures with actionable guidance', () => {
     const rootDir = process.cwd();
-    const url = 'https://github.com/ggml-org/llama.cpp/releases/download/b9505/llama-b9505-bin-win-cpu-x64.tar.gz';
+    const url = 'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip';
 
     const message = formatDownloadFailureMessage(404, 'Not Found', url, 'win-x64', rootDir);
 
     expect(message).toContain('does not exist');
     expect(message).toContain('published upstream llama.cpp asset');
-    expect(message).toContain('llama-b9505-bin-win-cpu-x64.tar.gz');
+    expect(message).toContain('llama-b9244-bin-win-cpu-x64.zip');
     expect(message).toContain('npm run llamacpp:runtime:win-x64');
   });
 });

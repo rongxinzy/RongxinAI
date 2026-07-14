@@ -76,8 +76,12 @@ export class LlamaCppClient {
     );
   }
 
+  async listModelsSnapshot(timeoutMs = 30_000): Promise<LlamaCppModel[]> {
+    return await this.listModelsWithTimeout(timeoutMs);
+  }
+
   async runningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
-    const models = await this.listModelsWithTimeout(timeoutMs);
+    const models = await this.listModelsSnapshot(timeoutMs);
     return models.filter(isRunningModel);
   }
 
