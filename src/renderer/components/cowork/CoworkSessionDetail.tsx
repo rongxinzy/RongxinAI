@@ -44,6 +44,7 @@ import { composeExportCanvas, domRectToCaptureRect, formatExportTimestamp, loadI
 import { buildConversationTurns, buildDisplayItems, hasRenderableAssistantContent } from './helpers/messageGrouping';
 // toolUtils helpers used in sub-components
 import { normalizeLocalPath, parseRootRelativePath,toAbsolutePathFromCwd } from './helpers/pathUtils';
+import { TodoQueue } from './TodoQueue';
 
 // Stable empty array reference to avoid unnecessary re-renders from useSelector
 const EMPTY_ARTIFACTS: Artifact[] = [];
@@ -1217,6 +1218,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       {/* Input Area */}
       <div className="p-4 shrink-0">
         <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
+          <TodoQueue messages={currentSession.messages} />
           <CoworkPromptInput
             ref={promptInputRef}
             onSubmit={onContinue}
