@@ -2,6 +2,7 @@ import { Message, MessageContent, MessageResponse } from '@shared/components/ai-
 import React, { useState } from 'react';
 
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
+import { useSmoothStreaming } from '../../../utils/useSmoothStreaming';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { CopyButton } from './CopyButton';
 
@@ -21,6 +22,8 @@ export const AssistantBubble: React.FC<{
   const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
+  const isStreaming = Boolean(message.metadata?.isStreaming);
+  const displayedContent = useSmoothStreaming(rawContent, isStreaming);
   const modelLabel = getMessageModelLabel(turnMetadata);
 
   return (
@@ -31,7 +34,7 @@ export const AssistantBubble: React.FC<{
     >
       <Message from="assistant">
         <MessageContent>
-          <MessageResponse>{rawContent}</MessageResponse>
+          <MessageResponse>{displayedContent}</MessageResponse>
         </MessageContent>
       </Message>
       {modelLabel && (

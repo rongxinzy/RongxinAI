@@ -127,10 +127,30 @@ class CoworkService {
     this.streamListenerCleanups.push(messageCleanup);
 
     // Message update listener (for streaming content updates)
-    const messageUpdateCleanup = cowork.onStreamMessageUpdate(({ sessionId, messageId, content, metadata }) => {
-      store.dispatch(updateMessageContent({ sessionId, messageId, content, metadata }));
+    // Batch dispatches with requestAnimationFrame to collapse multiple IPC
+    // messages into a single React render per frame for smooth streaming.
+    let rafId: number | null = null;
+    let pendingUpdate: { sessionId: string; messageId: string; content: string; metadata?: Record<string, unknown> } | null = null;
+    const messageUpdateCleanup = cowork.onStreamMessageUpdate((update) => {
+      pendingUpdate = update;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          if (pendingUpdate) {
+            store.dispatch(updateMessageContent(pendingUpdate));
+            pendingUpdate = null;
+          }
+        });
+      }
     });
-    this.streamListenerCleanups.push(messageUpdateCleanup);
+    const messageUpdateRafCleanup = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      messageUpdateCleanup();
+    };
+    this.streamListenerCleanups.push(messageUpdateRafCleanup);
 
     // Permission request listener
     const permissionCleanup = cowork.onStreamPermission(({ sessionId, request }) => {
