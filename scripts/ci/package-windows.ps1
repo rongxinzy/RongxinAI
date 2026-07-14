@@ -122,15 +122,25 @@ if (-not (Test-Path "$pythonDir\python.exe")) {
 # electron-builder beforePack 钩子需要 portable uv 运行时。
 # GitHub 在 CI 环境不可达，因此优先使用 Runner 本地缓存。
 $uvArchive = 'C:\ci-cache\uv-x86_64-pc-windows-msvc-0.8.4.zip'
+$uvRuntimeDir = 'resources\uv-win'
 if (Test-Path $uvArchive) {
   $env:LOBSTERAI_PORTABLE_UV_ARCHIVE = $uvArchive
   Write-Host "Using cached uv runtime archive: $uvArchive"
-  # 提前在脚本主流程中运行一次，让 uv 解压错误在 electron-builder 外部暴露。
-  Write-Host '[package-windows] Preparing uv runtime before electron-builder...'
-  & node scripts/setup-uv-runtime.js --required
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error 'FATAL: setup-uv-runtime.js failed'
-    exit $LASTEXITCODE
+  # setup-uv-runtime.js 在 CI 解压 zip 时容易静默崩溃，因此改用 PowerShell 直接复制。
+  # 只要 resources/uv-win 里已有健康的 uv.exe/uvx.exe，beforePack 钩子就会跳过解压。
+  New-Item -ItemType Directory -Path $uvRuntimeDir -Force | Out-Null
+  $uvSource = 'C:\Users\Administrator\.local\bin'
+  if ((Test-Path "$uvSource\uv.exe") -and (Test-Path "$uvSource\uvx.exe")) {
+    Copy-Item "$uvSource\uv.exe" "$uvRuntimeDir\uv.exe" -Force
+    Copy-Item "$uvSource\uvx.exe" "$uvRuntimeDir\uvx.exe" -Force
+    Write-Host "Copied uv.exe and uvx.exe from $uvSource to $uvRuntimeDir"
+  } else {
+    Write-Warning "Local uv executables not found at $uvSource; falling back to setup-uv-runtime.js"
+    & node scripts/setup-uv-runtime.js --required
+    if ($LASTEXITCODE -ne 0) {
+      Write-Error 'FATAL: setup-uv-runtime.js failed'
+      exit $LASTEXITCODE
+    }
   }
 } else {
   Write-Warning "Cached uv archive not found at $uvArchive; build will try to download from GitHub"
