@@ -60,6 +60,11 @@ Add-ToPath 'C:\Program Files (x86)\NSIS'
 # 按 package-lock 安装项目依赖，并安装 pnpm 供 OpenClaw 构建步骤使用。
 npm ci
 npm install -g pnpm --registry https://registry.npmmirror.com
+
+# CI 中 Vite 渲染构建需要超过默认 4GB 堆内存；在 npm run 之前设置确保生效。
+$env:NODE_OPTIONS = '--max-old-space-size=6144'
+Write-Host "NODE_OPTIONS set to $env:NODE_OPTIONS"
+
 pnpm config set registry https://registry.npmmirror.com
 $globalNpmPrefix = (& npm prefix -g).Trim()
 if ($globalNpmPrefix) {
