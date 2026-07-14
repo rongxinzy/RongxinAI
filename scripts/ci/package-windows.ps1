@@ -233,16 +233,24 @@ $distWinCommand = "dist:win:$llamaCppBackendBundleMode"
 # 应用构建、OpenClaw 运行时、技能构建以及 electron-builder NSIS 输出。
 $env:DEBUG = 'electron-builder'
 npm run $distWinCommand
+$builderExit = $LASTEXITCODE
+if ($builderExit -ne 0) {
+  Write-Error "electron-builder/npm run $distWinCommand exited with code $builderExit"
+}
 
 # 无论上传是否成功，都打印 release 目录内容，方便排查 CI 构建问题。
 Write-Host '=== Release directory contents ==='
 if (Test-Path 'release') {
-  Get-ChildItem release -Depth 1 | ForEach-Object { Write-Host ("{0,10} {1}" -f $_.Length, $_.FullName) }
+  Get-ChildItem release -Depth 2 | ForEach-Object { Write-Host ("{0,10} {1}" -f $_.Length, $_.FullName) }
 } else {
   Write-Host 'release directory is missing'
 }
 
-$exe = Get-ChildItem -Path 'release' -Filter '*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($builderExit -ne 0) {
+  exit $builderExit
+}
+
+$exe = Get-ChildItem -Path 'release' -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($exe) {
   # 区分 lite / full 文件名，避免两个 job 产物覆盖。
   $bundleSuffix = if ($llamaCppBackendBundleMode -eq 'full') { 'full' } else { 'lite' }
