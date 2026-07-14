@@ -60,7 +60,12 @@ test('collectAvailableModels does not expose running llama.cpp models when provi
 
 test('collectAvailableModels merges running llama.cpp models only when provider is user-enabled', async () => {
   const listRunningModels = vi.fn(async () => [
-    { name: 'qwen-local', runtime_context_length: 8192, trained_context_length: 32768 },
+    {
+      name: 'qwen-local',
+      runtime_context_length: 8192,
+      trained_context_length: 32768,
+      supportsThinkingToggle: true,
+    },
   ]);
   vi.stubGlobal('window', {
     electron: {
@@ -90,4 +95,5 @@ test('collectAvailableModels merges running llama.cpp models only when provider 
     runtimeContextWindow: 8192,
     trainedContextWindow: 32768,
   });
+  expect(llamaCppModel?.supportsThinkingToggle).toBe(true);
 });

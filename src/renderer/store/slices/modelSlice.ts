@@ -11,6 +11,7 @@ export interface Model {
   providerKey?: string;
   openClawProviderId?: string;
   supportsImage?: boolean;
+  supportsThinkingToggle?: boolean;
   isServerModel?: boolean;
   serverApiFormat?: string;
   llamaCppOpenClawEligibility?: LlamaCppOpenClawEligibility;

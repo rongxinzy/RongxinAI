@@ -2,6 +2,7 @@ import { isProviderEnabled, ProviderName, resolveCodingPlanBaseUrl } from '../..
 import { store } from '../store';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
+import { buildLocalThinkingRequestParams, type DirectChatRequestOptions } from './localThinkingRequest';
 
 export interface ApiConfig {
   apiKey: string;
@@ -319,16 +320,19 @@ class ApiService {
     message: string | ChatUserMessageInput,
     onProgress?: (content: string, reasoning?: string) => void,
     history: ChatMessagePayload[] = [],
-    modelId?: string,
+    options: DirectChatRequestOptions = {},
   ): Promise<{ content: string; reasoning?: string }> {
     if (!this.config) {
       throw new ApiError('API configuration not set. Please configure your API settings in the settings menu.');
     }
 
-    const state = store.getState().model;
-    const selectedModel = modelId
-      ? (state.availableModels.find(m => m.id === modelId || `${m.provider}/${m.id}` === modelId) ?? state.defaultSelectedModel)
-      : state.defaultSelectedModel;
+    const modelState = store.getState().model;
+    const requestedModelId = options.modelId?.trim();
+    const selectedModel = requestedModelId
+      ? modelState.availableModels.find(model =>
+        model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId,
+      ) ?? modelState.defaultSelectedModel
+      : modelState.defaultSelectedModel;
     const provider = this.detectProvider(
       selectedModel.id,
       selectedModel.providerKey ?? selectedModel.provider
@@ -365,7 +369,7 @@ class ApiService {
     }
 
     try {
-      return await this.chatWithOpenAICompatible(userMessage, onProgress, history, selectedModel.id, effectiveConfig, supportsImages, provider);
+      return await this.chatWithOpenAICompatible(userMessage, onProgress, history, selectedModel.id, effectiveConfig, supportsImages, provider, options);
     } catch (error) {
       // Auto-retry once for GitHub Copilot auth errors (401 / token expired)
       if (
@@ -383,7 +387,7 @@ class ApiService {
               apiKey: result.token,
               ...(result.baseUrl ? { baseUrl: result.baseUrl } : {}),
             };
-            return await this.chatWithOpenAICompatible(userMessage, onProgress, history, selectedModel.id, refreshedConfig, supportsImages, provider);
+            return await this.chatWithOpenAICompatible(userMessage, onProgress, history, selectedModel.id, refreshedConfig, supportsImages, provider, options);
           }
         } catch (refreshError) {
           console.warn('[api-chat] Copilot token refresh failed, throwing original error:', refreshError);
@@ -730,7 +734,8 @@ class ApiService {
     modelId: string = 'gpt-4',
     config: ApiConfig = this.config!,
     supportsImages: boolean = false,
-    provider: string = 'openai'
+    provider: string = 'openai',
+    options: DirectChatRequestOptions = {},
   ): Promise<{ content: string; reasoning?: string }> {
     let fullContent = '';
     let fullReasoning = '';
@@ -914,6 +919,7 @@ class ApiService {
         if (useResponsesApi && systemInstructions) {
           requestBody.instructions = systemInstructions;
         }
+        Object.assign(requestBody, buildLocalThinkingRequestParams(provider, options.localThinkingEnabled));
 
         window.electron.api.stream({
           url: requestUrl,

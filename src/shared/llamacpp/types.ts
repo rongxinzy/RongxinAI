@@ -292,6 +292,7 @@ export type LlamaCppModel = {
   effective_options?: {
     ctxSize?: number;
   };
+  supportsThinkingToggle?: boolean;
 };
 
 export type LlamaCppRunningModel = LlamaCppModel & {

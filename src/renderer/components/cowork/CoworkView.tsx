@@ -59,6 +59,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const [workMode, setWorkMode] = useState<'work' | 'chat'>(
     () => configService.getConfig().workMode ?? 'work'
   );
+  const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
   useEffect(() => {
     const handler = () => setWorkMode(configService.getConfig().workMode ?? 'work');
@@ -67,6 +68,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   }, []);
 
   const currentSession = useSelector(selectCurrentSession);
+  const directChatModelId = useSelector((state: RootState) => state.model.defaultSelectedModel.id);
 
   // Clear session when workMode changes and current session mode doesn't match.
   // Sessions without an explicit mode field (legacy) are treated as work mode.
@@ -299,7 +301,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
         try {
-          const transport = new ChatChatTransport(currentAgentSelectedModel?.id);
+          const transport = new ChatChatTransport({
+            modelId: directChatModelId,
+            localThinkingEnabled,
+          });
           const stream = await transport.sendMessages({
             trigger: 'submit-message',
             chatId: tempSessionId,
@@ -469,7 +474,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         }));
 
         dispatch(setStreaming(true));
-        const transport = new ChatChatTransport(currentAgentSelectedModel?.id);
+        const transport = new ChatChatTransport({
+          modelId: directChatModelId,
+          localThinkingEnabled,
+        });
         const stream = await transport.sendMessages({
           trigger: 'submit-message',
           chatId: currentSession.id,
@@ -523,11 +531,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
         // Persist updated session (with new messages) to SQLite
-        const state = store.getState();
-        const updatedSession = state.cowork.currentSession;
+        const updatedSession = store.getState().cowork.currentSession;
         if (updatedSession) {
-          coworkService.saveChatSession(updatedSession).catch(err =>
-            console.error('[CoworkView] Failed to persist chat continue:', err)
+          coworkService.saveChatSession(updatedSession).catch(error =>
+            console.error('[CoworkView] Failed to persist chat continue:', error),
           );
         }
       } catch (error) {
@@ -742,6 +749,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           onNewChat={onNewChat}
           updateBadge={updateBadge}
           workMode={workMode}
+          isDirectChat={workMode === 'chat'}
+          localThinkingEnabled={localThinkingEnabled}
+          onLocalThinkingEnabledChange={setLocalThinkingEnabled}
         />
       </div>
     );
@@ -796,6 +806,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 }}
                 showFolderSelector={workMode !== 'chat'}
                 showModelSelector
+                isDirectChat={workMode === 'chat'}
+                showLocalThinkingToggle={workMode === 'chat'}
+                localThinkingEnabled={localThinkingEnabled}
+                onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}
               />
             </div>

@@ -101,6 +101,7 @@ export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
   private process: ChildProcessWithoutNullStreams | null = null;
   private runtimeContextLengthByModel = new Map<string, number>();
+  private thinkingToggleSupportByModel = new Map<string, boolean>();
   private startupStderr = '';
   private readonly marketplaceService: MarketplaceService;
   private readonly storage?: LlamaCppManagerStorage;
@@ -915,6 +916,9 @@ export class LlamaCppManager extends EventEmitter {
 
   async listRunningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
     const runningModels = await (await this.client()).runningModels(timeoutMs);
+    if (this.needsThinkingToggleSupportRefresh(runningModels)) {
+      this.refreshThinkingToggleSupport();
+    }
     return this.hydrateRunningModels(runningModels);
   }
 
@@ -924,6 +928,7 @@ export class LlamaCppManager extends EventEmitter {
 
   async listLocalModels(): Promise<LlamaCppModel[]> {
     const scannedModels = scanLocalGgufModels(this.getModelsDir());
+    this.cacheThinkingToggleSupport(scannedModels);
     let routerModels: LlamaCppModel[] = [];
     try {
       routerModels = await (await this.client()).listModels();
@@ -1247,6 +1252,8 @@ export class LlamaCppManager extends EventEmitter {
       }
       const trainedContextLength =
         model.trained_context_length ?? model.details?.context_length ?? model.context_length;
+      const supportsThinkingToggle =
+        model.supportsThinkingToggle ?? this.getThinkingToggleSupport(model);
       return {
         ...model,
         context_length: trainedContextLength,
@@ -1255,6 +1262,7 @@ export class LlamaCppManager extends EventEmitter {
         effective_options: runtimeContextLength
           ? { ctxSize: runtimeContextLength }
           : model.effective_options,
+        ...(supportsThinkingToggle !== undefined ? { supportsThinkingToggle } : {}),
       };
     });
 
@@ -1265,6 +1273,41 @@ export class LlamaCppManager extends EventEmitter {
     }
 
     return hydrated;
+  }
+
+  private cacheThinkingToggleSupport(models: LlamaCppModel[]): void {
+    this.thinkingToggleSupportByModel.clear();
+    models.forEach(model => {
+      if (model.supportsThinkingToggle === undefined) return;
+      this.getModelReferenceKeys(model).forEach(key => {
+        this.thinkingToggleSupportByModel.set(key, model.supportsThinkingToggle === true);
+      });
+    });
+  }
+
+  private refreshThinkingToggleSupport(): void {
+    this.cacheThinkingToggleSupport(scanLocalGgufModels(this.getModelsDir()));
+  }
+
+  private needsThinkingToggleSupportRefresh(runningModels: LlamaCppRunningModel[]): boolean {
+    return runningModels.some(model =>
+      model.supportsThinkingToggle === undefined
+      && this.getThinkingToggleSupport(model) === undefined,
+    );
+  }
+
+  private getThinkingToggleSupport(model: LlamaCppModel): boolean | undefined {
+    return this.getModelReferenceKeys(model)
+      .map(key => this.thinkingToggleSupportByModel.get(key))
+      .find((supported): supported is boolean => supported !== undefined);
+  }
+
+  private getModelReferenceKeys(model: LlamaCppModel): string[] {
+    return [model.name, model.id, model.model, model.path]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .map(value => value.trim().replace(/\\/g, '/'))
+      .flatMap(value => [value, path.basename(value)])
+      .map(value => value.toLowerCase());
   }
 }
 

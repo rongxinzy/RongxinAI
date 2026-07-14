@@ -7,6 +7,7 @@ import {
 } from 'ai';
 
 import { apiService } from './api';
+import type { DirectChatRequestOptions } from './localThinkingRequest';
 
 /** Extract text from a UIMessage's text parts. */
 function extractText(message: UIMessage): string {
@@ -24,11 +25,7 @@ function extractText(message: UIMessage): string {
  * just text + reasoning streaming.
  */
 export class ChatChatTransport implements ChatTransport<UIMessage> {
-  private modelId: string | undefined;
-
-  constructor(modelId?: string) {
-    this.modelId = modelId;
-  }
+  constructor(private readonly options: DirectChatRequestOptions = {}) {}
 
   getSessionId(): null {
     return null;
@@ -46,6 +43,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
     messages: UIMessage[];
     abortSignal: AbortSignal | undefined;
   } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
+    const directChatOptions = this.options;
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     const prompt = lastUser ? extractText(lastUser) : '';
     if (!prompt.trim()) throw new Error('No prompt to send.');
@@ -58,8 +56,6 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         history.push({ role: msg.role, content: extractText(msg) });
       }
     }
-
-    const modelId = this.modelId;
 
     return new ReadableStream<UIMessageChunk>({
       start(controller) {
@@ -117,7 +113,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             }
           },
           history,
-          modelId,
+          directChatOptions,
         ).then(() => {
           close();
         }).catch((error: Error) => {

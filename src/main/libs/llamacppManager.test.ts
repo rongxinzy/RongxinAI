@@ -551,6 +551,22 @@ test('listLocalModels keeps the current models directory as the source of truth'
   ]);
 });
 
+test('listRunningModels refreshes GGUF thinking capabilities when the cache is cold', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-running-thinking-'));
+  fs.writeFileSync(path.join(modelsDir, 'qwen-local.gguf'), 'gguf');
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  manager.client = async () => ({
+    runningModels: async () => [{ name: 'qwen-local' }],
+  } as any);
+
+  await expect(manager.listRunningModels()).resolves.toEqual([
+    expect.objectContaining({
+      name: 'qwen-local',
+      supportsThinkingToggle: false,
+    }),
+  ]);
+});
+
 test('extractModelScopeFilePaths reads nested ModelScope repo file payloads', () => {
   expect(extractModelScopeFilePaths({
     Data: {
