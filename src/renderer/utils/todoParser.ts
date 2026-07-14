@@ -3,15 +3,24 @@ import type { QueueTodo } from '@shared/components/ai-elements/queue';
 /** Regex: markdown checklist lines — "- [ ] text" or "- [x] text" */
 const CHECKLIST_RE = /^-\s*\[([ xX])\]\s+(.+)$/;
 
+/** Simple string hash for stable content-based ids. */
+function hashId(s: string): string {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
+  }
+  return `todo-${Math.abs(hash).toString(36)}`;
+}
+
 /**
  * Parse markdown checklist from text content.
  * Extracts "- [ ] item" and "- [x] item" lines as QueueTodo items.
  * Only items at the start of lines are matched; indented items are skipped.
+ * Duplicate titles are deduplicated (last occurrence wins for status).
  */
 export function parseTodosFromText(content: string): QueueTodo[] {
   const lines = content.split('\n');
-  const todos: QueueTodo[] = [];
-  let idCounter = 0;
+  const seen = new Map<string, QueueTodo>();
 
   for (const line of lines) {
     const match = CHECKLIST_RE.exec(line);
@@ -19,8 +28,8 @@ export function parseTodosFromText(content: string): QueueTodo[] {
       const isCompleted = match[1].toLowerCase() === 'x';
       const title = match[2].trim();
       if (title) {
-        todos.push({
-          id: `todo-${idCounter++}`,
+        seen.set(title, {
+          id: hashId(title),
           title,
           status: isCompleted ? 'completed' : 'pending',
         });
@@ -28,23 +37,23 @@ export function parseTodosFromText(content: string): QueueTodo[] {
     }
   }
 
-  return todos;
+  return Array.from(seen.values());
 }
 
 /**
  * Extract todos from a session's messages.
- * Looks at the last assistant message's content and parses checklists.
- * Returns empty array if no todos found or no assistant messages exist.
+ * Walks backwards to find the latest assistant ANSWER message,
+ * skipping thinking messages (metadata.isThinking) to avoid showing
+ * internal planning as user-facing todos.
  */
 export function extractTodosFromMessages(
-  messages: Array<{ type: string; content: string }>,
+  messages: Array<{ type: string; content: string; metadata?: Record<string, unknown> }>,
 ): QueueTodo[] {
-  // Walk backwards to find the latest assistant message
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.type === 'assistant') {
-      return parseTodosFromText(msg.content);
-    }
+    if (msg.type !== 'assistant') continue;
+    if (msg.metadata?.isThinking) continue;
+    return parseTodosFromText(msg.content);
   }
   return [];
 }
