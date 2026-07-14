@@ -28,7 +28,7 @@ export function TodoQueue({ messages }: TodoQueueProps) {
   const total = todos.length;
 
   return (
-    <Queue className="mx-auto max-h-[150px] w-[95%] overflow-y-auto rounded-b-none border-input border-b-0">
+    <Queue className="w-full max-h-[150px] overflow-y-auto rounded-b-none border-input border-b-0">
       <QueueSection>
         <QueueSectionContent>
           <div className="flex items-center gap-2 px-1 py-0.5 text-xs text-muted-foreground">
