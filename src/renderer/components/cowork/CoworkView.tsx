@@ -131,11 +131,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     }
   };
 
-  const isOpenClawReadyForSession = (status: OpenClawEngineStatus | null): boolean => {
-    if (!status) return false;
-    return status.phase === 'running' || status.phase === 'ready';
-  };
-
   const handleRestartGateway = async () => {
     if (isRestartingGateway) return;
     setIsRestartingGateway(true);
@@ -205,10 +200,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       count: imageAttachments?.length ?? 0,
       details: imageAttachments?.map(a => ({ name: a.name, mimeType: a.mimeType, base64Length: a.base64Data?.length ?? 0 })) ?? [],
     });
-    if (workMode !== 'chat' && openClawStatus && !isOpenClawReadyForSession(openClawStatus)) {
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkErrorEngineNotReady') }));
-      return false;
-    }
     // Prevent duplicate submissions
     if (isStartingRef.current) return;
     isStartingRef.current = true;
@@ -557,11 +548,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     }
 
     // Work mode: use coworkService
-    if (openClawStatus && !isOpenClawReadyForSession(openClawStatus)) {
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('coworkErrorEngineNotReady') }));
-      return false;
-    }
-
     isContinuingRef.current = true;
     try {
       const sessionSkillIds = [...activeSkillIds];
@@ -683,7 +669,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
   const shouldShowEngineStatus = Boolean(openClawStatus && openClawStatus.phase !== 'running');
   const isEngineError = openClawStatus?.phase === 'error';
-  const isEngineReady = isOpenClawReadyForSession(openClawStatus);
 
   const homeHeader = (
     <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
@@ -797,7 +782,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 onSubmit={handleStartSession}
                 onStop={handleStopSession}
                 isStreaming={isStreaming}
-                disabled={workMode === 'chat' ? false : !isEngineReady}
+                disabled={false}
                 placeholder={workMode === 'chat' ? i18nService.t('chatPlaceholder') : i18nService.t('coworkPlaceholder')}
                 size="large"
                 workingDirectory={currentAgentWorkingDirectory}
