@@ -71,7 +71,7 @@ test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while k
     host: '127.0.0.1',
     listenHost: '0.0.0.0',
     port: '8080',
-    modelsMax: '0',
+    modelsMax: '3',
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
@@ -123,7 +123,7 @@ test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to
     threadsBatch: 'many',
     mainGpu: 'main',
   })).toEqual({
-    modelsMax: '0',
+    modelsMax: '3',
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
@@ -155,7 +155,7 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
     cacheReuse: '9999999',
     cacheRam: '9999999',
   })).toEqual({
-    modelsMax: '0',
+    modelsMax: '3',
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
@@ -223,11 +223,11 @@ test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () =>
   })).toEqual({});
 });
 
-test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as zero for unlimited router slots', () => {
+test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as the default loaded model limit', () => {
   expect(sanitizeLlamaCppServiceConfig({
     modelsMax: '',
   })).toEqual({
-    modelsMax: '0',
+    modelsMax: '3',
   });
 });
 

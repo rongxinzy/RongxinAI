@@ -6,7 +6,7 @@ const LLAMACPP_DEFAULT_CONTEXT_HIGH_VRAM_MIB = 20 * 1024;
 export const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {
   host: '127.0.0.1',
   port: '8080',
-  modelsMax: '0',
+  modelsMax: '3',
   timeout: '120',
   threadsHttp: '4',
   cacheReuse: '256',

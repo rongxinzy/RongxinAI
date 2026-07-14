@@ -40,6 +40,30 @@ describe('LlamaCppClient', () => {
     );
   });
 
+  test('lists model snapshots without forcing router preset reload', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      data: [{
+        id: 'qwen3:8b',
+        status: { value: 'loading' },
+      }],
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new LlamaCppClient('http://127.0.0.1:8080/');
+
+    await expect(client.listModelsSnapshot(12_000)).resolves.toEqual([expect.objectContaining({
+      name: 'qwen3:8b',
+      status: 'loading',
+    })]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8080/models',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      'http://127.0.0.1:8080/models?reload=1',
+      expect.anything(),
+    );
+  });
+
   test('throws on HTTP errors', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: false,

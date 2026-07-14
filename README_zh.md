@@ -60,7 +60,15 @@ cd RongxinAI
 npm install
 npm run electron:dev
 ```
+### 开发环境下使用llama服务
+```bash
+# 安装llamacpp服务
+npm run llamacpp:runtime:download
+# 安装openclaw服务
+npm run electron:dev:openclaw
 
+npm run electron:dev
+```
 当前仓库名称仍然保留为 `RongxinAI`，以兼容现有代码与流程。
 
 默认 Vite 开发服务器地址为 `http://localhost:5175`。
@@ -70,6 +78,7 @@ npm run electron:dev
 ```bash
 npm run electron:dev:openclaw
 ```
+
 
 该命令会确保固定版本的 OpenClaw runtime、准备当前主机所需的 llama.cpp runtime，并启动 Electron 开发应用。
 

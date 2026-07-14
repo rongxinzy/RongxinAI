@@ -1,3 +1,5 @@
+export const LLAMACPP_MODELS_MAX_DEFAULT_LIMIT = 3;
+
 export type LlamaCppLaunchContextResolution = {
   effectiveContextLength?: number;
   requestedContextLength?: number;
@@ -41,8 +43,9 @@ export function getLlamaCppModelsMaxLimitViolation(input: {
 }): LlamaCppModelsMaxLimitViolation | null {
   const trimmedLimit = input.modelsMax?.trim();
   if (!trimmedLimit || !/^\d+$/.test(trimmedLimit)) return null;
-  const limit = Number.parseInt(trimmedLimit, 10);
-  if (!Number.isFinite(limit) || limit <= 0) return null;
+  const parsedLimit = Number.parseInt(trimmedLimit, 10);
+  if (!Number.isFinite(parsedLimit)) return null;
+  const limit = parsedLimit <= 0 ? LLAMACPP_MODELS_MAX_DEFAULT_LIMIT : parsedLimit;
   const normalizedTarget = input.targetModelName.trim();
   if (normalizedTarget && input.runningModelNames.includes(normalizedTarget)) {
     return null;

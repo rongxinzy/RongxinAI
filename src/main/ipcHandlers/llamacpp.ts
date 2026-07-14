@@ -6,10 +6,13 @@ import type {
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
+  LlamaCppModel,
   LlamaCppModelLaunchInput,
+  LlamaCppModelLaunchResult,
   LlamaCppModelPreference,
   LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
+  LlamaCppRunningModel,
   LlamaCppServiceConfig,
   LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
@@ -24,7 +27,6 @@ import {
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppStructuredServiceFieldKey,
-  resolveLlamaCppLaunchContext,
 } from '../../shared/llamacpp';
 import { isProviderEnabled, ProviderName } from '../../shared/providers';
 import { t } from '../i18n';
@@ -33,7 +35,13 @@ import {
   LlamaCppManager,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
+import {
+  classifyLlamaCppModelLoadError,
+  getLlamaCppModelLoadFailureI18nKey,
+  LlamaCppModelLoadFailureReason,
+} from '../libs/llamacppModelLoadErrors';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
+import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
 import {
   buildLlamaCppRunningModelBinding,
   type LlamaCppOpenClawAppConfig,
@@ -153,6 +161,11 @@ function matchesRunningModelName(
   modelName: string,
 ): boolean {
   return model.name === modelName || model.model === modelName || model.id === modelName;
+}
+
+function toUserFacingLlamaCppModelLoadError(error: unknown): Error {
+  const reason = classifyLlamaCppModelLoadError(error);
+  return new Error(t(getLlamaCppModelLoadFailureI18nKey(reason)));
 }
 
 export async function waitForLlamaCppModelUnloadConfirmation(input: {
@@ -434,23 +447,24 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
-    if (!modelName) throw new Error('Model name is required');
+    if (!modelName) throw new Error(t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)));
     return await loadModelLock.runExclusive(
       modelName,
       async () => {
-        const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(
-          options.getStore(),
-          input,
-        );
+        const store = options.getStore();
+        const serviceConfig = getLlamaCppServiceConfig(store);
+        const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(store, input);
         const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
           reason: LlamaCppServiceStartupReason.LoadModel,
         });
         if (serviceStartupResult.success === false) {
           throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
         }
+
+        const runningModels = await manager.listRunningModels();
         const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
-          modelsMax: getLlamaCppServiceConfig(options.getStore()).modelsMax,
-          runningModels: await manager.listRunningModels(),
+          modelsMax: serviceConfig.modelsMax,
+          runningModels,
           targetModelName: modelName,
         });
         if (loadLimitViolation) {
@@ -460,34 +474,35 @@ export function registerLlamaCppIpcHandlers(
               .replace('{next}', String(loadLimitViolation.next)),
           );
         }
+
         const localModels = await manager.listLocalModels();
         const targetModel = localModels.find(
-          model => model.name === modelName || model.id === modelName,
+          model => model.name === modelName || model.id === modelName || model.model === modelName,
         );
-        const contextResolution = resolveLlamaCppLaunchContext({
-          requestedContextLength: inputWithPreferences.options?.ctxSize,
-          trainedContextLength:
-            targetModel?.trained_context_length ?? targetModel?.details?.context_length,
-        });
-        const resolvedLoadInput = contextResolution.clamped
-          ? {
-              ...inputWithPreferences,
-              options: {
-                ...inputWithPreferences.options,
-                ctxSize: contextResolution.effectiveContextLength,
-              },
-            }
-          : inputWithPreferences;
-        const result = await manager.loadModel({ ...resolvedLoadInput, model: modelName });
-        await refreshRunningModelBindings('llamacpp-model-loaded');
-        if (!contextResolution.clamped) return result;
-        return {
-          ...result,
-          warning: t('llamacppLaunchContextClampedToTrainingLimit')
-            .replace('{requested}', String(contextResolution.requestedContextLength))
-            .replace('{trained}', String(contextResolution.trainedContextLength))
-            .replace('{effective}', String(contextResolution.effectiveContextLength)),
-        };
+        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
+        const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((): null => null);
+
+        try {
+          const result = await loadLlamaCppModelThroughPipeline({
+            launchInput: { ...inputWithPreferences, model: modelName },
+            runtimeBackend: serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
+            runtimeCapabilities,
+            nvidiaSnapshot,
+            modelSizeBytes: targetModel?.size,
+            loadModel: async (loadInput: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> =>
+              manager.loadModel(loadInput),
+            listModels: (timeoutMs: number): Promise<LlamaCppModel[]> => manager.listRouterModels(timeoutMs),
+            listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
+            detectService: (): Promise<LlamaCppStatusSnapshot> => manager.detect(),
+            unloadModel: async unloadModelName => {
+              await (await manager.client()).unloadModel(unloadModelName);
+            },
+          });
+          await refreshRunningModelBindings('llamacpp-model-loaded');
+          return result;
+        } catch (error) {
+          throw toUserFacingLlamaCppModelLoadError(error);
+        }
       },
       () => new Error(t('llamacppModelLoadInProgress')),
     );
@@ -749,11 +764,14 @@ export function sanitizeLlamaCppServiceConfig(
   const runtimeVersion = config?.runtimeVersion?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
-  const modelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
+  const sanitizedModelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
     min: modelsMaxRange.min,
     max: modelsMaxRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax,
   });
+  const modelsMax = sanitizedModelsMax === '0'
+    ? LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax
+    : sanitizedModelsMax;
   const modelsAutoload = config?.modelsAutoload as unknown;
   const timeout = normalizeIntegerStringWithDefault(config?.timeout, {
     min: timeoutRange.min,

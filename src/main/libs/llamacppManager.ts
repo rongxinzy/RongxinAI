@@ -246,9 +246,10 @@ export class LlamaCppManager extends EventEmitter {
       );
       this.process = null;
       if (this.status.status === 'starting') {
+        const exitDetail = this.formatStartupExitDetail(code, signal);
         const stderrSnippet = this.startupStderr
-          ? `: ${this.startupStderr.slice(0, 300)}`
-          : ` (exit code ${code ?? 'null'})`;
+          ? `: ${this.startupStderr.slice(0, 300)} (${exitDetail})`
+          : ` (${exitDetail})`;
         this.setStatus({
           status: 'error',
           error: `llama.cpp exited unexpectedly during startup${stderrSnippet}`,
@@ -275,7 +276,11 @@ export class LlamaCppManager extends EventEmitter {
       });
     });
 
-    await this.waitUntilHealthy(this.getConnectionAndLoadTimeoutMs());
+    const startupProcess = this.process;
+    await Promise.race([
+      this.waitUntilHealthy(this.getConnectionAndLoadTimeoutMs()),
+      this.waitForStartupProcessExit(startupProcess),
+    ]);
     return this.status;
   }
 
@@ -922,6 +927,11 @@ export class LlamaCppManager extends EventEmitter {
     return this.hydrateRunningModels(runningModels);
   }
 
+  async listRouterModels(timeoutMs = 30_000): Promise<LlamaCppModel[]> {
+    const models = await (await this.client()).listModelsSnapshot(timeoutMs);
+    return this.hydrateModelContextMetadata(models);
+  }
+
   getRuntimeContextLength(modelName: string): number | undefined {
     return this.runtimeContextLengthByModel.get(modelName.trim());
   }
@@ -1192,6 +1202,28 @@ export class LlamaCppManager extends EventEmitter {
     }
   }
 
+  private async waitForStartupProcessExit(
+    child: ChildProcessWithoutNullStreams,
+  ): Promise<void> {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    await new Promise<void>(resolve => {
+      const settle = () => {
+        child.off('exit', settle);
+        child.off('error', settle);
+        resolve();
+      };
+      child.once('exit', settle);
+      child.once('error', settle);
+    });
+  }
+
+  private formatStartupExitDetail(code: number | null, signal: NodeJS.Signals | null): string {
+    const exitCode = code === null
+      ? 'null'
+      : `${code} (0x${code.toString(16)})`;
+    return `exit code ${exitCode}, signal ${signal ?? 'null'}`;
+  }
+
   private async waitUntilHealthy(timeoutMs: number): Promise<void> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
@@ -1235,6 +1267,29 @@ export class LlamaCppManager extends EventEmitter {
     } catch {
       // The model list will be refreshed when the service is started.
     }
+  }
+
+  private hydrateModelContextMetadata(models: LlamaCppModel[]): LlamaCppModel[] {
+    return models.map(model => {
+      const modelName = (model.name || model.model || model.id || '').trim();
+      const runtimeContextLength =
+        model.runtime_context_length ??
+        (modelName ? this.runtimeContextLengthByModel.get(modelName) : undefined);
+      if (modelName && runtimeContextLength) {
+        this.runtimeContextLengthByModel.set(modelName, runtimeContextLength);
+      }
+      const trainedContextLength =
+        model.trained_context_length ?? model.details?.context_length;
+      return {
+        ...model,
+        context_length: trainedContextLength,
+        trained_context_length: trainedContextLength,
+        runtime_context_length: runtimeContextLength,
+        effective_options: runtimeContextLength
+          ? { ctxSize: runtimeContextLength }
+          : model.effective_options,
+      };
+    });
   }
 
   private hydrateRunningModels(runningModels: LlamaCppRunningModel[]): LlamaCppRunningModel[] {
