@@ -202,7 +202,7 @@ export function ModelsPanel({
           {i18nService.t('localInferenceRegisteredModels')}
         </h2>
         {modelCards.length > 0 ? (
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] items-start gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] items-start justify-items-start gap-4">
             {modelCards.map(({ model, runningModel }) => (
               <ModelCard
                 key={model.name}
@@ -304,6 +304,7 @@ function ModelCard({
       onDragEnd={onDragEnd}
       className={cn(
         'relative cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+        'w-full max-w-[22rem]',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
         (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
