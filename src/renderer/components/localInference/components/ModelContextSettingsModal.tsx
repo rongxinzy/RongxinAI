@@ -55,14 +55,29 @@ export function ModelContextSettingsModal({
         </div>
 
         <div className="flex flex-col gap-3">
-          <Slider
-            aria-label={i18nService.t('localInferenceConfigureContext')}
-            min={0}
-            max={contextPresets.length - 1}
-            step={1}
-            value={Math.max(0, selectedPresetIndex)}
-            onValueChange={nextPresetIndex => setContextSize(contextPresets[nextPresetIndex] ?? contextPresets[0])}
-          />
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-[calc(50%+4px)] z-0"
+            >
+              {contextPresets.map((preset, index) => (
+                <span
+                  key={preset}
+                  className="absolute h-3 w-0.5 -translate-x-1/2 bg-[var(--lobster-primary)]"
+                  style={{ left: `${getContextPresetPosition(index, contextPresets.length)}%` }}
+                />
+              ))}
+            </div>
+            <Slider
+              aria-label={i18nService.t('localInferenceConfigureContext')}
+              min={0}
+              max={contextPresets.length - 1}
+              step={1}
+              value={Math.max(0, selectedPresetIndex)}
+              className="relative z-10"
+              onValueChange={nextPresetIndex => setContextSize(contextPresets[nextPresetIndex] ?? contextPresets[0])}
+            />
+          </div>
           <div
             className={`relative h-4 text-xs ${localInferenceMutedTextClass}`}
           >
