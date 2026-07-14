@@ -381,6 +381,17 @@ select::-ms-expand {
 [data-slot="button"].text-destructive {
   color: var(--lobster-destructive);
 }
+[data-slot="toggle"][aria-pressed="true"] {
+  background-color: var(--lobster-surface-raised);
+  color: var(--lobster-foreground);
+}
+
+/* Base UI select popup dimensions use runtime CSS variables. */
+[data-slot="select-content"] {
+  width: var(--anchor-width) !important;
+  max-height: var(--available-height) !important;
+  transform-origin: var(--transform-origin) !important;
+}
 
 /* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
 [data-mode="work-chat"][data-slot="switch"] {

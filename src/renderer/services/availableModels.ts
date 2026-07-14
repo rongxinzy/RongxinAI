@@ -70,6 +70,7 @@ export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]
       providerKey: ProviderName.LlamaCpp,
       openClawProviderId: ProviderRegistry.getOpenClawProviderId(ProviderName.LlamaCpp),
       supportsImage: false,
+      supportsThinkingToggle: model.supportsThinkingToggle,
       llamaCppOpenClawEligibility: eligibility,
       llamaCppRuntimeContextWindow: eligibility.runtimeContextWindow,
       llamaCppTrainedContextWindow: eligibility.trainedContextWindow,

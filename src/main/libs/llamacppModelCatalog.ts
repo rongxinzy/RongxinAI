@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import type { LlamaCppModel } from '../../shared/llamacpp';
+import { ggufSupportsThinkingToggle } from './ggufMetadata';
 
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
   const root = path.resolve(modelsDir);
@@ -21,6 +22,7 @@ export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
       path: filePath,
       modified_at: stat.mtime.toISOString(),
       size: stat.size,
+      supportsThinkingToggle: ggufSupportsThinkingToggle(filePath),
       source: filePath.includes(`${path.sep}modelscope${path.sep}`) ? 'modelscope' : 'local',
       status: 'unloaded',
       details: {

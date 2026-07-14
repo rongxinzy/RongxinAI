@@ -58,6 +58,9 @@ interface CoworkSessionDetailProps {
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
   workMode?: 'work' | 'chat';
+  isDirectChat?: boolean;
+  localThinkingEnabled?: boolean;
+  onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
 }
 
 const NAV_SCROLL_LOCK_DURATION = 800;
@@ -110,6 +113,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onNewChat,
   updateBadge,
   workMode = 'work',
+  isDirectChat = false,
+  localThinkingEnabled,
+  onLocalThinkingEnabledChange,
 }) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
@@ -1230,6 +1236,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             remoteManaged={remoteManaged}
             onManageSkills={remoteManaged ? undefined : onManageSkills}
             showModelSelector={true}
+            isDirectChat={isDirectChat}
+            showLocalThinkingToggle={workMode === 'chat'}
+            localThinkingEnabled={localThinkingEnabled}
+            onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
             sessionId={currentSession?.id}
           />
           <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">

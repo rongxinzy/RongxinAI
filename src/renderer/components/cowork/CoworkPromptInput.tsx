@@ -1,4 +1,3 @@
-import { ModelSelectorLogo, ModelSelectorName } from '@shared/components/ai-elements/model-selector';
 import {
   PromptInput,
   PromptInputBody,
@@ -11,8 +10,6 @@ import {
   usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { cn } from '@shared/lib/utils';
 import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback,useEffect, useRef, useState } from 'react';
@@ -33,7 +30,7 @@ import {
   setDraftPrompt,
   updateCurrentSessionModelOverride,
 } from '../../store/slices/coworkSlice';
-import { type Model,setSelectedModel } from '../../store/slices/modelSlice';
+import { type Model, setDefaultSelectedModel, setSelectedModel } from '../../store/slices/modelSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
@@ -42,7 +39,9 @@ import { getCompactFolderName } from '../../utils/path';
 import { ActiveSkillBadge,SkillsButton } from '../skills';
 import { resolveAgentModelSelection, resolveEffectiveModel, useAgentSelectedModel } from './agentModelSelection';
 import AttachmentCard from './AttachmentCard';
+import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
+import { LocalThinkingToggle } from './LocalThinkingToggle';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -52,10 +51,8 @@ type CoworkAttachment = DraftAttachment;
 // Stable empty array reference to avoid unnecessary re-renders from useSelector
 // returning a new [] on every call (when draftAttachments[draftKey] is undefined).
 const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
-
 /** Skills available in Chat mode (no local filesystem access) */
 const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx']);
-
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.ico', '.avif']);
 
 const isImagePath = (filePath: string): boolean => {
@@ -64,17 +61,14 @@ const isImagePath = (filePath: string): boolean => {
   const ext = filePath.slice(dotIndex).toLowerCase();
   return IMAGE_EXTENSIONS.has(ext);
 };
-
 const isImageMimeType = (mimeType: string): boolean => {
   return mimeType.startsWith('image/');
 };
-
 const extractBase64FromDataUrl = (dataUrl: string): { mimeType: string; base64Data: string } | null => {
   const match = /^data:(.+);base64,(.*)$/.exec(dataUrl);
   if (!match) return null;
   return { mimeType: match[1], base64Data: match[2] };
 };
-
 const getFileNameFromPath = (path: string): string => {
   const parts = path.split(/[/\\]/);
   return parts[parts.length - 1] || path;
@@ -128,6 +122,10 @@ interface CoworkPromptInputProps {
   sessionId?: string;
   /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
   remoteManaged?: boolean;
+  showLocalThinkingToggle?: boolean;
+  localThinkingEnabled?: boolean;
+  onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
+  isDirectChat?: boolean;
 }
 
 const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
@@ -146,6 +144,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       onManageSkills,
       sessionId,
       remoteManaged = false,
+      showLocalThinkingToggle = false,
+      localThinkingEnabled,
+      onLocalThinkingEnabledChange,
+      isDirectChat = false,
     } = props;
     const dispatch = useDispatch();
     const controller = usePromptInputController();
@@ -158,6 +160,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const agents = useSelector((state: RootState) => state.agent.agents);
     const coworkAgentEngine = useSelector((state: RootState) => state.cowork.config.agentEngine);
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
+    const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
     const [value, setValue] = useState(draftPrompt);
 
@@ -241,6 +244,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
   const handleModelSelect = useCallback(async (nextModel: Model) => {
     if (isPatchingModel || isPersistingAgentModel) return;
+    if (isDirectChat) {
+      dispatch(setDefaultSelectedModel(nextModel));
+      return;
+    }
     const modelRef = toOpenClawModelRef(nextModel);
     // Always update the agent-level model selection so that CoworkView's
     // currentAgentSelectedModel (used to build ChatChatTransport) reflects
@@ -270,17 +277,18 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       return;
     }
     await persistAgentModelSelection(nextModel);
-  }, [isPatchingModel, isPersistingAgentModel, sessionId, currentSession, currentAgentId, dispatch, currentAgent, agentModelIsInvalid, persistAgentModelSelection]);
+  }, [isPatchingModel, isPersistingAgentModel, isDirectChat, sessionId, currentSession, currentAgentId, dispatch, currentAgent, agentModelIsInvalid, persistAgentModelSelection]);
 
   const isLarge = size === 'large';
   const minHeight = isLarge ? 60 : 24;
   const maxHeight = isLarge ? 200 : 200;
 
-  const effectiveSelectedModel = resolveEffectiveModel({
+  const agentEffectiveModel = resolveEffectiveModel({
     sessionId,
     agentSelectedModel,
     globalSelectedModel: currentAgentSelectedModel,
   });
+  const effectiveSelectedModel = isDirectChat ? defaultSelectedModel : agentEffectiveModel;
   const modelSupportsImage = !!effectiveSelectedModel?.supportsImage;
 
   // Load skills on mount
@@ -387,7 +395,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     const trimmedValue = value.trim();
     if ((!trimmedValue && attachments.length === 0) || isStreaming || disabled || isPatchingModel) return;
-    if (hasUnavailableLlamaCppModel) {
+    if (!isDirectChat && hasUnavailableLlamaCppModel) {
       window.dispatchEvent(new CustomEvent('app:showToast', {
         detail: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
       }));
@@ -483,7 +491,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       // Submission rejected — restore the prompt so the user can retry.
       setValue(finalPrompt);
     }
-  }, [value, isStreaming, disabled, isPatchingModel, hasUnavailableLlamaCppModel, onSubmit, activeSkillIds, skills, attachments, showFolderSelector, workingDirectory, dispatch, draftKey, effectiveSelectedModel?.id, modelSupportsImage]);
+  }, [value, isStreaming, disabled, isPatchingModel, isDirectChat, hasUnavailableLlamaCppModel, onSubmit, activeSkillIds, skills, attachments, showFolderSelector, workingDirectory, dispatch, draftKey, effectiveSelectedModel?.id, modelSupportsImage]);
 
   const handleSelectSkill = useCallback((skill: Skill) => {
     dispatch(toggleActiveSkill(skill.id));
@@ -906,48 +914,15 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <PromptInputFooter>
             <PromptInputTools>
               {showModelSelector && (
-                <Popover open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
-                  <PopoverTrigger>
-                    <span className="inline-flex items-center gap-1.5 text-xs rounded-md border border-input px-2 py-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] max-w-[200px] [&_span]:flex-none cursor-pointer">
-                      {agentSelectedModel ? (
-                        <>
-                          <ModelSelectorLogo provider={effectiveSelectedModel?.providerKey || effectiveSelectedModel?.provider || 'openai'} />
-                          <ModelSelectorName>{agentSelectedModel.name}</ModelSelectorName>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
-                      )}
-                    </span>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-72 p-0 bg-background border ring-0 !rounded-md"
-                    side="top"
-                    align="start"
-                    sideOffset={4}
-                  >
-                    <Command className="bg-background !rounded-md [&_[data-slot=input-group]]:bg-transparent [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:px-2">
-                      <CommandInput placeholder={i18nService.t('searchModels')} />
-                      <CommandList>
-                        <CommandGroup heading={i18nService.t('serverModels')}>
-                          {availableModels.map(m => (
-                            <CommandItem
-                              key={m.id}
-                              value={m.name}
-                              className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                              onSelect={() => {
-                                handleModelSelect(m);
-                                setModelSelectorOpen(false);
-                              }}
-                            >
-                              <ModelSelectorLogo provider={m.providerKey || m.provider || 'openai'} />
-                              <ModelSelectorName>{m.name}</ModelSelectorName>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <CoworkModelPicker
+                  models={availableModels}
+                  selectedModel={effectiveSelectedModel}
+                  open={modelSelectorOpen}
+                  onOpenChange={setModelSelectorOpen}
+                  onSelect={model => {
+                    void handleModelSelect(model);
+                  }}
+                />
               )}
               {showFolderSelector && (
                 <>
@@ -981,6 +956,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   )}
                 </>
               )}
+              <LocalThinkingToggle
+                model={effectiveSelectedModel}
+                visible={showLocalThinkingToggle}
+                enabled={localThinkingEnabled}
+                disabled={disabled || isStreaming}
+                onEnabledChange={onLocalThinkingEnabledChange}
+              />
               {!remoteManaged && (
                 <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile} className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
                   <Paperclip className="h-4 w-4" />

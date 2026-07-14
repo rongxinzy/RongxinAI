@@ -8,8 +8,8 @@ import Modal from '../../common/Modal';
 import { localInferenceMutedTextClass } from '../constants';
 
 const CONTEXT_SLIDER_DEFAULT_VALUE = 32768;
-const CONTEXT_SLIDER_DEFAULT_MAX = 262144;
-const CONTEXT_PRESETS = [4096, 8192, 16384, 32768, 65536, 131072, 262144] as const;
+const CONTEXT_SLIDER_DEFAULT_MAX = 131072;
+const CONTEXT_PRESETS = [4096, 8192, 16384, 32768, 65536, 131072] as const;
 
 type ModelContextSettingsModalProps = {
   isOpen: boolean;
@@ -64,11 +64,16 @@ export function ModelContextSettingsModal({
             onValueChange={nextPresetIndex => setContextSize(contextPresets[nextPresetIndex] ?? contextPresets[0])}
           />
           <div
-            className={`grid text-center text-xs ${localInferenceMutedTextClass}`}
-            style={{ gridTemplateColumns: `repeat(${contextPresets.length}, minmax(0, 1fr))` }}
+            className={`relative h-4 text-xs ${localInferenceMutedTextClass}`}
           >
-            {contextPresets.map(preset => (
-              <span key={preset}>{formatContextPreset(preset)}</span>
+            {contextPresets.map((preset, index) => (
+              <span
+                key={preset}
+                className="absolute -translate-x-1/2"
+                style={{ left: `${getContextPresetPosition(index, contextPresets.length)}%` }}
+              >
+                {formatContextPreset(preset)}
+              </span>
             ))}
           </div>
         </div>
@@ -110,4 +115,9 @@ function getContextPresetValue(
   return contextPresets.reduce((closest, preset) =>
     Math.abs(preset - candidate) < Math.abs(closest - candidate) ? preset : closest,
   );
+}
+
+function getContextPresetPosition(index: number, count: number): number {
+  if (count <= 1) return 50;
+  return (index / (count - 1)) * 100;
 }
