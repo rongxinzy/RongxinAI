@@ -45,11 +45,13 @@ export function TodoQueue({ messages }: TodoQueueProps) {
           </div>
           {todos.map((todo) => (
             <QueueItem key={todo.id}>
-              <div className="flex items-center gap-2">
-                <QueueItemIndicator completed={todo.status === 'completed'} />
-                <QueueItemContent completed={todo.status === 'completed'}>
-                  {todo.title}
-                </QueueItemContent>
+              <div className={todo.status === 'completed' ? 'opacity-40' : ''}>
+                <div className="flex items-center gap-2">
+                  <QueueItemIndicator completed={todo.status === 'completed'} />
+                  <QueueItemContent completed={todo.status === 'completed'}>
+                    {todo.title}
+                  </QueueItemContent>
+                </div>
               </div>
             </QueueItem>
           ))}

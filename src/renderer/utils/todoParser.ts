@@ -12,24 +12,42 @@ function hashId(s: string): string {
   return `todo-${Math.abs(hash).toString(36)}`;
 }
 
+/** Strip trailing parenthetical status info for stem-based dedup.
+ *  "Phase 3：逐条撰写（① ✅）" → "Phase 3：逐条撰写"
+ *  "Phase 3：① ✅ | ② ✅"      → "Phase 3"                */
+function extractStem(title: string): string {
+  // Strip trailing Chinese/western bracket groups like （…） or (…)
+  let stem = title;
+  const stripped = stem.replace(/[（(][^）)]*[）)]\s*$/g, '').trim();
+  if (stripped) stem = stripped;
+  // Also strip trailing ①②③ status markers like "：① ✅ | ② ✅"
+  stem = stem.replace(/[：:]\s*[①-⑫◉○✓✔✕✗✘⨯xX\s\|✅]+$/g, '').trim();
+  return stem || title;
+}
+
 /**
  * Parse markdown checklist from text content.
  * Extracts "- [ ] item" and "- [x] item" lines as QueueTodo items.
  * Only items at the start of lines are matched; indented items are skipped.
- * Duplicate titles are deduplicated (last occurrence wins for status).
+ * Items with the same stem are deduplicated (last occurrence wins, keeping
+ * the longer title for display).
  */
 export function parseTodosFromText(content: string): QueueTodo[] {
   const lines = content.split('\n');
-  const seen = new Map<string, QueueTodo>();
+  const byStem = new Map<string, QueueTodo>();
 
   for (const line of lines) {
     const match = CHECKLIST_RE.exec(line);
     if (match) {
       const isCompleted = match[1].toLowerCase() === 'x';
       const title = match[2].trim();
-      if (title) {
-        seen.set(title, {
-          id: hashId(title),
+      if (!title) continue;
+      const stem = extractStem(title);
+      const existing = byStem.get(stem);
+      // Keep the longer title — status updates tend to add detail
+      if (!existing || title.length >= existing.title.length) {
+        byStem.set(stem, {
+          id: hashId(stem),
           title,
           status: isCompleted ? 'completed' : 'pending',
         });
@@ -37,7 +55,7 @@ export function parseTodosFromText(content: string): QueueTodo[] {
     }
   }
 
-  return Array.from(seen.values());
+  return Array.from(byStem.values());
 }
 
 /**
