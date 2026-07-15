@@ -97,11 +97,16 @@ export const TurnBlock: React.FC<{
     return -1;
   })();
 
-  // Turn is "done" when the final answer exists and is not streaming.
+  // Turn is "done" when the final answer exists, nothing is still streaming,
+  // and all items after the answer are non-streaming too (no tool calls mid-turn).
   const finalAnswerItem = lastAnswerIndex >= 0 ? visibleAssistantItems[lastAnswerIndex] : null;
+  const isAnythingStreaming = visibleAssistantItems.some(
+    item => item.type === 'assistant' && item.message.metadata?.isStreaming
+  );
   const isTurnDone = finalAnswerItem?.type === 'assistant'
-    && !finalAnswerItem.message.metadata?.isStreaming
-    && lastAnswerIndex > 0; // need at least one step before the answer
+    && !isAnythingStreaming
+    && lastAnswerIndex > 0
+    && lastAnswerIndex === visibleAssistantItems.length - 1; // answer is the last item
 
   // Split: execution steps (everything before final answer) vs final answer.
   const executionSteps = isTurnDone ? visibleAssistantItems.slice(0, lastAnswerIndex) : [];
