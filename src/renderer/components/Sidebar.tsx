@@ -85,9 +85,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     const mode = checked ? 'chat' : 'work';
     setWorkMode(mode);
     void configService.updateConfig({ workMode: mode });
-    // Reload all sessions without agent filter — work mode loadSessions(agentId)
-    // may have narrowed the list to a single agent, excluding chat sessions.
-    void coworkService.loadSessions();
   }, []);
 
   // Filter sessions by workMode — chat sessions only visible in chat mode
