@@ -30,6 +30,7 @@ export const LlamaCppIpcChannel = {
   GetRuntimeCapabilities: 'llamacpp:runtime:get-capabilities',
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
+  ModelLaunchLog: 'llamacpp:model-launch-log',
 } as const;
 
 export type LlamaCppIpcChannel = typeof LlamaCppIpcChannel[keyof typeof LlamaCppIpcChannel];
@@ -71,3 +72,39 @@ export const LlamaCppServiceConfigFieldKey = {
 
 export type LlamaCppServiceConfigFieldKey =
   typeof LlamaCppServiceConfigFieldKey[keyof typeof LlamaCppServiceConfigFieldKey];
+
+export const LlamaCppModelLaunchLogLevel = {
+  Debug: 'debug',
+  Info: 'info',
+  Warn: 'warn',
+  Error: 'error',
+} as const;
+
+export type LlamaCppModelLaunchLogLevel =
+  typeof LlamaCppModelLaunchLogLevel[keyof typeof LlamaCppModelLaunchLogLevel];
+
+export const LlamaCppModelLaunchLogPhase = {
+  Requested: 'requested',
+  CheckingService: 'checking-service',
+  StartingService: 'starting-service',
+  ServiceReady: 'service-ready',
+  PreparingModel: 'preparing-model',
+  CheckingRuntime: 'checking-runtime',
+  LoadingModel: 'loading-model',
+  WaitingReady: 'waiting-ready',
+  ProbingModel: 'probing-model',
+  Retrying: 'retrying',
+  Succeeded: 'succeeded',
+  Failed: 'failed',
+} as const;
+
+export type LlamaCppModelLaunchLogPhase =
+  typeof LlamaCppModelLaunchLogPhase[keyof typeof LlamaCppModelLaunchLogPhase];
+
+export const LlamaCppModelLaunchLogSource = {
+  LaunchFlow: 'launch-flow',
+} as const;
+
+export type LlamaCppModelLaunchLogSource =
+  typeof LlamaCppModelLaunchLogSource[keyof typeof LlamaCppModelLaunchLogSource];
+

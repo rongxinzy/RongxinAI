@@ -5,6 +5,11 @@ import type {
   LlamaCppRunningModel,
 } from '../../shared/llamacpp';
 import {
+  LlamaCppModelLaunchLogLevel,
+  LlamaCppModelLaunchLogPhase,
+} from '../../shared/llamacpp';
+import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
+import {
   classifyLlamaCppModelLoadError,
   isRetryableLlamaCppModelLoadError,
   LlamaCppModelLoadError,
@@ -41,6 +46,7 @@ export type LlamaCppModelLoadRetryInput<T> = {
   unloadModel?: (modelName: string) => Promise<void>;
   maxRetries?: number;
   minContextSize?: number;
+  onLog?: LlamaCppModelLaunchLogReporter;
 };
 
 const LlamaCppRetryRunningModelStatus = {
@@ -66,6 +72,11 @@ export async function loadLlamaCppModelWithRetry<T>(
   let currentInput = normalizeModelLoadInput(input.initialInput);
 
   for (let attemptIndex = 0; attemptIndex <= maxRetries; attemptIndex += 1) {
+    input.onLog?.({
+      level: LlamaCppModelLaunchLogLevel.Info,
+      phase: LlamaCppModelLaunchLogPhase.LoadingModel,
+      detail: describeRetryAttempt(currentInput, attemptIndex, maxRetries - attemptIndex),
+    });
     try {
       const result = await input.attemptLoad(currentInput, {
         attemptIndex,
@@ -95,12 +106,43 @@ export async function loadLlamaCppModelWithRetry<T>(
         unloadModel: input.unloadModel,
       });
       currentInput = halveLlamaCppModelLoadContext(currentInput, minContextSize);
+      input.onLog?.({
+        level: LlamaCppModelLaunchLogLevel.Warn,
+        phase: LlamaCppModelLaunchLogPhase.Retrying,
+        detail: describeRetryInput(currentInput, attemptIndex + 1, failureReason),
+      });
     }
   }
 
   throw new LlamaCppModelLoadError({
     reason: classifyLlamaCppModelLoadError(undefined),
   });
+}
+
+
+function describeRetryAttempt(
+  input: LlamaCppModelLaunchInput,
+  attemptIndex: number,
+  remainingRetries: number,
+): Record<string, unknown> {
+  return {
+    attemptIndex: attemptIndex + 1,
+    remainingRetries,
+    ...(input.options?.ctxSize ? { ctxSize: input.options.ctxSize } : {}),
+  };
+}
+
+function describeRetryInput(
+  input: LlamaCppModelLaunchInput,
+  nextAttemptIndex: number,
+  failureReason: LlamaCppModelLoadFailureReason,
+): Record<string, unknown> {
+  return {
+    model: input.model,
+    nextAttemptIndex: nextAttemptIndex + 1,
+    failureReason,
+    ...(input.options?.ctxSize ? { nextCtxSize: input.options.ctxSize } : {}),
+  };
 }
 
 export function halveLlamaCppModelLoadContext(

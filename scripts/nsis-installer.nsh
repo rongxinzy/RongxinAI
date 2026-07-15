@@ -339,6 +339,7 @@
     Abort
 
   LlamaCppBackendResourcesPresent:
+    StrCpy $R8 ""
     IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallRun LlamaCppBackendHelperMissing
 
   LlamaCppBackendHelperMissing:
@@ -352,7 +353,7 @@
   LlamaCppBackendInstallRun:
   FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
   !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=llamacpp-backend-install-start helper=$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs manifest=$INSTDIR\resources\llamacpp-backends\manifest.json$\r$\n"
+  FileWrite $2 "$8 phase=llamacpp-backend-install-start helper=$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs manifest=$INSTDIR\resources\llamacpp-backends\manifest.json local_signing_arg=$R8$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "\
@@ -366,7 +367,7 @@
     if (-not (Test-Path $$electron)) { Write-Output \"missing:electron-runtime\"; exit 20 };\
     if (-not (Test-Path $$helper)) { Write-Output \"missing:llamacpp-helper\"; exit 21 };\
     if (-not (Test-Path $$manifest)) { Write-Output \"missing:llamacpp-manifest\"; exit 22 };\
-    & $$electron $$helper --manifest $$manifest --resources-dir $$resources --app-data-dir $$appData --log-path $$log;\
+    & $$electron $$helper --manifest $$manifest --resources-dir $$resources --app-data-dir $$appData --log-path $$log $R8;\
     if ($$LASTEXITCODE -eq $$null) { exit 0 };\
     exit $$LASTEXITCODE"'
   Pop $0
@@ -385,7 +386,32 @@
   IntCmp $0 0 LlamaCppBackendInstallDone LlamaCppBackendInstallNonZero LlamaCppBackendInstallNonZero
 
   LlamaCppBackendInstallNonZero:
+    IntCmp $0 30 LlamaCppBackendLocalSigningConfirmationRequired 0 0
+    IntCmp $0 31 LlamaCppBackendLocalSigningFailed 0 0
     IntCmp $0 16 LlamaCppBackendInstallNetworkFailed LlamaCppBackendInstallFailed LlamaCppBackendInstallFailed
+
+  LlamaCppBackendLocalSigningConfirmationRequired:
+    StrCmp $R8 "--local-signing-confirmed" LlamaCppBackendLocalSigningFailed
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-confirmation-required exit=$0 output=$1$\r$\n"
+    FileClose $2
+    MessageBox MB_OKCANCEL|MB_ICONQUESTION "The llama.cpp backend contains unsigned executable files. RongxinAI can create a local code-signing certificate and sign only the unsigned llama.cpp files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
+
+  LlamaCppBackendLocalSigningConfirmed:
+    StrCpy $R8 "--local-signing-confirmed"
+    Goto LlamaCppBackendInstallRun
+
+  LlamaCppBackendLocalSigningCancelled:
+    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-cancelled$\r$\n"
+    FileClose $2
+    Abort
+
+  LlamaCppBackendLocalSigningFailed:
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend local signing failed (exit code $0). See %APPDATA%\RongxinAI\install-llamacpp.log and %APPDATA%\RongxinAI\install-timing.log for details."
+    Abort
 
   LlamaCppBackendInstallNetworkFailed:
     MessageBox MB_OK|MB_ICONSTOP "The llama.cpp backend download failed after automatic resume/retry. Please check your network, proxy, or firewall settings and run the installer again. See %APPDATA%\RongxinAI\install-llamacpp.log for details."

@@ -9,6 +9,7 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModel,
   LlamaCppModelLaunchInput,
+  LlamaCppModelLaunchLogEvent,
   LlamaCppModelLaunchResult,
   LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
@@ -437,6 +438,7 @@ interface IElectronAPI {
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
     onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
+    onModelLaunchLog: (callback: (event: LlamaCppModelLaunchLogEvent) => void) => () => void;
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
   };
   marketplace: {

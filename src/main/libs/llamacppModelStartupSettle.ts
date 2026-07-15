@@ -5,6 +5,11 @@ import type {
   LlamaCppRunningModel,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
+import {
+  LlamaCppModelLaunchLogLevel,
+  LlamaCppModelLaunchLogPhase,
+} from '../../shared/llamacpp';
+import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 
 export const LlamaCppModelStartupSettleStatus = {
   Loaded: 'loaded',
@@ -65,6 +70,7 @@ export type LlamaCppModelStartupSettleInput = {
   requestTimeoutMs?: number;
   now?: () => number;
   wait?: (delayMs: number) => Promise<void>;
+  onLog?: LlamaCppModelLaunchLogReporter;
 };
 
 const LlamaCppServerStatusValue = {
@@ -101,6 +107,8 @@ export async function settleLlamaCppModelStartup(
     input.requestTimeoutMs ?? LLAMACPP_MODEL_STARTUP_SETTLE_REQUEST_TIMEOUT_MS;
 
 
+  let lastObservedState: LlamaCppModelStartupObservedState | null = null;
+
   while (true) {
     // Each iteration first verifies service health, then reads the model table.
     // This separates service failures from model-level loading states.
@@ -111,8 +119,30 @@ export async function settleLlamaCppModelStartup(
       listModels: input.listModels,
       requestTimeoutMs: Math.max(1, Math.min(requestTimeoutMs, remainingMs || requestTimeoutMs)),
     });
+    if (observation.status !== LlamaCppModelStartupSettleStatus.Loaded) {
+      if (observation.observedState !== lastObservedState) {
+        lastObservedState = observation.observedState;
+        input.onLog?.({
+          level: observation.status === LlamaCppModelStartupSettleStatus.Failed
+            || observation.status === LlamaCppModelStartupSettleStatus.ServiceUnavailable
+            ? LlamaCppModelLaunchLogLevel.Warn
+            : LlamaCppModelLaunchLogLevel.Info,
+          phase: LlamaCppModelLaunchLogPhase.WaitingReady,
+          detail: {
+            observedState: observation.observedState,
+            serviceStatus: observation.serviceStatus?.status,
+            detail: observation.detail,
+          },
+        });
+      }
+    }
+
     // loaded and sleeping both mean the model is usable for the UI.
     if (observation.status === LlamaCppModelStartupSettleStatus.Loaded) {
+      input.onLog?.({
+        level: LlamaCppModelLaunchLogLevel.Info,
+        phase: LlamaCppModelLaunchLogPhase.ProbingModel,
+      });
       return {
         status: LlamaCppModelStartupSettleStatus.Loaded,
         runningModels: observation.runningModels,

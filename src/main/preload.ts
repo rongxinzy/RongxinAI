@@ -183,6 +183,8 @@ contextBridge.exposeInMainWorld('electron', {
       onPush(LlamaCppIpcChannel.StatusChanged, callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>
       onPush(LlamaCppIpcChannel.InstallProgress, callback),
+    onModelLaunchLog: (callback: (event: unknown) => void) =>
+      onPush(LlamaCppIpcChannel.ModelLaunchLog, callback),
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, progress: any) => {
         const name = String(progress?.modelId || progress?.modelName || '');

@@ -16,8 +16,12 @@ workflow:
 default:
   image: rongxinai-ci:latest
   before_script:
+    - |
+      export NPM_CONFIG_USERCONFIG="$CI_PROJECT_DIR/.npmrc"
+      export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
+      mkdir -p "$NPM_CONFIG_CACHE"
+      printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
     - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
-    - npm config set registry "$NPM_CONFIG_REGISTRY"
     - npm install --prefer-offline --no-audit --ignore-scripts
 
 stages:
@@ -39,8 +43,12 @@ variables:
 lint:
   stage: lint
   before_script:
+    - |
+      export NPM_CONFIG_USERCONFIG="$CI_PROJECT_DIR/.npmrc"
+      export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
+      mkdir -p "$NPM_CONFIG_CACHE"
+      printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
     - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
-    - npm config set registry "$NPM_CONFIG_REGISTRY"
     - npm install --prefer-offline --no-audit --ignore-scripts
   variables:
     GIT_DEPTH: 0

@@ -11,6 +11,7 @@ dist-electron
 .env.*
 !.env.example
 .npmrc
+.npm-cache/
 .claude/
 __pycache__/
 .codebuddy/
