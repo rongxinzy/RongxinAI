@@ -1,3 +1,4 @@
+import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
 import { Info, TriangleAlert } from 'lucide-react';
 import React from 'react';
 
@@ -8,12 +9,12 @@ import { i18nService } from '../../../services/i18n';
 import type { Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import { ArtifactPreviewCard } from '../../artifacts';
-import type { AssistantTurnItem,ConversationTurn } from '../helpers/messageGrouping';
+import type { ConversationTurn } from '../helpers/messageGrouping';
 import { getToolResultLineCount,getVisibleAssistantItems } from '../helpers/messageGrouping';
 import { getToolResultDisplay,hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
-import { CoworkChain } from './CoworkChain';
 import { TypingDots } from './StreamingBar';
+import { ToolCard } from './ToolCard';
 
 export const TurnBlock: React.FC<{
   turn: ConversationTurn;
@@ -27,9 +28,6 @@ export const TurnBlock: React.FC<{
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const isError = !hasText(message.content) && typeof message.metadata?.error === 'string';
-    // If the main process stored an errorKind, translate it via i18n so the
-    // user sees a friendly message (e.g. "任务执行出错，请重试…") instead of
-    // the raw Pi error string (e.g. "content is not iterable").
     const errorKind = message.metadata?.errorKind as CoworkErrorKind | undefined;
     const i18nKey = isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
     const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
@@ -82,45 +80,89 @@ export const TurnBlock: React.FC<{
     );
   };
 
-  // Split items into "chain" (thinking + tool calls) and "visible" (final text, etc.)
-  const { chainItems, visibleItems } = React.useMemo(() => {
-    const chain: AssistantTurnItem[] = [];
-    const visible: AssistantTurnItem[] = [];
-
-    for (const item of visibleAssistantItems) {
-      if (
-        item.type === 'assistant' && item.message.metadata?.isThinking
-      ) {
-        chain.push(item);
-      } else if (item.type === 'tool_group') {
-        chain.push(item);
-      } else if (item.type === 'tool_result') {
-        chain.push(item);
-      } else {
-        visible.push(item);
+  // Check if this is the last visible assistant bubble (for copy button)
+  const lastAssistantIndex = (() => {
+    for (let i = visibleAssistantItems.length - 1; i >= 0; i--) {
+      const item = visibleAssistantItems[i];
+      if (item.type === 'assistant' && !item.message.metadata?.isThinking) {
+        return i;
       }
     }
-
-    return { chainItems: chain, visibleItems: visible };
-  }, [visibleAssistantItems]);
-
-  const hasChain = chainItems.length > 0;
+    return -1;
+  })();
 
   return (
     <div className="px-4 py-2">
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {/* ── Chain of Thought wrapper (thinking + tool calls) ── */}
-            {hasChain ? (
-              <CoworkChain items={chainItems} mapDisplayText={mapDisplayText}>
-                {/* Visible non-chain items rendered after the chain */}
-                {visibleItems.map((item) => renderVisibleItem(item, visibleItems))}
-              </CoworkChain>
-            ) : (
-              /* No chain: render everything flat (backward compatible) */
-              visibleItems.map((item) => renderVisibleItem(item, visibleItems))
-            )}
+            {visibleAssistantItems.map((item, idx) => {
+              // ── Thinking: collapsed Reasoning block ──
+              if (item.type === 'assistant' && item.message.metadata?.isThinking) {
+                const meta = item.message.metadata;
+                const isStreaming = Boolean(meta?.isStreaming);
+                const isFinal = Boolean(meta?.isFinal);
+                const content = mapDisplayText
+                  ? mapDisplayText(item.message.content)
+                  : item.message.content;
+                return (
+                  <Reasoning key={item.message.id} isStreaming={isStreaming}>
+                    <ReasoningTrigger
+                      getThinkingMessage={(s, d) => {
+                        if (s) return <p>思考中…</p>;
+                        if (isFinal) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
+                        return <p>思考内容</p>;
+                      }}
+                    />
+                    <ReasoningContent>{content}</ReasoningContent>
+                  </Reasoning>
+                );
+              }
+
+              // ── Tool call + result ──
+              if (item.type === 'tool_group') {
+                return (
+                  <ToolCard
+                    key={item.group.toolUse.id}
+                    group={item.group}
+                    isLastInSequence
+                    mapDisplayText={mapDisplayText}
+                  />
+                );
+              }
+
+              // ── Orphan tool result ──
+              if (item.type === 'tool_result') {
+                return (
+                  <div key={item.message.id}>
+                    {renderOrphanToolResult(item.message)}
+                  </div>
+                );
+              }
+
+              // ── System message ──
+              if (item.type === 'system') {
+                const sys = renderSystemMessage(item.message);
+                return sys ? <div key={item.message.id}>{sys}</div> : null;
+              }
+
+              // ── Assistant answer (visible text) ──
+              if (item.type === 'assistant') {
+                const isLastAssistant = showCopyButtons && idx === lastAssistantIndex;
+                return (
+                  <AssistantBubble
+                    key={item.message.id}
+                    message={item.message}
+                    resolveLocalFilePath={resolveLocalFilePath}
+                    mapDisplayText={mapDisplayText}
+                    showCopyButton={isLastAssistant}
+                    turnMetadata={isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined}
+                  />
+                );
+              }
+
+              return null;
+            })}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -132,38 +174,4 @@ export const TurnBlock: React.FC<{
       </div>
     </div>
   );
-
-  // ── helper ──
-
-  function renderVisibleItem(
-    item: AssistantTurnItem,
-    allVisible: AssistantTurnItem[],
-  ) {
-    if (item.type === 'assistant') {
-      const itemIndex = allVisible.indexOf(item);
-      const hasToolGroupAfter = allVisible.slice(itemIndex + 1).some(
-        (laterItem) => laterItem.type === 'tool_group',
-      );
-      const isLastAssistant = showCopyButtons && !hasToolGroupAfter;
-      return (
-        <AssistantBubble
-          key={item.message.id}
-          message={item.message}
-          resolveLocalFilePath={resolveLocalFilePath}
-          mapDisplayText={mapDisplayText}
-          showCopyButton={isLastAssistant}
-          turnMetadata={isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined}
-        />
-      );
-    }
-    if (item.type === 'system') {
-      const systemMessage = renderSystemMessage(item.message);
-      if (!systemMessage) return null;
-      return <div key={item.message.id}>{systemMessage}</div>;
-    }
-    if (item.type === 'tool_result') {
-      return <div key={item.message.id}>{renderOrphanToolResult(item.message)}</div>;
-    }
-    return null;
-  }
 };

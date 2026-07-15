@@ -93,7 +93,7 @@ export const CoworkChain: React.FC<{
 
   return (
     <>
-      <ChainOfThought defaultOpen={true}>
+      <ChainOfThought defaultOpen={false}>
         <ChainOfThoughtHeader icon={SparklesIcon}>
           {`工作过程 (${stepCount} 步)`}
         </ChainOfThoughtHeader>
