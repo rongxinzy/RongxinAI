@@ -4,7 +4,6 @@ import {
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
-import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Info, SparklesIcon, TriangleAlert } from 'lucide-react';
 import React from 'react';
 
@@ -125,7 +124,7 @@ export const TurnBlock: React.FC<{
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
-              if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
+              if (s) return <span className="animate-pulse">思考中…</span>;
               if (isFinal) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
               return <p>思考内容</p>;
             }}
