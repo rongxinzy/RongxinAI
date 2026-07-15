@@ -16,6 +16,7 @@ import { i18nService } from '../../services/i18n';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
+import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import {
@@ -24,7 +25,6 @@ import {
   LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
-  localInferenceSoftTextClass,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
@@ -649,26 +649,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="inline-flex rounded-lg bg-surface-raised p-1">
-              {(['models', 'marketplace'] as LocalInferenceTab[]).map(tab => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`h-7 rounded-md px-3 text-sm font-medium transition-colors ${
-                    activeTab === tab
-                      ? 'bg-secondary text-secondary-foreground'
-                      : `${localInferenceSoftTextClass} hover:text-foreground`
-                  }`}
-                >
-                  {i18nService.t(
-                    tab === 'models'
-                        ? 'localInferenceTabModels'
-                        : 'localInferenceTabMarketplace',
-                  )}
-                </button>
-              ))}
-            </div>
+            <LocalInferenceTabSelector
+              activeTab={activeTab}
+              onActiveTabChange={setActiveTab}
+            />
             <div className="flex flex-wrap items-center gap-2">
               {activeTab === 'models' ? (
                 <>
