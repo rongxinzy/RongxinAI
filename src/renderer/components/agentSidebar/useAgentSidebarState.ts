@@ -337,8 +337,16 @@ export const useAgentSidebarState = (options?: UseAgentSidebarStateOptions) => {
         }
       };
 
-      // Always prune the current agent (even when sessions is empty).
-      pruneAgent(currentAgentId);
+      // Prune the current agent only when sessions are consistent with it.
+      // During agent switching, currentAgentId may have already updated while
+      // sessions still reflect the previous agent (loadSessions is async).
+      // Pruning against stale sessions would remove all cached task previews
+      // for the new agent, causing a collapse/re-expand flicker.
+      const sessionsMatchCurrentAgent = sessions.length === 0
+        || normalizeAgentId(sessions[0].agentId) === currentAgentId;
+      if (sessionsMatchCurrentAgent) {
+        pruneAgent(currentAgentId);
+      }
 
       // Prune the primary source agent of the Redux sessions.
       // When sessions is non-empty, the first session's agent is the one
