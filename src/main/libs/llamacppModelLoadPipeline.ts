@@ -9,12 +9,12 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
 import { planLlamaCppModelGpuPlacement } from './llamacppModelGpuPlacement';
+import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 import {
   LlamaCppModelLoadError,
   LlamaCppModelLoadFailureReason,
   type LlamaCppModelLoadFailureReason as LlamaCppModelLoadFailureReasonType,
 } from './llamacppModelLoadErrors';
-import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 import { loadLlamaCppModelWithRetry } from './llamacppModelLoadRetry';
 import {
   LlamaCppModelStartupSettleStatus,

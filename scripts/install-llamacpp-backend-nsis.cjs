@@ -18,6 +18,7 @@ const CliFlag = {
   Platform: '--platform',
   Arch: '--arch',
   HasNvidiaGpu: '--has-nvidia-gpu',
+  LocalSigningConfirmed: '--local-signing-confirmed',
   DryRun: '--dry-run',
 };
 
@@ -31,6 +32,8 @@ const ExitCode = {
   Sha256Mismatch: 14,
   ArchiveInstallFailed: 15,
   DownloadFailed: 16,
+  LocalSigningConfirmationRequired: 30,
+  LocalSigningFailed: 31,
   UnexpectedFailure: 70,
 };
 
@@ -100,6 +103,23 @@ const DownloadConfig = {
   RetryDelayMs: 1000,
 };
 
+const WindowsSignatureStatus = {
+  Valid: 'Valid',
+  NotSigned: 'NotSigned',
+};
+
+const PowerShellCommand = {
+  Executable: 'powershell',
+  NoProfile: '-NoProfile',
+  NonInteractive: '-NonInteractive',
+  ExecutionPolicy: '-ExecutionPolicy',
+  Bypass: 'Bypass',
+  Command: '-Command',
+};
+
+const LOCAL_SIGNING_CERT_SUBJECT = 'CN=RongxinAI Local llama.cpp Runtime Signing';
+const WINDOWS_SIGNABLE_FILE_EXTENSIONS = new Set(['.dll', '.exe']);
+
 function parseCliArgs(argv) {
   const options = { dryRun: false };
   for (let index = 0; index < argv.length; index += 1) {
@@ -110,6 +130,10 @@ function parseCliArgs(argv) {
     }
     if (arg === CliFlag.DryRun) {
       options.dryRun = true;
+      continue;
+    }
+    if (arg === CliFlag.LocalSigningConfirmed) {
+      options.localSigningConfirmed = true;
       continue;
     }
     if (
@@ -152,6 +176,7 @@ function printUsage() {
     '  --platform <platform>        Runtime platform override for tests, for example win32.',
     '  --arch <arch>                Runtime arch override for tests, for example x64 or arm64.',
     '  --has-nvidia-gpu <true|false>  GPU override for tests.',
+    '  --local-signing-confirmed   Allow the helper to locally sign unsigned Windows runtime files.',
     '  --dry-run                   Plan only. If omitted, the helper installs the selected backend.',
   ].join('\n'));
 }
@@ -408,7 +433,10 @@ async function runCli(argv = process.argv.slice(2), env = process.env) {
       return ExitCode.Success;
     }
     writePlanLog(plan, logPath, 'install');
-    const result = await installBackendFromPlan(plan, { logPath });
+    const result = await installBackendFromPlan(plan, {
+      localSigningConfirmed: Boolean(options.localSigningConfirmed),
+      logPath,
+    });
     if (!result.success) {
       console.error(result.error);
       return result.exitCode || ExitCode.UnexpectedFailure;
@@ -473,6 +501,19 @@ async function installBackendFromPlan(plan, options = {}) {
         cudaMajor: plan.backend.cudaMajor,
         installedAt: new Date().toISOString(),
       });
+
+      const signingResult = ensureWindowsRuntimeLocalSigning({
+        binDir: getManagedBackendBinDir(stagedBackendDir),
+        certificateProvider: options.localSigningCertificateProvider,
+        confirmed: Boolean(options.localSigningConfirmed),
+        fileSigner: options.localSigningFileSigner,
+        logPath,
+        platform: plan.platform,
+        statusProvider: options.localSigningStatusProvider,
+      });
+      if (!signingResult.success) {
+        return failedInstallResult(signingResult.exitCode, signingResult.error);
+      }
 
       replaceBackendDirectory(stagedBackendDir, plan.backendDir, logPath);
       syncCurrentBackend(plan.runtimeRoot, plan.backendDir, plan.currentPath);
@@ -671,6 +712,200 @@ function writeRuntimeBuildInfo(backendDir, buildInfo) {
   );
 }
 
+function ensureWindowsRuntimeLocalSigning(input) {
+  const platform = normalizePlatform(input.platform);
+  if (platform !== RuntimePlatform.Windows) {
+    return { success: true, checkedCount: 0, signedCount: 0 };
+  }
+
+  const hasInjectedSigningProvider = Boolean(
+    input.statusProvider || input.certificateProvider || input.fileSigner,
+  );
+  if (process.platform !== RuntimePlatform.Windows && !hasInjectedSigningProvider) {
+    appendLog(input.logPath, 'local signing skipped because the helper is not running on Windows');
+    return { success: true, checkedCount: 0, signedCount: 0 };
+  }
+
+  try {
+    const signableFiles = findWindowsRuntimeSignableFiles(input.binDir);
+    if (signableFiles.length === 0) {
+      appendLog(input.logPath, 'local signing skipped because no Windows executable files were staged');
+      return { success: true, checkedCount: 0, signedCount: 0 };
+    }
+
+    const getSignatureStatus = input.statusProvider || getWindowsAuthenticodeStatus;
+    const unsignedFiles = [];
+    for (const filePath of signableFiles) {
+      const status = getSignatureStatus(filePath);
+      if (status === WindowsSignatureStatus.NotSigned) {
+        unsignedFiles.push(filePath);
+      }
+    }
+
+    if (unsignedFiles.length === 0) {
+      appendLog(
+        input.logPath,
+        `local signing skipped because all ${signableFiles.length} executable files already have signatures or are not signable PE files`,
+      );
+      return { success: true, checkedCount: signableFiles.length, signedCount: 0 };
+    }
+
+    appendLog(input.logPath, `local signing confirmation required for ${unsignedFiles.length} unsigned Windows runtime files`);
+    if (!input.confirmed) {
+      return failedInstallResult(
+        ExitCode.LocalSigningConfirmationRequired,
+        `${unsignedFiles.length} unsigned Windows llama.cpp runtime files require local signing confirmation.`,
+      );
+    }
+
+    const getCertificate = input.certificateProvider || ensureWindowsLocalCodeSigningCertificate;
+    const signFile = input.fileSigner || signWindowsRuntimeFile;
+    const thumbprint = getCertificate(input.logPath);
+    let signedCount = 0;
+    for (const filePath of unsignedFiles) {
+      const status = signFile(filePath, thumbprint);
+      if (!status || status === WindowsSignatureStatus.NotSigned) {
+        throw createInstallError(
+          ExitCode.LocalSigningFailed,
+          `Local signing did not attach a signature to ${path.basename(filePath)}.`,
+        );
+      }
+      signedCount += 1;
+    }
+
+    appendLog(input.logPath, `local signing completed for ${signedCount} Windows runtime files`);
+    return { success: true, checkedCount: signableFiles.length, signedCount };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    appendLog(input.logPath, `local signing failed: ${message}`);
+    return failedInstallResult(resolveLocalSigningFailureExitCode(error), message);
+  }
+}
+
+function findWindowsRuntimeSignableFiles(rootDir) {
+  const resolvedRoot = path.resolve(rootDir);
+  if (!fs.existsSync(resolvedRoot)) {
+    return [];
+  }
+
+  const files = [];
+  const queue = [resolvedRoot];
+  while (queue.length > 0) {
+    const currentDir = queue.shift();
+    if (!currentDir) continue;
+    assertPathInside(currentDir, resolvedRoot);
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const entryPath = path.join(currentDir, entry.name);
+      assertPathInside(entryPath, resolvedRoot);
+      if (entry.isDirectory()) {
+        queue.push(entryPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (WINDOWS_SIGNABLE_FILE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+        files.push(entryPath);
+      }
+    }
+  }
+  return files.sort((left, right) => left.localeCompare(right));
+}
+
+function getWindowsAuthenticodeStatus(filePath) {
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '$signature = Get-AuthenticodeSignature -FilePath $args[0]',
+    'Write-Output $signature.Status',
+  ].join('; ');
+  return readLastNonEmptyLine(runPowerShellScript(script, [filePath], { timeoutMs: 15000 }));
+}
+
+function ensureWindowsLocalCodeSigningCertificate(logPath) {
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '$subject = $args[0]',
+    '$cert = Get-ChildItem -Path Cert:\\CurrentUser\\My -CodeSigningCert | Where-Object { $_.Subject -eq $subject -and $_.NotAfter -gt (Get-Date).AddDays(7) } | Sort-Object NotAfter -Descending | Select-Object -First 1',
+    'if (-not $cert) { $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $subject -CertStoreLocation Cert:\\CurrentUser\\My -KeyUsage DigitalSignature }',
+    "$stores = @('Cert:\\CurrentUser\\Root', 'Cert:\\CurrentUser\\TrustedPublisher')",
+    'foreach ($store in $stores) {',
+    '  $target = Join-Path $store $cert.Thumbprint',
+    '  if (-not (Test-Path $target)) { Copy-Item -Path ("Cert:\\CurrentUser\\My\\" + $cert.Thumbprint) -Destination $store | Out-Null }',
+    '}',
+    'Write-Output $cert.Thumbprint',
+  ].join('; ');
+  const thumbprint = readLastNonEmptyLine(runPowerShellScript(script, [LOCAL_SIGNING_CERT_SUBJECT], { timeoutMs: 60000 }));
+  if (!thumbprint) {
+    throw createInstallError(ExitCode.LocalSigningFailed, 'Local code signing certificate was not created.');
+  }
+  appendLog(logPath, `local signing certificate ready: ${thumbprint}`);
+  return thumbprint;
+}
+
+function signWindowsRuntimeFile(filePath, thumbprint) {
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '$thumbprint = $args[0]',
+    '$filePath = $args[1]',
+    '$cert = Get-Item -Path ("Cert:\\CurrentUser\\My\\" + $thumbprint)',
+    '$signature = Set-AuthenticodeSignature -FilePath $filePath -Certificate $cert',
+    'if ($signature.Status -eq "NotSigned") { Write-Output $signature.Status; exit 2 }',
+    '$updated = Get-AuthenticodeSignature -FilePath $filePath',
+    'Write-Output $updated.Status',
+  ].join('; ');
+  return readLastNonEmptyLine(runPowerShellScript(script, [thumbprint, filePath], { timeoutMs: 60000 }));
+}
+
+function runPowerShellScript(script, args = [], options = {}) {
+  const result = spawnSync(PowerShellCommand.Executable, [
+    PowerShellCommand.NoProfile,
+    PowerShellCommand.NonInteractive,
+    PowerShellCommand.ExecutionPolicy,
+    PowerShellCommand.Bypass,
+    PowerShellCommand.Command,
+    script,
+    ...args,
+  ], {
+    encoding: 'utf8',
+    timeout: options.timeoutMs || 60000,
+    windowsHide: true,
+  });
+  const stdout = String(result.stdout || '').trim();
+  const stderr = String(result.stderr || '').trim();
+  if (result.error) {
+    throw createInstallError(ExitCode.LocalSigningFailed, result.error.message);
+  }
+  if (result.status !== 0) {
+    throw createInstallError(
+      ExitCode.LocalSigningFailed,
+      stderr || stdout || `PowerShell exited with code ${result.status}.`,
+    );
+  }
+  return stdout;
+}
+
+function readLastNonEmptyLine(output) {
+  const lines = String(output || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines[lines.length - 1] : '';
+}
+
+function assertPathInside(targetPath, rootDir) {
+  const root = path.resolve(rootDir);
+  const target = path.resolve(targetPath);
+  const relative = path.relative(root, target);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw createInstallError(ExitCode.LocalSigningFailed, `Unsafe local signing path: ${target}`);
+  }
+}
+
+function resolveLocalSigningFailureExitCode(error) {
+  if (error && typeof error.exitCode === 'number') {
+    return error.exitCode;
+  }
+  return ExitCode.LocalSigningFailed;
+}
+
 function replaceBackendDirectory(stagedBackendDir, backendDir, logPath) {
   fs.mkdirSync(path.dirname(backendDir), { recursive: true });
   fs.rmSync(backendDir, { recursive: true, force: true });
@@ -754,8 +989,11 @@ module.exports = {
   RuntimePathName,
   RuntimePlatform,
   SelectionReason,
+  WindowsSignatureStatus,
   buildInstallPlan,
   detectNvidiaGpu,
+  ensureWindowsRuntimeLocalSigning,
+  findWindowsRuntimeSignableFiles,
   installBackendFromPlan,
   parseCliArgs,
   readManifest,

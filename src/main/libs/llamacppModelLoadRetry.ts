@@ -8,13 +8,13 @@ import {
   LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
 } from '../../shared/llamacpp';
+import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 import {
   classifyLlamaCppModelLoadError,
   isRetryableLlamaCppModelLoadError,
   LlamaCppModelLoadError,
   type LlamaCppModelLoadFailureReason,
 } from './llamacppModelLoadErrors';
-import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 
 export const LlamaCppModelLoadRetryDefaults = {
   MaxRetries: 1,

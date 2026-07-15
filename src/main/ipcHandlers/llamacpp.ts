@@ -7,8 +7,8 @@ import type {
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModel,
-  LlamaCppModelLaunchLogEvent,
   LlamaCppModelLaunchInput,
+  LlamaCppModelLaunchLogEvent,
   LlamaCppModelLaunchResult,
   LlamaCppModelPreference,
   LlamaCppModelPreferences,
@@ -38,14 +38,14 @@ import {
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
 import {
+  createLlamaCppModelLaunchLogger,
+  createLlamaCppServiceStartupLaunchLogger,
+} from '../libs/llamacppModelLaunchLog';
+import {
   classifyLlamaCppModelLoadError,
   getLlamaCppModelLoadFailureI18nKey,
   LlamaCppModelLoadFailureReason,
 } from '../libs/llamacppModelLoadErrors';
-import {
-  createLlamaCppModelLaunchLogger,
-  createLlamaCppServiceStartupLaunchLogger,
-} from '../libs/llamacppModelLaunchLog';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
 import {

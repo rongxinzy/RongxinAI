@@ -18,6 +18,7 @@ import {
   RuntimeBuildInfoSource,
   RuntimePlatform,
   SelectionReason,
+  WindowsSignatureStatus,
   selectRecommendedBackend,
 } from '../scripts/install-llamacpp-backend-nsis.cjs';
 
@@ -233,6 +234,7 @@ describe('install-llamacpp-backend-nsis local win-full install', () => {
     expect(plan.archive.source).toBe(ArchiveSource.Local);
 
     const result = await installBackendFromPlan(plan, {
+      localSigningStatusProvider: () => WindowsSignatureStatus.Valid,
       logPath: path.join(appDataDir, 'install-llamacpp.log'),
     });
 
@@ -264,6 +266,75 @@ describe('install-llamacpp-backend-nsis local win-full install', () => {
     expect(fs.lstatSync(currentPath).isSymbolicLink()).toBe(true);
     expect(fs.existsSync(path.join(currentPath, 'build', 'bin', 'llama-server.exe'))).toBe(true);
   });
+
+  test('requires confirmation before signing unsigned Windows runtime files', async () => {
+    const tempDir = createTempDir();
+    const resourcesDir = path.join(tempDir, 'resources');
+    const appDataDir = path.join(tempDir, 'appdata');
+    fs.mkdirSync(resourcesDir, { recursive: true });
+
+    const archiveName = 'llama-b9244-bin-win-cpu-x64.zip';
+    const archivePath = path.join(resourcesDir, archiveName);
+    const sha256 = await writeTestBackendZip(archivePath);
+    writeManifest(resourcesDir, createLocalManifest(archiveName, sha256));
+
+    const plan = buildInstallPlan({
+      resourcesDir,
+      appDataDir,
+      platform: RuntimePlatform.Windows,
+      arch: RuntimeArch.X64,
+      hasNvidiaGpu: false,
+    });
+
+    const result = await installBackendFromPlan(plan, {
+      localSigningStatusProvider: () => WindowsSignatureStatus.NotSigned,
+      logPath: path.join(appDataDir, 'install-llamacpp.log'),
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.exitCode).toBe(ExitCode.LocalSigningConfirmationRequired);
+    expect(fs.existsSync(path.join(appDataDir, 'llamacpp-runtime', 'current'))).toBe(false);
+  });
+
+  test('signs only unsigned Windows runtime files after confirmation', async () => {
+    const tempDir = createTempDir();
+    const resourcesDir = path.join(tempDir, 'resources');
+    const appDataDir = path.join(tempDir, 'appdata');
+    fs.mkdirSync(resourcesDir, { recursive: true });
+
+    const archiveName = 'llama-b9244-bin-win-cpu-x64.zip';
+    const archivePath = path.join(resourcesDir, archiveName);
+    const sha256 = await writeTestBackendZip(archivePath);
+    writeManifest(resourcesDir, createLocalManifest(archiveName, sha256));
+    const signedFiles: string[] = [];
+
+    const plan = buildInstallPlan({
+      resourcesDir,
+      appDataDir,
+      platform: RuntimePlatform.Windows,
+      arch: RuntimeArch.X64,
+      hasNvidiaGpu: false,
+    });
+
+    const result = await installBackendFromPlan(plan, {
+      localSigningCertificateProvider: () => 'test-thumbprint',
+      localSigningConfirmed: true,
+      localSigningFileSigner: (filePath: string, thumbprint: string) => {
+        expect(thumbprint).toBe('test-thumbprint');
+        signedFiles.push(path.basename(filePath));
+        return WindowsSignatureStatus.Valid;
+      },
+      localSigningStatusProvider: () => WindowsSignatureStatus.NotSigned,
+      logPath: path.join(appDataDir, 'install-llamacpp.log'),
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.exitCode).toBe(ExitCode.Success);
+    expect(signedFiles.sort()).toEqual(['ggml.dll', 'llama-server.exe']);
+    expect(
+      fs.existsSync(path.join(appDataDir, 'llamacpp-runtime', 'current', 'build', 'bin', 'llama-server.exe')),
+    ).toBe(true);
+  });
 });
 
 describe('install-llamacpp-backend-nsis remote win-lite install', () => {
@@ -291,6 +362,7 @@ describe('install-llamacpp-backend-nsis remote win-lite install', () => {
       expect(plan.archive.assetName).toBe(archiveName);
 
       const result = await installBackendFromPlan(plan, {
+        localSigningStatusProvider: () => WindowsSignatureStatus.Valid,
         logPath: path.join(appDataDir, 'install-llamacpp.log'),
       });
 
@@ -356,6 +428,7 @@ describe('install-llamacpp-backend-nsis remote win-lite install', () => {
       });
 
       const result = await installBackendFromPlan(plan, {
+        localSigningStatusProvider: () => WindowsSignatureStatus.Valid,
         logPath: path.join(appDataDir, 'install-llamacpp.log'),
       });
 
@@ -433,6 +506,23 @@ function writeManifest(resourcesDir: string, value: typeof manifest): void {
     `${JSON.stringify(value, null, 2)}\n`,
     'utf8',
   );
+}
+
+function createLocalManifest(archiveName: string, sha256: string): typeof manifest {
+  return {
+    ...manifest,
+    backends: manifest.backends.map(entry =>
+      entry.backend === BackendId.WinX64
+        ? {
+            ...entry,
+            archive: {
+              assetName: archiveName,
+              sha256,
+            },
+          }
+        : entry
+    ),
+  };
 }
 
 function createRemoteManifest(releaseBaseUrl: string, archiveName: string, sha256: string): typeof manifest {
