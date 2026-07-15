@@ -1,5 +1,11 @@
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+} from '@shared/components/ai-elements/chain-of-thought';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
-import { Info, TriangleAlert } from 'lucide-react';
+import { Shimmer } from '@shared/components/ai-elements/shimmer';
+import { Info, SparklesIcon, TriangleAlert } from 'lucide-react';
 import React from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
@@ -80,8 +86,8 @@ export const TurnBlock: React.FC<{
     );
   };
 
-  // Check if this is the last visible assistant bubble (for copy button)
-  const lastAssistantIndex = (() => {
+  // Find the last non-thinking assistant item (final answer)
+  const lastAnswerIndex = (() => {
     for (let i = visibleAssistantItems.length - 1; i >= 0; i--) {
       const item = visibleAssistantItems[i];
       if (item.type === 'assistant' && !item.message.metadata?.isThinking) {
@@ -91,78 +97,117 @@ export const TurnBlock: React.FC<{
     return -1;
   })();
 
+  // Turn is "done" when the final answer exists and is not streaming.
+  const finalAnswerItem = lastAnswerIndex >= 0 ? visibleAssistantItems[lastAnswerIndex] : null;
+  const isTurnDone = finalAnswerItem?.type === 'assistant'
+    && !finalAnswerItem.message.metadata?.isStreaming
+    && lastAnswerIndex > 0; // need at least one step before the answer
+
+  // Split: execution steps (everything before final answer) vs final answer.
+  const executionSteps = isTurnDone ? visibleAssistantItems.slice(0, lastAnswerIndex) : [];
+  const stepsAfterFinal = isTurnDone ? visibleAssistantItems.slice(lastAnswerIndex + 1) : [];
+  const stepCount = executionSteps.length;
+
+  const renderItem = (item: typeof visibleAssistantItems[0], _idx: number, isFinalAnswer: boolean) => {
+    // ── Thinking: collapsed Reasoning block with shimmer ──
+    if (item.type === 'assistant' && item.message.metadata?.isThinking) {
+      const meta = item.message.metadata;
+      const isStreaming = Boolean(meta?.isStreaming);
+      const isFinal = Boolean(meta?.isFinal);
+      const content = mapDisplayText
+        ? mapDisplayText(item.message.content)
+        : item.message.content;
+      return (
+        <Reasoning
+          key={item.message.id}
+          isStreaming={isStreaming}
+          defaultOpen={isStreaming}
+        >
+          <ReasoningTrigger
+            getThinkingMessage={(s, d) => {
+              if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
+              if (isFinal) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
+              return <p>思考内容</p>;
+            }}
+          />
+          <ReasoningContent>{content}</ReasoningContent>
+        </Reasoning>
+      );
+    }
+
+    // ── Tool call + result ──
+    if (item.type === 'tool_group') {
+      return (
+        <ToolCard
+          key={item.group.toolUse.id}
+          group={item.group}
+          isLastInSequence
+          mapDisplayText={mapDisplayText}
+        />
+      );
+    }
+
+    // ── Orphan tool result ──
+    if (item.type === 'tool_result') {
+      return (
+        <div key={item.message.id}>
+          {renderOrphanToolResult(item.message)}
+        </div>
+      );
+    }
+
+    // ── System message ──
+    if (item.type === 'system') {
+      const sys = renderSystemMessage(item.message);
+      return sys ? <div key={item.message.id}>{sys}</div> : null;
+    }
+
+    // ── Assistant answer ──
+    if (item.type === 'assistant') {
+      const isLastAssistant = showCopyButtons && isFinalAnswer;
+      return (
+        <AssistantBubble
+          key={item.message.id}
+          message={item.message}
+          resolveLocalFilePath={resolveLocalFilePath}
+          mapDisplayText={mapDisplayText}
+          showCopyButton={isLastAssistant}
+          turnMetadata={isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined}
+        />
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="px-4 py-2">
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {visibleAssistantItems.map((item, idx) => {
-              // ── Thinking: collapsed Reasoning block ──
-              if (item.type === 'assistant' && item.message.metadata?.isThinking) {
-                const meta = item.message.metadata;
-                const isStreaming = Boolean(meta?.isStreaming);
-                const isFinal = Boolean(meta?.isFinal);
-                const content = mapDisplayText
-                  ? mapDisplayText(item.message.content)
-                  : item.message.content;
-                return (
-                  <Reasoning key={item.message.id} isStreaming={isStreaming}>
-                    <ReasoningTrigger
-                      getThinkingMessage={(s, d) => {
-                        if (s) return <p>思考中…</p>;
-                        if (isFinal) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
-                        return <p>思考内容</p>;
-                      }}
-                    />
-                    <ReasoningContent>{content}</ReasoningContent>
-                  </Reasoning>
-                );
-              }
-
-              // ── Tool call + result ──
-              if (item.type === 'tool_group') {
-                return (
-                  <ToolCard
-                    key={item.group.toolUse.id}
-                    group={item.group}
-                    isLastInSequence
-                    mapDisplayText={mapDisplayText}
-                  />
-                );
-              }
-
-              // ── Orphan tool result ──
-              if (item.type === 'tool_result') {
-                return (
-                  <div key={item.message.id}>
-                    {renderOrphanToolResult(item.message)}
-                  </div>
-                );
-              }
-
-              // ── System message ──
-              if (item.type === 'system') {
-                const sys = renderSystemMessage(item.message);
-                return sys ? <div key={item.message.id}>{sys}</div> : null;
-              }
-
-              // ── Assistant answer (visible text) ──
-              if (item.type === 'assistant') {
-                const isLastAssistant = showCopyButtons && idx === lastAssistantIndex;
-                return (
-                  <AssistantBubble
-                    key={item.message.id}
-                    message={item.message}
-                    resolveLocalFilePath={resolveLocalFilePath}
-                    mapDisplayText={mapDisplayText}
-                    showCopyButton={isLastAssistant}
-                    turnMetadata={isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined}
-                  />
-                );
-              }
-
-              return null;
-            })}
+            {isTurnDone ? (
+              <>
+                {/* Execution steps wrapped in collapsible chain */}
+                <ChainOfThought defaultOpen={false}>
+                  <ChainOfThoughtHeader icon={SparklesIcon}>
+                    执行步骤（{stepCount} 步）
+                  </ChainOfThoughtHeader>
+                  <ChainOfThoughtContent>
+                    {executionSteps.map((item, idx) => renderItem(item, idx, false))}
+                  </ChainOfThoughtContent>
+                </ChainOfThought>
+                {/* Final answer — always visible */}
+                {finalAnswerItem && renderItem(finalAnswerItem, lastAnswerIndex, true)}
+                {stepsAfterFinal.map((item, idx) =>
+                  renderItem(item, lastAnswerIndex + 1 + idx, false)
+                )}
+              </>
+            ) : (
+              /* Streaming / no answer yet: everything inline in chronological order */
+              visibleAssistantItems.map((item, idx) =>
+                renderItem(item, idx, idx === lastAnswerIndex)
+              )
+            )}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
