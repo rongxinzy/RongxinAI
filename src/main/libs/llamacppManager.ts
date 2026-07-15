@@ -56,6 +56,7 @@ import {
   refreshInstallInputFromMarketplace,
   resolveManagedModelInstallDir,
 } from './llamacppModelInstallation';
+import { getDefaultLlamaCppModelsDir } from './llamacppModelLibraryPath';
 import { retryLlamaCppReadRequest } from './llamacppRequestRetry';
 import {
   createLlamaCppRuntimeInstallPlan,
@@ -138,7 +139,12 @@ export class LlamaCppManager extends EventEmitter {
   getModelsDir(): string {
     return (
       this.getServiceConfig().modelsDir?.trim() ||
-      path.join(app.getPath('userData'), 'models', 'llamacpp')
+      getDefaultLlamaCppModelsDir({
+        platform: process.platform,
+        appDataPath: app.getPath('appData'),
+        userDataPath: app.getPath('userData'),
+        localAppDataPath: process.env.LOCALAPPDATA,
+      })
     );
   }
 
