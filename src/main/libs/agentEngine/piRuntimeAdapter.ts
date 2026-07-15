@@ -44,6 +44,7 @@ import type {
 interface PiSession {
   prompt(text: string): Promise<void>;
   abort(): Promise<void>;
+  abortBash(): void;
   setModel(model: unknown): Promise<void>;
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
@@ -417,6 +418,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     // Only abort the current turn — keep the session alive in activeSessions
     // so continueSession can find it and preserve conversation history.
+    // Kill any running bash process first — PI SDK's abort() only stops the
+    // AI agent loop, not tool subprocesses (abortBash is only called by dispose).
+    active.piSession.abortBash();
     active.abortController.abort();
     void active.piSession.abort();
     this.emit('sessionStopped', sessionId);
