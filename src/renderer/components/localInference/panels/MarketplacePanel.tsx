@@ -1,4 +1,14 @@
-import { Download, ExternalLink, Eye, EyeOff, RefreshCw, SlidersHorizontal, Square, X } from 'lucide-react';
+import { Badge } from '@shared/components/ui/badge';
+import { Button } from '@shared/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@shared/components/ui/card';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@shared/components/ui/input-group';
+import { Label } from '@shared/components/ui/label';
+import { Download, ExternalLink, Eye, EyeOff, RefreshCw, Search, SlidersHorizontal, Square, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
@@ -7,18 +17,17 @@ import Modal from '../../common/Modal';
 import { EmptyState, InstallProgressBar } from '../components/Common';
 import {
   localInferenceMutedTextClass,
-  localInferencePlaceholderTextClass,
   localInferenceSoftTextClass,
-  smallOutlineButtonClass,
 } from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   capabilityLabel,
   formatDownloadCount,
   getInstallableMarketplaceModels,
+  getMarketplaceInstallProgress,
+  getMarketplacePageSize,
   openExternalUrl,
 } from '../utils/marketplace';
-import { getMarketplacePageSize } from '../utils/marketplace';
 import { formatPullProgress, isPullInProgress } from '../utils/progress';
 
 export function MarketplacePanel({
@@ -155,25 +164,22 @@ export function MarketplacePanel({
               >
                 {i18nService.t('marketplaceTitle')}
               </h2>
-              <button
+              <Button
                 type="button"
                 onClick={() => setTokenModalOpen(true)}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  savedToken
-                    ? 'border border-green-400/30 bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400'
-                    : `border border-border bg-surface ${localInferenceSoftTextClass} hover:border-primary/40 hover:text-foreground`
-                }`}
+                size="xs"
+                variant={savedToken ? 'secondary' : 'outline'}
                 title={
                   savedToken
                     ? i18nService.t('marketplaceTokenConfigured')
                     : i18nService.t('marketplaceTokenNotConfigured')
                 }
               >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <SlidersHorizontal data-icon="inline-start" />
                 {savedToken
                   ? i18nService.t('marketplaceTokenConfigured')
                   : i18nService.t('marketplaceTokenSettings')}
-              </button>
+              </Button>
             </div>
             {hasSearched && (
               <p className={`mt-1 text-xs ${localInferenceMutedTextClass}`}>{i18nService.t('marketplaceDescription')}</p>
@@ -189,31 +195,25 @@ export function MarketplacePanel({
         >
           <div className={hasSearched ? 'rounded-lg border border-border bg-surface p-3' : 'bg-transparent p-0'}>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <SearchIcon
-                  className={`${
-                    hasSearched ? 'left-2.5 h-3.5 w-3.5' : 'left-4 h-5 w-5'
-                  } pointer-events-none absolute top-1/2 -translate-y-1/2 text-foreground/55`}
-                />
-                <input
+              <InputGroup className={hasSearched ? 'h-9 flex-1' : 'h-16 flex-1 rounded-2xl'}>
+                <InputGroupAddon>
+                  <Search />
+                </InputGroupAddon>
+                <InputGroupInput
                   value={query}
                   onChange={event => onQueryChange(event.target.value)}
                   placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-                  className={`${
-                    hasSearched ? 'h-9 rounded-md pl-8 pr-2 text-xs' : 'h-16 rounded-2xl pl-12 pr-4 text-lg'
-                  } w-full border border-border bg-surface-input text-foreground ${localInferencePlaceholderTextClass.replace('text-', 'placeholder:')} focus:outline-none focus:ring-1 focus:ring-primary`}
+                  className={hasSearched ? 'text-xs' : 'h-16 text-lg'}
                 />
-              </div>
-              <button
+              </InputGroup>
+              <Button
                 type="submit"
                 disabled={marketplaceLoading}
-                className={`${
-                  hasSearched ? 'h-9 rounded-md px-3 text-xs' : 'h-16 rounded-2xl px-8 text-lg'
-                } inline-flex items-center gap-1 bg-primary font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60`}
+                className={hasSearched ? 'h-9 text-xs' : 'h-16 rounded-2xl px-8 text-lg'}
               >
-                {marketplaceLoading && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                {marketplaceLoading && <RefreshCw data-icon="inline-start" className="animate-spin" />}
                 {i18nService.t('marketplaceSearch')}
-              </button>
+              </Button>
             </div>
           </div>
         </form>
@@ -269,116 +269,115 @@ export function MarketplacePanel({
         <div className="flex min-h-[620px] flex-col">
           <div className="grid content-start gap-3 md:grid-cols-2">
             {visibleModels.map(model => {
-              const progress = installProgress[model.repoId];
+              const progress = getMarketplaceInstallProgress(installProgress, model);
               const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
               return (
-                <div
+                <Card
                   key={model.id}
-                  className="flex h-[168px] min-w-0 flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-3 transition-colors hover:bg-surface-raised"
+                  size="sm"
+                  className="min-w-0 gap-0 p-0 transition-colors hover:bg-surface-raised"
                 >
-                  <div className="min-h-0 overflow-hidden">
+                  <CardHeader className="gap-2 px-3 pt-3 pb-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="max-h-10 min-w-0 overflow-hidden break-all text-sm font-semibold leading-5 text-foreground">
+                      <CardTitle className="max-h-10 min-w-0 overflow-hidden break-all text-sm leading-5">
                         {model.repoId}
-                      </h3>
-                      <span className={`inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] font-medium ${localInferenceSoftTextClass}`}>
+                      </CardTitle>
+                      <Badge variant="secondary">
                         {model.recommendedTag}
-                      </span>
-                      <span className={`inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-medium ${localInferenceSoftTextClass}`}>
+                      </Badge>
+                      <Badge variant="outline">
                         {capabilityLabel(model.capability)}
-                      </span>
+                      </Badge>
                     </div>
-                    <p className={`mt-1.5 max-h-10 overflow-hidden text-xs leading-5 ${localInferenceMutedTextClass}`}>
+                  </CardHeader>
+                  <CardContent className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
+                    <p className={`max-h-10 overflow-hidden text-xs leading-5 ${localInferenceMutedTextClass}`}>
                       {model.description}
                     </p>
-                    <div className="mt-2 flex max-h-5 flex-wrap gap-1.5 overflow-hidden">
+                    <div className="flex max-h-5 flex-wrap gap-1.5 overflow-hidden">
                       {model.sizes.map(size => (
-                        <span
-                          key={size}
-                          className={`inline-flex h-5 items-center rounded-md border border-border px-1.5 text-[11px] font-mono ${localInferenceSoftTextClass}`}
-                        >
+                        <Badge key={size} variant="outline" className="font-mono">
                           {size}
-                        </span>
+                        </Badge>
                       ))}
                       {model.tags.slice(0, 3).map(tag => (
-                        <span
-                          key={tag}
-                          className={`inline-flex h-5 items-center rounded-md bg-surface-raised px-1.5 text-[11px] ${localInferenceSoftTextClass}`}
-                        >
+                        <Badge key={tag} variant="secondary">
                           {tag}
-                        </span>
+                        </Badge>
                       ))}
                     </div>
-                    {progress && (
-                      <div className="mt-2 rounded-md bg-surface-raised px-2 py-1.5">
-                        <div className={`flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}>
-                          <span>{formatPullProgress(progress)}</span>
-                          {typeof progress.percent === 'number' && <span>{progress.percent}%</span>}
-                        </div>
-                        <InstallProgressBar progress={progress} className="mt-2" />
+                  </CardContent>
+                  {progress && (
+                    <div className="border-t border-border px-3 py-2">
+                      <div className={`flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}>
+                        <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
+                        {typeof progress.percent === 'number' && <span>{progress.percent}%</span>}
                       </div>
-                    )}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-2">
+                      <InstallProgressBar progress={progress} className="mt-1.5" />
+                    </div>
+                  )}
+                  <CardFooter className="justify-between gap-2 p-3">
                     <span className={`text-xs ${localInferenceMutedTextClass}`}>{formatDownloadCount(model.downloads)}</span>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {model.detailUrl && (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => void openExternalUrl(model.detailUrl!)}
-                          className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-foreground/80 transition-colors hover:bg-surface-raised"
+                          size="sm"
+                          variant="outline"
                         >
-                          <ExternalLink className="h-3.5 w-3.5" />
+                          <ExternalLink data-icon="inline-start" />
                           {i18nService.t('marketplaceOpenModelScope')}
-                        </button>
+                        </Button>
                       )}
                       {installing ? (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
-                          className={smallOutlineButtonClass}
+                          size="sm"
+                          variant="outline"
                         >
-                          <Square className="h-3.5 w-3.5" />
+                          <Square data-icon="inline-start" />
                           {i18nService.t('marketplaceCancelInstall')}
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => void handleInstall(model)}
                           disabled={installing || loading}
-                          className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+                          size="sm"
                         >
-                          <Download className="h-3.5 w-3.5" />
+                          <Download data-icon="inline-start" />
                           {i18nService.t('marketplaceInstall')}
-                        </button>
+                        </Button>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </CardFooter>
+                </Card>
               );
             })}
           </div>
           {pageCount > 1 && (
             <div className="mx-auto mt-auto flex items-center justify-center gap-3 pt-4">
-              <button
+              <Button
                 type="button"
                 onClick={() => setPage(value => Math.max(1, value - 1))}
                 disabled={currentPage <= 1}
-                className="inline-flex h-8 min-w-20 items-center justify-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                variant="outline"
               >
                 {i18nService.t('skillMarketplacePrevPage')}
-              </button>
+              </Button>
               <span className={`inline-flex h-8 min-w-16 items-center justify-center text-sm ${localInferenceMutedTextClass}`}>
                 {currentPage}/{pageCount} {i18nService.t('marketplacePageUnit')}
               </span>
-              <button
+              <Button
                 type="button"
                 onClick={() => void handleNextPage()}
                 disabled={currentPage >= pageCount}
-                className="inline-flex h-8 min-w-20 items-center justify-center rounded-md border border-border px-3 text-xs text-foreground/80 transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+                variant="outline"
               >
                 {i18nService.t('skillMarketplaceNextPage')}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -390,105 +389,90 @@ export function MarketplacePanel({
         overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
         className="mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
       >
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-foreground">
               {i18nService.t('marketplaceTokenSettingsTitle')}
             </h3>
-            <button
+            <Button
               type="button"
               onClick={() => setTokenModalOpen(false)}
-              className={`rounded-md p-1 ${localInferenceMutedTextClass} transition-colors hover:bg-surface-raised hover:text-foreground`}
+              size="icon-sm"
+              variant="ghost"
+              aria-label={i18nService.t('close')}
             >
-              <X className="h-5 w-5" />
-            </button>
+              <X />
+            </Button>
           </div>
           <p className={`text-sm leading-relaxed ${localInferenceMutedTextClass}`}>
             {i18nService.t('marketplaceTokenSettingsDesc')}
           </p>
-          <div className="space-y-1.5">
-            <label className={`text-xs font-semibold tracking-wide ${localInferenceMutedTextClass}`}>
-              ModelScope API Token
-            </label>
-            <div className="relative">
-              <input
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="marketplace-token">
+              {i18nService.t('marketplaceTokenSettingsTitle')}
+            </Label>
+            <InputGroup>
+              <InputGroupInput
+                id="marketplace-token"
                 type={tokenInputVisible ? 'text' : 'password'}
                 value={tokenInput}
                 onChange={event => setTokenInput(event.target.value)}
                 placeholder={i18nService.t('marketplaceTokenPlaceholder')}
-                className={`w-full rounded-xl border border-border bg-surface-inset px-3 py-2 pr-16 text-sm text-foreground ${localInferencePlaceholderTextClass.replace('text-', 'placeholder:')} focus:outline-none focus:ring-2 focus:ring-primary`}
               />
-              <div className="absolute inset-y-0 right-2 flex items-center gap-1">
+              <InputGroupAddon align="inline-end">
                 {tokenInput && (
-                  <button
-                    type="button"
+                  <InputGroupButton
                     onClick={() => setTokenInput('')}
-                    className={`rounded p-0.5 ${localInferenceMutedTextClass} transition-colors hover:text-primary`}
-                    title={i18nService.t('marketplaceTokenClear')}
+                    aria-label={i18nService.t('marketplaceTokenClear')}
+                    size="icon-xs"
                   >
-                    <X className="h-4 w-4" />
-                  </button>
+                    <X />
+                  </InputGroupButton>
                 )}
-                <button
-                  type="button"
+                <InputGroupButton
                   onClick={() => setTokenInputVisible(v => !v)}
-                  className={`rounded p-0.5 ${localInferenceMutedTextClass} transition-colors hover:text-primary`}
+                  aria-label={i18nService.t(tokenInputVisible ? 'hide' : 'show')}
+                  size="icon-xs"
                 >
                   {tokenInputVisible ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye />
                   )}
-                </button>
-              </div>
-            </div>
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
           </div>
           <div className="flex items-center justify-between pt-1">
-            <button
+            <Button
               type="button"
               onClick={handleClearToken}
               disabled={!savedToken}
-              className={`rounded-lg border border-border px-3 py-2 text-xs font-medium ${localInferenceSoftTextClass} transition-colors hover:border-red-400/40 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40`}
+              size="sm"
+              variant="destructive"
             >
               {i18nService.t('marketplaceTokenClear')}
-            </button>
+            </Button>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setTokenModalOpen(false)}
-                className={`rounded-lg border border-border px-4 py-2 text-xs font-medium ${localInferenceSoftTextClass} transition-colors hover:bg-surface-raised hover:text-foreground`}
+                size="sm"
+                variant="outline"
               >
                 {i18nService.t('cancel')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => void handleSaveToken()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-hover"
+                size="sm"
               >
                 {i18nService.t('marketplaceTokenSave')}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </Modal>
     </div>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-      />
-    </svg>
   );
 }

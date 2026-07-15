@@ -366,6 +366,14 @@ select::-ms-expand {
   box-shadow: 0 0 0 2px var(--lobster-primary-muted);
 }
 
+/* Download progress uses Slider for consistent geometry, without an interactive thumb. */
+[data-slot="slider"][data-download-progress] [data-slot="slider-indicator"] {
+  background-color: var(--lobster-success);
+}
+[data-slot="slider"][data-download-progress] [data-slot="slider-thumb"] {
+  display: none;
+}
+
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
    via the Tailwind plugin which uses var(--lobster-*) directly. */
