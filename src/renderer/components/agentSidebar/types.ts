@@ -13,6 +13,7 @@ export interface AgentSidebarAgentSummary {
 export interface AgentSidebarTaskNode {
   id: string;
   agentId: string;
+  workspaceId?: string;
   title: string;
   status: CoworkSessionStatus;
   pinned: boolean;
@@ -33,9 +34,27 @@ export interface AgentSidebarAgentNode extends AgentSidebarAgentSummary {
   tasks: AgentSidebarTaskNode[];
 }
 
+export interface WorkspaceSidebarNode {
+  id: string;
+  name: string;
+  path: string;
+  isExpanded: boolean;
+  isTaskListExpanded: boolean;
+  canExpandTasks: boolean;
+  canCollapseTasks: boolean;
+  isLoadingTasks: boolean;
+  hasLoadError: boolean;
+  tasks: AgentSidebarTaskNode[];
+}
+
 export interface AgentSidebarPreferenceState {
   expandedAgentIds: string[];
   expandedTaskListAgentIds: string[];
   selectedAgentId?: string;
   selectedTaskId?: string;
+}
+
+export interface WorkspaceSidebarPreferenceState {
+  expandedWorkspaceIds: string[];
+  expandedTaskListWorkspaceIds: string[];
 }

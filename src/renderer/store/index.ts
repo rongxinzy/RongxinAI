@@ -10,6 +10,7 @@ import modelReducer from './slices/modelSlice';
 import quickActionReducer from './slices/quickActionSlice';
 import scheduledTaskReducer from './slices/scheduledTaskSlice';
 import skillReducer from './slices/skillSlice';
+import workspaceReducer from './slices/workspaceSlice';
 
 export const store = configureStore({
   reducer: {
@@ -23,6 +24,7 @@ export const store = configureStore({
     agent: agentReducer,
     auth: authReducer,
     artifact: artifactReducer,
+    workspace: workspaceReducer,
   },
 });
 

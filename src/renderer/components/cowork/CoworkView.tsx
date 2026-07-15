@@ -10,6 +10,7 @@ import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
+import { workspaceService } from '../../services/workspace';
 import { RootState, store } from '../../store';
 import {
   selectCoworkConfig,
@@ -93,7 +94,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgent = agents.find((agent) => agent.id === currentAgentId);
-  const currentAgentWorkingDirectory = currentAgent?.workingDirectory?.trim() || config.workingDirectory || '';
+  const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
+  const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
+  const currentWorkspace = workspaces.find((workspace) => workspace.id === currentWorkspaceId);
+  const currentWorkspacePath = currentWorkspace?.path || config.workingDirectory || '';
 
   const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
 
@@ -146,6 +150,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   useEffect(() => {
     const init = async () => {
       await coworkService.init();
+      await agentService.loadAgents();
       const initialEngineStatus = await coworkService.getOpenClawEngineStatus();
       if (initialEngineStatus) {
         setOpenClawStatus(initialEngineStatus);
@@ -193,6 +198,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!isInitialized || !currentWorkspaceId) return;
+    void coworkService.loadSessions(undefined, currentWorkspaceId);
+  }, [currentWorkspaceId, isInitialized]);
 
   const handleStartSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]): Promise<boolean | void> => {
     console.log('[CoworkView] handleStartSession: imageAttachments diagnosis', {
@@ -252,11 +262,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         pinned: false,
         createdAt: now,
         updatedAt: now,
-        cwd: currentAgentWorkingDirectory,
+        cwd: currentWorkspacePath,
         systemPrompt: '',
         modelOverride: currentAgentSelectedModel ? toOpenClawModelRef(currentAgentSelectedModel) : '',
         executionMode: config.executionMode || 'local',
         activeSkillIds: sessionSkillIds,
+        workspaceId: currentWorkspaceId || '',
         agentId: currentAgentId,
         messages: [
           {
@@ -402,9 +413,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       const { session: startedSession, error: startError } = await coworkService.startSession({
         prompt,
         title: fallbackTitle,
-        cwd: currentAgentWorkingDirectory || undefined,
+        cwd: currentWorkspacePath || undefined,
         systemPrompt: combinedSystemPrompt,
         activeSkillIds: sessionSkillIds,
+        workspaceId: currentWorkspaceId || undefined,
         agentId: currentAgentId,
         modelOverride: sessionModelOverride,
         imageAttachments,
@@ -558,7 +570,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       await coworkService.continueSession({
         sessionId: currentSession.id,
         prompt,
-        systemPrompt: combinedSystemPrompt,
+        systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
         imageAttachments,
       });
@@ -785,9 +797,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 disabled={false}
                 placeholder={workMode === 'chat' ? i18nService.t('chatPlaceholder') : i18nService.t('coworkPlaceholder')}
                 size="large"
-                workingDirectory={currentAgentWorkingDirectory}
+                workingDirectory={currentWorkspacePath}
                 onWorkingDirectoryChange={async (dir: string) => {
-                  await agentService.updateAgent(currentAgentId, { workingDirectory: dir });
+                  const workspace = await workspaceService.ensureWorkspace(dir);
+                  if (workspace) await workspaceService.selectWorkspace(workspace.id);
                 }}
                 showFolderSelector={workMode !== 'chat'}
                 showModelSelector

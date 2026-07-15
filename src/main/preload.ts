@@ -39,6 +39,7 @@ import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { TriageIpcChannel } from '../shared/triage';
+import { WorkspaceIpc } from '../shared/workspace';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 
@@ -359,9 +360,14 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   cowork: {
+    listWorkspaces: () => ipcRenderer.invoke(WorkspaceIpc.List),
+    ensureWorkspace: (options: { path: string; name?: string }) =>
+      ipcRenderer.invoke(WorkspaceIpc.Ensure, options),
+    renameWorkspace: (id: string, name: string) =>
+      ipcRenderer.invoke(WorkspaceIpc.Rename, id, name),
     startSession: (options: {
       prompt: string; cwd?: string; systemPrompt?: string; title?: string;
-      activeSkillIds?: string[]; agentId?: string; modelOverride?: string;
+      activeSkillIds?: string[]; workspaceId?: string; agentId?: string; modelOverride?: string;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Start, options),
 
@@ -388,7 +394,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkSessionIpc.GatewaySessionId, sessionId),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
-    listSessions: (options?: { limit?: number; offset?: number; agentId?: string }) =>
+    listSessions: (options?: { limit?: number; offset?: number; agentId?: string; workspaceId?: string }) =>
       ipcRenderer.invoke(CoworkSessionIpc.List, options),
     getSessionMessages: (options: { sessionId: string; limit?: number; offset?: number }) =>
       ipcRenderer.invoke(CoworkSessionIpc.GetMessages, options),

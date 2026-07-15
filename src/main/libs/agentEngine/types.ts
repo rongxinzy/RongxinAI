@@ -67,6 +67,10 @@ export type CoworkContinueOptions = {
   systemPrompt?: string;
   skillIds?: string[];
   imageAttachments?: CoworkImageAttachment[];
+  /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
+  workspaceRoot?: string;
+  agentId?: string;
+  modelOverride?: string;
 };
 
 export interface CoworkRuntime {

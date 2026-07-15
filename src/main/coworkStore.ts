@@ -8,23 +8,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { normalizeAgentAvatarIcon } from '../shared/agent/avatar';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
-
+import type { Workspace } from '../shared/workspace';
+import {
+  normalizeWorkspacePath,
+  workspaceIdForPath,
+  workspaceNameForPath,
+} from './workspaceUtils';
 
 // Default working directory for new users
 const getDefaultWorkingDirectory = (): string => {
   return path.join(os.homedir(), 'rongxinai', 'project');
-};
-
-const TASK_WORKSPACE_CONTAINER_DIR = '.rongxinai-tasks';
-
-const normalizeRecentWorkspacePath = (cwd: string): string => {
-  const resolved = path.resolve(cwd);
-  const marker = `${path.sep}${TASK_WORKSPACE_CONTAINER_DIR}${path.sep}`;
-  const markerIndex = resolved.lastIndexOf(marker);
-  if (markerIndex > 0) {
-    return resolved.slice(0, markerIndex);
-  }
-  return resolved;
 };
 
 const DEFAULT_MEMORY_ENABLED = true;
@@ -418,6 +411,7 @@ export interface CoworkSession {
   modelOverride: string;
   executionMode: CoworkExecutionMode;
   activeSkillIds: string[];
+  workspaceId: string;
   agentId: string;
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. */
@@ -435,6 +429,7 @@ export interface CoworkSessionSummary {
   mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
+  workspaceId: string;
   agentId: string;
   createdAt: number;
   updatedAt: number;
@@ -591,6 +586,73 @@ export class CoworkStore {
       .run(key, value, now);
   }
 
+  listWorkspaces(): Workspace[] {
+    const rows = this.getAll<{
+      id: string;
+      name: string;
+      path: string;
+      created_at: number;
+      updated_at: number;
+    }>(
+      'SELECT id, name, path, created_at, updated_at FROM workspaces ORDER BY updated_at DESC, name ASC',
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  getWorkspace(id: string): Workspace | null {
+    const row = this.getOne<{
+      id: string;
+      name: string;
+      path: string;
+      created_at: number;
+      updated_at: number;
+    }>('SELECT id, name, path, created_at, updated_at FROM workspaces WHERE id = ?', [id]);
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  ensureWorkspace(workspacePath: string, name?: string): Workspace {
+    const normalizedPath = normalizeWorkspacePath(workspacePath);
+    if (!normalizedPath) throw new Error('Workspace path is required');
+
+    const id = workspaceIdForPath(normalizedPath);
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO workspaces (id, name, path, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           path = excluded.path,
+           updated_at = excluded.updated_at`,
+      )
+      .run(id, name?.trim() || workspaceNameForPath(normalizedPath), normalizedPath, now, now);
+    return this.getWorkspace(id)!;
+  }
+
+  renameWorkspace(id: string, name: string): Workspace | null {
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error('Workspace name is required');
+    this.db.prepare('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?').run(
+      normalizedName,
+      Date.now(),
+      id,
+    );
+    return this.getWorkspace(id);
+  }
+
   createSession(
     title: string,
     cwd: string,
@@ -601,15 +663,18 @@ export class CoworkStore {
     modelOverride: string = '',
     mode: 'work' | 'chat' = 'work',
     id?: string,
+    workspaceId?: string,
   ): CoworkSession {
     const sessionId = id || uuidv4();
     const now = Date.now();
+    const workspace = workspaceId ? this.getWorkspace(workspaceId) : this.ensureWorkspace(cwd);
+    if (!workspace) throw new Error('Workspace not found');
 
     this.db
       .prepare(
         `
-      INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, agent_id, pinned, created_at, updated_at)
-      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+      INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, pinned, created_at, updated_at)
+      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
     `,
       )
       .run(
@@ -621,6 +686,7 @@ export class CoworkStore {
         modelOverride,
         executionMode,
         JSON.stringify(activeSkillIds),
+        workspace.id,
         agentId,
         now,
         now,
@@ -639,6 +705,7 @@ export class CoworkStore {
       modelOverride,
       executionMode,
       activeSkillIds,
+      workspaceId: workspace.id,
       agentId,
       messages: [],
       messagesOffset: 0,
@@ -662,6 +729,7 @@ export class CoworkStore {
       model_override?: string | null;
       execution_mode?: string | null;
       active_skill_ids?: string | null;
+      workspace_id?: string | null;
       agent_id?: string | null;
       created_at: number;
       updated_at: number;
@@ -669,7 +737,7 @@ export class CoworkStore {
 
     const row = this.getOne<SessionRow>(
       `
-      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, agent_id, created_at, updated_at
+      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at
       FROM cowork_sessions
       WHERE id = ?
     `,
@@ -708,6 +776,7 @@ export class CoworkStore {
       modelOverride: row.model_override || '',
       executionMode: (row.execution_mode as CoworkExecutionMode) || 'local',
       activeSkillIds,
+      workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
       messages,
       messagesOffset: messageOffset,
@@ -816,22 +885,22 @@ export class CoworkStore {
     }
 
     const session = this.db
-      .prepare('SELECT agent_id FROM cowork_sessions WHERE id = ?')
-      .get(id) as { agent_id?: string | null } | undefined;
+      .prepare('SELECT workspace_id FROM cowork_sessions WHERE id = ?')
+      .get(id) as { workspace_id?: string | null } | undefined;
     if (!session) {
       return null;
     }
 
-    const agentId = session.agent_id || 'main';
+    const workspaceId = session.workspace_id || '';
     const maxRow = this.db
       .prepare(
         `
         SELECT MAX(pin_order) as max_pin_order
         FROM cowork_sessions
-        WHERE pinned = 1 AND COALESCE(agent_id, 'main') = ?
+        WHERE pinned = 1 AND COALESCE(workspace_id, '') = ?
       `,
       )
-      .get(agentId) as { max_pin_order?: number | null } | undefined;
+      .get(workspaceId) as { max_pin_order?: number | null } | undefined;
     const pinOrder = (maxRow?.max_pin_order ?? 0) + 1;
     this.db
       .prepare('UPDATE cowork_sessions SET pinned = 1, pin_order = ? WHERE id = ?')
@@ -839,7 +908,13 @@ export class CoworkStore {
     return pinOrder;
   }
 
-  countSessions(agentId?: string): number {
+  countSessions(agentId?: string, workspaceId?: string): number {
+    if (workspaceId) {
+      const row = this.db
+        .prepare('SELECT COUNT(*) as count FROM cowork_sessions WHERE workspace_id = ?')
+        .get(workspaceId) as { count: number } | undefined;
+      return row?.count || 0;
+    }
     if (agentId) {
       const row = this.db
         .prepare('SELECT COUNT(*) as count FROM cowork_sessions WHERE agent_id = ?')
@@ -852,7 +927,12 @@ export class CoworkStore {
     return row?.count || 0;
   }
 
-  listSessions(limit = COWORK_SESSION_PAGE_SIZE, offset = 0, agentId?: string): CoworkSessionSummary[] {
+  listSessions(
+    limit = COWORK_SESSION_PAGE_SIZE,
+    offset = 0,
+    agentId?: string,
+    workspaceId?: string,
+  ): CoworkSessionSummary[] {
     interface SessionSummaryRow {
       id: string;
       title: string;
@@ -860,16 +940,32 @@ export class CoworkStore {
       mode: string | null;
       pinned: number | null;
       pin_order: number | null;
+      cwd: string;
+      workspace_id: string | null;
       agent_id: string | null;
       created_at: number;
       updated_at: number;
     }
 
     let rows: SessionSummaryRow[];
-    if (agentId) {
+    if (workspaceId) {
       rows = this.getAll<SessionSummaryRow>(
         `
-        SELECT id, title, status, mode, pinned, pin_order, agent_id, created_at, updated_at
+        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
+        FROM cowork_sessions
+        WHERE workspace_id = ?
+        ORDER BY pinned DESC,
+          CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
+          CASE WHEN pinned = 0 THEN updated_at END DESC,
+          updated_at DESC
+        LIMIT ? OFFSET ?
+      `,
+        [workspaceId, limit, offset],
+      );
+    } else if (agentId) {
+      rows = this.getAll<SessionSummaryRow>(
+        `
+        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
         FROM cowork_sessions
         WHERE agent_id = ?
         ORDER BY pinned DESC,
@@ -883,7 +979,7 @@ export class CoworkStore {
     } else {
       rows = this.getAll<SessionSummaryRow>(
         `
-        SELECT id, title, status, mode, pinned, pin_order, agent_id, created_at, updated_at
+        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
         FROM cowork_sessions
         ORDER BY pinned DESC,
           CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
@@ -902,6 +998,7 @@ export class CoworkStore {
       mode: (row.mode as 'work' | 'chat') || 'work',
       pinned: Boolean(row.pinned),
       pinOrder: row.pin_order ?? null,
+      workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -942,7 +1039,7 @@ export class CoworkStore {
     const deduped: string[] = [];
     const seen = new Set<string>();
     for (const row of rows) {
-      const normalized = normalizeRecentWorkspacePath(row.cwd);
+      const normalized = normalizeWorkspacePath(row.cwd);
       if (!normalized || seen.has(normalized)) {
         continue;
       }
