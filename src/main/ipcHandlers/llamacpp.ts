@@ -7,6 +7,7 @@ import type {
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModel,
+  LlamaCppModelLaunchLogEvent,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppModelPreference,
@@ -24,6 +25,7 @@ import {
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppIpcChannel,
+  LlamaCppModelLaunchLogPhase,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppStructuredServiceFieldKey,
@@ -40,6 +42,10 @@ import {
   getLlamaCppModelLoadFailureI18nKey,
   LlamaCppModelLoadFailureReason,
 } from '../libs/llamacppModelLoadErrors';
+import {
+  createLlamaCppModelLaunchLogger,
+  createLlamaCppServiceStartupLaunchLogger,
+} from '../libs/llamacppModelLaunchLog';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
 import {
@@ -281,6 +287,8 @@ export function registerLlamaCppIpcHandlers(
     broadcast(LlamaCppIpcChannel.StatusChanged, status);
   const sendProgress = (progress: LlamaCppInstallProgress) =>
     broadcast(LlamaCppIpcChannel.InstallProgress, progress);
+  const sendModelLaunchLog = (event: LlamaCppModelLaunchLogEvent) =>
+    broadcast(LlamaCppIpcChannel.ModelLaunchLog, event);
   const loadModelLock = new LlamaCppModelLoadLock();
   const serviceTransitionLock = new LlamaCppServiceTransitionLock();
   const runServiceTransition = async <T>(action: () => Promise<T>): Promise<T> =>
@@ -504,8 +512,17 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
-    if (!modelName) throw new Error(t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)));
+    const launchLogger = createLlamaCppModelLaunchLogger({
+      modelName,
+      emit: sendModelLaunchLog,
+    });
+    launchLogger.info(LlamaCppModelLaunchLogPhase.Requested, undefined, { modelName });
+    if (!modelName) {
+      launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, 'Model name is required');
+      throw new Error(t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)));
+    }
     if (serviceTransitionLock.isActive()) {
+      launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, 'Service transition is active');
       throw new Error(t('llamacppLoadModelServiceUnavailable'));
     }
     return await loadModelLock.runExclusive(
@@ -514,12 +531,22 @@ export function registerLlamaCppIpcHandlers(
         const store = options.getStore();
         const serviceConfig = getLlamaCppServiceConfig(store);
         const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(store, input);
+        launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingService);
         const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
           reason: LlamaCppServiceStartupReason.LoadModel,
+          logger: createLlamaCppServiceStartupLaunchLogger(launchLogger),
         });
         if (serviceStartupResult.success === false) {
+          launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, {
+            code: serviceStartupResult.code,
+            detail: serviceStartupResult.detail,
+          });
           throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
         }
+        launchLogger.info(LlamaCppModelLaunchLogPhase.ServiceReady, undefined, {
+          managedByApp: serviceStartupResult.serviceStatus.managedByApp,
+          pid: serviceStartupResult.serviceStatus.pid,
+        });
 
         const runningModels = await manager.listRunningModels();
         const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
@@ -528,6 +555,7 @@ export function registerLlamaCppIpcHandlers(
           targetModelName: modelName,
         });
         if (loadLimitViolation) {
+          launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, loadLimitViolation);
           throw new Error(
             t('llamacppLoadModelLimitReached')
               .replace('{limit}', String(loadLimitViolation.limit))
@@ -539,8 +567,20 @@ export function registerLlamaCppIpcHandlers(
         const targetModel = localModels.find(
           model => model.name === modelName || model.id === modelName || model.model === modelName,
         );
-        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((): null => null);
-        const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((): null => null);
+        launchLogger.info(LlamaCppModelLaunchLogPhase.PreparingModel, undefined, {
+          modelFound: Boolean(targetModel),
+          modelSizeBytes: targetModel?.size,
+          modelPath: targetModel?.path,
+        });
+        launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingRuntime);
+        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((error): null => {
+          launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
+          return null;
+        });
+        const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((error): null => {
+          launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
+          return null;
+        });
 
         try {
           const result = await loadLlamaCppModelThroughPipeline({
@@ -549,6 +589,7 @@ export function registerLlamaCppIpcHandlers(
             runtimeCapabilities,
             nvidiaSnapshot,
             modelSizeBytes: targetModel?.size,
+            onLog: launchLogger.report,
             loadModel: async (loadInput: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> =>
               manager.loadModel(loadInput),
             listModels: (timeoutMs: number): Promise<LlamaCppModel[]> => manager.listRouterModels(timeoutMs),
@@ -559,12 +600,19 @@ export function registerLlamaCppIpcHandlers(
             },
           });
           await refreshRunningModelBindings('llamacpp-model-loaded');
+          launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
+            runningModelCount: result.runningModels.length,
+          });
           return result;
         } catch (error) {
+          launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, error);
           throw toUserFacingLlamaCppModelLoadError(error);
         }
       },
-      () => new Error(t('llamacppModelLoadInProgress')),
+      () => {
+        launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, 'Another model load is in progress');
+        return new Error(t('llamacppModelLoadInProgress'));
+      },
     );
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {

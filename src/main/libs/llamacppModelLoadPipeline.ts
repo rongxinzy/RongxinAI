@@ -14,6 +14,7 @@ import {
   LlamaCppModelLoadFailureReason,
   type LlamaCppModelLoadFailureReason as LlamaCppModelLoadFailureReasonType,
 } from './llamacppModelLoadErrors';
+import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 import { loadLlamaCppModelWithRetry } from './llamacppModelLoadRetry';
 import {
   LlamaCppModelStartupSettleStatus,
@@ -45,6 +46,7 @@ export type LlamaCppModelLoadPipelineInput = {
   minContextSize?: number;
   startupBudgetMs?: number;
   now?: () => number;
+  onLog?: LlamaCppModelLaunchLogReporter;
 };
 
 /**
@@ -77,6 +79,7 @@ export async function loadLlamaCppModelThroughPipeline(
     minContextSize: input.minContextSize,
     listRunningModels: input.listRunningModels,
     unloadModel: input.unloadModel,
+    onLog: input.onLog,
     attemptLoad: async (attemptInput) => {
       const loadResult = await input.loadModel(attemptInput);
       const settleResult = await settleLlamaCppModelStartup({
@@ -87,6 +90,7 @@ export async function loadLlamaCppModelThroughPipeline(
         deadlineMs,
         pollIntervalMs: LlamaCppModelLoadPipelineDefaults.StartupPollIntervalMs,
         requestTimeoutMs: LlamaCppModelLoadPipelineDefaults.StartupRequestTimeoutMs,
+        onLog: input.onLog,
       });
 
       if (settleResult.status !== LlamaCppModelStartupSettleStatus.Loaded) {

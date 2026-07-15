@@ -1,4 +1,7 @@
 import type {
+  LlamaCppModelLaunchLogLevel,
+  LlamaCppModelLaunchLogPhase,
+  LlamaCppModelLaunchLogSource,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppServiceConfigFieldKey,
@@ -206,6 +209,19 @@ export type LlamaCppInstallProgress = {
   speed?: number;
   targetPath?: string;
   error?: string;
+};
+
+
+export type LlamaCppModelLaunchLogEvent = {
+  sessionId: string;
+  modelName: string;
+  sequence: number;
+  createdAt: string;
+  level: LlamaCppModelLaunchLogLevel;
+  phase: LlamaCppModelLaunchLogPhase;
+  source: LlamaCppModelLaunchLogSource;
+  message?: string;
+  detail?: string;
 };
 
 export type LlamaCppServiceConfig = {
