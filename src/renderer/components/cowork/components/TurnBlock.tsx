@@ -100,7 +100,7 @@ export const TurnBlock: React.FC<{
   // Turn is "done" when the final answer exists and is not streaming.
   const finalAnswerItem = lastAnswerIndex >= 0 ? visibleAssistantItems[lastAnswerIndex] : null;
   const isTurnDone = finalAnswerItem?.type === 'assistant'
-    && !Boolean(finalAnswerItem.message.metadata?.isStreaming)
+    && !finalAnswerItem.message.metadata?.isStreaming
     && lastAnswerIndex > 0; // need at least one step before the answer
 
   // Split: execution steps (everything before final answer) vs final answer.
