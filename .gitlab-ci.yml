@@ -1,8 +1,8 @@
 # .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
 #
 # Stage: lint → build → test
-# 依赖：宿主机只读卷 /opt/ci-cache/node_modules，lint 校验，其余只拷贝
 # 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
+# 缓存：使用 GitLab CI 原生 cache，存储在 runner 本地目录，不依赖宿主机卷
 
 workflow:
   auto_cancel:
@@ -15,13 +15,16 @@ workflow:
 
 default:
   image: rongxinai-ci:latest
+  cache:
+    - key: "$CI_COMMIT_REF_SLUG"
+      paths:
+        - node_modules/
   before_script:
     - |
       export NPM_CONFIG_USERCONFIG="$CI_PROJECT_DIR/.npmrc"
       export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
       mkdir -p "$NPM_CONFIG_CACHE"
       printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
-    - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
     - npm install --prefer-offline --no-audit --ignore-scripts
 
 stages:
@@ -42,14 +45,6 @@ variables:
 # ═══════════════════════════════════════════════════════
 lint:
   stage: lint
-  before_script:
-    - |
-      export NPM_CONFIG_USERCONFIG="$CI_PROJECT_DIR/.npmrc"
-      export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
-      mkdir -p "$NPM_CONFIG_CACHE"
-      printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
-    - cp -r /opt/ci-cache/node_modules node_modules 2>/dev/null || true
-    - npm install --prefer-offline --no-audit --ignore-scripts
   variables:
     GIT_DEPTH: 0
   script:
@@ -69,7 +64,6 @@ lint:
       else
         echo "No TypeScript files changed, skipping lint"
       fi
-    - cp -r node_modules /opt/ci-cache/node_modules 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_TAG
       when: never
