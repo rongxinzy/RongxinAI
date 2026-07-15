@@ -18,8 +18,8 @@ import {
   RuntimeBuildInfoSource,
   RuntimePlatform,
   SelectionReason,
-  WindowsSignatureStatus,
   selectRecommendedBackend,
+  WindowsSignatureStatus,
 } from '../scripts/install-llamacpp-backend-nsis.cjs';
 
 const tempDirs: string[] = [];
