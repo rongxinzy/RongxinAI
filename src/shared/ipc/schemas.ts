@@ -156,6 +156,7 @@ export const CoworkSessionStartSchema = {
     systemPrompt: z.string().optional(),
     title: z.string().optional(),
     activeSkillIds: z.array(z.string()).optional(),
+    workspaceId: z.string().optional(),
     agentId: z.string().optional(),
     modelOverride: z.string().optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
@@ -217,6 +218,7 @@ export const CoworkSessionListSchema = {
   input: z.object({
     limit: z.number().int().positive().optional(),
     offset: z.number().int().min(0).optional(),
+    workspaceId: z.string().optional(),
     agentId: z.string().optional(),
   }).optional(),
   output: IpcResult({

@@ -3,6 +3,7 @@ import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import { COWORK_SESSION_PAGE_SIZE } from '../../shared/cowork/constants';
 import { store } from '../store';
+import { setCurrentAgentId } from '../store/slices/agentSlice';
 import {
   addMessage,
   addSession,
@@ -41,6 +42,7 @@ import type {
   OpenClawSessionPolicyConfig,
 } from '../types/cowork';
 import { i18nService } from './i18n';
+import { workspaceService } from './workspace';
 
 const classifyError = (error: string | CoworkError): string => {
   if (typeof error === 'object' && 'kind' in error) {
@@ -66,8 +68,9 @@ class CoworkService {
     // Load initial config
     await this.loadConfig();
 
-    // Load sessions list
-    await this.loadSessions();
+    // Load workspaces and the sessions belonging to the selected workspace.
+    await workspaceService.loadWorkspaces();
+    await this.loadSessions(undefined, store.getState().workspace.currentWorkspaceId ?? undefined);
 
     // Set up stream listeners
     this.setupStreamListeners();
@@ -256,9 +259,15 @@ class CoworkService {
     this.openClawEngineListenerAttached = false;
   }
 
-  async loadSessions(agentId?: string): Promise<void> {
+  async loadSessions(agentId?: string, workspaceId?: string): Promise<void> {
     const requestId = ++this.latestLoadSessionsRequestId;
-    const result = await window.electron?.cowork?.listSessions({ limit: COWORK_SESSION_PAGE_SIZE, offset: 0, agentId });
+    const effectiveWorkspaceId = workspaceId ?? store.getState().workspace.currentWorkspaceId ?? undefined;
+    const result = await window.electron?.cowork?.listSessions({
+      limit: COWORK_SESSION_PAGE_SIZE,
+      offset: 0,
+      agentId: effectiveWorkspaceId ? undefined : agentId,
+      workspaceId: effectiveWorkspaceId,
+    });
     if (result?.success && result.sessions) {
       // High-frequency IM traffic can trigger overlapping list refreshes.
       // Ignore stale responses so an older snapshot does not hide newer sessions.
@@ -279,6 +288,15 @@ class CoworkService {
     return result ?? { success: false, error: 'Cowork IPC is unavailable' };
   }
 
+  async listSessionsForWorkspacePreview(
+    workspaceId: string,
+    limit: number,
+    offset: number,
+  ): Promise<CoworkSessionListResult> {
+    const result = await window.electron?.cowork?.listSessions({ limit, offset, workspaceId });
+    return result ?? { success: false, error: 'Cowork IPC is unavailable' };
+  }
+
   async listSessionsForSearch(limit: number, offset: number): Promise<CoworkSessionListResult> {
     const result = await window.electron?.cowork?.listSessions({ limit, offset });
     return result ?? { success: false, error: 'Cowork IPC is unavailable' };
@@ -289,7 +307,11 @@ class CoworkService {
     if (!state.hasMoreSessions) return false;
 
     const offset = state.sessions.length;
-    const result = await window.electron?.cowork?.listSessions({ limit: COWORK_SESSION_PAGE_SIZE, offset });
+    const result = await window.electron?.cowork?.listSessions({
+      limit: COWORK_SESSION_PAGE_SIZE,
+      offset,
+      workspaceId: store.getState().workspace.currentWorkspaceId ?? undefined,
+    });
     if (result?.success && result.sessions) {
       store.dispatch(appendSessions({ sessions: result.sessions, hasMore: result.hasMore ?? false }));
       return true;
@@ -336,7 +358,10 @@ class CoworkService {
 
     store.dispatch(setStreaming(true));
 
-    const result = await cowork.startSession(options);
+    const result = await cowork.startSession({
+      ...options,
+      workspaceId: options.workspaceId ?? store.getState().workspace.currentWorkspaceId ?? undefined,
+    });
     if (result.success && result.session) {
       store.dispatch(addSession(result.session));
       // Only clear streaming for terminal statuses, not transitional 'idle'.
@@ -574,6 +599,12 @@ class CoworkService {
       // Keep only the latest session load result to avoid stale async overwrites.
       if (requestId !== this.latestLoadSessionRequestId) {
         return result.session;
+      }
+      if (result.session.workspaceId) {
+        await workspaceService.selectWorkspace(result.session.workspaceId);
+      }
+      if (result.session.agentId) {
+        store.dispatch(setCurrentAgentId(result.session.agentId));
       }
       store.dispatch(setCurrentSession(result.session));
       // Only restore streaming for running sessions — never clear it here.

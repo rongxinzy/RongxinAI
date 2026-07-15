@@ -115,6 +115,8 @@ npm run dist:linux
 
 Cowork 是核心会话系统。用户任务从 Renderer 通过 IPC 发送到 Main Process，再交给 OpenClaw 执行。消息、权限请求、工具状态和完成事件会实时流回 UI。
 
+会话列表和工作目录以 Workspace 为主归属，Agent 仅作为创建会话时的角色快照。Workspace、历史会话迁移、Expert prompt 隔离以及恢复规则详见：[Workspace 会话模型重构说明](WORKSPACE_SESSION_REFACTOR.zh-CN.md)。
+
 关键流式事件：
 
 | 事件 | 说明 |

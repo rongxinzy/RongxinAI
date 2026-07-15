@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { app } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { AgentId, DefaultAgentAvatarIcon, DefaultAgentProfile, LegacyAgentName, normalizeAgentAvatarIcon } from '../shared/agent';
@@ -11,6 +12,7 @@ import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
 } from './libs/sqliteBackup/sqliteBackupManager';
+import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 type ChangePayload<T = unknown> = {
   key: string;
@@ -85,10 +87,22 @@ export class SqliteStore {
         system_prompt TEXT NOT NULL DEFAULT '',
         model_override TEXT NOT NULL DEFAULT '',
         execution_mode TEXT,
+        workspace_id TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
     `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workspaces (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL UNIQUE,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);');
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS cowork_messages (
@@ -284,6 +298,34 @@ export class SqliteStore {
         );
         this.didRunMigration = true;
       }
+      if (!sessionColNames.includes('workspace_id')) {
+        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN workspace_id TEXT;');
+        this.didRunMigration = true;
+      }
+
+      const fallbackWorkspacePath = path.join(os.homedir(), 'rongxinai', 'project');
+      const legacySessions = this.db
+        .prepare('SELECT id, cwd FROM cowork_sessions WHERE workspace_id IS NULL OR TRIM(workspace_id) = \'\'')
+        .all() as Array<{ id: string; cwd: string }>;
+      const insertWorkspace = this.db.prepare(
+        `INSERT INTO workspaces (id, name, path, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at`,
+      );
+      const updateSessionWorkspace = this.db.prepare(
+        'UPDATE cowork_sessions SET workspace_id = ? WHERE id = ?',
+      );
+      const now = Date.now();
+      const migrateWorkspaces = this.db.transaction(() => {
+        for (const session of legacySessions) {
+          const workspacePath = normalizeWorkspacePath(session.cwd?.trim() || fallbackWorkspacePath);
+          const workspaceId = workspaceIdForPath(workspacePath);
+          insertWorkspace.run(workspaceId, workspaceNameForPath(workspacePath), workspacePath, now, now);
+          updateSessionWorkspace.run(workspaceId, session.id);
+        }
+      });
+      migrateWorkspaces();
+      if (legacySessions.length > 0) this.didRunMigration = true;
     } catch {
       // Column already exists or migration not needed.
     }

@@ -65,6 +65,7 @@ interface CoworkSession {
   modelOverride: string;
   executionMode: 'auto' | 'local' | 'sandbox';
   activeSkillIds: string[];
+  workspaceId: string;
   agentId: string;
   messages: CoworkMessage[];
   messagesOffset: number;
@@ -87,6 +88,7 @@ interface CoworkSessionSummary {
   status: 'idle' | 'running' | 'completed' | 'error';
   pinned: boolean;
   pinOrder?: number | null;
+  workspaceId?: string;
   agentId?: string;
   createdAt: number;
   updatedAt: number;
@@ -528,12 +530,16 @@ interface IElectronAPI {
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
   cowork: {
+    listWorkspaces: () => Promise<{ success: boolean; workspaces?: import('../../shared/workspace').Workspace[]; error?: string }>;
+    ensureWorkspace: (options: { path: string; name?: string }) => Promise<{ success: boolean; workspace?: import('../../shared/workspace').Workspace; error?: string }>;
+    renameWorkspace: (id: string, name: string) => Promise<{ success: boolean; workspace?: import('../../shared/workspace').Workspace; error?: string }>;
     startSession: (options: {
       prompt: string;
       cwd?: string;
       systemPrompt?: string;
       title?: string;
       activeSkillIds?: string[];
+      workspaceId?: string;
       agentId?: string;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => Promise<{
@@ -577,7 +583,7 @@ interface IElectronAPI {
     remoteManaged: (
       sessionId: string,
     ) => Promise<{ success: boolean; remoteManaged: boolean; error?: string }>;
-    listSessions: (options?: { limit?: number; offset?: number; agentId?: string }) => Promise<{
+    listSessions: (options?: { limit?: number; offset?: number; agentId?: string; workspaceId?: string }) => Promise<{
       success: boolean;
       sessions?: CoworkSessionSummary[];
       hasMore?: boolean;

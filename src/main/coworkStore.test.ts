@@ -48,7 +48,18 @@ function setupDb(): void {
       model_override TEXT NOT NULL DEFAULT '',
       execution_mode TEXT NOT NULL DEFAULT 'local',
       active_skill_ids TEXT,
+      workspace_id TEXT,
       agent_id TEXT NOT NULL DEFAULT 'main',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -117,8 +128,8 @@ function setupDb(): void {
 function insertSession(id: string): void {
   const now = Date.now();
   db.prepare(
-    `INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, agent_id, created_at, updated_at)
-     VALUES (?, 'test', NULL, 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', 'main', ?, ?)`,
+    `INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at)
+     VALUES (?, 'test', NULL, 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', NULL, 'main', ?, ?)`,
   ).run(id, now, now);
 }
 
@@ -171,6 +182,19 @@ test('getSession returns all messages when one has corrupt metadata', () => {
   // Null metadata → undefined
   const nullMsg = session!.messages.find((m) => m.id === 'msg-null')!;
   expect(nullMsg.metadata).toBeUndefined();
+});
+
+test('sessions are grouped by workspace independently of their agent snapshot', () => {
+  const first = store.createSession('first', '/tmp/workspace-a', '', 'local', [], 'agent-a');
+  const second = store.createSession('second', '/tmp/workspace-a', '', 'local', [], 'agent-b');
+  store.createSession('third', '/tmp/workspace-b', '', 'local', [], 'agent-a');
+
+  expect(first.workspaceId).toBe(second.workspaceId);
+  expect(first.agentId).not.toBe(second.agentId);
+  expect(store.countSessions(undefined, first.workspaceId)).toBe(2);
+  expect(store.listSessions(10, 0, undefined, first.workspaceId).map((session) => session.id)).toEqual(
+    expect.arrayContaining([first.id, second.id]),
+  );
 });
 
 test('replaceConversationMessages preserves existing timestamps and uses gateway timestamps', () => {

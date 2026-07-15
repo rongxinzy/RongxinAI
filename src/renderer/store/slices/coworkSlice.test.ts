@@ -22,6 +22,7 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   modelOverride: '',
   executionMode: 'local' as const,
   activeSkillIds: [],
+  workspaceId: 'workspace-test',
   agentId: 'main',
   messages: [],
   messagesOffset: 0,

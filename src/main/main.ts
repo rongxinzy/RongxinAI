@@ -15,6 +15,7 @@ import { CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
+import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
 import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
@@ -1156,10 +1157,10 @@ const resolveAgentDefaultWorkingDirectory = (agentId?: string): string => {
   return getCoworkStore().getConfig().workingDirectory.trim();
 };
 
-const resolveSessionWorkingDirectory = (options: { cwd?: string; agentId?: string }): string => {
+const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
   const explicitWorkingDirectory = options.cwd?.trim();
   if (explicitWorkingDirectory) return explicitWorkingDirectory;
-  return resolveAgentDefaultWorkingDirectory(options.agentId);
+  return getCoworkStore().getConfig().workingDirectory.trim();
 };
 
 const isLobsteraiServerModelRef = (modelRef: string): boolean => {
@@ -3169,6 +3170,45 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle(WorkspaceIpc.List, async () => {
+    try {
+      const store = getCoworkStore();
+      let workspaces = store.listWorkspaces();
+      if (workspaces.length === 0) {
+        const configuredPath = store.getConfig().workingDirectory.trim();
+        if (configuredPath) {
+          store.ensureWorkspace(configuredPath);
+          workspaces = store.listWorkspaces();
+        }
+      }
+      return { success: true, workspaces };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to list workspaces' };
+    }
+  });
+
+  ipcMain.handle(WorkspaceIpc.Ensure, async (_event, rawOptions: { path?: string; name?: string }) => {
+    try {
+      const workspacePath = rawOptions?.path?.trim();
+      if (!workspacePath) return { success: false, error: 'Workspace path is required' };
+      const workspace = getCoworkStore().ensureWorkspace(workspacePath, rawOptions.name);
+      return { success: true, workspace };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to ensure workspace' };
+    }
+  });
+
+  ipcMain.handle(WorkspaceIpc.Rename, async (_event, id: string, name: string) => {
+    try {
+      const workspace = getCoworkStore().renameWorkspace(id, name);
+      return workspace
+        ? { success: true, workspace }
+        : { success: false, error: 'Workspace not found' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to rename workspace' };
+    }
+  });
+
   // Cowork IPC handlers
   ipcMain.handle('cowork:session:start', async (_event, rawOptions: unknown) => {
     const cid = generateCorrelationId();
@@ -3188,12 +3228,16 @@ if (!gotTheLock) {
 
       const coworkStoreInstance = getCoworkStore();
       const config = coworkStoreInstance.getConfig();
+      const selectedAgent = getAgentManager().getAgent(options.agentId || 'main');
+      const sessionPrompt = [selectedAgent?.systemPrompt, options.systemPrompt ?? config.systemPrompt]
+        .filter((prompt): prompt is string => Boolean(prompt?.trim()))
+        .join('\n\n');
       const systemPrompt = mergeCoworkSystemPrompt(
-        options.systemPrompt ?? config.systemPrompt,
+        sessionPrompt,
       );
+      const workspace = options.workspaceId ? coworkStoreInstance.getWorkspace(options.workspaceId) : null;
       const selectedTaskDirectory = resolveSessionWorkingDirectory({
-        cwd: options.cwd,
-        agentId: options.agentId,
+        cwd: workspace?.path || options.cwd,
       });
 
       if (!selectedTaskDirectory) {
@@ -3202,6 +3246,7 @@ if (!gotTheLock) {
           error: 'Please select a task folder before submitting.',
         };
       }
+      const selectedWorkspace = workspace || coworkStoreInstance.ensureWorkspace(selectedTaskDirectory);
 
       const fallbackTitle = buildSessionTitleFromInput(
         options.prompt,
@@ -3217,7 +3262,10 @@ if (!gotTheLock) {
         config.executionMode || 'local',
         options.activeSkillIds || [],
         options.agentId || 'main',
-        options.modelOverride || ''
+        options.modelOverride || '',
+        'work',
+        undefined,
+        selectedWorkspace.id,
       );
 
       if (options.modelOverride) {
@@ -3340,11 +3388,12 @@ if (!gotTheLock) {
       }
 
       runtime.continueSession(options.sessionId, options.prompt, {
-        systemPrompt: mergeCoworkSystemPrompt(
-          options.systemPrompt ?? existingSession?.systemPrompt,
-        ),
+        systemPrompt: existingSession?.systemPrompt || options.systemPrompt,
         skillIds: options.activeSkillIds,
         imageAttachments: options.imageAttachments,
+        workspaceRoot: existingSession?.cwd,
+        agentId: existingSession?.agentId,
+        modelOverride: existingSession?.modelOverride,
       }).catch(error => {
         console.error('[Cowork] continue error:', error);
         try {
@@ -3569,14 +3618,15 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('cowork:session:list', async (_event, options?: { limit?: number; offset?: number; agentId?: string }) => {
+  ipcMain.handle('cowork:session:list', async (_event, options?: { limit?: number; offset?: number; agentId?: string; workspaceId?: string }) => {
     try {
       const limit = options?.limit ?? COWORK_SESSION_PAGE_SIZE;
       const offset = options?.offset ?? 0;
       const agentId = options?.agentId;
+      const workspaceId = options?.workspaceId;
       const store = getCoworkStore();
-      const sessions = store.listSessions(limit, offset, agentId);
-      const total = store.countSessions(agentId);
+      const sessions = store.listSessions(limit, offset, agentId, workspaceId);
+      const total = store.countSessions(agentId, workspaceId);
       return { success: true, sessions, hasMore: offset + sessions.length < total };
     } catch (error) {
       return {

@@ -1055,6 +1055,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Multi-Agent 管理
     createAgent: '创建 Agent',
     myAgents: '我的项目',
+    workspaces: '工作区',
+    workspaceAdd: '添加工作区',
+    workspaceNoWorkspaces: '还没有工作区',
     defaultAgentDisplayName: '主项目',
     myAgentSidebarPinned: '置顶',
     myAgentSidebarExpandMore: '展开显示',
@@ -3235,6 +3238,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Multi-Agent management
     createAgent: 'Create Agent',
     myAgents: 'My Projects',
+    workspaces: 'Workspaces',
+    workspaceAdd: 'Add workspace',
+    workspaceNoWorkspaces: 'No workspaces yet',
     defaultAgentDisplayName: 'Primary Project',
     myAgentSidebarPinned: 'Pinned',
     myAgentSidebarExpandMore: 'Show more',

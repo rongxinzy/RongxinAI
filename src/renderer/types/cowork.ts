@@ -85,6 +85,7 @@ export interface CoworkSession {
   modelOverride: string;
   executionMode: CoworkExecutionMode;
   activeSkillIds: string[];
+  workspaceId: string;
   agentId: string;
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. 0 means loaded from the beginning. */
@@ -212,6 +213,7 @@ export interface CoworkSessionSummary {
   mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
+  workspaceId?: string;
   agentId?: string;
   createdAt: number;
   updatedAt: number;
@@ -224,6 +226,7 @@ export interface CoworkStartOptions {
   systemPrompt?: string;
   title?: string;
   activeSkillIds?: string[];
+  workspaceId?: string;
   agentId?: string;
   modelOverride?: string;
   imageAttachments?: CoworkImageAttachment[];
