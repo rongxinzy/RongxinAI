@@ -86,33 +86,6 @@ export const TurnBlock: React.FC<{
     );
   };
 
-  // Find the last non-thinking assistant item (final answer)
-  const lastAnswerIndex = (() => {
-    for (let i = visibleAssistantItems.length - 1; i >= 0; i--) {
-      const item = visibleAssistantItems[i];
-      if (item.type === 'assistant' && !item.message.metadata?.isThinking) {
-        return i;
-      }
-    }
-    return -1;
-  })();
-
-  // Turn is "done" when the final answer exists, nothing is still streaming,
-  // and all items after the answer are non-streaming too (no tool calls mid-turn).
-  const finalAnswerItem = lastAnswerIndex >= 0 ? visibleAssistantItems[lastAnswerIndex] : null;
-  const isAnythingStreaming = visibleAssistantItems.some(
-    item => item.type === 'assistant' && item.message.metadata?.isStreaming
-  );
-  const isTurnDone = finalAnswerItem?.type === 'assistant'
-    && !isAnythingStreaming
-    && lastAnswerIndex > 0
-    && lastAnswerIndex === visibleAssistantItems.length - 1; // answer is the last item
-
-  // Split: execution steps (everything before final answer) vs final answer.
-  const executionSteps = isTurnDone ? visibleAssistantItems.slice(0, lastAnswerIndex) : [];
-  const stepsAfterFinal = isTurnDone ? visibleAssistantItems.slice(lastAnswerIndex + 1) : [];
-  const stepCount = executionSteps.length;
-
   const renderItem = (item: typeof visibleAssistantItems[0], _idx: number, isFinalAnswer: boolean) => {
     // ── Thinking: collapsed Reasoning block with shimmer ──
     if (item.type === 'assistant' && item.message.metadata?.isThinking) {
@@ -185,34 +158,98 @@ export const TurnBlock: React.FC<{
     return null;
   };
 
+  // Build step groups: consecutive non-answer items grouped into a single
+  // ChainOfThought with a dynamic summary. Answer items appear inline.
+  const groups = (() => {
+    const result: Array<{ summary: string; items: typeof visibleAssistantItems; streaming: boolean }> = [];
+    let currentItems: typeof visibleAssistantItems = [];
+
+    const flush = () => {
+      if (currentItems.length === 0) return;
+      // "Streaming" means any item is still active (not finalized for thinking, no result for tools)
+      const hasStreaming = currentItems.some(item => {
+        if (item.type === 'assistant') {
+          const meta = item.message.metadata;
+          return Boolean(meta?.isStreaming) && !Boolean(meta?.isFinal);
+        }
+        if (item.type === 'tool_group') return !item.group.toolResult;
+        return false;
+      });
+      // Find the currently active item for accurate summary text
+      const streamingItem = hasStreaming
+        ? (() => {
+            for (let i = currentItems.length - 1; i >= 0; i--) {
+              const it = currentItems[i];
+              if (it.type === 'assistant') {
+                const m = it.message.metadata;
+                if (Boolean(m?.isStreaming) && !Boolean(m?.isFinal)) return it;
+              }
+              if (it.type === 'tool_group' && !it.group.toolResult) return it;
+            }
+            return null;
+          })()
+        : null;
+      let summary: string;
+      if (hasStreaming && streamingItem) {
+        if (streamingItem.type === 'assistant') {
+          summary = '思考中…';
+        } else if (streamingItem.type === 'tool_group') {
+          summary = getToolSummary(
+            streamingItem.group.toolUse.metadata?.toolName as string
+          );
+        } else {
+          summary = '执行中…';
+        }
+      } else {
+        summary = `执行步骤（${currentItems.length} 步）`;
+      }
+      result.push({ summary, items: [...currentItems], streaming: hasStreaming });
+      currentItems = [];
+    };
+
+    for (const item of visibleAssistantItems) {
+      const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
+      const isStep = item.type === 'assistant' && item.message.metadata?.isThinking
+        || item.type === 'tool_group';
+
+      if (isAnswer) {
+        flush();
+        result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming) });
+      } else if (isStep) {
+        currentItems.push(item);
+      }
+    }
+    flush();
+    return result;
+  })();
+
   return (
     <div className="px-4 py-2">
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {isTurnDone ? (
-              <>
-                {/* Execution steps wrapped in collapsible chain */}
-                <ChainOfThought defaultOpen={false}>
-                  <ChainOfThoughtHeader icon={SparklesIcon}>
-                    执行步骤（{stepCount} 步）
+            {groups.map((group, gIdx) => {
+              const firstItem = group.items[0];
+              const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
+              if (isAnswerItem) {
+                // Single answer item — render inline
+                return renderItem(firstItem, gIdx, gIdx === groups.length - 1);
+              }
+              // Step group — wrapped in ChainOfThought with dynamic summary
+              const isStreaming = group.streaming;
+              return (
+                <ChainOfThought key={gIdx} defaultOpen={isStreaming}>
+                  <ChainOfThoughtHeader icon={isStreaming ? SparklesIcon : undefined}>
+                    {isStreaming
+                      ? <span className="animate-pulse">{group.summary}</span>
+                      : group.summary}
                   </ChainOfThoughtHeader>
                   <ChainOfThoughtContent>
-                    {executionSteps.map((item, idx) => renderItem(item, idx, false))}
+                    {group.items.map((item, idx) => renderItem(item, idx, false))}
                   </ChainOfThoughtContent>
                 </ChainOfThought>
-                {/* Final answer — always visible */}
-                {finalAnswerItem && renderItem(finalAnswerItem, lastAnswerIndex, true)}
-                {stepsAfterFinal.map((item, idx) =>
-                  renderItem(item, lastAnswerIndex + 1 + idx, false)
-                )}
-              </>
-            ) : (
-              /* Streaming / no answer yet: everything inline in chronological order */
-              visibleAssistantItems.map((item, idx) =>
-                renderItem(item, idx, idx === lastAnswerIndex)
-              )
-            )}
+              );
+            })}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -224,4 +261,18 @@ export const TurnBlock: React.FC<{
       </div>
     </div>
   );
+
+  function getToolSummary(toolName?: string): string {
+    switch (toolName) {
+      case 'bash': return '正在执行命令…';
+      case 'read': return '正在读取文件…';
+      case 'write': return '正在写入文件…';
+      case 'edit': return '正在编辑文件…';
+      case 'grep': return '正在搜索…';
+      case 'find': return '正在查找文件…';
+      case 'ls': return '正在列出目录…';
+      case 'mcp': return '正在调用工具…';
+      default: return toolName ? `正在执行 ${toolName}…` : '执行中…';
+    }
+  }
 };
