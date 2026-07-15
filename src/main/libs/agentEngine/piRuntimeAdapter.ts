@@ -1119,7 +1119,8 @@ function resolvePiAuthStorage(
   }
 
   const authStorage = existingAuthStorage ?? pi.AuthStorage.inMemory();
-  authStorage.setRuntimeApiKey(providerMetadata.providerName, config.apiKey);
+  const piProviderId = resolvePiBuiltinProviderId(providerMetadata.providerName);
+  authStorage.setRuntimeApiKey(piProviderId ?? providerMetadata.providerName, config.apiKey);
   return authStorage;
 }
 
