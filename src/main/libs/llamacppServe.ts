@@ -54,13 +54,7 @@ export function buildLlamaServerArgs(
     '--no-ui',
   ];
   appendArg(args, '--models-max', config.modelsMax);
-  if (typeof config.modelsAutoload === 'boolean') {
-    args.push(
-      config.modelsAutoload && shouldEnableLlamaCppModelsAutoload(config.modelsMax)
-        ? '--models-autoload'
-        : '--no-models-autoload',
-    );
-  }
+  args.push('--no-models-autoload');
   appendArg(args, '--timeout', config.timeout);
   appendArg(args, '--threads-http', config.threadsHttp);
   appendArg(args, '--cache-reuse', config.cacheReuse);

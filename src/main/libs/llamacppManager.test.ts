@@ -100,6 +100,7 @@ test('buildLlamaServerArgs uses the fixed local router defaults and model discov
     '--props',
     '--slots',
     '--no-ui',
+    '--no-models-autoload',
   ]);
 });
 
@@ -187,7 +188,7 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
   ]);
 });
 
-test('buildLlamaServerArgs disables autoload when more than one resident model is allowed', () => {
+test('buildLlamaServerArgs always disables router model autoload', () => {
   expect(buildLlamaServerArgs({
     modelsAutoload: true,
   }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
@@ -209,7 +210,7 @@ test('buildLlamaServerArgs disables autoload when more than one resident model i
   }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
     '--models-max',
     '1',
-    '--models-autoload',
+    '--no-models-autoload',
   ]));
 });
 
