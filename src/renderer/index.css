@@ -35,6 +35,12 @@ table {
 th, td {
   border-color: var(--lobster-border);
 }
+th {
+  background-color: var(--lobster-surface);
+}
+td {
+  background-color: var(--lobster-surface);
+}
 
 /* CodeMirror editor: keep isolated */
 .cm-editor pre {
@@ -47,13 +53,20 @@ th, td {
   font-family: inherit;
 }
 
-/* ── Streamdown 2.5 code-block → ai-elements flat single-card ── */
-/* Outer: group relative my-4 flex w-full flex-col gap-2 rounded-xl border border-border bg-sidebar p-2 */
+/* ── ai-elements CodeBlock: white background ── */
+[data-language] {
+  background-color: var(--lobster-surface) !important;
+}
+[data-language] [class*="bg-muted"] {
+  background-color: var(--lobster-surface) !important;
+}
+
+/* ── Streamdown 2.5 raw code-block (fallback) ── */
 div[class~="bg-sidebar"][class~="my-4"] {
   overflow: hidden !important;
   border-radius: 0.5rem !important;
   border: 1px solid var(--lobster-border) !important;
-  background-color: var(--lobster-background) !important;
+  background-color: var(--lobster-surface) !important;
   padding: 0 !important;
   gap: 0 !important;
   display: block !important;
@@ -64,16 +77,12 @@ div[class~="bg-sidebar"][class~="my-4"] > div:first-child {
   display: flex !important;
   align-items: center !important;
   border-bottom: 1px solid var(--lobster-border) !important;
-  background-color: color-mix(in srgb, var(--color-muted, hsl(240 5% 84%)) 50%, transparent) !important;
+  background-color: var(--lobster-surface) !important;
   padding-left: 1rem !important;
   padding-right: 1rem !important;
   height: auto !important;
   padding-top: 0.5rem !important;
   padding-bottom: 0.5rem !important;
-}
-/* Header language label */
-div[class~="bg-sidebar"][class~="my-4"] > div:first-child span {
-  @apply font-mono text-xs text-muted-foreground;
 }
 /* Code body */
 div[class~="bg-sidebar"][class~="my-4"] > div:last-child {
@@ -88,6 +97,12 @@ div[class~="bg-sidebar"][class~="my-4"] > div:last-child pre {
   margin: 0 !important;
   border-radius: 0 !important;
   font-family: 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
+}
+
+/* Line numbers in code blocks: very subdued color */
+[data-language] code span::before {
+  color: var(--lobster-text-muted) !important;
+  opacity: 0.35;
 }
 
 /* Style for blockquotes */

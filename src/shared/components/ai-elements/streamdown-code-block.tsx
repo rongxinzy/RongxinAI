@@ -7,7 +7,6 @@ import type { BundledLanguage } from "shiki";
 import {
   CodeBlock,
   CodeBlockActions,
-  CodeBlockContent,
   CodeBlockCopyButton,
   CodeBlockHeader,
   CodeBlockTitle,
@@ -18,46 +17,80 @@ import {
  * when it contains a fenced code block (pre > code[class*="language-"]).
  * Plain `<pre>` elements pass through unchanged.
  *
- * Use as: <Streamdown components={{ pre: AiPre }} ... />
+ * Tries two detection paths:
+ * 1. Streamdown HAST `node` prop (Streamdown v2.4)
+ * 2. React `children` element (Streamdown v2.5+ fallback)
  */
 export const AiPre: React.FC<React.ComponentProps<"pre"> & { node?: any }> = ({
   node,
   children,
   ...props
 }) => {
-  // Streamdown passes the HAST element via ExtraProps.node
+  let lang: BundledLanguage | null = null;
+  let rawText = "";
+
+  // Path 1: Streamdown HAST node (v2.4)
   const codeNode: any = (node as any)?.children?.find?.((c: any) => c?.tagName === "code");
-  if (!codeNode) return <pre {...props}>{children}</pre>;
+  if (codeNode) {
+    const className: string =
+      (Array.isArray(codeNode.properties?.className)
+        ? codeNode.properties.className.join(" ")
+        : "") ?? "";
+    const match = /language-([\w-]+)/.exec(className);
+    if (match) {
+      lang = match[1].toLowerCase() as BundledLanguage;
+      rawText = (Array.isArray(codeNode.children)
+        ? codeNode.children.map((c: any) => c?.value ?? "").join("")
+        : "") ?? "";
+    }
+  }
 
-  const className: string =
-    (Array.isArray(codeNode.properties?.className)
-      ? codeNode.properties.className.join(" ")
-      : "") ?? "";
-  const match = /language-([\w-]+)/.exec(className);
-  if (!match) return <pre {...props}>{children}</pre>;
+  // Path 2: React children (Streamdown v2.5+ fallback)
+  if (!lang) {
+    const codeChild = React.Children.toArray(children).find(
+      (c) => React.isValidElement(c) && (c.type as any) === "code"
+    ) as React.ReactElement<{ className?: string; children?: React.ReactNode; dangerouslySetInnerHTML?: { __html: string } }> | undefined;
+    if (codeChild?.props?.className) {
+      const match = /language-([\w-]+)/.exec(codeChild.props.className);
+      if (match) {
+        lang = match[1].toLowerCase() as BundledLanguage;
+        // Prefer dangerouslySetInnerHTML (Streamdown prerendered HTML), fallback to children extraction
+        if (codeChild.props.dangerouslySetInnerHTML?.__html) {
+          const tmp = document.createElement("div");
+          tmp.innerHTML = codeChild.props.dangerouslySetInnerHTML.__html;
+          rawText = tmp.textContent || "";
+        } else {
+          rawText = extractTextContent(codeChild.props.children);
+        }
+      }
+    }
+  }
 
-  const lang = match[1].toLowerCase() as BundledLanguage;
-  const textValues: string = (Array.isArray(codeNode.children)
-    ? codeNode.children.map((c: any) => c?.value ?? "").join("")
-    : "") ?? "";
-  const rawText = textValues.replace(/\n$/, "");
+  if (!lang) return <pre {...props}>{children}</pre>;
+
+  rawText = rawText.replace(/\n$/, "");
 
   return (
-    <CodeBlock code={rawText} language={lang}>
+    <CodeBlock code={rawText} language={lang} showLineNumbers>
       <CodeBlockHeader>
         <CodeBlockTitle>
           <File size={14} />
-          <span className="font-mono text-xs text-muted-foreground">{match[1]}</span>
+          <span className="font-mono text-xs text-muted-foreground">{lang}</span>
         </CodeBlockTitle>
         <CodeBlockActions>
           <CodeBlockCopyButton />
         </CodeBlockActions>
       </CodeBlockHeader>
-      <CodeBlockContent
-        code={rawText}
-        language={lang}
-        showLineNumbers={false}
-      />
     </CodeBlock>
   );
 };
+
+/** Recursively extract text from React children (string, array, nested elements). */
+function extractTextContent(children: React.ReactNode): string {
+  if (typeof children === "string") return children;
+  if (Array.isArray(children)) return children.map(extractTextContent).join("");
+  if (React.isValidElement(children)) {
+    return extractTextContent((children.props as any)?.children);
+  }
+  return "";
+}
