@@ -106,7 +106,11 @@ export const TurnBlock: React.FC<{
                   ? mapDisplayText(item.message.content)
                   : item.message.content;
                 return (
-                  <Reasoning key={item.message.id} isStreaming={isStreaming}>
+                  <Reasoning
+                    key={item.message.id}
+                    isStreaming={isStreaming}
+                    defaultOpen={isStreaming}
+                  >
                     <ReasoningTrigger
                       getThinkingMessage={(s, d) => {
                         if (s) return <p>思考中…</p>;
