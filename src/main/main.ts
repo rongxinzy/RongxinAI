@@ -110,7 +110,7 @@ import {
 } from './libs/openclawMemoryFile';
 import { startOpenClawTokenProxy, stopOpenClawTokenProxy } from './libs/openclawTokenProxy';
 import { migrateMainAgentWorkspace } from './libs/openclawWorkspaceMigration';
-import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
+import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
@@ -6386,6 +6386,7 @@ if (!gotTheLock) {
             console.error('[Main] initApp: ensurePythonRuntimeReady failed:', runtimeResult.error);
           } else {
             console.log('[Main] initApp: ensurePythonRuntimeReady done');
+            appendPythonRuntimeToEnv(process.env as Record<string, string | undefined>);
           }
         } catch (error) {
           console.error('[Main] initApp: ensurePythonRuntimeReady threw:', error);
