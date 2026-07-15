@@ -1,6 +1,8 @@
+import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
 import { MARKETPLACE_PAGE_SIZE, MARKETPLACE_SEARCH_MAX_MODEL_COUNT } from '../constants';
+import type { InstallProgressState } from '../types';
 
 export function buildMarketplaceSearchParams(input: {
   query: string;
@@ -33,6 +35,14 @@ export function getInstallableMarketplaceModels(
       : undefined;
     return !model.installed && !installedModelName;
   });
+}
+
+export function getMarketplaceInstallProgress(
+  progress: InstallProgressState,
+  model: Pick<MarketplaceModel, 'id' | 'repoId'>,
+): LlamaCppInstallProgress | undefined {
+  // ModelScope emits repo IDs, while other marketplace sources may emit model IDs.
+  return progress[model.repoId] ?? progress[model.id];
 }
 
 export function capabilityLabel(capability: MarketplaceModel['capability']): string {
