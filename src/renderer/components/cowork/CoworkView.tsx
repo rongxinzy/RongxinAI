@@ -288,8 +288,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         totalMessages: 1,
       };
 
-      // Immediately show the session detail page with user message
-      dispatch(setCurrentSession(tempSession));
+      // Chat sessions use the temporary session as their UI identity
+      // until the direct model stream finishes. Add it to the sidebar now so
+      // the user's message is visible in history immediately after submit.
+      if (workMode === 'chat') {
+        dispatch(addSession(tempSession));
+      } else {
+        // Work sessions are added after the backend creates their real session.
+        dispatch(setCurrentSession(tempSession));
+      }
       dispatch(setStreaming(true));
 
       // Clear quick action selection after starting session
