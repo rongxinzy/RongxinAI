@@ -3,7 +3,6 @@ import {
   PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
-  PromptInputHeader,
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
@@ -928,15 +927,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             {i18nService.t('coworkDropFileHint')}
           </div>
         )}
-        {!isDirectChat && (
-          <PromptInputHeader className="px-3 pt-2">
-            <SessionExpertPicker
-              selectedExpertIds={selectedExpertIds}
-              onChange={setSelectedExpertIds}
-              disabled={disabled || isStreaming}
-            />
-          </PromptInputHeader>
-        )}
         <PromptInputBody>
           <PromptInputTextarea
             ref={textareaRef}
@@ -947,8 +937,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             disabled={disabled}
           />
         </PromptInputBody>
-          <PromptInputFooter>
-            <PromptInputTools>
+          <PromptInputFooter className="flex-wrap">
+            <PromptInputTools className="min-w-0 flex-1 flex-wrap">
               {showModelSelector && (
                 <CoworkModelPicker
                   models={availableModels}
@@ -1011,6 +1001,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     onManageSkills={handleManageSkills}
                   />
                   <ActiveSkillBadge />
+                  {!isDirectChat && (
+                    <SessionExpertPicker
+                      selectedExpertIds={selectedExpertIds}
+                      onChange={setSelectedExpertIds}
+                      disabled={disabled || isStreaming}
+                    />
+                  )}
                 </>
               )}
             </PromptInputTools>

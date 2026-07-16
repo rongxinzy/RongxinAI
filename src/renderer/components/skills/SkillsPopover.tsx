@@ -57,11 +57,16 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
       <PopoverContent
         side="top"
         align="start"
-        className="w-72 p-0"
+        sideOffset={4}
+        className="w-72 !rounded-md !border-0 !bg-surface p-0 shadow-md !ring-0 !outline-none"
       >
-        <Command shouldFilter={false}>
+        <Command
+          shouldFilter={false}
+          className="!rounded-md !bg-surface [&_[data-slot=input-group]]:!border-0 [&_[data-slot=input-group]]:!bg-transparent [&_[data-slot=input-group]]:!shadow-none [&_[data-slot=input-group]]:!ring-0"
+        >
           <CommandInput
             placeholder={i18nService.t('searchSkills')}
+            className="bg-transparent focus:ring-0"
           />
           <CommandList className="max-h-64">
             <CommandEmpty>
