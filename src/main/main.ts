@@ -21,6 +21,7 @@ import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
 import { APP_DATA_DIR_NAME, APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
+import { applyCoworkLanguagePrompt, type CoworkPromptLanguage } from './coworkLanguagePrompt';
 import { type CoworkExecutionMode, type CoworkMessageType, type CoworkSessionStatus,CoworkStore } from './coworkStore';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
@@ -2065,7 +2066,6 @@ function mergeCoworkSystemPrompt(
     'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是李知远智能体。" You may add "英文名是 LEO。". In English, say "I am LEO." You may add "My Chinese product name is 李知远智能体."',
     'Do not present RongxinAI as the current product identity. If asked about RongxinAI, say only that it is a legacy name or compatibility identifier that may still appear in some technical paths, while the current product identity is 李知远智能体 / LEO.',
     'Do not describe LobsterAI as the current product identity. If asked about LobsterAI, say only that it is a historical internal or compatibility identifier in some technical paths, while the current product identity is 李知远智能体 / LEO.',
-    'Do not claim 李知远智能体 / LEO is owned by, affiliated with, or derived from Youdao, NetEase Youdao, or Youdao Notes.',
     'Do not use any other product name, model name, runtime name, or preset role as your identity.',
     'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
   ].join('\n');
@@ -2074,7 +2074,11 @@ function mergeCoworkSystemPrompt(
     buildScheduledTaskEnginePrompt(),
     systemPrompt?.trim() || '',
   ].filter(Boolean);
-  return sections.length > 0 ? sections.join('\n\n') : undefined;
+  if (sections.length === 0) return undefined;
+
+  const configuredLanguage = getStore().get<AppConfigSettings>('app_config')?.language;
+  const language: CoworkPromptLanguage = configuredLanguage === 'en' ? 'en' : 'zh';
+  return applyCoworkLanguagePrompt(sections.join('\n\n'), language);
 }
 
 const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpertInput[] => {
@@ -3470,8 +3474,15 @@ if (!gotTheLock) {
         ...(existingSession?.experts || []).flatMap((expert) => expert.skillIds),
       ])];
 
+      const configuredLanguage = getStore().get<AppConfigSettings>('app_config')?.language;
+      const language: CoworkPromptLanguage = configuredLanguage === 'en' ? 'en' : 'zh';
+      const runtimeSystemPrompt = applyCoworkLanguagePrompt(
+        existingSession?.systemPrompt || options.systemPrompt,
+        language,
+      );
+
       runtime.continueSession(options.sessionId, options.prompt, {
-        systemPrompt: existingSession?.systemPrompt || options.systemPrompt,
+        systemPrompt: runtimeSystemPrompt,
         skillIds: runtimeSkillIds,
         imageAttachments: options.imageAttachments,
         workspaceRoot: existingSession?.cwd,

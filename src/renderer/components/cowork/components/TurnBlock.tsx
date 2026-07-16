@@ -3,10 +3,14 @@ import {
   ChainOfThoughtContent,
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
-import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Brain, Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
@@ -16,8 +20,8 @@ import type { Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import { ArtifactPreviewCard } from '../../artifacts';
 import type { ConversationTurn } from '../helpers/messageGrouping';
-import { getToolResultLineCount,getVisibleAssistantItems } from '../helpers/messageGrouping';
-import { getToolResultDisplay,hasText } from '../helpers/toolUtils';
+import { getToolResultLineCount, getVisibleAssistantItems } from '../helpers/messageGrouping';
+import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
@@ -29,7 +33,14 @@ export const TurnBlock: React.FC<{
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
-}> = ({ turn, artifacts, resolveLocalFilePath, mapDisplayText, showTypingIndicator = false, showCopyButtons = true }) => {
+}> = ({
+  turn,
+  artifacts,
+  resolveLocalFilePath,
+  mapDisplayText,
+  showTypingIndicator = false,
+  showCopyButtons = true,
+}) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
   const renderSystemMessage = (message: CoworkMessage) => {
@@ -39,8 +50,11 @@ export const TurnBlock: React.FC<{
     const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
     const rawContent = i18nMessage
       ? i18nMessage
-      : hasText(message.content) ? message.content
-      : (typeof message.metadata?.error === 'string' ? message.metadata.error : '');
+      : hasText(message.content)
+        ? message.content
+        : typeof message.metadata?.error === 'string'
+          ? message.metadata.error
+          : '';
     const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
     const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
     if (!content.trim()) return null;
@@ -60,7 +74,9 @@ export const TurnBlock: React.FC<{
 
   const renderOrphanToolResult = (message: CoworkMessage) => {
     const toolResultDisplayRaw = getToolResultDisplay(message);
-    const toolResultDisplay = mapDisplayText ? mapDisplayText(toolResultDisplayRaw) : toolResultDisplayRaw;
+    const toolResultDisplay = mapDisplayText
+      ? mapDisplayText(toolResultDisplayRaw)
+      : toolResultDisplayRaw;
     const isToolError = Boolean(message.metadata?.isError || message.metadata?.error);
     const hasToolResultText = hasText(toolResultDisplay);
     const resultLineCount = hasToolResultText ? getToolResultLineCount(toolResultDisplay) : 0;
@@ -70,14 +86,30 @@ export const TurnBlock: React.FC<{
     return (
       <div className="py-1">
         <div className="flex items-start gap-2">
-          <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`} />
+          <span
+            className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`}
+          />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-muted-foreground">{i18nService.t('coworkToolResult')}</div>
-            {resultLineCount > 0 && <div className="text-xs text-muted mt-0.5">{resultLineCount} {resultLineCount === 1 ? 'line' : 'lines'} of output</div>}
-            {resultLineCount === 0 && showNoDetailError && <div className={`text-xs mt-0.5 ${isToolError ? 'text-red-500/80' : 'text-muted'}`}>{fallbackText}</div>}
+            <div className="text-sm font-medium text-muted-foreground">
+              {i18nService.t('coworkToolResult')}
+            </div>
+            {resultLineCount > 0 && (
+              <div className="text-xs text-muted mt-0.5">
+                {resultLineCount} {resultLineCount === 1 ? 'line' : 'lines'} of output
+              </div>
+            )}
+            {resultLineCount === 0 && showNoDetailError && (
+              <div className={`text-xs mt-0.5 ${isToolError ? 'text-red-500/80' : 'text-muted'}`}>
+                {fallbackText}
+              </div>
+            )}
             {(hasToolResultText || showNoDetailError) && (
               <div className="mt-2 px-3 py-2 rounded-lg bg-surface-raised max-h-64 overflow-y-auto">
-                <pre className={`text-xs whitespace-pre-wrap break-words font-mono ${isToolError ? 'text-red-500' : hasToolResultText ? 'text-foreground' : 'text-muted-foreground italic'}`}>{displayText}</pre>
+                <pre
+                  className={`text-xs whitespace-pre-wrap break-words font-mono ${isToolError ? 'text-red-500' : hasToolResultText ? 'text-foreground' : 'text-muted-foreground italic'}`}
+                >
+                  {displayText}
+                </pre>
               </div>
             )}
           </div>
@@ -87,7 +119,7 @@ export const TurnBlock: React.FC<{
   };
 
   const renderItem = (
-    item: typeof visibleAssistantItems[0],
+    item: (typeof visibleAssistantItems)[0],
     _idx: number,
     isFinalAnswer: boolean,
     streamingOverride?: boolean,
@@ -97,15 +129,13 @@ export const TurnBlock: React.FC<{
       const meta = item.message.metadata;
       const isStreaming = streamingOverride ?? (Boolean(meta?.isStreaming) && !meta?.isFinal);
       const isComplete = Boolean(meta?.isFinal) || streamingOverride === false;
-      const content = mapDisplayText
-        ? mapDisplayText(item.message.content)
-        : item.message.content;
+      const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
-          <Reasoning
-            key={item.message.id}
-            isStreaming={isStreaming}
-            defaultOpen={true}
-            autoClose={false}
+        <Reasoning
+          key={item.message.id}
+          isStreaming={isStreaming}
+          defaultOpen={true}
+          autoClose={false}
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
@@ -133,11 +163,7 @@ export const TurnBlock: React.FC<{
 
     // ── Orphan tool result ──
     if (item.type === 'tool_result') {
-      return (
-        <div key={item.message.id}>
-          {renderOrphanToolResult(item.message)}
-        </div>
-      );
+      return <div key={item.message.id}>{renderOrphanToolResult(item.message)}</div>;
     }
 
     // ── System message ──
@@ -156,7 +182,9 @@ export const TurnBlock: React.FC<{
           resolveLocalFilePath={resolveLocalFilePath}
           mapDisplayText={mapDisplayText}
           showCopyButton={isLastAssistant}
-          turnMetadata={isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined}
+          turnMetadata={
+            isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined
+          }
         />
       );
     }
@@ -167,7 +195,12 @@ export const TurnBlock: React.FC<{
   // Build step groups: consecutive non-answer items grouped into a single
   // ChainOfThought with a dynamic summary. Answer items appear inline.
   const groups = (() => {
-    const result: Array<{ summary: string; items: typeof visibleAssistantItems; streaming: boolean; streamingType: 'thinking' | 'tool' | null }> = [];
+    const result: Array<{
+      summary: string;
+      items: typeof visibleAssistantItems;
+      streaming: boolean;
+      streamingType: 'thinking' | 'tool' | null;
+    }> = [];
     let currentItems: typeof visibleAssistantItems = [];
 
     const flush = (followedByAnswer = false) => {
@@ -203,9 +236,7 @@ export const TurnBlock: React.FC<{
           summary = '思考中…';
           streamingType = 'thinking';
         } else if (streamingItem.type === 'tool_group') {
-          summary = getToolSummary(
-            streamingItem.group.toolUse.metadata?.toolName as string
-          );
+          summary = getToolSummary(streamingItem.group.toolUse.metadata?.toolName as string);
           streamingType = 'tool';
         } else {
           summary = '执行中…';
@@ -219,12 +250,18 @@ export const TurnBlock: React.FC<{
 
     for (const item of visibleAssistantItems) {
       const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
-      const isStep = item.type === 'assistant' && item.message.metadata?.isThinking
-        || item.type === 'tool_group';
+      const isStep =
+        (item.type === 'assistant' && item.message.metadata?.isThinking) ||
+        item.type === 'tool_group';
 
       if (isAnswer) {
         flush(true); // answer follows → thinking before it is done
-        result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming), streamingType: null });
+        result.push({
+          summary: '',
+          items: [item],
+          streaming: Boolean(item.message.metadata?.isStreaming),
+          streamingType: null,
+        });
       } else if (isStep) {
         currentItems.push(item);
       }
@@ -238,24 +275,31 @@ export const TurnBlock: React.FC<{
       ? index
       : lastIndex;
   }, -1);
-  const hasStreamingGroups = groups.some((group) => group.streaming);
-  const [intermediateOpen, setIntermediateOpen] = useState(hasStreamingGroups);
-  const wasStreamingRef = useRef(hasStreamingGroups);
-
-  useEffect(() => {
-    if (hasStreamingGroups) {
-      setIntermediateOpen(true);
-    } else if (wasStreamingRef.current) {
-      setIntermediateOpen(false);
-    }
-    wasStreamingRef.current = hasStreamingGroups;
-  }, [hasStreamingGroups]);
-
-  const intermediateGroups = groups.filter((_, index) => index !== lastAnswerGroupIndex);
-  const intermediateItemCount = intermediateGroups.reduce((count, group) => count + group.items.length, 0);
   const finalAnswerGroup = lastAnswerGroupIndex >= 0 ? groups[lastAnswerGroupIndex] : null;
+  const finalAnswerItem = finalAnswerGroup?.items[0];
+  const finalAnswerStarted = Boolean(
+    finalAnswerItem?.type === 'assistant' &&
+    !finalAnswerItem.message.metadata?.isThinking &&
+    hasText(finalAnswerItem.message.content),
+  );
+  const isEmptyAnswerGroup = (group: (typeof groups)[number]) => {
+    const firstItem = group.items[0];
+    return (
+      firstItem?.type === 'assistant' &&
+      !firstItem.message.metadata?.isThinking &&
+      !hasText(firstItem.message.content)
+    );
+  };
+  const intermediateGroups = finalAnswerStarted
+    ? groups.filter((_, index) => index !== lastAnswerGroupIndex)
+    : groups.filter(group => !isEmptyAnswerGroup(group));
+  const intermediateItemCount = intermediateGroups.reduce(
+    (count, group) => count + group.items.length,
+    0,
+  );
+  const [intermediateOpen, setIntermediateOpen] = useState(false);
 
-  const renderIntermediateGroup = (group: typeof groups[number], groupKey: string) => {
+  const renderIntermediateGroup = (group: (typeof groups)[number], groupKey: string) => {
     const firstItem = group.items[0];
     const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
     if (isAnswerItem) {
@@ -264,16 +308,16 @@ export const TurnBlock: React.FC<{
 
     const isStreaming = group.streaming;
     const headerIcon = isStreaming
-      ? group.streamingType === 'thinking' ? Brain
-      : group.streamingType === 'tool' ? Wrench
-      : SparklesIcon
+      ? group.streamingType === 'thinking'
+        ? Brain
+        : group.streamingType === 'tool'
+          ? Wrench
+          : SparklesIcon
       : SparklesIcon;
     return (
       <ChainOfThought key={groupKey} defaultOpen={true}>
         <ChainOfThoughtHeader icon={headerIcon}>
-          {isStreaming
-            ? <span className="animate-pulse">{group.summary}</span>
-            : group.summary}
+          {isStreaming ? <span className="animate-pulse">{group.summary}</span> : group.summary}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
           {group.items.map((item, idx) => renderItem(item, idx, false, isStreaming))}
@@ -287,21 +331,33 @@ export const TurnBlock: React.FC<{
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {intermediateGroups.length > 0 && (
+            {finalAnswerStarted && intermediateGroups.length > 0 && (
               <ChainOfThought open={intermediateOpen} onOpenChange={setIntermediateOpen}>
                 <ChainOfThoughtHeader icon={SparklesIcon}>
-                  {i18nService.t('coworkIntermediateProcess').replace('{count}', String(intermediateItemCount))}
+                  {i18nService
+                    .t('coworkIntermediateProcess')
+                    .replace('{count}', String(intermediateItemCount))}
                 </ChainOfThoughtHeader>
                 <ChainOfThoughtContent>
-                  {intermediateGroups.map((group, index) => renderIntermediateGroup(group, `intermediate-${index}`))}
+                  {intermediateGroups.map((group, index) =>
+                    renderIntermediateGroup(group, `intermediate-${index}`),
+                  )}
                 </ChainOfThoughtContent>
               </ChainOfThought>
             )}
-            {finalAnswerGroup && renderItem(finalAnswerGroup.items[0], lastAnswerGroupIndex, true)}
+            {finalAnswerStarted &&
+              finalAnswerGroup &&
+              renderItem(finalAnswerGroup.items[0], lastAnswerGroupIndex, true)}
+            {!finalAnswerStarted &&
+              intermediateGroups.map((group, index) =>
+                renderIntermediateGroup(group, `streaming-${index}`),
+              )}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
-                {artifacts.map(artifact => <ArtifactPreviewCard key={artifact.id} artifact={artifact} />)}
+                {artifacts.map(artifact => (
+                  <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                ))}
               </div>
             )}
           </div>
@@ -312,15 +368,24 @@ export const TurnBlock: React.FC<{
 
   function getToolSummary(toolName?: string): string {
     switch (toolName) {
-      case 'bash': return '正在执行命令…';
-      case 'read': return '正在读取文件…';
-      case 'write': return '正在写入文件…';
-      case 'edit': return '正在编辑文件…';
-      case 'grep': return '正在搜索…';
-      case 'find': return '正在查找文件…';
-      case 'ls': return '正在列出目录…';
-      case 'mcp': return '正在调用工具…';
-      default: return toolName ? `正在执行 ${toolName}…` : '执行中…';
+      case 'bash':
+        return '正在执行命令…';
+      case 'read':
+        return '正在读取文件…';
+      case 'write':
+        return '正在写入文件…';
+      case 'edit':
+        return '正在编辑文件…';
+      case 'grep':
+        return '正在搜索…';
+      case 'find':
+        return '正在查找文件…';
+      case 'ls':
+        return '正在列出目录…';
+      case 'mcp':
+        return '正在调用工具…';
+      default:
+        return toolName ? `正在执行 ${toolName}…` : '执行中…';
     }
   }
 };
