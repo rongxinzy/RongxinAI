@@ -324,3 +324,11 @@ Windows 执行搜索脚本必须使用 Git Bash/PortableGit，不能直接使用
 - `git diff --check`
 
 完整 Vitest 在当前 Windows 宿主机上被 `better-sqlite3` 原生文件锁定阻断，错误为 `EBUSY/EPERM`，未出现测试断言失败。该环境问题需要释放占用 `node_modules/better-sqlite3/build/Release/better_sqlite3.node` 的进程后再执行。
+
+### 12.7 MR 交付与合并
+
+- 源分支：`feat/session-level-experts`。
+- 目标分支：`dev`，提交基线为远端最新 `origin/dev`。
+- 提交内容包含历史分页、中间过程折叠、系统语言约束、联网搜索说明、代码高亮容错和本文档。
+- 合并前应确认 TypeScript、Lint 和差异检查通过；Vitest 需在释放 `better-sqlite3` 文件锁后补跑。
+- 合并后建议重新打开已有会话，验证历史消息可持续向上加载，且 final answer 前的中间过程不会展开工具卡片。
