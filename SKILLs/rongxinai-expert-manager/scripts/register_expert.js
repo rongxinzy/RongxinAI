@@ -51,7 +51,7 @@ function getDefaultExpertPackagesDir() {
 }
 
 function parseMdFrontmatter(mdPath) {
-  const content = fs.readFileSync(mdPath, 'utf-8');
+  const content = fs.readFileSync(mdPath, 'utf-8').replace(/\r\n?/g, '\n');
   const match = content.match(/^---\n(.*?)\n---/s);
   if (!match) return { frontmatter: {}, body: content };
 
