@@ -99,12 +99,12 @@ export const TurnBlock: React.FC<{
         <Reasoning
           key={item.message.id}
           isStreaming={isStreaming}
-          defaultOpen={isStreaming}
+          defaultOpen={false}
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
-              if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
               if (isFinal) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
+              if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
               return <p>思考内容</p>;
             }}
           />
@@ -239,7 +239,7 @@ export const TurnBlock: React.FC<{
               // Step group — wrapped in ChainOfThought with dynamic summary
               const isStreaming = group.streaming;
               return (
-                <ChainOfThought key={gIdx} defaultOpen={isStreaming}>
+                <ChainOfThought key={gIdx} defaultOpen={false}>
                   <ChainOfThoughtHeader icon={isStreaming ? SparklesIcon : undefined}>
                     {isStreaming
                       ? <span className="animate-pulse">{group.summary}</span>
