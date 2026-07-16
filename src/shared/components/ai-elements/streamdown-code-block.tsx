@@ -10,6 +10,7 @@ import {
   CodeBlockCopyButton,
   CodeBlockHeader,
   CodeBlockTitle,
+  normalizeCodeLanguage,
 } from "./code-block";
 
 /**
@@ -38,7 +39,7 @@ export const AiPre: React.FC<React.ComponentProps<"pre"> & { node?: any }> = ({
         : "") ?? "";
     const match = /language-([\w-]+)/.exec(className);
     if (match) {
-      lang = match[1].toLowerCase() as BundledLanguage;
+      lang = normalizeCodeLanguage(match[1]);
       rawText = (Array.isArray(codeNode.children)
         ? codeNode.children.map((c: any) => c?.value ?? "").join("")
         : "") ?? "";
@@ -53,7 +54,7 @@ export const AiPre: React.FC<React.ComponentProps<"pre"> & { node?: any }> = ({
     if (codeChild?.props?.className) {
       const match = /language-([\w-]+)/.exec(codeChild.props.className);
       if (match) {
-        lang = match[1].toLowerCase() as BundledLanguage;
+        lang = normalizeCodeLanguage(match[1]);
         // Prefer dangerouslySetInnerHTML (Streamdown prerendered HTML), fallback to children extraction
         if (codeChild.props.dangerouslySetInnerHTML?.__html) {
           const tmp = document.createElement("div");

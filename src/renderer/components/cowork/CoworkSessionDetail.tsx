@@ -44,6 +44,7 @@ import { composeExportCanvas, domRectToCaptureRect, formatExportTimestamp, loadI
 import { buildConversationTurns, buildDisplayItems, hasRenderableAssistantContent } from './helpers/messageGrouping';
 // toolUtils helpers used in sub-components
 import { normalizeLocalPath, parseRootRelativePath,toAbsolutePathFromCwd } from './helpers/pathUtils';
+import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { TodoQueue } from './TodoQueue';
 
 // Stable empty array reference to avoid unnecessary re-renders from useSelector
@@ -755,6 +756,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const displayItems = useMemo(() => messages ? buildDisplayItems(messages) : [], [messages]);
   const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
 
+  useSessionHistoryPagination({
+    sessionId,
+    messagesOffset: currentSession?.messagesOffset ?? 0,
+    messageCount: messagesLength,
+    rootRef: detailRootRef,
+  });
+
   // Cache turn-level DOM elements (data-turn-index, always in DOM even for lazy turns)
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -1001,7 +1009,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={detailRootRef} className="flex-1 flex flex-col bg-background h-full" style={{ minWidth: COWORK_DETAIL_MIN_WIDTH }}>
       <div className="relative flex-1 min-h-0">
         <Conversation className="h-full">
-          <ConversationContent className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}>
+          <ConversationContent
+            className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
+            scrollClassName="cowork-conversation-scroll"
+          >
             <div ref={scrollContainerRef}>
               {renderConversationTurns()}
               <div className="h-20" />

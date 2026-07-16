@@ -231,7 +231,7 @@ npx tsc -p tsconfig.json --noEmit
 + 当前会话选中的技能上下文
 ```
 
-Pi runtime 通过 `createAgentSession({ systemPrompt })` 接收提示词，不再把每个会话的提示词写入共享的 `<workspace>/.pi/SYSTEM.md` 或 `~/.pi/agent/SYSTEM.md`。技能只格式化当前会话需要的技能，避免把全部用户技能注入每个会话。
+Pi runtime 通过每个会话独立的 `DefaultResourceLoader({ systemPromptOverride })` 接收提示词，不再把每个会话的提示词写入共享的 `<workspace>/.pi/SYSTEM.md` 或 `~/.pi/agent/SYSTEM.md`。技能只格式化当前会话需要的技能，避免把全部用户技能注入每个会话。
 
 升级时需要注意：旧版本可能已经在 Workspace 留下 `.pi/SYSTEM.md`。首次演示应使用干净 Workspace，避免旧文件被 Pi ResourceLoader 自动加载并污染新会话。
 
@@ -275,3 +275,52 @@ npm test
 6. 使用旧数据库启动，确认历史会话和消息仍可见。
 
 展会应使用全新 Workspace，提前安装专家、配置模型和登录态，并预热 runtime。建议演示“输入区选择专家 -> 首次发送 -> 展示 Badge -> 重启后恢复会话”。当前版本不建议现场演示运行中会话动态替换专家、高权限 MCP 或 OpenClaw 网关故障恢复。
+
+## 12. 本次 MR 增量修复
+
+### 12.1 会话历史分页与滚动加载
+
+会话首次打开时后端仍只读取最近一页消息，默认页大小为 30 条，以控制首次 IPC 传输和首屏渲染成本。消息区滚动到顶部后，Renderer 调用 `getSessionMessages` 分页读取更早消息，并通过新增内容的高度差补偿 `scrollTop`，保证用户当前阅读位置不跳动。
+
+如果首屏消息不足以产生滚动条，前端会自动继续请求更早页面，直到历史内容能够滚动或已经到达会话开头。该机制不删除、不覆盖 SQLite 中的历史消息。
+
+### 12.2 中间过程统一折叠
+
+一个会话 turn 中，最后一个 assistant answer 单独显示；其之前的中间 answer、思考内容和工具调用统一放在“中间过程”折叠区中：
+
+- 流式执行期间中间过程保持展开，方便观察实时进度。
+- final answer 生成后中间过程自动收起。
+- 用户展开中间过程时，工具卡片仍保持工具自身的折叠状态，不会一次性展开工具输入和输出。
+- 思考状态以消息分组状态为准；后续 answer 已出现时，即使旧 metadata 仍标记 `isStreaming`，界面也显示“思考完成”。
+
+### 12.3 系统语言与全局提示词
+
+`resources/SYSTEM_PROMPT.md` 要求回复语言优先跟随用户当前系统语言或应用语言设置：
+
+1. 不因模型默认语言、专家套件或技能提示词自行切换语言。
+2. 无法读取系统语言时，跟随用户当前消息语言。
+3. 用户明确指定语言时，遵循用户的明确要求。
+
+### 12.4 联网搜索与 Playwright
+
+联网搜索优先使用 RongxinAI `web-search` skill。该 skill 通过 Playwright 控制隔离的本地 Chrome，默认无头搜索，受阻时回退到可见浏览器。已知 URL 优先使用 `web_fetch`，需要登录、表单或复杂动态交互时才使用 `browser`。
+
+Windows 执行搜索脚本必须使用 Git Bash/PortableGit，不能直接使用没有 Linux 发行版的 `C:\Windows\System32\bash.exe`。Playwright CLI 操作遵循 `open -> snapshot -> 使用最新 ref -> 页面变化后重新 snapshot` 的流程。
+
+### 12.5 Markdown 代码高亮容错
+
+流式代码围栏可能在语言标识尚未生成完整时短暂出现 `pyt`，随后才变为 `python`。代码块渲染器现在会：
+
+- 将 `pyt` 归一化为 `python`。
+- 对未知语言跳过 Shiki 加载，按纯文本显示，避免前端异常。
+- 保证头部显示语言和实际 Shiki 高亮语言使用同一个归一化结果。
+
+### 12.6 本次验证
+
+已通过：
+
+- `npm.cmd run build:tsc`
+- 相关 Renderer、ai-elements 和 i18n 文件 ESLint
+- `git diff --check`
+
+完整 Vitest 在当前 Windows 宿主机上被 `better-sqlite3` 原生文件锁定阻断，错误为 `EBUSY/EPERM`，未出现测试断言失败。该环境问题需要释放占用 `node_modules/better-sqlite3/build/Release/better_sqlite3.node` 的进程后再执行。

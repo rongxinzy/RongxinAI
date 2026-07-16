@@ -1347,6 +1347,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkModelSwitchFailed: '模型切换失败，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
+    coworkIntermediateProcess: '中间过程（{count} 项）',
 
     // Expert
     expert: '专家',
@@ -3322,6 +3323,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkQuestionWizardAnswerRequired: 'Please select or enter an answer',
     coworkWelcome: 'Start Collaborating',
     coworkDescription: 'A 24/7 personal assistant agent that gets work done for you',
+    coworkIntermediateProcess: 'Intermediate process ({count} items)',
 
     // Multi-Agent management
     createAgent: 'Create Agent',
