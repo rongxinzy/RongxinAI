@@ -107,6 +107,8 @@ interface ActivePiSession {
 
 interface PiModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
+  DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
+  getAgentDir: () => string;
   getModel: (provider: string, modelId: string) => unknown;
   AuthStorage: {
     inMemory: () => PiAuthStorage;
@@ -116,6 +118,10 @@ interface PiModules {
     context: { messages: Array<{ role: string; content: string }> },
     options?: { apiKey?: string },
   ) => Promise<{ content: Array<{ text: string }> }>;
+}
+
+interface PiResourceLoader {
+  reload(): Promise<void>;
 }
 
 interface PiAuthStorage {
@@ -142,6 +148,8 @@ async function getPiModules(): Promise<PiModules> {
       const compat = await import('@earendil-works/pi-ai/compat');
       _piModules = {
         createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
+        DefaultResourceLoader: codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
+        getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
         AuthStorage: codingAgent.AuthStorage as PiModules['AuthStorage'],
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
@@ -251,9 +259,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const abortController = new AbortController();
 
     try {
-      const sessionOptions: Record<string, unknown> = {
-        cwd: options.workspaceRoot || process.cwd(),
-      };
+      const workspaceRoot = options.workspaceRoot || process.cwd();
+      const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
 
       // System prompt — merge user config + skills manifest.
       // pi's ResourceLoader discovers SYSTEM.md at two levels:
@@ -264,7 +271,27 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const basePrompt = options.systemPrompt?.trim() || '';
       const skillsPrompt = this.buildSkillsPrompt(options.skillIds);
       const mergedPrompt = [basePrompt, skillsPrompt].filter(Boolean).join('\n\n');
-      if (mergedPrompt) sessionOptions.systemPrompt = mergedPrompt;
+      const history = options.conversationHistory;
+      const historyBlock = history && history.length > 0
+        ? [
+            '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
+            ...history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
+            '=== END PREVIOUS CONVERSATION ===',
+          ].join('\n')
+        : '';
+      const effectiveSystemPrompt = [mergedPrompt, historyBlock].filter(Boolean).join('\n\n');
+
+      // Pi's createAgentSession does not accept a systemPrompt option. Its
+      // default resource loader supplies the Pi Coding Assistant identity,
+      // so override that loader per session to keep expert contexts isolated.
+      const resourceLoader = new pi.DefaultResourceLoader({
+        cwd: workspaceRoot,
+        agentDir: pi.getAgentDir(),
+        systemPromptOverride: () => effectiveSystemPrompt || '',
+        appendSystemPromptOverride: (): string[] => [],
+      });
+      await resourceLoader.reload();
+      sessionOptions.resourceLoader = resourceLoader;
 
       // Resolve model early — needed by both MCP proxy and subagent tool
       const resolvedModel = resolvePiModel(pi, options.modelOverride);
@@ -316,25 +343,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
-
-      // Restore conversation history via system prompt append.
-      // Directly injecting into agent.state.messages crashes the PI SDK
-      // ("Cannot read properties of undefined (reading 'totalTokens')")
-      // because internal token counters go out of sync. Instead, format the
-      // history as a plain-text context block in the system prompt which
-      // the LLM can read but the PI SDK treats as immutable system text.
-      const history = options.conversationHistory;
-      if (history && history.length > 0) {
-        const historyBlock = [
-          '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
-          ...history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
-          '=== END PREVIOUS CONVERSATION ===',
-        ].join('\n');
-        const currentSystem = (sessionOptions.systemPrompt as string) || '';
-        sessionOptions.systemPrompt = currentSystem
-          ? `${currentSystem}\n\n${historyBlock}`
-          : historyBlock;
-      }
 
       const active: ActivePiSession = {
         sessionId,

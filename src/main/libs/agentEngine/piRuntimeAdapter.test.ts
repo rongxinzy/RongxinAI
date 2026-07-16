@@ -18,6 +18,10 @@ const hoisted = vi.hoisted(() => {
   return {
     mockSession,
     mockCreateAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
+    mockDefaultResourceLoader: vi.fn(function (this: { reload: () => Promise<void> }) {
+      this.reload = vi.fn().mockResolvedValue(undefined);
+    }),
+    mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
     mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
     mockGetModel: vi.fn((provider: string, modelId: string) => ({ provider, id: modelId })),
     mockAuthStorage: {
@@ -90,12 +94,15 @@ const hoisted = vi.hoisted(() => {
 
 const mockSession = hoisted.mockSession;
 const mockCreateAgentSession = hoisted.mockCreateAgentSession;
+const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
 const mockGetModel = hoisted.mockGetModel;
 const mockAuthStorage = hoisted.mockAuthStorage;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
+  DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
+  getAgentDir: hoisted.mockGetAgentDir,
   AuthStorage: {
     inMemory: vi.fn(() => hoisted.mockAuthStorage),
   },
@@ -128,6 +135,25 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello Pi');
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
+    });
+
+    it('should inject the session system prompt through Pi resource loading', async () => {
+      await adapter.startSession('test', 'Hello Pi', { systemPrompt: 'You are the selected expert.' });
+
+      expect(mockDefaultResourceLoader).toHaveBeenCalledWith(expect.objectContaining({
+        agentDir: '/tmp/pi-agent',
+        cwd: process.cwd(),
+        appendSystemPromptOverride: expect.any(Function),
+        systemPromptOverride: expect.any(Function),
+      }));
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        systemPromptOverride: (base: string | undefined) => string | undefined;
+      };
+      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe('You are the selected expert.');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(expect.objectContaining({
+        resourceLoader: expect.any(Object),
+      }));
+      expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('systemPrompt');
     });
 
     it('should resolve the explicit model override for a new session', async () => {
