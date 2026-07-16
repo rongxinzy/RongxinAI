@@ -67,9 +67,17 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
             )}
           </PromptInputButton>
         </PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-80 p-0">
-          <Command>
-            <CommandInput placeholder={i18nService.t('searchSessionExperts')} />
+        <PopoverContent
+          side="top"
+          align="start"
+          sideOffset={4}
+          className="w-80 !rounded-md !border-0 !bg-surface p-0 shadow-md !ring-0 !outline-none"
+        >
+          <Command className="!rounded-md !bg-surface [&_[data-slot=input-group]]:!border-0 [&_[data-slot=input-group]]:!bg-transparent [&_[data-slot=input-group]]:!shadow-none [&_[data-slot=input-group]]:!ring-0">
+            <CommandInput
+              placeholder={i18nService.t('searchSessionExperts')}
+              className="bg-transparent focus:ring-0"
+            />
             <CommandList>
               <CommandEmpty>{i18nService.t('noSessionExperts')}</CommandEmpty>
               <CommandGroup heading={i18nService.t('sessionExperts')}>
