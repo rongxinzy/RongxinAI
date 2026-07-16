@@ -1,4 +1,4 @@
-export type AgentSource = 'custom' | 'preset';
+export type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
 
 export interface Agent {
   id: string;

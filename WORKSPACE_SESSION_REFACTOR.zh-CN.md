@@ -198,3 +198,80 @@ npx tsc -p tsconfig.json --noEmit
 4. 选择 Workspace B 创建会话，确认侧栏按 Workspace 分组。
 5. 使用旧数据库启动应用，确认历史会话自动出现于对应 Workspace。
 6. 关闭应用后重新打开，确认 Workspace、会话和 Agent 快照可以恢复。
+## 11. 会话级专家架构
+
+本节补充当前版本的会话级专家实现。专家属于会话上下文，不属于 Workspace 配置；Workspace 只负责文件工具的工作目录。同一个 Workspace 内的不同会话可以选择不同专家，一个会话也可以同时选择多个专家。
+
+### 11.1 数据模型
+
+新增 `cowork_session_experts` 表保存专家快照，包含会话 ID、专家 ID、专家包 ID、显示名称、来源、`prompt_snapshot`、技能 ID、能力策略、内容哈希和创建时间。会话删除时关系级联删除；删除或更新专家不会删除历史会话，也不会改写已经保存的提示词。
+
+`agents` 表继续保留，用于兼容旧 Agent、IM 绑定和历史数据。Cowork 新会话通过 `expertIds` 选择专家，Main 进程只接受专家 ID，校验后生成快照，不信任 Renderer 传入的 MD 内容或文件路径。
+
+### 11.2 用户流程
+
+1. 用户在输入框顶部打开专家选择器。
+2. 通过 Popover 和 Command 搜索并多选已安装专家。
+3. 选中的专家以 Badge 显示在输入框内。
+4. 首次发送时，专家 ID 与会话一起写入 SQLite。
+5. 关闭并重新打开会话时，从 `cowork_session_experts` 恢复专家名称和选择状态。
+6. 继续会话时，Main 根据快照恢复提示词和技能列表。
+
+运行中的 Pi 会话不能通过 `session.prompt()` 动态替换 system prompt。当前版本允许保存新的专家绑定，但完整提示词会在 runtime 会话重建后生效；展会演示应在首次发送前完成选择。
+
+### 11.3 提示词和技能隔离
+
+普通会话不读取其他专家的 MD 文件。专家会话的提示词由 Main 统一拼装：
+
+```text
+产品和运行时基础规则
++ 定时任务规则
++ Cowork 配置提示词
++ 当前会话的专家 prompt_snapshot
++ 当前会话选中的技能上下文
+```
+
+Pi runtime 通过 `createAgentSession({ systemPrompt })` 接收提示词，不再把每个会话的提示词写入共享的 `<workspace>/.pi/SYSTEM.md` 或 `~/.pi/agent/SYSTEM.md`。技能只格式化当前会话需要的技能，避免把全部用户技能注入每个会话。
+
+升级时需要注意：旧版本可能已经在 Workspace 留下 `.pi/SYSTEM.md`。首次演示应使用干净 Workspace，避免旧文件被 Pi ResourceLoader 自动加载并污染新会话。
+
+### 11.4 Workspace 和 Team 专家
+
+主会话和 Team 子代理都应使用父会话的 `workspaceRoot`。Team 成员仍通过专家包导入流程同步到 Pi 专家目录，当前版本按专家包前缀筛选成员；后续应改为按会话快照和包哈希筛选，避免全局成员目录成为隐式依赖。
+
+### 11.5 安全边界
+
+- 专家包中的 `agents`、`skills` 路径必须经过 `realpath` 包含检查。
+- 拒绝通过符号链接访问专家包目录外的文件。
+- 专家 MD 和技能是模型指令，不是安全边界；`local` 模式仍可能访问本地工具。
+- 当前 MCP manifest 仍是全局能力，`capability_policy` 已保存但尚未强制过滤 MCP 工具，不应把当前版本当作完整沙箱。
+- 专家导入应在验证全部路径后再复制技能和同步 Pi 文件，避免损坏或恶意包产生半成品副作用。
+
+### 11.6 兼容、性能和回滚
+
+- 老会话没有专家关系时继续使用已有 `system_prompt`、`cwd`、`agent_id` 和模型快照。
+- Agent 切换不会改写已有会话的专家快照。
+- SQLite 通过会话 ID 和创建时间索引读取专家绑定，不影响 Workspace 会话分页。
+- 专家提示词和技能清单只在创建 Pi session 时拼接；Team 子代理目前每次委派都会创建独立 Pi session，并有 120 秒超时。
+- 回滚代码时可以保留 `cowork_session_experts` 表，旧版本会忽略该表；旧版本不会显示会话专家。
+
+### 11.7 验证和展会演示清单
+
+自动化检查：
+
+```bash
+npm run build:tsc
+npm run lint
+npm test
+```
+
+手工检查：
+
+1. 同一个 Workspace 创建两个会话，分别选择不同专家，确认提示词不串扰。
+2. 选择多个专家并发送消息，关闭后重新打开，确认 Badge 和专家名称仍存在。
+3. 修改或删除专家定义，确认既有会话仍使用快照。
+4. 使用包含 `../` 或符号链接的专家包，确认导入失败且不复制包外文件。
+5. Team 专家委派成员，确认成员 cwd 等于父会话 Workspace。
+6. 使用旧数据库启动，确认历史会话和消息仍可见。
+
+展会应使用全新 Workspace，提前安装专家、配置模型和登录态，并预热 runtime。建议演示“输入区选择专家 -> 首次发送 -> 展示 Badge -> 重启后恢复会话”。当前版本不建议现场演示运行中会话动态替换专家、高权限 MCP 或 OpenClaw 网关故障恢复。

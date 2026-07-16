@@ -1,0 +1,43 @@
+{
+  "name": "data-analyst",
+  "version": "1.0.0",
+  "description": "A data analysis expert for statistics, visualization, and business intelligence.",
+  "author": {
+    "name": "RongxinAI",
+    "email": "dev@rongxinai.com"
+  },
+
+  "expertType": "agent",
+  "agentName": "data-analyst",
+
+  "agents": ["./agents/data-analyst.md"],
+
+  "displayName": {
+    "en": "Data Analyst",
+    "zh": "数据分析专家"
+  },
+  "profession": {
+    "en": "Senior Data Analyst",
+    "zh": "资深数据分析师"
+  },
+  "displayDescription": {
+    "en": "Expert in data analysis, statistical modeling, and business intelligence. Turns raw data into actionable insights with clear visualizations.",
+    "zh": "精通数据分析、统计建模和商业智能，将原始数据转化为可落地的洞察与直观的可视化报告。"
+  },
+  "categoryId": "04-DataAI",
+  "defaultInitPrompt": {
+    "zh": "帮我分析这份销售数据并找出趋势",
+    "en": "Help me analyze this sales data and identify trends"
+  },
+  "plugin": "data-analyst",
+  "tags": [
+    { "en": "Data Analysis", "zh": "数据分析" },
+    { "en": "Statistics", "zh": "统计分析" },
+    { "en": "Visualization", "zh": "数据可视化" }
+  ],
+  "quickPrompts": [
+    { "en": "Help me analyze this sales data and identify trends", "zh": "帮我分析这份销售数据并找出趋势" },
+    { "en": "Create a dashboard plan for tracking key metrics", "zh": "为关键指标设计一个仪表盘方案" },
+    { "en": "Run A/B test analysis on these experiment results", "zh": "对这些实验结果进行 A/B 测试分析" }
+  ]
+}

@@ -12,6 +12,7 @@ import { CoworkView } from './components/cowork';
 import CoworkPermissionModal from './components/cowork/CoworkPermissionModal';
 import CoworkQuestionWizard from './components/cowork/CoworkQuestionWizard';
 import EngineStartupOverlay from './components/cowork/EngineStartupOverlay';
+import ExpertView from './components/expert/ExpertView';
 import { LocalInferenceView } from './components/localInference';
 import { McpView } from './components/mcp';
 import { ScheduledTasksView } from './components/scheduledTasks';
@@ -50,7 +51,7 @@ const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
-  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference'>('cowork');
+  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert'>('cowork');
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -316,6 +317,10 @@ const App: React.FC = () => {
 
   const handleShowLocalInference = useCallback(() => {
     setMainView('localInference');
+  }, []);
+
+  const handleShowExpert = useCallback(() => {
+    setMainView('expert');
   }, []);
 
   const handleToggleSidebar = useCallback(() => {
@@ -710,6 +715,7 @@ const handleConfirmUpdate = useCallback(async () => {
           onShowScheduledTasks={handleShowScheduledTasks}
           onShowMcp={handleShowMcp}
           onShowLocalInference={handleShowLocalInference}
+          onShowExpert={handleShowExpert}
           onNewChat={handleNewChat}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={handleToggleSidebar}
@@ -751,6 +757,15 @@ const handleConfirmUpdate = useCallback(async () => {
                 onToggleSidebar={handleToggleSidebar}
                 onNewChat={handleNewChat}
                 updateBadge={isSidebarCollapsed ? updateBadge : null}
+              />
+            ) : mainView === 'expert' ? (
+              <ExpertView
+                isSidebarCollapsed={isSidebarCollapsed}
+                onToggleSidebar={handleToggleSidebar}
+                onNewChat={handleNewChat}
+                updateBadge={isSidebarCollapsed ? updateBadge : null}
+                readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                onCreateSkillByChat={handleCreateSkillByChat}
               />
             ) : mainView === 'localInference' ? null : (
               <CoworkView

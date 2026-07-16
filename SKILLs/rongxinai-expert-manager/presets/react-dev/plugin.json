@@ -1,0 +1,43 @@
+{
+  "name": "react-dev",
+  "version": "1.0.0",
+  "description": "A React development expert specializing in TypeScript, hooks, and component architecture.",
+  "author": {
+    "name": "RongxinAI",
+    "email": "dev@rongxinai.com"
+  },
+
+  "expertType": "agent",
+  "agentName": "react-dev",
+
+  "agents": ["./agents/react-dev.md"],
+
+  "displayName": {
+    "en": "React Developer",
+    "zh": "React 开发专家"
+  },
+  "profession": {
+    "en": "Senior Frontend Engineer",
+    "zh": "高级前端工程师"
+  },
+  "displayDescription": {
+    "en": "Specializes in React, TypeScript, and modern frontend architecture. Helps with component design, state management, and performance optimization.",
+    "zh": "精通 React、TypeScript 和现代前端架构，擅长组件设计、状态管理和性能优化。"
+  },
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "zh": "帮我设计一个 React 组件",
+    "en": "Help me design a React component"
+  },
+  "plugin": "react-dev",
+  "tags": [
+    { "en": "React", "zh": "React" },
+    { "en": "TypeScript", "zh": "TypeScript" },
+    { "en": "Frontend", "zh": "前端开发" }
+  ],
+  "quickPrompts": [
+    { "en": "Help me design a React component", "zh": "帮我设计一个 React 组件" },
+    { "en": "Review this component and suggest improvements", "zh": "审查这个组件并提出改进建议" },
+    { "en": "Refactor this code to use modern React patterns", "zh": "用现代 React 模式重构这段代码" }
+  ]
+}

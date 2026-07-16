@@ -29,12 +29,13 @@ import LoginButton from './LoginButton';
 interface SidebarProps {
   onShowSettings: () => void;
   onShowLogin?: () => void;
-  activeView: 'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference';
+  activeView: 'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert';
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowScheduledTasks: () => void;
   onShowMcp: () => void;
   onShowLocalInference: () => void;
+  onShowExpert: () => void;
   onNewChat: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -60,6 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowScheduledTasks,
   onShowMcp,
   onShowLocalInference,
+  onShowExpert,
   onNewChat,
   isCollapsed,
   onToggleCollapse,
@@ -400,32 +402,53 @@ const Sidebar: React.FC<SidebarProps> = ({
               {i18nService.t('scheduledTasks')}
             </Button>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setIsSearchOpen(false);
-              onShowSkills();
-            }}
-            className={activeView === 'skills' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-            aria-current={activeView === 'skills' ? 'page' : undefined}
-          >
-            <Puzzle className="h-4 w-4 shrink-0" />
-            {i18nService.t('skills')}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setIsSearchOpen(false);
-              onShowMcp();
-            }}
-            className={activeView === 'mcp' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-            aria-current={activeView === 'mcp' ? 'page' : undefined}
-          >
-            <Plug className="h-4 w-4 shrink-0" />
-            {i18nService.t('mcpServers')}
-          </Button>
+          {workMode !== 'chat' && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  onShowExpert();
+                }}
+                className={activeView === 'expert' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
+                aria-current={activeView === 'expert' ? 'page' : undefined}
+              >
+                <Puzzle className="h-4 w-4 shrink-0" />
+                {i18nService.t('expert')}
+              </Button>
+            </>
+          )}
+          {workMode === 'chat' && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  onShowSkills();
+                }}
+                className={activeView === 'skills' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
+                aria-current={activeView === 'skills' ? 'page' : undefined}
+              >
+                <Puzzle className="h-4 w-4 shrink-0" />
+                {i18nService.t('skills')}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  onShowMcp();
+                }}
+                className={activeView === 'mcp' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
+                aria-current={activeView === 'mcp' ? 'page' : undefined}
+              >
+                <Plug className="h-4 w-4 shrink-0" />
+                {i18nService.t('mcpServers')}
+              </Button>
+            </>
+          )}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">

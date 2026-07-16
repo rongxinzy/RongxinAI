@@ -4,6 +4,7 @@ import React, { useEffect, useRef,useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
+import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
 import { configService } from '../../services/config';
@@ -204,7 +205,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     void coworkService.loadSessions(undefined, currentWorkspaceId);
   }, [currentWorkspaceId, isInitialized]);
 
-  const handleStartSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]): Promise<boolean | void> => {
+  const handleStartSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds: string[] = []): Promise<boolean | void> => {
     console.log('[CoworkView] handleStartSession: imageAttachments diagnosis', {
       hasImageAttachments: !!imageAttachments,
       count: imageAttachments?.length ?? 0,
@@ -403,13 +404,24 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       // auto-routing prompt to avoid injecting Claude SDK tool-calling instructions
       // that confuse non-Claude models (e.g. kimi-k2.5 falls back to text-based
       // tool calls, producing empty tool names and err=true failures).
-      const combinedSystemPrompt = [skillPrompt, config.systemPrompt]
+      const isExpertAgent = currentAgent?.source === CoworkSessionExpertSource.Package || currentAgent?.source === CoworkSessionExpertSource.Member;
+      const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
+      const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
+      const combinedSystemPrompt = [skillPrompt, baseSystemPrompt]
         .filter(p => p?.trim())
         .join('\n\n') || undefined;
 
       // Start the actual session immediately with fallback title
       const sessionModelOverride = currentAgentSelectedModel ? toOpenClawModelRef(currentAgentSelectedModel) : '';
-      console.log('[CoworkView] creating session:', { modelId: currentAgentSelectedModel?.id, providerKey: currentAgentSelectedModel?.providerKey, isServerModel: currentAgentSelectedModel?.isServerModel, sessionModelOverride, agentModel: currentAgent?.model });
+      console.log('[CoworkView] creating session:', {
+        modelId: currentAgentSelectedModel?.id,
+        providerKey: currentAgentSelectedModel?.providerKey,
+        agentId: currentAgentId,
+        agentName: currentAgent?.name,
+        agentSource: currentAgent?.source,
+        agentSystemPrompt: agentSystemPrompt ? `${agentSystemPrompt.slice(0, 80)}...` : '(empty)',
+        combinedSystemPrompt: combinedSystemPrompt ? `${combinedSystemPrompt.slice(0, 120)}...` : '(undefined)',
+      });
       const { session: startedSession, error: startError } = await coworkService.startSession({
         prompt,
         title: fallbackTitle,
@@ -418,6 +430,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         activeSkillIds: sessionSkillIds,
         workspaceId: currentWorkspaceId || undefined,
         agentId: currentAgentId,
+        expertIds,
         modelOverride: sessionModelOverride,
         imageAttachments,
       });
@@ -452,7 +465,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     }
   };
 
-  const handleContinueSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => {
+  const handleContinueSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds: string[] = []) => {
     if (!currentSession) return;
     if (isContinuingRef.current) return;
 
@@ -563,7 +576,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     isContinuingRef.current = true;
     try {
       const sessionSkillIds = [...activeSkillIds];
-      const combinedSystemPrompt = [skillPrompt, config.systemPrompt]
+      const isExpertAgent = currentAgent?.source === CoworkSessionExpertSource.Package || currentAgent?.source === CoworkSessionExpertSource.Member;
+      const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
+      const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
+      const combinedSystemPrompt = [skillPrompt, baseSystemPrompt]
         .filter(p => p?.trim())
         .join('\n\n') || undefined;
 
@@ -572,6 +588,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         prompt,
         systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
+        expertIds,
         imageAttachments,
       });
     } finally {

@@ -69,6 +69,13 @@ export default defineConfig({
         onstart() {
           // Signal that the main process bundle is ready for electron to load
           fs.writeFileSync('dist-electron/.electron-ready', '');
+
+          // Copy photon-node WASM artifact into dist-electron so pi-coding-agent can load it
+          const wasmSource = path.resolve(__dirname, 'node_modules/@earendil-works/pi-coding-agent/node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm');
+          const wasmDest = path.resolve(__dirname, 'dist-electron/photon_rs_bg.wasm');
+          if (fs.existsSync(wasmSource) && !fs.existsSync(wasmDest)) {
+            fs.copyFileSync(wasmSource, wasmDest);
+          }
         },
       },
       {

@@ -21,6 +21,7 @@ vi.mock('electron', () => ({
 import BetterSqlite3 from 'better-sqlite3';
 
 import { AgentAvatarSvg, DefaultAgentAvatarIcon, encodeAgentAvatarIcon } from '../shared/agent/avatar';
+import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { CoworkStore } from './coworkStore';
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,23 @@ function setupDb(): void {
       metadata TEXT,
       created_at INTEGER NOT NULL,
       sequence INTEGER,
+      FOREIGN KEY (session_id) REFERENCES cowork_sessions(id) ON DELETE CASCADE
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cowork_session_experts (
+      session_id TEXT NOT NULL,
+      expert_id TEXT NOT NULL,
+      package_id TEXT NOT NULL,
+      expert_name TEXT NOT NULL,
+      source TEXT NOT NULL,
+      prompt_snapshot TEXT NOT NULL,
+      skill_ids TEXT NOT NULL DEFAULT '[]',
+      capability_policy TEXT NOT NULL DEFAULT '{}',
+      content_hash TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, expert_id),
       FOREIGN KEY (session_id) REFERENCES cowork_sessions(id) ON DELETE CASCADE
     );
   `);
@@ -195,6 +213,46 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(store.listSessions(10, 0, undefined, first.workspaceId).map((session) => session.id)).toEqual(
     expect.arrayContaining([first.id, second.id]),
   );
+});
+
+test('session expert snapshots persist independently from workspace and agent state', () => {
+  const snapshot = {
+    expertId: 'expert-a',
+    packageId: 'package-a',
+    expertName: 'Expert A',
+    source: CoworkSessionExpertSource.Package,
+    promptSnapshot: 'Use the expert instructions for this session.',
+    skillIds: ['skill-a'],
+    capabilityPolicy: {},
+    contentHash: 'hash-a',
+  };
+  const session = store.createSession(
+    'expert session',
+    '/tmp/workspace-a',
+    snapshot.promptSnapshot,
+    'local',
+    [],
+    'main',
+    '',
+    'work',
+    undefined,
+    undefined,
+    [snapshot],
+  );
+
+  const loaded = store.getSession(session.id);
+  expect(loaded?.experts).toEqual([
+    expect.objectContaining({
+      expertId: 'expert-a',
+      packageId: 'package-a',
+      promptSnapshot: snapshot.promptSnapshot,
+      skillIds: ['skill-a'],
+      contentHash: 'hash-a',
+    }),
+  ]);
+
+  store.replaceSessionExperts(session.id, []);
+  expect(store.getSession(session.id)?.experts).toEqual([]);
 });
 
 test('replaceConversationMessages preserves existing timestamps and uses gateway timestamps', () => {

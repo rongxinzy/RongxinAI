@@ -413,6 +413,7 @@ class CoworkService {
       prompt: options.prompt,
       systemPrompt: options.systemPrompt,
       activeSkillIds: options.activeSkillIds,
+      expertIds: options.expertIds,
       imageAttachments: options.imageAttachments,
     });
     if (!result.success) {
@@ -453,6 +454,7 @@ class CoworkService {
       return false;
     }
 
+    void this.loadSession(options.sessionId);
     return true;
   }
 

@@ -120,6 +120,27 @@ export class SqliteStore {
     `);
 
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS cowork_session_experts (
+        session_id TEXT NOT NULL,
+        expert_id TEXT NOT NULL,
+        package_id TEXT NOT NULL,
+        expert_name TEXT NOT NULL,
+        source TEXT NOT NULL,
+        prompt_snapshot TEXT NOT NULL,
+        skill_ids TEXT NOT NULL DEFAULT '[]',
+        capability_policy TEXT NOT NULL DEFAULT '{}',
+        content_hash TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (session_id, expert_id),
+        FOREIGN KEY (session_id) REFERENCES cowork_sessions(id) ON DELETE CASCADE
+      );
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_cowork_session_experts_session_id
+      ON cowork_session_experts(session_id, created_at);
+    `);
+
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS cowork_config (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,

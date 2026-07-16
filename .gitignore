@@ -38,6 +38,7 @@ SKILLs/**/.connection
 SKILLs/**/.server.log
 SKILLs/**/.server.pid
 SKILLs/**/.venv/
+.pi/
 
 # Agent skills (installed via npx skills add)
 .agents/

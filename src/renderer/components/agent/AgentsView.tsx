@@ -32,6 +32,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null);
   const [addingPreset, setAddingPreset] = useState<string | null>(null);
+  const [importingExpert, setImportingExpert] = useState(false);
 
   useEffect(() => {
     agentService.loadAgents();
@@ -45,7 +46,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
 
   const enabledAgents = agents.filter((a) => a.enabled && a.id !== 'main');
   const presetAgents = enabledAgents.filter((a) => a.source === 'preset');
-  const customAgents = enabledAgents.filter((a) => a.source === 'custom');
+  const customAgents = enabledAgents.filter((a) => a.source === 'custom' || a.source === 'expert-package' || a.source === 'expert-package-member');
   const uninstalledPresets = presets.filter((p) => !p.installed);
 
   const handleAddPreset = async (presetId: string) => {
@@ -54,6 +55,26 @@ const AgentsView: React.FC<AgentsViewProps> = ({
       await agentService.addPreset(presetId);
     } finally {
       setAddingPreset(null);
+    }
+  };
+
+  const handleImportExpertPackage = async () => {
+    try {
+      const result = await window.electron?.dialog?.selectDirectory?.();
+      const expertDir = result?.path;
+      if (!expertDir) return;
+
+      setImportingExpert(true);
+      const importResult = await agentService.importExpertPackage(expertDir);
+      if (importResult?.success) {
+        window.alert(i18nService.t('importExpertPackageSuccess').replace('{name}', importResult.name || ''));
+      } else {
+        window.alert(i18nService.t('importExpertPackageError').replace('{error}', importResult?.error || 'Unknown error'));
+      }
+    } catch (error) {
+      window.alert(i18nService.t('importExpertPackageError').replace('{error}', error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setImportingExpert(false);
     }
   };
 
@@ -164,6 +185,22 @@ const AgentsView: React.FC<AgentsViewProps> = ({
                 </div>
                 <span className="text-sm font-medium text-primary">
                   {i18nService.t('createNewAgent')}
+                </span>
+              </Button>
+
+              {/* Import expert package card */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleImportExpertPackage}
+                disabled={importingExpert}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 min-h-[140px] h-auto"
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-primary/10">
+                  <Plus className="h-5 w-5 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-primary">
+                  {importingExpert ? '...' : i18nService.t('importExpertPackage')}
                 </span>
               </Button>
             </div>

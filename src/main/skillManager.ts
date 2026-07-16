@@ -1,4 +1,4 @@
-﻿import { execSync, spawn, spawnSync } from 'child_process';
+import { execSync, spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
 import { app, BrowserWindow, session } from 'electron';
 import extractZip from 'extract-zip';
@@ -2359,7 +2359,7 @@ export class SkillManager {
     return roots;
   }
 
-  private getBundledSkillsRoot(): string {
+  getBundledSkillsRoot(): string {
     if (app.isPackaged) {
       // In production, bundled SKILLs should be in Resources/SKILLs.
       const resourcesRoot = path.resolve(process.resourcesPath, SKILLS_DIR_NAME);
