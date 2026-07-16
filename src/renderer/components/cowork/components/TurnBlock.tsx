@@ -6,7 +6,7 @@ import {
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Brain, Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
@@ -86,24 +86,30 @@ export const TurnBlock: React.FC<{
     );
   };
 
-  const renderItem = (item: typeof visibleAssistantItems[0], _idx: number, isFinalAnswer: boolean) => {
+  const renderItem = (
+    item: typeof visibleAssistantItems[0],
+    _idx: number,
+    isFinalAnswer: boolean,
+    streamingOverride?: boolean,
+  ) => {
     // ── Thinking: collapsed Reasoning block with shimmer ──
     if (item.type === 'assistant' && item.message.metadata?.isThinking) {
       const meta = item.message.metadata;
-      const isStreaming = Boolean(meta?.isStreaming);
-      const isFinal = Boolean(meta?.isFinal);
+      const isStreaming = streamingOverride ?? (Boolean(meta?.isStreaming) && !meta?.isFinal);
+      const isComplete = Boolean(meta?.isFinal) || streamingOverride === false;
       const content = mapDisplayText
         ? mapDisplayText(item.message.content)
         : item.message.content;
       return (
-        <Reasoning
-          key={item.message.id}
-          isStreaming={isStreaming}
-          defaultOpen={false}
+          <Reasoning
+            key={item.message.id}
+            isStreaming={isStreaming}
+            defaultOpen={true}
+            autoClose={false}
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
-              if (isFinal) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
+              if (isComplete) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
               if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
               return <p>思考内容</p>;
             }}
@@ -226,39 +232,72 @@ export const TurnBlock: React.FC<{
     flush();
     return result;
   })();
+  const lastAnswerGroupIndex = groups.reduce((lastIndex, group, index) => {
+    const firstItem = group.items[0];
+    return firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking
+      ? index
+      : lastIndex;
+  }, -1);
+  const hasStreamingGroups = groups.some((group) => group.streaming);
+  const [intermediateOpen, setIntermediateOpen] = useState(hasStreamingGroups);
+  const wasStreamingRef = useRef(hasStreamingGroups);
+
+  useEffect(() => {
+    if (hasStreamingGroups) {
+      setIntermediateOpen(true);
+    } else if (wasStreamingRef.current) {
+      setIntermediateOpen(false);
+    }
+    wasStreamingRef.current = hasStreamingGroups;
+  }, [hasStreamingGroups]);
+
+  const intermediateGroups = groups.filter((_, index) => index !== lastAnswerGroupIndex);
+  const intermediateItemCount = intermediateGroups.reduce((count, group) => count + group.items.length, 0);
+  const finalAnswerGroup = lastAnswerGroupIndex >= 0 ? groups[lastAnswerGroupIndex] : null;
+
+  const renderIntermediateGroup = (group: typeof groups[number], groupKey: string) => {
+    const firstItem = group.items[0];
+    const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
+    if (isAnswerItem) {
+      return renderItem(firstItem, 0, false);
+    }
+
+    const isStreaming = group.streaming;
+    const headerIcon = isStreaming
+      ? group.streamingType === 'thinking' ? Brain
+      : group.streamingType === 'tool' ? Wrench
+      : SparklesIcon
+      : SparklesIcon;
+    return (
+      <ChainOfThought key={groupKey} defaultOpen={true}>
+        <ChainOfThoughtHeader icon={headerIcon}>
+          {isStreaming
+            ? <span className="animate-pulse">{group.summary}</span>
+            : group.summary}
+        </ChainOfThoughtHeader>
+        <ChainOfThoughtContent>
+          {group.items.map((item, idx) => renderItem(item, idx, false, isStreaming))}
+        </ChainOfThoughtContent>
+      </ChainOfThought>
+    );
+  };
 
   return (
     <div className="px-4 py-2">
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {groups.map((group, gIdx) => {
-              const firstItem = group.items[0];
-              const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
-              if (isAnswerItem) {
-                // Single answer item — render inline
-                return renderItem(firstItem, gIdx, gIdx === groups.length - 1);
-              }
-              // Step group — wrapped in ChainOfThought with dynamic summary
-              const isStreaming = group.streaming;
-              const headerIcon = isStreaming
-                ? group.streamingType === 'thinking' ? Brain
-                : group.streamingType === 'tool' ? Wrench
-                : SparklesIcon
-                : SparklesIcon;
-              return (
-                <ChainOfThought key={gIdx} defaultOpen={false}>
-                  <ChainOfThoughtHeader icon={headerIcon}>
-                    {isStreaming
-                      ? <span className="animate-pulse">{group.summary}</span>
-                      : group.summary}
-                  </ChainOfThoughtHeader>
-                  <ChainOfThoughtContent>
-                    {group.items.map((item, idx) => renderItem(item, idx, false))}
-                  </ChainOfThoughtContent>
-                </ChainOfThought>
-              );
-            })}
+            {intermediateGroups.length > 0 && (
+              <ChainOfThought open={intermediateOpen} onOpenChange={setIntermediateOpen}>
+                <ChainOfThoughtHeader icon={SparklesIcon}>
+                  {i18nService.t('coworkIntermediateProcess').replace('{count}', String(intermediateItemCount))}
+                </ChainOfThoughtHeader>
+                <ChainOfThoughtContent>
+                  {intermediateGroups.map((group, index) => renderIntermediateGroup(group, `intermediate-${index}`))}
+                </ChainOfThoughtContent>
+              </ChainOfThought>
+            )}
+            {finalAnswerGroup && renderItem(finalAnswerGroup.items[0], lastAnswerGroupIndex, true)}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">

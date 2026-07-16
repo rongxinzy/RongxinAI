@@ -19,7 +19,7 @@ import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
-import { APP_NAME, LEGACY_APP_NAME } from './appConstants';
+import { APP_DATA_DIR_NAME, APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { type CoworkExecutionMode, type CoworkMessageType, type CoworkSessionStatus,CoworkStore } from './coworkStore';
 import { setLanguage, t } from './i18n';
@@ -628,7 +628,7 @@ const savePngWithDialog = async (
 
 const configureUserDataPath = (): void => {
   const appDataPath = app.getPath('appData');
-  const preferredUserDataPath = path.join(appDataPath, APP_NAME);
+  const preferredUserDataPath = path.join(appDataPath, APP_DATA_DIR_NAME);
   const legacyUserDataPath = path.join(appDataPath, LEGACY_APP_NAME);
   const currentUserDataPath = app.getPath('userData');
   const targetUserDataPath =

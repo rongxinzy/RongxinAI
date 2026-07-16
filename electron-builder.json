@@ -1,7 +1,7 @@
 {
   "appId": "com.rongxinai.app",
-  "productName": "RongxinAI",
-  "executableName": "RongxinAI",
+  "productName": "知远",
+  "executableName": "知远",
   "directories": {
     "output": "release"
   },
@@ -62,7 +62,7 @@
   ],
   "protocols": [
     {
-      "name": "RongxinAI",
+      "name": "知远",
       "schemes": [
         "rongxinai"
       ]
@@ -80,9 +80,9 @@
     "entitlementsInherit": "build/entitlements.mac.plist",
     "extendInfo": {
       "CFBundleIconName": "icon",
-      "NSCalendarsUsageDescription": "RongxinAI 需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
-      "NSRemindersUsageDescription": "RongxinAI 需要访问您的提醒事项来帮助您管理待办事项。",
-      "NSAppleEventsUsageDescription": "RongxinAI 需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
+      "NSCalendarsUsageDescription": "知远需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
+      "NSRemindersUsageDescription": "知远需要访问您的提醒事项来帮助您管理待办事项。",
+      "NSAppleEventsUsageDescription": "知远需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
     },
     "extraResources": [
       {
@@ -241,7 +241,7 @@
       }
     ],
     "desktop": {
-      "Name": "RongxinAI",
+      "Name": "知远",
       "Comment": "AI-assisted coding and productivity tool",
       "Terminal": "false"
     }

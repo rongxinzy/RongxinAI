@@ -41,8 +41,8 @@
 
   ; ── Kill every process that might hold file handles in the install dir ──
   ;
-  ; 1. RongxinAI.exe — the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
-  ; 2. node.exe whose binary lives inside the RongxinAI install tree
+  ; 1. 知远.exe — the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
+  ; 2. node.exe whose binary lives inside the 知远 or RongxinAI install tree
   ;    (Web Search bridge server, MCP servers spawned with detached:true)
   ;
   ; Stop-Process -Force is equivalent to taskkill /F — the processes have no
@@ -50,15 +50,17 @@
   ; "ghost handles" in the Windows kernel. We poll until no matching process
   ; remains before proceeding.
 
-  DetailPrint "[Installer] Stopping running RongxinAI processes"
+  DetailPrint "[Installer] Stopping running 知远 processes"
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
     Stop-Process -Name RongxinAI -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
       $$procs = @();\
+      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
       $$procs += Get-Process -Name RongxinAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" };\
+      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" };\
       if ($$procs.Count -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'
@@ -71,7 +73,7 @@
   FileClose $9
   DetailPrint "Stop processes: $5 ms"
   FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
-  FileWrite $R9 "  Stop RongxinAI processes: $5 ms$\r$\n"
+  FileWrite $R9 "  Stop 知远 processes: $5 ms$\r$\n"
   FileClose $R9
 
   ; ── Clean stale openclaw-weixin session data ──
@@ -335,7 +337,7 @@
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-manifest$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend manifest is missing from the installer resources. Please reinstall RongxinAI with a valid installer package."
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend manifest is missing from the installer resources. Please reinstall 知远 with a valid installer package."
     Abort
 
   LlamaCppBackendResourcesPresent:
@@ -347,7 +349,7 @@
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-helper$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installer helper is missing from the installer resources. Please reinstall RongxinAI with a valid installer package."
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installer helper is missing from the installer resources. Please reinstall 知远 with a valid installer package."
     Abort
 
   LlamaCppBackendInstallRun:
@@ -358,7 +360,7 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "\
     $$env:ELECTRON_RUN_AS_NODE = \"1\";\
-    $$electron = \"$INSTDIR\RongxinAI.exe\";\
+    $$electron = \"$INSTDIR\知远.exe\";\
     $$helper = \"$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs\";\
     $$manifest = \"$INSTDIR\resources\llamacpp-backends\manifest.json\";\
     $$resources = \"$INSTDIR\resources\llamacpp-backends\";\
@@ -505,16 +507,18 @@
   ; Kill all running app instances (main app + OpenClaw gateway + detached
   ; node.exe services) before the uninstaller's built-in process check.
   ; Without this, the uninstaller detects the OpenClaw gateway process
-  ; (also named RongxinAI.exe) and shows an "app cannot be closed" dialog
+  ; (also named 知远.exe) and shows an "app cannot be closed" dialog
   ; where even "Retry" never succeeds — because the gateway has no UI window
   ; for the user to close.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
     Stop-Process -Name RongxinAI -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
       $$procs = @();\
+      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
       $$procs += Get-Process -Name RongxinAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" };\
+      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" };\
       if ($$procs.Count -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'

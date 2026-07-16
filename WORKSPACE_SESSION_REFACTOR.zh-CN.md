@@ -48,13 +48,13 @@ Agent 表示角色、身份、模型和技能配置。它不再决定 Cowork 会
 
 新增 `workspaces` 表：
 
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 由规范化路径计算出的稳定 ID |
-| `name` | 侧栏显示名称，默认取目录名 |
-| `path` | 规范化后的绝对路径，唯一 |
-| `created_at` | 首次登记时间 |
-| `updated_at` | 最近使用或重命名时间 |
+| 字段         | 说明                        |
+| ------------ | --------------------------- |
+| `id`         | 由规范化路径计算出的稳定 ID |
+| `name`       | 侧栏显示名称，默认取目录名  |
+| `path`       | 规范化后的绝对路径，唯一    |
+| `created_at` | 首次登记时间                |
+| `updated_at` | 最近使用或重命名时间        |
 
 `cowork_sessions` 新增：
 
@@ -114,12 +114,12 @@ Agent 的 OpenClaw 专属文件仍可由 OpenClaw 配置同步逻辑维护，用
 
 这保证了以下行为：
 
-| 操作 | 新会话 | 已有会话 |
-| --- | --- | --- |
-| 切换 Agent | 影响后续新会话 | 不改变角色 |
-| 修改 Agent prompt | 影响后续新会话 | 不改变已保存 prompt |
-| 切换 Workspace | 影响后续新会话 | 通过会话自身 Workspace 恢复 |
-| 修改全局 Cowork prompt | 影响后续新会话 | 不覆盖历史 prompt |
+| 操作                   | 新会话         | 已有会话                    |
+| ---------------------- | -------------- | --------------------------- |
+| 切换 Agent             | 影响后续新会话 | 不改变角色                  |
+| 修改 Agent prompt      | 影响后续新会话 | 不改变已保存 prompt         |
+| 切换 Workspace         | 影响后续新会话 | 通过会话自身 Workspace 恢复 |
+| 修改全局 Cowork prompt | 影响后续新会话 | 不覆盖历史 prompt           |
 
 ## 6. 运行时工作目录
 
@@ -142,11 +142,11 @@ OpenClaw IM/邮件通道仍保留原有 Agent 默认工作目录解析，因为�
 
 Workspace IPC 常量位于 `src/shared/workspace/constants.ts`：
 
-| IPC | 用途 |
-| --- | --- |
-| `cowork:workspace:list` | 获取 Workspace 列表 |
+| IPC                       | 用途                       |
+| ------------------------- | -------------------------- |
+| `cowork:workspace:list`   | 获取 Workspace 列表        |
 | `cowork:workspace:ensure` | 按目录创建或获取 Workspace |
-| `cowork:workspace:rename` | 修改 Workspace 显示名称 |
+| `cowork:workspace:rename` | 修改 Workspace 显示名称    |
 
 会话 IPC 的 start/list 请求增加 `workspaceId`。当 Workspace ID 存在时，主进程以 Workspace 记录中的路径为准，不信任与其不一致的前端 `cwd`。
 
@@ -198,6 +198,7 @@ npx tsc -p tsconfig.json --noEmit
 4. 选择 Workspace B 创建会话，确认侧栏按 Workspace 分组。
 5. 使用旧数据库启动应用，确认历史会话自动出现于对应 Workspace。
 6. 关闭应用后重新打开，确认 Workspace、会话和 Agent 快照可以恢复。
+
 ## 11. 会话级专家架构
 
 本节补充当前版本的会话级专家实现。专家属于会话上下文，不属于 Workspace 配置；Workspace 只负责文件工具的工作目录。同一个 Workspace 内的不同会话可以选择不同专家，一个会话也可以同时选择多个专家。
@@ -231,7 +232,7 @@ npx tsc -p tsconfig.json --noEmit
 + 当前会话选中的技能上下文
 ```
 
-Pi runtime 通过 `createAgentSession({ systemPrompt })` 接收提示词，不再把每个会话的提示词写入共享的 `<workspace>/.pi/SYSTEM.md` 或 `~/.pi/agent/SYSTEM.md`。技能只格式化当前会话需要的技能，避免把全部用户技能注入每个会话。
+Pi runtime 通过每个会话独立的 `DefaultResourceLoader({ systemPromptOverride })` 接收提示词，不再把每个会话的提示词写入共享的 `<workspace>/.pi/SYSTEM.md` 或 `~/.pi/agent/SYSTEM.md`。技能只格式化当前会话需要的技能，避免把全部用户技能注入每个会话。
 
 升级时需要注意：旧版本可能已经在 Workspace 留下 `.pi/SYSTEM.md`。首次演示应使用干净 Workspace，避免旧文件被 Pi ResourceLoader 自动加载并污染新会话。
 
@@ -275,3 +276,68 @@ npm test
 6. 使用旧数据库启动，确认历史会话和消息仍可见。
 
 展会应使用全新 Workspace，提前安装专家、配置模型和登录态，并预热 runtime。建议演示“输入区选择专家 -> 首次发送 -> 展示 Badge -> 重启后恢复会话”。当前版本不建议现场演示运行中会话动态替换专家、高权限 MCP 或 OpenClaw 网关故障恢复。
+
+## 12. 本次 MR 增量修复
+
+### 12.1 会话历史分页与滚动加载
+
+会话首次打开时后端仍只读取最近一页消息，默认页大小为 30 条，以控制首次 IPC 传输和首屏渲染成本。消息区滚动到顶部后，Renderer 调用 `getSessionMessages` 分页读取更早消息，并通过新增内容的高度差补偿 `scrollTop`，保证用户当前阅读位置不跳动。
+
+如果首屏消息不足以产生滚动条，前端会自动继续请求更早页面，直到历史内容能够滚动或已经到达会话开头。该机制不删除、不覆盖 SQLite 中的历史消息。
+
+### 12.2 中间过程统一折叠
+
+一个会话 turn 中，最后一个 assistant answer 单独显示；其之前的中间 answer、思考内容和工具调用统一放在“中间过程”折叠区中：
+
+- 流式执行期间中间过程保持展开，方便观察实时进度。
+- final answer 生成后中间过程自动收起。
+- 用户展开中间过程时，工具卡片仍保持工具自身的折叠状态，不会一次性展开工具输入和输出。
+- 思考状态以消息分组状态为准；后续 answer 已出现时，即使旧 metadata 仍标记 `isStreaming`，界面也显示“思考完成”。
+
+### 12.3 系统语言与全局提示词
+
+`resources/SYSTEM_PROMPT.md` 要求回复语言优先跟随用户当前系统语言或应用语言设置：
+
+1. 不因模型默认语言、专家套件或技能提示词自行切换语言。
+2. 无法读取系统语言时，跟随用户当前消息语言。
+3. 用户明确指定语言时，遵循用户的明确要求。
+
+### 12.4 联网搜索与 Playwright
+
+联网搜索优先使用 RongxinAI `web-search` skill。该 skill 通过 Playwright 控制隔离的本地 Chrome，默认无头搜索，受阻时回退到可见浏览器。已知 URL 优先使用 `web_fetch`，需要登录、表单或复杂动态交互时才使用 `browser`。
+
+Windows 执行搜索脚本必须使用 Git Bash/PortableGit，不能直接使用没有 Linux 发行版的 `C:\Windows\System32\bash.exe`。Playwright CLI 操作遵循 `open -> snapshot -> 使用最新 ref -> 页面变化后重新 snapshot` 的流程。
+
+### 12.5 Markdown 代码高亮容错
+
+流式代码围栏可能在语言标识尚未生成完整时短暂出现 `pyt`，随后才变为 `python`。代码块渲染器现在会：
+
+- 将 `pyt` 归一化为 `python`。
+- 对未知语言跳过 Shiki 加载，按纯文本显示，避免前端异常。
+- 保证头部显示语言和实际 Shiki 高亮语言使用同一个归一化结果。
+
+### 12.6 本次验证
+
+已通过：
+
+- `npm.cmd run build:tsc`
+- 相关 Renderer、ai-elements 和 i18n 文件 ESLint
+- `git diff --check`
+
+完整 Vitest 在当前 Windows 宿主机上被 `better-sqlite3` 原生文件锁定阻断，错误为 `EBUSY/EPERM`，未出现测试断言失败。该环境问题需要释放占用 `node_modules/better-sqlite3/build/Release/better_sqlite3.node` 的进程后再执行。
+
+### 12.7 MR 交付与合并
+
+- 源分支：`feat/session-level-experts`。
+- 目标分支：`dev`，提交基线为远端最新 `origin/dev`。
+- 提交内容包含历史分页、中间过程折叠、系统语言约束、联网搜索说明、代码高亮容错和本文档。
+- 合并前应确认 TypeScript、Lint 和差异检查通过；Vitest 需在释放 `better-sqlite3` 文件锁后补跑。
+- 合并后建议重新打开已有会话，验证历史消息可持续向上加载，且 final answer 前的中间过程不会展开工具卡片。
+
+### 12.8 产品名称与后端路径兼容
+
+- 设置“关于”、窗口标题、托盘菜单、安装包、可执行文件、安装器和系统应用注册名统一显示为“知远”。
+- `appId`、`rongxinai` 协议 scheme、SQLite 文件名和历史兼容标识保持不变，避免破坏已有安装、协议唤起和数据读取。
+- Windows、macOS 和 Linux 的打包配置只调整产品显示名；安装器仍兼容停止旧版 `RongxinAI.exe` 进程。
+- `%APPDATA%\\RongxinAI` 继续作为首选用户数据目录，OpenClaw 状态、SQLite、技能、模型、日志和更新文件不会迁移到“知远”目录。
+- 如果设备只有旧版 `%APPDATA%\\LobsterAI` 数据目录且没有 `RongxinAI` 目录，启动时仍沿用旧目录，保证历史数据可见。
