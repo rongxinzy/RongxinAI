@@ -9,6 +9,30 @@ import renderer from 'vite-plugin-electron-renderer';
 const devPort = 5175;
 const katexVersion = process.env.npm_package_dependencies_katex?.replace(/^[~^]/, '') || '0.16.0';
 
+const copyPhotonWasmPlugin = () => ({
+  name: 'copy-photon-wasm',
+  closeBundle() {
+    const sourceCandidates = [
+      path.resolve(__dirname, 'node_modules/@earendil-works/pi-coding-agent/node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm'),
+      path.resolve(__dirname, 'node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm'),
+    ];
+    const source = sourceCandidates.find((candidate) => fs.existsSync(candidate));
+    if (!source) {
+      console.warn('[Vite] Photon WASM asset was not found; Electron main process may fail to start.');
+      return;
+    }
+    const targetDir = path.resolve(__dirname, 'dist-electron');
+    fs.mkdirSync(targetDir, { recursive: true });
+    const target = path.join(targetDir, 'photon_rs_bg.wasm');
+    if (fs.existsSync(target)) {
+      const sourceBytes = fs.readFileSync(source);
+      const targetBytes = fs.readFileSync(target);
+      if (sourceBytes.equals(targetBytes)) return;
+    }
+    fs.copyFileSync(source, target);
+  },
+});
+
 export default defineConfig({
   define: {
     // KaTeX ESM bundle references this compile-time constant.
@@ -23,6 +47,7 @@ export default defineConfig({
         // 主进程入口文件
         entry: 'src/main/main.ts',
         vite: {
+          plugins: [copyPhotonWasmPlugin()],
           build: {
             sourcemap: true,
             outDir: 'dist-electron',
