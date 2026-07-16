@@ -265,8 +265,8 @@ class CoworkService {
     const result = await window.electron?.cowork?.listSessions({
       limit: COWORK_SESSION_PAGE_SIZE,
       offset: 0,
-      agentId: effectiveWorkspaceId ? undefined : agentId,
-      workspaceId: effectiveWorkspaceId,
+      agentId: workspaceService.isWorkspaceApiAvailable() && effectiveWorkspaceId ? undefined : agentId,
+      workspaceId: workspaceService.isWorkspaceApiAvailable() ? effectiveWorkspaceId : undefined,
     });
     if (result?.success && result.sessions) {
       // High-frequency IM traffic can trigger overlapping list refreshes.
@@ -293,7 +293,11 @@ class CoworkService {
     limit: number,
     offset: number,
   ): Promise<CoworkSessionListResult> {
-    const result = await window.electron?.cowork?.listSessions({ limit, offset, workspaceId });
+    const result = await window.electron?.cowork?.listSessions({
+      limit,
+      offset,
+      workspaceId: workspaceService.isWorkspaceApiAvailable() ? workspaceId : undefined,
+    });
     return result ?? { success: false, error: 'Cowork IPC is unavailable' };
   }
 
@@ -310,7 +314,9 @@ class CoworkService {
     const result = await window.electron?.cowork?.listSessions({
       limit: COWORK_SESSION_PAGE_SIZE,
       offset,
-      workspaceId: store.getState().workspace.currentWorkspaceId ?? undefined,
+      workspaceId: workspaceService.isWorkspaceApiAvailable()
+        ? store.getState().workspace.currentWorkspaceId ?? undefined
+        : undefined,
     });
     if (result?.success && result.sessions) {
       store.dispatch(appendSessions({ sessions: result.sessions, hasMore: result.hasMore ?? false }));
@@ -360,7 +366,9 @@ class CoworkService {
 
     const result = await cowork.startSession({
       ...options,
-      workspaceId: options.workspaceId ?? store.getState().workspace.currentWorkspaceId ?? undefined,
+      workspaceId: workspaceService.isWorkspaceApiAvailable()
+        ? options.workspaceId ?? store.getState().workspace.currentWorkspaceId ?? undefined
+        : undefined,
     });
     if (result.success && result.session) {
       store.dispatch(addSession(result.session));
