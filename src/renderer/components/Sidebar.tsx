@@ -360,7 +360,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               className={sidebarNavItemClassName}
             >
               <Pencil className={sidebarCreateIconClassName} />
-              {i18nService.t('newChat')}
+              {workMode === 'chat' ? i18nService.t('newChat') : '新建任务'}
             </Button>
           </div>
           {workMode !== 'chat' && (
@@ -422,7 +422,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Button>
             </>
           )}
-          {workMode === 'chat' && (
+          {workMode !== 'chat' && (
             <>
               <Button
                 type="button"
