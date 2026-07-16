@@ -17,7 +17,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           issue-message: |
-            👋 感谢你提交第一个 Issue！欢迎参与 LobsterAI 社区。
+            👋 感谢你提交第一个 Issue！欢迎参与容芯致远AI社区。
 
             请确认已完成以下事项：
             - 完整填写 Issue 模板
@@ -28,7 +28,7 @@ jobs:
 
             ---
 
-            👋 Thanks for opening your first issue! We appreciate your contribution to LobsterAI.
+            👋 Thanks for opening your first issue! We appreciate your contribution to RongxinZhiyuanAI.
 
             Please make sure you've:
             - Filled out the issue template completely
@@ -37,7 +37,7 @@ jobs:
 
             We'll review your issue as soon as possible.
           pr-message: |
-            👋 感谢你提交第一个 Pull Request！欢迎参与 LobsterAI 社区。
+            👋 感谢你提交第一个 Pull Request！欢迎参与容芯致远AI社区。
 
             请确认 PR 已满足以下要求：
             - 遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范
@@ -49,7 +49,7 @@ jobs:
 
             ---
 
-            👋 Thanks for your first pull request to LobsterAI! We appreciate your contribution.
+            👋 Thanks for your first pull request to RongxinZhiyuanAI! We appreciate your contribution.
 
             Please make sure your PR:
             - Follows the [Conventional Commits](https://www.conventionalcommits.org/) spec
