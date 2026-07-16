@@ -170,7 +170,7 @@ export const TurnBlock: React.FC<{
       const hasStreaming = currentItems.some(item => {
         if (item.type === 'assistant') {
           const meta = item.message.metadata;
-          return Boolean(meta?.isStreaming) && !Boolean(meta?.isFinal);
+          return Boolean(meta?.isStreaming) && !meta?.isFinal;
         }
         if (item.type === 'tool_group') return !item.group.toolResult;
         return false;
@@ -182,7 +182,7 @@ export const TurnBlock: React.FC<{
               const it = currentItems[i];
               if (it.type === 'assistant') {
                 const m = it.message.metadata;
-                if (Boolean(m?.isStreaming) && !Boolean(m?.isFinal)) return it;
+                if (Boolean(m?.isStreaming) && !m?.isFinal) return it;
               }
               if (it.type === 'tool_group' && !it.group.toolResult) return it;
             }
