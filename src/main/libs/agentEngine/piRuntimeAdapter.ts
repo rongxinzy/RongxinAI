@@ -288,7 +288,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         cwd: workspaceRoot,
         agentDir: pi.getAgentDir(),
         systemPromptOverride: () => effectiveSystemPrompt || '',
-        appendSystemPromptOverride: () => [],
+        appendSystemPromptOverride: (): string[] => [],
       });
       await resourceLoader.reload();
       sessionOptions.resourceLoader = resourceLoader;

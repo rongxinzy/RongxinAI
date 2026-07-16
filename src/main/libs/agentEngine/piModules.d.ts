@@ -8,6 +8,18 @@
  */
 
 declare module '@earendil-works/pi-coding-agent' {
+  export class DefaultResourceLoader {
+    constructor(options: {
+      cwd: string;
+      agentDir: string;
+      systemPromptOverride?: (base: string | undefined) => string | undefined;
+      appendSystemPromptOverride?: (base: string[]) => string[];
+    });
+    reload(): Promise<void>;
+  }
+
+  export function getAgentDir(): string;
+
   export const AuthStorage: {
     inMemory(): {
       setRuntimeApiKey(provider: string, apiKey: string): void;
