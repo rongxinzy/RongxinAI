@@ -164,24 +164,25 @@ export const TurnBlock: React.FC<{
     const result: Array<{ summary: string; items: typeof visibleAssistantItems; streaming: boolean }> = [];
     let currentItems: typeof visibleAssistantItems = [];
 
-    const flush = () => {
+    const flush = (followedByAnswer = false) => {
       if (currentItems.length === 0) return;
-      // "Streaming" means any item is still active (not finalized for thinking, no result for tools)
+      // An answer after thinking means thinking is definitely done, regardless of metadata.
       const hasStreaming = currentItems.some(item => {
         if (item.type === 'assistant') {
           const meta = item.message.metadata;
+          if (followedByAnswer) return false; // answer appeared → thinking is done
           return Boolean(meta?.isStreaming) && !meta?.isFinal;
         }
         if (item.type === 'tool_group') return !item.group.toolResult;
         return false;
       });
-      // Find the currently active item for accurate summary text
       const streamingItem = hasStreaming
         ? (() => {
             for (let i = currentItems.length - 1; i >= 0; i--) {
               const it = currentItems[i];
               if (it.type === 'assistant') {
                 const m = it.message.metadata;
+                if (followedByAnswer) continue; // answer appeared → thinking done
                 if (Boolean(m?.isStreaming) && !m?.isFinal) return it;
               }
               if (it.type === 'tool_group' && !it.group.toolResult) return it;
@@ -213,7 +214,7 @@ export const TurnBlock: React.FC<{
         || item.type === 'tool_group';
 
       if (isAnswer) {
-        flush();
+        flush(true); // answer follows → thinking before it is done
         result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming) });
       } else if (isStep) {
         currentItems.push(item);
