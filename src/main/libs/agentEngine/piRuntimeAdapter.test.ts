@@ -217,6 +217,15 @@ describe('PiRuntimeAdapter', () => {
       // prompt() called twice total (once for start, once for continue)
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
+
+    it('should recreate an active session when its system prompt changes', async () => {
+      await adapter.startSession('test', 'First', { systemPrompt: 'You are the original expert.' });
+      await adapter.continueSession('test', 'Second', { systemPrompt: 'You are the replacement expert.' });
+
+      expect(mockSession.abort).toHaveBeenCalled();
+      expect(mockDefaultResourceLoader).toHaveBeenCalledTimes(2);
+      expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('stopSession', () => {

@@ -89,6 +89,8 @@ interface ActivePiSession {
   piSession: PiSession;
   abortController: AbortController;
   authStorage: PiAuthStorage | null;
+  /** System prompt requested by the current Cowork session snapshot. */
+  requestedSystemPrompt: string;
   /** Message id for the visible answer (text) bubble of the current turn. */
   assistantMessageId: string | null;
   /** Message id for the thinking bubble of the current turn. */
@@ -349,6 +351,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         piSession: session,
         abortController,
         authStorage: resolvedModel.authStorage,
+        requestedSystemPrompt: options.systemPrompt?.trim() || '',
         assistantMessageId: null,
         thinkingMessageId: null,
         answerText: '',
@@ -401,6 +404,19 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       return this.startSession(sessionId, prompt, {
         ...options,
         _piPromptOverride: piPrompt,
+      });
+    }
+
+    const requestedSystemPrompt = options.systemPrompt?.trim();
+    if (requestedSystemPrompt !== undefined && requestedSystemPrompt !== active.requestedSystemPrompt) {
+      const history = this.store?.getSession(sessionId)?.messages ?? [];
+      return this.startSession(sessionId, prompt, {
+        ...options,
+        conversationHistory: history
+          .filter((message): message is CoworkMessage & { type: 'user' | 'assistant' } => (
+            message.type === 'user' || message.type === 'assistant'
+          ))
+          .map(message => ({ role: message.type, content: message.content })),
       });
     }
 

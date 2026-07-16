@@ -111,7 +111,7 @@ function checkI18nArrayField(obj, fieldName, result, expectedCount) {
 function parseMdFrontmatter(mdPath) {
   let content;
   try {
-    content = fs.readFileSync(mdPath, 'utf-8');
+    content = fs.readFileSync(mdPath, 'utf-8').replace(/\r\n?/g, '\n');
   } catch (e) {
     return { fm: null, content: null, error: `Cannot read ${mdPath}: ${e.message}` };
   }
