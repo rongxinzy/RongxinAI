@@ -286,13 +286,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       // Pi's createAgentSession does not accept a systemPrompt option. Its
       // default resource loader supplies the Pi Coding Assistant identity,
       // so override that loader per session to keep expert contexts isolated.
-      const resourceLoader = new pi.DefaultResourceLoader({
-        cwd: workspaceRoot,
-        agentDir: pi.getAgentDir(),
-        systemPromptOverride: () => effectiveSystemPrompt || '',
-        appendSystemPromptOverride: (): string[] => [],
-      });
-      await resourceLoader.reload();
+      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, effectiveSystemPrompt);
       sessionOptions.resourceLoader = resourceLoader;
 
       // Resolve model early — needed by both MCP proxy and subagent tool
@@ -392,9 +386,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const active = this.activeSessions.get(sessionId);
     if (!active) {
       console.log(`[PiRuntime] continueSession: session ${sessionId} not active, restoring context via prompt`);
+      const storedSession = this.store?.getSession(sessionId);
       // Load previous messages and embed them as context prepended to the PI prompt.
       // The user message saved/emitted to the renderer stays the clean original prompt.
-      const history = this.store?.getSession(sessionId)?.messages ?? [];
+      const history = storedSession?.messages ?? [];
       const contextParts = history
         .filter(m => m.type === 'user' || m.type === 'assistant')
         .map(m => `${m.type === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
@@ -403,6 +398,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         : prompt;
       return this.startSession(sessionId, prompt, {
         ...options,
+        systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
+        expertIds: options.expertIds ?? storedSession?.experts.map(expert => expert.expertId),
+        workspaceRoot: options.workspaceRoot ?? storedSession?.cwd,
+        agentId: options.agentId ?? storedSession?.agentId,
+        modelOverride: options.modelOverride ?? storedSession?.modelOverride,
         _piPromptOverride: piPrompt,
       });
     }
@@ -520,6 +520,21 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   }
 
   // ── Chat mode: direct LLM without agent loop ──
+
+  private async createPiResourceLoader(
+    pi: PiModules,
+    cwd: string,
+    systemPrompt: string,
+  ): Promise<PiResourceLoader> {
+    const resourceLoader = new pi.DefaultResourceLoader({
+      cwd,
+      agentDir: pi.getAgentDir(),
+      systemPromptOverride: () => systemPrompt || '',
+      appendSystemPromptOverride: (): string[] => [],
+    });
+    await resourceLoader.reload();
+    return resourceLoader;
+  }
 
   /**
    * Send a prompt directly to the LLM, bypassing the agent loop.
@@ -1232,9 +1247,13 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         try {
           const subOptions: Record<string, unknown> = {
             cwd: workspaceRoot || process.cwd(),
-            systemPrompt,
             model,
           };
+          subOptions.resourceLoader = await this.createPiResourceLoader(
+            pi,
+            (subOptions.cwd as string),
+            systemPrompt,
+          );
           if (authStorage) {
             subOptions.authStorage = authStorage;
           }
