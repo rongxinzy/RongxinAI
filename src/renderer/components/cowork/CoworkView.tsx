@@ -545,6 +545,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
               throw new Error(chunk.errorText);
           }
         }
+        // Finalize message metadata to prevent streaming replay on reload
+        if (assistantMessageAdded) {
+          dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: assistantMsgId, content: assistantContent, metadata: { isStreaming: false, isFinal: true } }));
+        }
+        if (thinkingMessageAdded) {
+          dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: thinkingMsgId, content: thinkingContent, metadata: { isStreaming: false, isFinal: true, isThinking: true } }));
+        }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
         // Persist updated session (with new messages) to SQLite
         const updatedSession = store.getState().cowork.currentSession;
