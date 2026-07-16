@@ -21,6 +21,7 @@ import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
 import { APP_DATA_DIR_NAME, APP_NAME, LEGACY_APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
+import { applyCoworkLanguagePrompt, type CoworkPromptLanguage } from './coworkLanguagePrompt';
 import { type CoworkExecutionMode, type CoworkMessageType, type CoworkSessionStatus,CoworkStore } from './coworkStore';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
@@ -2074,7 +2075,11 @@ function mergeCoworkSystemPrompt(
     buildScheduledTaskEnginePrompt(),
     systemPrompt?.trim() || '',
   ].filter(Boolean);
-  return sections.length > 0 ? sections.join('\n\n') : undefined;
+  if (sections.length === 0) return undefined;
+
+  const configuredLanguage = getStore().get<AppConfigSettings>('app_config')?.language;
+  const language: CoworkPromptLanguage = configuredLanguage === 'en' ? 'en' : 'zh';
+  return applyCoworkLanguagePrompt(sections.join('\n\n'), language);
 }
 
 const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpertInput[] => {
@@ -3470,8 +3475,15 @@ if (!gotTheLock) {
         ...(existingSession?.experts || []).flatMap((expert) => expert.skillIds),
       ])];
 
+      const configuredLanguage = getStore().get<AppConfigSettings>('app_config')?.language;
+      const language: CoworkPromptLanguage = configuredLanguage === 'en' ? 'en' : 'zh';
+      const runtimeSystemPrompt = applyCoworkLanguagePrompt(
+        existingSession?.systemPrompt || options.systemPrompt,
+        language,
+      );
+
       runtime.continueSession(options.sessionId, options.prompt, {
-        systemPrompt: existingSession?.systemPrompt || options.systemPrompt,
+        systemPrompt: runtimeSystemPrompt,
         skillIds: runtimeSkillIds,
         imageAttachments: options.imageAttachments,
         workspaceRoot: existingSession?.cwd,
