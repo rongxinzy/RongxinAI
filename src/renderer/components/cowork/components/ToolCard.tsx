@@ -49,8 +49,9 @@ const TodoWriteInputView: React.FC<{ items: ParsedTodoItem[] }> = ({ items }) =>
 export const ToolCard: React.FC<{
   group: ToolGroupItem;
   isLastInSequence?: boolean;
+  muted?: boolean;
   mapDisplayText?: (value: string) => string;
-}> = ({ group, isLastInSequence = true, mapDisplayText }) => {
+}> = ({ group, isLastInSequence = true, muted = false, mapDisplayText }) => {
   const { toolUse, toolResult } = group;
   const rawToolName = typeof toolUse.metadata?.toolName === 'string' ? toolUse.metadata.toolName : 'Tool';
   const displayName = getToolDisplayName(rawToolName);
@@ -78,7 +79,7 @@ export const ToolCard: React.FC<{
   return (
     <div className="relative py-1">
       {!isLastInSequence && <div className="absolute left-[3.5px] top-[14px] bottom-[-8px] w-px bg-border" />}
-      <Tool>
+      <Tool className={muted ? 'text-muted-foreground' : undefined}>
         <ToolHeader type={`tool-${rawToolName}` as ToolUIPart['type']} state={toolState} title={displayName} />
         <ToolContent className="flex flex-col gap-4">
           {isBashTool ? (

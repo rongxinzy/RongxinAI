@@ -15,3 +15,13 @@ export const AgentSidebarPageSize = {
   Preview: 6,
   AllBatch: 100,
 } as const;
+
+export const ScheduledSessionTitlePrefix = {
+  Chinese: '[定时]',
+  English: '[Cron]',
+} as const;
+
+export const isScheduledSessionTitle = (title: string): boolean => {
+  const normalizedTitle = title.trim();
+  return Object.values(ScheduledSessionTitlePrefix).some((prefix) => normalizedTitle.startsWith(prefix));
+};

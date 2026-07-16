@@ -23,6 +23,7 @@ interface WorkspaceTreeNodeProps {
   onRenameTask: (task: AgentSidebarTaskNode, title: string) => Promise<void>;
   onToggleSelection: (sessionId: string) => void;
   onEnterBatchMode: (task: AgentSidebarTaskNode) => void;
+  showCreateTask?: boolean;
 }
 
 const TASKS_TRANSITION_MS = 200;
@@ -43,6 +44,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   onRenameTask,
   onToggleSelection,
   onEnterBatchMode,
+  showCreateTask = true,
 }) => {
   const [shouldRenderTasks, setShouldRenderTasks] = useState(workspace.isExpanded);
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
@@ -84,15 +86,17 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
           <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground"><Folder className="size-4" /></span>
           <span className="min-w-0 flex-1 truncate opacity-[0.76]" title={workspace.path}>{workspace.name}</span>
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => onCreateTask(workspace)}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-[0.3] hover:opacity-[0.46]"
-          aria-label={i18nService.t('myAgentSidebarNewTask')}
-        >
-          <Pencil className="size-3.5" />
-        </Button>
+        {showCreateTask && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => onCreateTask(workspace)}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-[0.3] hover:opacity-[0.46]"
+            aria-label={i18nService.t('myAgentSidebarNewTask')}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        )}
       </div>
 
       {shouldRenderTasks && (
