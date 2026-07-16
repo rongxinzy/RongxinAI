@@ -2,10 +2,7 @@
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
 import { LlamaCppModelLaunchLogPhase } from '../../../../shared/llamacpp';
-import {
-  LOCAL_INFERENCE_MODEL_LAUNCH_LOG_MAX_ENTRIES,
-  LOCAL_INFERENCE_MODEL_LAUNCH_SUCCESS_CLOSE_MS,
-} from '../constants';
+import { LOCAL_INFERENCE_MODEL_LAUNCH_LOG_MAX_ENTRIES } from '../constants';
 
 export const ModelLaunchLogPanelStatus = {
   Idle: 'idle',
@@ -39,29 +36,10 @@ export function useModelLaunchLogs() {
   const [state, setState] = useState<ModelLaunchLogPanelState>(initialState);
   const userClosedCurrentLaunchRef = useRef(false);
   const stateRef = useRef<ModelLaunchLogPanelState>(initialState);
-  const successCloseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
-
-  const clearSuccessCloseTimer = useCallback(() => {
-    if (successCloseTimerRef.current === null) return;
-    window.clearTimeout(successCloseTimerRef.current);
-    successCloseTimerRef.current = null;
-  }, []);
-
-  const scheduleSuccessClose = useCallback(() => {
-    clearSuccessCloseTimer();
-    successCloseTimerRef.current = window.setTimeout(() => {
-      successCloseTimerRef.current = null;
-      setState(current => ({
-        ...current,
-        visible: false,
-        status: ModelLaunchLogPanelStatus.Idle,
-      }));
-    }, LOCAL_INFERENCE_MODEL_LAUNCH_SUCCESS_CLOSE_MS);
-  }, [clearSuccessCloseTimer]);
 
   const appendEvent = useCallback((event: LlamaCppModelLaunchLogEvent) => {
     if (!shouldAcceptLaunchLogEvent(stateRef.current, event)) return;
@@ -81,11 +59,7 @@ export function useModelLaunchLogs() {
         logs,
       };
     });
-
-    if (event.phase === LlamaCppModelLaunchLogPhase.Succeeded) {
-      scheduleSuccessClose();
-    }
-  }, [scheduleSuccessClose]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = window.electron.llamacpp.onModelLaunchLog(appendEvent);
@@ -94,10 +68,7 @@ export function useModelLaunchLogs() {
     };
   }, [appendEvent]);
 
-  useEffect(() => () => clearSuccessCloseTimer(), [clearSuccessCloseTimer]);
-
   const beginModelLaunch = useCallback((modelName: string) => {
-    clearSuccessCloseTimer();
     userClosedCurrentLaunchRef.current = false;
     setState({
       visible: true,
@@ -107,7 +78,7 @@ export function useModelLaunchLogs() {
       modelName,
       logs: [],
     });
-  }, [clearSuccessCloseTimer]);
+  }, []);
 
   const markModelLaunchSucceeded = useCallback(() => {
     setState(current => ({
@@ -116,18 +87,16 @@ export function useModelLaunchLogs() {
         ? current.status
         : ModelLaunchLogPanelStatus.Succeeded,
     }));
-    scheduleSuccessClose();
-  }, [scheduleSuccessClose]);
+  }, []);
 
   const markModelLaunchFailed = useCallback(() => {
-    clearSuccessCloseTimer();
     setState(current => ({
       ...current,
       visible: true,
       collapsed: false,
       status: ModelLaunchLogPanelStatus.Failed,
     }));
-  }, [clearSuccessCloseTimer]);
+  }, []);
 
   const setCollapsed = useCallback((collapsed: boolean) => {
     setState(current => ({ ...current, collapsed }));

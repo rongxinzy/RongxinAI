@@ -82,6 +82,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppServiceStartupBackendUnavailable: '当前 llama.cpp 运行时后端不可用，请检查显卡驱动或运行时配置。',
     llamacppServiceStartupRuntimeDamaged: 'llama.cpp runtime 不可用或可能已损坏，请重新安装应用后重试。',
     llamacppServiceStartupUnknown: 'llama.cpp 服务启动失败，请稍后重试。',
+    llamacppModelLaunchLogWindowTitle: '模型启动日志',
     localInferenceImportRuntimeDialogTitle: '选择 llama.cpp backend',
     localInferenceImportRuntimeDialogMessage: '请选择 llama.cpp backend 主包压缩包（zip 或 tar.gz）；如果已经解压，请进入目录后选择其中任意文件。RongxinAI 会校验平台和 backend 类型后导入。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
@@ -368,6 +369,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppServiceStartupBackendUnavailable: 'The selected llama.cpp runtime backend is unavailable. Check the GPU driver or runtime configuration.',
     llamacppServiceStartupRuntimeDamaged: 'The llama.cpp runtime is unavailable or may be damaged. Reinstall the application and try again.',
     llamacppServiceStartupUnknown: 'The llama.cpp service failed to start. Please try again later.',
+    llamacppModelLaunchLogWindowTitle: 'Model startup logs',
     localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Backend',
     localInferenceImportRuntimeDialogMessage: 'Select a llama.cpp backend archive (zip or tar.gz). If it is already extracted, open that directory and choose any file inside it. RongxinAI will validate the platform and backend type before importing it.',
     coworkErrorUnknown:

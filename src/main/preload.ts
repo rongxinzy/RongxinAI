@@ -177,6 +177,12 @@ contextBridge.exposeInMainWorld('electron', {
     setModelPreference: (input: unknown) => ipcRenderer.invoke(LlamaCppIpcChannel.SetModelPreference, input),
     loadModel: (input: unknown) => ipcRenderer.invoke(LlamaCppIpcChannel.LoadModel, input),
     unloadModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.UnloadModel, name),
+    getLatestModelLaunchLogSession: (input?: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.GetLatestModelLaunchLogSession, input),
+    readModelLaunchLogFile: (input: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.ReadModelLaunchLogFile, input),
+    openModelLaunchLogWindow: (input?: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.OpenModelLaunchLogWindow, input),
     installModel: (input: unknown) => ipcRenderer.invoke(LlamaCppIpcChannel.InstallModel, input),
     cancelInstall: (modelId: string) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.CancelInstall, modelId),
@@ -186,6 +192,10 @@ contextBridge.exposeInMainWorld('electron', {
       onPush(LlamaCppIpcChannel.InstallProgress, callback),
     onModelLaunchLog: (callback: (event: unknown) => void) =>
       onPush(LlamaCppIpcChannel.ModelLaunchLog, callback),
+    onModelLaunchLogCleared: (callback: (event: unknown) => void) =>
+      onPush(LlamaCppIpcChannel.ModelLaunchLogCleared, callback),
+    onModelLaunchLogWindowTargetChanged: (callback: (target: unknown) => void) =>
+      onPush(LlamaCppIpcChannel.ModelLaunchLogWindowTargetChanged, callback),
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, progress: any) => {
         const name = String(progress?.modelId || progress?.modelName || '');

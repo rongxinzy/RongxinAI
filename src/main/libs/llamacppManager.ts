@@ -100,6 +100,17 @@ type LlamaCppManagerStorage = {
   delete(key: string): void;
 };
 
+export const LlamaCppManagerLifecycleEvent = {
+  ModelsUnloadedForQuit: 'models-unloaded-for-quit',
+} as const;
+
+export type LlamaCppManagerLifecycleEvent =
+  typeof LlamaCppManagerLifecycleEvent[keyof typeof LlamaCppManagerLifecycleEvent];
+
+export type LlamaCppModelsUnloadedForQuitEvent = {
+  modelNames: string[];
+};
+
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
   private process: ChildProcessWithoutNullStreams | null = null;
@@ -1099,25 +1110,38 @@ export class LlamaCppManager extends EventEmitter {
       return;
     }
 
-    const modelNames = Array.from(
+    const unloadModelNames = Array.from(
       new Set(runningModels.map(model => (model.name || model.model || '').trim()).filter(Boolean)),
     );
-    if (modelNames.length === 0) return;
+    const logModelNames = Array.from(
+      new Set(
+        runningModels
+          .flatMap(model => [model.name, model.model, model.id])
+          .map(value => value?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+    if (unloadModelNames.length === 0) return;
 
-    console.log(`[LlamaCpp] unloading ${modelNames.length} model(s) during app quit`);
+    console.log(`[LlamaCpp] unloading ${unloadModelNames.length} model(s) during app quit`);
     const results = await Promise.allSettled(
-      modelNames.map(async modelName => {
+      unloadModelNames.map(async modelName => {
         await client.unloadModel(modelName, QUIT_UNLOAD_MODEL_TIMEOUT_MS);
       }),
     );
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         console.warn(
-          `[LlamaCpp] failed to unload model ${modelNames[index]} during quit:`,
+          `[LlamaCpp] failed to unload model ${unloadModelNames[index]} during quit:`,
           result.reason,
         );
       }
     });
+    if (logModelNames.length > 0) {
+      this.emit(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, {
+        modelNames: logModelNames,
+      } satisfies LlamaCppModelsUnloadedForQuitEvent);
+    }
   }
 
   private async writeModelPreset(

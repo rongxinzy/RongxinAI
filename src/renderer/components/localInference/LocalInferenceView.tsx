@@ -18,7 +18,6 @@ import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
-import { ModelLaunchLogPanel } from './components/ModelLaunchLogPanel';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
@@ -29,7 +28,6 @@ import {
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
-import { useModelLaunchLogs } from './hooks/useModelLaunchLogs';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
@@ -117,7 +115,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   useI18nLanguage();
-  const modelLaunchLogs = useModelLaunchLogs();
   const marketplaceSearchRef = useRef<number>(0);
   const loadingModelNameRef = useRef<string | null>(null);
   const marketplaceQueryRef = useRef(marketplaceQuery);
@@ -483,7 +480,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handleLoadModel = (model: OllamaModel) => {
     const modelName = model.name;
     if (loadingModelNameRef.current) return;
-    modelLaunchLogs.beginModelLaunch(modelName);
     loadingModelNameRef.current = modelName;
     setLoadingModelName(modelName);
     void runAction(async () => {
@@ -495,13 +491,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         const result = await window.electron.llamacpp.loadModel(input);
         setRunningModels(result.runningModels);
         notifyLlamaCppRunningModelsChanged();
-        modelLaunchLogs.markModelLaunchSucceeded();
         if (result.warning) {
           showToast(result.warning, LocalInferenceToastKind.Info);
         }
-      } catch (loadError) {
-        modelLaunchLogs.markModelLaunchFailed();
-        throw loadError;
       } finally {
         loadingModelNameRef.current = null;
         setLoadingModelName(current => (current === modelName ? null : current));
@@ -692,12 +684,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
           {activeTab === 'models' ? (
             <>
-              <ModelLaunchLogPanel
-                state={modelLaunchLogs.state}
-                onCollapsedChange={modelLaunchLogs.setCollapsed}
-                onClose={modelLaunchLogs.closePanel}
-              />
-
               <ModelsPanel
                 loading={loading}
                 loadingModelName={loadingModelName}

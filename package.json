@@ -79,7 +79,7 @@
     "build:skills": "npm run build:skill:web-search && npm run build:skill:tech-news && npm run build:skill:email",
     "prepare:modelscope-tokens": "node scripts/write-modelscope-token-resource.cjs",
     "start:electron": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron .",
-    "electron:dev": "rimraf dist-electron && npm run compile:electron && concurrently \"vite --port 5175\" \"wait-on -v -t 120000 -d 20000 http://localhost:5175 dist-electron/.electron-ready && npm run start:electron\"",
+    "electron:dev": "rimraf dist-electron && npm run compile:electron && concurrently \"vite --port 5175\" \"wait-on -l -t 120000 -d 20000 -i 1000 -s 1 http://localhost:5175 && wait-on -l -t 120000 -i 1000 dist-electron/.electron-ready && npm run start:electron\"",
     "electron:dev:openclaw": "npm run openclaw:runtime:host && npm run llamacpp:runtime:host && npm run electron:dev",
     "postinstall": "patch-package && electron-builder install-app-deps",
     "pack": "npm run setup:python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:host && npm run prepare:modelscope-tokens && electron-builder --dir",

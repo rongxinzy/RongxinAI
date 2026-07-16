@@ -38,6 +38,7 @@ import type {
   LlamaCppRunningModel,
 } from '../../../../shared/llamacpp';
 import { ProviderName } from '../../../../shared/providers';
+import logIconUrl from '../../../assets/localInference/log.svg';
 import { i18nService } from '../../../services/i18n';
 import {
   AnthropicIcon,
@@ -294,6 +295,10 @@ function ModelCard({
   const quantization = model.details?.quantization_level?.trim();
   const contextValue = getPreferredContext(model, runningModel, preference);
   const details = getModelDetails(model, quantization);
+  const handleOpenLaunchLog = () => {
+    void window.electron.llamacpp.openModelLaunchLogWindow({ modelName: model.name });
+  };
+
   return (
     <Card
       size="sm"
@@ -303,7 +308,7 @@ function ModelCard({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-        'relative cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+        'relative min-h-[8.5rem] cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
         'w-full max-w-[22rem]',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
@@ -324,8 +329,14 @@ function ModelCard({
         />
       ) : null}
       {loadingModel || unloading ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
-          <Button type="button" disabled size="sm" variant={unloading ? 'outline' : 'default'}>
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
+          <Button
+            type="button"
+            disabled
+            size="sm"
+            variant={unloading ? 'destructive' : 'default'}
+            data-local-inference-unload-button={unloading ? 'true' : undefined}
+          >
             <Spinner
               aria-label={i18nService.t(
                 unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading',
@@ -335,6 +346,17 @@ function ModelCard({
             />
             {i18nService.t(unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading')}
           </Button>
+          {loadingModel ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleOpenLaunchLog}
+            >
+              <LogButtonIcon />
+              {i18nService.t('localInferenceModelLaunchLogAction')}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -369,7 +391,11 @@ function ModelCard({
               </DropdownMenuContent>
             </DropdownMenu>
           </CardAction>
-        ) : null}
+        ) : (
+          <CardAction aria-hidden="true" className="pointer-events-none flex items-center gap-2">
+            <span className="size-6" />
+          </CardAction>
+        )}
 
         <div className="flex min-w-0 items-start gap-2 pl-1">
           <span aria-hidden="true" className="mt-0.5 flex size-5 shrink-0 items-center justify-center">
@@ -410,13 +436,23 @@ function ModelCard({
           </div>
         </div>
       </CardHeader>
-      <div className="flex justify-end px-3 pb-3">
+      <div className="flex justify-end gap-2 px-3 pb-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleOpenLaunchLog}
+        >
+          <LogButtonIcon />
+          {i18nService.t('localInferenceModelLaunchLogAction')}
+        </Button>
         {isRunning ? (
           <Button
             type="button"
-            variant="outline"
+            variant="destructive"
             size="sm"
             disabled={buttonsDisabled}
+            data-local-inference-unload-button="true"
             onClick={onUnload}
           >
             <Square data-icon="inline-start" />
@@ -435,6 +471,19 @@ function ModelCard({
         )}
       </div>
     </Card>
+  );
+}
+
+
+function LogButtonIcon() {
+  return (
+    <img
+      src={logIconUrl}
+      alt=""
+      aria-hidden="true"
+      data-icon="inline-start"
+      className="size-3.5 shrink-0"
+    />
   );
 }
 
