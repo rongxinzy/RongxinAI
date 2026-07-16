@@ -29,11 +29,26 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   onVisibleSessionsChange,
   workMode = 'work',
 }) => {
-  const { workspaceNodes, patchTaskPreview, removeTaskPreview, retryLoadTasks, loadMoreTasks, collapseTasks, toggleExpanded } = useWorkspaceSidebarState(workMode);
+  const {
+    workspaceNodes,
+    scheduledWorkspaceNodes,
+    patchTaskPreview,
+    removeTaskPreview,
+    retryLoadTasks,
+    loadMoreTasks,
+    loadMoreScheduledTasks,
+    collapseTasks,
+    collapseScheduledTasks,
+    toggleExpanded,
+    toggleScheduledExpanded,
+  } = useWorkspaceSidebarState(workMode);
 
   useEffect(() => {
-    onVisibleSessionsChange?.(workspaceNodes.flatMap((workspace) => workspace.tasks.map((task) => task.id)));
-  }, [onVisibleSessionsChange, workspaceNodes]);
+    onVisibleSessionsChange?.([
+      ...workspaceNodes.flatMap((workspace) => workspace.tasks.map((task) => task.id)),
+      ...scheduledWorkspaceNodes.flatMap((workspace) => workspace.tasks.map((task) => task.id)),
+    ]);
+  }, [onVisibleSessionsChange, scheduledWorkspaceNodes, workspaceNodes]);
 
   const handleSelectTask = async (task: AgentSidebarTaskNode) => {
     if (task.workspaceId) await workspaceService.selectWorkspace(task.workspaceId);
@@ -113,6 +128,42 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               onEnterBatchMode={(task) => onEnterBatchMode(task.id)}
             />
           ))}
+        </div>
+      )}
+
+      {workMode === 'work' && (
+        <div className="mt-3 flex flex-col gap-0.5">
+          <div className="flex h-10 items-center bg-surface-raised px-1.5">
+            <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">{i18nService.t('scheduledTasks')}</h2>
+          </div>
+
+          {scheduledWorkspaceNodes.length === 0 ? (
+            <div className="px-3 py-3 text-xs text-muted-foreground">{i18nService.t('scheduledTasksEmptyState')}</div>
+          ) : (
+            <div className="flex flex-col gap-0.5 px-0">
+              {scheduledWorkspaceNodes.map((workspace) => (
+                <WorkspaceTreeNode
+                  key={`scheduled-${workspace.id}`}
+                  workspace={workspace}
+                  isBatchMode={isBatchMode}
+                  selectedIds={selectedIds}
+                  onToggleExpanded={toggleScheduledExpanded}
+                  onCreateTask={() => undefined}
+                  onRetryLoadTasks={(workspaceId) => void retryLoadTasks(workspaceId)}
+                  onLoadMoreTasks={(workspaceId) => void loadMoreScheduledTasks(workspaceId)}
+                  onCollapseTasks={collapseScheduledTasks}
+                  onSelectTask={(task) => void handleSelectTask(task)}
+                  onDeleteTask={handleDeleteTask}
+                  onShareTask={handleShareTask}
+                  onToggleTaskPin={handleToggleTaskPin}
+                  onRenameTask={handleRenameTask}
+                  onToggleSelection={onToggleSelection}
+                  onEnterBatchMode={(task) => onEnterBatchMode(task.id)}
+                  showCreateTask={false}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

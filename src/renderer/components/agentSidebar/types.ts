@@ -57,4 +57,6 @@ export interface AgentSidebarPreferenceState {
 export interface WorkspaceSidebarPreferenceState {
   expandedWorkspaceIds: string[];
   expandedTaskListWorkspaceIds: string[];
+  scheduledExpandedWorkspaceIds?: string[];
+  scheduledExpandedTaskListWorkspaceIds?: string[];
 }

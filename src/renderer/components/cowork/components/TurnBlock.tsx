@@ -33,6 +33,7 @@ export const TurnBlock: React.FC<{
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
+  turnStreaming?: boolean;
 }> = ({
   turn,
   artifacts,
@@ -40,6 +41,7 @@ export const TurnBlock: React.FC<{
   mapDisplayText,
   showTypingIndicator = false,
   showCopyButtons = true,
+  turnStreaming = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
@@ -123,6 +125,7 @@ export const TurnBlock: React.FC<{
     _idx: number,
     isFinalAnswer: boolean,
     streamingOverride?: boolean,
+    mutedExecution = false,
   ) => {
     // ── Thinking: collapsed Reasoning block with shimmer ──
     if (item.type === 'assistant' && item.message.metadata?.isThinking) {
@@ -133,6 +136,7 @@ export const TurnBlock: React.FC<{
       return (
         <Reasoning
           key={item.message.id}
+          className={mutedExecution ? 'text-muted-foreground' : undefined}
           isStreaming={isStreaming}
           defaultOpen={true}
           autoClose={false}
@@ -156,6 +160,7 @@ export const TurnBlock: React.FC<{
           key={item.group.toolUse.id}
           group={item.group}
           isLastInSequence
+          muted={mutedExecution}
           mapDisplayText={mapDisplayText}
         />
       );
@@ -192,8 +197,8 @@ export const TurnBlock: React.FC<{
     return null;
   };
 
-  // Build step groups: consecutive non-answer items grouped into a single
-  // ChainOfThought with a dynamic summary. Answer items appear inline.
+  // Group consecutive execution items so they can be collapsed before the
+  // final answer. Once the answer starts, these groups are flattened again.
   const groups = (() => {
     const result: Array<{
       summary: string;
@@ -252,7 +257,9 @@ export const TurnBlock: React.FC<{
       const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
       const isStep =
         (item.type === 'assistant' && item.message.metadata?.isThinking) ||
-        item.type === 'tool_group';
+        item.type === 'tool_group' ||
+        item.type === 'tool_result' ||
+        item.type === 'system';
 
       if (isAnswer) {
         flush(true); // answer follows → thinking before it is done
@@ -278,6 +285,8 @@ export const TurnBlock: React.FC<{
   const finalAnswerGroup = lastAnswerGroupIndex >= 0 ? groups[lastAnswerGroupIndex] : null;
   const finalAnswerItem = finalAnswerGroup?.items[0];
   const finalAnswerStarted = Boolean(
+    !turnStreaming &&
+    lastAnswerGroupIndex === groups.length - 1 &&
     finalAnswerItem?.type === 'assistant' &&
     !finalAnswerItem.message.metadata?.isThinking &&
     hasText(finalAnswerItem.message.content),
@@ -293,13 +302,9 @@ export const TurnBlock: React.FC<{
   const intermediateGroups = finalAnswerStarted
     ? groups.filter((_, index) => index !== lastAnswerGroupIndex)
     : groups.filter(group => !isEmptyAnswerGroup(group));
-  const intermediateItemCount = intermediateGroups.reduce(
-    (count, group) => count + group.items.length,
-    0,
-  );
   const [intermediateOpen, setIntermediateOpen] = useState(false);
 
-  const renderIntermediateGroup = (group: (typeof groups)[number], groupKey: string) => {
+  const renderExecutionGroup = (group: (typeof groups)[number], groupKey: string) => {
     const firstItem = group.items[0];
     const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
     if (isAnswerItem) {
@@ -315,16 +320,21 @@ export const TurnBlock: React.FC<{
           : SparklesIcon
       : SparklesIcon;
     return (
-      <ChainOfThought key={groupKey} defaultOpen={true}>
+      <ChainOfThought key={groupKey} defaultOpen={false}>
         <ChainOfThoughtHeader icon={headerIcon}>
-          {isStreaming ? <span className="animate-pulse">{group.summary}</span> : group.summary}
+          {isStreaming ? (
+            <span className="animate-pulse">{group.summary}</span>
+          ) : (
+            i18nService.t('coworkExecutionSteps')
+          )}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
-          {group.items.map((item, idx) => renderItem(item, idx, false, isStreaming))}
+          {group.items.map((item, idx) => renderItem(item, idx, false, isStreaming, true))}
         </ChainOfThoughtContent>
       </ChainOfThought>
     );
   };
+  const intermediateItems = intermediateGroups.flatMap((group) => group.items);
 
   return (
     <div className="px-4 py-2">
@@ -334,14 +344,13 @@ export const TurnBlock: React.FC<{
             {finalAnswerStarted && intermediateGroups.length > 0 && (
               <ChainOfThought open={intermediateOpen} onOpenChange={setIntermediateOpen}>
                 <ChainOfThoughtHeader icon={SparklesIcon}>
-                  {i18nService
-                    .t('coworkIntermediateProcess')
-                    .replace('{count}', String(intermediateItemCount))}
+                  {i18nService.t('coworkIntermediateProcess')}
                 </ChainOfThoughtHeader>
                 <ChainOfThoughtContent>
-                  {intermediateGroups.map((group, index) =>
-                    renderIntermediateGroup(group, `intermediate-${index}`),
-                  )}
+                  {intermediateItems.map((item, index) => {
+                    const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
+                    return renderItem(item, index, false, false, !isAnswer);
+                  })}
                 </ChainOfThoughtContent>
               </ChainOfThought>
             )}
@@ -350,7 +359,7 @@ export const TurnBlock: React.FC<{
               renderItem(finalAnswerGroup.items[0], lastAnswerGroupIndex, true)}
             {!finalAnswerStarted &&
               intermediateGroups.map((group, index) =>
-                renderIntermediateGroup(group, `streaming-${index}`),
+                renderExecutionGroup(group, `streaming-${index}`),
               )}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
