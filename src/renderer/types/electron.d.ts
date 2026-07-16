@@ -7,12 +7,20 @@ import type {
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
+  LlamaCppLatestModelLaunchLogSessionInput,
   LlamaCppModel,
   LlamaCppModelLaunchInput,
+  LlamaCppModelLaunchLogClearedEvent,
   LlamaCppModelLaunchLogEvent,
+  LlamaCppModelLaunchLogSession,
+  LlamaCppModelLaunchLogWindowTarget,
   LlamaCppModelLaunchResult,
   LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
+  LlamaCppOpenModelLaunchLogWindowInput,
+  LlamaCppOpenModelLaunchLogWindowResult,
+  LlamaCppReadModelLaunchLogFileInput,
+  LlamaCppReadModelLaunchLogFileResult,
   LlamaCppRunningModel,
   LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeImportResult,
@@ -436,11 +444,16 @@ interface IElectronAPI {
     setModelPreference: (input: LlamaCppSetModelPreferenceInput) => Promise<LlamaCppModelPreferences>;
     loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
     unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
+    getLatestModelLaunchLogSession: (input?: LlamaCppLatestModelLaunchLogSessionInput) => Promise<LlamaCppModelLaunchLogSession | null>;
+    readModelLaunchLogFile: (input: LlamaCppReadModelLaunchLogFileInput) => Promise<LlamaCppReadModelLaunchLogFileResult>;
+    openModelLaunchLogWindow: (input?: LlamaCppOpenModelLaunchLogWindowInput) => Promise<LlamaCppOpenModelLaunchLogWindowResult>;
     installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
     onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
     onModelLaunchLog: (callback: (event: LlamaCppModelLaunchLogEvent) => void) => () => void;
+    onModelLaunchLogCleared: (callback: (event: LlamaCppModelLaunchLogClearedEvent) => void) => () => void;
+    onModelLaunchLogWindowTargetChanged: (callback: (target: LlamaCppModelLaunchLogWindowTarget) => void) => () => void;
     onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
   };
   marketplace: {

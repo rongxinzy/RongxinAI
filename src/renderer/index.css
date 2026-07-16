@@ -414,6 +414,16 @@ select::-ms-expand {
 [data-slot="button"].text-destructive {
   color: var(--lobster-destructive);
 }
+[data-slot="button"][data-local-inference-unload-button="true"] {
+  background-color: var(--lobster-destructive);
+  border-color: var(--lobster-destructive);
+  color: var(--lobster-destructive-foreground);
+}
+[data-slot="button"][data-local-inference-unload-button="true"]:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--lobster-destructive) 88%, black);
+  border-color: color-mix(in srgb, var(--lobster-destructive) 88%, black);
+  color: var(--lobster-destructive-foreground);
+}
 [data-slot="toggle"][aria-pressed="true"] {
   background-color: var(--lobster-surface-raised);
   color: var(--lobster-foreground);

@@ -8,7 +8,6 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppModel,
   LlamaCppModelLaunchInput,
-  LlamaCppModelLaunchLogEvent,
   LlamaCppModelLaunchResult,
   LlamaCppModelPreference,
   LlamaCppModelPreferences,
@@ -35,6 +34,7 @@ import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
   LlamaCppManager,
+  LlamaCppManagerLifecycleEvent,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
 import {
@@ -63,6 +63,7 @@ import { applyLlamaCppServiceTransition } from '../libs/llamacppServiceTransitio
 import { LlamaCppServiceTransitionLock } from '../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import type { SqliteStore } from '../sqliteStore';
+import { registerLlamaCppModelLaunchLogIpcHandlers } from './llamacppModelLaunchLogs';
 
 const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
@@ -162,6 +163,19 @@ export function hasRecoveredVram(input: {
     return false;
   }
   return currentFreeMiB - beforeFreeMiB >= requiredRecoveryMiB;
+}
+
+
+function getLlamaCppModelLogClearNames(
+  requestedModelName: string,
+  runningModel?: { name?: string; model?: string; id?: string },
+): string[] {
+  return Array.from(new Set([
+    requestedModelName,
+    runningModel?.name,
+    runningModel?.model,
+    runningModel?.id,
+  ].map(value => value?.trim()).filter((value): value is string => Boolean(value))));
 }
 
 function matchesRunningModelName(
@@ -287,8 +301,7 @@ export function registerLlamaCppIpcHandlers(
     broadcast(LlamaCppIpcChannel.StatusChanged, status);
   const sendProgress = (progress: LlamaCppInstallProgress) =>
     broadcast(LlamaCppIpcChannel.InstallProgress, progress);
-  const sendModelLaunchLog = (event: LlamaCppModelLaunchLogEvent) =>
-    broadcast(LlamaCppIpcChannel.ModelLaunchLog, event);
+  const { clearModelLaunchLog, sendModelLaunchLog } = registerLlamaCppModelLaunchLogIpcHandlers({ broadcast });
   const loadModelLock = new LlamaCppModelLoadLock();
   const serviceTransitionLock = new LlamaCppServiceTransitionLock();
   const runServiceTransition = async <T>(action: () => Promise<T>): Promise<T> =>
@@ -316,6 +329,12 @@ export function registerLlamaCppIpcHandlers(
     }
   });
   manager.on('install-progress', sendProgress);
+  manager.on(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, (event) => {
+    for (const modelName of event.modelNames) {
+      clearModelLaunchLog(modelName);
+    }
+  });
+
   const activeInstalls = new Map<string, AbortController>();
 
   ipcMain.handle(LlamaCppIpcChannel.Status, async () => manager.detect());
@@ -633,6 +652,9 @@ export function registerLlamaCppIpcHandlers(
       confirmation.runningModels,
       confirmation.confirmed ? 'llamacpp-model-unloaded' : 'llamacpp-model-visibility-refresh',
     );
+    for (const clearedModelName of getLlamaCppModelLogClearNames(modelName, unloadingModel)) {
+      clearModelLaunchLog(clearedModelName);
+    }
     const result: LlamaCppModelUnloadResult = {
       success: true,
       confirmed: confirmation.confirmed,

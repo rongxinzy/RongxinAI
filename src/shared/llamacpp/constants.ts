@@ -31,9 +31,30 @@ export const LlamaCppIpcChannel = {
   StatusChanged: 'llamacpp:status-changed',
   InstallProgress: 'llamacpp:install-progress',
   ModelLaunchLog: 'llamacpp:model-launch-log',
+  ModelLaunchLogCleared: 'llamacpp:model-launch-log:cleared',
+  GetLatestModelLaunchLogSession: 'llamacpp:model-launch-log-session:latest',
+  ReadModelLaunchLogFile: 'llamacpp:model-launch-log-file:read',
+  OpenModelLaunchLogWindow: 'llamacpp:model-launch-log-window:open',
+  ModelLaunchLogWindowTargetChanged: 'llamacpp:model-launch-log-window:target-changed',
 } as const;
 
 export type LlamaCppIpcChannel = typeof LlamaCppIpcChannel[keyof typeof LlamaCppIpcChannel];
+
+export const LlamaCppModelLaunchLogWindowView = {
+  ModelLaunchLog: 'llamacpp-model-launch-log',
+} as const;
+
+export type LlamaCppModelLaunchLogWindowView =
+  typeof LlamaCppModelLaunchLogWindowView[keyof typeof LlamaCppModelLaunchLogWindowView];
+
+export const LlamaCppModelLaunchLogWindowQuery = {
+  View: 'view',
+  SessionId: 'sessionId',
+  ModelName: 'modelName',
+} as const;
+
+export type LlamaCppModelLaunchLogWindowQuery =
+  typeof LlamaCppModelLaunchLogWindowQuery[keyof typeof LlamaCppModelLaunchLogWindowQuery];
 
 export const LlamaCppRuntimeBackend = {
   Auto: 'auto',
@@ -107,4 +128,13 @@ export const LlamaCppModelLaunchLogSource = {
 
 export type LlamaCppModelLaunchLogSource =
   typeof LlamaCppModelLaunchLogSource[keyof typeof LlamaCppModelLaunchLogSource];
+
+export const LlamaCppModelLaunchLogSessionStatus = {
+  Starting: 'starting',
+  Succeeded: 'succeeded',
+  Failed: 'failed',
+} as const;
+
+export type LlamaCppModelLaunchLogSessionStatus =
+  typeof LlamaCppModelLaunchLogSessionStatus[keyof typeof LlamaCppModelLaunchLogSessionStatus];
 

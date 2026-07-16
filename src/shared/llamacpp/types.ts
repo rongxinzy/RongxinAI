@@ -1,6 +1,7 @@
 import type {
   LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
+  LlamaCppModelLaunchLogSessionStatus,
   LlamaCppModelLaunchLogSource,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
@@ -211,7 +212,6 @@ export type LlamaCppInstallProgress = {
   error?: string;
 };
 
-
 export type LlamaCppModelLaunchLogEvent = {
   sessionId: string;
   modelName: string;
@@ -222,6 +222,49 @@ export type LlamaCppModelLaunchLogEvent = {
   source: LlamaCppModelLaunchLogSource;
   message?: string;
   detail?: string;
+};
+
+export type LlamaCppModelLaunchLogClearedEvent = {
+  modelName: string;
+};
+
+export type LlamaCppModelLaunchLogSession = {
+  sessionId: string;
+  modelName: string;
+  fileName: string;
+  filePath: string;
+  startedAt: string;
+  updatedAt: string;
+  status: LlamaCppModelLaunchLogSessionStatus;
+  sequence: number;
+};
+
+export type LlamaCppLatestModelLaunchLogSessionInput = {
+  modelName?: string;
+};
+
+export type LlamaCppReadModelLaunchLogFileInput = {
+  sessionId: string;
+};
+
+export type LlamaCppReadModelLaunchLogFileResult = {
+  success: boolean;
+  session?: LlamaCppModelLaunchLogSession;
+  content?: string;
+  error?: string;
+};
+
+export type LlamaCppModelLaunchLogWindowTarget = {
+  sessionId?: string;
+  modelName?: string;
+};
+
+export type LlamaCppOpenModelLaunchLogWindowInput = LlamaCppModelLaunchLogWindowTarget;
+
+export type LlamaCppOpenModelLaunchLogWindowResult = {
+  success: boolean;
+  session?: LlamaCppModelLaunchLogSession;
+  error?: string;
 };
 
 export type LlamaCppServiceConfig = {
