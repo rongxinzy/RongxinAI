@@ -102,8 +102,6 @@ export class SqliteStore {
         updated_at INTEGER NOT NULL
       );
     `);
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);');
-
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS cowork_messages (
         id TEXT PRIMARY KEY,
@@ -329,6 +327,9 @@ export class SqliteStore {
     } catch {
       // Column already exists or migration not needed.
     }
+
+    // Create the index only after legacy databases have received workspace_id.
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);');
 
     // Migration: Add working_directory column to agents
     try {
