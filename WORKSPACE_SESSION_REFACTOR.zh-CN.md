@@ -48,13 +48,13 @@ Agent 表示角色、身份、模型和技能配置。它不再决定 Cowork 会
 
 新增 `workspaces` 表：
 
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 由规范化路径计算出的稳定 ID |
-| `name` | 侧栏显示名称，默认取目录名 |
-| `path` | 规范化后的绝对路径，唯一 |
-| `created_at` | 首次登记时间 |
-| `updated_at` | 最近使用或重命名时间 |
+| 字段         | 说明                        |
+| ------------ | --------------------------- |
+| `id`         | 由规范化路径计算出的稳定 ID |
+| `name`       | 侧栏显示名称，默认取目录名  |
+| `path`       | 规范化后的绝对路径，唯一    |
+| `created_at` | 首次登记时间                |
+| `updated_at` | 最近使用或重命名时间        |
 
 `cowork_sessions` 新增：
 
@@ -114,12 +114,12 @@ Agent 的 OpenClaw 专属文件仍可由 OpenClaw 配置同步逻辑维护，用
 
 这保证了以下行为：
 
-| 操作 | 新会话 | 已有会话 |
-| --- | --- | --- |
-| 切换 Agent | 影响后续新会话 | 不改变角色 |
-| 修改 Agent prompt | 影响后续新会话 | 不改变已保存 prompt |
-| 切换 Workspace | 影响后续新会话 | 通过会话自身 Workspace 恢复 |
-| 修改全局 Cowork prompt | 影响后续新会话 | 不覆盖历史 prompt |
+| 操作                   | 新会话         | 已有会话                    |
+| ---------------------- | -------------- | --------------------------- |
+| 切换 Agent             | 影响后续新会话 | 不改变角色                  |
+| 修改 Agent prompt      | 影响后续新会话 | 不改变已保存 prompt         |
+| 切换 Workspace         | 影响后续新会话 | 通过会话自身 Workspace 恢复 |
+| 修改全局 Cowork prompt | 影响后续新会话 | 不覆盖历史 prompt           |
 
 ## 6. 运行时工作目录
 
@@ -142,11 +142,11 @@ OpenClaw IM/邮件通道仍保留原有 Agent 默认工作目录解析，因为�
 
 Workspace IPC 常量位于 `src/shared/workspace/constants.ts`：
 
-| IPC | 用途 |
-| --- | --- |
-| `cowork:workspace:list` | 获取 Workspace 列表 |
+| IPC                       | 用途                       |
+| ------------------------- | -------------------------- |
+| `cowork:workspace:list`   | 获取 Workspace 列表        |
 | `cowork:workspace:ensure` | 按目录创建或获取 Workspace |
-| `cowork:workspace:rename` | 修改 Workspace 显示名称 |
+| `cowork:workspace:rename` | 修改 Workspace 显示名称    |
 
 会话 IPC 的 start/list 请求增加 `workspaceId`。当 Workspace ID 存在时，主进程以 Workspace 记录中的路径为准，不信任与其不一致的前端 `cwd`。
 
@@ -198,6 +198,7 @@ npx tsc -p tsconfig.json --noEmit
 4. 选择 Workspace B 创建会话，确认侧栏按 Workspace 分组。
 5. 使用旧数据库启动应用，确认历史会话自动出现于对应 Workspace。
 6. 关闭应用后重新打开，确认 Workspace、会话和 Agent 快照可以恢复。
+
 ## 11. 会话级专家架构
 
 本节补充当前版本的会话级专家实现。专家属于会话上下文，不属于 Workspace 配置；Workspace 只负责文件工具的工作目录。同一个 Workspace 内的不同会话可以选择不同专家，一个会话也可以同时选择多个专家。
@@ -332,3 +333,11 @@ Windows 执行搜索脚本必须使用 Git Bash/PortableGit，不能直接使用
 - 提交内容包含历史分页、中间过程折叠、系统语言约束、联网搜索说明、代码高亮容错和本文档。
 - 合并前应确认 TypeScript、Lint 和差异检查通过；Vitest 需在释放 `better-sqlite3` 文件锁后补跑。
 - 合并后建议重新打开已有会话，验证历史消息可持续向上加载，且 final answer 前的中间过程不会展开工具卡片。
+
+### 12.8 产品名称与后端路径兼容
+
+- 设置“关于”、窗口标题、托盘菜单、安装包、可执行文件、安装器和系统应用注册名统一显示为“知远”。
+- `appId`、`rongxinai` 协议 scheme、SQLite 文件名和历史兼容标识保持不变，避免破坏已有安装、协议唤起和数据读取。
+- Windows、macOS 和 Linux 的打包配置只调整产品显示名；安装器仍兼容停止旧版 `RongxinAI.exe` 进程。
+- `%APPDATA%\\RongxinAI` 继续作为首选用户数据目录，OpenClaw 状态、SQLite、技能、模型、日志和更新文件不会迁移到“知远”目录。
+- 如果设备只有旧版 `%APPDATA%\\LobsterAI` 数据目录且没有 `RongxinAI` 目录，启动时仍沿用旧目录，保证历史数据可见。

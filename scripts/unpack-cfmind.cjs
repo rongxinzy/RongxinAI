@@ -4,9 +4,9 @@
  * Windows 安装后资源 tar 解压脚本
  *
  * 由 NSIS installer.nsh 的 customInstall 宏调用。
- * 通过 RongxinAI.exe (ELECTRON_RUN_AS_NODE=1 模式) 执行。
+ * 通过 知远.exe (ELECTRON_RUN_AS_NODE=1 模式) 执行。
  *
- * 用法: RongxinAI.exe <本脚本路径> <tarPath> <destDir>
+ * 用法: 知远.exe <本脚本路径> <tarPath> <destDir>
  *
  * 效果:
  *   输入: $INSTDIR/resources/win-resources.tar
@@ -38,7 +38,7 @@ const destDir = process.argv[3];
 const installLogPath = process.argv[4];
 
 if (!tarPath || !destDir) {
-  console.error('[unpack-cfmind] Usage: RongxinAI.exe unpack-cfmind.cjs <tarPath> <destDir>');
+  console.error('[unpack-cfmind] Usage: 知远.exe unpack-cfmind.cjs <tarPath> <destDir>');
   process.exit(1);
 }
 

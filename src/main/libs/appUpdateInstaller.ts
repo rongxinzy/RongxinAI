@@ -366,7 +366,7 @@ async function installWindowsNsis(exePath: string): Promise<void> {
   console.log(`[AppUpdate]   appPid: ${process.pid}`);
 
   // We must NOT spawn the installer directly as a child of the app, because
-  // the NSIS customInit macro runs `taskkill /IM "RongxinAI.exe" /F /T`
+  // the NSIS customInit macro stops the installed app process tree
   // which kills the entire process tree — including child processes.
   //
   // Strategy: use a tiny PowerShell script (launched via hidden VBS) that

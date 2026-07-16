@@ -4481,10 +4481,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             {/* Logo & App Name */}
             <img
               src="logo.png"
-              alt="Leo"
+              alt="知远"
               className="w-16 h-16 mb-3 select-none"
             />
-            <h3 className="text-lg font-semibold text-foreground">Leo</h3>
+            <h3 className="text-lg font-semibold text-foreground">知远</h3>
             <span className="text-xs text-muted-foreground mt-1">v{appVersion}</span>
             <span className="text-xs text-muted-foreground mt-0.5">开放源码，汇聚智慧</span>
 

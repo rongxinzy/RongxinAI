@@ -8,7 +8,7 @@
  * Usage:
  *   import { t, setLanguage } from './i18n';
  *   setLanguage('en');
- *   const label = t('trayShowWindow'); // "Open RongxinAI"
+ *   const label = t('trayShowWindow'); // "Open 知远"
  *   const msg = t('imMissingCredentials', { fields: 'appId, appSecret' });
  */
 
@@ -17,7 +17,7 @@ export type LanguageType = 'zh' | 'en';
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
     // Tray menu
-    trayShowWindow: '打开 RongxinAI',
+    trayShowWindow: '打开知远',
     trayNewTask: '新建任务',
     traySettings: '设置',
     trayQuit: '退出',
@@ -293,7 +293,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
   },
   en: {
     // Tray menu
-    trayShowWindow: 'Open RongxinAI',
+    trayShowWindow: 'Open 知远',
     trayNewTask: 'New Task',
     traySettings: 'Settings',
     trayQuit: 'Quit',
