@@ -1,9 +1,10 @@
-import { describe, expect, test } from 'vitest';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import * as os from 'node:os';
+import * as path from 'node:path';
 
-import { parseExpertPackage, getPiAgentsDir } from '../SKILLs/rongxinai-expert-manager/scripts/register_expert';
+import { describe, expect, test } from 'vitest';
+
+import { getPiAgentsDir, parseExpertPackage } from '../SKILLs/rongxinai-expert-manager/scripts/register_expert';
 
 function createMinimalExpertPackage(dir: string, overrides: Record<string, unknown> = {}) {
   const agentDir = path.join(dir, 'agents');
