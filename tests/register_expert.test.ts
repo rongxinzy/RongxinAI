@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import { getPiAgentsDir, parseExpertPackage } from '../SKILLs/rongxinai-expert-manager/scripts/register_expert';
+import { validateExpert } from '../SKILLs/rongxinai-expert-manager/scripts/validate_expert';
 
 function createMinimalExpertPackage(dir: string, overrides: Record<string, unknown> = {}) {
   const agentDir = path.join(dir, 'agents');
@@ -82,6 +83,21 @@ describe('parseExpertPackage', () => {
       expect(agent.skillIds).toEqual(['hello-skill']);
       expect(agent.icon).toBe('agent-avatar-svg:code');
       expect(agent.systemPrompt).toContain('# 测试代码助手');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('accepts Windows CRLF agent frontmatter', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-expert-crlf-test-'));
+    try {
+      createMinimalExpertPackage(tmpDir);
+      const agentPath = path.join(tmpDir, 'agents', 'test-code-assistant.md');
+      const content = fs.readFileSync(agentPath, 'utf-8');
+      fs.writeFileSync(agentPath, content.replace(/\n/g, '\r\n'), 'utf-8');
+
+      const result = validateExpert(tmpDir);
+      expect(result.isValid).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
