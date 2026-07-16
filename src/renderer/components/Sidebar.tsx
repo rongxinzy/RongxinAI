@@ -311,7 +311,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
       <div className="pt-3 pb-3">
         <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
-          <div className={`${isMac ? 'pl-[68px]' : ''}`}>{updateBadge}</div>
+          <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
+            <span className="text-sm font-bold text-muted-foreground select-none">知远</span>
+            {updateBadge}
+          </div>
           <Button
             type="button"
             variant="ghost"
