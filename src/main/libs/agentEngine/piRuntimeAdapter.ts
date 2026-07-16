@@ -413,7 +413,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       return this.startSession(sessionId, prompt, {
         ...options,
         conversationHistory: history
-          .filter(message => message.type === 'user' || message.type === 'assistant')
+          .filter((message): message is CoworkMessage & { type: 'user' | 'assistant' } => (
+            message.type === 'user' || message.type === 'assistant'
+          ))
           .map(message => ({ role: message.type, content: message.content })),
       });
     }
