@@ -218,7 +218,7 @@ export const TurnBlock: React.FC<{
 
       if (isAnswer) {
         flush(true); // answer follows → thinking before it is done
-        result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming) });
+        result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming), streamingType: null });
       } else if (isStep) {
         currentItems.push(item);
       }
