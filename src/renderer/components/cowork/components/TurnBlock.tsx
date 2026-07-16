@@ -5,7 +5,7 @@ import {
 } from '@shared/components/ai-elements/chain-of-thought';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
-import { Info, SparklesIcon, TriangleAlert } from 'lucide-react';
+import { Brain, Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
@@ -161,7 +161,7 @@ export const TurnBlock: React.FC<{
   // Build step groups: consecutive non-answer items grouped into a single
   // ChainOfThought with a dynamic summary. Answer items appear inline.
   const groups = (() => {
-    const result: Array<{ summary: string; items: typeof visibleAssistantItems; streaming: boolean }> = [];
+    const result: Array<{ summary: string; items: typeof visibleAssistantItems; streaming: boolean; streamingType: 'thinking' | 'tool' | null }> = [];
     let currentItems: typeof visibleAssistantItems = [];
 
     const flush = (followedByAnswer = false) => {
@@ -191,20 +191,23 @@ export const TurnBlock: React.FC<{
           })()
         : null;
       let summary: string;
+      let streamingType: 'thinking' | 'tool' | null = null;
       if (hasStreaming && streamingItem) {
         if (streamingItem.type === 'assistant') {
           summary = '思考中…';
+          streamingType = 'thinking';
         } else if (streamingItem.type === 'tool_group') {
           summary = getToolSummary(
             streamingItem.group.toolUse.metadata?.toolName as string
           );
+          streamingType = 'tool';
         } else {
           summary = '执行中…';
         }
       } else {
         summary = `执行步骤（${currentItems.length} 步）`;
       }
-      result.push({ summary, items: [...currentItems], streaming: hasStreaming });
+      result.push({ summary, items: [...currentItems], streaming: hasStreaming, streamingType });
       currentItems = [];
     };
 
@@ -215,7 +218,7 @@ export const TurnBlock: React.FC<{
 
       if (isAnswer) {
         flush(true); // answer follows → thinking before it is done
-        result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming) });
+        result.push({ summary: '', items: [item], streaming: Boolean(item.message.metadata?.isStreaming), streamingType: null });
       } else if (isStep) {
         currentItems.push(item);
       }
@@ -238,9 +241,14 @@ export const TurnBlock: React.FC<{
               }
               // Step group — wrapped in ChainOfThought with dynamic summary
               const isStreaming = group.streaming;
+              const headerIcon = isStreaming
+                ? group.streamingType === 'thinking' ? Brain
+                : group.streamingType === 'tool' ? Wrench
+                : SparklesIcon
+                : SparklesIcon;
               return (
                 <ChainOfThought key={gIdx} defaultOpen={false}>
-                  <ChainOfThoughtHeader icon={isStreaming ? SparklesIcon : undefined}>
+                  <ChainOfThoughtHeader icon={headerIcon}>
                     {isStreaming
                       ? <span className="animate-pulse">{group.summary}</span>
                       : group.summary}
