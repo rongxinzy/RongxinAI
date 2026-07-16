@@ -11,7 +11,9 @@ interface AgentSummary {
   pinned: boolean;
   pinOrder?: number | null;
   isDefault: boolean;
-  source: 'custom' | 'preset';
+  source: 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
+  presetId: string;
+  systemPrompt: string;
   skillIds: string[];
 }
 

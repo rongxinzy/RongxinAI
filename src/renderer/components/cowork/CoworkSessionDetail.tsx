@@ -51,7 +51,7 @@ const EMPTY_ARTIFACTS: Artifact[] = [];
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
-  onContinue: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => boolean | void | Promise<boolean | void>;
+  onContinue: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds?: string[]) => boolean | void | Promise<boolean | void>;
   onStop: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;

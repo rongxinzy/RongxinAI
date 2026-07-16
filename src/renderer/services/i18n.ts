@@ -1205,6 +1205,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     presetAgents: '预设 Agent',
     myCustomAgents: '我创建的项目',
     createNewAgent: '新建项目',
+    importExpertPackage: '导入专家包',
+    importExpertPackageError: '导入专家包失败：{error}',
+    importExpertPackageSuccess: '成功导入专家包：{name}',
     addAgent: '添加',
     agentTabPrompt: '提示词',
     agentTabBasic: '基础信息',
@@ -1331,6 +1334,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
 
+    // Expert
+    expert: '专家',
+    expertInstall: '安装专家',
+    expertInstalling: '安装中...',
+    expertInstalled: '已安装',
+    expertInstallError: '安装失败，请重试',
+    expertPresetsEmpty: '暂无预设专家',
+    sessionExperts: '会话专家',
+    addSessionExpert: '添加会话专家',
+    searchSessionExperts: '搜索会话专家',
+    noSessionExperts: '暂无可用专家',
     // Skills
     skills: '技能',
     searchSkills: '搜索技能',
@@ -3413,6 +3427,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     presetAgents: 'Preset Agents',
     myCustomAgents: 'My Custom Projects',
     createNewAgent: 'New Project',
+    importExpertPackage: 'Import Expert Package',
+    importExpertPackageError: 'Failed to import expert package: {error}',
+    importExpertPackageSuccess: 'Expert package imported: {name}',
     addAgent: 'Add',
     agentTabPrompt: 'Prompt',
     agentTabBasic: 'Basic Info',
@@ -3552,6 +3569,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
 
+    // Expert
+    expert: 'Expert',
+    expertInstall: 'Install',
+    expertInstalling: 'Installing...',
+    expertInstalled: 'Installed',
+    expertInstallError: 'Installation failed. Please try again.',
+    expertPresetsEmpty: 'No preset experts available',
+    sessionExperts: 'Session experts',
+    addSessionExpert: 'Add session expert',
+    searchSessionExperts: 'Search session experts',
+    noSessionExperts: 'No experts available',
     // Skills
     skills: 'Skills',
     searchSkills: 'Search skills',

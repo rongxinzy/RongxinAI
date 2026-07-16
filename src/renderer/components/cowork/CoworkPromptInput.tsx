@@ -3,6 +3,7 @@ import {
   PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
@@ -12,9 +13,10 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
+import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -42,6 +44,7 @@ import AttachmentCard from './AttachmentCard';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
+import SessionExpertPicker from './SessionExpertPicker';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -108,7 +111,7 @@ export interface CoworkPromptInputRef {
 }
 
 interface CoworkPromptInputProps {
-  onSubmit: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => boolean | void | Promise<boolean | void>;
+  onSubmit: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds?: string[]) => boolean | void | Promise<boolean | void>;
   onStop?: () => void;
   isStreaming?: boolean;
   placeholder?: string;
@@ -156,12 +159,24 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const draftPrompt = useSelector((state: RootState) => selectDraftPrompts(state)[draftKey] || '');
 
     const attachments = (useSelector((state: RootState) => state.cowork.draftAttachments[draftKey]) || EMPTY_ATTACHMENTS) as CoworkAttachment[];
-    const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
-    const agents = useSelector((state: RootState) => state.agent.agents);
+  const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
+  const agents = useSelector((state: RootState) => state.agent.agents);
+  const currentAgent = agents.find((agent) => agent.id === currentAgentId);
     const coworkAgentEngine = useSelector((state: RootState) => state.cowork.config.agentEngine);
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
-    const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
-    const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
+  const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
+  const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
+  const persistedExpertIds = useMemo(
+    () => currentSession?.experts?.map((expert) => expert.expertId) ?? [],
+    [currentSession?.experts],
+  );
+  const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(
+    () => persistedExpertIds.length > 0
+      ? persistedExpertIds
+      : (currentAgent?.source === CoworkSessionExpertSource.Package || currentAgent?.source === CoworkSessionExpertSource.Member
+        ? [currentAgent.id]
+        : []),
+  );
     const [value, setValue] = useState(draftPrompt);
 
     // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
@@ -220,7 +235,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const skills = useSelector((state: RootState) => state.skill.skills);
-  const currentAgent = agents.find((agent) => agent.id === currentAgentId);
   const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
   const {
     isPersistingAgentModel,
@@ -292,6 +306,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
   const modelSupportsImage = !!effectiveSelectedModel?.supportsImage;
 
   // Load skills on mount
+  useEffect(() => {
+    setSelectedExpertIds(persistedExpertIds.length > 0
+      ? persistedExpertIds
+      : (currentAgent?.source === CoworkSessionExpertSource.Package || currentAgent?.source === CoworkSessionExpertSource.Member
+        ? [currentAgent.id]
+        : []));
+  }, [currentSession?.id, currentAgentId, currentAgent?.id, currentAgent?.source, persistedExpertIds]);
+
   useEffect(() => {
     const loadSkills = async () => {
       const loadedSkills = await skillService.loadSkills();
@@ -486,12 +508,17 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
     dispatch(clearDraftAttachments(draftKey));
     setImageVisionHint(false);
-    const result = await onSubmit(finalPrompt, skillPrompt, imageAtts.length > 0 ? imageAtts : undefined);
+    const result = await onSubmit(
+      finalPrompt,
+      skillPrompt,
+      imageAtts.length > 0 ? imageAtts : undefined,
+      selectedExpertIds,
+    );
     if (result === false) {
       // Submission rejected — restore the prompt so the user can retry.
       setValue(finalPrompt);
     }
-  }, [value, isStreaming, disabled, isPatchingModel, isDirectChat, hasUnavailableLlamaCppModel, onSubmit, activeSkillIds, skills, attachments, showFolderSelector, workingDirectory, dispatch, draftKey, effectiveSelectedModel?.id, modelSupportsImage]);
+  }, [value, isStreaming, disabled, isPatchingModel, isDirectChat, hasUnavailableLlamaCppModel, onSubmit, activeSkillIds, skills, attachments, showFolderSelector, workingDirectory, dispatch, draftKey, effectiveSelectedModel?.id, modelSupportsImage, selectedExpertIds]);
 
   const handleSelectSkill = useCallback((skill: Skill) => {
     dispatch(toggleActiveSkill(skill.id));
@@ -900,6 +927,15 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] bg-primary/10 text-xs font-medium text-primary">
             {i18nService.t('coworkDropFileHint')}
           </div>
+        )}
+        {!isDirectChat && (
+          <PromptInputHeader className="px-3 pt-2">
+            <SessionExpertPicker
+              selectedExpertIds={selectedExpertIds}
+              onChange={setSelectedExpertIds}
+              disabled={disabled || isStreaming}
+            />
+          </PromptInputHeader>
         )}
         <PromptInputBody>
           <PromptInputTextarea

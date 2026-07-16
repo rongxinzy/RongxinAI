@@ -56,6 +56,7 @@ export type CoworkStartOptions = {
   confirmationMode?: 'modal' | 'text';
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
+  expertIds?: string[];
   modelOverride?: string;
   /** Previous conversation to restore (user/assistant pairs), injected into PI session state */
   conversationHistory?: CoworkConversationHistoryMessage[];
@@ -70,6 +71,7 @@ export type CoworkContinueOptions = {
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
   agentId?: string;
+  expertIds?: string[];
   modelOverride?: string;
 };
 

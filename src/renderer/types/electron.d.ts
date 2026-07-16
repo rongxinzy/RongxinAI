@@ -464,6 +464,8 @@ interface IElectronAPI {
     presets: () => Promise<PresetAgent[]>;
     presetTemplates: () => Promise<PresetAgent[]>;
     addPreset: (presetId: string) => Promise<Agent>;
+    importExpertPackage: (expertDir: string) => Promise<{ success: boolean; agentIds?: string[]; expertType?: string; name?: string; error?: string }>;
+    getPresetExperts: () => Promise<{ experts: Array<{ name: string; displayName: { en: string; zh: string }; profession: { en: string; zh: string }; displayDescription: { en: string; zh: string }; categoryId: string; tags: Array<{ en: string; zh: string }>; quickPrompts: Array<{ en: string; zh: string }>; path: string }>; error?: string }>;
   };
   api: {
     fetch: (options: {
@@ -543,6 +545,7 @@ interface IElectronAPI {
       activeSkillIds?: string[];
       workspaceId?: string;
       agentId?: string;
+      expertIds?: string[];
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => Promise<{
       success: boolean;
@@ -556,6 +559,7 @@ interface IElectronAPI {
       prompt: string;
       systemPrompt?: string;
       activeSkillIds?: string[];
+      expertIds?: string[];
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => Promise<{
       success: boolean;

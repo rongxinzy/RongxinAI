@@ -1,4 +1,6 @@
 // Cowork image attachment for vision-capable models
+import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
+
 export interface CoworkImageAttachment {
   name: string;
   mimeType: string;
@@ -87,6 +89,7 @@ export interface CoworkSession {
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
+  experts?: CoworkSessionExpertSnapshot[];
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. 0 means loaded from the beginning. */
   messagesOffset: number;
@@ -228,6 +231,7 @@ export interface CoworkStartOptions {
   activeSkillIds?: string[];
   workspaceId?: string;
   agentId?: string;
+  expertIds?: string[];
   modelOverride?: string;
   imageAttachments?: CoworkImageAttachment[];
 }
@@ -238,6 +242,7 @@ export interface CoworkContinueOptions {
   prompt: string;
   systemPrompt?: string;
   activeSkillIds?: string[];
+  expertIds?: string[];
   imageAttachments?: CoworkImageAttachment[];
 }
 

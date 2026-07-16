@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import type { WebContents } from 'electron';
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, powerMonitor, powerSaveBlocker, protocol, screen, session, shell } from 'electron';
 import fs from 'fs';
@@ -11,6 +12,7 @@ import { migrateScheduledTaskRunsToOpenclaw, migrateScheduledTasksToOpenclaw } f
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
+import { type CoworkSessionExpertInput,CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
 import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
@@ -2053,25 +2055,63 @@ const getIMGatewayManager = () => {
 
 function mergeCoworkSystemPrompt(
   systemPrompt?: string,
+  skipLeoIdentity = false,
 ): string | undefined {
+  const leoIdentity = [
+    'You are LEO.',
+    'The official Chinese product name is 李知远智能体, and the official English product name is LEO.',
+    '李知远智能体 / LEO is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+    'Treat 李知远智能体 and LEO as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
+    'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是李知远智能体。" You may add "英文名是 LEO。". In English, say "I am LEO." You may add "My Chinese product name is 李知远智能体."',
+    'Do not present RongxinAI as the current product identity. If asked about RongxinAI, say only that it is a legacy name or compatibility identifier that may still appear in some technical paths, while the current product identity is 李知远智能体 / LEO.',
+    'Do not describe LobsterAI as the current product identity. If asked about LobsterAI, say only that it is a historical internal or compatibility identifier in some technical paths, while the current product identity is 李知远智能体 / LEO.',
+    'Do not claim 李知远智能体 / LEO is owned by, affiliated with, or derived from Youdao, NetEase Youdao, or Youdao Notes.',
+    'Do not use any other product name, model name, runtime name, or preset role as your identity.',
+    'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
+  ].join('\n');
   const sections = [
-    [
-      'You are LEO.',
-      'The official Chinese product name is 李知远智能体, and the official English product name is LEO.',
-      '李知远智能体 / LEO is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
-      'Treat 李知远智能体 and LEO as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
-      'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是李知远智能体。" You may add "英文名是 LEO。". In English, say "I am LEO." You may add "My Chinese product name is 李知远智能体."',
-      'Do not present RongxinAI as the current product identity. If asked about RongxinAI, say only that it is a legacy name or compatibility identifier that may still appear in some technical paths, while the current product identity is 李知远智能体 / LEO.',
-      'Do not describe LobsterAI as the current product identity. If asked about LobsterAI, say only that it is a historical internal or compatibility identifier in some technical paths, while the current product identity is 李知远智能体 / LEO.',
-      'Do not claim 李知远智能体 / LEO is owned by, affiliated with, or derived from Youdao, NetEase Youdao, or Youdao Notes.',
-      'Do not use any other product name, model name, runtime name, or preset role as your identity.',
-      'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
-    ].join('\n'),
+    skipLeoIdentity ? null : leoIdentity,
     buildScheduledTaskEnginePrompt(),
     systemPrompt?.trim() || '',
   ].filter(Boolean);
   return sections.length > 0 ? sections.join('\n\n') : undefined;
 }
+
+const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpertInput[] => {
+  const snapshots: CoworkSessionExpertInput[] = [];
+  const seen = new Set<string>();
+  for (const rawExpertId of expertIds) {
+    const expertId = rawExpertId.trim();
+    if (!expertId || seen.has(expertId)) continue;
+    seen.add(expertId);
+
+    const expert = getAgentManager().getAgent(expertId);
+    if (!expert || (expert.source !== CoworkSessionExpertSource.Package && expert.source !== CoworkSessionExpertSource.Member)) {
+      throw new Error(`Expert '${expertId}' is not installed or is not an expert package agent`);
+    }
+    const promptSnapshot = expert.systemPrompt.trim();
+    if (!promptSnapshot) {
+      throw new Error(`Expert '${expertId}' has an empty system prompt`);
+    }
+    const packageId = expert.presetId.trim() || expert.id;
+    const skillIds = [...expert.skillIds];
+    const contentHash = crypto
+      .createHash('sha256')
+      .update(JSON.stringify({ packageId, expertId: expert.id, promptSnapshot, skillIds }))
+      .digest('hex');
+    snapshots.push({
+      expertId: expert.id,
+      packageId,
+      expertName: expert.name,
+      source: expert.source,
+      promptSnapshot,
+      skillIds,
+      capabilityPolicy: {},
+      contentHash,
+    });
+  }
+  return snapshots;
+};
 
 // 获取正确的预加载脚本路径
 const PRELOAD_PATH = app.isPackaged
@@ -3214,7 +3254,7 @@ if (!gotTheLock) {
     const cid = generateCorrelationId();
     const log = createLogger('CoworkSession').withContext({ cid });
     const options = CoworkSessionStartSchema.input.parse(rawOptions);
-    log.info('session start requested', { prompt: options.prompt.slice(0, 80), agentId: options.agentId });
+    log.info('session start requested', { prompt: options.prompt.slice(0, 80), agentId: options.agentId, systemPromptLen: options.systemPrompt?.length ?? 0 });
     return runWithCorrelationId(cid, async () => {
     try {
       // Work sessions use Pi (SDK mode, instant availability). No need to wait
@@ -3229,11 +3269,23 @@ if (!gotTheLock) {
       const coworkStoreInstance = getCoworkStore();
       const config = coworkStoreInstance.getConfig();
       const selectedAgent = getAgentManager().getAgent(options.agentId || 'main');
-      const sessionPrompt = [selectedAgent?.systemPrompt, options.systemPrompt ?? config.systemPrompt]
+      const fallbackExpertIds = selectedAgent &&
+        (selectedAgent.source === CoworkSessionExpertSource.Package || selectedAgent.source === CoworkSessionExpertSource.Member)
+        ? [selectedAgent.id]
+        : [];
+      const expertSnapshots = resolveSessionExpertSnapshots(options.expertIds ?? fallbackExpertIds);
+      const expertPrompt = expertSnapshots.map((expert) => expert.promptSnapshot).join('\n\n');
+      const isExpertSession = expertSnapshots.length > 0;
+      const sessionPrompt = [
+        selectedAgent && !isExpertSession ? selectedAgent.systemPrompt : undefined,
+        options.systemPrompt ?? config.systemPrompt,
+        expertPrompt,
+      ]
         .filter((prompt): prompt is string => Boolean(prompt?.trim()))
         .join('\n\n');
       const systemPrompt = mergeCoworkSystemPrompt(
         sessionPrompt,
+        isExpertSession,
       );
       const workspace = options.workspaceId ? coworkStoreInstance.getWorkspace(options.workspaceId) : null;
       const selectedTaskDirectory = resolveSessionWorkingDirectory({
@@ -3266,6 +3318,7 @@ if (!gotTheLock) {
         'work',
         undefined,
         selectedWorkspace.id,
+        expertSnapshots,
       );
 
       if (options.modelOverride) {
@@ -3304,14 +3357,19 @@ if (!gotTheLock) {
 
       // Start the session asynchronously (skip initial user message since we already added it)
       const runtime = getPiRuntimeAdapter();
+      const runtimeSkillIds = [...new Set([
+        ...(options.activeSkillIds || []),
+        ...expertSnapshots.flatMap((expert) => expert.skillIds),
+      ])];
       runtime.startSession(session.id, options.prompt, {
         skipInitialUserMessage: true,
         systemPrompt,
-        skillIds: options.activeSkillIds,
+        skillIds: runtimeSkillIds,
         workspaceRoot: taskWorkingDirectory,
         confirmationMode: 'modal',
         imageAttachments: options.imageAttachments,
         agentId: options.agentId,
+        expertIds: expertSnapshots.map((expert) => expert.expertId),
         modelOverride: options.modelOverride,
       }).catch(error => {
         console.error('[Cowork] session error:', error);
@@ -3351,6 +3409,7 @@ if (!gotTheLock) {
     prompt: string;
     systemPrompt?: string;
     activeSkillIds?: string[];
+    expertIds?: string[];
     imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
   }) => {
     try {
@@ -3363,7 +3422,26 @@ if (!gotTheLock) {
       }
 
       const runtime = getPiRuntimeAdapter();
-      const existingSession = getCoworkStore().getSession(options.sessionId);
+      const store = getCoworkStore();
+      let existingSession = store.getSession(options.sessionId);
+      if (options.expertIds !== undefined && existingSession) {
+        const expertSnapshots = resolveSessionExpertSnapshots(options.expertIds);
+        let basePrompt = existingSession.systemPrompt;
+        for (const expert of existingSession.experts) {
+          basePrompt = basePrompt.split(expert.promptSnapshot).join('');
+        }
+        const expertPrompt = expertSnapshots.map((expert) => expert.promptSnapshot).join('\n\n');
+        const sessionPrompt = [basePrompt, expertPrompt]
+          .filter((prompt): prompt is string => Boolean(prompt?.trim()))
+          .join('\n\n');
+        const nextSystemPrompt = mergeCoworkSystemPrompt(
+          sessionPrompt,
+          expertSnapshots.length > 0,
+        );
+        store.replaceSessionExperts(options.sessionId, expertSnapshots);
+        store.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt || '' });
+        existingSession = store.getSession(options.sessionId);
+      }
       if (options.imageAttachments?.length) {
         console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
           sessionId: options.sessionId,
@@ -3379,7 +3457,7 @@ if (!gotTheLock) {
       // Persist active skill selection to session record
       if (options.activeSkillIds !== undefined) {
         try {
-          getCoworkStore().updateSession(options.sessionId, {
+          store.updateSession(options.sessionId, {
             activeSkillIds: options.activeSkillIds,
           });
         } catch (error) {
@@ -3387,12 +3465,18 @@ if (!gotTheLock) {
         }
       }
 
+      const runtimeSkillIds = [...new Set([
+        ...(options.activeSkillIds || []),
+        ...(existingSession?.experts || []).flatMap((expert) => expert.skillIds),
+      ])];
+
       runtime.continueSession(options.sessionId, options.prompt, {
         systemPrompt: existingSession?.systemPrompt || options.systemPrompt,
-        skillIds: options.activeSkillIds,
+        skillIds: runtimeSkillIds,
         imageAttachments: options.imageAttachments,
         workspaceRoot: existingSession?.cwd,
         agentId: existingSession?.agentId,
+        expertIds: existingSession?.experts.map((expert) => expert.expertId),
         modelOverride: existingSession?.modelOverride,
       }).catch(error => {
         console.error('[Cowork] continue error:', error);
@@ -3789,6 +3873,89 @@ if (!gotTheLock) {
       return { success: true, agent };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to add preset agent' };
+    }
+  });
+
+  ipcMain.handle(AgentIpcChannel.ImportExpertPackage, async (_event, expertDir: string) => {
+    try {
+      const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
+      const { parseExpertPackage } = require(path.join(bundledSkillsRoot, 'rongxinai-expert-manager', 'scripts', 'register_expert'));
+      const dbPath = path.join(app.getPath('userData'), 'lobsterai.sqlite');
+      const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, { dbPath });
+
+      const agentManager = getAgentManager();
+      const defaultModel = resolveDefaultAgentModelRef();
+      const agentIds: string[] = [];
+
+      for (const request of requests) {
+        const agent = agentManager.createAgent(request, defaultModel);
+        agentIds.push(agent.id);
+      }
+
+      // Write to expert-packages/registry.json in userData
+      const packagesDir = path.join(app.getPath('userData'), 'expert-packages');
+      fs.mkdirSync(packagesDir, { recursive: true });
+      const registryPath = path.join(packagesDir, 'registry.json');
+      let registry: { packages: Array<Record<string, unknown>> } = { packages: [] };
+      if (fs.existsSync(registryPath)) {
+        try {
+          registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+          if (!Array.isArray(registry.packages)) registry.packages = [];
+        } catch {
+          registry = { packages: [] };
+        }
+      }
+      registry.packages = registry.packages.filter((p) => p.name !== pluginJson.name);
+      registry.packages.push({
+        name: pluginJson.name,
+        version: pluginJson.version,
+        expertType: pluginJson.expertType,
+        path: expertDir,
+        agentIds,
+        piSyncedFiles: piSyncedFiles || [],
+        createdAt: new Date().toISOString(),
+      });
+      fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf-8');
+
+      return { success: true, agentIds, expertType: pluginJson.expertType, name: pluginJson.name };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to import expert package' };
+    }
+  });
+
+  ipcMain.handle(AgentIpcChannel.GetPresetExperts, async () => {
+    try {
+      const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
+      const presetsDir = path.join(bundledSkillsRoot, 'rongxinai-expert-manager', 'presets');
+      if (!fs.existsSync(presetsDir)) return { experts: [] };
+
+      const entries = fs.readdirSync(presetsDir, { withFileTypes: true });
+      const experts = entries
+        .filter(e => e.isDirectory())
+        .map(e => {
+          const pluginPath = path.join(presetsDir, e.name, 'plugin.json');
+          if (!fs.existsSync(pluginPath)) return null;
+          try {
+            const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf-8'));
+            return {
+              name: plugin.name,
+              displayName: plugin.displayName,
+              profession: plugin.profession,
+              displayDescription: plugin.displayDescription,
+              categoryId: plugin.categoryId,
+              tags: plugin.tags,
+              quickPrompts: plugin.quickPrompts,
+              path: path.join(presetsDir, e.name),
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+
+      return { experts };
+    } catch (error) {
+      return { experts: [], error: error instanceof Error ? error.message : 'Failed to list preset experts' };
     }
   });
 

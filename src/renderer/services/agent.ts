@@ -32,6 +32,8 @@ class AgentService {
           pinOrder: a.pinOrder ?? null,
           isDefault: a.isDefault,
           source: a.source,
+          presetId: a.presetId ?? '',
+          systemPrompt: a.systemPrompt ?? '',
           skillIds: a.skillIds ?? [],
         }));
         store.dispatch(setAgents(mappedAgents));
@@ -68,6 +70,8 @@ class AgentService {
           pinOrder: agent.pinOrder ?? null,
           isDefault: agent.isDefault,
           source: agent.source,
+          presetId: agent.presetId ?? '',
+          systemPrompt: agent.systemPrompt ?? '',
           skillIds: agent.skillIds ?? [],
         }));
         return agent;
@@ -182,6 +186,8 @@ class AgentService {
           pinOrder: agent.pinOrder ?? null,
           isDefault: agent.isDefault,
           source: agent.source,
+          presetId: agent.presetId ?? '',
+          systemPrompt: agent.systemPrompt ?? '',
           skillIds: agent.skillIds ?? [],
         }));
         return agent;
@@ -190,6 +196,19 @@ class AgentService {
     } catch (error) {
       console.error('Failed to add preset agent:', error);
       return null;
+    }
+  }
+
+  async importExpertPackage(expertDir: string): Promise<{ success: boolean; agentIds?: string[]; expertType?: string; name?: string; error?: string }> {
+    try {
+      const result = await window.electron?.agents?.importExpertPackage(expertDir);
+      if (result?.success) {
+        await this.loadAgents();
+      }
+      return result ?? { success: false, error: 'Import not supported' };
+    } catch (error) {
+      console.error('Failed to import expert package:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to import expert package' };
     }
   }
 

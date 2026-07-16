@@ -357,6 +357,12 @@ contextBridge.exposeInMainWorld('electron', {
       const result = await ipcRenderer.invoke(AgentIpcChannel.AddPreset, presetId);
       return result?.success ? result.agent : null;
     },
+    importExpertPackage: async (expertDir: string) => {
+      return await ipcRenderer.invoke(AgentIpcChannel.ImportExpertPackage, expertDir);
+    },
+    getPresetExperts: async () => {
+      return await ipcRenderer.invoke(AgentIpcChannel.GetPresetExperts);
+    },
   },
 
   cowork: {
@@ -367,13 +373,13 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(WorkspaceIpc.Rename, id, name),
     startSession: (options: {
       prompt: string; cwd?: string; systemPrompt?: string; title?: string;
-      activeSkillIds?: string[]; workspaceId?: string; agentId?: string; modelOverride?: string;
+      activeSkillIds?: string[]; workspaceId?: string; agentId?: string; expertIds?: string[]; modelOverride?: string;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Start, options),
 
     continueSession: (options: {
       sessionId: string; prompt: string; systemPrompt?: string;
-      activeSkillIds?: string[];
+      activeSkillIds?: string[]; expertIds?: string[];
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 

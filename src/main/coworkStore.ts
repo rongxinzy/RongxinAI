@@ -8,6 +8,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { normalizeAgentAvatarIcon } from '../shared/agent/avatar';
 import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
+import type {
+  CoworkSessionExpertInput,
+  CoworkSessionExpertSnapshot,
+} from '../shared/cowork/sessionExperts';
 import type { Workspace } from '../shared/workspace';
 import {
   normalizeWorkspacePath,
@@ -306,7 +310,7 @@ export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result
 export type CoworkExecutionMode = 'auto' | 'local' | 'sandbox';
 export type CoworkAgentEngine = 'openclaw' | 'pi';
 
-export type AgentSource = 'custom' | 'preset';
+export type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
 
 export interface Agent {
   id: string;
@@ -413,6 +417,7 @@ export interface CoworkSession {
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
+  experts: CoworkSessionExpertSnapshot[];
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. */
   messagesOffset: number;
@@ -664,20 +669,24 @@ export class CoworkStore {
     mode: 'work' | 'chat' = 'work',
     id?: string,
     workspaceId?: string,
+    expertSnapshots: CoworkSessionExpertInput[] = [],
   ): CoworkSession {
     const sessionId = id || uuidv4();
     const now = Date.now();
     const workspace = workspaceId ? this.getWorkspace(workspaceId) : this.ensureWorkspace(cwd);
     if (!workspace) throw new Error('Workspace not found');
 
-    this.db
-      .prepare(
-        `
+    const insertSession = this.db.prepare(`
       INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, pinned, created_at, updated_at)
       VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-    `,
-      )
-      .run(
+    `);
+    const insertExpert = this.db.prepare(`
+      INSERT INTO cowork_session_experts
+        (session_id, expert_id, package_id, expert_name, source, prompt_snapshot, skill_ids, capability_policy, content_hash, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const create = this.db.transaction(() => {
+      insertSession.run(
         sessionId,
         title,
         mode,
@@ -691,6 +700,22 @@ export class CoworkStore {
         now,
         now,
       );
+      for (const expert of expertSnapshots) {
+        insertExpert.run(
+          sessionId,
+          expert.expertId,
+          expert.packageId,
+          expert.expertName,
+          expert.source,
+          expert.promptSnapshot,
+          JSON.stringify(expert.skillIds),
+          JSON.stringify(expert.capabilityPolicy ?? {}),
+          expert.contentHash,
+          now,
+        );
+      }
+    });
+    create();
 
     return {
       id: sessionId,
@@ -707,6 +732,11 @@ export class CoworkStore {
       activeSkillIds,
       workspaceId: workspace.id,
       agentId,
+      experts: expertSnapshots.map((expert) => ({
+        ...expert,
+        capabilityPolicy: expert.capabilityPolicy ?? {},
+        createdAt: now,
+      })),
       messages: [],
       messagesOffset: 0,
       totalMessages: 0,
@@ -763,6 +793,55 @@ export class CoworkStore {
       }
     }
 
+    const expertRows = this.db.prepare(
+      `SELECT expert_id, package_id, expert_name, source, prompt_snapshot,
+              skill_ids, capability_policy, content_hash, created_at
+       FROM cowork_session_experts
+       WHERE session_id = ?
+       ORDER BY created_at ASC, expert_id ASC`,
+    ).all(id) as Array<{
+      expert_id: string;
+      package_id: string;
+      expert_name: string;
+      source: CoworkSessionExpertSnapshot['source'];
+      prompt_snapshot: string;
+      skill_ids: string;
+      capability_policy: string;
+      content_hash: string;
+      created_at: number;
+    }>;
+    const experts = expertRows.map((expertRow): CoworkSessionExpertSnapshot => {
+      let skillIds: string[] = [];
+      let capabilityPolicy: Record<string, unknown> = {};
+      try {
+        const parsed = JSON.parse(expertRow.skill_ids);
+        if (Array.isArray(parsed)) {
+          skillIds = parsed.filter((value): value is string => typeof value === 'string');
+        }
+      } catch {
+        // Keep malformed legacy snapshots empty.
+      }
+      try {
+        const parsed = JSON.parse(expertRow.capability_policy);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          capabilityPolicy = parsed;
+        }
+      } catch {
+        // Keep malformed legacy snapshots restrictive.
+      }
+      return {
+        expertId: expertRow.expert_id,
+        packageId: expertRow.package_id,
+        expertName: expertRow.expert_name,
+        source: expertRow.source,
+        promptSnapshot: expertRow.prompt_snapshot,
+        skillIds,
+        capabilityPolicy,
+        contentHash: expertRow.content_hash,
+        createdAt: expertRow.created_at,
+      };
+    });
+
     return {
       id: row.id,
       title: row.title,
@@ -778,6 +857,7 @@ export class CoworkStore {
       activeSkillIds,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
+      experts,
       messages,
       messagesOffset: messageOffset,
       totalMessages,
@@ -849,6 +929,34 @@ export class CoworkStore {
     `,
       )
       .run(...values);
+  }
+
+  replaceSessionExperts(id: string, expertSnapshots: CoworkSessionExpertInput[]): void {
+    const deleteExperts = this.db.prepare('DELETE FROM cowork_session_experts WHERE session_id = ?');
+    const insertExpert = this.db.prepare(`
+      INSERT INTO cowork_session_experts
+        (session_id, expert_id, package_id, expert_name, source, prompt_snapshot, skill_ids, capability_policy, content_hash, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const now = Date.now();
+    const replace = this.db.transaction(() => {
+      deleteExperts.run(id);
+      for (const expert of expertSnapshots) {
+        insertExpert.run(
+          id,
+          expert.expertId,
+          expert.packageId,
+          expert.expertName,
+          expert.source,
+          expert.promptSnapshot,
+          JSON.stringify(expert.skillIds),
+          JSON.stringify(expert.capabilityPolicy ?? {}),
+          expert.contentHash,
+          now,
+        );
+      }
+    });
+    replace();
   }
 
   deleteSession(id: string): void {

@@ -28,6 +28,7 @@
     "music-search": { "order": 223, "enabled": true },
     "technology-news-search": { "order": 224, "enabled": false },
     "skill-vetter": { "order": 299, "enabled": true },
-    "skill-creator": { "order": 300, "enabled": true }
+    "skill-creator": { "order": 300, "enabled": true },
+    "rongxinai-expert-manager": { "order": 310, "enabled": true }
   }
 }
