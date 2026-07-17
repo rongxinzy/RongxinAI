@@ -699,6 +699,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 onConfigureContext={model => {
                   setContextModel(model);
                 }}
+                showRegisteredModelsTitle={false}
               />
             </>
           ) : (
