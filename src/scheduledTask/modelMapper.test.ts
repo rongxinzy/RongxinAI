@@ -1,10 +1,16 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
-BindingKind, DeliveryChannel,   DeliveryMode,   OriginKind, PayloadKind,
-ScheduleKind, SessionTarget, WakeMode,
+  BindingKind,
+  DeliveryChannel,
+  DeliveryMode,
+  OriginKind,
+  PayloadKind,
+  ScheduleKind,
+  SessionTarget,
+  WakeMode,
 } from './constants';
-import { makeModel,makeTask } from './fixtures';
+import { makeModel, makeTask } from './fixtures';
 import { TaskModelMapper } from './modelMapper';
 import { CoworkTaskPolicy } from './policies/coworkPolicy';
 import { ManualTaskPolicy } from './policies/manualPolicy';
@@ -27,7 +33,7 @@ test('mapper.fromWire: with explicit meta, uses meta directly', () => {
 });
 
 test('mapper.fromWire: without meta, falls back to infer', () => {
-  const wire = makeTask({ sessionKey: 'agent:main:lobsterai:sess-1' });
+  const wire = makeTask({ sessionKey: 'agent:main:zhiyuan:sess-1' });
   const model = mapper.fromWire(wire);
   expect(model.origin.kind).toBe(OriginKind.Cowork);
   expect(model.binding.kind).toBe(BindingKind.UISession);
@@ -41,7 +47,10 @@ test('mapper.fromWire: preserves all wire fields', () => {
     payload: { kind: PayloadKind.AgentTurn, message: 'work', timeoutSeconds: 120 },
     delivery: { mode: DeliveryMode.Announce, channel: 'feishu' },
   });
-  const model = mapper.fromWire(wire, { origin: { kind: OriginKind.Manual }, binding: { kind: BindingKind.NewSession } });
+  const model = mapper.fromWire(wire, {
+    origin: { kind: OriginKind.Manual },
+    binding: { kind: BindingKind.NewSession },
+  });
   expect(model.name).toBe('My Task');
   expect(model.description).toBe('Test desc');
   expect(model.schedule).toEqual({ kind: ScheduleKind.Cron, expr: '*/5 * * * *' });
@@ -66,7 +75,7 @@ test('mapper.toWireInput: ui_session binding -> managed sessionKey', () => {
     binding: { kind: BindingKind.UISession, sessionId: 'sess-x' },
   });
   const wire = mapper.toWireInput(model, coworkPolicy);
-  expect(wire.sessionKey).toBe('agent:main:lobsterai:sess-x');
+  expect(wire.sessionKey).toBe('agent:main:zhiyuan:sess-x');
   expect(wire.sessionTarget).toBe(SessionTarget.Main);
 });
 
@@ -97,7 +106,10 @@ test('mapper.toWireInput: passes through non-binding fields', () => {
 });
 
 test('mapper.createDraft: from manual origin has valid defaults', () => {
-  const draft = mapper.createDraft({ kind: OriginKind.Manual }, { sessionTarget: SessionTarget.Isolated, wakeMode: WakeMode.Now });
+  const draft = mapper.createDraft(
+    { kind: OriginKind.Manual },
+    { sessionTarget: SessionTarget.Isolated, wakeMode: WakeMode.Now },
+  );
   expect(draft.id.startsWith('draft-')).toBeTruthy();
   expect(draft.origin.kind).toBe(OriginKind.Manual);
   expect(draft.binding.kind).toBe(BindingKind.NewSession);

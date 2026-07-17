@@ -1,6 +1,10 @@
 import { expect, test } from 'vitest';
 
-import { isValidMcpCommandFormat, isValidMcpUrlFormat, validateMcpTransportFields } from './mcpValidation';
+import {
+  isValidMcpCommandFormat,
+  isValidMcpUrlFormat,
+  validateMcpTransportFields,
+} from './mcpValidation';
 
 test('isValidMcpCommandFormat accepts common executable commands', () => {
   expect(isValidMcpCommandFormat('npx')).toBe(true);

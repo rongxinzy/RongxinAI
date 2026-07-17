@@ -1,5 +1,14 @@
-import { ModelSelectorLogo, ModelSelectorName } from '@shared/components/ai-elements/model-selector';
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
+import {
+  ModelSelectorLogo,
+  ModelSelectorName,
+} from '@shared/components/ai-elements/model-selector';
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 
 import { i18nService } from '../../services/i18n';
@@ -27,7 +36,9 @@ export function CoworkModelPicker({
           <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs hover:bg-black/3 dark:hover:bg-white/4 [&_span]:flex-none">
             {selectedModel ? (
               <>
-                <ModelSelectorLogo provider={selectedModel.providerKey || selectedModel.provider || 'openai'} />
+                <ModelSelectorLogo
+                  provider={selectedModel.providerKey || selectedModel.provider || 'openai'}
+                />
                 <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
               </>
             ) : (

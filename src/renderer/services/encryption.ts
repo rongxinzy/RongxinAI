@@ -14,7 +14,7 @@ export interface EncryptedPayload {
 
 const bytesToBase64 = (bytes: Uint8Array): string => {
   let binary = '';
-  bytes.forEach((byte) => {
+  bytes.forEach(byte => {
     binary += String.fromCharCode(byte);
   });
   return btoa(binary);
@@ -57,12 +57,16 @@ const readRawExportKey = (stored: unknown): Uint8Array<ArrayBuffer> | null => {
   if (stored instanceof ArrayBuffer) {
     return new Uint8Array(stored);
   }
-  if (Array.isArray(stored) && stored.every((value) => typeof value === 'number')) {
+  if (Array.isArray(stored) && stored.every(value => typeof value === 'number')) {
     return new Uint8Array(stored);
   }
-  if (typeof stored === 'object' && stored !== null && Array.isArray((stored as { data?: unknown }).data)) {
+  if (
+    typeof stored === 'object' &&
+    stored !== null &&
+    Array.isArray((stored as { data?: unknown }).data)
+  ) {
     const data = (stored as { data: unknown[] }).data;
-    if (data.every((value) => typeof value === 'number')) {
+    if (data.every(value => typeof value === 'number')) {
       return new Uint8Array(data);
     }
   }
@@ -171,19 +175,18 @@ export interface PasswordEncryptedPayload {
   salt: string;
 }
 
-const deriveKeyFromPassword = async (password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> => {
+const deriveKeyFromPassword = async (
+  password: string,
+  salt: Uint8Array<ArrayBuffer>,
+): Promise<CryptoKey> => {
   if (!crypto?.subtle) {
     throw new Error('Crypto API unavailable');
   }
   const encoder = new TextEncoder();
   const passwordBuffer = encoder.encode(password);
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    passwordBuffer,
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
+  const keyMaterial = await crypto.subtle.importKey('raw', passwordBuffer, 'PBKDF2', false, [
+    'deriveKey',
+  ]);
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
@@ -194,11 +197,14 @@ const deriveKeyFromPassword = async (password: string, salt: Uint8Array<ArrayBuf
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
 };
 
-export const encryptWithPassword = async (value: string, password: string): Promise<PasswordEncryptedPayload> => {
+export const encryptWithPassword = async (
+  value: string,
+  password: string,
+): Promise<PasswordEncryptedPayload> => {
   const salt = crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES));
   const key = await deriveKeyFromPassword(password, salt);
   const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));
@@ -211,7 +217,10 @@ export const encryptWithPassword = async (value: string, password: string): Prom
   };
 };
 
-export const decryptWithPassword = async (payload: PasswordEncryptedPayload, password: string): Promise<string> => {
+export const decryptWithPassword = async (
+  payload: PasswordEncryptedPayload,
+  password: string,
+): Promise<string> => {
   if (!payload?.encrypted || !payload?.iv || !payload?.salt) {
     throw new Error('Invalid encrypted payload');
   }

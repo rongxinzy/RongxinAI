@@ -28,9 +28,7 @@ export type SqliteBackupPaths = {
   manifestPath: string;
 };
 
-export type SqliteHealthCheckResult =
-  | { ok: true }
-  | { ok: false; reason: string };
+export type SqliteHealthCheckResult = { ok: true } | { ok: false; reason: string };
 
 export type SqliteRestoreResult = {
   restored: boolean;
@@ -102,19 +100,21 @@ const padTimestampSegment = (value: number, width = 2): string => {
 
 export const formatTimestampForLocalPath = (value: number): string => {
   const date = new Date(value);
-  return [
-    padTimestampSegment(date.getFullYear(), 4),
-    padTimestampSegment(date.getMonth() + 1),
-    padTimestampSegment(date.getDate()),
-  ].join('-')
-    + 'T'
-    + [
+  return (
+    [
+      padTimestampSegment(date.getFullYear(), 4),
+      padTimestampSegment(date.getMonth() + 1),
+      padTimestampSegment(date.getDate()),
+    ].join('-') +
+    'T' +
+    [
       padTimestampSegment(date.getHours()),
       padTimestampSegment(date.getMinutes()),
       padTimestampSegment(date.getSeconds()),
-    ].join('-')
-    + '-'
-    + padTimestampSegment(date.getMilliseconds(), 3);
+    ].join('-') +
+    '-' +
+    padTimestampSegment(date.getMilliseconds(), 3)
+  );
 };
 
 const computeFileSha256 = (filePath: string): string => {
@@ -203,7 +203,10 @@ const publishBackupFile = (tempFilePath: string, finalFilePath: string): void =>
       try {
         fs.renameSync(swapFilePath, finalFilePath);
       } catch (restoreError) {
-        console.error('[SqliteBackup] Failed to restore previous backup after publish error:', restoreError);
+        console.error(
+          '[SqliteBackup] Failed to restore previous backup after publish error:',
+          restoreError,
+        );
       }
     }
     throw error;
@@ -229,7 +232,9 @@ export class SqliteBackupManager {
     }
 
     try {
-      const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Partial<SqliteBackupManifest>;
+      const parsed = JSON.parse(
+        fs.readFileSync(manifestPath, 'utf8'),
+      ) as Partial<SqliteBackupManifest>;
       if (!Array.isArray(parsed.snapshots)) {
         return emptyManifest();
       }
@@ -338,7 +343,9 @@ export class SqliteBackupManager {
     const quarantineTargetDir = path.join(quarantineDir, quarantineStamp);
     let hasQuarantinedCurrentFiles = false;
 
-    for (const snapshot of manifest.snapshots.sort((left, right) => right.createdAt - left.createdAt)) {
+    for (const snapshot of manifest.snapshots.sort(
+      (left, right) => right.createdAt - left.createdAt,
+    )) {
       const snapshotPath = resolveBackupRestorePath(path.join(snapshotsDir, snapshot.fileName));
       if (!snapshotPath) continue;
 
@@ -412,9 +419,11 @@ export class SqliteBackupManager {
     this.stopPeriodicBackupLoop();
     this.periodicTimer = setInterval(() => {
       if (!this.shouldCreatePeriodicBackup()) return;
-      void this.createBackup({ db: getDb(), trigger: SqliteBackupTrigger.Periodic }).catch((error) => {
-        console.error('[SqliteBackup] Periodic backup failed:', error);
-      });
+      void this.createBackup({ db: getDb(), trigger: SqliteBackupTrigger.Periodic }).catch(
+        error => {
+          console.error('[SqliteBackup] Periodic backup failed:', error);
+        },
+      );
     }, SQLITE_BACKUP_INTERVAL_MS);
   }
 
@@ -457,7 +466,7 @@ export class SqliteBackupManager {
 
   private markSnapshotAsRestoreTested(fileName: string): void {
     const manifest = this.readManifest();
-    const snapshots = manifest.snapshots.map((snapshot) =>
+    const snapshots = manifest.snapshots.map(snapshot =>
       snapshot.fileName === fileName ? { ...snapshot, restoreTested: true } : snapshot,
     );
     this.writeManifest({

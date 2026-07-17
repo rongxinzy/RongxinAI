@@ -1,11 +1,11 @@
 import { Button } from '@shared/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import React from 'react';
-import { useDispatch,useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { RootState } from '../../store';
 import { selectPrompt } from '../../store/slices/quickActionSlice';
-import type { LocalizedPrompt,LocalizedQuickAction } from '../../types/quickAction';
+import type { LocalizedPrompt, LocalizedQuickAction } from '../../types/quickAction';
 
 interface PromptPanelProps {
   action: LocalizedQuickAction;
@@ -14,9 +14,7 @@ interface PromptPanelProps {
 
 const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => {
   const dispatch = useDispatch();
-  const selectedPromptId = useSelector(
-    (state: RootState) => state.quickAction.selectedPromptId
-  );
+  const selectedPromptId = useSelector((state: RootState) => state.quickAction.selectedPromptId);
 
   const handlePromptClick = (prompt: LocalizedPrompt) => {
     dispatch(selectPrompt(prompt.id));
@@ -31,14 +29,12 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
     <div className="w-full animate-fade-in-up">
       {/* 标题 */}
       <div className="mb-2.5 px-0.5">
-        <span className="text-xs font-medium text-muted-foreground">
-          {action.label}
-        </span>
+        <span className="text-xs font-medium text-muted-foreground">{action.label}</span>
       </div>
 
       {/* 提示词卡片网格 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {action.prompts.map((prompt) => {
+        {action.prompts.map(prompt => {
           const isPromptSelected = selectedPromptId === prompt.id;
 
           return (
@@ -52,14 +48,16 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
                 border text-left transition-all duration-200 h-auto
                 ${
                   isPromptSelected
-                    ? 'dark:bg-primary-muted bg-primary-muted border-[color-mix(in_srgb,var(--lobster-primary)_50%,transparent)]'
+                    ? 'dark:bg-primary-muted bg-primary-muted border-[color-mix(in_srgb,var(--zy-primary)_50%,transparent)]'
                     : 'bg-surface border-border hover:border-border hover:border-border hover:bg-surface-raised'
                 }
               `}
             >
               {/* 标题 */}
               <div className="flex items-center justify-between w-full">
-                <span className={`text-sm font-medium ${isPromptSelected ? 'text-primary' : 'text-foreground'}`}>
+                <span
+                  className={`text-sm font-medium ${isPromptSelected ? 'text-primary' : 'text-foreground'}`}
+                >
                   {prompt.label}
                 </span>
                 <ArrowRight
@@ -76,9 +74,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
 
               {/* 描述 */}
               {prompt.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2">
-                  {prompt.description}
-                </p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{prompt.description}</p>
               )}
             </Button>
           );

@@ -13,7 +13,12 @@ interface McpViewProps {
   updateBadge?: React.ReactNode;
 }
 
-const McpView: React.FC<McpViewProps> = ({ isSidebarCollapsed, onToggleSidebar, onNewChat, updateBadge }) => {
+const McpView: React.FC<McpViewProps> = ({
+  isSidebarCollapsed,
+  onToggleSidebar,
+  onNewChat,
+  updateBadge,
+}) => {
   const isMac = window.electron.platform === 'darwin';
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
@@ -42,9 +47,7 @@ const McpView: React.FC<McpViewProps> = ({ isSidebarCollapsed, onToggleSidebar, 
               {updateBadge}
             </div>
           )}
-          <h1 className="text-lg font-semibold text-foreground">
-            {i18nService.t('mcpServers')}
-          </h1>
+          <h1 className="text-lg font-semibold text-foreground">{i18nService.t('mcpServers')}</h1>
         </div>
         <WindowTitleBar inline />
       </div>

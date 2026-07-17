@@ -41,7 +41,8 @@ npm run openclaw:runtime:host   # current platform
 
 ## Architecture Overview
 
-RongxinAI is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
+知远智能体 is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
+
 1. **Cowork Mode** - AI-assisted task sessions powered by OpenClaw as the primary agent runtime
 2. **llama.cpp Local Inference** - local model service management, model launch options, and local model integration with OpenClaw
 3. **Skills and MCP** - built-in skills, remote skill marketplace, and MCP server configuration
@@ -49,7 +50,7 @@ RongxinAI is an Electron + React desktop application for local-first AI Agent wo
 
 Uses strict process isolation with IPC communication.
 
-Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. LobsterAI, RongxinAI, LEO, and 李知远 are retired brand names — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
+Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. All pre-rebrand product names (including 知远智能体, LEO, and 李知远) are retired — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Legacy identifiers (the old storage name, the retired SQLite filename, the old app data directory, the retired protocol scheme, and legacy session keys) have been fully replaced with the new 知远智能体 (ZhiYuan Agent) identifiers under a scorched-earth policy: no data migration, no compatibility shims, no fallbacks; pre-rename user data is abandoned in place. New code must use the new identifiers only.
 
 ### Authentication Flow
 
@@ -63,6 +64,7 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 8. **退出条件：** 连续 30 天不使用（refreshToken 过期）→ 清除本地 token → 用户需重新登录
 
 **关键文件：**
+
 - Token 存储与请求：`src/renderer/services/api.ts`（`fetchWithAuth()`、token 管理）
 - 登录流程：`src/main/main.ts`（deep link callback 处理；legacy protocol names may still be present）
 - 持久化：`src/main/sqliteStore.ts`（kv 表存储 `auth_tokens`）
@@ -70,6 +72,7 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 ### Process Model
 
 **Main Process** (`src/main/main.ts`):
+
 - Window lifecycle management
 - SQLite storage via `better-sqlite3` (`src/main/sqliteStore.ts`)
 - Agent engine routing (`src/main/libs/agentEngine/coworkEngineRouter.ts`) - dispatches to `openclawRuntimeAdapter.ts` (OpenClaw)
@@ -81,10 +84,12 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 - Security: context isolation enabled, node integration disabled, sandbox enabled
 
 **Preload Script** (`src/main/preload.ts`):
+
 - Exposes `window.electron` API via `contextBridge`
 - Includes `cowork` namespace for session management and streaming events
 
 **Renderer Process** (React in `src/renderer/`):
+
 - All UI and business logic
 - Communicates with main process exclusively through IPC
 
@@ -146,15 +151,18 @@ SKILLs/                  # Custom skill definitions for cowork sessions
 The Cowork feature provides AI-assisted coding sessions:
 
 **Execution Modes** (`CoworkExecutionMode`):
+
 - `auto` - Automatically choose based on context
 - `local` - Run tools directly on the local machine
 
 **Agent Engine** (configured via `agentEngine` in cowork config):
+
 - `openclaw` - OpenClaw gateway (`openclawRuntimeAdapter.ts`); requires the bundled OpenClaw runtime to be running. Engine lifecycle managed by `OpenClawEngineManager` with states: `not_installed → ready → starting → running | error`
 
 The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-agnostic. Engine-specific IPC: `openclaw:engine:*` channels manage runtime lifecycle separately from `cowork:*` session channels.
 
 **Memory System**: File-based persistent memory stored in the OpenClaw working directory:
+
 - `MEMORY.md` - Durable facts, preferences, and decisions; loaded automatically at every session start.
 - `memory/YYYY-MM-DD.md` - Daily notes for recent context.
 - `USER.md` / `SOUL.md` - User profile and agent personality files read at session startup.
@@ -162,6 +170,7 @@ The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-
 - GUI in Settings panel allows manual add/edit/delete of `MEMORY.md` entries.
 
 **Stream Events** (IPC from main to renderer):
+
 - `message` - New message added to session
 - `messageUpdate` - Streaming content update for existing message
 - `permissionRequest` - Tool needs user approval
@@ -169,6 +178,7 @@ The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-
 - `error` - Session encountered an error
 
 **Key IPC Channels**:
+
 - `cowork:startSession`, `cowork:continueSession`, `cowork:stopSession`
 - `cowork:getSession`, `cowork:listSessions`, `cowork:deleteSession`
 - `cowork:respondToPermission`, `cowork:getConfig`, `cowork:setConfig`
@@ -189,6 +199,7 @@ The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-
 The Artifacts feature provides rich preview of code outputs similar to Claude's artifacts:
 
 **Supported Types**:
+
 - `html` - Full HTML pages rendered in sandboxed iframe
 - `svg` - SVG graphics with DOMPurify sanitization and zoom controls
 - `mermaid` - Flowcharts, sequence diagrams, class diagrams via Mermaid.js
@@ -196,15 +207,18 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - `code` - Syntax highlighted code with line numbers
 
 **Detection Methods**:
+
 1. Explicit markers: ` ```artifact:html title="My Page" `
 2. Heuristic detection: Analyzes code block language and content patterns
 
 **UI Components**:
+
 - Right-side panel (300-800px resizable width)
 - Header with type icon, title, copy/download/close buttons
 - Artifact badges in messages to switch between artifacts
 
 **Security**:
+
 - HTML: `sandbox="allow-scripts"` with no `allow-same-origin`
 - SVG: DOMPurify removes all script content
 - React: Completely isolated iframe with no network access
@@ -216,7 +230,7 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - Cowork config stored in `cowork_config` table (workingDirectory, systemPrompt, executionMode, **agentEngine**)
 - Cowork sessions and messages stored in `cowork_sessions` and `cowork_messages` tables
 - Scheduled task metadata stored in `scheduled_task_meta` table (origin and binding info); task definitions are managed by OpenClaw
-- Database file: currently uses the configured app SQLite filename in the user data directory. Legacy installations may still use `lobsterai.sqlite`; do not change storage names without a migration plan.
+- Database file: `zhiyuan.sqlite` in the user data directory. Pre-rename database files are not migrated or read — old data is abandoned in place (scorched earth).
 - OpenClaw pinned version declared in `package.json` under `"openclaw": { "version": "...", "repo": "..." }`; update the version field and re-run to upgrade
 
 ### TypeScript Configuration
@@ -242,46 +256,46 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 
 位于 `src/shared/components/ui/`，基于 [shadcn/ui](https://ui.shadcn.com/)（base-nova 风格，lucide 图标库）。
 
-| 组件 | 用途 |
-|------|------|
-| `button`, `button-group` | 按钮 |
-| `input`, `input-group`, `textarea` | 输入框 |
-| `select` | 下拉选择 |
-| `checkbox`, `radio-group`, `switch` | 选择控件 |
-| `dialog`, `sheet`, `popover`, `hover-card` | 弹层 |
-| `tooltip` | 提示 |
-| `dropdown-menu`, `command` | 菜单 |
-| `tabs` | 标签页 |
-| `card` | 卡片 |
-| `sidebar` | 侧边栏 |
-| `table` | 表格 |
-| `badge` | 徽标 |
-| `avatar` | 头像 |
-| `label` | 标签 |
-| `separator` | 分隔线 |
-| `scroll-area` | 滚动区域 |
-| `collapsible` | 折叠面板 |
-| `breadcrumb` | 面包屑 |
-| `skeleton`, `spinner` | 加载态 |
-| `sonner` | Toast 通知 |
+| 组件                                       | 用途       |
+| ------------------------------------------ | ---------- |
+| `button`, `button-group`                   | 按钮       |
+| `input`, `input-group`, `textarea`         | 输入框     |
+| `select`                                   | 下拉选择   |
+| `checkbox`, `radio-group`, `switch`        | 选择控件   |
+| `dialog`, `sheet`, `popover`, `hover-card` | 弹层       |
+| `tooltip`                                  | 提示       |
+| `dropdown-menu`, `command`                 | 菜单       |
+| `tabs`                                     | 标签页     |
+| `card`                                     | 卡片       |
+| `sidebar`                                  | 侧边栏     |
+| `table`                                    | 表格       |
+| `badge`                                    | 徽标       |
+| `avatar`                                   | 头像       |
+| `label`                                    | 标签       |
+| `separator`                                | 分隔线     |
+| `scroll-area`                              | 滚动区域   |
+| `collapsible`                              | 折叠面板   |
+| `breadcrumb`                               | 面包屑     |
+| `skeleton`, `spinner`                      | 加载态     |
+| `sonner`                                   | Toast 通知 |
 
 ### ai-elements（对话组件）
 
 位于 `src/shared/components/ai-elements/`，用于聊天/AI 对话场景。
 
-| 组件 | 用途 |
-|------|------|
-| `conversation` | 对话容器 |
-| `message` | 消息气泡 |
-| `prompt-input` | 输入框 |
-| `code-block` | 代码块渲染 |
-| `reasoning` | 推理过程展示 |
-| `tool` | 工具调用展示 |
-| `attachments` | 附件预览 |
-| `sources` | 来源引用 |
-| `suggestion` | 建议问题 |
-| `shimmer` | 加载闪烁效果 |
-| `terminal` | 终端输出 |
+| 组件           | 用途         |
+| -------------- | ------------ |
+| `conversation` | 对话容器     |
+| `message`      | 消息气泡     |
+| `prompt-input` | 输入框       |
+| `code-block`   | 代码块渲染   |
+| `reasoning`    | 推理过程展示 |
+| `tool`         | 工具调用展示 |
+| `attachments`  | 附件预览     |
+| `sources`      | 来源引用     |
+| `suggestion`   | 建议问题     |
+| `shimmer`      | 加载闪烁效果 |
+| `terminal`     | 终端输出     |
 
 ### 规则
 
@@ -338,7 +352,7 @@ export const SessionTarget = {
   Main: 'main',
   Isolated: 'isolated',
 } as const;
-export type SessionTarget = typeof SessionTarget[keyof typeof SessionTarget];
+export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 ```
 
 ### Rules
@@ -367,12 +381,12 @@ The main process uses `electron-log` via `src/main/logger.ts`, which intercepts 
 
 Choose the level that matches the **significance** of the event:
 
-| Level | API | When to use |
-|-------|-----|-------------|
-| Error | `console.error` | Unrecoverable failures that need investigation — caught exceptions, broken invariants, data corruption |
-| Warn | `console.warn` | Unexpected but recoverable situations — missing optional config, fallback behavior, degraded service |
-| Info | `console.log` | Key lifecycle events worth keeping in production logs — service started/stopped, connection established/lost, session created/destroyed, configuration changed |
-| Debug | `console.debug` | Development-time detail useful only when actively debugging — intermediate state, request/response payloads, loop iterations, sync cursors |
+| Level | API             | When to use                                                                                                                                                    |
+| ----- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Error | `console.error` | Unrecoverable failures that need investigation — caught exceptions, broken invariants, data corruption                                                         |
+| Warn  | `console.warn`  | Unexpected but recoverable situations — missing optional config, fallback behavior, degraded service                                                           |
+| Info  | `console.log`   | Key lifecycle events worth keeping in production logs — service started/stopped, connection established/lost, session created/destroyed, configuration changed |
+| Debug | `console.debug` | Development-time detail useful only when actively debugging — intermediate state, request/response payloads, loop iterations, sync cursors                     |
 
 ### Message Format
 
@@ -387,8 +401,18 @@ console.warn('[ChannelSync] session list returned unexpected type, skipping');
 console.error('[ChannelSync] polling failed:', error);
 
 // Bad — dumps variable names and raw values
-console.log('[ChannelSync] pollChannelSessions: got', sessions.length, 'sessions, keys:', sessions.map(s => s?.key).join(', '));
-console.log('[Debug:syncChannelUserMessages] cursor:', cursor, 'history entries:', historyEntries.length);
+console.log(
+  '[ChannelSync] pollChannelSessions: got',
+  sessions.length,
+  'sessions, keys:',
+  sessions.map(s => s?.key).join(', '),
+);
+console.log(
+  '[Debug:syncChannelUserMessages] cursor:',
+  cursor,
+  'history entries:',
+  historyEntries.length,
+);
 ```
 
 ### Rules
@@ -404,6 +428,7 @@ console.log('[Debug:syncChannelUserMessages] cursor:', cursor, 'history entries:
 ### Before Submitting
 
 When adding or modifying log statements, verify:
+
 1. No new `console.log` calls inside hot loops or polling callbacks — use `console.debug` instead.
 2. Messages read as natural English, not as stringified code.
 3. Error/warn logs include enough context to diagnose without a debugger.
@@ -447,12 +472,14 @@ Optional footer: BREAKING CHANGE: ..., Closes #123, etc.
 **Types**: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `style`, `ci`, `build`, `revert`
 
 **Rules**:
+
 - Subject line: lowercase, imperative mood, no trailing period, ≤72 chars
 - Scope (optional): the affected area, e.g. `feat(cowork):`, `fix(im):`
 - Body and footer must be in English markdown
 - Breaking changes: add `!` after type/scope (`feat!:`) **and** a `BREAKING CHANGE:` footer
 
 **Examples**:
+
 ```
 feat(cowork): add streaming progress indicator
 fix(sqlite): prevent duplicate session insert on retry
@@ -474,29 +501,31 @@ When using Claude Code with this repository, it reads `CLAUDE.md` (which points 
 
 - `shadcn/ui` — shadcn/ui component usage and styling rules.
 - `vercel/ai-elements` — AI Elements chat components.
-- `rongxinai-ui-adapter` — RongxinAI-specific constraints and lobster theme mapping.
+- `zhiyuan-ui-adapter` — 知远智能体-specific constraints and Zhiyuan theme mapping.
 
 These global skills complement, not replace, the conventions in this file.
 
 > **CRITICAL: Color Format Incompatibility**
 >
-> shadcn/ui components expect HSL color values in CSS variables (e.g., `--primary: 217 91% 60%`), and Tailwind generates classes like `bg-primary` as `hsl(var(--primary))`. However, RongxinAI's lobster theme stores colors as **hex values** (`--lobster-primary: #3B82F6`), and the bridge maps them one-to-one (`--primary: var(--lobster-primary)`).
+> shadcn/ui components expect HSL color values in CSS variables (e.g., `--primary: 217 91% 60%`), and Tailwind generates classes like `bg-primary` as `hsl(var(--primary))`. However, 知远智能体's Zhiyuan theme stores colors as **hex values** (`--zy-primary: #3B82F6`), and the bridge maps them one-to-one (`--primary: var(--zy-primary)`).
 >
 > This means `hsl(var(--primary))` → `hsl(#3B82F6)` → **invalid CSS** — the browser silently drops the declaration. Any shadcn component using `bg-primary`, `bg-input`, `bg-secondary`, `text-primary`, etc. may appear to have no color at all.
 >
 > **When debugging invisible component styles:**
+>
 > 1. Open DevTools and check if the element has a `background-color` or `color` set to `hsl(...)` with a hex value inside — this is the root cause.
-> 2. Fix by writing a CSS rule that reads `var(--lobster-*)` directly without the `hsl()` wrapper.
+> 2. Fix by writing a CSS rule that reads `var(--zy-*)` directly without the `hsl()` wrapper.
 > 3. Do NOT add className overrides on the component — `className` is for layout only per the shadcn skill. Always fix color issues in the global CSS file (`src/renderer/index.css`).
 >
 > Example fix for Switch component:
+>
 > ```css
 > /* index.css */
-> [data-slot="switch"][data-unchecked] {
->   background-color: var(--lobster-surface-raised);
+> [data-slot='switch'][data-unchecked] {
+>   background-color: var(--zy-surface-raised);
 > }
-> [data-slot="switch"][data-checked] {
->   background-color: var(--lobster-primary);
+> [data-slot='switch'][data-checked] {
+>   background-color: var(--zy-primary);
 > }
 > ```
 >
@@ -504,10 +533,10 @@ These global skills complement, not replace, the conventions in this file.
 >
 > This project uses **Tailwind v4** (upgraded from v3.4). v4 supports shorthand variant syntax natively:
 >
-> | Variant | Tailwind v4 (shorthand) |
-> |---------|------------------------|
-> | `data-*` attribute | `data-active:bg-background` |
-> | `data-*` with value | `data-checked:bg-primary` |
-> | `data-*` boolean | `data-disabled:opacity-50` |
+> | Variant             | Tailwind v4 (shorthand)     |
+> | ------------------- | --------------------------- |
+> | `data-*` attribute  | `data-active:bg-background` |
+> | `data-*` with value | `data-checked:bg-primary`   |
+> | `data-*` boolean    | `data-disabled:opacity-50`  |
 >
 > **Note**: The full syntax `data-[active]:bg-background` also works in v4, but shorthand is preferred. The upgrade codemod automatically converted v3-style `data-[active]:` to v4-style `data-active:` in all component files.

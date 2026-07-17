@@ -1,4 +1,4 @@
-import { type UIMessage,useChat } from '@ai-sdk/react';
+import { type UIMessage, useChat } from '@ai-sdk/react';
 
 import { IpcChatTransport, type IpcChatTransportOptions } from '../services/ipcChatTransport';
 

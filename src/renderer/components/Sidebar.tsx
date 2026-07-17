@@ -4,7 +4,17 @@ import { Checkbox } from '@shared/components/ui/checkbox';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { Cog, Cpu, TriangleAlert } from 'lucide-react';
-import { Briefcase, Clock, MessageCircle, PanelLeft, Pencil, Plug, Puzzle, Search, Trash2 } from 'lucide-react';
+import {
+  Briefcase,
+  Clock,
+  MessageCircle,
+  PanelLeft,
+  Pencil,
+  Plug,
+  Puzzle,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -49,8 +59,7 @@ const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
   'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4';
-const activeSidebarNavItemClassName =
-  `${sidebarNavItemClassName} bg-black/6 hover:bg-black/6 dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
+const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-black/6 hover:bg-black/6 dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
 const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -80,7 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [agentScrollEdges, setAgentScrollEdges] = useState({ top: false, bottom: false });
   const [workMode, setWorkMode] = useState<'work' | 'chat'>(
-    () => configService.getConfig().workMode ?? 'work'
+    () => configService.getConfig().workMode ?? 'work',
   );
 
   const handleWorkModeChange = useCallback((checked: boolean) => {
@@ -90,11 +99,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   // Filter sessions by workMode — chat sessions only visible in chat mode
-  const sessions = React.useMemo(() =>
-    workMode === 'chat'
-      ? allSessions.filter(s => s.mode === 'chat')
-      : allSessions.filter(s => s.mode !== 'chat'),
-  [allSessions, workMode]);
+  const sessions = React.useMemo(
+    () =>
+      workMode === 'chat'
+        ? allSessions.filter(s => s.mode === 'chat')
+        : allSessions.filter(s => s.mode !== 'chat'),
+    [allSessions, workMode],
+  );
 
   // Chat mode: map sessions to AgentSidebarTaskNode for AgentTaskRow rendering
   const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
@@ -172,9 +183,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const updateAgentScrollEdges = useCallback((element: HTMLDivElement | null) => {
     if (!element) {
-      setAgentScrollEdges((previousEdges) => (
-        previousEdges.top || previousEdges.bottom ? { top: false, bottom: false } : previousEdges
-      ));
+      setAgentScrollEdges(previousEdges =>
+        previousEdges.top || previousEdges.bottom ? { top: false, bottom: false } : previousEdges,
+      );
       return;
     }
 
@@ -184,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       bottom: maxScrollTop - element.scrollTop > 1,
     };
 
-    setAgentScrollEdges((previousEdges) => {
+    setAgentScrollEdges(previousEdges => {
       if (previousEdges.top === nextEdges.top && previousEdges.bottom === nextEdges.bottom) {
         return previousEdges;
       }
@@ -192,9 +203,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
   }, []);
 
-  const handleAgentScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    updateAgentScrollEdges(event.currentTarget);
-  }, [updateAgentScrollEdges]);
+  const handleAgentScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      updateAgentScrollEdges(event.currentTarget);
+    },
+    [updateAgentScrollEdges],
+  );
 
   const handleToggleSelection = useCallback((sessionId: string) => {
     setSelectedIds(prev => {
@@ -234,41 +248,44 @@ const Sidebar: React.FC<SidebarProps> = ({
     handleExitBatchMode();
   }, [selectedIds, handleExitBatchMode]);
 
-  const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (isCollapsed) return;
-    event.preventDefault();
-    isResizingRef.current = true;
-    setIsResizing(true);
-    resizeStartXRef.current = event.clientX;
-    resizeStartWidthRef.current = sidebarWidth;
-    document.body.classList.add('select-none');
+  const handleResizeStart = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (isCollapsed) return;
+      event.preventDefault();
+      isResizingRef.current = true;
+      setIsResizing(true);
+      resizeStartXRef.current = event.clientX;
+      resizeStartWidthRef.current = sidebarWidth;
+      document.body.classList.add('select-none');
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isResizingRef.current) return;
-      const nextWidth = resizeStartWidthRef.current + moveEvent.clientX - resizeStartXRef.current;
-      if (nextWidth < MIN_SIDEBAR_WIDTH) {
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!isResizingRef.current) return;
+        const nextWidth = resizeStartWidthRef.current + moveEvent.clientX - resizeStartXRef.current;
+        if (nextWidth < MIN_SIDEBAR_WIDTH) {
+          isResizingRef.current = false;
+          setIsResizing(false);
+          document.body.classList.remove('select-none');
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          onToggleCollapse();
+          return;
+        }
+        setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, nextWidth));
+      };
+
+      const handleMouseUp = () => {
         isResizingRef.current = false;
         setIsResizing(false);
         document.body.classList.remove('select-none');
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
-        onToggleCollapse();
-        return;
-      }
-      setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, nextWidth));
-    };
+      };
 
-    const handleMouseUp = () => {
-      isResizingRef.current = false;
-      setIsResizing(false);
-      document.body.classList.remove('select-none');
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [isCollapsed, onToggleCollapse, sidebarWidth]);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [isCollapsed, onToggleCollapse, sidebarWidth],
+  );
 
   useEffect(() => {
     return () => {
@@ -309,347 +326,379 @@ const Sidebar: React.FC<SidebarProps> = ({
           transitionDuration: `${SIDEBAR_COLLAPSE_TRANSITION_MS}ms`,
         }}
       >
-      <div className="pt-3 pb-3">
-        <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
-          <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-            <span className="text-sm font-bold text-muted-foreground select-none">知远</span>
-            {updateBadge}
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onToggleCollapse}
-            className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-            aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
-          >
-            <PanelLeft className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="mt-[5px] space-y-0.5 px-3">
-          <div className="relative h-7 w-full cursor-pointer" onClick={() => handleWorkModeChange(workMode !== 'chat')}>
-            <Switch
-              checked={workMode === 'chat'}
-              onCheckedChange={handleWorkModeChange}
-              data-mode="work-chat"
-            />
-            <span className={cn(
-              'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
-              workMode === 'work'
-                ? 'font-semibold text-foreground'
-                : 'font-normal text-muted-foreground opacity-50'
-            )} style={{ left: '25%', transform: 'translate(-50%, -50%)' }}>
-              <Briefcase className="size-3.5" />
-              <span className="text-sm">{i18nService.t('workMode')}</span>
-            </span>
-            <span className={cn(
-              'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
-              workMode === 'chat'
-                ? 'font-semibold text-foreground'
-                : 'font-normal text-muted-foreground opacity-50'
-            )} style={{ left: '75%', transform: 'translate(-50%, -50%)' }}>
-              <MessageCircle className="size-3.5" />
-              <span className="text-sm">{i18nService.t('chatMode')}</span>
-            </span>
-          </div>
-          <div className="mt-2!">
+        <div className="pt-3 pb-3">
+          <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
+            <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
+              <span className="text-sm font-bold text-muted-foreground select-none">知远</span>
+              {updateBadge}
+            </div>
             <Button
               type="button"
               variant="ghost"
-              onClick={onNewChat}
+              size="icon"
+              onClick={onToggleCollapse}
+              className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+              aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
+            >
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="mt-[5px] space-y-0.5 px-3">
+            <div
+              className="relative h-7 w-full cursor-pointer"
+              onClick={() => handleWorkModeChange(workMode !== 'chat')}
+            >
+              <Switch
+                checked={workMode === 'chat'}
+                onCheckedChange={handleWorkModeChange}
+                data-mode="work-chat"
+              />
+              <span
+                className={cn(
+                  'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
+                  workMode === 'work'
+                    ? 'font-semibold text-foreground'
+                    : 'font-normal text-muted-foreground opacity-50',
+                )}
+                style={{ left: '25%', transform: 'translate(-50%, -50%)' }}
+              >
+                <Briefcase className="size-3.5" />
+                <span className="text-sm">{i18nService.t('workMode')}</span>
+              </span>
+              <span
+                className={cn(
+                  'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
+                  workMode === 'chat'
+                    ? 'font-semibold text-foreground'
+                    : 'font-normal text-muted-foreground opacity-50',
+                )}
+                style={{ left: '75%', transform: 'translate(-50%, -50%)' }}
+              >
+                <MessageCircle className="size-3.5" />
+                <span className="text-sm">{i18nService.t('chatMode')}</span>
+              </span>
+            </div>
+            <div className="mt-2!">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onNewChat}
+                className={sidebarNavItemClassName}
+              >
+                <Pencil className={sidebarCreateIconClassName} />
+                {workMode === 'chat' ? i18nService.t('newChat') : '新建任务'}
+              </Button>
+            </div>
+            {workMode !== 'chat' && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  onShowLocalInference();
+                }}
+                className={
+                  activeView === 'localInference'
+                    ? activeSidebarNavItemClassName
+                    : sidebarNavItemClassName
+                }
+                aria-current={activeView === 'localInference' ? 'page' : undefined}
+              >
+                <Cpu className="h-4 w-4 shrink-0" />
+                {i18nService.t('localInferenceTitle')}
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                onShowCowork();
+                setIsSearchOpen(true);
+              }}
               className={sidebarNavItemClassName}
             >
-              <Pencil className={sidebarCreateIconClassName} />
-              {workMode === 'chat' ? i18nService.t('newChat') : '新建任务'}
+              <Search className="h-4 w-4 shrink-0" />
+              {i18nService.t(workMode === 'chat' ? 'searchChats' : 'search')}
             </Button>
+            {workMode !== 'chat' && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  onShowScheduledTasks();
+                }}
+                className={
+                  activeView === 'scheduledTasks'
+                    ? activeSidebarNavItemClassName
+                    : sidebarNavItemClassName
+                }
+                aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
+              >
+                <Clock className="h-4 w-4 shrink-0" />
+                {i18nService.t('scheduledTasks')}
+              </Button>
+            )}
+            {workMode !== 'chat' && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    onShowExpert();
+                  }}
+                  className={
+                    activeView === 'expert'
+                      ? activeSidebarNavItemClassName
+                      : sidebarNavItemClassName
+                  }
+                  aria-current={activeView === 'expert' ? 'page' : undefined}
+                >
+                  <Puzzle className="h-4 w-4 shrink-0" />
+                  {i18nService.t('expert')}
+                </Button>
+              </>
+            )}
+            {workMode === 'chat' && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    onShowSkills();
+                  }}
+                  className={
+                    activeView === 'skills'
+                      ? activeSidebarNavItemClassName
+                      : sidebarNavItemClassName
+                  }
+                  aria-current={activeView === 'skills' ? 'page' : undefined}
+                >
+                  <Puzzle className="h-4 w-4 shrink-0" />
+                  {i18nService.t('skills')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    onShowMcp();
+                  }}
+                  className={
+                    activeView === 'mcp' ? activeSidebarNavItemClassName : sidebarNavItemClassName
+                  }
+                  aria-current={activeView === 'mcp' ? 'page' : undefined}
+                >
+                  <Plug className="h-4 w-4 shrink-0" />
+                  {i18nService.t('mcpServers')}
+                </Button>
+              </>
+            )}
           </div>
-          {workMode !== 'chat' && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setIsSearchOpen(false);
-                onShowLocalInference();
-              }}
-              className={activeView === 'localInference' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-              aria-current={activeView === 'localInference' ? 'page' : undefined}
-            >
-              <Cpu className="h-4 w-4 shrink-0" />
-              {i18nService.t('localInferenceTitle')}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              onShowCowork();
-              setIsSearchOpen(true);
-            }}
-            className={sidebarNavItemClassName}
-          >
-            <Search className="h-4 w-4 shrink-0" />
-            {i18nService.t(workMode === 'chat' ? 'searchChats' : 'search')}
-          </Button>
-          {workMode !== 'chat' && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setIsSearchOpen(false);
-                onShowScheduledTasks();
-              }}
-              className={activeView === 'scheduledTasks' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-              aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
-            >
-              <Clock className="h-4 w-4 shrink-0" />
-              {i18nService.t('scheduledTasks')}
-            </Button>
-          )}
-          {workMode !== 'chat' && (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  onShowExpert();
-                }}
-                className={activeView === 'expert' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-                aria-current={activeView === 'expert' ? 'page' : undefined}
-              >
-                <Puzzle className="h-4 w-4 shrink-0" />
-                {i18nService.t('expert')}
-              </Button>
-            </>
-          )}
-          {workMode === 'chat' && (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  onShowSkills();
-                }}
-                className={activeView === 'skills' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-                aria-current={activeView === 'skills' ? 'page' : undefined}
-              >
-                <Puzzle className="h-4 w-4 shrink-0" />
-                {i18nService.t('skills')}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setIsSearchOpen(false);
-                  onShowMcp();
-                }}
-                className={activeView === 'mcp' ? activeSidebarNavItemClassName : sidebarNavItemClassName}
-                aria-current={activeView === 'mcp' ? 'page' : undefined}
-              >
-                <Plug className="h-4 w-4 shrink-0" />
-                {i18nService.t('mcpServers')}
-              </Button>
-            </>
-          )}
         </div>
-      </div>
-      <div className="relative min-h-0 flex-1">
-        <div
-          ref={agentScrollContainerRef}
-          className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
-          onScroll={handleAgentScroll}
-        >
-          <div className={workMode !== 'chat' ? '' : 'hidden'}>
-            <MyAgentSidebarTree
-              isBatchMode={isBatchMode}
-              selectedIds={selectedIds}
-              onShowCowork={onShowCowork}
-              onToggleSelection={handleToggleSelection}
-              onEnterBatchMode={handleEnterBatchMode}
-              onVisibleSessionsChange={handleVisibleSessionsChange}
-              workMode={workMode}
-            />
-          </div>
-          {workMode === 'chat' && (
-            <>
-              <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
-                <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
-                  {i18nService.t('chatRecentTitle')}
-                </h2>
-              </div>
-              {chatTaskNodes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 px-4">
-                  <MessageCircle className="size-10 text-muted-foreground mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground mb-1">
-                    {i18nService.t('chatNoSessions')}
-                  </p>
-                  <p className="text-xs text-muted-foreground text-center">
-                    {i18nService.t('chatNoSessionsHint')}
-                  </p>
+        <div className="relative min-h-0 flex-1">
+          <div
+            ref={agentScrollContainerRef}
+            className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
+            onScroll={handleAgentScroll}
+          >
+            <div className={workMode !== 'chat' ? '' : 'hidden'}>
+              <MyAgentSidebarTree
+                isBatchMode={isBatchMode}
+                selectedIds={selectedIds}
+                onShowCowork={onShowCowork}
+                onToggleSelection={handleToggleSelection}
+                onEnterBatchMode={handleEnterBatchMode}
+                onVisibleSessionsChange={handleVisibleSessionsChange}
+                workMode={workMode}
+              />
+            </div>
+            {workMode === 'chat' && (
+              <>
+                <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
+                  <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+                    {i18nService.t('chatRecentTitle')}
+                  </h2>
                 </div>
-              ) : (
-                <div className="space-y-0.5 **:[[role=treeitem]]:pl-3!">
-                  {chatTaskNodes.map((task) => (
-                    <AgentTaskRow
-                  key={task.id}
-                  task={task}
-                  isBatchMode={isBatchMode}
-                  isSelected={selectedIds.has(task.id)}
-                  onSelect={() => {
-                    const session = allSessions.find(s => s.id === task.id);
-                    if (session) void handleSelectSession(session);
-                  }}
-                  onDelete={() => handleDeleteSession(task.id)}
-                  onShare={async () => {
-                    const session = allSessions.find(s => s.id === task.id);
-                    if (session) {
-                      await handleSelectSession(session);
-                      window.setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('cowork:open-share-options', {
-                          detail: { sessionId: task.id },
-                        }));
-                      }, 0);
-                    }
-                  }}
-                  onTogglePin={(pinned) => handleToggleSessionPin(task.id, pinned)}
-                  onRename={(title) => handleRenameSession(task.id, title)}
-                  onToggleSelection={() => handleToggleSelection(task.id)}
-                  onEnterBatchMode={() => handleEnterBatchMode(task.id)}
-                />
-              ))}
+                {chatTaskNodes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-4">
+                    <MessageCircle className="size-10 text-muted-foreground mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground mb-1">
+                      {i18nService.t('chatNoSessions')}
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {i18nService.t('chatNoSessionsHint')}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5 **:[[role=treeitem]]:pl-3!">
+                    {chatTaskNodes.map(task => (
+                      <AgentTaskRow
+                        key={task.id}
+                        task={task}
+                        isBatchMode={isBatchMode}
+                        isSelected={selectedIds.has(task.id)}
+                        onSelect={() => {
+                          const session = allSessions.find(s => s.id === task.id);
+                          if (session) void handleSelectSession(session);
+                        }}
+                        onDelete={() => handleDeleteSession(task.id)}
+                        onShare={async () => {
+                          const session = allSessions.find(s => s.id === task.id);
+                          if (session) {
+                            await handleSelectSession(session);
+                            window.setTimeout(() => {
+                              window.dispatchEvent(
+                                new CustomEvent('cowork:open-share-options', {
+                                  detail: { sessionId: task.id },
+                                }),
+                              );
+                            }, 0);
+                          }
+                        }}
+                        onTogglePin={pinned => handleToggleSessionPin(task.id, pinned)}
+                        onRename={title => handleRenameSession(task.id, title)}
+                        onToggleSelection={() => handleToggleSelection(task.id)}
+                        onEnterBatchMode={() => handleEnterBatchMode(task.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
+              agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+          <div
+            className={`pointer-events-none absolute inset-x-0 top-[68px] z-10 h-10 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
+              agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
+              agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        </div>
+        {!isCollapsed && (
+          <div
+            className="non-draggable absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
+            onMouseDown={handleResizeStart}
+          />
+        )}
+        <CoworkSearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSelectSession={handleSelectSession}
+          workMode={workMode}
+        />
+        {isBatchMode ? (
+          <div className="px-3 pb-3 pt-1 flex items-center justify-between">
+            <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
+              <Checkbox
+                checked={
+                  selectedIds.size === allVisibleSessionIdsRef.current.length &&
+                  allVisibleSessionIdsRef.current.length > 0
+                }
+                onCheckedChange={handleSelectAll}
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
+              />
+              {i18nService.t('batchSelectAll')}
+            </label>
+            <div className="flex items-center justify-start gap-2">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleBatchDeleteClick}
+                disabled={selectedIds.size === 0}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExitBatchMode}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+              >
+                {i18nService.t('batchCancel')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1 px-3 pb-1 pt-1">
+            <div className="flex items-center gap-1">
+              {!hideLogin && (
+                <div className="flex-1 min-w-0">
+                  <LoginButton />
                 </div>
               )}
-            </>
-          )}
-        </div>
-        <div
-          className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
-            agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-        <div
-          className={`pointer-events-none absolute inset-x-0 top-[68px] z-10 h-10 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
-            agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-        <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
-            agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-      </div>
-      {!isCollapsed && (
-        <div
-          className="non-draggable absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
-          onMouseDown={handleResizeStart}
-        />
-      )}
-      <CoworkSearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        sessions={sessions}
-        currentSessionId={currentSessionId}
-        onSelectSession={handleSelectSession}
-        workMode={workMode}
-      />
-      {isBatchMode ? (
-        <div className="px-3 pb-3 pt-1 flex items-center justify-between">
-          <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
-            <Checkbox
-              checked={selectedIds.size === allVisibleSessionIdsRef.current.length && allVisibleSessionIdsRef.current.length > 0}
-              onCheckedChange={handleSelectAll}
-              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
-            />
-            {i18nService.t('batchSelectAll')}
-          </label>
-          <div className="flex items-center justify-start gap-2">
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleBatchDeleteClick}
-              disabled={selectedIds.size === 0}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExitBatchMode}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-            >
-              {i18nService.t('batchCancel')}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-1 px-3 pb-1 pt-1">
-          <div className="flex items-center gap-1">
-          {!hideLogin && (
-            <div className="flex-1 min-w-0">
-              <LoginButton />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onShowSettings()}
+                className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
+                aria-label={i18nService.t('settings')}
+              >
+                <Cog className="h-4 w-4 shrink-0" />
+                {i18nService.t('settings')}
+              </Button>
             </div>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onShowSettings()}
-            className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
-            aria-label={i18nService.t('settings')}
+          </div>
+        )}
+        {/* Batch Delete Confirmation Modal */}
+        {showBatchDeleteConfirm && (
+          <Modal
+            onClose={() => setShowBatchDeleteConfirm(false)}
+            className="w-full max-w-sm mx-4 bg-surface rounded-2xl shadow-xl overflow-hidden"
           >
-            <Cog className="h-4 w-4 shrink-0" />
-            {i18nService.t('settings')}
-          </Button>
-          </div>
-        </div>
-      )}
-      {/* Batch Delete Confirmation Modal */}
-      {showBatchDeleteConfirm && (
-        <Modal
-          onClose={() => setShowBatchDeleteConfirm(false)}
-          className="w-full max-w-sm mx-4 bg-surface rounded-2xl shadow-xl overflow-hidden"
-        >
-          <div className="flex items-center gap-3 px-5 py-4">
-            <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
+            <div className="flex items-center gap-3 px-5 py-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
+                <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
+              </div>
+              <h2 className="text-base font-semibold text-foreground">
+                {i18nService.t('batchDeleteConfirmTitle')}
+              </h2>
             </div>
-            <h2 className="text-base font-semibold text-foreground">
-              {i18nService.t('batchDeleteConfirmTitle')}
-            </h2>
-          </div>
-          <div className="px-5 pb-4">
-            <p className="text-sm text-muted-foreground">
-              {i18nService
-                .t('batchDeleteConfirmMessage')
-                .replace('{count}', String(selectedIds.size))}
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowBatchDeleteConfirm(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-            >
-              {i18nService.t('cancel')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleBatchDelete}
-              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-            >
-              {i18nService.t('batchDelete')} ({selectedIds.size})
-            </Button>
-          </div>
-        </Modal>
-      )}
+            <div className="px-5 pb-4">
+              <p className="text-sm text-muted-foreground">
+                {i18nService
+                  .t('batchDeleteConfirmMessage')
+                  .replace('{count}', String(selectedIds.size))}
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBatchDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+              >
+                {i18nService.t('cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleBatchDelete}
+                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+              >
+                {i18nService.t('batchDelete')} ({selectedIds.size})
+              </Button>
+            </div>
+          </Modal>
+        )}
       </div>
     </aside>
   );

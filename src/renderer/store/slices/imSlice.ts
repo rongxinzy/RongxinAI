@@ -29,10 +29,7 @@ import type {
   WecomOpenClawConfig,
   WeixinOpenClawConfig,
 } from '../../types/im';
-import {
-  DEFAULT_IM_CONFIG,
-  DEFAULT_IM_STATUS,
-} from '../../types/im';
+import { DEFAULT_IM_CONFIG, DEFAULT_IM_STATUS } from '../../types/im';
 
 export interface IMState {
   config: IMGatewayConfig;
@@ -69,8 +66,13 @@ const imSlice = createSlice({
     setDingTalkMultiInstanceConfig: (state, action: PayloadAction<DingTalkMultiInstanceConfig>) => {
       state.config.dingtalk = action.payload;
     },
-    setDingTalkInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<DingTalkOpenClawConfig> }>) => {
-      const inst = state.config.dingtalk.instances.find(i => i.instanceId === action.payload.instanceId);
+    setDingTalkInstanceConfig: (
+      state,
+      action: PayloadAction<{ instanceId: string; config: Partial<DingTalkOpenClawConfig> }>,
+    ) => {
+      const inst = state.config.dingtalk.instances.find(
+        i => i.instanceId === action.payload.instanceId,
+      );
       if (inst) Object.assign(inst, action.payload.config);
     },
     addDingTalkInstance: (state, action: PayloadAction<DingTalkInstanceConfig>) => {
@@ -78,7 +80,7 @@ const imSlice = createSlice({
     },
     removeDingTalkInstance: (state, action: PayloadAction<string>) => {
       state.config.dingtalk.instances = state.config.dingtalk.instances.filter(
-        i => i.instanceId !== action.payload
+        i => i.instanceId !== action.payload,
       );
     },
     /** @deprecated Use setFeishuInstanceConfig instead */
@@ -95,8 +97,13 @@ const imSlice = createSlice({
     setFeishuMultiInstanceConfig: (state, action: PayloadAction<FeishuMultiInstanceConfig>) => {
       state.config.feishu = action.payload;
     },
-    setFeishuInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<FeishuOpenClawConfig> }>) => {
-      const inst = state.config.feishu.instances.find(i => i.instanceId === action.payload.instanceId);
+    setFeishuInstanceConfig: (
+      state,
+      action: PayloadAction<{ instanceId: string; config: Partial<FeishuOpenClawConfig> }>,
+    ) => {
+      const inst = state.config.feishu.instances.find(
+        i => i.instanceId === action.payload.instanceId,
+      );
       if (inst) Object.assign(inst, action.payload.config);
     },
     addFeishuInstance: (state, action: PayloadAction<FeishuInstanceConfig>) => {
@@ -104,7 +111,7 @@ const imSlice = createSlice({
     },
     removeFeishuInstance: (state, action: PayloadAction<string>) => {
       state.config.feishu.instances = state.config.feishu.instances.filter(
-        i => i.instanceId !== action.payload
+        i => i.instanceId !== action.payload,
       );
     },
     /** @deprecated Use setTelegramInstanceConfig instead */
@@ -120,8 +127,13 @@ const imSlice = createSlice({
     setTelegramMultiInstanceConfig: (state, action: PayloadAction<TelegramMultiInstanceConfig>) => {
       state.config.telegram = action.payload;
     },
-    setTelegramInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<TelegramOpenClawConfig> }>) => {
-      const inst = state.config.telegram.instances.find(i => i.instanceId === action.payload.instanceId);
+    setTelegramInstanceConfig: (
+      state,
+      action: PayloadAction<{ instanceId: string; config: Partial<TelegramOpenClawConfig> }>,
+    ) => {
+      const inst = state.config.telegram.instances.find(
+        i => i.instanceId === action.payload.instanceId,
+      );
       if (inst) Object.assign(inst, action.payload.config);
     },
     addTelegramInstance: (state, action: PayloadAction<TelegramInstanceConfig>) => {
@@ -129,7 +141,7 @@ const imSlice = createSlice({
     },
     removeTelegramInstance: (state, action: PayloadAction<string>) => {
       state.config.telegram.instances = state.config.telegram.instances.filter(
-        i => i.instanceId !== action.payload
+        i => i.instanceId !== action.payload,
       );
     },
     /** @deprecated Use setQQInstanceConfig instead */
@@ -146,7 +158,10 @@ const imSlice = createSlice({
     setQQMultiInstanceConfig: (state, action: PayloadAction<QQMultiInstanceConfig>) => {
       state.config.qq = action.payload;
     },
-    setQQInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<QQOpenClawConfig> }>) => {
+    setQQInstanceConfig: (
+      state,
+      action: PayloadAction<{ instanceId: string; config: Partial<QQOpenClawConfig> }>,
+    ) => {
       const inst = state.config.qq.instances.find(i => i.instanceId === action.payload.instanceId);
       if (inst) Object.assign(inst, action.payload.config);
     },
@@ -155,7 +170,7 @@ const imSlice = createSlice({
     },
     removeQQInstance: (state, action: PayloadAction<string>) => {
       state.config.qq.instances = state.config.qq.instances.filter(
-        i => i.instanceId !== action.payload
+        i => i.instanceId !== action.payload,
       );
     },
     /** @deprecated Use setDiscordInstanceConfig instead */
@@ -171,8 +186,13 @@ const imSlice = createSlice({
     setDiscordMultiInstanceConfig: (state, action: PayloadAction<DiscordMultiInstanceConfig>) => {
       state.config.discord = action.payload;
     },
-    setDiscordInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<DiscordOpenClawConfig> }>) => {
-      const inst = state.config.discord.instances.find(i => i.instanceId === action.payload.instanceId);
+    setDiscordInstanceConfig: (
+      state,
+      action: PayloadAction<{ instanceId: string; config: Partial<DiscordOpenClawConfig> }>,
+    ) => {
+      const inst = state.config.discord.instances.find(
+        i => i.instanceId === action.payload.instanceId,
+      );
       if (inst) Object.assign(inst, action.payload.config);
     },
     addDiscordInstance: (state, action: PayloadAction<DiscordInstanceConfig>) => {
@@ -180,7 +200,7 @@ const imSlice = createSlice({
     },
     removeDiscordInstance: (state, action: PayloadAction<string>) => {
       state.config.discord.instances = state.config.discord.instances.filter(
-        i => i.instanceId !== action.payload
+        i => i.instanceId !== action.payload,
       );
     },
     /** @deprecated Use setWecomInstanceConfig instead */
@@ -197,8 +217,13 @@ const imSlice = createSlice({
     setWecomMultiInstanceConfig: (state, action: PayloadAction<WecomMultiInstanceConfig>) => {
       state.config.wecom = action.payload;
     },
-    setWecomInstanceConfig: (state, action: PayloadAction<{ instanceId: string; config: Partial<WecomOpenClawConfig> }>) => {
-      const inst = state.config.wecom.instances.find(i => i.instanceId === action.payload.instanceId);
+    setWecomInstanceConfig: (
+      state,
+      action: PayloadAction<{ instanceId: string; config: Partial<WecomOpenClawConfig> }>,
+    ) => {
+      const inst = state.config.wecom.instances.find(
+        i => i.instanceId === action.payload.instanceId,
+      );
       if (inst) Object.assign(inst, action.payload.config);
     },
     addWecomInstance: (state, action: PayloadAction<WecomInstanceConfig>) => {
@@ -206,7 +231,7 @@ const imSlice = createSlice({
     },
     removeWecomInstance: (state, action: PayloadAction<string>) => {
       state.config.wecom.instances = state.config.wecom.instances.filter(
-        i => i.instanceId !== action.payload
+        i => i.instanceId !== action.payload,
       );
     },
     setWeixinConfig: (state, action: PayloadAction<Partial<WeixinOpenClawConfig>>) => {
@@ -224,7 +249,7 @@ const imSlice = createSlice({
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
-    clearError: (state) => {
+    clearError: state => {
       state.error = null;
     },
   },

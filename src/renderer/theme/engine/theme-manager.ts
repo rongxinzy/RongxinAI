@@ -6,7 +6,7 @@ export interface ThemeStorage {
 }
 
 export interface ThemeManagerOptions {
-  /** localStorage key for persistence. Default: 'lobster-theme' */
+  /** localStorage key for persistence. Default: 'zhiyuan-theme' */
   storageKey?: string;
   /** Default theme ID (first theme if omitted) */
   defaultTheme?: string;
@@ -26,16 +26,18 @@ export class ThemeManager {
   private mqHandler: ((e: MediaQueryListEvent) => void) | null = null;
 
   constructor(themes: ThemeDefinition[], options: ThemeManagerOptions = {}) {
-    this.themes = new Map(themes.map((t) => [t.meta.id, t]));
+    this.themes = new Map(themes.map(t => [t.meta.id, t]));
     const fallback = themes[0]?.meta.id ?? '';
     this.currentId = fallback;
     this.opts = {
-      storageKey: options.storageKey ?? 'lobster-theme',
+      storageKey: options.storageKey ?? 'zhiyuan-theme',
       defaultTheme: options.defaultTheme ?? fallback,
       followSystem: options.followSystem ?? false,
       storage: options.storage ?? {
-        get: (k) => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null),
-        set: (k, v) => { if (typeof localStorage !== 'undefined') localStorage.setItem(k, v); },
+        get: k => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null),
+        set: (k, v) => {
+          if (typeof localStorage !== 'undefined') localStorage.setItem(k, v);
+        },
       },
       onChange: options.onChange ?? (() => {}),
     };
@@ -122,18 +124,19 @@ export class ThemeManager {
           symbol: theme.tokens['text-muted-foreground'],
           windowBg: theme.tokens['background'],
         });
-      } catch { /* not in Electron */ }
+      } catch {
+        /* not in Electron */
+      }
     }
 
     this.opts.onChange(theme);
   }
 
   private applySystemPreference(): void {
-    const isDark = typeof window !== 'undefined'
-      && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark =
+      typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const target = isDark ? 'dark' : 'light';
-    const match = Array.from(this.themes.values())
-      .find((t) => t.meta.appearance === target);
+    const match = Array.from(this.themes.values()).find(t => t.meta.appearance === target);
     if (match) this.apply(match.meta.id);
   }
 }

@@ -56,20 +56,20 @@ export const defaultConfig: Config = {
       '--no-default-browser-check',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding'
-    ]
+      '--disable-renderer-backgrounding',
+    ],
   },
   server: {
     port: 8923,
-    host: '127.0.0.1' // Localhost only for security
+    host: '127.0.0.1', // Localhost only for security
   },
   search: {
     defaultEngine: 'auto',
     fallbackOrder: ['google', 'bing'],
     defaultMaxResults: 10,
     searchTimeout: 30000, // 30 seconds
-    navigationTimeout: 15000 // 15 seconds
-  }
+    navigationTimeout: 15000, // 15 seconds
+  },
 };
 
 /**
@@ -83,6 +83,6 @@ export function mergeConfig(userConfig?: Partial<Config>): Config {
   return {
     browser: { ...defaultConfig.browser, ...userConfig.browser },
     server: { ...defaultConfig.server, ...userConfig.server },
-    search: { ...defaultConfig.search, ...userConfig.search }
+    search: { ...defaultConfig.search, ...userConfig.search },
   };
 }

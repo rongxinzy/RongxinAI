@@ -3,9 +3,9 @@
  * Intercepts console.* methods and writes to file + console simultaneously.
  *
  * Log file locations:
- *   macOS:   ~/Library/Logs/RongxinAI/main[-dev]-YYYY-MM-DD.log
- *   Windows: %USERPROFILE%\AppData\Roaming\RongxinAI\logs\main[-dev]-YYYY-MM-DD.log
- *   Linux:   ~/.config/RongxinAI/logs/main[-dev]-YYYY-MM-DD.log
+ *   macOS:   ~/Library/Logs/ZhiYuanAgent/main[-dev]-YYYY-MM-DD.log
+ *   Windows: %USERPROFILE%\AppData\Roaming\ZhiYuanAgent\logs\main[-dev]-YYYY-MM-DD.log
+ *   Linux:   ~/.config/ZhiYuanAgent/logs/main[-dev]-YYYY-MM-DD.log
  *
  * Production uses  "main-YYYY-MM-DD.log"
  * Development uses "main-dev-YYYY-MM-DD.log"  (app.isPackaged === false)
@@ -43,7 +43,7 @@ function logDir(): string {
  */
 export function initLogger(): void {
   // Daily rotation: one file per calendar day
-  log.transports.file.resolvePathFn = (vars) => {
+  log.transports.file.resolvePathFn = vars => {
     _logDir = vars.libraryDefaultDir;
     return path.join(vars.libraryDefaultDir, `${LOG_BASENAME}-${todayStr()}.log`);
   };
@@ -98,7 +98,7 @@ export function initLogger(): void {
   // Log startup marker
   const mode = app.isPackaged ? 'production' : 'development';
   log.info('='.repeat(60));
-  log.info(`RongxinAI started (${process.platform} ${process.arch}, ${mode})`);
+  log.info(`ZhiYuanAgent started (${process.platform} ${process.arch}, ${mode})`);
   log.info('='.repeat(60));
 }
 
@@ -139,9 +139,10 @@ export function getRecentMainLogEntries(): Array<{ archiveName: string; filePath
 
   const cutoffMs = Date.now() - LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-  return fs.readdirSync(dir)
-    .filter((f) => LOG_FILE_RE.test(f))
-    .map((f) => ({ archiveName: f, filePath: path.join(dir, f) }))
+  return fs
+    .readdirSync(dir)
+    .filter(f => LOG_FILE_RE.test(f))
+    .map(f => ({ archiveName: f, filePath: path.join(dir, f) }))
     .filter(({ filePath }) => {
       try {
         return fs.statSync(filePath).mtimeMs >= cutoffMs;

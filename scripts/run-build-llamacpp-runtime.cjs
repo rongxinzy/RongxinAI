@@ -21,8 +21,12 @@ function resolveBashExecutable(rootDir) {
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     if (result.status === 0 && result.stdout) {
-      const paths = result.stdout.trim().split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
-      const gitBash = paths.find((p) => {
+      const paths = result.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map(p => p.trim())
+        .filter(Boolean);
+      const gitBash = paths.find(p => {
         const lower = p.toLowerCase();
         return !lower.includes('windowsapps') && !lower.includes('system32');
       });

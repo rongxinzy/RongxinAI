@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Apply version-specific LobsterAI patches to the openclaw source tree.
+ * Apply version-specific ZhiYuanAgent patches to the openclaw source tree.
  *
  * Patches are organised in scripts/patches/<version>/ directories, where
  * <version> matches the "openclaw.version" field in package.json (e.g.
@@ -11,7 +11,7 @@
  *   node scripts/apply-openclaw-patches.cjs [openclaw-src-dir]
  *
  * If openclaw-src-dir is not specified, defaults to ../openclaw relative to
- * the LobsterAI project root.
+ * the ZhiYuanAgent project root.
  *
  * Safe to run multiple times — already-applied patches are skipped.
  */
@@ -47,11 +47,14 @@ if (!fs.existsSync(path.join(openclawSrc, 'package.json'))) {
 }
 
 if (!fs.existsSync(patchesDir)) {
-  console.log(`[apply-openclaw-patches] No patches directory for ${openclawVersion}, nothing to do.`);
+  console.log(
+    `[apply-openclaw-patches] No patches directory for ${openclawVersion}, nothing to do.`,
+  );
   process.exit(0);
 }
 
-const patchFiles = fs.readdirSync(patchesDir)
+const patchFiles = fs
+  .readdirSync(patchesDir)
   .filter(f => f.endsWith('.patch'))
   .sort();
 
@@ -60,10 +63,12 @@ if (patchFiles.length === 0) {
   process.exit(0);
 }
 
-console.log(`[apply-openclaw-patches] Applying patches for openclaw ${openclawVersion} (${patchFiles.length} file(s))`);
+console.log(
+  `[apply-openclaw-patches] Applying patches for openclaw ${openclawVersion} (${patchFiles.length} file(s))`,
+);
 
 // Reset openclaw source to a clean tag state before applying patches.
-// This removes stale patches left by a different LobsterAI branch that may have
+// This removes stale patches left by a different ZhiYuanAgent branch that may have
 // applied different patches for the same openclaw version.
 try {
   execFileSync('git', ['reset', 'HEAD', '.'], { cwd: openclawSrc, stdio: 'pipe' });
@@ -86,7 +91,7 @@ for (const patchFile of patchFiles) {
   const needsNormalize = raw.includes('\r');
   let patchPath = originalPatchPath;
   if (needsNormalize) {
-    patchPath = path.join(os.tmpdir(), `lobsterai-patch-${patchFile}`);
+    patchPath = path.join(os.tmpdir(), `zhiyuan-patch-${patchFile}`);
     fs.writeFileSync(patchPath, raw.replace(/\r/g, ''), 'utf8');
   }
 
@@ -139,15 +144,21 @@ for (const patchFile of patchFiles) {
       const patchDoesNotApply = stderr.includes('patch does not apply');
 
       if (alreadyExists || patchDoesNotApply) {
-        console.log(`[apply-openclaw-patches] Already applied (forward check confirms): ${patchFile}`);
+        console.log(
+          `[apply-openclaw-patches] Already applied (forward check confirms): ${patchFile}`,
+        );
         skipped++;
         continue;
       }
 
       // Genuinely cannot apply — report error.
       console.error(`[apply-openclaw-patches] Patch does not apply cleanly: ${patchFile}`);
-      console.error(`[apply-openclaw-patches] This usually means the openclaw version has changed.`);
-      console.error(`[apply-openclaw-patches] Regenerate patches or update to match the new source.`);
+      console.error(
+        `[apply-openclaw-patches] This usually means the openclaw version has changed.`,
+      );
+      console.error(
+        `[apply-openclaw-patches] Regenerate patches or update to match the new source.`,
+      );
       if (stderr) console.error(stderr);
       process.exit(1);
     }
@@ -169,9 +180,13 @@ for (const patchFile of patchFiles) {
   } finally {
     // Clean up temporary normalized patch file.
     if (needsNormalize && fs.existsSync(patchPath)) {
-      try { fs.unlinkSync(patchPath); } catch {}
+      try {
+        fs.unlinkSync(patchPath);
+      } catch {}
     }
   }
 }
 
-console.log(`[apply-openclaw-patches] Done. Applied: ${applied}, Skipped (already applied): ${skipped}`);
+console.log(
+  `[apply-openclaw-patches] Done. Applied: ${applied}, Skipped (already applied): ${skipped}`,
+);

@@ -1,10 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
 import { Spinner } from '@shared/components/ui/spinner';
 import { RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,52 +27,55 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
 
-  const loadSession = useCallback(async (isRetry = false): Promise<boolean> => {
-    if (!isRetry) {
-      setLoading(true);
-      setError(null);
-    }
-
-    try {
-      let loadedSession: CoworkSession | null = null;
-
-      if (sessionId) {
-        const result = await window.electron?.cowork?.getSession(sessionId);
-        if (result?.success && result.session) {
-          const s = result.session;
-          loadedSession = {
-            ...s,
-            messagesOffset: s.messagesOffset ?? 0,
-            totalMessages: s.totalMessages ?? s.messages?.length ?? 0,
-          };
-        }
-      }
-
-      if (!loadedSession && sessionKey) {
-        const result = await window.electron?.scheduledTasks?.resolveSession(sessionKey);
-        if (result?.success && result.session) {
-          const s = result.session;
-          loadedSession = {
-            ...s,
-            messagesOffset: s.messagesOffset ?? 0,
-            totalMessages: s.totalMessages ?? s.messages?.length ?? 0,
-          };
-        }
-      }
-
-      if (cancelledRef.current) return false;
-
-      if (loadedSession) {
-        setSession(loadedSession);
-        setLoading(false);
+  const loadSession = useCallback(
+    async (isRetry = false): Promise<boolean> => {
+      if (!isRetry) {
+        setLoading(true);
         setError(null);
-        return true;
       }
-      return false;
-    } catch {
-      return false;
-    }
-  }, [sessionId, sessionKey]);
+
+      try {
+        let loadedSession: CoworkSession | null = null;
+
+        if (sessionId) {
+          const result = await window.electron?.cowork?.getSession(sessionId);
+          if (result?.success && result.session) {
+            const s = result.session;
+            loadedSession = {
+              ...s,
+              messagesOffset: s.messagesOffset ?? 0,
+              totalMessages: s.totalMessages ?? s.messages?.length ?? 0,
+            };
+          }
+        }
+
+        if (!loadedSession && sessionKey) {
+          const result = await window.electron?.scheduledTasks?.resolveSession(sessionKey);
+          if (result?.success && result.session) {
+            const s = result.session;
+            loadedSession = {
+              ...s,
+              messagesOffset: s.messagesOffset ?? 0,
+              totalMessages: s.totalMessages ?? s.messages?.length ?? 0,
+            };
+          }
+        }
+
+        if (cancelledRef.current) return false;
+
+        if (loadedSession) {
+          setSession(loadedSession);
+          setLoading(false);
+          setError(null);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    [sessionId, sessionKey],
+  );
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -138,11 +136,19 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
     }
   };
 
-  const displayItems = useMemo(() => buildDisplayItems(session?.messages ?? []), [session?.messages]);
+  const displayItems = useMemo(
+    () => buildDisplayItems(session?.messages ?? []),
+    [session?.messages],
+  );
   const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0 bg-card overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <DialogTitle className="text-sm font-semibold truncate">
@@ -188,20 +194,14 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
 
           {!loading && !error && turns.length > 0 && (
             <div className="py-2">
-              {turns.map((turn) => {
+              {turns.map(turn => {
                 const showAssistantBlock = turn.assistantItems.length > 0;
 
                 return (
                   <React.Fragment key={turn.id}>
-                    {turn.userMessage && (
-                      <UserBubble message={turn.userMessage} skills={[]} />
-                    )}
+                    {turn.userMessage && <UserBubble message={turn.userMessage} skills={[]} />}
                     {showAssistantBlock && (
-                      <TurnBlock
-                        turn={turn}
-                        showTypingIndicator={false}
-                        showCopyButtons={true}
-                      />
+                      <TurnBlock turn={turn} showTypingIndicator={false} showCopyButtons={true} />
                     )}
                   </React.Fragment>
                 );

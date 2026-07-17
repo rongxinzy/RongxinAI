@@ -13,4 +13,3 @@ export function useI18nLanguage(): ReturnType<typeof i18nService.getLanguage> {
 
   return language;
 }
-

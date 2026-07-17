@@ -25,11 +25,13 @@ SMTP_FROM=your@gmail.com
 ```
 
 2. **Install dependencies:**
+
 ```bash
 npm install
 ```
 
 3. **Test the connection:**
+
 ```bash
 node scripts/imap.js check
 node scripts/smtp.js test
@@ -38,6 +40,7 @@ node scripts/smtp.js test
 ## IMAP Commands (Receiving Email)
 
 ### Check for new emails
+
 ```bash
 node scripts/imap.js check --limit 10
 node scripts/imap.js check --recent 2h        # Last 2 hours
@@ -45,11 +48,13 @@ node scripts/imap.js check --recent 30m       # Last 30 minutes
 ```
 
 ### Fetch specific email
+
 ```bash
 node scripts/imap.js fetch <uid>
 ```
 
 ### Search emails
+
 ```bash
 node scripts/imap.js search --unseen
 node scripts/imap.js search --from "sender@example.com"
@@ -58,12 +63,14 @@ node scripts/imap.js search --recent 24h
 ```
 
 ### Mark as read/unread
+
 ```bash
 node scripts/imap.js mark-read <uid>
 node scripts/imap.js mark-unread <uid>
 ```
 
 ### List mailboxes
+
 ```bash
 node scripts/imap.js list-mailboxes
 ```
@@ -71,11 +78,13 @@ node scripts/imap.js list-mailboxes
 ## SMTP Commands (Sending Email)
 
 ### Test SMTP connection
+
 ```bash
 node scripts/smtp.js test
 ```
 
 ### Send email
+
 ```bash
 # Simple text email
 node scripts/smtp.js send --to recipient@example.com --subject "Hello" --body "World"
@@ -92,26 +101,28 @@ node scripts/smtp.js send --to "a@example.com,b@example.com" --cc "c@example.com
 
 ## Common Email Servers
 
-| Provider | IMAP Host | IMAP Port | SMTP Host | SMTP Port |
-|----------|-----------|-----------|-----------|-----------|
-| 163.com | imap.163.com | 993 | smtp.163.com | 465 |
-| vip.163.com | imap.vip.163.com | 993 | smtp.vip.163.com | 465 |
-| 126.com | imap.126.com | 993 | smtp.126.com | 465 |
-| vip.126.com | imap.vip.126.com | 993 | smtp.vip.126.com | 465 |
-| 188.com | imap.188.com | 993 | smtp.188.com | 465 |
-| vip.188.com | imap.vip.188.com | 993 | smtp.vip.188.com | 465 |
-| yeah.net | imap.yeah.net | 993 | smtp.yeah.net | 465 |
-| Gmail | imap.gmail.com | 993 | smtp.gmail.com | 587 |
-| Outlook | outlook.office365.com | 993 | smtp.office365.com | 587 |
-| QQ Mail | imap.qq.com | 993 | smtp.qq.com | 587 |
+| Provider    | IMAP Host             | IMAP Port | SMTP Host          | SMTP Port |
+| ----------- | --------------------- | --------- | ------------------ | --------- |
+| 163.com     | imap.163.com          | 993       | smtp.163.com       | 465       |
+| vip.163.com | imap.vip.163.com      | 993       | smtp.vip.163.com   | 465       |
+| 126.com     | imap.126.com          | 993       | smtp.126.com       | 465       |
+| vip.126.com | imap.vip.126.com      | 993       | smtp.vip.126.com   | 465       |
+| 188.com     | imap.188.com          | 993       | smtp.188.com       | 465       |
+| vip.188.com | imap.vip.188.com      | 993       | smtp.vip.188.com   | 465       |
+| yeah.net    | imap.yeah.net         | 993       | smtp.yeah.net      | 465       |
+| Gmail       | imap.gmail.com        | 993       | smtp.gmail.com     | 587       |
+| Outlook     | outlook.office365.com | 993       | smtp.office365.com | 587       |
+| QQ Mail     | imap.qq.com           | 993       | smtp.qq.com        | 587       |
 
 **Important for 163.com:**
+
 - Use **authorization code** (授权码), not account password
 - Enable IMAP/SMTP in web settings first
 
 ## Configuration Options
 
 **IMAP:**
+
 - `IMAP_HOST` - Server hostname
 - `IMAP_PORT` - Server port
 - `IMAP_USER` - Your email address
@@ -121,6 +132,7 @@ node scripts/smtp.js send --to "a@example.com,b@example.com" --cc "c@example.com
 - `IMAP_MAILBOX` - Default mailbox (INBOX)
 
 **SMTP:**
+
 - `SMTP_HOST` - Server hostname
 - `SMTP_PORT` - Server port (587 for STARTTLS, 465 for SSL)
 - `SMTP_SECURE` - true for SSL (465), false for STARTTLS (587)
@@ -132,14 +144,17 @@ node scripts/smtp.js send --to "a@example.com,b@example.com" --cc "c@example.com
 ## Troubleshooting
 
 **Connection errors:**
+
 - Verify IMAP/SMTP server is running and accessible
 - Check host/port settings in `.env`
 
 **Authentication failed:**
+
 - For Gmail: Use App Password (not account password if 2FA enabled)
 - For 163.com: Use authorization code (授权码), not account password
 
 **TLS/SSL errors:**
+
 - For self-signed certs: Set `IMAP_REJECT_UNAUTHORIZED=false` or `SMTP_REJECT_UNAUTHORIZED=false`
 
 ## Files

@@ -125,7 +125,7 @@ if (-not (Test-Path "$pythonDir\python.exe")) {
 $uvArchive = 'C:\ci-cache\uv-x86_64-pc-windows-msvc-0.8.4.zip'
 $uvRuntimeDir = 'resources\uv-win'
 if (Test-Path $uvArchive) {
-  $env:LOBSTERAI_PORTABLE_UV_ARCHIVE = $uvArchive
+  $env:ZHIYUAN_PORTABLE_UV_ARCHIVE = $uvArchive
   Write-Host "Using cached uv runtime archive: $uvArchive"
   # setup-uv-runtime.js 在 CI 解压 zip 时容易静默崩溃，因此改用 PowerShell 直接复制。
   # 只要 resources/uv-win 里已有健康的 uv.exe/uvx.exe，beforePack 钩子就会跳过解压。
@@ -183,8 +183,8 @@ if (-not $isRelease) {
 
 # 优先从 Runner 本地缓存目录同步 llama.cpp backend 资源到 build/win-lite 与 build/win-full，
 # 使 electron-builder-hooks 既能使用 CI cache，也能在本地开发/Runner 直接读取下载目录。
-$llamaCppBackendDownloadDir = if ($env:RONGXINAI_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR) {
-  $env:RONGXINAI_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
+$llamaCppBackendDownloadDir = if ($env:ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR) {
+  $env:ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
 } else {
   'C:\ci-cache'
 }
@@ -240,8 +240,8 @@ Sync-BackendResourceDirectory -SourceName 'win-full' `
   -TargetDir 'build\win-full'
 
 # 根据环境变量选择 lite / full 打包命令，默认 lite。
-$llamaCppBackendBundleMode = if ($env:RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE) {
-  $env:RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE
+$llamaCppBackendBundleMode = if ($env:ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE) {
+  $env:ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE
 } else {
   'lite'
 }
@@ -284,7 +284,7 @@ if ($exe) {
 
   Write-Host "Package: $($exe.FullName) ($([math]::Round($exe.Length / 1MB, 1)) MB)"
   $encodedName = [uri]::EscapeDataString($exe.Name)
-  $uploadUrl = "http://172.18.5.249:8081/artifactory/RongxinAI/windows/$encodedName"
+  $uploadUrl = "http://172.18.5.249:8081/artifactory/ZhiYuanAgent/windows/$encodedName"
   Write-Host "Uploading to $uploadUrl ..."
 
   if ($env:ARTIFACTORY_USER -and $env:ARTIFACTORY_PASSWORD) {

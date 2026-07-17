@@ -105,7 +105,6 @@ export class IMGatewayManager extends EventEmitter {
   private coworkRuntime: CoworkRuntime | null = null;
   private coworkStore: CoworkStore | null = null;
 
-
   // DingTalk direct HTTP API token cache
   private dingTalkAccessToken: string | null = null;
   private dingTalkAccessTokenExpiry = 0;
@@ -125,7 +124,8 @@ export class IMGatewayManager extends EventEmitter {
     this.ensureOpenClawGatewayConnected = options?.ensureOpenClawGatewayConnected ?? null;
     this.getOpenClawGatewayClient = options?.getOpenClawGatewayClient ?? null;
     this.ensureOpenClawGatewayReady = options?.ensureOpenClawGatewayReady ?? null;
-    this.getOpenClawSessionKeysForCoworkSession = options?.getOpenClawSessionKeysForCoworkSession ?? null;
+    this.getOpenClawSessionKeysForCoworkSession =
+      options?.getOpenClawSessionKeysForCoworkSession ?? null;
     this.createScheduledTask = options?.createScheduledTask ?? null;
 
     // Forward gateway events
@@ -137,13 +137,9 @@ export class IMGatewayManager extends EventEmitter {
    */
   private setupGatewayEventForwarding(): void {
     // DingTalk runs via OpenClaw; no direct gateway events to forward
-
     // QQ runs via OpenClaw; no direct gateway events to forward
-
     // WeCom runs via OpenClaw; no direct gateway events to forward
-
     // Weixin runs via OpenClaw; no direct gateway events to forward
-
   }
 
   /**
@@ -173,7 +169,6 @@ export class IMGatewayManager extends EventEmitter {
   }): void {
     this.getLLMConfig = options.getLLMConfig;
     this.getSkillsPrompt = options.getSkillsPrompt ?? null;
-
   }
 
   /**
@@ -188,7 +183,10 @@ export class IMGatewayManager extends EventEmitter {
         this.imStore.setNotificationTarget(platform, target);
       }
     } catch (err: any) {
-      console.warn(`[IMGatewayManager] Failed to persist notification target for ${platform}:`, err.message);
+      console.warn(
+        `[IMGatewayManager] Failed to persist notification target for ${platform}:`,
+        err.message,
+      );
     }
   }
 
@@ -204,7 +202,10 @@ export class IMGatewayManager extends EventEmitter {
       // Weixin runs via OpenClaw; notification target not managed locally
       console.log(`[IMGatewayManager] Restored notification target for ${platform}`);
     } catch (err: any) {
-      console.warn(`[IMGatewayManager] Failed to restore notification target for ${platform}:`, err.message);
+      console.warn(
+        `[IMGatewayManager] Failed to restore notification target for ${platform}:`,
+        err.message,
+      );
     }
   }
 
@@ -236,11 +237,12 @@ export class IMGatewayManager extends EventEmitter {
   private updateCoworkHandler(): void {
     // Always create Cowork handler if we have the required dependencies
     if (this.coworkRuntime && this.coworkStore && !this.coworkHandler) {
-      const detectScheduledTaskRequest = this.getLLMConfig && this.createScheduledTask
-        ? createIMScheduledTaskRequestDetector({
-            getLLMConfig: this.getLLMConfig,
-          })
-        : undefined;
+      const detectScheduledTaskRequest =
+        this.getLLMConfig && this.createScheduledTask
+          ? createIMScheduledTaskRequestDetector({
+              getLLMConfig: this.getLLMConfig,
+            })
+          : undefined;
       this.coworkHandler = new IMCoworkHandler({
         coworkRuntime: this.coworkRuntime,
         coworkStore: this.coworkStore,
@@ -277,9 +279,7 @@ export class IMGatewayManager extends EventEmitter {
 
     // Feishu now runs via OpenClaw; config sync is handled by IPC handler
 
-
     // Weixin runs via OpenClaw; config changes are synced via OpenClawConfigSync
-
   }
 
   private async restartGateway(platform: Platform): Promise<void> {
@@ -384,7 +384,7 @@ export class IMGatewayManager extends EventEmitter {
 
   async testGateway(
     platform: Platform,
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     // Telegram always uses OpenClaw mode
     if (platform === 'telegram') {
@@ -450,7 +450,7 @@ export class IMGatewayManager extends EventEmitter {
       const authMessage = await this.withTimeout(
         this.runAuthProbe(platform, config),
         CONNECTIVITY_TIMEOUT_MS,
-        t('imAuthProbeTimeout')
+        t('imAuthProbeTimeout'),
       );
       addCheck({
         code: 'auth_check',
@@ -590,44 +590,58 @@ export class IMGatewayManager extends EventEmitter {
 
     if (platform === 'dingtalk') {
       // DingTalk runs via OpenClaw gateway (dingtalk-connector plugin)
-      console.log('[IMGatewayManager] DingTalk in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.log(
+        '[IMGatewayManager] DingTalk in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:dingtalk');
       await this.ensureOpenClawGatewayConnected?.();
       return;
     } else if (platform === 'feishu') {
       // Feishu runs via OpenClaw gateway (feishu-openclaw-plugin)
-      console.log('[IMGatewayManager] Feishu in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.log(
+        '[IMGatewayManager] Feishu in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:feishu');
       await this.ensureOpenClawGatewayConnected?.();
       return;
     } else if (platform === 'telegram') {
       // Telegram always runs via OpenClaw gateway
-      console.log('[IMGatewayManager] Telegram in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.log(
+        '[IMGatewayManager] Telegram in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:telegram');
       // Connect the gateway WebSocket so channel events (e.g. Telegram messages) are received
       await this.ensureOpenClawGatewayConnected?.();
       return;
     } else if (platform === 'discord') {
       // Discord runs via OpenClaw gateway
-      console.log('[IMGatewayManager] Discord in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.log(
+        '[IMGatewayManager] Discord in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:discord');
       await this.ensureOpenClawGatewayConnected?.();
       return;
     } else if (platform === 'qq') {
       // QQ runs via OpenClaw gateway (qqbot plugin)
-      console.log('[IMGatewayManager] QQ in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.log(
+        '[IMGatewayManager] QQ in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:qq');
       await this.ensureOpenClawGatewayConnected?.();
       return;
     } else if (platform === 'wecom') {
       // WeCom runs via OpenClaw gateway (wecom-openclaw-plugin)
-      console.log('[IMGatewayManager] WeCom in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.log(
+        '[IMGatewayManager] WeCom in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:wecom');
       await this.ensureOpenClawGatewayConnected?.();
       return;
     } else if (platform === 'weixin') {
       // Weixin runs via OpenClaw gateway (weixin-openclaw-plugin)
-      console.debug('[IMGatewayManager] Weixin in OpenClaw mode, syncing config instead of starting direct gateway');
+      console.debug(
+        '[IMGatewayManager] Weixin in OpenClaw mode, syncing config instead of starting direct gateway',
+      );
       await this.syncOpenClawConfig?.('im-gateway-start:weixin');
       await this.ensureOpenClawGatewayConnected?.();
       return;
@@ -723,9 +737,13 @@ export class IMGatewayManager extends EventEmitter {
       openClawPlatformsToStart.push('weixin');
     }
     if (openClawPlatformsToStart.length > 0) {
-      console.log(`[IMGatewayManager] Starting OpenClaw platforms in batch: ${openClawPlatformsToStart.join(', ')}`);
+      console.log(
+        `[IMGatewayManager] Starting OpenClaw platforms in batch: ${openClawPlatformsToStart.join(', ')}`,
+      );
       try {
-        await this.syncOpenClawConfig?.(`im-gateway-start-batch:${openClawPlatformsToStart.join(',')}`);
+        await this.syncOpenClawConfig?.(
+          `im-gateway-start-batch:${openClawPlatformsToStart.join(',')}`,
+        );
         await this.ensureOpenClawGatewayConnected?.();
       } catch (error: any) {
         console.error(`[IMGatewayManager] Failed to start OpenClaw platforms: ${error.message}`);
@@ -804,7 +822,10 @@ export class IMGatewayManager extends EventEmitter {
       }
       return true;
     } catch (error: any) {
-      console.error(`[IMGatewayManager] Failed to send notification via ${platform}:`, error.message);
+      console.error(
+        `[IMGatewayManager] Failed to send notification via ${platform}:`,
+        error.message,
+      );
       return false;
     }
   }
@@ -821,14 +842,21 @@ export class IMGatewayManager extends EventEmitter {
         console.log('[IMGatewayManager] QQ notification with media via OpenClaw not yet supported');
       } else if (platform === 'wecom') {
         // WeCom runs via OpenClaw; notifications are handled by the wecom-openclaw-plugin
-        console.log('[IMGatewayManager] WeCom notification with media via OpenClaw not yet supported');
+        console.log(
+          '[IMGatewayManager] WeCom notification with media via OpenClaw not yet supported',
+        );
       } else if (platform === 'weixin') {
         // Weixin runs via OpenClaw; notifications are handled by the weixin-openclaw-plugin
-        console.debug('[IMGatewayManager] Weixin notification with media via OpenClaw not yet supported');
+        console.debug(
+          '[IMGatewayManager] Weixin notification with media via OpenClaw not yet supported',
+        );
       }
       return true;
     } catch (error: any) {
-      console.error(`[IMGatewayManager] Failed to send notification with media via ${platform}:`, error.message);
+      console.error(
+        `[IMGatewayManager] Failed to send notification with media via ${platform}:`,
+        error.message,
+      );
       return false;
     }
   }
@@ -837,31 +865,48 @@ export class IMGatewayManager extends EventEmitter {
    * Probe a channel via the OpenClaw gateway using sessions.list.
    * Returns a check array (empty on success, or error check on failure).
    */
-  private async probeOpenClawChannel(
-    channelPrefix: string,
-  ): Promise<IMConnectivityCheck[]> {
+  private async probeOpenClawChannel(channelPrefix: string): Promise<IMConnectivityCheck[]> {
     const client = this.getOpenClawGatewayClient?.() ?? null;
     if (!client) return [];
 
     try {
-      const result = await client.request<{ sessions?: Array<{ key?: string }> }>(
-        'sessions.list',
-        { activeMinutes: 240, limit: 200 },
-      );
+      const result = await client.request<{ sessions?: Array<{ key?: string }> }>('sessions.list', {
+        activeMinutes: 240,
+        limit: 200,
+      });
       const hasSessions = result.sessions?.some(
         s => s.key?.startsWith(`${channelPrefix}:`) || s.key?.includes(`${channelPrefix}:`),
       );
       if (hasSessions) {
-        return [{ code: 'inbound_activity', level: 'pass', message: t('imChannelActive', { channel: channelPrefix }) }];
+        return [
+          {
+            code: 'inbound_activity',
+            level: 'pass',
+            message: t('imChannelActive', { channel: channelPrefix }),
+          },
+        ];
       }
-      return [{ code: 'inbound_activity', level: 'warn', message: t('imChannelNoSessions', { channel: channelPrefix }), suggestion: t('imChannelNoSessionsSuggestion') }];
+      return [
+        {
+          code: 'inbound_activity',
+          level: 'warn',
+          message: t('imChannelNoSessions', { channel: channelPrefix }),
+          suggestion: t('imChannelNoSessionsSuggestion'),
+        },
+      ];
     } catch (err) {
-      return [{ code: 'platform_last_error', level: 'warn', message: t('imChannelProbeError', { error: String(err) }) }];
+      return [
+        {
+          code: 'platform_last_error',
+          level: 'warn',
+          message: t('imChannelProbeError', { error: String(err) }),
+        },
+      ];
     }
   }
 
   private async testTelegramOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -890,10 +935,10 @@ export class IMGatewayManager extends EventEmitter {
         fetchJsonWithTimeout<TelegramGetMeResponse>(
           `https://api.telegram.org/bot${botToken}/getMe`,
           {},
-          CONNECTIVITY_TIMEOUT_MS
+          CONNECTIVITY_TIMEOUT_MS,
         ),
         CONNECTIVITY_TIMEOUT_MS,
-        t('imAuthProbeTimeout')
+        t('imAuthProbeTimeout'),
       );
       if (response?.ok && response.result?.username) {
         checks.push({
@@ -905,7 +950,9 @@ export class IMGatewayManager extends EventEmitter {
         checks.push({
           code: 'auth_check',
           level: 'fail',
-          message: t('imTelegramAuthFailed', { error: response?.description || t('imTelegramAuthFailedUnknown') }),
+          message: t('imTelegramAuthFailed', {
+            error: response?.description || t('imTelegramAuthFailedUnknown'),
+          }),
           suggestion: t('imTelegramCheckToken'),
         });
         return { platform, testedAt, verdict: 'fail', checks };
@@ -927,7 +974,7 @@ export class IMGatewayManager extends EventEmitter {
       message: t('imTelegramOpenClawHint'),
     });
 
-    checks.push(...await this.probeOpenClawChannel('telegram'));
+    checks.push(...(await this.probeOpenClawChannel('telegram')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -939,7 +986,7 @@ export class IMGatewayManager extends EventEmitter {
   }
 
   private async testDiscordOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -967,10 +1014,10 @@ export class IMGatewayManager extends EventEmitter {
         fetchJsonWithTimeout<DiscordUserResponse>(
           'https://discord.com/api/v10/users/@me',
           { headers: { Authorization: `Bot ${botToken}` } },
-          CONNECTIVITY_TIMEOUT_MS
+          CONNECTIVITY_TIMEOUT_MS,
         ),
         CONNECTIVITY_TIMEOUT_MS,
-        t('imAuthProbeTimeout')
+        t('imAuthProbeTimeout'),
       );
       const username = response?.username
         ? `${response.username}${response.discriminator && response.discriminator !== '0' ? `#${response.discriminator}` : ''}`
@@ -1004,7 +1051,7 @@ export class IMGatewayManager extends EventEmitter {
       message: t('imDiscordGroupMention'),
     });
 
-    checks.push(...await this.probeOpenClawChannel('discord'));
+    checks.push(...(await this.probeOpenClawChannel('discord')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -1016,7 +1063,7 @@ export class IMGatewayManager extends EventEmitter {
   }
 
   private async testFeishuOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -1096,7 +1143,7 @@ export class IMGatewayManager extends EventEmitter {
       suggestion: t('imFeishuEventSubscriptionSuggestion'),
     });
 
-    checks.push(...await this.probeOpenClawChannel('feishu'));
+    checks.push(...(await this.probeOpenClawChannel('feishu')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -1108,7 +1155,7 @@ export class IMGatewayManager extends EventEmitter {
   }
 
   private async testDingTalkOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -1136,9 +1183,13 @@ export class IMGatewayManager extends EventEmitter {
     try {
       const tokenUrl = `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(dtConfig.clientId)}&appsecret=${encodeURIComponent(dtConfig.clientSecret)}`;
       const resp = await this.withTimeout(
-        fetchJsonWithTimeout<{ errcode?: number; errmsg?: string; access_token?: string }>(tokenUrl, {}, CONNECTIVITY_TIMEOUT_MS),
+        fetchJsonWithTimeout<{ errcode?: number; errmsg?: string; access_token?: string }>(
+          tokenUrl,
+          {},
+          CONNECTIVITY_TIMEOUT_MS,
+        ),
         CONNECTIVITY_TIMEOUT_MS,
-        t('imAuthProbeTimeout')
+        t('imAuthProbeTimeout'),
       );
       if (resp.errcode && resp.errcode !== 0) {
         throw new Error(resp.errmsg || `errcode ${resp.errcode}`);
@@ -1174,7 +1225,7 @@ export class IMGatewayManager extends EventEmitter {
     });
 
     // Check 5: Probe gateway sessions
-    checks.push(...await this.probeOpenClawChannel('dingtalk-connector'));
+    checks.push(...(await this.probeOpenClawChannel('dingtalk-connector')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -1186,7 +1237,7 @@ export class IMGatewayManager extends EventEmitter {
   }
 
   private async testWecomOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -1224,7 +1275,7 @@ export class IMGatewayManager extends EventEmitter {
       message: t('imWecomOpenClawHint'),
     });
 
-    checks.push(...await this.probeOpenClawChannel('wecom'));
+    checks.push(...(await this.probeOpenClawChannel('wecom')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -1236,7 +1287,7 @@ export class IMGatewayManager extends EventEmitter {
   }
 
   private async testWeixinOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -1290,7 +1341,7 @@ export class IMGatewayManager extends EventEmitter {
     });
 
     // Check 3: Probe via OpenClaw gateway sessions.list
-    checks.push(...await this.probeOpenClawChannel('openclaw-weixin'));
+    checks.push(...(await this.probeOpenClawChannel('openclaw-weixin')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -1305,7 +1356,11 @@ export class IMGatewayManager extends EventEmitter {
    * Start Weixin QR code login via OpenClaw Gateway RPC.
    * Returns the QR code data URL and a session key for polling.
    */
-  async weixinQrLoginStart(): Promise<{ qrDataUrl?: string; message: string; sessionKey?: string }> {
+  async weixinQrLoginStart(): Promise<{
+    qrDataUrl?: string;
+    message: string;
+    sessionKey?: string;
+  }> {
     const client = this.getOpenClawGatewayClient?.();
     if (!client) {
       await this.ensureOpenClawGatewayReady?.();
@@ -1318,12 +1373,15 @@ export class IMGatewayManager extends EventEmitter {
     return this.doWeixinQrLoginStart(client);
   }
 
-  private async doWeixinQrLoginStart(client: GatewayClientLike): Promise<{ qrDataUrl?: string; message: string; sessionKey?: string }> {
+  private async doWeixinQrLoginStart(
+    client: GatewayClientLike,
+  ): Promise<{ qrDataUrl?: string; message: string; sessionKey?: string }> {
     try {
-      const result = await client.request<{ qrDataUrl?: string; message: string; sessionKey?: string }>(
-        'web.login.start',
-        { force: true, timeoutMs: 300000, verbose: true },
-      );
+      const result = await client.request<{
+        qrDataUrl?: string;
+        message: string;
+        sessionKey?: string;
+      }>('web.login.start', { force: true, timeoutMs: 300000, verbose: true });
       console.log('[IMGatewayManager] Weixin QR login start result:', result.message);
       return result;
     } catch (err) {
@@ -1335,18 +1393,31 @@ export class IMGatewayManager extends EventEmitter {
   /**
    * Wait for Weixin QR code scan completion via OpenClaw Gateway RPC.
    */
-  async weixinQrLoginWait(accountId?: string): Promise<{ connected: boolean; message: string; accountId?: string }> {
+  async weixinQrLoginWait(
+    accountId?: string,
+  ): Promise<{ connected: boolean; message: string; accountId?: string }> {
     const client = this.getOpenClawGatewayClient?.();
     if (!client) {
       return { connected: false, message: 'OpenClaw Gateway is not connected.' };
     }
     try {
-      const result = await client.request<{ connected: boolean; message: string; accountId?: string }>(
+      const result = await client.request<{
+        connected: boolean;
+        message: string;
+        accountId?: string;
+      }>(
         'web.login.wait',
         { timeoutMs: 480_000, ...(accountId ? { accountId } : {}) },
         { timeoutMs: 65_000 },
       );
-      console.log('[IMGatewayManager] Weixin QR login wait result:', JSON.stringify({ connected: result.connected, message: result.message, accountId: result.accountId }));
+      console.log(
+        '[IMGatewayManager] Weixin QR login wait result:',
+        JSON.stringify({
+          connected: result.connected,
+          message: result.message,
+          accountId: result.accountId,
+        }),
+      );
       if (result.connected) {
         // Sync config and restart gateway so the weixin channel starts with
         // the newly saved account credentials. The gateway's web.login.wait
@@ -1363,7 +1434,7 @@ export class IMGatewayManager extends EventEmitter {
   }
 
   private async testQQOpenClawConnectivity(
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult> {
     const checks: IMConnectivityCheck[] = [];
     const testedAt = Date.now();
@@ -1390,17 +1461,22 @@ export class IMGatewayManager extends EventEmitter {
     // Check 2: Auth probe via QQ Bot API
     try {
       const tokenResponse = await this.withTimeout(
-        fetchJsonWithTimeout<{ access_token?: string; expires_in?: number; code?: number; message?: string }>(
+        fetchJsonWithTimeout<{
+          access_token?: string;
+          expires_in?: number;
+          code?: number;
+          message?: string;
+        }>(
           'https://bots.qq.com/app/getAppAccessToken',
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ appId: qqConfig.appId, clientSecret: qqConfig.appSecret }),
           },
-          CONNECTIVITY_TIMEOUT_MS
+          CONNECTIVITY_TIMEOUT_MS,
         ),
         CONNECTIVITY_TIMEOUT_MS,
-        t('imAuthProbeTimeout')
+        t('imAuthProbeTimeout'),
       );
       if (!tokenResponse.access_token) {
         throw new Error(tokenResponse.message || t('imQqAccessTokenFailed'));
@@ -1434,7 +1510,7 @@ export class IMGatewayManager extends EventEmitter {
       message: t('imQqMentionHint'),
     });
 
-    checks.push(...await this.probeOpenClawChannel('qqbot'));
+    checks.push(...(await this.probeOpenClawChannel('qqbot')));
 
     const verdict: IMConnectivityVerdict = checks.some(c => c.level === 'fail')
       ? 'fail'
@@ -1444,8 +1520,6 @@ export class IMGatewayManager extends EventEmitter {
 
     return { platform, testedAt, verdict, checks };
   }
-
-
 
   private buildMergedConfig(configOverride?: Partial<IMGatewayConfig>): IMGatewayConfig {
     const current = this.getConfig();
@@ -1526,7 +1600,11 @@ export class IMGatewayManager extends EventEmitter {
         throw new Error(t('imConfigIncomplete'));
       }
       const tokenUrl = `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(dtInst.clientId)}&appsecret=${encodeURIComponent(dtInst.clientSecret)}`;
-      const resp = await fetchJsonWithTimeout<{ errcode?: number; errmsg?: string }>(tokenUrl, {}, CONNECTIVITY_TIMEOUT_MS);
+      const resp = await fetchJsonWithTimeout<{ errcode?: number; errmsg?: string }>(
+        tokenUrl,
+        {},
+        CONNECTIVITY_TIMEOUT_MS,
+      );
       if (resp.errcode && resp.errcode !== 0) {
         throw new Error(resp.errmsg || `errcode ${resp.errcode}`);
       }
@@ -1565,7 +1643,6 @@ export class IMGatewayManager extends EventEmitter {
         throw new Error(t('imConfigIncomplete'));
       }
       return t('imWecomConfigReadyOpenClaw', { botId: wcInst.botId });
-
     }
 
     if (platform === 'weixin') {
@@ -1582,14 +1659,19 @@ export class IMGatewayManager extends EventEmitter {
       const { appId, appSecret } = qqInst;
       // Verify credentials by requesting an AccessToken directly via HTTP
       // This avoids starting a full WebSocket connection just for auth check
-      const tokenResponse = await fetchJsonWithTimeout<{ access_token?: string; expires_in?: number; code?: number; message?: string }>(
+      const tokenResponse = await fetchJsonWithTimeout<{
+        access_token?: string;
+        expires_in?: number;
+        code?: number;
+        message?: string;
+      }>(
         'https://bots.qq.com/app/getAppAccessToken',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId, clientSecret: appSecret }),
         },
-        CONNECTIVITY_TIMEOUT_MS
+        CONNECTIVITY_TIMEOUT_MS,
       );
       if (!tokenResponse.access_token) {
         throw new Error(tokenResponse.message || t('imQqAccessTokenFailed'));
@@ -1600,15 +1682,21 @@ export class IMGatewayManager extends EventEmitter {
     return t('imUnknownPlatform');
   }
 
-
-  async sendConversationReply(platform: Platform, conversationId: string, text: string): Promise<boolean> {
+  async sendConversationReply(
+    platform: Platform,
+    conversationId: string,
+    text: string,
+  ): Promise<boolean> {
     try {
       switch (platform) {
         default:
           return this.sendNotificationWithMedia(platform, text);
       }
     } catch (error) {
-      console.error(`[IMGatewayManager] Failed to send conversation reply for ${platform}:${conversationId}:`, error);
+      console.error(
+        `[IMGatewayManager] Failed to send conversation reply for ${platform}:${conversationId}:`,
+        error,
+      );
       return false;
     }
   }
@@ -1624,18 +1712,22 @@ export class IMGatewayManager extends EventEmitter {
     const resp = await fetchJsonWithTimeout<{
       accessToken?: string;
       expireIn?: number;
-    }>('https://api.dingtalk.com/v1.0/oauth2/accessToken', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appKey: clientId, appSecret: clientSecret }),
-    }, 10_000);
+    }>(
+      'https://api.dingtalk.com/v1.0/oauth2/accessToken',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appKey: clientId, appSecret: clientSecret }),
+      },
+      10_000,
+    );
 
     if (!resp.accessToken) {
       throw new Error('DingTalk accessToken response missing token');
     }
 
     this.dingTalkAccessToken = resp.accessToken;
-    this.dingTalkAccessTokenExpiry = now + ((resp.expireIn ?? 7200) * 1000);
+    this.dingTalkAccessTokenExpiry = now + (resp.expireIn ?? 7200) * 1000;
     return this.dingTalkAccessToken;
   }
 
@@ -1643,7 +1735,9 @@ export class IMGatewayManager extends EventEmitter {
     const dtInstances = this.imStore.getDingTalkInstances();
     const dtConfig = dtInstances.find(i => i.enabled && i.clientId && i.clientSecret);
     if (!dtConfig?.clientId || !dtConfig?.clientSecret) {
-      console.warn('[IMGatewayManager] DingTalk direct send skipped: missing clientId/clientSecret');
+      console.warn(
+        '[IMGatewayManager] DingTalk direct send skipped: missing clientId/clientSecret',
+      );
       return false;
     }
 
@@ -1653,7 +1747,14 @@ export class IMGatewayManager extends EventEmitter {
     const hasMarkdown = /^[#*>\-]|[*_`#\[\]]/.test(text) || text.includes('\n');
     const msgKey = hasMarkdown ? 'sampleMarkdown' : 'sampleText';
     const msgParam = hasMarkdown
-      ? { title: text.split('\n')[0].replace(/^[#*\s\->]+/, '').slice(0, 20) || 'Message', text }
+      ? {
+          title:
+            text
+              .split('\n')[0]
+              .replace(/^[#*\s\->]+/, '')
+              .slice(0, 20) || 'Message',
+          text,
+        }
       : { content: text };
 
     const body = {
@@ -1663,30 +1764,42 @@ export class IMGatewayManager extends EventEmitter {
       msgParam: JSON.stringify(msgParam),
     };
 
-    console.log('[IMGatewayManager] DingTalk direct HTTP send', JSON.stringify({
-      userId,
-      msgKey,
-      textLength: text.length,
-    }));
+    console.log(
+      '[IMGatewayManager] DingTalk direct HTTP send',
+      JSON.stringify({
+        userId,
+        msgKey,
+        textLength: text.length,
+      }),
+    );
 
     const resp = await fetchJsonWithTimeout<{
       processQueryKey?: string;
       message?: string;
-    }>('https://api.dingtalk.com/v1.0/robot/oToMessages/batchSend', {
-      method: 'POST',
-      headers: {
-        'x-acs-dingtalk-access-token': token,
-        'Content-Type': 'application/json',
+    }>(
+      'https://api.dingtalk.com/v1.0/robot/oToMessages/batchSend',
+      {
+        method: 'POST',
+        headers: {
+          'x-acs-dingtalk-access-token': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    }, 10_000);
+      10_000,
+    );
 
     if (resp.processQueryKey) {
-      console.log(`[IMGatewayManager] DingTalk direct send success: processQueryKey=${resp.processQueryKey}`);
+      console.log(
+        `[IMGatewayManager] DingTalk direct send success: processQueryKey=${resp.processQueryKey}`,
+      );
       return true;
     }
 
-    console.warn('[IMGatewayManager] DingTalk direct send unexpected response:', JSON.stringify(resp));
+    console.warn(
+      '[IMGatewayManager] DingTalk direct send unexpected response:',
+      JSON.stringify(resp),
+    );
     return false;
   }
   async primeConversationReplyRoute(
@@ -1699,19 +1812,25 @@ export class IMGatewayManager extends EventEmitter {
     }
 
     try {
-      const lookup = await this.lookupDingTalkConversationReplyRoute(conversationId, coworkSessionId);
+      const lookup = await this.lookupDingTalkConversationReplyRoute(
+        conversationId,
+        coworkSessionId,
+      );
       const resolved = lookup?.resolved;
       if (resolved) {
         this.cacheConversationReplyRoute('dingtalk', conversationId, resolved.route);
         const sendParams = buildDingTalkSendParamsFromRoute(resolved.route);
-        console.log('[IMGatewayManager] Primed DingTalk reply route', JSON.stringify({
-          conversationId,
-          coworkSessionId: lookup.coworkSessionId,
-          sessionKey: resolved.sessionKey,
-          channel: resolved.route.channel,
-          target: sendParams?.target ?? resolved.route.to,
-          accountId: sendParams?.accountId ?? resolved.route.accountId ?? null,
-        }));
+        console.log(
+          '[IMGatewayManager] Primed DingTalk reply route',
+          JSON.stringify({
+            conversationId,
+            coworkSessionId: lookup.coworkSessionId,
+            sessionKey: resolved.sessionKey,
+            channel: resolved.route.channel,
+            target: sendParams?.target ?? resolved.route.to,
+            accountId: sendParams?.accountId ?? resolved.route.accountId ?? null,
+          }),
+        );
         return;
       }
 
@@ -1723,14 +1842,17 @@ export class IMGatewayManager extends EventEmitter {
       );
       if (fallbackRoute) {
         this.cacheConversationReplyRoute('dingtalk', conversationId, fallbackRoute.route);
-        console.log('[IMGatewayManager] Primed DingTalk reply route from session key context', JSON.stringify({
-          conversationId,
-          coworkSessionId,
-          sessionKey: fallbackRoute.sessionKey,
-          channel: fallbackRoute.route.channel,
-          target: fallbackRoute.route.to,
-          accountId: fallbackRoute.route.accountId ?? null,
-        }));
+        console.log(
+          '[IMGatewayManager] Primed DingTalk reply route from session key context',
+          JSON.stringify({
+            conversationId,
+            coworkSessionId,
+            sessionKey: fallbackRoute.sessionKey,
+            channel: fallbackRoute.route.channel,
+            target: fallbackRoute.route.to,
+            accountId: fallbackRoute.route.accountId ?? null,
+          }),
+        );
       }
     } catch (error: any) {
       console.warn(
@@ -1743,7 +1865,8 @@ export class IMGatewayManager extends EventEmitter {
   private async resolveDingTalkConversationReplyTarget(
     conversationId: string,
   ): Promise<{ accountId?: string; target: string } | null> {
-    let lookup: Awaited<ReturnType<IMGatewayManager['lookupDingTalkConversationReplyRoute']>> = null;
+    let lookup: Awaited<ReturnType<IMGatewayManager['lookupDingTalkConversationReplyRoute']>> =
+      null;
     try {
       lookup = await this.lookupDingTalkConversationReplyRoute(conversationId);
     } catch (error: any) {
@@ -1769,12 +1892,15 @@ export class IMGatewayManager extends EventEmitter {
       if (cachedRoute) {
         const cachedSendParams = buildDingTalkSendParamsFromRoute(cachedRoute);
         if (cachedSendParams) {
-          console.log('[IMGatewayManager] Reused cached DingTalk reply route', JSON.stringify({
-            conversationId,
-            channel: cachedRoute.channel,
-            target: cachedSendParams.target,
-            accountId: cachedSendParams.accountId ?? null,
-          }));
+          console.log(
+            '[IMGatewayManager] Reused cached DingTalk reply route',
+            JSON.stringify({
+              conversationId,
+              channel: cachedRoute.channel,
+              target: cachedSendParams.target,
+              accountId: cachedSendParams.accountId ?? null,
+            }),
+          );
           return cachedSendParams;
         }
       }
@@ -1788,13 +1914,16 @@ export class IMGatewayManager extends EventEmitter {
         this.cacheConversationReplyRoute('dingtalk', conversationId, fallbackRoute.route);
         const fallbackSendParams = buildDingTalkSendParamsFromRoute(fallbackRoute.route);
         if (fallbackSendParams) {
-          console.log('[IMGatewayManager] Resolved DingTalk reply route from session key context', JSON.stringify({
-            conversationId,
-            sessionKey: fallbackRoute.sessionKey,
-            channel: fallbackRoute.route.channel,
-            target: fallbackSendParams.target,
-            accountId: fallbackSendParams.accountId ?? null,
-          }));
+          console.log(
+            '[IMGatewayManager] Resolved DingTalk reply route from session key context',
+            JSON.stringify({
+              conversationId,
+              sessionKey: fallbackRoute.sessionKey,
+              channel: fallbackRoute.route.channel,
+              target: fallbackSendParams.target,
+              accountId: fallbackSendParams.accountId ?? null,
+            }),
+          );
           return fallbackSendParams;
         }
       }
@@ -1813,14 +1942,17 @@ export class IMGatewayManager extends EventEmitter {
       return null;
     }
 
-    console.log('[IMGatewayManager] Resolved DingTalk reply route', JSON.stringify({
-      conversationId,
-      coworkSessionId: lookup.coworkSessionId,
-      sessionKey: resolved.sessionKey,
-      channel: resolved.route.channel,
-      target: sendParams.target,
-      accountId: sendParams.accountId ?? null,
-    }));
+    console.log(
+      '[IMGatewayManager] Resolved DingTalk reply route',
+      JSON.stringify({
+        conversationId,
+        coworkSessionId: lookup.coworkSessionId,
+        sessionKey: resolved.sessionKey,
+        channel: resolved.route.channel,
+        target: sendParams.target,
+        accountId: sendParams.accountId ?? null,
+      }),
+    );
     return sendParams;
   }
 
@@ -1833,9 +1965,10 @@ export class IMGatewayManager extends EventEmitter {
     dingtalkSessionKeys: string[];
     resolved: { sessionKey: string; route: OpenClawDeliveryRoute } | null;
   } | null> {
-    const normalizedCoworkSessionId = coworkSessionId?.trim()
-      || this.imStore.getSessionMapping(conversationId, 'dingtalk')?.coworkSessionId
-      || '';
+    const normalizedCoworkSessionId =
+      coworkSessionId?.trim() ||
+      this.imStore.getSessionMapping(conversationId, 'dingtalk')?.coworkSessionId ||
+      '';
     if (!normalizedCoworkSessionId) {
       return null;
     }
@@ -1855,8 +1988,9 @@ export class IMGatewayManager extends EventEmitter {
       coworkSessionId: normalizedCoworkSessionId,
       candidateSessionKeys,
       dingtalkSessionKeys: this.collectSessionKeysByChannel(sessions, DINGTALK_OPENCLAW_CHANNEL),
-      resolved: resolveOpenClawDeliveryRouteForSessionKeys(candidateSessionKeys, sessions)
-        ?? resolveManagedSessionDeliveryRoute(normalizedCoworkSessionId, sessions),
+      resolved:
+        resolveOpenClawDeliveryRouteForSessionKeys(candidateSessionKeys, sessions) ??
+        resolveManagedSessionDeliveryRoute(normalizedCoworkSessionId, sessions),
     };
   }
 
@@ -1881,11 +2015,12 @@ export class IMGatewayManager extends EventEmitter {
         continue;
       }
       const deliveryContext = record.deliveryContext;
-      const deliveryChannel = deliveryContext && typeof deliveryContext === 'object' && !Array.isArray(deliveryContext)
-        ? (typeof (deliveryContext as Record<string, unknown>).channel === 'string'
-          ? ((deliveryContext as Record<string, unknown>).channel as string)
-          : undefined)
-        : undefined;
+      const deliveryChannel =
+        deliveryContext && typeof deliveryContext === 'object' && !Array.isArray(deliveryContext)
+          ? typeof (deliveryContext as Record<string, unknown>).channel === 'string'
+            ? ((deliveryContext as Record<string, unknown>).channel as string)
+            : undefined
+          : undefined;
       const lastChannel = typeof record.lastChannel === 'string' ? record.lastChannel : undefined;
       const routeChannel = (deliveryChannel ?? lastChannel ?? '').trim().toLowerCase();
       if (routeChannel !== normalizedChannel && !key.toLowerCase().includes(normalizedChannel)) {
@@ -1961,19 +2096,22 @@ export class IMGatewayManager extends EventEmitter {
       // Determine the target address from the session context.
       const chatType = typeof ctx.chattype === 'string' ? ctx.chattype : 'direct';
       const peerId = typeof ctx.peerid === 'string' ? (ctx.peerid as string).trim() : '';
-      const ctxConversationId = typeof ctx.conversationid === 'string' ? (ctx.conversationid as string).trim() : '';
+      const ctxConversationId =
+        typeof ctx.conversationid === 'string' ? (ctx.conversationid as string).trim() : '';
       if (!peerId && !ctxConversationId) {
         continue;
       }
 
-      const to = chatType === 'group'
-        ? `group:${ctxConversationId || peerId}`
-        : `user:${peerId || ctxConversationId}`;
+      const to =
+        chatType === 'group'
+          ? `group:${ctxConversationId || peerId}`
+          : `user:${peerId || ctxConversationId}`;
 
       // Keep the original accountId from the session context (e.g. '__default__').
       // The dingtalk-connector plugin uses this as an account lookup key, NOT the clientId.
       // When accountId is '__default__', omit it so the plugin uses its default account.
-      let accountId = typeof ctx.accountid === 'string' ? (ctx.accountid as string).trim() : undefined;
+      let accountId =
+        typeof ctx.accountid === 'string' ? (ctx.accountid as string).trim() : undefined;
       if (!accountId || accountId === '__default__') {
         accountId = undefined;
       }
@@ -1994,11 +2132,20 @@ export class IMGatewayManager extends EventEmitter {
    * Fetch the OpenClaw config schema (JSON Schema + uiHints) from the gateway.
    * Returns { schema, uiHints } or null if the gateway is unavailable.
    */
-  async getOpenClawConfigSchema(): Promise<{ schema: Record<string, unknown>; uiHints: Record<string, Record<string, unknown>> } | null> {
+  async getOpenClawConfigSchema(): Promise<{
+    schema: Record<string, unknown>;
+    uiHints: Record<string, Record<string, unknown>>;
+  } | null> {
     try {
-      return await this.requestOpenClawGateway<{ schema: Record<string, unknown>; uiHints: Record<string, Record<string, unknown>> }>('config.schema', {});
+      return await this.requestOpenClawGateway<{
+        schema: Record<string, unknown>;
+        uiHints: Record<string, Record<string, unknown>>;
+      }>('config.schema', {});
     } catch (err: any) {
-      console.warn('[IMGatewayManager] Failed to fetch config.schema from OpenClaw gateway:', err.message);
+      console.warn(
+        '[IMGatewayManager] Failed to fetch config.schema from OpenClaw gateway:',
+        err.message,
+      );
       return null;
     }
   }
@@ -2085,7 +2232,8 @@ export class IMGatewayManager extends EventEmitter {
   private _feishuAuthModule: any = null;
   private async getFeishuAuthModule() {
     if (!this._feishuAuthModule) {
-      this._feishuAuthModule = await import('@larksuite/openclaw-lark-tools/dist/utils/feishu-auth.js');
+      this._feishuAuthModule =
+        await import('@larksuite/openclaw-lark-tools/dist/utils/feishu-auth.js');
     }
     return this._feishuAuthModule;
   }
@@ -2147,7 +2295,10 @@ export class IMGatewayManager extends EventEmitter {
   /**
    * Validate existing Feishu app credentials (App ID + App Secret).
    */
-  async verifyFeishuCredentials(appId: string, appSecret: string): Promise<{
+  async verifyFeishuCredentials(
+    appId: string,
+    appSecret: string,
+  ): Promise<{
     success: boolean;
     error?: string;
   }> {
@@ -2187,7 +2338,11 @@ export class IMGatewayManager extends EventEmitter {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source }),
     });
-    const initData = await initResp.json() as { errcode: number; errmsg?: string; nonce?: string };
+    const initData = (await initResp.json()) as {
+      errcode: number;
+      errmsg?: string;
+      nonce?: string;
+    };
     if (initData.errcode !== 0 || !initData.nonce) {
       throw new Error(initData.errmsg || 'DingTalk registration init failed');
     }
@@ -2198,7 +2353,7 @@ export class IMGatewayManager extends EventEmitter {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nonce: initData.nonce }),
     });
-    const beginData = await beginResp.json() as {
+    const beginData = (await beginResp.json()) as {
       errcode: number;
       errmsg?: string;
       device_code?: string;
@@ -2233,7 +2388,7 @@ export class IMGatewayManager extends EventEmitter {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ device_code: deviceCode }),
     });
-    const pollData = await pollResp.json() as {
+    const pollData = (await pollResp.json()) as {
       errcode: number;
       errmsg?: string;
       status?: string;
@@ -2261,7 +2416,10 @@ export class IMGatewayManager extends EventEmitter {
   /**
    * Validate existing DingTalk app credentials (Client ID + Client Secret).
    */
-  async verifyDingTalkCredentials(clientId: string, clientSecret: string): Promise<{
+  async verifyDingTalkCredentials(
+    clientId: string,
+    clientSecret: string,
+  ): Promise<{
     success: boolean;
     error?: string;
   }> {
@@ -2271,21 +2429,24 @@ export class IMGatewayManager extends EventEmitter {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appKey: clientId, appSecret: clientSecret }),
       });
-      const data = await resp.json() as { accessToken?: string; code?: string; message?: string };
+      const data = (await resp.json()) as { accessToken?: string; code?: string; message?: string };
       if (data.accessToken) {
         return { success: true };
       }
       return { success: false, error: data.message || t('dingtalkVerifyCredentialsFailed') };
     } catch (err: unknown) {
-      return { success: false, error: (err instanceof Error ? err.message : undefined) || t('dingtalkVerifyFailed') };
+      return {
+        success: false,
+        error: (err instanceof Error ? err.message : undefined) || t('dingtalkVerifyFailed'),
+      };
     }
   }
 
   private calculateVerdict(checks: IMConnectivityCheck[]): IMConnectivityVerdict {
-    if (checks.some((check) => check.level === 'fail')) {
+    if (checks.some(check => check.level === 'fail')) {
       return 'fail';
     }
-    if (checks.some((check) => check.level === 'warn')) {
+    if (checks.some(check => check.level === 'warn')) {
       return 'warn';
     }
     return 'pass';
@@ -2300,7 +2461,9 @@ export class IMGatewayManager extends EventEmitter {
    * onOpenClawReconnected call.
    */
   onOpenClawDisconnected(reason: string): void {
-    console.warn(`[IMGatewayManager] OpenClaw gateway disconnected: ${reason}. Pausing IM gateways.`);
+    console.warn(
+      `[IMGatewayManager] OpenClaw gateway disconnected: ${reason}. Pausing IM gateways.`,
+    );
     // Mark all active platform gateways as disconnected
     // The platform status will reflect the degraded state in the UI
     this.emit('openclawDisconnected', reason);

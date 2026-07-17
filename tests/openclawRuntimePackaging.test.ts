@@ -68,7 +68,9 @@ test('pruneBareDistAfterGatewayPack keeps bundled extensions but removes diffs',
   pruneBareDistAfterGatewayPack(runtimeRoot);
 
   expect(fs.existsSync(path.join(runtimeRoot, 'dist', 'control-ui', 'index.html'))).toBe(true);
-  expect(fs.existsSync(path.join(runtimeRoot, 'dist', 'extensions', 'browser', 'index.js'))).toBe(true);
+  expect(fs.existsSync(path.join(runtimeRoot, 'dist', 'extensions', 'browser', 'index.js'))).toBe(
+    true,
+  );
   expect(fs.existsSync(path.join(runtimeRoot, 'dist', 'extensions', 'diffs'))).toBe(false);
   expect(fs.existsSync(path.join(runtimeRoot, 'dist', 'entry.js'))).toBe(false);
   expect(fs.existsSync(path.join(runtimeRoot, 'dist', 'client.js'))).toBe(false);

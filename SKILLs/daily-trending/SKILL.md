@@ -15,6 +15,7 @@ Fetch today's trending topics by scraping data from various platforms via tophub
 ### Multi-Platform Trending Lists
 
 Fetch trending lists from the following platforms on tophub.today:
+
 - Zhihu Hot List: `/n/mproPpoq6O`
 - Weibo Trending: `/n/KqndgxeLl9`
 - Baidu Real-time Hot Topics: `/n/Jb0vmloB1G`
@@ -37,6 +38,7 @@ web_fetch("https://tophub.today/n/Jb0vmloB1G")  # Baidu
 ```
 
 **Fetching Priority:**
+
 1. Prioritize Weibo + Zhihu + Baidu (covers 90% of hot topics)
 2. Only fetch other platforms if suitable topics are not found in these 3
 3. Fetch one platform at a time, filter immediately, then decide whether to fetch the next
@@ -46,17 +48,20 @@ web_fetch("https://tophub.today/n/Jb0vmloB1G")  # Baidu
 From all platform trending lists, filter out **truly important topics**:
 
 **Include:**
+
 - Major Events: Significant policies, international relations, social events
 - Hot Discussion Topics: Topics that spark widespread discussion
 - Factual Content: Keep the events themselves without commentary
 
 **Exclude:**
+
 - Headlines with subjective commentary
 - Pure entertainment gossip
 - Obvious promotional content
 - Emotional expressions
 
 **Output Requirements:**
+
 - Each news item must be complete with clear beginning and end
 - Describe events like news headlines
 - Avoid single words or incomplete fragments
@@ -80,6 +85,7 @@ Output only the 5 most valuable items:
 ```
 
 Notes:
+
 - Each news item should be complete with clear beginning and end
 - No source attribution needed
 - Facts only, exclude subjective commentary

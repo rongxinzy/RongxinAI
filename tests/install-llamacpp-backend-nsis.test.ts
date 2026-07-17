@@ -175,7 +175,9 @@ describe('install-llamacpp-backend-nsis dry-run plan', () => {
     expect(plan.backend.versionBackend).toBe('b9244/win-x64');
     expect(plan.archive.source).toBe(ArchiveSource.Remote);
     expect(plan.archive.requiresDownload).toBe(true);
-    expect(plan.archive.url).toBe('https://example.test/llamacpp/b9244/llama-b9244-bin-win-cpu-x64.zip');
+    expect(plan.archive.url).toBe(
+      'https://example.test/llamacpp/b9244/llama-b9244-bin-win-cpu-x64.zip',
+    );
     expect(plan.runtimeRoot).toContain('llamacpp-runtime');
   });
 
@@ -215,7 +217,7 @@ describe('install-llamacpp-backend-nsis local win-full install', () => {
                 sha256,
               },
             }
-          : entry
+          : entry,
       ),
     };
     fs.writeFileSync(
@@ -332,7 +334,9 @@ describe('install-llamacpp-backend-nsis local win-full install', () => {
     expect(result.exitCode).toBe(ExitCode.Success);
     expect(signedFiles.sort()).toEqual(['ggml.dll', 'llama-server.exe']);
     expect(
-      fs.existsSync(path.join(appDataDir, 'llamacpp-runtime', 'current', 'build', 'bin', 'llama-server.exe')),
+      fs.existsSync(
+        path.join(appDataDir, 'llamacpp-runtime', 'current', 'build', 'bin', 'llama-server.exe'),
+      ),
     ).toBe(true);
   });
 });
@@ -391,7 +395,12 @@ describe('install-llamacpp-backend-nsis remote win-lite install', () => {
       expect(buildInfo.archiveSha256).toBe(sha256);
       expect(buildInfo.archiveUrl).toBe(`${server.baseUrl}/${archiveName}`);
 
-      const downloadedArchivePath = path.join(appDataDir, 'llamacpp-runtime', 'downloads', archiveName);
+      const downloadedArchivePath = path.join(
+        appDataDir,
+        'llamacpp-runtime',
+        'downloads',
+        archiveName,
+      );
       expect(fs.existsSync(downloadedArchivePath)).toBe(true);
       expect(createSha256(fs.readFileSync(downloadedArchivePath))).toBe(sha256);
       const archiveRequests = server.requests.filter(request => request.url?.endsWith(archiveName));
@@ -434,7 +443,9 @@ describe('install-llamacpp-backend-nsis remote win-lite install', () => {
 
       expect(result.success).toBe(true);
       expect(result.exitCode).toBe(ExitCode.Success);
-      expect(server.requests.filter(request => request.method === HttpMethod.Get).length).toBeGreaterThanOrEqual(2);
+      expect(
+        server.requests.filter(request => request.method === HttpMethod.Get).length,
+      ).toBeGreaterThanOrEqual(2);
       expect(server.requests.some(request => request.range === `bytes=${partialSize}-`)).toBe(true);
       expect(createSha256(fs.readFileSync(path.join(downloadsDir, archiveName)))).toBe(sha256);
     } finally {
@@ -470,7 +481,9 @@ describe('install-llamacpp-backend-nsis remote win-lite install', () => {
       expect(result.success).toBe(false);
       expect(result.exitCode).toBe(ExitCode.DownloadFailed);
       expect(result.error).toContain('Please check network, proxy, or firewall settings.');
-      expect(server.requests.filter(request => request.method === HttpMethod.Get).length).toBeGreaterThanOrEqual(1);
+      expect(
+        server.requests.filter(request => request.method === HttpMethod.Get).length,
+      ).toBeGreaterThanOrEqual(1);
     } finally {
       await server.close();
     }
@@ -520,12 +533,16 @@ function createLocalManifest(archiveName: string, sha256: string): typeof manife
               sha256,
             },
           }
-        : entry
+        : entry,
     ),
   };
 }
 
-function createRemoteManifest(releaseBaseUrl: string, archiveName: string, sha256: string): typeof manifest {
+function createRemoteManifest(
+  releaseBaseUrl: string,
+  archiveName: string,
+  sha256: string,
+): typeof manifest {
   return {
     ...manifest,
     releaseBaseUrl,
@@ -538,7 +555,7 @@ function createRemoteManifest(releaseBaseUrl: string, archiveName: string, sha25
               sha256,
             },
           }
-        : entry
+        : entry,
     ),
   };
 }
@@ -562,7 +579,9 @@ async function startArchiveServer(input: {
   const requests: ArchiveServer['requests'] = [];
   let getCount = 0;
   const server = http.createServer((request, response) => {
-    const range = Array.isArray(request.headers.range) ? request.headers.range[0] : request.headers.range;
+    const range = Array.isArray(request.headers.range)
+      ? request.headers.range[0]
+      : request.headers.range;
     requests.push({ method: request.method, range, url: request.url });
 
     if (!request.url?.endsWith(input.archiveName)) {
@@ -637,12 +656,13 @@ async function startArchiveServer(input: {
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     requests,
-    close: () => new Promise<void>((resolve, reject) => {
-      for (const socket of sockets) {
-        socket.destroy();
-      }
-      server.close(error => (error ? reject(error) : resolve()));
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        for (const socket of sockets) {
+          socket.destroy();
+        }
+        server.close(error => (error ? reject(error) : resolve()));
+      }),
   };
 }
 

@@ -36,7 +36,6 @@ describe('mapKeepAliveToSessionReset', () => {
     });
   });
 
-
   test('maps thirty days to idle reset', () => {
     expect(mapKeepAliveToSessionReset(OpenClawSessionKeepAlive.ThirtyDays)).toEqual({
       mode: 'idle',
@@ -50,14 +49,15 @@ describe('mapKeepAliveToSessionReset', () => {
       idleMinutes: 525600,
     });
   });
-
 });
 
 describe('buildOpenClawSessionConfig', () => {
   test('builds session config with one-day reset and fixed maintenance', () => {
-    expect(buildOpenClawSessionConfig({
-      keepAlive: OpenClawSessionKeepAlive.OneDay,
-    })).toEqual({
+    expect(
+      buildOpenClawSessionConfig({
+        keepAlive: OpenClawSessionKeepAlive.OneDay,
+      }),
+    ).toEqual({
       dmScope: 'per-account-channel-peer',
       reset: {
         mode: 'idle',
@@ -66,7 +66,6 @@ describe('buildOpenClawSessionConfig', () => {
       maintenance: OPENCLAW_SESSION_MAINTENANCE,
     });
   });
-
 
   test('uses default policy when omitted', () => {
     expect(buildOpenClawSessionConfig()).toEqual({
@@ -90,7 +89,6 @@ describe('DEFAULT_OPENCLAW_SESSION_POLICY_CONFIG', () => {
 
 describe('load/save session policy config', () => {
   const defaultConfig = DEFAULT_OPENCLAW_SESSION_POLICY_CONFIG;
-
 
   test('load falls back to default when nothing stored', () => {
     const store = {

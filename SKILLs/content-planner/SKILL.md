@@ -27,8 +27,8 @@ npm install -g cheerio
 
 ## Script Directory
 
-| Script | Purpose | Usage |
-|--------|---------|-------|
+| Script                     | Purpose                     | Usage                                                                    |
+| -------------------------- | --------------------------- | ------------------------------------------------------------------------ |
 | `scripts/wechat_search.js` | Sogou WeChat article search | `node "$SKILLS_ROOT/content-planner/scripts/wechat_search.js" "keyword"` |
 
 ### Search Script Parameters
@@ -88,12 +88,12 @@ Wait 3-5 seconds between each search to avoid triggering anti-scraping mechanism
 
 Extract from search results:
 
-| Analysis Dimension | Extracted Content |
-|-------------------|-------------------|
-| Title Strategy | Which title patterns get high engagement |
-| Topic Direction | Which directions are recent hot topics |
-| Content Angle | What angles do existing articles take, how to differentiate |
-| Publish Time | Competitors' publishing frequency and timing |
+| Analysis Dimension | Extracted Content                                           |
+| ------------------ | ----------------------------------------------------------- |
+| Title Strategy     | Which title patterns get high engagement                    |
+| Topic Direction    | Which directions are recent hot topics                      |
+| Content Angle      | What angles do existing articles take, how to differentiate |
+| Publish Time       | Competitors' publishing frequency and timing                |
 
 ### Step 4: Generate Topic Recommendations
 
@@ -107,6 +107,7 @@ Based on trending data and competitor analysis, generate 5-10 topic suggestions.
 - **Reference Articles** (from search results)
 
 **Topic Quality Requirements:**
+
 - Each topic must be based on real search data, not fabricated
 - Each topic must have a clear differentiation angle
 - Must include at least 1 high-urgency topic (🔥) and 2 reserve topics (📦)

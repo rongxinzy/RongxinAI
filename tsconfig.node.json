@@ -8,4 +8,4 @@
     "esModuleInterop": true
   },
   "include": ["vite.config.ts"]
-} 
+}

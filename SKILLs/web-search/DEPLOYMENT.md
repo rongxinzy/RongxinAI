@@ -49,7 +49,7 @@ export async function getEnhancedEnv(): Promise<Record<string, string | undefine
   // Inject SKILLs directory path for skill scripts
   const skillsRoot = getSkillsRoot();
   env.SKILLS_ROOT = skillsRoot;
-  env.LOBSTERAI_SKILLS_ROOT = skillsRoot; // Alternative name for clarity
+  env.ZHIYUAN_SKILLS_ROOT = skillsRoot; // Alternative name for clarity
 
   // ... rest of code ...
 }

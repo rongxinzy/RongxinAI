@@ -13,8 +13,8 @@ const Parser = require('../vendor/rss-parser.bundle');
 const parser = new Parser({
   timeout: 10000,
   customFields: {
-    item: ['content:encoded', 'description']
-  }
+    item: ['content:encoded', 'description'],
+  },
 });
 
 function extractRedditUpvotes(contentStr) {
@@ -108,9 +108,15 @@ function cleanText(text) {
 
   // Decode basic HTML entities
   const entities = {
-    '&lt;': '<', '&gt;': '>', '&amp;': '&', '&quot;': '"',
-    '&apos;': "'", '&#39;': "'", '&nbsp;': ' ',
-    '&mdash;': '—', '&ndash;': '–'
+    '&lt;': '<',
+    '&gt;': '>',
+    '&amp;': '&',
+    '&quot;': '"',
+    '&apos;': "'",
+    '&#39;': "'",
+    '&nbsp;': ' ',
+    '&mdash;': '—',
+    '&ndash;': '–',
   };
 
   for (const [entity, char] of Object.entries(entities)) {
@@ -156,10 +162,8 @@ async function parseRssFeed(sourceConfig, keyword = null, limit = 10) {
         if (!url) continue;
 
         // Extract content/summary
-        let summary = item.contentSnippet ||
-                     item.content ||
-                     item.description ||
-                     item['content:encoded'] || '';
+        let summary =
+          item.contentSnippet || item.content || item.description || item['content:encoded'] || '';
         summary = cleanText(summary);
         // Limit summary length
         summary = summary.length > 300 ? summary.substring(0, 300) + '...' : summary;
@@ -183,7 +187,7 @@ async function parseRssFeed(sourceConfig, keyword = null, limit = 10) {
           published_at: publishedAt,
           source: sourceConfig.name,
           language: sourceConfig.language || 'en',
-          category: sourceConfig.category || 'general'
+          category: sourceConfig.category || 'general',
         };
 
         // Store match type for heat score calculation
@@ -217,5 +221,5 @@ async function parseRssFeed(sourceConfig, keyword = null, limit = 10) {
 module.exports = {
   parseRssFeed,
   tokenizeKeyword,
-  matchKeyword
+  matchKeyword,
 };

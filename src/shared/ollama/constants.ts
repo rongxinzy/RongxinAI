@@ -25,4 +25,4 @@ export const OllamaIpcChannel = {
   ChatStreamChunk: 'ollama:chat-stream-chunk',
 } as const;
 
-export type OllamaIpcChannel = typeof OllamaIpcChannel[keyof typeof OllamaIpcChannel];
+export type OllamaIpcChannel = (typeof OllamaIpcChannel)[keyof typeof OllamaIpcChannel];

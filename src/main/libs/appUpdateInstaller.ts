@@ -71,8 +71,8 @@ export async function downloadUpdate(
   const ext = path.extname(parsedUrl.pathname) || (process.platform === 'darwin' ? '.dmg' : '.exe');
   const updateDir = path.join(app.getPath('userData'), 'updates');
   const ts = Date.now();
-  const downloadPath = path.join(updateDir, `rongxinai-update-${source}-${ts}${ext}.download`);
-  const finalPath = path.join(updateDir, `rongxinai-update-${source}-${ts}${ext}`);
+  const downloadPath = path.join(updateDir, `zhiyuan-update-${source}-${ts}${ext}.download`);
+  const finalPath = path.join(updateDir, `zhiyuan-update-${source}-${ts}${ext}`);
 
   console.log(`[AppUpdate] Temp path: ${downloadPath}`);
   console.log(`[AppUpdate] Final path: ${finalPath}`);
@@ -258,7 +258,7 @@ async function installMacDmg(dmgPath: string): Promise<void> {
     );
 
     // Parse mount point from output (last line, last column)
-    const lines = mountOutput.split('\n').filter((l) => l.trim());
+    const lines = mountOutput.split('\n').filter(l => l.trim());
     const lastLine = lines[lines.length - 1];
     const mountMatch = lastLine?.match(/\t(\/Volumes\/.+)$/);
     if (!mountMatch) {
@@ -269,7 +269,7 @@ async function installMacDmg(dmgPath: string): Promise<void> {
 
     // Find .app bundle in mount point
     const entries = await fs.promises.readdir(mountPoint);
-    const appBundle = entries.find((e) => e.endsWith('.app'));
+    const appBundle = entries.find(e => e.endsWith('.app'));
     if (!appBundle) {
       throw new Error('No .app bundle found in DMG');
     }
@@ -303,7 +303,8 @@ async function installMacDmg(dmgPath: string): Promise<void> {
       console.log('[AppUpdate] Normal copy failed, requesting admin privileges...');
       try {
         // For osascript, escape backslashes and double quotes for the inner shell
-        const escapeForInnerShell = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+        const escapeForInnerShell = (s: string) =>
+          s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
         const escapedTarget = escapeForInnerShell(targetApp);
         const escapedSource = escapeForInnerShell(sourceApp);
         await execAsync(
@@ -375,9 +376,9 @@ async function installWindowsNsis(exePath: string): Promise<void> {
   // desktop shortcuts, start menu entries, "Run after finish", etc.
   const ts = Date.now();
   const tempDir = app.getPath('temp');
-  const logPath = path.join(tempDir, `rongxinai-update-${ts}.log`);
-  const scriptPath = path.join(tempDir, `rongxinai-update-${ts}.ps1`);
-  const vbsPath = path.join(tempDir, `rongxinai-update-${ts}.vbs`);
+  const logPath = path.join(tempDir, `zhiyuan-update-${ts}.log`);
+  const scriptPath = path.join(tempDir, `zhiyuan-update-${ts}.ps1`);
+  const vbsPath = path.join(tempDir, `zhiyuan-update-${ts}.vbs`);
 
   console.log(`[AppUpdate] Script log: ${logPath}`);
 

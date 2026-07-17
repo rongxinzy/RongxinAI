@@ -8,18 +8,21 @@ describe('LlamaCppModelLoadLock', () => {
     let releaseFirstAction!: () => void;
     const firstAction = lock.runExclusive(
       'model-a',
-      () => new Promise<string>(resolve => {
-        releaseFirstAction = () => resolve('loaded-a');
-      }),
+      () =>
+        new Promise<string>(resolve => {
+          releaseFirstAction = () => resolve('loaded-a');
+        }),
       activeModelName => new Error(`blocked by ${activeModelName}`),
     );
 
     expect(lock.getActiveModelName()).toBe('model-a');
-    await expect(lock.runExclusive(
-      'model-b',
-      async () => 'loaded-b',
-      activeModelName => new Error(`blocked by ${activeModelName}`),
-    )).rejects.toThrow('blocked by model-a');
+    await expect(
+      lock.runExclusive(
+        'model-b',
+        async () => 'loaded-b',
+        activeModelName => new Error(`blocked by ${activeModelName}`),
+      ),
+    ).rejects.toThrow('blocked by model-a');
 
     releaseFirstAction();
     await expect(firstAction).resolves.toBe('loaded-a');
@@ -32,17 +35,21 @@ describe('LlamaCppModelLoadLock', () => {
       throw new Error('load failed');
     });
 
-    await expect(lock.runExclusive(
-      'model-a',
-      action,
-      activeModelName => new Error(`blocked by ${activeModelName}`),
-    )).rejects.toThrow('load failed');
+    await expect(
+      lock.runExclusive(
+        'model-a',
+        action,
+        activeModelName => new Error(`blocked by ${activeModelName}`),
+      ),
+    ).rejects.toThrow('load failed');
 
     expect(lock.getActiveModelName()).toBeNull();
-    await expect(lock.runExclusive(
-      'model-b',
-      async () => 'loaded-b',
-      activeModelName => new Error(`blocked by ${activeModelName}`),
-    )).resolves.toBe('loaded-b');
+    await expect(
+      lock.runExclusive(
+        'model-b',
+        async () => 'loaded-b',
+        activeModelName => new Error(`blocked by ${activeModelName}`),
+      ),
+    ).resolves.toBe('loaded-b');
   });
 });

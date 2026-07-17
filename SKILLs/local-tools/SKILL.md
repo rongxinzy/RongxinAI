@@ -13,6 +13,7 @@ Use the local-tools skill when you need to:
 - **Calendar Management** - View, create, update, or delete calendar events
 
 **Examples of when to use:**
+
 - User: "Show me my schedule for tomorrow"
 - User: "Create a meeting at 3 PM"
 - User: "Search for calendar events containing 'project'"
@@ -29,6 +30,7 @@ Use the local-tools skill when you need to:
 ```
 
 **Architecture:**
+
 1. **CLI Scripts** - Platform-specific scripts, no HTTP server needed
    - `calendar.sh` - Bash script for macOS
    - `calendar.ps1` - PowerShell script for Windows
@@ -41,20 +43,22 @@ Use the local-tools skill when you need to:
 
 ## Platform Support
 
-| Platform | Implementation | Calendar App | Status |
-|----------|---------------|--------------|--------|
-| **macOS 10.10+** | JXA + Calendar.app | Calendar.app | ✅ Fully Supported |
-| **Windows 7+** | PowerShell + COM | Microsoft Outlook | ✅ Fully Supported |
-| **Linux** | - | - | ❌ Not Supported |
+| Platform         | Implementation     | Calendar App      | Status             |
+| ---------------- | ------------------ | ----------------- | ------------------ |
+| **macOS 10.10+** | JXA + Calendar.app | Calendar.app      | ✅ Fully Supported |
+| **Windows 7+**   | PowerShell + COM   | Microsoft Outlook | ✅ Fully Supported |
+| **Linux**        | -                  | -                 | ❌ Not Supported   |
 
 ## Permissions
 
 ### macOS
+
 - Requires "Calendar" access permission
 - User will be prompted on first use
 - Can be managed in: System Settings > Privacy & Security > Calendar
 
 ### Windows
+
 - Requires Microsoft Outlook to be installed
 - May require administrative privileges for COM access
 
@@ -65,10 +69,12 @@ Use the local-tools skill when you need to:
 When you read this SKILL.md file using the Read tool, you receive its absolute path (e.g., `/Users/username/.../SKILLs/local-tools/SKILL.md`).
 
 **To construct the script path:**
+
 1. Take the directory of this SKILL.md file
 2. Append `/scripts/calendar.sh` (macOS) or `/scripts/calendar.ps1` (Windows)
 
 **Example:**
+
 ```bash
 # If SKILL.md is at: /Users/username/path/to/SKILLs/local-tools/SKILL.md
 # Then the script is: /Users/username/path/to/SKILLs/local-tools/scripts/calendar.sh
@@ -81,18 +87,21 @@ In all examples below, `<skill-dir>/scripts/calendar.sh` is a placeholder. Repla
 ### Best Practices for AI Assistant
 
 **DO:**
+
 - ✅ Execute commands directly without showing trial-and-error process
 - ✅ If command fails, inform user about permission issues without showing technical errors
 - ✅ Use `search` command for searching birthdays/anniversaries
 - ✅ If no calendar name specified, script will automatically use first available calendar
 
 **DON'T:**
+
 - ❌ Don't repeatedly try different command combinations
 - ❌ Don't show error stacks or technical details to users
 - ❌ Don't read script source code to analyze issues
 - ❌ Don't ask users for calendar name, use default behavior
 
 **Example - Searching for birthdays:**
+
 ```bash
 # Correct approach: Search directly, don't trial-and-error
 bash "<skill-dir>/scripts/calendar.sh" search --query "birthday"
@@ -216,12 +225,12 @@ All commands return JSON with the following structure:
 
 ### Error Codes
 
-| Code | Meaning | Recoverable |
-|------|---------|-------------|
-| `CALENDAR_ACCESS_ERROR` | Permission denied or calendar not accessible | Yes |
-| `INVALID_INPUT` | Missing required parameters | No |
-| `EVENT_NOT_FOUND` | Event ID not found | No |
-| `OUTLOOK_NOT_AVAILABLE` | Microsoft Outlook not installed (Windows) | Yes |
+| Code                    | Meaning                                      | Recoverable |
+| ----------------------- | -------------------------------------------- | ----------- |
+| `CALENDAR_ACCESS_ERROR` | Permission denied or calendar not accessible | Yes         |
+| `INVALID_INPUT`         | Missing required parameters                  | No          |
+| `EVENT_NOT_FOUND`       | Event ID not found                           | No          |
+| `OUTLOOK_NOT_AVAILABLE` | Microsoft Outlook not installed (Windows)    | Yes         |
 
 ## Date Format Guidelines
 
@@ -300,10 +309,12 @@ bash "<skill-dir>/scripts/calendar.sh" list \
 ### Time Range Matching
 
 The `list` command uses **interval overlap detection**:
+
 - Returns events that have **any overlap** with the query time range
 - Does NOT require events to be fully contained within the range
 
 **Examples:**
+
 - Query: 2026-02-13 00:00:00 to 23:59:59
 - Returns:
   - ✅ Events fully on Feb 13 (e.g., 10:00-11:00)
@@ -383,18 +394,21 @@ fi
 ## Limitations
 
 ### macOS
+
 - Requires macOS 10.10 Yosemite or later (for JXA support)
 - Requires Calendar access permission
 - Does not support advanced recurring event queries
 - Cannot modify recurring event rules
 
 ### Windows
+
 - Requires Microsoft Outlook to be installed
 - Does not support other calendar applications (Windows Calendar, Google Calendar, etc.)
 - May require COM access permissions in corporate environments
 - Folder enumeration may skip restricted calendars
 
 ### General
+
 - All dates must be in ISO 8601 format (`YYYY-MM-DDTHH:mm:ss`)
 - Uses local timezone for all operations
 - Return values are converted to UTC (ISO 8601 with Z suffix)
@@ -405,30 +419,39 @@ fi
 ### macOS
 
 **Permission Denied:**
+
 ```
 Error: Calendar access permission is required
 ```
+
 **Solution:** Open System Settings > Privacy & Security > Calendar, authorize Terminal or RongxinAI
 
 **Script Not Found:**
+
 ```
 bash: calendar.sh: No such file or directory
 ```
+
 **Solution:** Ensure you're using the absolute path from SKILL.md's directory + `/scripts/calendar.sh`
 
 ### Windows
 
 **Outlook Not Found:**
+
 ```
 Error: Microsoft Outlook is not installed or not accessible
 ```
+
 **Solution:** Install Microsoft Outlook and ensure it's properly configured
 
 **PowerShell Execution Policy:**
+
 ```
 Error: Execution of scripts is disabled on this system
 ```
+
 **Solution:** Run PowerShell as Administrator and execute:
+
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -438,12 +461,14 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### macOS Implementation
 
 **JXA (JavaScript for Automation):**
+
 - Uses `osascript -l JavaScript` to execute JXA code
 - Controls Calendar.app via Apple Events
 - Works on both Intel and Apple Silicon Macs
 - Requires user permission for Calendar access
 
 **Date Handling:**
+
 - Uses BSD date command (macOS native)
 - Format: `date +%Y-%m-%dT%H:%M:%S` (local timezone)
 - Relative dates: `date -v+7d` (7 days from now)
@@ -451,17 +476,20 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### Windows Implementation
 
 **PowerShell + COM:**
+
 - Uses Outlook COM API via PowerShell
 - Requires Outlook to be installed and configured
 - Works with all Outlook-compatible calendars
 
 **Date Handling:**
+
 - Uses PowerShell `[DateTime]::Parse()` for date parsing
 - Automatically handles local timezone
 
 ### Cross-Platform Consistency
 
 Both implementations:
+
 - Use identical JSON output format
 - Support the same operations (list, create, update, delete, search)
 - Handle dates in local timezone

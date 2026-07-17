@@ -29,9 +29,9 @@ To import a Lottie animation:
 - Render the Lottie animation using the `Lottie` component from the `@remotion/lottie` package
 
 ```tsx
-import {Lottie, LottieAnimationData} from '@remotion/lottie';
-import {useEffect, useState} from 'react';
-import {cancelRender, continueRender, delayRender} from 'remotion';
+import { Lottie, LottieAnimationData } from '@remotion/lottie';
+import { useEffect, useState } from 'react';
+import { cancelRender, continueRender, delayRender } from 'remotion';
 
 export const MyAnimation = () => {
   const [handle] = useState(() => delayRender('Loading Lottie animation'));
@@ -40,12 +40,12 @@ export const MyAnimation = () => {
 
   useEffect(() => {
     fetch('https://assets4.lottiefiles.com/packages/lf20_zyquagfl.json')
-      .then((data) => data.json())
-      .then((json) => {
+      .then(data => data.json())
+      .then(json => {
         setAnimationData(json);
         continueRender(handle);
       })
-      .catch((err) => {
+      .catch(err => {
         cancelRender(err);
       });
   }, [handle]);
@@ -63,6 +63,5 @@ export const MyAnimation = () => {
 Lottie supports the `style` prop to allow styles and animations:
 
 ```tsx
-return <Lottie animationData={animationData} style={{width: 400, height: 400}} />;
+return <Lottie animationData={animationData} style={{ width: 400, height: 400 }} />;
 ```
-

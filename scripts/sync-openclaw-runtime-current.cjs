@@ -40,7 +40,9 @@ try {
 const linkType = process.platform === 'win32' ? 'junction' : 'dir';
 fs.symlinkSync(targetRuntimeDir, currentRuntimeDir, linkType);
 
-console.log(`[sync-openclaw-runtime-current] Synced ${targetId} -> vendor/openclaw-runtime/current`);
+console.log(
+  `[sync-openclaw-runtime-current] Synced ${targetId} -> vendor/openclaw-runtime/current`,
+);
 
 // Extract entry files from gateway.asar if bare files are missing.
 // On Windows, Electron's utilityProcess.fork() cannot load ESM from inside .asar archives,
@@ -75,8 +77,12 @@ if (fs.existsSync(gatewayAsarPath) && !fs.existsSync(bareEntryPath)) {
       }
     }
 
-    console.log(`[sync-openclaw-runtime-current] Extracted ${extracted}/${toExtract.length} entry files from gateway.asar`);
+    console.log(
+      `[sync-openclaw-runtime-current] Extracted ${extracted}/${toExtract.length} entry files from gateway.asar`,
+    );
   } catch (err) {
-    console.warn(`[sync-openclaw-runtime-current] Could not extract from gateway.asar: ${err.message}`);
+    console.warn(
+      `[sync-openclaw-runtime-current] Could not extract from gateway.asar: ${err.message}`,
+    );
   }
 }

@@ -5,7 +5,7 @@ export const OpenClawSessionResponseUsage = {
 } as const;
 
 export type OpenClawSessionResponseUsage =
-  typeof OpenClawSessionResponseUsage[keyof typeof OpenClawSessionResponseUsage];
+  (typeof OpenClawSessionResponseUsage)[keyof typeof OpenClawSessionResponseUsage];
 
 export const OpenClawSessionSendPolicy = {
   Allow: 'allow',
@@ -13,7 +13,7 @@ export const OpenClawSessionSendPolicy = {
 } as const;
 
 export type OpenClawSessionSendPolicy =
-  typeof OpenClawSessionSendPolicy[keyof typeof OpenClawSessionSendPolicy];
+  (typeof OpenClawSessionSendPolicy)[keyof typeof OpenClawSessionSendPolicy];
 
 export interface OpenClawSessionPatch {
   model?: string | null;

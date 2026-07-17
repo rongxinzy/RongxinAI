@@ -83,14 +83,20 @@ process.stderr.write(`[warmup] Loading bundle: ${bundlePath} ...\n`);
 const bundleUrl = pathToFileURL(bundlePath).href;
 import(bundleUrl)
   .then(() => {
-    try { require('node:module').flushCompileCache(); } catch (_) {}
+    try {
+      require('node:module').flushCompileCache();
+    } catch (_) {}
     process.stderr.write(`[warmup] Bundle loaded successfully. (${elapsed()})\n`);
     process.exit(0);
   })
-  .catch((err) => {
+  .catch(err => {
     // Some import errors are expected (missing native modules, etc.)
     // The compile cache is still written for the JS portions that were parsed.
-    try { require('node:module').flushCompileCache(); } catch (_) {}
-    process.stderr.write(`[warmup] Bundle load finished with error (cache still written): ${err.message} (${elapsed()})\n`);
+    try {
+      require('node:module').flushCompileCache();
+    } catch (_) {}
+    process.stderr.write(
+      `[warmup] Bundle load finished with error (cache still written): ${err.message} (${elapsed()})\n`,
+    );
     process.exit(0);
   });

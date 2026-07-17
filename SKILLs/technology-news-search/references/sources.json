@@ -8,9 +8,7 @@
       "enabled": true,
       "language": "en",
       "category": "startup",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "global"
     },
     {
@@ -21,9 +19,7 @@
       "enabled": true,
       "language": "en",
       "category": "consumer_tech",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "global"
     },
     {
@@ -34,9 +30,7 @@
       "enabled": true,
       "language": "en",
       "category": "tech_culture",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "global"
     },
     {
@@ -47,9 +41,7 @@
       "enabled": true,
       "language": "en",
       "category": "tech_analysis",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "global"
     },
     {
@@ -60,9 +52,7 @@
       "enabled": true,
       "language": "en",
       "category": "research",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "global"
     },
     {
@@ -73,10 +63,7 @@
       "enabled": true,
       "language": "en",
       "category": "ai_enterprise",
-      "domains": [
-        "general",
-        "ai"
-      ],
+      "domains": ["general", "ai"],
       "region": "global"
     },
     {
@@ -87,9 +74,7 @@
       "enabled": true,
       "language": "en",
       "category": "community",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "global"
     },
     {
@@ -100,9 +85,7 @@
       "enabled": true,
       "language": "zh",
       "category": "startup",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "cn"
     },
     {
@@ -113,9 +96,7 @@
       "enabled": true,
       "language": "zh",
       "category": "business",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "cn"
     },
     {
@@ -126,9 +107,7 @@
       "enabled": true,
       "language": "zh",
       "category": "tech_news",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "cn"
     },
     {
@@ -139,10 +118,7 @@
       "enabled": false,
       "language": "zh",
       "category": "ai",
-      "domains": [
-        "general",
-        "ai"
-      ],
+      "domains": ["general", "ai"],
       "region": "cn"
     },
     {
@@ -153,10 +129,7 @@
       "enabled": true,
       "language": "zh",
       "category": "ai",
-      "domains": [
-        "general",
-        "ai"
-      ],
+      "domains": ["general", "ai"],
       "region": "cn"
     },
     {
@@ -167,9 +140,7 @@
       "enabled": true,
       "language": "zh",
       "category": "tech_business",
-      "domains": [
-        "general"
-      ],
+      "domains": ["general"],
       "region": "cn"
     },
     {
@@ -180,9 +151,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -193,9 +162,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -206,9 +173,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -219,9 +184,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -232,10 +195,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend",
-        "backend"
-      ],
+      "domains": ["frontend", "backend"],
       "region": "global"
     },
     {
@@ -246,9 +206,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -259,9 +217,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -272,9 +228,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -285,9 +239,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -298,9 +250,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "ai"
-      ],
+      "domains": ["ai"],
       "region": "global"
     },
     {
@@ -311,9 +261,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "ai"
-      ],
+      "domains": ["ai"],
       "region": "global"
     },
     {
@@ -324,9 +272,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -337,9 +283,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -350,9 +294,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -363,9 +305,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -376,9 +316,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -389,9 +327,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -402,9 +338,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -415,9 +349,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -428,9 +360,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -441,9 +371,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -454,9 +382,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -467,9 +393,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "mobile"
-      ],
+      "domains": ["mobile"],
       "region": "global"
     },
     {
@@ -480,9 +404,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "mobile"
-      ],
+      "domains": ["mobile"],
       "region": "global"
     },
     {
@@ -493,9 +415,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "mobile"
-      ],
+      "domains": ["mobile"],
       "region": "global"
     },
     {
@@ -506,9 +426,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "ai"
-      ],
+      "domains": ["ai"],
       "region": "global"
     },
     {
@@ -519,9 +437,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "ai"
-      ],
+      "domains": ["ai"],
       "region": "global"
     },
     {
@@ -532,9 +448,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "ai"
-      ],
+      "domains": ["ai"],
       "region": "global"
     },
     {
@@ -545,9 +459,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -558,9 +470,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -571,9 +481,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -584,9 +492,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "hardware"
-      ],
+      "domains": ["hardware"],
       "region": "global"
     },
     {
@@ -597,9 +503,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "hardware"
-      ],
+      "domains": ["hardware"],
       "region": "global"
     },
     {
@@ -610,9 +514,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "security"
-      ],
+      "domains": ["security"],
       "region": "global"
     },
     {
@@ -623,9 +525,7 @@
       "enabled": true,
       "language": "en",
       "category": "developer_community",
-      "domains": [
-        "security"
-      ],
+      "domains": ["security"],
       "region": "global"
     },
     {
@@ -636,9 +536,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -649,9 +547,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -662,9 +558,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "frontend"
-      ],
+      "domains": ["frontend"],
       "region": "global"
     },
     {
@@ -675,9 +569,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -688,9 +580,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -701,9 +591,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -714,9 +602,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "backend"
-      ],
+      "domains": ["backend"],
       "region": "global"
     },
     {
@@ -727,9 +613,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -740,9 +624,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "devops"
-      ],
+      "domains": ["devops"],
       "region": "global"
     },
     {
@@ -753,9 +635,7 @@
       "enabled": true,
       "language": "en",
       "category": "official_blog",
-      "domains": [
-        "mobile"
-      ],
+      "domains": ["mobile"],
       "region": "global"
     },
     {
@@ -766,9 +646,7 @@
       "enabled": true,
       "language": "en",
       "category": "specialized_news",
-      "domains": [
-        "hardware"
-      ],
+      "domains": ["hardware"],
       "region": "global"
     },
     {
@@ -779,9 +657,7 @@
       "enabled": true,
       "language": "en",
       "category": "specialized_news",
-      "domains": [
-        "hardware"
-      ],
+      "domains": ["hardware"],
       "region": "global"
     },
     {
@@ -792,9 +668,7 @@
       "enabled": true,
       "language": "en",
       "category": "specialized_news",
-      "domains": [
-        "security"
-      ],
+      "domains": ["security"],
       "region": "global"
     },
     {
@@ -805,9 +679,7 @@
       "enabled": true,
       "language": "en",
       "category": "specialized_news",
-      "domains": [
-        "security"
-      ],
+      "domains": ["security"],
       "region": "global"
     },
     {
@@ -818,9 +690,7 @@
       "enabled": true,
       "language": "en",
       "category": "specialized_news",
-      "domains": [
-        "os"
-      ],
+      "domains": ["os"],
       "region": "global"
     },
     {
@@ -832,11 +702,7 @@
       "language": "zh",
       "region": "cn",
       "category": "developer_community",
-      "domains": [
-        "general",
-        "frontend",
-        "backend"
-      ]
+      "domains": ["general", "frontend", "backend"]
     },
     {
       "id": "infoq_cn",
@@ -847,9 +713,7 @@
       "language": "zh",
       "region": "cn",
       "category": "tech_news",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "oschina",
@@ -860,9 +724,7 @@
       "language": "zh",
       "region": "cn",
       "category": "opensource",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "cnblogs",
@@ -873,10 +735,7 @@
       "language": "zh",
       "region": "cn",
       "category": "developer_community",
-      "domains": [
-        "general",
-        "backend"
-      ]
+      "domains": ["general", "backend"]
     },
     {
       "id": "segmentfault",
@@ -887,9 +746,7 @@
       "language": "zh",
       "region": "cn",
       "category": "developer_community",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "v2ex",
@@ -900,9 +757,7 @@
       "language": "zh",
       "region": "cn",
       "category": "community",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "geekpark",
@@ -913,9 +768,7 @@
       "language": "zh",
       "region": "cn",
       "category": "innovation",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "ifanr",
@@ -926,9 +779,7 @@
       "language": "zh",
       "region": "cn",
       "category": "consumer_tech",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "pingwest",
@@ -939,9 +790,7 @@
       "language": "zh",
       "region": "cn",
       "category": "tech_business",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "sspai",
@@ -952,9 +801,7 @@
       "language": "zh",
       "region": "cn",
       "category": "digital_life",
-      "domains": [
-        "general"
-      ]
+      "domains": ["general"]
     },
     {
       "id": "leiphone",
@@ -965,10 +812,7 @@
       "language": "zh",
       "region": "cn",
       "category": "ai",
-      "domains": [
-        "general",
-        "ai"
-      ]
+      "domains": ["general", "ai"]
     },
     {
       "id": "aliyun_developer",
@@ -979,10 +823,7 @@
       "language": "zh",
       "region": "cn",
       "category": "cloud",
-      "domains": [
-        "devops",
-        "backend"
-      ]
+      "domains": ["devops", "backend"]
     }
   ]
 }

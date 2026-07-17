@@ -12,8 +12,7 @@ import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 
 const LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
-const LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL =
-  'https://rongxinai.krli.org/llamacpp';
+const LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL = 'https://rongxinai.krli.org/llamacpp';
 const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
   [LlamaCppRuntimeTargetId.MacArm64]: 'llama-{tag}-bin-macos-arm64.tar.gz',
   [LlamaCppRuntimeTargetId.MacX64]: 'llama-{tag}-bin-macos-x64.tar.gz',
@@ -40,16 +39,25 @@ export function resolveLlamaCppExecutableName(platform: NodeJS.Platform): string
   return platform === 'win32' ? 'llama-server.exe' : 'llama-server';
 }
 
-export function resolveLlamaCppRuntimeTargetId(platform: NodeJS.Platform, arch: string): string | null {
+export function resolveLlamaCppRuntimeTargetId(
+  platform: NodeJS.Platform,
+  arch: string,
+): string | null {
   const normalizedArch = arch === 'arm64' ? 'arm64' : arch === 'ia32' ? 'ia32' : 'x64';
   if (platform === 'darwin') {
-    return normalizedArch === 'x64' ? LlamaCppRuntimeTargetId.MacX64 : LlamaCppRuntimeTargetId.MacArm64;
+    return normalizedArch === 'x64'
+      ? LlamaCppRuntimeTargetId.MacX64
+      : LlamaCppRuntimeTargetId.MacArm64;
   }
   if (platform === 'win32') {
-    return normalizedArch === 'arm64' ? LlamaCppRuntimeTargetId.WinArm64 : LlamaCppRuntimeTargetId.WinX64;
+    return normalizedArch === 'arm64'
+      ? LlamaCppRuntimeTargetId.WinArm64
+      : LlamaCppRuntimeTargetId.WinX64;
   }
   if (platform === 'linux') {
-    return normalizedArch === 'arm64' ? LlamaCppRuntimeTargetId.LinuxArm64 : LlamaCppRuntimeTargetId.LinuxX64;
+    return normalizedArch === 'arm64'
+      ? LlamaCppRuntimeTargetId.LinuxArm64
+      : LlamaCppRuntimeTargetId.LinuxX64;
   }
   return null;
 }
@@ -81,7 +89,11 @@ export function resolveLlamaCppRuntimeCompanionDownloads(
 ): Array<{ assetName: string; url: string; fallbackUrls?: string[] }> {
   return (LLAMACPP_RUNTIME_COMPANION_ASSETS[targetId] ?? []).map(template => {
     const assetName = template.replace(/\{tag\}/g, LLAMACPP_RUNTIME_RELEASE_TAG);
-    const [url, ...fallbackUrls] = resolveLlamaCppRuntimeAssetDownloadUrls(targetId, assetName, env);
+    const [url, ...fallbackUrls] = resolveLlamaCppRuntimeAssetDownloadUrls(
+      targetId,
+      assetName,
+      env,
+    );
     return { assetName, url, fallbackUrls };
   });
 }
@@ -105,7 +117,9 @@ function resolveLlamaCppRuntimeAssetDownloadUrls(
   ];
 }
 
-export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstallContext): LlamaCppRuntimeInstallPlan {
+export function createLlamaCppRuntimeInstallPlan(
+  context: LlamaCppRuntimeInstallContext,
+): LlamaCppRuntimeInstallPlan {
   if (context.existingExecutablePath) {
     return {
       kind: 'ready',
@@ -113,7 +127,8 @@ export function createLlamaCppRuntimeInstallPlan(context: LlamaCppRuntimeInstall
     };
   }
 
-  const targetId = context.preferredTargetId ?? resolveLlamaCppRuntimeTargetId(context.platform, context.arch);
+  const targetId =
+    context.preferredTargetId ?? resolveLlamaCppRuntimeTargetId(context.platform, context.arch);
   if (!targetId) {
     return {
       kind: 'needs-manual',
@@ -193,17 +208,28 @@ export async function ensureLlamaCppRuntimeCurrent(
   targetId: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
-  const currentExecutablePath = resolveLlamaCppRuntimeExecutablePath(projectRoot, 'current', platform);
+  const currentExecutablePath = resolveLlamaCppRuntimeExecutablePath(
+    projectRoot,
+    'current',
+    platform,
+  );
   if (fs.existsSync(currentExecutablePath)) return currentExecutablePath;
 
-  const targetExecutablePath = resolveLlamaCppRuntimeExecutablePath(projectRoot, targetId, platform);
+  const targetExecutablePath = resolveLlamaCppRuntimeExecutablePath(
+    projectRoot,
+    targetId,
+    platform,
+  );
   if (!fs.existsSync(targetExecutablePath)) return null;
 
   await syncLlamaCppRuntimeCurrent(projectRoot, targetId);
   return fs.existsSync(currentExecutablePath) ? currentExecutablePath : null;
 }
 
-export async function syncLlamaCppRuntimeCurrent(projectRoot: string, targetId: string): Promise<void> {
+export async function syncLlamaCppRuntimeCurrent(
+  projectRoot: string,
+  targetId: string,
+): Promise<void> {
   const runtimeBaseDir = path.join(projectRoot, 'vendor', 'llamacpp-runtime');
   const targetRuntimeDir = path.join(runtimeBaseDir, targetId);
   const currentRuntimeDir = path.join(runtimeBaseDir, 'current');
@@ -232,7 +258,14 @@ export function resolveLlamaCppRuntimeExecutablePath(
   runtimeId: string,
   platform: NodeJS.Platform = process.platform,
 ): string {
-  return path.join(projectRoot, 'vendor', 'llamacpp-runtime', runtimeId, 'bin', resolveLlamaCppExecutableName(platform));
+  return path.join(
+    projectRoot,
+    'vendor',
+    'llamacpp-runtime',
+    runtimeId,
+    'bin',
+    resolveLlamaCppExecutableName(platform),
+  );
 }
 
 export function getProjectRoot(): string {
@@ -240,15 +273,19 @@ export function getProjectRoot(): string {
 }
 
 function formatMissingRuntimeMessage(targetId: string): string {
-  const buildHint = targetId === LlamaCppRuntimeTargetId.WinX64Cuda12
-    ? 'use npm run llamacpp:runtime:download:win-x64-cuda-12'
-    : `build locally with npm run llamacpp:runtime:${targetId}`;
+  const buildHint =
+    targetId === LlamaCppRuntimeTargetId.WinX64Cuda12
+      ? 'use npm run llamacpp:runtime:download:win-x64-cuda-12'
+      : `build locally with npm run llamacpp:runtime:${targetId}`;
   return `The prebuilt llama.cpp runtime is missing. Run npm run llamacpp:runtime:download -- ${targetId} before starting the app. If the download returns 404, the published release asset is missing and you must either set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL, ${buildHint}, or set LLAMACPP_BIN to a prebuilt llama-server executable.`;
 }
 
-async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan, { kind: 'download' }>): Promise<void> {
+async function installDownloadedRuntime(
+  plan: Extract<LlamaCppRuntimeInstallPlan, { kind: 'download' }>,
+): Promise<void> {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-runtime-'));
-  const archiveName = path.basename(new URL(plan.url).pathname) || resolveLlamaCppRuntimeAssetName(plan.targetId);
+  const archiveName =
+    path.basename(new URL(plan.url).pathname) || resolveLlamaCppRuntimeAssetName(plan.targetId);
   const archivePath = path.join(tempDir, archiveName);
   const extractDir = path.join(tempDir, 'extract');
   const executableName = path.basename(plan.executablePath);
@@ -270,7 +307,10 @@ async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan
     copyDirectoryContents(path.dirname(extractedExecutable), targetBinDir);
     for (const companion of plan.companionDownloads ?? []) {
       const companionArchivePath = path.join(tempDir, companion.assetName);
-      const companionExtractDir = path.join(tempDir, `extract-${sanitizePathSegment(companion.assetName)}`);
+      const companionExtractDir = path.join(
+        tempDir,
+        `extract-${sanitizePathSegment(companion.assetName)}`,
+      );
       await downloadFile(companion.url, companionArchivePath, companion.fallbackUrls);
       fs.mkdirSync(companionExtractDir, { recursive: true });
       await extractArchive(companionArchivePath, companionExtractDir);
@@ -279,7 +319,9 @@ async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan
     writeRuntimeBuildInfo(currentRuntimeRoot, { ...plan, url: sourceUrl }, archiveName);
 
     if (!fs.existsSync(plan.executablePath)) {
-      throw new Error(`Installed llama.cpp runtime is missing ${path.join('bin', executableName)}.`);
+      throw new Error(
+        `Installed llama.cpp runtime is missing ${path.join('bin', executableName)}.`,
+      );
     }
     if (process.platform !== 'win32') {
       fs.chmodSync(plan.executablePath, 0o755);
@@ -289,13 +331,17 @@ async function installDownloadedRuntime(plan: Extract<LlamaCppRuntimeInstallPlan
   }
 }
 
-async function downloadFile(url: string, outputPath: string, fallbackUrls: string[] = []): Promise<string> {
+async function downloadFile(
+  url: string,
+  outputPath: string,
+  fallbackUrls: string[] = [],
+): Promise<string> {
   const attempts = [url, ...fallbackUrls];
   const errors: string[] = [];
 
   for (const attemptUrl of attempts) {
     const response = await fetch(attemptUrl, {
-      headers: { 'User-Agent': 'RongxinAI/llamacpp-runtime-installer' },
+      headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-runtime-installer' },
     });
     if (!response.ok || !response.body) {
       errors.push(`HTTP ${response.status} ${response.statusText} (${attemptUrl})`);
@@ -383,14 +429,18 @@ function writeRuntimeBuildInfo(
 ): void {
   fs.writeFileSync(
     path.join(runtimeRoot, 'runtime-build-info.json'),
-    JSON.stringify({
-      target: plan.targetId,
-      version: LLAMACPP_RUNTIME_RELEASE_TAG,
-      source: 'official-release',
-      sourceUrl: plan.url,
-      assetName: archiveName,
-      installedAt: new Date().toISOString(),
-    }, null, 2) + '\n',
+    JSON.stringify(
+      {
+        target: plan.targetId,
+        version: LLAMACPP_RUNTIME_RELEASE_TAG,
+        source: 'official-release',
+        sourceUrl: plan.url,
+        assetName: archiveName,
+        installedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ) + '\n',
     'utf8',
   );
 }

@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
 
 import { migrateMainAgentWorkspace } from './openclawWorkspaceMigration';
 
-const AGENTS_MARKER = '<!-- LobsterAI managed: do not edit below this line -->';
+const AGENTS_MARKER = '<!-- ZhiYuanAgent managed: do not edit below this line -->';
 
 function createStore() {
   const values = new Map<string, string>();
@@ -55,7 +55,9 @@ describe('openclawWorkspaceMigration', () => {
 
     migrateMainAgentWorkspace(stateDir, oldDir, store as never);
 
-    expect(fs.readFileSync(path.join(newDir, 'memory', '2026-05-06.md'), 'utf8')).toBe('daily note\n');
+    expect(fs.readFileSync(path.join(newDir, 'memory', '2026-05-06.md'), 'utf8')).toBe(
+      'daily note\n',
+    );
     expect(values.get('migration.mainAgentWorkspace.v3.completed')).toBe('1');
   });
 
@@ -72,8 +74,9 @@ describe('openclawWorkspaceMigration', () => {
     migrateMainAgentWorkspace(stateDir, oldDir, store as never);
 
     expect(fs.readFileSync(path.join(newMemoryDir, '2026-05-06.md'), 'utf8')).toBe('new note\n');
-    const conflictFile = fs.readdirSync(newMemoryDir)
-      .find((name) => name.startsWith('2026-05-06.migrated-') && name.endsWith('.md'));
+    const conflictFile = fs
+      .readdirSync(newMemoryDir)
+      .find(name => name.startsWith('2026-05-06.migrated-') && name.endsWith('.md'));
     expect(conflictFile).toBeTruthy();
     expect(fs.readFileSync(path.join(newMemoryDir, conflictFile!), 'utf8')).toBe('old note\n');
   });
@@ -126,6 +129,8 @@ describe('openclawWorkspaceMigration', () => {
     migrateMainAgentWorkspace(stateDir, oldDir, store as never);
 
     expect(fs.readFileSync(path.join(newDir, 'TOOLS.md'), 'utf8')).toBe('# Tools\n');
-    expect(fs.readFileSync(path.join(newDir, 'BOOTSTRAP.md'), 'utf8')).toBe('# Existing bootstrap\n');
+    expect(fs.readFileSync(path.join(newDir, 'BOOTSTRAP.md'), 'utf8')).toBe(
+      '# Existing bootstrap\n',
+    );
   });
 });

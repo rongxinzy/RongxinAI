@@ -22,18 +22,12 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
 import { readBundledLlamaCppBackendManifest } from './llamacppBackendResources';
-import {
-  listLlamaCppRuntimeDevices,
-} from './llamacppManager';
+import { listLlamaCppRuntimeDevices } from './llamacppManager';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
-import {
-  copyDirectoryContents,
-  resolveLlamaCppExecutableName,
-} from './llamacppRuntimeInstaller';
+import { copyDirectoryContents, resolveLlamaCppExecutableName } from './llamacppRuntimeInstaller';
 
 const DEFAULT_RUNTIME_VERSION = 'b9518';
-const DEFAULT_RELEASE_BASE_URL =
-  'https://rongxinai.krli.org/llamacpp';
+const DEFAULT_RELEASE_BASE_URL = 'https://rongxinai.krli.org/llamacpp';
 const GITHUB_RELEASE_BASE_URL = 'https://github.com/ggml-org/llama.cpp/releases/download';
 const BUILD_INFO_FILE = 'runtime-build-info.json';
 let hasLoggedManifestFallback = false;
@@ -87,7 +81,10 @@ export function getLlamaCppBackendExecutablePath(
   return resolveManagedBackendExecutablePath(getLlamaCppBackendDir(runtimeRoot, ref), platform);
 }
 
-export function getLlamaCppCurrentExecutablePath(runtimeRoot: string, platform: NodeJS.Platform): string {
+export function getLlamaCppCurrentExecutablePath(
+  runtimeRoot: string,
+  platform: NodeJS.Platform,
+): string {
   return resolveManagedBackendExecutablePath(getLlamaCppCurrentBackendDir(runtimeRoot), platform);
 }
 
@@ -105,14 +102,17 @@ export async function fetchLlamaCppBackendManifest(
   const manifestUrl = explicitUrl || `${DEFAULT_RELEASE_BASE_URL}/manifest.json`;
   try {
     const manifest = await fetchManifestFromUrl(manifestUrl);
-    if (manifest.backends.length === 0) throw new Error('The backend manifest does not contain any backends.');
+    if (manifest.backends.length === 0)
+      throw new Error('The backend manifest does not contain any backends.');
     return manifest;
   } catch (error) {
     if (!hasLoggedManifestFallback) {
       console.warn('[LlamaCppBackend] manifest fetch failed, using built-in fallback:', error);
       hasLoggedManifestFallback = true;
     } else {
-      console.debug('[LlamaCppBackend] manifest fetch failed again, continuing with built-in fallback.');
+      console.debug(
+        '[LlamaCppBackend] manifest fetch failed again, continuing with built-in fallback.',
+      );
     }
     return buildFallbackManifest(version);
   }
@@ -124,10 +124,10 @@ function resolveBundledManifestUrl(): string {
 
 async function fetchManifestFromUrl(manifestUrl: string): Promise<LlamaCppBackendManifest> {
   const response = await fetch(manifestUrl, {
-    headers: { 'User-Agent': 'RongxinAI/llamacpp-backend-manager' },
+    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
   });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
-  const parsed = await response.json() as LlamaCppBackendManifest | LlamaCppBackendRootManifest;
+  const parsed = (await response.json()) as LlamaCppBackendManifest | LlamaCppBackendRootManifest;
   if (Array.isArray((parsed as LlamaCppBackendManifest).backends)) {
     return normalizeManifest(parsed as LlamaCppBackendManifest, manifestUrl);
   }
@@ -144,21 +144,26 @@ async function fetchVersionedManifestIndex(
   if (versions.length === 0) {
     throw new Error('The root backend manifest does not contain any versions.');
   }
-  const baseUrl = (rootManifest.publicBaseUrl || manifestUrl.replace(/\/manifest\.json(?:[?#].*)?$/, '')).replace(/\/$/, '');
-  const manifests = await Promise.all(versions.map(async (version) => {
-    const versionManifestUrl = `${baseUrl}/${version}/manifest.json`;
-    const versionManifest = await fetchManifestFromUrl(versionManifestUrl);
-    return {
-      version,
-      manifest: versionManifest,
-    };
-  }));
+  const baseUrl = (
+    rootManifest.publicBaseUrl || manifestUrl.replace(/\/manifest\.json(?:[?#].*)?$/, '')
+  ).replace(/\/$/, '');
+  const manifests = await Promise.all(
+    versions.map(async version => {
+      const versionManifestUrl = `${baseUrl}/${version}/manifest.json`;
+      const versionManifest = await fetchManifestFromUrl(versionManifestUrl);
+      return {
+        version,
+        manifest: versionManifest,
+      };
+    }),
+  );
   return {
     schemaVersion: 1,
-    defaultVersion: rootManifest.defaultVersion || manifests[0]?.manifest.defaultVersion || versions[0],
+    defaultVersion:
+      rootManifest.defaultVersion || manifests[0]?.manifest.defaultVersion || versions[0],
     releaseBaseUrl: baseUrl,
     backends: manifests.flatMap(({ version, manifest }) =>
-      manifest.backends.map(entry => injectVersionedArchiveUrls(entry, manifest, version, baseUrl))
+      manifest.backends.map(entry => injectVersionedArchiveUrls(entry, manifest, version, baseUrl)),
     ),
   };
 }
@@ -177,10 +182,9 @@ function injectVersionedArchiveUrls(
   };
 }
 
-function injectArchiveUrls<T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] }>(
-  archive: T,
-  releaseBaseUrl: string,
-): T {
+function injectArchiveUrls<
+  T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] },
+>(archive: T, releaseBaseUrl: string): T {
   return {
     ...archive,
     url: archive.url || `${releaseBaseUrl}/${archive.assetName}`,
@@ -197,9 +201,23 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
     defaultVersion: version,
     releaseBaseUrl: `${DEFAULT_RELEASE_BASE_URL}/${version}`,
     backends: [
-      createFallbackEntry(version, LlamaCppRuntimeTargetId.WinX64, 'win32', 'x64', 'cpu', `llama-${version}-bin-win-cpu-x64.tar.gz`),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.WinX64,
+        'win32',
+        'x64',
+        'cpu',
+        `llama-${version}-bin-win-cpu-x64.tar.gz`,
+      ),
       {
-        ...createFallbackEntry(version, LlamaCppRuntimeTargetId.WinX64Cuda12, 'win32', 'x64', 'cuda', `llama-${version}-bin-win-cuda-12.4-x64.tar.gz`),
+        ...createFallbackEntry(
+          version,
+          LlamaCppRuntimeTargetId.WinX64Cuda12,
+          'win32',
+          'x64',
+          'cuda',
+          `llama-${version}-bin-win-cuda-12.4-x64.tar.gz`,
+        ),
         cudaMajor: '12',
         companions: [
           {
@@ -209,7 +227,14 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
         ],
       },
       {
-        ...createFallbackEntry(version, 'win-x64-cuda-13', 'win32', 'x64', 'cuda', `llama-${version}-bin-win-cuda-13.3-x64.tar.gz`),
+        ...createFallbackEntry(
+          version,
+          'win-x64-cuda-13',
+          'win32',
+          'x64',
+          'cuda',
+          `llama-${version}-bin-win-cuda-13.3-x64.tar.gz`,
+        ),
         cudaMajor: '13',
         companions: [
           {
@@ -218,10 +243,38 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
           },
         ],
       },
-      createFallbackEntry(version, 'win-x64-vulkan', 'win32', 'x64', 'vulkan', `llama-${version}-bin-win-vulkan-x64.tar.gz`),
-      createFallbackEntry(version, 'win-x64-hip', 'win32', 'x64', 'hip', `llama-${version}-bin-win-hip-radeon-x64.tar.gz`),
-      createFallbackEntry(version, LlamaCppRuntimeTargetId.WinArm64, 'win32', 'arm64', 'cpu', `llama-${version}-bin-win-cpu-arm64.tar.gz`),
-      createFallbackEntry(version, 'win-arm64-opencl-adreno', 'win32', 'arm64', 'cpu', `llama-${version}-bin-win-opencl-adreno-arm64.tar.gz`),
+      createFallbackEntry(
+        version,
+        'win-x64-vulkan',
+        'win32',
+        'x64',
+        'vulkan',
+        `llama-${version}-bin-win-vulkan-x64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        'win-x64-hip',
+        'win32',
+        'x64',
+        'hip',
+        `llama-${version}-bin-win-hip-radeon-x64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.WinArm64,
+        'win32',
+        'arm64',
+        'cpu',
+        `llama-${version}-bin-win-cpu-arm64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        'win-arm64-opencl-adreno',
+        'win32',
+        'arm64',
+        'cpu',
+        `llama-${version}-bin-win-opencl-adreno-arm64.tar.gz`,
+      ),
     ],
   };
 }
@@ -254,8 +307,12 @@ export async function listLlamaCppBackends(input: {
   hasNvidiaGpu: boolean;
   config?: LlamaCppServiceConfig;
   manifest?: LlamaCppBackendManifest;
-}): Promise<{ backends: LlamaCppBackendInfo[]; selection?: LlamaCppBackendRef; recommended?: LlamaCppBackendRef }> {
-  const manifest = input.manifest ?? await fetchLlamaCppBackendManifest();
+}): Promise<{
+  backends: LlamaCppBackendInfo[];
+  selection?: LlamaCppBackendRef;
+  recommended?: LlamaCppBackendRef;
+}> {
+  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
   const installed = listInstalledBackendRefs(input.runtimeRoot, input.platform);
   const installedKeys = new Set(installed.map(ref => ref.versionBackend));
   const selection = readCurrentBackendRef(input.runtimeRoot);
@@ -291,7 +348,7 @@ export async function listLlamaCppBackends(input: {
         platform: String(buildInfo?.platform ?? input.platform),
         arch: String(buildInfo?.arch ?? input.arch),
         accelerator: inferBackendAccelerator(ref.backend),
-        cudaMajor: ref.backend.includes('cuda-12') ? '12' as const : undefined,
+        cudaMajor: ref.backend.includes('cuda-12') ? ('12' as const) : undefined,
         installed: true,
         recommended: recommended?.versionBackend === ref.versionBackend,
         current: selection?.versionBackend === ref.versionBackend,
@@ -313,7 +370,7 @@ export async function getLlamaCppBackendCompatibilityError(input: {
   hasNvidiaGpu: boolean;
   manifest?: LlamaCppBackendManifest;
 }): Promise<string | undefined> {
-  const manifest = input.manifest ?? await fetchLlamaCppBackendManifest();
+  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
   const manifestEntry = findManifestEntry(manifest, input.ref);
   if (manifestEntry) {
     return validateBackendForMachine(manifestEntry, input.platform, input.arch, input.hasNvidiaGpu);
@@ -322,15 +379,22 @@ export async function getLlamaCppBackendCompatibilityError(input: {
   const buildInfo = readBackendBuildInfo(getLlamaCppBackendDir(input.runtimeRoot, input.ref));
   if (!buildInfo) return undefined;
 
-  return validateBackendForMachine({
-    version: input.ref.version,
-    backend: input.ref.backend,
-    platform: normalizePlatform(String(buildInfo.platform ?? input.platform)),
-    arch: normalizeArch(String(buildInfo.arch ?? input.arch)),
-    accelerator: (buildInfo.accelerator as LlamaCppBackendManifestEntry['accelerator'] | undefined) ?? inferBackendAccelerator(input.ref.backend),
-    cudaMajor: buildInfo.cudaMajor as LlamaCppBackendManifestEntry['cudaMajor'] | undefined,
-    archive: { assetName: '' },
-  }, input.platform, input.arch, input.hasNvidiaGpu);
+  return validateBackendForMachine(
+    {
+      version: input.ref.version,
+      backend: input.ref.backend,
+      platform: normalizePlatform(String(buildInfo.platform ?? input.platform)),
+      arch: normalizeArch(String(buildInfo.arch ?? input.arch)),
+      accelerator:
+        (buildInfo.accelerator as LlamaCppBackendManifestEntry['accelerator'] | undefined) ??
+        inferBackendAccelerator(input.ref.backend),
+      cudaMajor: buildInfo.cudaMajor as LlamaCppBackendManifestEntry['cudaMajor'] | undefined,
+      archive: { assetName: '' },
+    },
+    input.platform,
+    input.arch,
+    input.hasNvidiaGpu,
+  );
 }
 
 export function recommendLlamaCppBackend(input: {
@@ -342,11 +406,15 @@ export function recommendLlamaCppBackend(input: {
 }): LlamaCppBackendRef | undefined {
   const normalizedPlatform = normalizePlatform(input.platform);
   const normalizedArch = normalizeArch(input.arch);
-  const version = input.config?.runtimeVersion?.trim() || input.manifest.defaultVersion || latestManifestVersion(input.manifest);
-  const compatible = input.manifest.backends.filter(entry =>
-    normalizePlatform(entry.platform) === normalizedPlatform &&
-    normalizeArch(entry.arch) === normalizedArch &&
-    (!version || entry.version === version)
+  const version =
+    input.config?.runtimeVersion?.trim() ||
+    input.manifest.defaultVersion ||
+    latestManifestVersion(input.manifest);
+  const compatible = input.manifest.backends.filter(
+    entry =>
+      normalizePlatform(entry.platform) === normalizedPlatform &&
+      normalizeArch(entry.arch) === normalizedArch &&
+      (!version || entry.version === version),
   );
   const desiredBackend = input.config?.runtimeBackend ?? LlamaCppRuntimeBackend.Auto;
   const selected = selectBackendByPriority(compatible, {
@@ -372,29 +440,39 @@ function selectBackendByPriority(
       return compatible.find(entry => entry.accelerator === 'cpu');
     }
     if (input.desiredBackend === LlamaCppRuntimeBackend.Cuda) {
-      return compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13')
-        ?? compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12');
+      return (
+        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13') ??
+        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12')
+      );
     }
     if (input.hasNvidiaGpu) {
-      return compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13')
-        ?? compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12')
-        ?? compatible.find(entry => entry.accelerator === 'vulkan')
-        ?? compatible.find(entry => entry.accelerator === 'cpu');
+      return (
+        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13') ??
+        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12') ??
+        compatible.find(entry => entry.accelerator === 'vulkan') ??
+        compatible.find(entry => entry.accelerator === 'cpu')
+      );
     }
-    return compatible.find(entry => entry.accelerator === 'vulkan')
-      ?? compatible.find(entry => entry.accelerator === 'cpu');
+    return (
+      compatible.find(entry => entry.accelerator === 'vulkan') ??
+      compatible.find(entry => entry.accelerator === 'cpu')
+    );
   }
   if (input.platform === 'win32' && input.arch === 'arm64') {
-    return compatible.find(entry => entry.backend === LlamaCppRuntimeTargetId.WinArm64)
-      ?? compatible.find(entry => entry.accelerator === 'cpu')
-      ?? compatible[0];
+    return (
+      compatible.find(entry => entry.backend === LlamaCppRuntimeTargetId.WinArm64) ??
+      compatible.find(entry => entry.accelerator === 'cpu') ??
+      compatible[0]
+    );
   }
-  return compatible.find(entry => entry.accelerator === 'metal')
-    ?? compatible.find(entry => entry.accelerator === 'cuda')
-    ?? compatible.find(entry => entry.accelerator === 'vulkan')
-    ?? compatible.find(entry => entry.accelerator === 'hip')
-    ?? compatible.find(entry => entry.accelerator === 'cpu')
-    ?? compatible[0];
+  return (
+    compatible.find(entry => entry.accelerator === 'metal') ??
+    compatible.find(entry => entry.accelerator === 'cuda') ??
+    compatible.find(entry => entry.accelerator === 'vulkan') ??
+    compatible.find(entry => entry.accelerator === 'hip') ??
+    compatible.find(entry => entry.accelerator === 'cpu') ??
+    compatible[0]
+  );
 }
 
 export async function installLlamaCppBackend(input: {
@@ -407,16 +485,25 @@ export async function installLlamaCppBackend(input: {
   switchCurrent?: boolean;
   onProgress?: BackendInstallProgressReporter;
 }): Promise<LlamaCppRuntimeInstallResult> {
-  const manifest = input.manifest ?? await fetchLlamaCppBackendManifest();
+  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
   const entry = findManifestEntry(manifest, input.ref);
   if (!entry) {
     return failedInstall(`llama.cpp backend is not available: ${input.ref.versionBackend}`);
   }
-  const validation = validateBackendForMachine(entry, input.platform, input.arch, input.hasNvidiaGpu);
+  const validation = validateBackendForMachine(
+    entry,
+    input.platform,
+    input.arch,
+    input.hasNvidiaGpu,
+  );
   if (validation) return failedInstall(validation);
 
   const backendDir = getLlamaCppBackendDir(input.runtimeRoot, input.ref);
-  const executablePath = getLlamaCppBackendExecutablePath(input.runtimeRoot, input.ref, input.platform);
+  const executablePath = getLlamaCppBackendExecutablePath(
+    input.runtimeRoot,
+    input.ref,
+    input.platform,
+  );
   if (fs.existsSync(executablePath)) {
     if (input.switchCurrent !== false) syncCurrentBackend(input.runtimeRoot, input.ref);
     return {
@@ -464,15 +551,25 @@ export async function installLlamaCppBackend(input: {
       const companionPath = await downloadArchive(companion, manifest, tempDir, progress => {
         reportProgress(progress);
       });
-      const companionExtractDir = path.join(tempDir, `extract-${sanitizePathSegment(companion.assetName)}`);
+      const companionExtractDir = path.join(
+        tempDir,
+        `extract-${sanitizePathSegment(companion.assetName)}`,
+      );
       fs.mkdirSync(companionExtractDir, { recursive: true });
       reportProgress({ phase: 'installing', message: 'extracting' });
       await extractArchive(companionPath, companionExtractDir);
-      copyDirectoryContents(findRuntimePayloadDirectory(companionExtractDir), getManagedBackendBinDir(backendDir));
+      copyDirectoryContents(
+        findRuntimePayloadDirectory(companionExtractDir),
+        getManagedBackendBinDir(backendDir),
+      );
     }
 
     reportProgress({ phase: 'detecting', message: 'verifying' });
-    const installedExecutablePath = getLlamaCppBackendExecutablePath(input.runtimeRoot, input.ref, input.platform);
+    const installedExecutablePath = getLlamaCppBackendExecutablePath(
+      input.runtimeRoot,
+      input.ref,
+      input.platform,
+    );
     if (!fs.existsSync(installedExecutablePath)) {
       throw new Error(`Installed backend is missing ${path.join('build', 'bin', executableName)}.`);
     }
@@ -523,7 +620,7 @@ export async function updateLlamaCppBackend(input: {
   config?: LlamaCppServiceConfig;
   manifest?: LlamaCppBackendManifest;
 }): Promise<LlamaCppRuntimeInstallResult> {
-  const manifest = input.manifest ?? await fetchLlamaCppBackendManifest();
+  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
   const recommended = recommendLlamaCppBackend({ ...input, manifest });
   if (!recommended) return failedInstall('No compatible llama.cpp backend is available.');
   return await installLlamaCppBackend({ ...input, manifest, ref: recommended });
@@ -581,7 +678,12 @@ export async function importLlamaCppBackendArchive(input: {
     cudaMajor: parsed.ref.backend.includes('cuda-12') ? '12' : undefined,
     archive: { assetName: path.basename(input.archivePath) },
   };
-  const validation = validateBackendForMachine(entry, input.platform, input.arch, input.hasNvidiaGpu);
+  const validation = validateBackendForMachine(
+    entry,
+    input.platform,
+    input.arch,
+    input.hasNvidiaGpu,
+  );
   if (validation) return { success: false, error: validation };
 
   const backendDir = getLlamaCppBackendDir(input.runtimeRoot, parsed.ref);
@@ -599,7 +701,11 @@ export async function importLlamaCppBackendArchive(input: {
     fs.rmSync(backendDir, { recursive: true, force: true });
     fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
     copyDirectoryContents(path.dirname(extractedExecutable), getManagedBackendBinDir(backendDir));
-    const executablePath = getLlamaCppBackendExecutablePath(input.runtimeRoot, parsed.ref, input.platform);
+    const executablePath = getLlamaCppBackendExecutablePath(
+      input.runtimeRoot,
+      parsed.ref,
+      input.platform,
+    );
     if (input.platform !== 'win32') fs.chmodSync(executablePath, 0o755);
     writeBackendBuildInfo(backendDir, {
       ...parsed.ref,
@@ -671,7 +777,8 @@ export async function importLlamaCppBackendPath(input: {
     }
     return {
       success: false,
-      error: '所选文件不是有效的 llama.cpp backend 压缩包。请选择官方 zip/tar.gz 主包，或进入已解压目录后选择其中任意文件。',
+      error:
+        '所选文件不是有效的 llama.cpp backend 压缩包。请选择官方 zip/tar.gz 主包，或进入已解压目录后选择其中任意文件。',
     };
   }
   return await importLlamaCppBackendArchive({
@@ -692,13 +799,19 @@ async function importLlamaCppBackendDirectory(input: {
 }): Promise<LlamaCppRuntimeImportResult> {
   const archiveNameHint = findArchiveNameHint(input.sourceDir);
   if (archiveNameHint && /cudart-llama-bin/i.test(archiveNameHint)) {
-    return { success: false, error: 'CUDA companion 包不能单独导入，请选择 llama backend 主包或完整解压目录。' };
+    return {
+      success: false,
+      error: 'CUDA companion 包不能单独导入，请选择 llama backend 主包或完整解压目录。',
+    };
   }
 
   const executableName = resolveLlamaCppExecutableName(input.platform);
   const executablePath = findExecutablePath(input.sourceDir, executableName);
   if (!executablePath) {
-    return { success: false, error: `所选目录中缺少 ${executableName}。请选择已解压的 llama.cpp backend 目录。` };
+    return {
+      success: false,
+      error: `所选目录中缺少 ${executableName}。请选择已解压的 llama.cpp backend 目录。`,
+    };
   }
 
   const metadata = inferBackendDirectoryMetadata({
@@ -708,7 +821,11 @@ async function importLlamaCppBackendDirectory(input: {
     arch: input.arch,
   });
   if (!metadata) {
-    return { success: false, error: '无法从目录识别 llama.cpp backend 版本和类型。请选择包含版本号的目录，或直接选择官方压缩包。' };
+    return {
+      success: false,
+      error:
+        '无法从目录识别 llama.cpp backend 版本和类型。请选择包含版本号的目录，或直接选择官方压缩包。',
+    };
   }
 
   const entry: LlamaCppBackendManifestEntry = {
@@ -719,7 +836,12 @@ async function importLlamaCppBackendDirectory(input: {
     cudaMajor: metadata.cudaMajor,
     archive: { assetName: path.basename(input.sourceDir) },
   };
-  const validation = validateBackendForMachine(entry, input.platform, input.arch, input.hasNvidiaGpu);
+  const validation = validateBackendForMachine(
+    entry,
+    input.platform,
+    input.arch,
+    input.hasNvidiaGpu,
+  );
   if (validation) return { success: false, error: validation };
 
   const backendDir = getLlamaCppBackendDir(input.runtimeRoot, metadata.ref);
@@ -728,7 +850,11 @@ async function importLlamaCppBackendDirectory(input: {
     fs.rmSync(backendDir, { recursive: true, force: true });
     fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
     copyDirectoryContents(path.dirname(executablePath), getManagedBackendBinDir(backendDir));
-    const installedExecutablePath = getLlamaCppBackendExecutablePath(input.runtimeRoot, metadata.ref, input.platform);
+    const installedExecutablePath = getLlamaCppBackendExecutablePath(
+      input.runtimeRoot,
+      metadata.ref,
+      input.platform,
+    );
     if (input.platform !== 'win32') fs.chmodSync(installedExecutablePath, 0o755);
     writeBackendBuildInfo(backendDir, {
       ...metadata.ref,
@@ -768,9 +894,13 @@ export function readCurrentBackendRef(runtimeRoot: string): LlamaCppBackendRef |
   return readBackendBuildInfo(getLlamaCppCurrentBackendDir(runtimeRoot));
 }
 
-export function readBackendBuildInfo(runtimeDir: string): (LlamaCppBackendRef & Record<string, unknown>) | undefined {
+export function readBackendBuildInfo(
+  runtimeDir: string,
+): (LlamaCppBackendRef & Record<string, unknown>) | undefined {
   try {
-    const parsed = JSON.parse(fs.readFileSync(path.join(runtimeDir, BUILD_INFO_FILE), 'utf8')) as Record<string, unknown>;
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(runtimeDir, BUILD_INFO_FILE), 'utf8'),
+    ) as Record<string, unknown>;
     const version = String(parsed.version ?? '').trim();
     const backend = String(parsed.backend ?? parsed.target ?? '').trim();
     if (!version || !backend) return undefined;
@@ -800,7 +930,9 @@ export function listInstalledBackendRefs(
   const refs: LlamaCppBackendRef[] = [];
   for (const versionEntry of fs.readdirSync(backendsRoot, { withFileTypes: true })) {
     if (!versionEntry.isDirectory()) continue;
-    for (const backendEntry of fs.readdirSync(path.join(backendsRoot, versionEntry.name), { withFileTypes: true })) {
+    for (const backendEntry of fs.readdirSync(path.join(backendsRoot, versionEntry.name), {
+      withFileTypes: true,
+    })) {
       if (!backendEntry.isDirectory()) continue;
       const ref = toBackendRef(versionEntry.name, backendEntry.name);
       const executablePath = resolveManagedBackendExecutablePath(
@@ -815,8 +947,12 @@ export function listInstalledBackendRefs(
   return refs;
 }
 
-function normalizeManifest(manifest: LlamaCppBackendManifest, manifestUrl: string): LlamaCppBackendManifest {
-  const releaseBaseUrl = manifest.releaseBaseUrl || manifestUrl.replace(/\/manifest\.json(?:[?#].*)?$/, '');
+function normalizeManifest(
+  manifest: LlamaCppBackendManifest,
+  manifestUrl: string,
+): LlamaCppBackendManifest {
+  const releaseBaseUrl =
+    manifest.releaseBaseUrl || manifestUrl.replace(/\/manifest\.json(?:[?#].*)?$/, '');
   return {
     ...manifest,
     schemaVersion: 1,
@@ -839,8 +975,8 @@ function findManifestEntry(
   manifest: LlamaCppBackendManifest,
   ref: LlamaCppBackendRef,
 ): LlamaCppBackendManifestEntry | undefined {
-  return manifest.backends.find(entry =>
-    entry.version === ref.version && normalizeBackendId(entry.backend) === ref.backend
+  return manifest.backends.find(
+    entry => entry.version === ref.version && normalizeBackendId(entry.backend) === ref.backend,
   );
 }
 
@@ -863,7 +999,7 @@ function validateBackendForMachine(
     return 'Vulkan backend will validate device availability after installation.';
   }
   if (entry.backend === 'win-x64-hip') {
-    return 'HIP backend requires a Windows x64 machine with AMD HIP/ROCm support. RongxinAI will validate device availability after installation.';
+    return 'HIP backend requires a Windows x64 machine with AMD HIP/ROCm support. ZhiYuanAgent will validate device availability after installation.';
   }
   if (entry.backend === 'win-arm64-opencl-adreno') {
     if (normalizePlatform(platform) !== 'win32' || normalizeArch(arch) !== 'arm64') {
@@ -907,7 +1043,8 @@ function inferBackendAccelerator(backend: string): LlamaCppBackendManifestEntry[
   if (backend.includes('openvino')) return 'openvino';
   if (backend.includes('sycl')) return 'sycl';
   if (backend.startsWith('mac-') || backend.startsWith('macos-')) return 'metal';
-  if (backend.includes('cpu') || backend.startsWith('win-') || backend.startsWith('linux-')) return 'cpu';
+  if (backend.includes('cpu') || backend.startsWith('win-') || backend.startsWith('linux-'))
+    return 'cpu';
   return 'unknown';
 }
 
@@ -996,16 +1133,23 @@ async function downloadArchive(
     }
     fs.writeFileSync(outputPath, Buffer.concat(buffers));
   } else {
-    await downloadFile(resolveArchiveUrl(archive, manifest), outputPath, (completed, total, speed) => {
-      onProgress?.({
-        phase: 'downloading-progress',
-        completed,
-        total,
-        percent: typeof total === 'number' && total > 0 ? Math.round((completed / total) * 100) : undefined,
-        speed,
-        targetPath: outputPath,
-      });
-    });
+    await downloadFile(
+      resolveArchiveUrl(archive, manifest),
+      outputPath,
+      (completed, total, speed) => {
+        onProgress?.({
+          phase: 'downloading-progress',
+          completed,
+          total,
+          percent:
+            typeof total === 'number' && total > 0
+              ? Math.round((completed / total) * 100)
+              : undefined,
+          speed,
+          targetPath: outputPath,
+        });
+      },
+    );
   }
   if (archive.sha256) verifySha256(outputPath, archive.sha256);
   return outputPath;
@@ -1019,7 +1163,10 @@ function resolveArchiveUrl(
   return `${(manifest.releaseBaseUrl || DEFAULT_RELEASE_BASE_URL).replace(/\/$/, '')}/${archive.assetName}`;
 }
 
-function resolvePartUrl(part: LlamaCppBackendArchivePart, manifest: LlamaCppBackendManifest): string {
+function resolvePartUrl(
+  part: LlamaCppBackendArchivePart,
+  manifest: LlamaCppBackendManifest,
+): string {
   if (part.url) return part.url;
   return `${(manifest.releaseBaseUrl || DEFAULT_RELEASE_BASE_URL).replace(/\/$/, '')}/${part.assetName}`;
 }
@@ -1060,7 +1207,7 @@ async function downloadFileWithHelper(
 
   const downloader = new DownloaderHelper(url, outputDir, {
     fileName: path.basename(outputPath),
-    headers: { 'User-Agent': 'RongxinAI/llamacpp-backend-manager' },
+    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
     override: true,
     removeOnFail: false,
     resumeIfFileExists: true,
@@ -1214,7 +1361,11 @@ function findRuntimePayloadDirectory(rootDir: string): string {
 }
 
 function writeBackendBuildInfo(runtimeDir: string, info: Record<string, unknown>): void {
-  fs.writeFileSync(path.join(runtimeDir, BUILD_INFO_FILE), `${JSON.stringify(info, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(
+    path.join(runtimeDir, BUILD_INFO_FILE),
+    `${JSON.stringify(info, null, 2)}\n`,
+    'utf8',
+  );
 }
 
 function parseBackendArchiveName(archiveName: string): {
@@ -1223,7 +1374,10 @@ function parseBackendArchiveName(archiveName: string): {
   arch: string;
   companion: boolean;
 } | null {
-  const match = /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.exec(archiveName);
+  const match =
+    /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.exec(
+      archiveName,
+    );
   if (!match) return null;
   const version = match[2];
   const companion = Boolean(match[3]);
@@ -1249,7 +1403,11 @@ function findArchiveNameHint(sourceDir: string): string | undefined {
   if (/llama-(?:main-)?b\d+/i.test(baseName)) return baseName;
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
-    if (/^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.test(entry.name)) {
+    if (
+      /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.test(
+        entry.name,
+      )
+    ) {
       return entry.name;
     }
   }
@@ -1287,7 +1445,12 @@ function inferBackendDirectoryMetadata(input: {
 
   const version = inferDirectoryVersion(input.sourceDir, input.executablePath);
   if (!version) return null;
-  const backend = inferDirectoryBackendId(input.sourceDir, path.dirname(input.executablePath), input.platform, input.arch);
+  const backend = inferDirectoryBackendId(
+    input.sourceDir,
+    path.dirname(input.executablePath),
+    input.platform,
+    input.arch,
+  );
   if (!backend) return null;
   const accelerator = inferBackendAccelerator(backend);
   return {
@@ -1295,11 +1458,7 @@ function inferBackendDirectoryMetadata(input: {
     platform: normalizePlatform(input.platform),
     arch: normalizeArch(input.arch),
     accelerator,
-    cudaMajor: backend.includes('cuda-13')
-      ? '13'
-      : backend.includes('cuda-12')
-        ? '12'
-        : undefined,
+    cudaMajor: backend.includes('cuda-13') ? '13' : backend.includes('cuda-12') ? '12' : undefined,
   };
 }
 
@@ -1325,10 +1484,14 @@ function inferDirectoryBackendId(
   const normalizedPlatform = normalizePlatform(platform);
   const normalizedArch = normalizeArch(arch);
   if (normalizedPlatform === 'darwin') {
-    return normalizedArch === 'arm64' ? LlamaCppRuntimeTargetId.MacArm64 : LlamaCppRuntimeTargetId.MacX64;
+    return normalizedArch === 'arm64'
+      ? LlamaCppRuntimeTargetId.MacArm64
+      : LlamaCppRuntimeTargetId.MacX64;
   }
   if (normalizedPlatform === 'linux') {
-    return normalizedArch === 'arm64' ? LlamaCppRuntimeTargetId.LinuxArm64 : LlamaCppRuntimeTargetId.LinuxX64;
+    return normalizedArch === 'arm64'
+      ? LlamaCppRuntimeTargetId.LinuxArm64
+      : LlamaCppRuntimeTargetId.LinuxX64;
   }
   if (normalizedPlatform !== 'win32') return undefined;
   if (normalizedArch === 'arm64') return LlamaCppRuntimeTargetId.WinArm64;
@@ -1358,7 +1521,10 @@ function hasCuda12RuntimeMarkers(rootDir: string): boolean {
 }
 
 function hasCuda13RuntimeMarkers(rootDir: string): boolean {
-  return hasMarker(rootDir, /(?:cudart64_13|cublas64_13|cublasLt64_13|cuda-13\.[13]|win-cuda-13\.)/i);
+  return hasMarker(
+    rootDir,
+    /(?:cudart64_13|cublas64_13|cublasLt64_13|cuda-13\.[13]|win-cuda-13\.)/i,
+  );
 }
 
 function hasVulkanRuntimeMarkers(rootDir: string): boolean {
@@ -1393,7 +1559,10 @@ function getManagedBackendBinDir(runtimeDir: string): string {
   return path.join(runtimeDir, 'build', 'bin');
 }
 
-function resolveManagedBackendExecutablePath(runtimeDir: string, platform: NodeJS.Platform): string {
+function resolveManagedBackendExecutablePath(
+  runtimeDir: string,
+  platform: NodeJS.Platform,
+): string {
   const executableName = resolveLlamaCppExecutableName(platform);
   const buildBinPath = path.join(runtimeDir, 'build', 'bin', executableName);
   if (fs.existsSync(buildBinPath)) return buildBinPath;

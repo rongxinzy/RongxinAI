@@ -2,7 +2,7 @@
  * OpenClaw Channel Session Sync
  *
  * Discovers and maps sessions created by OpenClaw channel extensions (e.g. Telegram)
- * to local Cowork sessions so that conversations are visible in the RongxinAI UI.
+ * to local Cowork sessions so that conversations are visible in the ZhiYuanAgent UI.
  */
 
 import { BrowserWindow } from 'electron';
@@ -13,7 +13,7 @@ import { t } from '../i18n';
 import type { IMStore } from '../im/imStore';
 import type { Platform } from '../im/types';
 
-const LOBSTERAI_SESSION_PREFIX = 'lobsterai:';
+const ZHIYUAN_SESSION_PREFIX = 'zhiyuan:';
 export const DEFAULT_MANAGED_AGENT_ID = 'main';
 
 export interface ManagedSessionKey {
@@ -27,7 +27,7 @@ export function buildManagedSessionKey(
 ): string {
   const normalizedSessionId = sessionId.trim();
   const normalizedAgentId = agentId.trim() || DEFAULT_MANAGED_AGENT_ID;
-  return `agent:${normalizedAgentId}:lobsterai:${normalizedSessionId}`;
+  return `agent:${normalizedAgentId}:zhiyuan:${normalizedSessionId}`;
 }
 
 export function parseManagedSessionKey(
@@ -36,8 +36,8 @@ export function parseManagedSessionKey(
   const raw = (sessionKey ?? '').trim();
   if (!raw) return null;
 
-  if (raw.startsWith(LOBSTERAI_SESSION_PREFIX)) {
-    const sessionId = raw.slice(LOBSTERAI_SESSION_PREFIX.length).trim();
+  if (raw.startsWith(ZHIYUAN_SESSION_PREFIX)) {
+    const sessionId = raw.slice(ZHIYUAN_SESSION_PREFIX.length).trim();
     return sessionId ? { agentId: null, sessionId } : null;
   }
 
@@ -46,7 +46,7 @@ export function parseManagedSessionKey(
   }
 
   const parts = raw.split(':');
-  if (parts.length < 4 || parts[0] !== 'agent' || parts[2] !== 'lobsterai') {
+  if (parts.length < 4 || parts[0] !== 'agent' || parts[2] !== 'zhiyuan') {
     return null;
   }
 
@@ -198,7 +198,14 @@ export function extractAccountIdFromKey(sessionKey: string): string | null {
   return null;
 }
 
-const MULTI_INSTANCE_PLATFORMS = new Set<Platform>(['dingtalk', 'feishu', 'qq', 'wecom', 'telegram', 'discord']);
+const MULTI_INSTANCE_PLATFORMS = new Set<Platform>([
+  'dingtalk',
+  'feishu',
+  'qq',
+  'wecom',
+  'telegram',
+  'discord',
+]);
 
 /**
  * Resolve the agent binding for a platform, supporting per-instance bindings.
@@ -287,7 +294,9 @@ export class OpenClawChannelSessionSync {
   private readonly imStore: IMStore;
   private readonly getDefaultCwd: (agentId?: string) => string;
   private readonly resolveJobName: ((jobId: string) => string | null) | null;
-  private readonly onBindingChanged: ((sessionKey: string, platform: Platform, newAgentId: string) => void) | null;
+  private readonly onBindingChanged:
+    | ((sessionKey: string, platform: Platform, newAgentId: string) => void)
+    | null;
 
   /** In-memory cache: openclawSessionKey → local sessionId. */
   private readonly syncedSessionKeys = new Map<string, string>();
@@ -352,9 +361,9 @@ export class OpenClawChannelSessionSync {
    * Returns the local sessionId if the sessionKey belongs to a channel, or null if not.
    */
   resolveOrCreateSession(sessionKey: string): string | null {
-    // 1. Skip RongxinAI-originated sessions
+    // 1. Skip ZhiYuanAgent-originated sessions
     if (isManagedSessionKey(sessionKey)) {
-      console.log('[ChannelSessionSync] skipped: RongxinAI-originated session');
+      console.log('[ChannelSessionSync] skipped: ZhiYuanAgent-originated session');
       return null;
     }
 
@@ -467,7 +476,11 @@ export class OpenClawChannelSessionSync {
         );
         this.syncedSessionKeys.set(sessionKey, existingMapping.coworkSessionId);
         if (existingMapping.openClawSessionKey !== sessionKey) {
-          this.imStore.updateSessionOpenClawSessionKey(parsed.conversationId, parsed.platform, sessionKey);
+          this.imStore.updateSessionOpenClawSessionKey(
+            parsed.conversationId,
+            parsed.platform,
+            sessionKey,
+          );
         }
         this.imStore.updateSessionLastActive(parsed.conversationId, parsed.platform);
         return existingMapping.coworkSessionId;
@@ -488,7 +501,11 @@ export class OpenClawChannelSessionSync {
     const title = `${titlePrefix} ${shortId}`;
     // Look up the per-platform agent binding so the session is filed under the correct agent.
     // (imSettings, accountId already resolved above; re-resolve agentId for the new-session path)
-    const agentId = resolveAgentBinding(imSettings.platformAgentBindings, parsed.platform, accountId);
+    const agentId = resolveAgentBinding(
+      imSettings.platformAgentBindings,
+      parsed.platform,
+      accountId,
+    );
     const cwd = this.getDefaultCwd(agentId);
     console.log(
       '[ChannelSessionSync] creating new cowork session: title=',
@@ -505,7 +522,13 @@ export class OpenClawChannelSessionSync {
     );
 
     // 6. Persist mapping
-    this.imStore.createSessionMapping(parsed.conversationId, parsed.platform, session.id, agentId, sessionKey);
+    this.imStore.createSessionMapping(
+      parsed.conversationId,
+      parsed.platform,
+      session.id,
+      agentId,
+      sessionKey,
+    );
     console.log(
       '[ChannelSessionSync] persisted mapping: conversationId=',
       parsed.conversationId,
@@ -547,7 +570,11 @@ export class OpenClawChannelSessionSync {
       if (session) {
         this.syncedSessionKeys.set(sessionKey, existingMapping.coworkSessionId);
         if (existingMapping.openClawSessionKey !== sessionKey) {
-          this.imStore.updateSessionOpenClawSessionKey(parsed.conversationId, parsed.platform, sessionKey);
+          this.imStore.updateSessionOpenClawSessionKey(
+            parsed.conversationId,
+            parsed.platform,
+            sessionKey,
+          );
         }
         return existingMapping.coworkSessionId;
       }

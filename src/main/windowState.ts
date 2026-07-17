@@ -46,13 +46,13 @@ const clamp = (value: number, min: number, max: number): number => {
 
 const normalizeWorkAreas = (workAreas: WindowRectangle[]): WindowRectangle[] => {
   const normalized = workAreas
-    .map((area) => ({
+    .map(area => ({
       x: Math.round(area.x),
       y: Math.round(area.y),
       width: Math.round(area.width),
       height: Math.round(area.height),
     }))
-    .filter((area) => area.width > 0 && area.height > 0);
+    .filter(area => area.width > 0 && area.height > 0);
 
   return normalized.length > 0 ? normalized : [FALLBACK_WORK_AREA];
 };
@@ -88,8 +88,14 @@ const centerBounds = (
 });
 
 const resolveDefaultBounds = (workArea: WindowRectangle): WindowRectangle => {
-  const maxWidth = Math.max(MIN_APP_WINDOW_WIDTH, workArea.width - DEFAULT_WINDOW_SCREEN_MARGIN * 2);
-  const maxHeight = Math.max(MIN_APP_WINDOW_HEIGHT, workArea.height - DEFAULT_WINDOW_SCREEN_MARGIN * 2);
+  const maxWidth = Math.max(
+    MIN_APP_WINDOW_WIDTH,
+    workArea.width - DEFAULT_WINDOW_SCREEN_MARGIN * 2,
+  );
+  const maxHeight = Math.max(
+    MIN_APP_WINDOW_HEIGHT,
+    workArea.height - DEFAULT_WINDOW_SCREEN_MARGIN * 2,
+  );
   const scale = Math.min(
     1,
     maxWidth / DEFAULT_APP_WINDOW_WIDTH,
@@ -104,27 +110,16 @@ const resolveDefaultBounds = (workArea: WindowRectangle): WindowRectangle => {
   return centerBounds(size, workArea);
 };
 
-const containsPoint = (
-  area: WindowRectangle,
-  point: { x: number; y: number },
-): boolean => (
-  point.x >= area.x
-  && point.x <= area.x + area.width
-  && point.y >= area.y
-  && point.y <= area.y + area.height
-);
+const containsPoint = (area: WindowRectangle, point: { x: number; y: number }): boolean =>
+  point.x >= area.x &&
+  point.x <= area.x + area.width &&
+  point.y >= area.y &&
+  point.y <= area.y + area.height;
 
-const intersects = (a: WindowRectangle, b: WindowRectangle): boolean => (
-  a.x < b.x + b.width
-  && a.x + a.width > b.x
-  && a.y < b.y + b.height
-  && a.y + a.height > b.y
-);
+const intersects = (a: WindowRectangle, b: WindowRectangle): boolean =>
+  a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 
-const selectWorkArea = (
-  stored: AppWindowState,
-  workAreas: WindowRectangle[],
-): WindowRectangle => {
+const selectWorkArea = (stored: AppWindowState, workAreas: WindowRectangle[]): WindowRectangle => {
   if (typeof stored.x === 'number' && typeof stored.y === 'number') {
     const storedBounds = {
       x: stored.x,
@@ -137,31 +132,32 @@ const selectWorkArea = (
       y: stored.y + stored.height / 2,
     };
 
-    return workAreas.find((area) => containsPoint(area, center))
-      ?? workAreas.find((area) => intersects(area, storedBounds))
-      ?? workAreas[0];
+    return (
+      workAreas.find(area => containsPoint(area, center)) ??
+      workAreas.find(area => intersects(area, storedBounds)) ??
+      workAreas[0]
+    );
   }
 
   return workAreas[0];
 };
 
-const fitStoredBounds = (
-  stored: AppWindowState,
-  workArea: WindowRectangle,
-): WindowRectangle => {
+const fitStoredBounds = (stored: AppWindowState, workArea: WindowRectangle): WindowRectangle => {
   const originalBounds = {
     x: stored.x ?? workArea.x,
     y: stored.y ?? workArea.y,
     width: Math.max(MIN_APP_WINDOW_WIDTH, Math.round(stored.width)),
     height: Math.max(MIN_APP_WINDOW_HEIGHT, Math.round(stored.height)),
   };
-  const maxWidth = Math.max(MIN_APP_WINDOW_WIDTH, workArea.width - DEFAULT_WINDOW_SCREEN_MARGIN * 2);
-  const maxHeight = Math.max(MIN_APP_WINDOW_HEIGHT, workArea.height - DEFAULT_WINDOW_SCREEN_MARGIN * 2);
-  const scale = Math.min(
-    1,
-    maxWidth / originalBounds.width,
-    maxHeight / originalBounds.height,
+  const maxWidth = Math.max(
+    MIN_APP_WINDOW_WIDTH,
+    workArea.width - DEFAULT_WINDOW_SCREEN_MARGIN * 2,
   );
+  const maxHeight = Math.max(
+    MIN_APP_WINDOW_HEIGHT,
+    workArea.height - DEFAULT_WINDOW_SCREEN_MARGIN * 2,
+  );
+  const scale = Math.min(1, maxWidth / originalBounds.width, maxHeight / originalBounds.height);
   const width = Math.min(
     Math.max(MIN_APP_WINDOW_WIDTH, Math.round(originalBounds.width * scale)),
     Math.max(MIN_APP_WINDOW_WIDTH, workArea.width),
@@ -171,16 +167,17 @@ const fitStoredBounds = (
     Math.max(MIN_APP_WINDOW_HEIGHT, workArea.height),
   );
   const fallback = centerBounds({ width, height }, workArea);
-  const hasVisiblePosition = typeof stored.x === 'number'
-    && typeof stored.y === 'number'
-    && intersects(originalBounds, workArea);
+  const hasVisiblePosition =
+    typeof stored.x === 'number' &&
+    typeof stored.y === 'number' &&
+    intersects(originalBounds, workArea);
   const x = clamp(
-    Math.round(hasVisiblePosition ? stored.x ?? fallback.x : fallback.x),
+    Math.round(hasVisiblePosition ? (stored.x ?? fallback.x) : fallback.x),
     workArea.x,
     workArea.x + Math.max(0, workArea.width - width),
   );
   const y = clamp(
-    Math.round(hasVisiblePosition ? stored.y ?? fallback.y : fallback.y),
+    Math.round(hasVisiblePosition ? (stored.y ?? fallback.y) : fallback.y),
     workArea.y,
     workArea.y + Math.max(0, workArea.height - height),
   );

@@ -26,7 +26,7 @@ index 68b1abc..5f5f1d2 100644
 -        repoRoot,
 -      },
 -    });
-+    try { installPluginRuntimeDepsWithRetries({ attempts: installAttempts, install: installPluginRuntimeDepsImpl, installParams: { fingerprint, packageJson, pluginDir, pluginId, pruneConfig, repoRoot } }); } catch(e) { console.warn("[RongxinAI] skipping runtime deps for "+pluginId+": "+e.message); }
++    try { installPluginRuntimeDepsWithRetries({ attempts: installAttempts, install: installPluginRuntimeDepsImpl, installParams: { fingerprint, packageJson, pluginDir, pluginId, pruneConfig, repoRoot } }); } catch(e) { console.warn("[ZhiYuanAgent] skipping runtime deps for "+pluginId+": "+e.message); }
    }
  }
  

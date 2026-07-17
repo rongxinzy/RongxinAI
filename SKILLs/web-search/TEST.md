@@ -17,11 +17,13 @@ This guide walks through testing the entire Web Search Skill integration with Ro
 **Steps:**
 
 1. Start RongxinAI in development mode:
+
    ```bash
    npm run electron:dev
    ```
 
 2. Check the console output for:
+
    ```
    [SkillServices] Starting skill services...
    [SkillServices] Starting Web Search Bridge Server...
@@ -29,11 +31,13 @@ This guide walks through testing the entire Web Search Skill integration with Ro
    ```
 
 3. Verify the server is running:
+
    ```bash
    curl http://127.0.0.1:8923/api/health
    ```
 
    Expected response:
+
    ```json
    {
      "success": true,
@@ -56,6 +60,7 @@ This guide walks through testing the entire Web Search Skill integration with Ro
 1. Open a terminal while RongxinAI is running
 
 2. Execute a search:
+
    ```bash
    bash SKILLs/web-search/scripts/search.sh "React 19 features" 5
    ```
@@ -98,6 +103,7 @@ This guide walks through testing the entire Web Search Skill integration with Ro
 **Steps:**
 
 1. In a Cowork session, ask:
+
    ```
    1. Search for "TypeScript 5.0 features"
    2. Search for "React Server Components guide"
@@ -119,6 +125,7 @@ This guide walks through testing the entire Web Search Skill integration with Ro
 
 1. With RongxinAI running and searches completed, quit the application
 2. Check console output for:
+
    ```
    [SkillServices] Stopping skill services...
    [SkillServices] Stopping Web Search Bridge Server...
@@ -126,6 +133,7 @@ This guide walks through testing the entire Web Search Skill integration with Ro
    ```
 
 3. Verify server is stopped:
+
    ```bash
    curl http://127.0.0.1:8923/api/health
    ```
@@ -147,12 +155,14 @@ This guide walks through testing the entire Web Search Skill integration with Ro
 
 1. Start RongxinAI
 2. Manually stop the Bridge Server:
+
    ```bash
    bash SKILLs/web-search/scripts/stop-server.sh
    ```
 
 3. In Cowork session, ask Claude to search
 4. Observe error message:
+
    ```
    ✗ Bridge Server is not running
      Please start the server first:
@@ -160,6 +170,7 @@ This guide walks through testing the entire Web Search Skill integration with Ro
    ```
 
 5. Manually restart:
+
    ```bash
    bash SKILLs/web-search/scripts/start-server.sh
    ```
@@ -191,6 +202,7 @@ This guide walks through testing the entire Web Search Skill integration with Ro
 **Platform-Specific Steps:**
 
 ### macOS
+
 ```bash
 # Verify Chrome path detection
 bash SKILLs/web-search/scripts/search.sh "test" 1
@@ -199,6 +211,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 ```
 
 ### Linux
+
 ```bash
 # Verify Chrome/Chromium detection
 bash SKILLs/web-search/scripts/search.sh "test" 1
@@ -207,6 +220,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 ```
 
 ### Windows
+
 ```bash
 # Verify Chrome detection
 bash SKILLs/web-search/scripts/search.sh "test" 1
@@ -238,6 +252,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 **Steps:**
 
 1. Search for a specific topic:
+
    ```bash
    bash SKILLs/web-search/scripts/search.sh "Playwright documentation" 5
    ```
@@ -256,13 +271,13 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 
 ## Performance Benchmarks
 
-| Operation | Target | Acceptable |
-|-----------|--------|------------|
-| Server startup | < 2s | < 3s |
-| Browser launch | < 3s | < 5s |
-| First search | < 3s | < 5s |
-| Subsequent search | < 1s | < 2s |
-| Server shutdown | < 2s | < 3s |
+| Operation         | Target | Acceptable |
+| ----------------- | ------ | ---------- |
+| Server startup    | < 2s   | < 3s       |
+| Browser launch    | < 3s   | < 5s       |
+| First search      | < 3s   | < 5s       |
+| Subsequent search | < 1s   | < 2s       |
+| Server shutdown   | < 2s   | < 3s       |
 
 ## Common Issues and Solutions
 
@@ -271,6 +286,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 **Symptoms:** No PID file created, health check fails
 
 **Debug:**
+
 ```bash
 cat SKILLs/web-search/.server.log
 npm run build --prefix SKILLs/web-search
@@ -281,6 +297,7 @@ npm run build --prefix SKILLs/web-search
 **Symptoms:** "Chrome not found" error
 
 **Solution:**
+
 - macOS: Install from https://www.google.com/chrome/
 - Linux: `sudo apt install chromium-browser`
 - Windows: Install Chrome
@@ -290,6 +307,7 @@ npm run build --prefix SKILLs/web-search
 **Symptoms:** "Address already in use" error
 
 **Solution:**
+
 ```bash
 lsof -i :8923
 kill -9 <PID>
@@ -301,6 +319,7 @@ bash SKILLs/web-search/scripts/start-server.sh
 **Symptoms:** "Connection not found" error
 
 **Solution:**
+
 ```bash
 rm SKILLs/web-search/.connection
 ```

@@ -8,7 +8,10 @@ const STORE_KEY = 'marketplace_modelscope_token';
 
 export function registerMarketplaceIpcHandlers(options: {
   getModelsDir: () => string;
-  getStore: () => { get: <T = unknown>(key: string) => T | undefined; set: (key: string, value: unknown) => void };
+  getStore: () => {
+    get: <T = unknown>(key: string) => T | undefined;
+    set: (key: string, value: unknown) => void;
+  };
 }): void {
   // Build token pool: user-configured token (from store) has highest priority,
   // followed by env var / .env / resource file tokens.
@@ -19,7 +22,9 @@ export function registerMarketplaceIpcHandlers(options: {
     const existingTokens = collectExistingTokens(tokenPool);
     tokenPool = createModelScopeTokenPool({ extraTokens: [userToken, ...existingTokens] });
   }
-  console.log(`[Marketplace] initialized ModelScope token pool with ${tokenPool.size()} token(s) (user=${!!userToken})`);
+  console.log(
+    `[Marketplace] initialized ModelScope token pool with ${tokenPool.size()} token(s) (user=${!!userToken})`,
+  );
   const service = new MarketplaceService(options.getModelsDir, {
     getModelScopeToken: tokenPool.nextToken,
   });
@@ -50,7 +55,9 @@ export function registerMarketplaceIpcHandlers(options: {
     }
     // Update the service's token getter to use the new pool.
     service.setTokenGetter(tokenPool.nextToken);
-    console.log(`[Marketplace] user token ${trimmed ? 'updated' : 'cleared'}, pool size=${tokenPool.size()}`);
+    console.log(
+      `[Marketplace] user token ${trimmed ? 'updated' : 'cleared'}, pool size=${tokenPool.size()}`,
+    );
   });
 }
 

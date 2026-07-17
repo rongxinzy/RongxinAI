@@ -69,7 +69,7 @@ export function resolveManagedSessionModelTarget(options: {
   }
 
   const matchingProviders = Object.entries(options.availableProviders)
-    .filter(([, config]) => config.models.some((model) => model.id === explicitModel))
+    .filter(([, config]) => config.models.some(model => model.id === explicitModel))
     .map(([providerId]) => providerId);
 
   if (fallbackTarget && matchingProviders.includes(fallbackTarget.providerId)) {
@@ -123,7 +123,7 @@ export function resolveQualifiedAgentModelRef(options: {
   const explicitTarget = parsePrimaryModelRef(explicitModel);
   if (explicitTarget) {
     const providerModels = options.availableProviders[explicitTarget.providerId]?.models ?? [];
-    if (providerModels.some((model) => model.id === explicitTarget.modelId)) {
+    if (providerModels.some(model => model.id === explicitTarget.modelId)) {
       return {
         status: 'qualified',
         primaryModel: explicitTarget.primaryModel,
@@ -131,7 +131,7 @@ export function resolveQualifiedAgentModelRef(options: {
     }
 
     const matchingProviders = Object.entries(options.availableProviders)
-      .filter(([, config]) => config.models.some((model) => model.id === explicitTarget.modelId))
+      .filter(([, config]) => config.models.some(model => model.id === explicitTarget.modelId))
       .map(([providerId]) => providerId);
 
     if (matchingProviders.length === 1) {
@@ -155,7 +155,7 @@ export function resolveQualifiedAgentModelRef(options: {
   }
 
   const matchingProviders = Object.entries(options.availableProviders)
-    .filter(([, config]) => config.models.some((model) => model.id === explicitModel))
+    .filter(([, config]) => config.models.some(model => model.id === explicitModel))
     .map(([providerId]) => providerId);
 
   if (matchingProviders.length === 1) {
@@ -188,18 +188,21 @@ export function buildAgentEntry(
     agentModel: agent.model,
     availableProviders: options?.availableProviders ?? {},
   });
-  const primaryModel = qualified.status === 'qualified' ? qualified.primaryModel : fallbackPrimaryModel;
+  const primaryModel =
+    qualified.status === 'qualified' ? qualified.primaryModel : fallbackPrimaryModel;
   const legacyIcon = isDesignedAgentAvatarIcon(agent.icon) ? '' : agent.icon;
 
   return {
     id: agent.id,
     ...(agent.isDefault ? { default: true } : {}),
-    ...(agent.name || legacyIcon ? {
-      identity: {
-        ...(agent.name ? { name: agent.name } : {}),
-        ...(legacyIcon ? { emoji: legacyIcon } : {}),
-      },
-    } : {}),
+    ...(agent.name || legacyIcon
+      ? {
+          identity: {
+            ...(agent.name ? { name: agent.name } : {}),
+            ...(legacyIcon ? { emoji: legacyIcon } : {}),
+          },
+        }
+      : {}),
     ...(agent.skillIds && agent.skillIds.length > 0 ? { skills: agent.skillIds } : {}),
     ...(options?.workspace ? { workspace: options.workspace } : {}),
     ...(agent.workingDirectory?.trim() ? { cwd: path.resolve(agent.workingDirectory.trim()) } : {}),
@@ -216,9 +219,14 @@ export function buildManagedAgentEntries({
   availableProviders,
 }: BuildManagedAgentEntriesInput): Array<Record<string, unknown>> {
   return agents
-    .filter((agent) => agent.id !== 'main' && agent.enabled)
-    .map((agent) => buildAgentEntry(agent, fallbackPrimaryModel, stateDir
-      ? { workspace: path.join(stateDir, `workspace-${agent.id}`), availableProviders }
-      : { availableProviders },
-    ));
+    .filter(agent => agent.id !== 'main' && agent.enabled)
+    .map(agent =>
+      buildAgentEntry(
+        agent,
+        fallbackPrimaryModel,
+        stateDir
+          ? { workspace: path.join(stateDir, `workspace-${agent.id}`), availableProviders }
+          : { availableProviders },
+      ),
+    );
 }

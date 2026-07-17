@@ -26,16 +26,17 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
   onClose,
 }) => {
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="bg-card">
         <DialogHeader>
           <div>
-            <DialogTitle>
-              {i18nService.t('scheduledTasksFailureDetailTitle')}
-            </DialogTitle>
-            {taskName && (
-              <p className="text-xs text-muted-foreground mt-0.5">{taskName}</p>
-            )}
+            <DialogTitle>{i18nService.t('scheduledTasksFailureDetailTitle')}</DialogTitle>
+            {taskName && <p className="text-xs text-muted-foreground mt-0.5">{taskName}</p>}
           </div>
         </DialogHeader>
 
@@ -69,11 +70,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
         </div>
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-          >
+          <Button type="button" variant="outline" onClick={onClose}>
             {i18nService.t('close')}
           </Button>
         </DialogFooter>

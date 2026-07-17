@@ -16,7 +16,12 @@ describe('Channel probe contract: weixin', () => {
       platform: 'weixin',
       result: buildProbeResult('weixin', {
         checks: [
-          makeCheck('weixin_not_logged_in', 'warn', 'WeChat is not logged in.', 'Scan the QR code in the WeChat tab to log in.'),
+          makeCheck(
+            'weixin_not_logged_in',
+            'warn',
+            'WeChat is not logged in.',
+            'Scan the QR code in the WeChat tab to log in.',
+          ),
           makeGatewayRunningCheck(),
         ],
         verdict: 'warn',
@@ -42,7 +47,12 @@ describe('Channel probe contract: weixin', () => {
       platform: 'weixin',
       result: buildProbeResult('weixin', {
         checks: [
-          makeCheck('weixin_gateway_probe_failed', 'warn', 'WeChat gateway probe failed.', 'Check that the OpenClaw Gateway is running.'),
+          makeCheck(
+            'weixin_gateway_probe_failed',
+            'warn',
+            'WeChat gateway probe failed.',
+            'Check that the OpenClaw Gateway is running.',
+          ),
           makeCheck('openclaw_gateway_not_running', 'fail', 'OpenClaw Gateway is not running.'),
         ],
         verdict: 'fail',

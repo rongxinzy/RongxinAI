@@ -22,28 +22,28 @@ const button21stVariants = cva(
       variant: {
         primary: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-foreground hover:border-[color:color-mix(in_srgb,var(--lobster-foreground)_18%,var(--lobster-border)_82%)]',
+          'border-border/70 fill-current text-foreground hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
         ].join(' '),
         secondary: [
           button21stSurfaceClassName,
-          'border-border/80 fill-current text-secondary-foreground hover:border-[color:color-mix(in_srgb,var(--lobster-foreground)_14%,var(--lobster-border)_86%)]',
+          'border-border/80 fill-current text-secondary-foreground hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_14%,var(--zy-border)_86%)]',
           'hover:bg-[linear-gradient(180deg,#f6f6f6_0%,#ffffff_100%)]',
         ].join(' '),
         danger: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-[var(--lobster-destructive)] hover:border-[color:color-mix(in_srgb,var(--lobster-foreground)_18%,var(--lobster-border)_82%)]',
+          'border-border/70 fill-current text-[var(--zy-destructive)] hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
         ].join(' '),
         loading: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-[color:color-mix(in_srgb,var(--lobster-primary)_92%,white)] disabled:opacity-100',
-          'hover:border-[color:color-mix(in_srgb,var(--lobster-foreground)_18%,var(--lobster-border)_82%)]',
-          'hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--lobster-primary)_8%,#ffffff)_0%,#ffffff_100%)]',
+          'border-border/70 fill-current text-[color:color-mix(in_srgb,var(--zy-primary)_92%,white)] disabled:opacity-100',
+          'hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
+          'hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--zy-primary)_8%,#ffffff)_0%,#ffffff_100%)]',
         ].join(' '),
         closing: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-[color:color-mix(in_srgb,var(--lobster-destructive)_92%,white)] disabled:opacity-100',
-          'hover:border-[color:color-mix(in_srgb,var(--lobster-foreground)_18%,var(--lobster-border)_82%)]',
-          'hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--lobster-destructive)_8%,#ffffff)_0%,#ffffff_100%)]',
+          'border-border/70 fill-current text-[color:color-mix(in_srgb,var(--zy-destructive)_92%,white)] disabled:opacity-100',
+          'hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
+          'hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--zy-destructive)_8%,#ffffff)_0%,#ffffff_100%)]',
         ].join(' '),
       },
       size: {

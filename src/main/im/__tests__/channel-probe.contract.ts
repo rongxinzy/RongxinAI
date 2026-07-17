@@ -62,10 +62,7 @@ const VALID_VERDICTS: ReadonlySet<string> = new Set<IMConnectivityVerdict>([
 export function validateCheckShape(check: IMConnectivityCheck): void {
   expect(check, 'each check must have a code').toHaveProperty('code');
   expect(typeof check.code, 'check.code must be a string').toBe('string');
-  expect(
-    VALID_CHECK_CODES.has(check.code),
-    `unknown check code: ${check.code}`,
-  ).toBe(true);
+  expect(VALID_CHECK_CODES.has(check.code), `unknown check code: ${check.code}`).toBe(true);
 
   expect(check, 'each check must have a level').toHaveProperty('level');
   expect(
@@ -109,14 +106,18 @@ export function validateJsonSerializable(result: IMConnectivityTestResult): void
   expect(roundTripped!).toHaveProperty('platform');
   expect(roundTripped!).toHaveProperty('verdict');
   expect(roundTripped!).toHaveProperty('checks');
-  expect(Array.isArray(roundTripped!.checks), 'checks must be an array after deserialization').toBe(true);
+  expect(Array.isArray(roundTripped!.checks), 'checks must be an array after deserialization').toBe(
+    true,
+  );
 
   // suggestion is optional but must survive round-trip when present
   for (let i = 0; i < result.checks.length; i++) {
     const orig = result.checks[i];
     const rt = roundTripped!.checks[i];
     if (orig.suggestion !== undefined) {
-      expect(rt?.suggestion, `check[${i}].suggestion must survive JSON round-trip`).toBe(orig.suggestion);
+      expect(rt?.suggestion, `check[${i}].suggestion must survive JSON round-trip`).toBe(
+        orig.suggestion,
+      );
     }
   }
 }
@@ -126,10 +127,7 @@ export function validateVerdictConsistency(result: IMConnectivityTestResult): vo
   const { checks, verdict } = result;
 
   // Verdict must be a recognised value
-  expect(
-    VALID_VERDICTS.has(verdict),
-    `verdict must be pass|warn|fail, got: ${verdict}`,
-  ).toBe(true);
+  expect(VALID_VERDICTS.has(verdict), `verdict must be pass|warn|fail, got: ${verdict}`).toBe(true);
 
   const hasFail = checks.some(c => c.level === 'fail');
   const hasWarn = checks.some(c => c.level === 'warn');
@@ -137,8 +135,10 @@ export function validateVerdictConsistency(result: IMConnectivityTestResult): vo
   if (hasFail) {
     expect(verdict, 'verdict must be fail when any check.level is fail').toBe('fail');
   } else if (hasWarn) {
-    expect(['warn', 'fail'].includes(verdict),
-      'verdict must be warn or fail when any check.level is warn').toBe(true);
+    expect(
+      ['warn', 'fail'].includes(verdict),
+      'verdict must be warn or fail when any check.level is warn',
+    ).toBe(true);
   }
   // If no fail/warn, verdict is expected to be pass (though the caller
   // may have platform-specific logic — this is a soft check).

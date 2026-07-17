@@ -66,7 +66,7 @@ async function parseHackerNews(sourceConfig, keyword = null, limit = 10) {
           language: 'en',
           category: 'community',
           hn_points: points,
-          hn_comments: numComments
+          hn_comments: numComments,
         });
       } catch (error) {
         console.error('Error parsing HN item:', error.message);
@@ -81,5 +81,5 @@ async function parseHackerNews(sourceConfig, keyword = null, limit = 10) {
 }
 
 module.exports = {
-  parseHackerNews
+  parseHackerNews,
 };

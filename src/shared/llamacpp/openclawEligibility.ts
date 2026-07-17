@@ -8,7 +8,7 @@ export const LlamaCppOpenClawEligibilityReason = {
 } as const;
 
 export type LlamaCppOpenClawEligibilityReason =
-  typeof LlamaCppOpenClawEligibilityReason[keyof typeof LlamaCppOpenClawEligibilityReason];
+  (typeof LlamaCppOpenClawEligibilityReason)[keyof typeof LlamaCppOpenClawEligibilityReason];
 
 export type LlamaCppOpenClawEligibility = {
   eligible: boolean;

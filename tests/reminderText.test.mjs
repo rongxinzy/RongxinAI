@@ -25,7 +25,8 @@ const {
 } = require('../dist-electron/scheduledTask/reminderText.js');
 
 const PREFIX = 'A scheduled reminder has been triggered. The reminder content is:';
-const INTERNAL = 'Handle this reminder internally. Do not relay it to the user unless explicitly requested.';
+const INTERNAL =
+  'Handle this reminder internally. Do not relay it to the user unless explicitly requested.';
 const RELAY = 'Please relay this reminder to the user in a helpful and friendly way.';
 const TIME_PREFIX = 'Current time:';
 
@@ -98,7 +99,9 @@ test('parseLegacyScheduledReminderSystemMessage: returns null for empty string',
 });
 
 test('parseLegacyScheduledReminderSystemMessage: parses System line with brackets and emoji', () => {
-  const result = parseLegacyScheduledReminderSystemMessage('System: [2026-03-27 14:00] ⏰ Daily standup');
+  const result = parseLegacyScheduledReminderSystemMessage(
+    'System: [2026-03-27 14:00] ⏰ Daily standup',
+  );
   assert.notEqual(result, null);
   assert.equal(result.reminderText, '⏰ Daily standup');
   assert.equal(result.currentTime, '2026-03-27 14:00');
@@ -112,12 +115,17 @@ test('parseLegacyScheduledReminderSystemMessage: parses System line without brac
 });
 
 test('parseLegacyScheduledReminderSystemMessage: returns null if ⏰ is missing', () => {
-  assert.equal(parseLegacyScheduledReminderSystemMessage('System: [2026-03-27] Reminder without emoji'), null);
+  assert.equal(
+    parseLegacyScheduledReminderSystemMessage('System: [2026-03-27] Reminder without emoji'),
+    null,
+  );
 });
 
 test('parseLegacyScheduledReminderSystemMessage: falls back to wrapped prompt in remainder', () => {
   const wrapped = `${PREFIX} Check deployments ${INTERNAL}`;
-  const result = parseLegacyScheduledReminderSystemMessage(`System: [2026-03-27] ⏰ Override\n${wrapped}`);
+  const result = parseLegacyScheduledReminderSystemMessage(
+    `System: [2026-03-27] ⏰ Override\n${wrapped}`,
+  );
   assert.notEqual(result, null);
   assert.equal(result.reminderText, 'Check deployments');
 });
@@ -188,14 +196,14 @@ test('parseSimpleScheduledReminderText: bare ⏰ returns prompt with just the em
 test('getScheduledReminderDisplayText: returns text for standard format', () => {
   assert.equal(
     getScheduledReminderDisplayText(`${PREFIX} Attend weekly planning`),
-    'Attend weekly planning'
+    'Attend weekly planning',
   );
 });
 
 test('getScheduledReminderDisplayText: returns text for legacy format', () => {
   assert.equal(
     getScheduledReminderDisplayText('System: [09:00] ⏰ Morning standup'),
-    '⏰ Morning standup'
+    '⏰ Morning standup',
   );
 });
 

@@ -29,12 +29,14 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceExternal: '外部运行',
     localInferenceExternalServiceHint: 'Llama.cpp 正由外部进程运行，请在系统服务或终端中关闭。',
     localInferenceServiceConfigTitle: '服务设置',
-    localInferenceServiceConfigDescription: '这里只保留常用服务行为设置。上下文、GPU 卸载、线程、批处理和 mmap 请在启动模型时配置。',
+    localInferenceServiceConfigDescription:
+      '这里只保留常用服务行为设置。上下文、GPU 卸载、线程、批处理和 mmap 请在启动模型时配置。',
     localInferenceServiceConfigSaved: '本地推理服务参数已保存，下次启动生效。',
     localInferenceServiceConfigSavedRestartRequired: '本地推理服务参数已保存，重启服务后生效。',
     localInferenceServiceConfigSanitizedNotice: '部分参数超出安全范围，已调整为默认值：{fields}',
     localInferenceServiceConfigValidationFixErrors: '请先修正非法的服务参数后再保存。',
-    localInferenceLoadModelLimitReached: '同时驻留模型的数量为 {limit}，不能启动第 {next} 个模型，需先手动关闭已启动的模型。',
+    localInferenceLoadModelLimitReached:
+      '同时驻留模型的数量为 {limit}，不能启动第 {next} 个模型，需先手动关闭已启动的模型。',
     localInferenceLibrarySettings: '模型库设置',
     localInferenceLibraryDirectory: '模型库目录',
     localInferenceLibraryDirectoryHint: '模型市场下载和手动导入都会进入这个目录。',
@@ -54,18 +56,24 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceContextInvalid: '请输入有效的上下文长度',
     localInferenceDeleteConfirmMessage: '确定要删除模型“{name}”吗？此操作不可撤销。',
     localInferenceDeleteRunningBlocked: '该模型当前正在运行，请先卸载后再删除。',
-    localInferenceServiceConfigRestartAppRequired: '当前应用主进程还未加载服务参数能力，请重启应用后再保存。',
-    localInferenceServiceConfigExternalWarning: '当前本地推理由外部进程启动，App 保存的服务启动参数不会影响这个正在运行的服务。',
-    localInferenceServiceConfigExternalHint: '请先关闭外部本地推理，再由 App 启动服务，参数才会生效。',
-    localInferenceServiceConfigExternalNotApplied: '当前本地推理由外部进程运行，无法应用服务启动参数。请先关闭外部本地推理，再由 App 启动服务。',
+    localInferenceServiceConfigRestartAppRequired:
+      '当前应用主进程还未加载服务参数能力，请重启应用后再保存。',
+    localInferenceServiceConfigExternalWarning:
+      '当前本地推理由外部进程启动，App 保存的服务启动参数不会影响这个正在运行的服务。',
+    localInferenceServiceConfigExternalHint:
+      '请先关闭外部本地推理，再由 App 启动服务，参数才会生效。',
+    localInferenceServiceConfigExternalNotApplied:
+      '当前本地推理由外部进程运行，无法应用服务启动参数。请先关闭外部本地推理，再由 App 启动服务。',
     localInferenceServiceConfigRestartRequired: '需要重启服务生效',
     localInferenceServiceConfigGroupBasic: '基础',
     localInferenceServiceConfigGroupPerformance: '性能',
     localInferenceServiceConfigGroupCache: '缓存',
     localInferenceServiceConfigGroupAdvanced: '高级',
-    localInferenceServiceConfigAdvancedDescription: '排障或多卡/模板调优时再展开；不了解含义时保持默认。',
+    localInferenceServiceConfigAdvancedDescription:
+      '排障或多卡/模板调优时再展开；不了解含义时保持默认。',
     localInferenceServiceConfigGroupService: '服务控制',
-    localInferenceServiceConfigGroupServiceDescription: '控制 router 的加载数量、并发处理、HTTP 线程和请求超时。',
+    localInferenceServiceConfigGroupServiceDescription:
+      '控制 router 的加载数量、并发处理、HTTP 线程和请求超时。',
     localInferenceServiceConfigGroupCacheDescription: '调整提示缓存、缓存复用和长对话吞吐表现。',
     localInferenceServiceConfigGroupGpu: 'GPU 加速',
     localInferenceServiceConfigGroupGpuDescription: '仅在当前 runtime 检测到可用 GPU 能力时显示。',
@@ -73,7 +81,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigGroupCompatDescription: '模板兼容和常见内存驻留策略。',
     localInferenceServiceConfigGroupRequest: '并发与请求',
     localInferenceServiceConfigGroupRequestDescription: '集中设置并发槽位和 HTTP 请求线程。',
-    localInferenceServiceConfigGpuHiddenHint: '当前 runtime 未检测到可用的 GPU 加速参数，因此已隐藏多卡与显卡相关配置。',
+    localInferenceServiceConfigGpuHiddenHint:
+      '当前 runtime 未检测到可用的 GPU 加速参数，因此已隐藏多卡与显卡相关配置。',
     localInferenceServiceConfigHostLabel: '监听地址',
     localInferenceServiceConfigPortLabel: '监听端口',
     localInferenceServiceConfigExecutablePathLabel: 'llama-server 路径',
@@ -100,9 +109,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigMmapLabel: 'mmap',
     localInferenceServiceConfigMlockLabel: 'mlock',
     localInferenceServiceConfigHostHint: '本地推理服务监听地址；桌面本机使用建议保留 127.0.0.1。',
-    localInferenceServiceConfigPortHint: 'OpenAI-compatible API 端口；修改后客户端会使用新端口连接。',
+    localInferenceServiceConfigPortHint:
+      'OpenAI-compatible API 端口；修改后客户端会使用新端口连接。',
     localInferenceAccessSettings: '访问设置',
-    localInferenceAccessSettingsDescription: '配置本地推理的服务访问范围。多个模型仍通过同一个 OpenAI 兼容入口访问，并用 model 字段区分。',
+    localInferenceAccessSettingsDescription:
+      '配置本地推理的服务访问范围。多个模型仍通过同一个 OpenAI 兼容入口访问，并用 model 字段区分。',
     localInferenceAccessAllowLan: '允许局域网访问',
     localInferenceAccessAllowLanEnabledHint: '局域网设备可通过本机 IP 访问。',
     localInferenceAccessAllowLanDisabledHint: '仅本机可访问。',
@@ -114,51 +125,81 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceAccessRestartRequiredTitle: '修改后需要重启服务',
     localInferenceAccessRestartRequiredHint: '下次启动服务后生效。',
     localInferenceAccessRequestExample: '请求示例',
-    localInferenceAccessRequestExampleHint: '统一走一个服务端口，通过请求体里的 model 字段区分模型。',
+    localInferenceAccessRequestExampleHint:
+      '统一走一个服务端口，通过请求体里的 model 字段区分模型。',
     localInferenceAccessSettingsSaved: '访问设置已保存。',
     localInferenceAccessSettingsSavedRestarted: '访问设置已保存，本地推理已自动重启并生效。',
     localInferenceAccessSettingsSavedRestartRequired: '访问设置已保存；重启本地推理服务后生效。',
-    localInferenceServiceConfigExecutablePathHint: '高级选项；显式选择已有 llama-server 时才填写。留空时使用 App 下载的固定版本。',
+    localInferenceServiceConfigExecutablePathHint:
+      '高级选项；显式选择已有 llama-server 时才填写。留空时使用 App 下载的固定版本。',
     localInferenceServiceConfigExecutablePathPlaceholder: '例如 /usr/local/bin/llama-server',
-    localInferenceServiceConfigDeviceHint: '限制本地推理可见设备；请填写 0、1、2 这类设备索引，多个值用英文逗号分隔，保存时会映射成真实设备 ID。留空默认全部可见。',
-    localInferenceServiceConfigModelsMaxHint: '同时驻留内存的模型数量；桌面单模型建议填 1，多模型切换可填 2，留空不限制。',
+    localInferenceServiceConfigDeviceHint:
+      '限制本地推理可见设备；请填写 0、1、2 这类设备索引，多个值用英文逗号分隔，保存时会映射成真实设备 ID。留空默认全部可见。',
+    localInferenceServiceConfigModelsMaxHint:
+      '同时驻留内存的模型数量；桌面单模型建议填 1，多模型切换可填 2，留空不限制。',
     localInferenceServiceConfigModelsAutoloadHint: '服务启动时是否自动加载 preset 中的模型。',
-    localInferenceServiceConfigParallelHint: '单个模型同时处理的请求数；桌面交互建议填 1，需要并发请求可填 2，过高会增加显存和内存压力。',
-    localInferenceServiceConfigCtxSizeHint: '服务默认上下文长度，对Agent 引擎这类长提示词场景建议 8192 或 16384 起步。',
-    localInferenceServiceConfigGpuLayersHint: 'GPU 卸载层数；auto 让本地推理自动判断，all 尝试全部卸载。',
+    localInferenceServiceConfigParallelHint:
+      '单个模型同时处理的请求数；桌面交互建议填 1，需要并发请求可填 2，过高会增加显存和内存压力。',
+    localInferenceServiceConfigCtxSizeHint:
+      '服务默认上下文长度，对Agent 引擎这类长提示词场景建议 8192 或 16384 起步。',
+    localInferenceServiceConfigGpuLayersHint:
+      'GPU 卸载层数；auto 让本地推理自动判断，all 尝试全部卸载。',
     localInferenceServiceConfigBatchSizeHint: '提示词处理逻辑批大小；越大越快但更占显存和内存。',
     localInferenceServiceConfigUbatchSizeHint: '物理微批大小；显存紧张时降低。',
     localInferenceServiceConfigThreadsHint: '生成阶段 CPU 线程数；留空使用本地推理默认值。',
-    localInferenceServiceConfigThreadsBatchHint: '提示词批处理阶段 CPU 线程数；留空使用本地推理默认值。',
-    localInferenceServiceConfigTimeoutHint: '本地推理连接与加载超时时间，单位秒；模型较大或设备较慢时可适当调大。',
+    localInferenceServiceConfigThreadsBatchHint:
+      '提示词批处理阶段 CPU 线程数；留空使用本地推理默认值。',
+    localInferenceServiceConfigTimeoutHint:
+      '本地推理连接与加载超时时间，单位秒；模型较大或设备较慢时可适当调大。',
     localInferenceServiceConfigThreadsHttpHint: 'HTTP 请求处理线程数；留空自动。',
     localInferenceServiceConfigCachePromptHint: '是否启用提示词缓存，有助于长提示词和重复对话。',
-    localInferenceServiceConfigCacheReuseHint: 'Prompt/KV 缓存复用阈值；值越小越积极复用，值越大越保守。常见桌面值 256。',
-    localInferenceServiceConfigCacheRamHint: 'Prompt/KV 缓存可用的 RAM 上限，单位 MiB；-1 表示不限制，0 表示关闭，留空使用默认值。',
+    localInferenceServiceConfigCacheReuseHint:
+      'Prompt/KV 缓存复用阈值；值越小越积极复用，值越大越保守。常见桌面值 256。',
+    localInferenceServiceConfigCacheRamHint:
+      'Prompt/KV 缓存可用的 RAM 上限，单位 MiB；-1 表示不限制，0 表示关闭，留空使用默认值。',
     localInferenceServiceConfigFlashAttnHint: 'Flash Attention 开关；支持的后端可降低显存占用。',
-    localInferenceServiceConfigJinjaHint: '是否启用 Jinja chat template。工具调用和复杂模板通常需要开启。',
-    localInferenceServiceConfigSplitModeHint: '多 GPU 时可选择 layer/tensor/row 分配策略；留空使用默认值。',
-    localInferenceServiceConfigTensorSplitHint: '多 GPU 张量拆分比例，例如 3,2；通常只在拆分模式为按张量拆分时使用。',
+    localInferenceServiceConfigJinjaHint:
+      '是否启用 Jinja chat template。工具调用和复杂模板通常需要开启。',
+    localInferenceServiceConfigSplitModeHint:
+      '多 GPU 时可选择 layer/tensor/row 分配策略；留空使用默认值。',
+    localInferenceServiceConfigTensorSplitHint:
+      '多 GPU 张量拆分比例，例如 3,2；通常只在拆分模式为按张量拆分时使用。',
     localInferenceServiceConfigMainGpuHint: '指定主 GPU 序号；多 GPU 或显存策略调优时使用。',
-    localInferenceServiceConfigGpuUnavailableHint: '当前本地推理运行时未探测到可配置 GPU，仅检测到 CPU 或未返回加速设备。',
-    localInferenceServiceConfigGpuDetectionFailedHint: '当前本地推理运行时未提供可用 GPU 枚举结果，无法配置显卡参数。',
+    localInferenceServiceConfigGpuUnavailableHint:
+      '当前本地推理运行时未探测到可配置 GPU，仅检测到 CPU 或未返回加速设备。',
+    localInferenceServiceConfigGpuDetectionFailedHint:
+      '当前本地推理运行时未提供可用 GPU 枚举结果，无法配置显卡参数。',
     localInferenceServiceConfigFieldErrorIntegerRange: '请输入 {min} 到 {max} 之间的整数。',
-    localInferenceServiceConfigFieldErrorDeviceFormat: '请输入设备索引，多个值用英文逗号分隔，例如 0,1。',
-    localInferenceServiceConfigFieldErrorDeviceUnavailable: '当前运行时没有可配置 GPU，无法设置可见设备。',
-    localInferenceServiceConfigFieldErrorDeviceDetectionFailed: '当前运行时未提供可用 GPU 枚举结果，无法设置可见设备。',
-    localInferenceServiceConfigFieldErrorDeviceOutOfRange: '设备索引超出当前可配置 GPU 范围，请填写 {min} 到 {max}。',
-    localInferenceServiceConfigFieldErrorDeviceIndexRange: '设备索引超出范围，当前可用的最大索引是 {max}。',
-    localInferenceServiceConfigFieldErrorGpuLayersFormat: '请输入 0 到 4096 之间的整数，或填写 auto / all。',
-    localInferenceServiceConfigFieldErrorMainGpuUnavailable: '当前运行时没有可配置 GPU，无法设置 Main GPU。',
-    localInferenceServiceConfigFieldErrorMainGpuDetectionFailed: '当前运行时未提供可用 GPU 枚举结果，无法设置 Main GPU。',
-    localInferenceServiceConfigFieldErrorMainGpuOutOfRange: 'Main GPU 索引超出当前可配置 GPU 范围，请填写 {min} 到 {max}。',
-    localInferenceServiceConfigFieldErrorTensorSplitFormat: '请输入逗号分隔的正数比例，例如 3,2 或 1,1,0.5。',
-    localInferenceServiceConfigFieldErrorTensorSplitRequiresMode: '仅当拆分模式为“按张量拆分”时才可填写张量拆分。',
+    localInferenceServiceConfigFieldErrorDeviceFormat:
+      '请输入设备索引，多个值用英文逗号分隔，例如 0,1。',
+    localInferenceServiceConfigFieldErrorDeviceUnavailable:
+      '当前运行时没有可配置 GPU，无法设置可见设备。',
+    localInferenceServiceConfigFieldErrorDeviceDetectionFailed:
+      '当前运行时未提供可用 GPU 枚举结果，无法设置可见设备。',
+    localInferenceServiceConfigFieldErrorDeviceOutOfRange:
+      '设备索引超出当前可配置 GPU 范围，请填写 {min} 到 {max}。',
+    localInferenceServiceConfigFieldErrorDeviceIndexRange:
+      '设备索引超出范围，当前可用的最大索引是 {max}。',
+    localInferenceServiceConfigFieldErrorGpuLayersFormat:
+      '请输入 0 到 4096 之间的整数，或填写 auto / all。',
+    localInferenceServiceConfigFieldErrorMainGpuUnavailable:
+      '当前运行时没有可配置 GPU，无法设置 Main GPU。',
+    localInferenceServiceConfigFieldErrorMainGpuDetectionFailed:
+      '当前运行时未提供可用 GPU 枚举结果，无法设置 Main GPU。',
+    localInferenceServiceConfigFieldErrorMainGpuOutOfRange:
+      'Main GPU 索引超出当前可配置 GPU 范围，请填写 {min} 到 {max}。',
+    localInferenceServiceConfigFieldErrorTensorSplitFormat:
+      '请输入逗号分隔的正数比例，例如 3,2 或 1,1,0.5。',
+    localInferenceServiceConfigFieldErrorTensorSplitRequiresMode:
+      '仅当拆分模式为“按张量拆分”时才可填写张量拆分。',
     localInferenceServiceConfigTensorSplitDisabledHint: '仅当拆分模式为“按张量拆分”时才需要设置。',
     localInferenceServiceConfigMainGpuDisabledHint: '当前拆分模式下不需要设置主 GPU。',
-    localInferenceServiceConfigPromptCacheDependentHint: '仅当 Prompt 缓存开启或使用默认值时才会生效。',
-    localInferenceServiceConfigMmapHint: '是否使用内存映射加载模型；关闭时会向本地推理传递 no-mmap。',
-    localInferenceServiceConfigMlockHint: '是否锁定模型内存，避免被系统换出；可能需要更多可用内存。',
+    localInferenceServiceConfigPromptCacheDependentHint:
+      '仅当 Prompt 缓存开启或使用默认值时才会生效。',
+    localInferenceServiceConfigMmapHint:
+      '是否使用内存映射加载模型；关闭时会向本地推理传递 no-mmap。',
+    localInferenceServiceConfigMlockHint:
+      '是否锁定模型内存，避免被系统换出；可能需要更多可用内存。',
     localInferenceServiceConfigSplitNone: '不拆分',
     localInferenceServiceConfigSplitLayer: '按层拆分',
     localInferenceServiceConfigSplitRow: '按行拆分',
@@ -167,14 +208,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigStartHint: '保存后下次启动本地推理时应用。',
     localInferenceInstall: '安装本地推理',
     localInferenceImportRuntime: '从本地导入...',
-    localInferenceImportRuntimeTooltip: '选择本地推理 backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录，导入到知远智能体 管理的 backend 目录。',
+    localInferenceImportRuntimeTooltip:
+      '选择本地推理 backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录，导入到知远智能体 管理的 backend 目录。',
     localInferenceImportRuntimeSuccess: '本地推理运行时导入成功。',
     localInferenceBackendManager: '本地推理 Backend',
     localInferenceBackendConfigTitle: '版本配置',
-    localInferenceBackendConfigDescription: '管理本地推理的版本和 backend。服务参数仍保留在本地推理服务设置中。',
-    localInferenceBackendListFailed: '无法读取本地推理 backend 列表。请刷新，或重启应用以加载最新 main/preload 代码。',
-    localInferenceBackendListEmpty: '没有可用 backend。请确认 Gitee release 中存在 manifest.json，或使用内置 fallback 后重启应用。',
-    localInferenceBackendHandlerMissing: '当前运行中的应用还没有加载新的本地推理 backend IPC。请完全退出应用后重新启动。',
+    localInferenceBackendConfigDescription:
+      '管理本地推理的版本和 backend。服务参数仍保留在本地推理服务设置中。',
+    localInferenceBackendListFailed:
+      '无法读取本地推理 backend 列表。请刷新，或重启应用以加载最新 main/preload 代码。',
+    localInferenceBackendListEmpty:
+      '没有可用 backend。请确认 Gitee release 中存在 manifest.json，或使用内置 fallback 后重启应用。',
+    localInferenceBackendHandlerMissing:
+      '当前运行中的应用还没有加载新的本地推理 backend IPC。请完全退出应用后重新启动。',
     localInferenceBackendSourceLocal: '来源：本地导入',
     localInferenceBackendSourceRemote: '来源：远程清单',
     localInferenceBackendVersion: 'Version',
@@ -187,31 +233,42 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceBackendRecommendedUnavailable: '当前平台 {platform} 没有可用 backend。',
     localInferenceBackendInstalled: '当前 backend 已安装',
     localInferenceBackendNotInstalled: '当前 backend 未安装',
-    localInferenceBackendRunningHint: '服务正在运行时切换 backend 不会影响已启动进程，请停止并重新启动服务后生效。',
+    localInferenceBackendRunningHint:
+      '服务正在运行时切换 backend 不会影响已启动进程，请停止并重新启动服务后生效。',
     localInferenceBackendSwitch: '切换',
     localInferenceBackendUpdate: '安装 / 更新',
     localInferenceBackendUpdated: '本地推理 backend 已更新。',
     localInferenceBackendUpdateFailed: '本地推理 backend 更新失败。',
-    localInferenceBackendUpdateUnavailableLocal: '本地导入的 backend 不能直接从远程更新。请重新导入新版本，或先配置 manifest/OSS 后再更新。',
+    localInferenceBackendUpdateUnavailableLocal:
+      '本地导入的 backend 不能直接从远程更新。请重新导入新版本，或先配置 manifest/OSS 后再更新。',
     localInferenceBackendCheckDevices: '检查设备',
     localInferenceBackendDeviceCheckDone: '设备检查完成。',
     localInferenceBackendDeviceCheckFailed: '设备检查失败。',
     localInferenceBackendNoDevices: '未发现设备输出。',
     localInferenceImportGuideTitle: '导入本地推理运行时',
-    localInferenceImportGuideDescription: '请确保所选目录包含完整的本地推理运行环境。以下是各操作系统的文件要求和推荐获取方式：',
-    localInferenceImportGuideFilesWin: '必需文件：llama-server.exe, ggml.dll, llama.dll, ggml-cpu-*.dll, libomp*.dll 等',
-    localInferenceImportGuideFilesMac: '必需文件：llama-server, libggml.dylib, libllama.dylib, libggml-metal.dylib, libmtmd.dylib 等',
-    localInferenceImportGuideFilesLinux: '必需文件：llama-server, libggml.so, libllama.so, libggml-cpu.so 等',
+    localInferenceImportGuideDescription:
+      '请确保所选目录包含完整的本地推理运行环境。以下是各操作系统的文件要求和推荐获取方式：',
+    localInferenceImportGuideFilesWin:
+      '必需文件：llama-server.exe, ggml.dll, llama.dll, ggml-cpu-*.dll, libomp*.dll 等',
+    localInferenceImportGuideFilesMac:
+      '必需文件：llama-server, libggml.dylib, libllama.dylib, libggml-metal.dylib, libmtmd.dylib 等',
+    localInferenceImportGuideFilesLinux:
+      '必需文件：llama-server, libggml.so, libllama.so, libggml-cpu.so 等',
     localInferenceImportGuideStep1: '从 GitHub Releases 下载对应平台的预编译包：',
     localInferenceImportGuideStep1LinkLabel: 'ggml-org/本地推理 Releases',
     localInferenceImportGuideStep1Url: 'https://github.com/ggml-org/本地推理/releases',
-    localInferenceImportGuideStep1WinNote: 'Windows 用户请选择包含 "win-cpu-x64" 或 "win-cpu-arm64" 的 zip 文件',
-    localInferenceImportGuideStep1MacNote: 'macOS 用户请选择包含 "macos-arm64" 或 "macos-x64" 的 tar.gz 文件',
-    localInferenceImportGuideStep1LinuxNote: 'Linux 用户请选择包含 "ubuntu-x64" 或 "ubuntu-arm64" 的 tar.gz 文件',
+    localInferenceImportGuideStep1WinNote:
+      'Windows 用户请选择包含 "win-cpu-x64" 或 "win-cpu-arm64" 的 zip 文件',
+    localInferenceImportGuideStep1MacNote:
+      'macOS 用户请选择包含 "macos-arm64" 或 "macos-x64" 的 tar.gz 文件',
+    localInferenceImportGuideStep1LinuxNote:
+      'Linux 用户请选择包含 "ubuntu-x64" 或 "ubuntu-arm64" 的 tar.gz 文件',
     localInferenceImportGuideStep2: '解压下载的压缩包',
-    localInferenceImportGuideStep3: '点击「从本地导入...」，选择本地推理 backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录',
+    localInferenceImportGuideStep3:
+      '点击「从本地导入...」，选择本地推理 backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录',
     localInferenceImportGuideClose: '关闭',
-    localInferenceImportGuideInlineDescription: '请先到本地推理官方发布页下载与你当前电脑匹配的 backend 主压缩包，再回到这里直接导入该压缩包。',
+    localInferenceImportGuideInlineDescription:
+      '请先到本地推理官方发布页下载与你当前电脑匹配的 backend 主压缩包，再回到这里直接导入该压缩包。',
     localInferenceImportGuideInlineStepArchive: '1. 打开官方发布页',
     localInferenceImportGuideInlineReleaseUrl: 'https://github.com/ggml-org/本地推理/releases',
     localInferenceImportGuideInlineStepExtracted: '2. 按你的机器选择对应压缩包',
@@ -221,13 +278,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceImportGuideInlinePlatformWinX64Vulkan: 'Windows x64 Vulkan：选 win-vulkan-x64',
     localInferenceImportGuideInlinePlatformMacArm64: 'macOS Apple Silicon：选 macos-arm64',
     localInferenceImportGuideInlinePlatformMacX64: 'macOS Intel：选 macos-x64',
-    localInferenceImportGuideInlineStepReject: '3. 将压缩包下载到本地后，点击“从本地导入...”，直接选择这个可单独安装的主压缩包。不要选择只有 CUDA 依赖的附加压缩包，否则会导入失败。',
-    localInferenceImportGuideInlineStepResult: '4. 导入成功后，backend 会出现在当前配置列表中，可直接切换或安装使用。如果压缩包与当前机器系统、架构或显卡能力不匹配，安装或切换时会失败。',
+    localInferenceImportGuideInlineStepReject:
+      '3. 将压缩包下载到本地后，点击“从本地导入...”，直接选择这个可单独安装的主压缩包。不要选择只有 CUDA 依赖的附加压缩包，否则会导入失败。',
+    localInferenceImportGuideInlineStepResult:
+      '4. 导入成功后，backend 会出现在当前配置列表中，可直接切换或安装使用。如果压缩包与当前机器系统、架构或显卡能力不匹配，安装或切换时会失败。',
     localInferenceImportRuntimeFailed: '导入失败',
     localInferenceRuntimeReady: '本地推理已安装就绪。',
     localInferenceRuntimeMissing: '本地推理安装失败，请检查网络后重试。',
     localInferenceServiceNeedsBackendInstall: '请先在本地推理配置中安装 backend，然后再启动服务。',
-    localInferenceServiceNeedsBackendSwitch: '请先在本地推理配置中切换到一个已安装 backend，然后再启动服务。',
+    localInferenceServiceNeedsBackendSwitch:
+      '请先在本地推理配置中切换到一个已安装 backend，然后再启动服务。',
     localInferenceRuntimeUninstall: '卸载本地推理',
     localInferenceRuntimeUninstalled: 'App 管理的本地推理已卸载。',
     localInferenceRuntimeNotInstalled: '没有发现 App 管理的本地推理。',
@@ -258,7 +318,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplacePullCancelled: '拉取已取消',
     marketplaceTokenSettings: '设置魔搭 API Token',
     marketplaceTokenSettingsTitle: '配置魔搭社区 API Token',
-    marketplaceTokenSettingsDesc: '填入 Token 后可使用 ModelScope OpenAPI 搜索，获得更准确的模型列表和更快的搜索速度。在 modelscope.cn 注册账号后，前往个人设置 → 访问令牌获取。',
+    marketplaceTokenSettingsDesc:
+      '填入 Token 后可使用 ModelScope OpenAPI 搜索，获得更准确的模型列表和更快的搜索速度。在 modelscope.cn 注册账号后，前往个人设置 → 访问令牌获取。',
     marketplaceTokenPlaceholder: '请输入魔搭社区 API Token',
     marketplaceTokenSave: '保存',
     marketplaceTokenClear: '清除',
@@ -291,7 +352,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceInstallFailed: '安装失败',
     marketplaceCancelInstall: '取消安装',
     localInferencePullTitle: '从 ModelScope 安装 GGUF 仓库',
-    localInferencePullHint: '输入 owner/repo 仓库名即可安装，若未指定文件，后端会自动选择推荐 GGUF 量化。',
+    localInferencePullHint:
+      '输入 owner/repo 仓库名即可安装，若未指定文件，后端会自动选择推荐 GGUF 量化。',
     localInferencePullPlaceholder: 'unsloth/Qwen3.5-0.8B-GGUF',
     localInferencePull: '安装',
     localInferenceCancelPull: '取消安装',
@@ -316,11 +378,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceModelLaunchLogWindowEmpty: '暂无启动日志。',
     localInferenceModelLaunchLogWindowReadFailed: '读取启动日志失败',
     localInferenceModelLaunchLogWindowSessionNotFound: '未找到对应的启动日志会话',
-    localInferenceModelLaunchLogWindowDescription: '展示本地推理模型启动阶段日志，用于确认启动进度和排查问题。',
+    localInferenceModelLaunchLogWindowDescription:
+      '展示本地推理模型启动阶段日志，用于确认启动进度和排查问题。',
     localInferenceModelLaunchLogWindowModelLabel: '模型',
     localInferenceModelLaunchLogWindowWaitingModel: '等待模型',
     localInferenceModelLaunchLogWindowFileLabel: '文件',
-    localInferenceModelLaunchLogWindowTroubleshootingHint: '日志保持原始文本格式，便于复制、搜索和定位启动阶段问题。',
+    localInferenceModelLaunchLogWindowTroubleshootingHint:
+      '日志保持原始文本格式，便于复制、搜索和定位启动阶段问题。',
     localInferenceModelLaunchLogWindowLive: '实时更新',
     localInferenceModelLaunchLogsForModel: '正在启动：{name}',
     localInferenceModelLaunchLogsWaiting: '等待启动日志...',
@@ -354,7 +418,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceUseOpenClawDisabledHint: '请先配置启动并加载模型，再用于Agent 引擎。',
     localInferenceSetOpenClawDone: '当前运行中的模型 {name} 已可供Agent 引擎使用',
     localInferenceSetOpenClawFailed: '刷新Agent 引擎可见模型失败',
-    localInferenceSetOpenClawCtxTooSmall: '当前上下文长度 {ctx} 低于Agent 引擎最低要求 ({min})，请先调大上下文长度再配置。',
+    localInferenceSetOpenClawCtxTooSmall:
+      '当前上下文长度 {ctx} 低于Agent 引擎最低要求 ({min})，请先调大上下文长度再配置。',
     localInferencePresetSaved: '推理参数已保存',
     localInferenceGenerationCancelled: '生成已取消',
     localInferenceModel: '模型',
@@ -397,7 +462,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceReasoningPreferenceHigh: '开启思考',
     localInferenceSystemPromptHint: '只在需要固定输出风格或角色时再填写。',
     localInferenceOptionCachePromptLabel: 'Prompt 缓存',
-    localInferenceOptionCachePromptHint: '本次请求是否复用 KV prompt cache；自动时使用 server 默认值。',
+    localInferenceOptionCachePromptHint:
+      '本次请求是否复用 KV prompt cache；自动时使用 server 默认值。',
     localInferenceOptionSeedLabel: '随机种子',
     localInferenceOptionSeedHint: '-1 表示随机；非负数用于复现实验。',
     localInferenceOptionStopLabel: '停止词',
@@ -414,11 +480,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceTokenRemaining: '剩余',
     localInferenceContextOverflowTitle: '模型上下文已用尽',
     localInferenceContextOverflowDescription: '当前请求已超过可用上下文大小。',
-    localInferenceContextOverflowDetails: '本次请求约 {requested} tokens，可用上下文约 {available} tokens。',
+    localInferenceContextOverflowDetails:
+      '本次请求约 {requested} tokens，可用上下文约 {available} tokens。',
     localInferenceContextOverflowAction: '增大上下文',
     localInferenceRequestPreview: '请求预览',
     localInferenceJumpToBottom: '跳到最新回复',
-    localInferenceHiddenThinkingOnly: '该模型模板会强制输出 thinking；当前已隐藏思考内容，但没有生成可见回复。可以开启 Thinking，或提高最大生成 tokens 后重试。',
+    localInferenceHiddenThinkingOnly:
+      '该模型模板会强制输出 thinking；当前已隐藏思考内容，但没有生成可见回复。可以开启 Thinking，或提高最大生成 tokens 后重试。',
     localInferenceNoVisibleReply: '模型没有返回可见回复。可以重试，或提高最大生成 tokens。',
     localInferenceMetricsSpeed: '速度: {speed} tokens/s',
     localInferenceDetails: '详细信息',
@@ -428,13 +496,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceVram: '显存',
     localInferenceLaunchTitle: '启动模型',
     localInferenceLaunchLifecycleTitle: '启动一个桌面模型实例',
-    localInferenceLaunchLifecycleDescription: '这里配置本次模型加载方式。切换 GPU 预设时会重启本地推理服务，然后重新加载模型。',
+    localInferenceLaunchLifecycleDescription:
+      '这里配置本次模型加载方式。切换 GPU 预设时会重启本地推理服务，然后重新加载模型。',
     localInferenceLaunchAutoTitle: '自动优化',
     localInferenceLaunchAutoDescription: '根据模型大小、可用显存和 CPU 线程填写保守参数。',
     localInferenceLaunchAutoFormula: '公式：上下文按模型大小估算；线程数=min(逻辑线程-2, 16)。',
     localInferenceLaunchAutoOptimize: '自动优化参数',
-    localInferenceLaunchAutoAppliedFallback: '已应用保守参数：上下文 {context}，GPU 加速 {gpuLayers}，线程 {threads}，批处理 {batch}。',
-    localInferenceLaunchAutoAppliedWithGpu: '已读取可用 GPU 显存 {memory}：上下文 {context}，GPU 加速 {gpuLayers}，线程 {threads}，批处理 {batch}。',
+    localInferenceLaunchAutoAppliedFallback:
+      '已应用保守参数：上下文 {context}，GPU 加速 {gpuLayers}，线程 {threads}，批处理 {batch}。',
+    localInferenceLaunchAutoAppliedWithGpu:
+      '已读取可用 GPU 显存 {memory}：上下文 {context}，GPU 加速 {gpuLayers}，线程 {threads}，批处理 {batch}。',
     localInferenceLaunchKeepAlive: '驻留时间',
     localInferenceLaunchKeepAliveForever: '常驻，直到手动结束',
     localInferenceLaunchGpuPresetTitle: '工作站 GPU 预设',
@@ -452,7 +523,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceLaunchGpuCustom: '自定义',
     localInferenceLaunchGpuCustomHint: '手动指定本地推理使用哪些设备。',
     localInferenceLaunchGpuCustomValue: 'GPU 设备',
-    localInferenceLaunchGpuCustomValueHint: '可填写 0、1 这类索引，多个值用逗号分隔；也支持直接填写设备名。留空则不改服务设置。',
+    localInferenceLaunchGpuCustomValueHint:
+      '可填写 0、1 这类索引，多个值用逗号分隔；也支持直接填写设备名。留空则不改服务设置。',
     localInferenceLaunchGpuCurrent: '当前服务',
     localInferenceLaunchGpuWillUse: '本次启动',
     localInferenceLaunchGpuAutoVisible: '自动选择',
@@ -477,7 +549,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceLaunchNumThread: '线程数',
     localInferenceLaunchNumThreadHint: 'CPU 推理线程数；过高会抢占桌面响应。',
     localInferenceLaunchAdvancedTitle: '高级参数',
-    localInferenceLaunchAdvancedDescription: '这些模型加载参数会写入本地推理 preset。不了解含义时保持默认即可。',
+    localInferenceLaunchAdvancedDescription:
+      '这些模型加载参数会写入本地推理 preset。不了解含义时保持默认即可。',
     localInferenceLaunchNumBatch: '批处理大小',
     localInferenceLaunchNumBatchHint: '提示词处理批大小；显存紧张时降低。',
     localInferenceLaunchUseMmap: '内存映射',
@@ -488,15 +561,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceLaunchBooleanDisabled: '禁用',
     localInferenceLaunchLoadOnly: '预加载',
     localInferenceLaunchLoadAndDebug: '开始调试',
-    'localInferenceStatus_unknown': '未知',
+    localInferenceStatus_unknown: '未知',
     'localInferenceStatus_not-installed': '未安装',
-    'localInferenceStatus_installing': '安装中',
-    'localInferenceStatus_installed': '已安装',
-    'localInferenceStatus_starting': '启动中',
-    'localInferenceStatus_running': '运行中',
+    localInferenceStatus_installing: '安装中',
+    localInferenceStatus_installed: '已安装',
+    localInferenceStatus_starting: '启动中',
+    localInferenceStatus_running: '运行中',
     localInferenceContextShort: '上下文',
-    'localInferenceStatus_stopped': '已停止',
-    'localInferenceStatus_error': '异常',
+    localInferenceStatus_stopped: '已停止',
+    localInferenceStatus_error: '异常',
 
     // 设置
     settings: '设置',
@@ -567,7 +640,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamaCppProviderStatusStarting: '启动中',
     llamaCppProviderStatusStopped: '服务未运行',
     llamaCppProviderSettingsTitle: '本地推理仅作为本地运行态模型来源',
-    llamaCppProviderSettingsDescription: '这里不维护 API Key 和模型列表。只有当前已加载到显存、并且服务可用的模型，才会出现在 Agent / Agent 引擎的模型选择中。',
+    llamaCppProviderSettingsDescription:
+      '这里不维护 API Key 和模型列表。只有当前已加载到显存、并且服务可用的模型，才会出现在 Agent / Agent 引擎的模型选择中。',
     llamaCppProviderServiceStatus: '服务状态',
     llamaCppProviderRunningModels: '当前运行中的模型',
     llamaCppProviderOpenLocalInference: '前往本地推理',
@@ -911,13 +985,18 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkAgentEngineOpenClaw: 'Agent 引擎（默认）',
     coworkAgentEngineOpenClawHint: '个人 AI 助理',
     coworkAgentEnginePi: 'Pi（内测）',
-    coworkAgentEnginePiHint: '极简 Agent Loop，进程内运行，Work/Chat 模式专用。Pi 引擎无需额外启动。',
+    coworkAgentEnginePiHint:
+      '极简 Agent Loop，进程内运行，Work/Chat 模式专用。Pi 引擎无需额外启动。',
     coworkEngineArchInfo: '知远智能体 采用双内核并行架构，两个引擎同时常驻运行，按职责固定分工：',
-    coworkEnginePiRole: '负责 Cowork Work（Agent 模式）和 Chat（直连 LLM）。进程内运行，无需额外启动。',
-    coworkEngineOpenClawRole: '负责 IM 频道（钉钉/飞书/企微/微信等）和定时任务。需启动 Gateway 子进程。',
-    settingsSavedButOpenClawSyncFailed: '设置已保存，但应用到Agent 引擎运行环境失败。请重试保存，或重启Agent 引擎后再试。',
+    coworkEnginePiRole:
+      '负责 Cowork Work（Agent 模式）和 Chat（直连 LLM）。进程内运行，无需额外启动。',
+    coworkEngineOpenClawRole:
+      '负责 IM 频道（钉钉/飞书/企微/微信等）和定时任务。需启动 Gateway 子进程。',
+    settingsSavedButOpenClawSyncFailed:
+      '设置已保存，但应用到Agent 引擎运行环境失败。请重试保存，或重启Agent 引擎后再试。',
     openClawSessionKeepAlive: '会话保持时长',
-    openClawSessionKeepAliveHint: '决定一段对话在连续空闲多久后会被视为新的会话。只要间隔没有超过这个时间，就会继续沿用原来的上下文。设置得更长可以保留更多上下文，但也可能增加 token 消耗。',
+    openClawSessionKeepAliveHint:
+      '决定一段对话在连续空闲多久后会被视为新的会话。只要间隔没有超过这个时间，就会继续沿用原来的上下文。设置得更长可以保留更多上下文，但也可能增加 token 消耗。',
     openClawSessionKeepAliveOneDay: '24小时',
     openClawSessionKeepAliveSevenDays: '7天',
     openClawSessionKeepAliveThirtyDays: '30天（推荐）',
@@ -1025,7 +1104,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkMemoryEmbeddingProviderMistral: 'Mistral',
     coworkMemoryEmbeddingProviderOllama: 'Ollama',
     coworkMemoryEmbeddingRemoteBaseUrl: 'API Base URL',
-    coworkMemoryEmbeddingRemoteBaseUrlHint: '填写到域名/版本号即可，无需包含 /embeddings 路径。例如 https://api.openai.com/v1',
+    coworkMemoryEmbeddingRemoteBaseUrlHint:
+      '填写到域名/版本号即可，无需包含 /embeddings 路径。例如 https://api.openai.com/v1',
     coworkMemoryEmbeddingRemoteApiKey: 'API Key',
     coworkMemoryEmbeddingRemoteApiKeyHint: '用于远程 embedding 服务的 API 密钥',
     coworkConfigSaveFailed: '保存知远智能体 配置失败，请稍后重试。',
@@ -1125,7 +1205,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentNamePlaceholder: '项目名称',
     agentAvatarPickerTitle: '选择头像',
     agentAvatarPickerDone: '完成',
-    agentAvatarSvgLobster: '知远',
+    agentAvatarSvgZhiyuan: '知远',
     agentAvatarSvgCode: '代码',
     agentAvatarSvgRepair: '修理',
     agentAvatarSvgBriefcase: '公文包',
@@ -1200,15 +1280,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentDefaultModel: 'Agent 默认模型',
     agentUseDefaultModel: '默认模型',
     agentLlamaCppModelNotRunningHint: '该本地推理模型当前未运行，请先在本地推理页加载模型',
-    agentLlamaCppModelNotRunningBlocked: '该本地推理模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
-    agentLlamaCppContextInsufficientHint: '当前本地推理模型暂不可用于此任务，请先将上下文长度调到至少 32K（32768）后重新加载，或改用其他模型',
-    agentLlamaCppContextUnknownHint: '?? 本地推理 ??????????????????? Agent 引擎 ? 32K?32768?????????????????????????????',
+    agentLlamaCppModelNotRunningBlocked:
+      '该本地推理模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
+    agentLlamaCppContextInsufficientHint:
+      '当前本地推理模型暂不可用于此任务，请先将上下文长度调到至少 32K（32768）后重新加载，或改用其他模型',
+    agentLlamaCppContextUnknownHint:
+      '?? 本地推理 ??????????????????? Agent 引擎 ? 32K?32768?????????????????????????????',
     agentLlamaCppContextTooSmallHint: '?? 本地推理 ??????????????????????? 32K?32768??????????????',
     agentLlamaCppTrainedContextTooSmallHint: '?? 本地推理 ???????????? 32K?32768?????????????????',
     agentDefaultWorkingDirectory: 'Agent 默认工作目录',
     agentDefaultWorkingDirectoryHint: '新建会话默认在此目录执行',
     agentModelInvalidHint: '当前模型已不可用，请重新选择',
-    agentSystemPromptPlaceholder: '定义这个 Agent 的角色、工作方式和回答风格，例如：你是专业的办公文档助理，擅长起草报告、润色邮件、整理表格要点，并保持格式清晰。',
+    agentSystemPromptPlaceholder:
+      '定义这个 Agent 的角色、工作方式和回答风格，例如：你是专业的办公文档助理，擅长起草报告、润色邮件、整理表格要点，并保持格式清晰。',
     agentSkills: '技能',
     agentSkillsHint: '选择该 Agent 可使用的技能。不选则使用所有已启用技能。',
     agentSkillsSearch: '搜索技能...',
@@ -1229,11 +1313,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentTabIM: 'IM 渠道',
     agentTabTriage: '路由',
     agentTriageEnable: '启用自动模型路由',
-    agentTriageEnableHint: '根据消息复杂度自动选择轻量、标准或强推理模型。冷却轮次等全局参数在设置 → 模型路由中配置。',
+    agentTriageEnableHint:
+      '根据消息复杂度自动选择轻量、标准或强推理模型。冷却轮次等全局参数在设置 → 模型路由中配置。',
     agentTriageLightModel: '轻量模型',
     agentTriageLightModelHint: '用于问候语、简单问答、翻译等低复杂度消息',
     agentTriageHeavyModel: '强推理模型',
-    agentTriageHeavyModelHint: '用于代码编写、架构设计、调试等复杂任务（可选，不选则使用 Agent 默认模型）',
+    agentTriageHeavyModelHint:
+      '用于代码编写、架构设计、调试等复杂任务（可选，不选则使用 Agent 默认模型）',
     agentTriageStandardNote: '标准消息使用此 Agent 的默认模型，无需额外配置。',
     agentTriageCrossProvider: '允许跨服务商切换',
     agentTriageNoProviderModels: '需要先为此 Agent 选择模型并配置对应的服务商',
@@ -1380,7 +1466,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     remoteSkillImportDescription:
       '支持 owner/repo、仓库或压缩包链接、GitHub 子目录链接，以及 ModelScope 技能页面链接。若仓库内有多个技能，将自动全部导入。',
     remoteSkillImportUrlLabel: 'URL',
-    remoteSkillImportPlaceholder: '例如：owner/repo、zip 链接或 https://modelscope.cn/skills/<skill-id>',
+    remoteSkillImportPlaceholder:
+      '例如：owner/repo、zip 链接或 https://modelscope.cn/skills/<skill-id>',
     remoteSkillImportExamples:
       '示例：owner/repo；https://github.com/owner/repo/tree/main/SKILLs/my-skill；https://modelscope.cn/skills/<skill-id>',
     importSkill: '导入',
@@ -1393,7 +1480,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillMarketplace: '技能市场',
     skillMarketplaceEmpty: '暂无可用技能',
     skillMarketplaceFeaturedTitle: 'ModelScope 精选技能',
-    skillMarketplaceFeaturedDescription: '这里展示当前可安装的精选技能；如需浏览完整列表，请前往 ModelScope。',
+    skillMarketplaceFeaturedDescription:
+      '这里展示当前可安装的精选技能；如需浏览完整列表，请前往 ModelScope。',
     skillMarketplaceOpenExternal: '查看全部 ModelScope 技能',
     skillMarketplacePrevPage: '上一页',
     skillMarketplaceNextPage: '下一页',
@@ -1405,7 +1493,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillAlreadyInstalled: '已安装',
 
     // Security scan
-    lobsterGuardEnabled: '安全防护中',
+    zhiyuanGuardEnabled: '安全防护中',
     securityScanTitle: '技能安全扫描',
     securityRisk_safe: '风险评估',
     securityRisk_low: '风险评估',
@@ -1754,8 +1842,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     dingtalkBotCreateWizardScanBtn: '扫码配置机器人',
     dingtalkBotCreateWizardScanHint: '使用钉钉客户端扫描二维码，一键创建并配置机器人',
     dingtalkBotCreateWizardOrManual: '或 手动填写机器人凭证',
-    dingtalkBotCreateWizardQrcodeDesc:
-      '使用钉钉客户端扫描二维码，完成机器人创建与授权。',
+    dingtalkBotCreateWizardQrcodeDesc: '使用钉钉客户端扫描二维码，完成机器人创建与授权。',
     dingtalkBotCreateWizardQrcodeExpired: '二维码已过期，请点击重新扫码',
     dingtalkBotCreateWizardSuccessTitle: '机器人配置成功',
     dingtalkBotCreateWizardGenerating: '正在生成二维码…',
@@ -2214,21 +2301,29 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceHint: '{local} local models registered, {running} models loaded.',
     localInferenceServiceManagedByApp: 'Managed by this app',
     localInferenceServiceExternal: 'External process',
-    localInferenceExternalServiceHint: 'Llama.cpp is running outside this app. Stop it from the system service or your terminal.',
+    localInferenceExternalServiceHint:
+      'Llama.cpp is running outside this app. Stop it from the system service or your terminal.',
     localInferenceServiceConfigTitle: 'local inference Service Settings',
-    localInferenceServiceConfigDescription: 'Only common service behavior is shown here. Configure context, GPU offload, threads, batch size, and mmap when launching a model.',
-    localInferenceServiceConfigSaved: 'local inference service parameters saved. They will apply on next start.',
-    localInferenceServiceConfigSavedRestartRequired: 'local inference service parameters saved. Restart local inference to apply them.',
-    localInferenceServiceConfigSanitizedNotice: 'Some parameters were out of the safe range and were reset to defaults: {fields}',
+    localInferenceServiceConfigDescription:
+      'Only common service behavior is shown here. Configure context, GPU offload, threads, batch size, and mmap when launching a model.',
+    localInferenceServiceConfigSaved:
+      'local inference service parameters saved. They will apply on next start.',
+    localInferenceServiceConfigSavedRestartRequired:
+      'local inference service parameters saved. Restart local inference to apply them.',
+    localInferenceServiceConfigSanitizedNotice:
+      'Some parameters were out of the safe range and were reset to defaults: {fields}',
     localInferenceServiceConfigValidationFixErrors: 'Fix invalid service parameters before saving.',
-    localInferenceLoadModelLimitReached: 'The loaded model limit is {limit}. You cannot start model number {next}; unload an existing model first.',
+    localInferenceLoadModelLimitReached:
+      'The loaded model limit is {limit}. You cannot start model number {next}; unload an existing model first.',
     localInferenceLibrarySettings: 'Model Library Settings',
     localInferenceLibraryDirectory: 'Model Library Directory',
-    localInferenceLibraryDirectoryHint: 'Marketplace downloads and manual imports both use this directory.',
+    localInferenceLibraryDirectoryHint:
+      'Marketplace downloads and manual imports both use this directory.',
     localInferenceChangeDirectory: 'Change Directory',
     localInferenceOpenLibraryDirectory: 'Open Directory',
     localInferenceLibrarySaved: 'Model library directory saved',
-    localInferenceLibrarySavedRestarted: 'Model library directory saved. local inference restarted; load a model again.',
+    localInferenceLibrarySavedRestarted:
+      'Model library directory saved. local inference restarted; load a model again.',
     localInferenceConfigureContext: 'Configure Context',
     localInferenceContextSettingsHint: 'Leave empty to use the default value.',
     localInferenceContextClear: 'Use default',
@@ -2240,27 +2335,39 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceContextSavedReloadRequired: 'Model context saved. Reload the model to apply it.',
     localInferenceContextInvalid: 'Enter a valid context length',
     localInferenceDeleteConfirmMessage: 'Delete model "{name}"? This action cannot be undone.',
-    localInferenceDeleteRunningBlocked: 'This model is currently running. Unload it before deleting.',
-    localInferenceServiceConfigRestartAppRequired: 'The app main process has not loaded service parameter support yet. Restart the app before saving.',
-    localInferenceServiceConfigExternalWarning: 'local inference is currently started by an external process. Service startup parameters saved here will not affect that running service.',
-    localInferenceServiceConfigExternalHint: 'Stop the external local inference first, then start the service from this app for these parameters to apply.',
-    localInferenceServiceConfigExternalNotApplied: 'local inference is running as an external process, so service startup parameters cannot be applied. Stop the external local inference first, then start it from this app.',
+    localInferenceDeleteRunningBlocked:
+      'This model is currently running. Unload it before deleting.',
+    localInferenceServiceConfigRestartAppRequired:
+      'The app main process has not loaded service parameter support yet. Restart the app before saving.',
+    localInferenceServiceConfigExternalWarning:
+      'local inference is currently started by an external process. Service startup parameters saved here will not affect that running service.',
+    localInferenceServiceConfigExternalHint:
+      'Stop the external local inference first, then start the service from this app for these parameters to apply.',
+    localInferenceServiceConfigExternalNotApplied:
+      'local inference is running as an external process, so service startup parameters cannot be applied. Stop the external local inference first, then start it from this app.',
     localInferenceServiceConfigRestartRequired: 'Requires service restart',
     localInferenceServiceConfigGroupBasic: 'Basic',
     localInferenceServiceConfigGroupPerformance: 'Performance',
     localInferenceServiceConfigGroupCache: 'Cache',
     localInferenceServiceConfigGroupAdvanced: 'Advanced',
-    localInferenceServiceConfigAdvancedDescription: 'Expand only for troubleshooting, multi-GPU tuning, or template tuning. Keep defaults if unsure.',
+    localInferenceServiceConfigAdvancedDescription:
+      'Expand only for troubleshooting, multi-GPU tuning, or template tuning. Keep defaults if unsure.',
     localInferenceServiceConfigGroupService: 'Service control',
-    localInferenceServiceConfigGroupServiceDescription: 'Controls router loading behavior, request concurrency, HTTP threads, and timeout.',
-    localInferenceServiceConfigGroupCacheDescription: 'Tune prompt caching, cache reuse, and long-session throughput.',
+    localInferenceServiceConfigGroupServiceDescription:
+      'Controls router loading behavior, request concurrency, HTTP threads, and timeout.',
+    localInferenceServiceConfigGroupCacheDescription:
+      'Tune prompt caching, cache reuse, and long-session throughput.',
     localInferenceServiceConfigGroupGpu: 'GPU acceleration',
-    localInferenceServiceConfigGroupGpuDescription: 'Shown only when the current runtime reports usable GPU acceleration.',
+    localInferenceServiceConfigGroupGpuDescription:
+      'Shown only when the current runtime reports usable GPU acceleration.',
     localInferenceServiceConfigGroupCompat: 'Compatibility and memory',
-    localInferenceServiceConfigGroupCompatDescription: 'Template compatibility and common memory residency controls.',
+    localInferenceServiceConfigGroupCompatDescription:
+      'Template compatibility and common memory residency controls.',
     localInferenceServiceConfigGroupRequest: 'Concurrency and requests',
-    localInferenceServiceConfigGroupRequestDescription: 'Configure request slots and HTTP worker threads together.',
-    localInferenceServiceConfigGpuHiddenHint: 'The current runtime did not report usable GPU acceleration parameters, so GPU-specific settings are hidden.',
+    localInferenceServiceConfigGroupRequestDescription:
+      'Configure request slots and HTTP worker threads together.',
+    localInferenceServiceConfigGpuHiddenHint:
+      'The current runtime did not report usable GPU acceleration parameters, so GPU-specific settings are hidden.',
     localInferenceServiceConfigHostLabel: 'Listen address',
     localInferenceServiceConfigPortLabel: 'Listen port',
     localInferenceServiceConfigExecutablePathLabel: 'llama-server path',
@@ -2286,12 +2393,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigFlashAttnLabel: 'Flash Attention',
     localInferenceServiceConfigMmapLabel: 'mmap',
     localInferenceServiceConfigMlockLabel: 'mlock',
-    localInferenceServiceConfigHostHint: 'local inference listen address. Keep 127.0.0.1 for local desktop use.',
-    localInferenceServiceConfigPortHint: 'OpenAI-compatible API port. Clients will connect to this port after it changes.',
+    localInferenceServiceConfigHostHint:
+      'local inference listen address. Keep 127.0.0.1 for local desktop use.',
+    localInferenceServiceConfigPortHint:
+      'OpenAI-compatible API port. Clients will connect to this port after it changes.',
     localInferenceAccessSettings: 'Access Settings',
-    localInferenceAccessSettingsDescription: 'Configure the local inference service exposure scope. Multiple models still share one OpenAI-compatible endpoint and are distinguished by the model field.',
+    localInferenceAccessSettingsDescription:
+      'Configure the local inference service exposure scope. Multiple models still share one OpenAI-compatible endpoint and are distinguished by the model field.',
     localInferenceAccessAllowLan: 'Allow LAN access',
-    localInferenceAccessAllowLanEnabledHint: 'LAN devices can use this machine\'s IP.',
+    localInferenceAccessAllowLanEnabledHint: "LAN devices can use this machine's IP.",
     localInferenceAccessAllowLanDisabledHint: 'Only this machine can connect.',
     localInferenceAccessCurrentMode: 'Current access mode',
     localInferenceAccessListenAddress: 'Listen address: {host}',
@@ -2301,68 +2411,118 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceAccessRestartRequiredTitle: 'Restart required',
     localInferenceAccessRestartRequiredHint: 'Takes effect when the service next starts.',
     localInferenceAccessRequestExample: 'Request example',
-    localInferenceAccessRequestExampleHint: 'Use one shared service endpoint and distinguish models with the model field in the request body.',
+    localInferenceAccessRequestExampleHint:
+      'Use one shared service endpoint and distinguish models with the model field in the request body.',
     localInferenceAccessSettingsSaved: 'Access settings saved.',
-    localInferenceAccessSettingsSavedRestarted: 'Access settings saved. local inference was restarted and the change is now active.',
-    localInferenceAccessSettingsSavedRestartRequired: 'Access settings saved. Restart local inference for the change to take effect.',
-    localInferenceServiceConfigExecutablePathHint: 'Advanced option. Fill this only when explicitly using an existing llama-server. Leave empty to use the app-managed fixed runtime.',
+    localInferenceAccessSettingsSavedRestarted:
+      'Access settings saved. local inference was restarted and the change is now active.',
+    localInferenceAccessSettingsSavedRestartRequired:
+      'Access settings saved. Restart local inference for the change to take effect.',
+    localInferenceServiceConfigExecutablePathHint:
+      'Advanced option. Fill this only when explicitly using an existing llama-server. Leave empty to use the app-managed fixed runtime.',
     localInferenceServiceConfigExecutablePathPlaceholder: 'Example: /usr/local/bin/llama-server',
-    localInferenceServiceConfigDeviceHint: 'Limit visible local inference devices. Enter device indexes such as 0, 1, or 2. Separate multiple values with commas. The app maps them to real device IDs when saving. Leave empty to keep all devices visible.',
-    localInferenceServiceConfigNumGpuHint: 'Default GPU offload layers; -1 tries full GPU offload, 0 means CPU only.',
-    localInferenceServiceConfigModelsMaxHint: 'Number of models allowed to stay loaded in memory at once. Use 1 for a desktop single-model setup, 2 for switching between models, or leave empty for no limit.',
-    localInferenceServiceConfigModelsAutoloadHint: 'Whether the service loads preset models automatically when it starts.',
-    localInferenceServiceConfigParallelHint: 'Concurrent requests per model. Use 1 for desktop interaction, 2 for light concurrency. Higher values increase VRAM and memory pressure.',
-    localInferenceServiceConfigCtxSizeHint: 'Default context length. For Agent engine-style long prompts, start with 8192 or 16384.',
-    localInferenceServiceConfigGpuLayersHint: 'GPU offload layers. auto lets local inference decide; all tries full offload.',
-    localInferenceServiceConfigBatchSizeHint: 'Logical prompt processing batch size. Higher is faster but uses more VRAM and memory.',
-    localInferenceServiceConfigUbatchSizeHint: 'Physical micro-batch size. Lower it when VRAM is tight.',
-    localInferenceServiceConfigThreadsHint: 'CPU threads for generation. Leave empty for the local inference default.',
-    localInferenceServiceConfigThreadsBatchHint: 'CPU threads for prompt batch processing. Leave empty for the local inference default.',
-    localInferenceServiceConfigTimeoutHint: 'local inference connection and load timeout in seconds. Increase it for larger models or slower devices.',
-    localInferenceServiceConfigThreadsHttpHint: 'HTTP worker threads. Leave empty for automatic selection.',
-    localInferenceServiceConfigCachePromptHint: 'Enable prompt caching for long prompts and repeated conversations.',
-    localInferenceServiceConfigCacheReuseHint: 'Prompt/KV cache reuse threshold. Smaller values reuse more aggressively, larger values are more conservative. 256 is a common desktop value.',
-    localInferenceServiceConfigCacheRamHint: 'RAM limit for prompt/KV cache in MiB. -1 means unlimited, 0 disables it, and empty uses the default.',
-    localInferenceServiceConfigFlashAttnHint: 'Flash Attention mode. Supported backends can reduce VRAM usage.',
-    localInferenceServiceConfigJinjaHint: 'Enable Jinja chat templates. Tool calls and complex templates usually need it.',
-    localInferenceServiceConfigSplitModeHint: 'Multi-GPU split strategy. Leave empty for the default.',
-    localInferenceServiceConfigTensorSplitHint: 'Tensor split ratio across GPUs, for example 3,2. Usually used with tensor split mode.',
-    localInferenceServiceConfigMainGpuHint: 'Main GPU index for multi-GPU or memory-placement tuning.',
-    localInferenceServiceConfigGpuUnavailableHint: 'The current local inference runtime did not report any configurable GPU. Only CPU or no accelerator devices were detected.',
-    localInferenceServiceConfigGpuDetectionFailedHint: 'The current local inference runtime did not provide usable GPU enumeration results, so GPU parameters cannot be configured.',
+    localInferenceServiceConfigDeviceHint:
+      'Limit visible local inference devices. Enter device indexes such as 0, 1, or 2. Separate multiple values with commas. The app maps them to real device IDs when saving. Leave empty to keep all devices visible.',
+    localInferenceServiceConfigNumGpuHint:
+      'Default GPU offload layers; -1 tries full GPU offload, 0 means CPU only.',
+    localInferenceServiceConfigModelsMaxHint:
+      'Number of models allowed to stay loaded in memory at once. Use 1 for a desktop single-model setup, 2 for switching between models, or leave empty for no limit.',
+    localInferenceServiceConfigModelsAutoloadHint:
+      'Whether the service loads preset models automatically when it starts.',
+    localInferenceServiceConfigParallelHint:
+      'Concurrent requests per model. Use 1 for desktop interaction, 2 for light concurrency. Higher values increase VRAM and memory pressure.',
+    localInferenceServiceConfigCtxSizeHint:
+      'Default context length. For Agent engine-style long prompts, start with 8192 or 16384.',
+    localInferenceServiceConfigGpuLayersHint:
+      'GPU offload layers. auto lets local inference decide; all tries full offload.',
+    localInferenceServiceConfigBatchSizeHint:
+      'Logical prompt processing batch size. Higher is faster but uses more VRAM and memory.',
+    localInferenceServiceConfigUbatchSizeHint:
+      'Physical micro-batch size. Lower it when VRAM is tight.',
+    localInferenceServiceConfigThreadsHint:
+      'CPU threads for generation. Leave empty for the local inference default.',
+    localInferenceServiceConfigThreadsBatchHint:
+      'CPU threads for prompt batch processing. Leave empty for the local inference default.',
+    localInferenceServiceConfigTimeoutHint:
+      'local inference connection and load timeout in seconds. Increase it for larger models or slower devices.',
+    localInferenceServiceConfigThreadsHttpHint:
+      'HTTP worker threads. Leave empty for automatic selection.',
+    localInferenceServiceConfigCachePromptHint:
+      'Enable prompt caching for long prompts and repeated conversations.',
+    localInferenceServiceConfigCacheReuseHint:
+      'Prompt/KV cache reuse threshold. Smaller values reuse more aggressively, larger values are more conservative. 256 is a common desktop value.',
+    localInferenceServiceConfigCacheRamHint:
+      'RAM limit for prompt/KV cache in MiB. -1 means unlimited, 0 disables it, and empty uses the default.',
+    localInferenceServiceConfigFlashAttnHint:
+      'Flash Attention mode. Supported backends can reduce VRAM usage.',
+    localInferenceServiceConfigJinjaHint:
+      'Enable Jinja chat templates. Tool calls and complex templates usually need it.',
+    localInferenceServiceConfigSplitModeHint:
+      'Multi-GPU split strategy. Leave empty for the default.',
+    localInferenceServiceConfigTensorSplitHint:
+      'Tensor split ratio across GPUs, for example 3,2. Usually used with tensor split mode.',
+    localInferenceServiceConfigMainGpuHint:
+      'Main GPU index for multi-GPU or memory-placement tuning.',
+    localInferenceServiceConfigGpuUnavailableHint:
+      'The current local inference runtime did not report any configurable GPU. Only CPU or no accelerator devices were detected.',
+    localInferenceServiceConfigGpuDetectionFailedHint:
+      'The current local inference runtime did not provide usable GPU enumeration results, so GPU parameters cannot be configured.',
     localInferenceServiceConfigFieldErrorIntegerRange: 'Enter an integer between {min} and {max}.',
-    localInferenceServiceConfigFieldErrorDeviceFormat: 'Enter device indexes separated by commas, for example 0,1.',
-    localInferenceServiceConfigFieldErrorDeviceUnavailable: 'No configurable GPU is available in the current runtime, so visible devices cannot be set.',
-    localInferenceServiceConfigFieldErrorDeviceDetectionFailed: 'The current runtime did not provide usable GPU enumeration results, so visible devices cannot be set.',
-    localInferenceServiceConfigFieldErrorDeviceOutOfRange: 'Device indexes are outside the available GPU range. Enter a value between {min} and {max}.',
-    localInferenceServiceConfigFieldErrorDeviceIndexRange: 'Device index is out of range. The maximum available index is {max}.',
-    localInferenceServiceConfigFieldErrorGpuLayersFormat: 'Enter an integer between 0 and 4096, or use auto / all.',
-    localInferenceServiceConfigFieldErrorMainGpuUnavailable: 'No configurable GPU is available in the current runtime, so Main GPU cannot be set.',
-    localInferenceServiceConfigFieldErrorMainGpuDetectionFailed: 'The current runtime did not provide usable GPU enumeration results, so Main GPU cannot be set.',
-    localInferenceServiceConfigFieldErrorMainGpuOutOfRange: 'Main GPU is outside the available GPU range. Enter a value between {min} and {max}.',
-    localInferenceServiceConfigFieldErrorTensorSplitFormat: 'Enter comma-separated positive numbers such as 3,2 or 1,1,0.5.',
-    localInferenceServiceConfigFieldErrorTensorSplitRequiresMode: 'Tensor split is available only when split mode is tensor.',
-    localInferenceServiceConfigTensorSplitDisabledHint: 'Available only when split mode is set to tensor.',
-    localInferenceServiceConfigMainGpuDisabledHint: 'The current split mode does not use a main GPU setting.',
-    localInferenceServiceConfigPromptCacheDependentHint: 'Takes effect only when prompt cache is enabled or left at the default setting.',
-    localInferenceServiceConfigMmapHint: 'Whether to load models with memory mapping. Disabled maps to local inference no-mmap.',
-    localInferenceServiceConfigMlockHint: 'Lock model memory to avoid swapping. This can require more available RAM.',
+    localInferenceServiceConfigFieldErrorDeviceFormat:
+      'Enter device indexes separated by commas, for example 0,1.',
+    localInferenceServiceConfigFieldErrorDeviceUnavailable:
+      'No configurable GPU is available in the current runtime, so visible devices cannot be set.',
+    localInferenceServiceConfigFieldErrorDeviceDetectionFailed:
+      'The current runtime did not provide usable GPU enumeration results, so visible devices cannot be set.',
+    localInferenceServiceConfigFieldErrorDeviceOutOfRange:
+      'Device indexes are outside the available GPU range. Enter a value between {min} and {max}.',
+    localInferenceServiceConfigFieldErrorDeviceIndexRange:
+      'Device index is out of range. The maximum available index is {max}.',
+    localInferenceServiceConfigFieldErrorGpuLayersFormat:
+      'Enter an integer between 0 and 4096, or use auto / all.',
+    localInferenceServiceConfigFieldErrorMainGpuUnavailable:
+      'No configurable GPU is available in the current runtime, so Main GPU cannot be set.',
+    localInferenceServiceConfigFieldErrorMainGpuDetectionFailed:
+      'The current runtime did not provide usable GPU enumeration results, so Main GPU cannot be set.',
+    localInferenceServiceConfigFieldErrorMainGpuOutOfRange:
+      'Main GPU is outside the available GPU range. Enter a value between {min} and {max}.',
+    localInferenceServiceConfigFieldErrorTensorSplitFormat:
+      'Enter comma-separated positive numbers such as 3,2 or 1,1,0.5.',
+    localInferenceServiceConfigFieldErrorTensorSplitRequiresMode:
+      'Tensor split is available only when split mode is tensor.',
+    localInferenceServiceConfigTensorSplitDisabledHint:
+      'Available only when split mode is set to tensor.',
+    localInferenceServiceConfigMainGpuDisabledHint:
+      'The current split mode does not use a main GPU setting.',
+    localInferenceServiceConfigPromptCacheDependentHint:
+      'Takes effect only when prompt cache is enabled or left at the default setting.',
+    localInferenceServiceConfigMmapHint:
+      'Whether to load models with memory mapping. Disabled maps to local inference no-mmap.',
+    localInferenceServiceConfigMlockHint:
+      'Lock model memory to avoid swapping. This can require more available RAM.',
     localInferenceServiceConfigSplitNone: 'No split',
     localInferenceServiceConfigSplitLayer: 'Layer split',
     localInferenceServiceConfigSplitRow: 'Row split',
     localInferenceServiceConfigSplitTensor: 'Tensor split',
-    localInferenceServiceConfigRestartHint: 'local inference is running. Restart the service to apply saved values.',
-    localInferenceServiceConfigStartHint: 'Saved values apply the next time local inference starts.',
+    localInferenceServiceConfigRestartHint:
+      'local inference is running. Restart the service to apply saved values.',
+    localInferenceServiceConfigStartHint:
+      'Saved values apply the next time local inference starts.',
     localInferenceInstall: 'Install local inference',
     localInferenceImportRuntime: 'Import from local...',
-    localInferenceImportRuntimeTooltip: 'Select a local inference backend archive (zip or tar.gz), or a fully extracted backend directory, to import into the backend directory managed by ZhiYuan Agent.',
+    localInferenceImportRuntimeTooltip:
+      'Select a local inference backend archive (zip or tar.gz), or a fully extracted backend directory, to import into the backend directory managed by ZhiYuan Agent.',
     localInferenceImportRuntimeSuccess: 'local inference runtime imported successfully.',
     localInferenceBackendManager: 'local inference Backend',
     localInferenceBackendConfigTitle: 'local inference Config',
-    localInferenceBackendConfigDescription: 'Manage local inference version and backend. Service parameters remain in local inference service settings.',
-    localInferenceBackendListFailed: 'Could not read the local inference backend list. Refresh, or restart the app to load the latest main/preload code.',
-    localInferenceBackendListEmpty: 'No backend is available. Ensure the Gitee release has manifest.json, or restart the app to use the built-in fallback.',
-    localInferenceBackendHandlerMissing: 'The running app has not loaded the new local inference backend IPC yet. Fully quit and restart the app.',
+    localInferenceBackendConfigDescription:
+      'Manage local inference version and backend. Service parameters remain in local inference service settings.',
+    localInferenceBackendListFailed:
+      'Could not read the local inference backend list. Refresh, or restart the app to load the latest main/preload code.',
+    localInferenceBackendListEmpty:
+      'No backend is available. Ensure the Gitee release has manifest.json, or restart the app to use the built-in fallback.',
+    localInferenceBackendHandlerMissing:
+      'The running app has not loaded the new local inference backend IPC yet. Fully quit and restart the app.',
     localInferenceBackendSourceLocal: 'Source: local import',
     localInferenceBackendSourceRemote: 'Source: remote manifest',
     localInferenceBackendVersion: 'Version',
@@ -2371,38 +2531,52 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceBackendRecommendedLabel: 'Recommended',
     localInferenceBackendNone: 'None',
     localInferenceBackendRecommended: 'Recommended: {backend}',
-    localInferenceBackendRecommendedReason: 'Recommended {backend} based on current machine capabilities.',
-    localInferenceBackendRecommendedUnavailable: 'No compatible backend is available for the current platform {platform}.',
+    localInferenceBackendRecommendedReason:
+      'Recommended {backend} based on current machine capabilities.',
+    localInferenceBackendRecommendedUnavailable:
+      'No compatible backend is available for the current platform {platform}.',
     localInferenceBackendInstalled: 'The selected backend is installed',
     localInferenceBackendNotInstalled: 'The selected backend is not installed',
-    localInferenceBackendRunningHint: 'Switching backend while the service is running does not affect the current process. Stop and restart the service to apply it.',
+    localInferenceBackendRunningHint:
+      'Switching backend while the service is running does not affect the current process. Stop and restart the service to apply it.',
     localInferenceBackendSwitch: 'Switch',
     localInferenceBackendUpdate: 'Install / Update',
     localInferenceBackendUpdated: 'local inference backend updated.',
     localInferenceBackendUpdateFailed: 'Failed to update local inference backend.',
-    localInferenceBackendUpdateUnavailableLocal: 'A locally imported backend cannot be updated from the remote source directly. Re-import a newer version or configure a manifest/OSS source first.',
+    localInferenceBackendUpdateUnavailableLocal:
+      'A locally imported backend cannot be updated from the remote source directly. Re-import a newer version or configure a manifest/OSS source first.',
     localInferenceBackendCheckDevices: 'Check devices',
     localInferenceBackendDeviceCheckDone: 'Device check completed.',
     localInferenceBackendDeviceCheckFailed: 'Device check failed.',
     localInferenceBackendNoDevices: 'No device output was reported.',
     localInferenceImportRuntimeFailed: 'Import failed',
     localInferenceImportGuideTitle: 'Import local inference Runtime',
-    localInferenceImportGuideDescription: 'The selected directory must contain a complete local inference runtime environment. Here are the required files and recommended sources for each operating system:',
-    localInferenceImportGuideFilesWin: 'Required: llama-server.exe, ggml.dll, llama.dll, ggml-cpu-*.dll, libomp*.dll, etc.',
-    localInferenceImportGuideFilesMac: 'Required: llama-server, libggml.dylib, libllama.dylib, libggml-metal.dylib, libmtmd.dylib, etc.',
-    localInferenceImportGuideFilesLinux: 'Required: llama-server, libggml.so, libllama.so, libggml-cpu.so, etc.',
+    localInferenceImportGuideDescription:
+      'The selected directory must contain a complete local inference runtime environment. Here are the required files and recommended sources for each operating system:',
+    localInferenceImportGuideFilesWin:
+      'Required: llama-server.exe, ggml.dll, llama.dll, ggml-cpu-*.dll, libomp*.dll, etc.',
+    localInferenceImportGuideFilesMac:
+      'Required: llama-server, libggml.dylib, libllama.dylib, libggml-metal.dylib, libmtmd.dylib, etc.',
+    localInferenceImportGuideFilesLinux:
+      'Required: llama-server, libggml.so, libllama.so, libggml-cpu.so, etc.',
     localInferenceImportGuideStep1: 'Download the prebuilt package from GitHub Releases:',
     localInferenceImportGuideStep1LinkLabel: 'ggml-org/local inference Releases',
     localInferenceImportGuideStep1Url: 'https://github.com/ggml-org/local inference/releases',
-    localInferenceImportGuideStep1WinNote: 'Windows users: choose a zip containing "win-cpu-x64" or "win-cpu-arm64"',
-    localInferenceImportGuideStep1MacNote: 'macOS users: choose a tar.gz containing "macos-arm64" or "macos-x64"',
-    localInferenceImportGuideStep1LinuxNote: 'Linux users: choose a tar.gz containing "ubuntu-x64" or "ubuntu-arm64"',
+    localInferenceImportGuideStep1WinNote:
+      'Windows users: choose a zip containing "win-cpu-x64" or "win-cpu-arm64"',
+    localInferenceImportGuideStep1MacNote:
+      'macOS users: choose a tar.gz containing "macos-arm64" or "macos-x64"',
+    localInferenceImportGuideStep1LinuxNote:
+      'Linux users: choose a tar.gz containing "ubuntu-x64" or "ubuntu-arm64"',
     localInferenceImportGuideStep2: 'Extract the downloaded archive',
-    localInferenceImportGuideStep3: 'Click "Import from local..." and select a local inference backend archive (zip or tar.gz), or a fully extracted backend directory',
+    localInferenceImportGuideStep3:
+      'Click "Import from local..." and select a local inference backend archive (zip or tar.gz), or a fully extracted backend directory',
     localInferenceImportGuideClose: 'Close',
-    localInferenceImportGuideInlineDescription: 'First download the backend main archive that matches your current machine from the official local inference releases page, then import that archive directly here.',
+    localInferenceImportGuideInlineDescription:
+      'First download the backend main archive that matches your current machine from the official local inference releases page, then import that archive directly here.',
     localInferenceImportGuideInlineStepArchive: '1. Open the official releases page',
-    localInferenceImportGuideInlineReleaseUrl: 'https://github.com/ggml-org/local inference/releases',
+    localInferenceImportGuideInlineReleaseUrl:
+      'https://github.com/ggml-org/local inference/releases',
     localInferenceImportGuideInlineStepExtracted: '2. Choose the archive that matches your machine',
     localInferenceImportGuideInlinePlatformWinX64Cpu: 'Windows x64 CPU: use win-cpu-x64',
     localInferenceImportGuideInlinePlatformWinArm64Cpu: 'Windows ARM64 CPU: use win-cpu-arm64',
@@ -2410,12 +2584,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceImportGuideInlinePlatformWinX64Vulkan: 'Windows x64 Vulkan: use win-vulkan-x64',
     localInferenceImportGuideInlinePlatformMacArm64: 'macOS Apple Silicon: use macos-arm64',
     localInferenceImportGuideInlinePlatformMacX64: 'macOS Intel: use macos-x64',
-    localInferenceImportGuideInlineStepReject: '3. Download the archive locally, click "Import from local...", and select that main archive directly. Do not choose a CUDA dependency companion archive by itself, or the import will fail.',
-    localInferenceImportGuideInlineStepResult: '4. After a successful import, the backend appears in the current config list and can be switched to or installed. Installation or switching will fail if the archive does not match the current machine OS, architecture, or GPU capability.',
+    localInferenceImportGuideInlineStepReject:
+      '3. Download the archive locally, click "Import from local...", and select that main archive directly. Do not choose a CUDA dependency companion archive by itself, or the import will fail.',
+    localInferenceImportGuideInlineStepResult:
+      '4. After a successful import, the backend appears in the current config list and can be switched to or installed. Installation or switching will fail if the archive does not match the current machine OS, architecture, or GPU capability.',
     localInferenceRuntimeReady: 'local inference is installed and ready.',
-    localInferenceRuntimeMissing: 'Failed to install local inference. Check the network and try again.',
-    localInferenceServiceNeedsBackendInstall: 'Install a backend in local inference Config before starting the service.',
-    localInferenceServiceNeedsBackendSwitch: 'Switch to an installed backend in local inference Config before starting the service.',
+    localInferenceRuntimeMissing:
+      'Failed to install local inference. Check the network and try again.',
+    localInferenceServiceNeedsBackendInstall:
+      'Install a backend in local inference Config before starting the service.',
+    localInferenceServiceNeedsBackendSwitch:
+      'Switch to an installed backend in local inference Config before starting the service.',
     localInferenceRuntimeUninstall: 'Uninstall local inference',
     localInferenceRuntimeUninstalled: 'The app-managed local inference has been uninstalled.',
     localInferenceRuntimeNotInstalled: 'No app-managed local inference was found.',
@@ -2429,7 +2608,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceDescription: 'Search and install GGUF models by keyword',
     marketplaceSearch: 'Search',
     marketplaceSearchPlaceholder: 'Search models, e.g. qwen3, deepseek-r1...',
-    marketplaceSearchHint: 'Search calls ModelScope OpenAPI directly with a fixed GGUF library filter.',
+    marketplaceSearchHint:
+      'Search calls ModelScope OpenAPI directly with a fixed GGUF library filter.',
     marketplaceInstall: 'Install',
     marketplaceInstalled: 'Installed',
     marketplaceInfer: 'Infer',
@@ -2442,11 +2622,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceError: 'Search failed',
     marketplacePullStarted: 'Started pulling model {name}',
     marketplacePullDone: 'Model {name} has been pulled',
-    marketplaceInstallAlreadyInProgress: 'A model download is already in progress. Please wait for it to complete.',
+    marketplaceInstallAlreadyInProgress:
+      'A model download is already in progress. Please wait for it to complete.',
     marketplacePullCancelled: 'Pull cancelled',
     marketplaceTokenSettings: 'ModelScope API Token',
     marketplaceTokenSettingsTitle: 'Configure ModelScope API Token',
-    marketplaceTokenSettingsDesc: 'Enter a token to enable ModelScope OpenAPI search for faster, more accurate model results. Register at modelscope.cn, then go to Settings → Access Tokens.',
+    marketplaceTokenSettingsDesc:
+      'Enter a token to enable ModelScope OpenAPI search for faster, more accurate model results. Register at modelscope.cn, then go to Settings → Access Tokens.',
     marketplaceTokenPlaceholder: 'Enter ModelScope API token',
     marketplaceTokenSave: 'Save',
     marketplaceTokenClear: 'Clear',
@@ -2466,7 +2648,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceResultSummary: 'Showing {shown} / {total} models',
     marketplacePageSummary: 'Page {page} / {total}',
     marketplacePageUnit: 'pages',
-    marketplaceDataSourceHint: 'Source: ModelScope OpenAPI, with legacy API and local curated fallback on failure',
+    marketplaceDataSourceHint:
+      'Source: ModelScope OpenAPI, with legacy API and local curated fallback on failure',
     marketplaceRepoLabel: 'Repository',
     marketplaceRecommendedFileLabel: 'Recommended GGUF',
     marketplaceInstalledPathLabel: 'Installed Path',
@@ -2479,7 +2662,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceInstallFailed: 'Installation failed',
     marketplaceCancelInstall: 'Cancel Installation',
     localInferencePullTitle: 'Install GGUF Repo From ModelScope',
-    localInferencePullHint: 'Enter an owner/repo repository. If no file is specified, the backend chooses a recommended GGUF quantization.',
+    localInferencePullHint:
+      'Enter an owner/repo repository. If no file is specified, the backend chooses a recommended GGUF quantization.',
     localInferencePullPlaceholder: 'unsloth/Qwen3.5-0.8B-GGUF',
     localInferencePull: 'Install',
     localInferenceCancelPull: 'Cancel Installation',
@@ -2504,11 +2688,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceModelLaunchLogWindowEmpty: 'No startup logs yet.',
     localInferenceModelLaunchLogWindowReadFailed: 'Failed to read startup logs',
     localInferenceModelLaunchLogWindowSessionNotFound: 'Startup log session was not found',
-    localInferenceModelLaunchLogWindowDescription: 'Shows local inference model startup logs so you can track progress and troubleshoot startup issues.',
+    localInferenceModelLaunchLogWindowDescription:
+      'Shows local inference model startup logs so you can track progress and troubleshoot startup issues.',
     localInferenceModelLaunchLogWindowModelLabel: 'Model',
     localInferenceModelLaunchLogWindowWaitingModel: 'Waiting for model',
     localInferenceModelLaunchLogWindowFileLabel: 'File',
-    localInferenceModelLaunchLogWindowTroubleshootingHint: 'Logs keep the original text format for copying, searching, and diagnosing startup issues.',
+    localInferenceModelLaunchLogWindowTroubleshootingHint:
+      'Logs keep the original text format for copying, searching, and diagnosing startup issues.',
     localInferenceModelLaunchLogWindowLive: 'Live',
     localInferenceModelLaunchLogsForModel: 'Starting: {name}',
     localInferenceModelLaunchLogsWaiting: 'Waiting for startup logs...',
@@ -2534,15 +2720,18 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceModelLaunchPhaseFailed: 'Model startup failed',
     chatThinkingToggle: 'Thinking',
     chatThinkingToggleHint: 'Choose whether the model produces reasoning before replying',
-    localInferenceLoadingHint: 'This model is loading and other model load actions are temporarily locked.',
+    localInferenceLoadingHint:
+      'This model is loading and other model load actions are temporarily locked.',
     localInferenceUnloading: 'Unloading...',
     localInferenceUnloadingHint: 'This model is unloading and its actions are temporarily locked.',
     localInferenceInfer: 'Infer',
     localInferenceUseOpenClaw: 'Use for Agent engine',
-    localInferenceUseOpenClawDisabledHint: 'Configure and load the model before using it for Agent engine.',
+    localInferenceUseOpenClawDisabledHint:
+      'Configure and load the model before using it for Agent engine.',
     localInferenceSetOpenClawDone: 'Running model {name} is now visible to Agent engine',
     localInferenceSetOpenClawFailed: 'Failed to refresh Agent engine-visible local models',
-    localInferenceSetOpenClawCtxTooSmall: 'Current context length {ctx} is below the minimum required for Agent engine ({min}). Please increase the context length first.',
+    localInferenceSetOpenClawCtxTooSmall:
+      'Current context length {ctx} is below the minimum required for Agent engine ({min}). Please increase the context length first.',
     localInferencePresetSaved: 'Inference parameters saved',
     localInferenceGenerationCancelled: 'Generation cancelled',
     localInferenceModel: 'Model',
@@ -2565,27 +2754,33 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceOptionRequestParamsTitle: 'Request generation parameters',
     localInferenceOptionAuto: 'Auto',
     localInferenceOptionTemperatureLabel: 'Randomness',
-    localInferenceOptionTemperatureHint: 'Sampling temperature. Higher values produce more varied output.',
+    localInferenceOptionTemperatureHint:
+      'Sampling temperature. Higher values produce more varied output.',
     localInferenceOptionTopPLabel: 'Nucleus sampling',
-    localInferenceOptionTopPHint: 'Only sample candidates whose cumulative probability reaches this value.',
+    localInferenceOptionTopPHint:
+      'Only sample candidates whose cumulative probability reaches this value.',
     localInferenceOptionTopKLabel: 'Top K',
     localInferenceOptionTopKHint: 'Sample from the K most likely tokens only. 0 disables it.',
     localInferenceOptionMinPLabel: 'Min P',
-    localInferenceOptionMinPHint: 'Filters tokens by probability relative to the most likely token.',
+    localInferenceOptionMinPHint:
+      'Filters tokens by probability relative to the most likely token.',
     localInferenceOptionMaxTokensLabel: 'Max generated tokens',
     localInferenceOptionMaxTokensHint: 'Sent as max_tokens. -1 means unlimited.',
     localInferenceOptionRepeatPenaltyLabel: 'Repeat penalty',
     localInferenceOptionRepeatPenaltyHint: 'Reduces the chance of repeated token sequences.',
     localInferenceOptionPresencePenaltyLabel: 'Presence penalty',
-    localInferenceOptionPresencePenaltyHint: 'Penalizes tokens that already appeared. Range: -2 to 2.',
+    localInferenceOptionPresencePenaltyHint:
+      'Penalizes tokens that already appeared. Range: -2 to 2.',
     localInferenceReasoningPreferenceLabel: 'Reasoning',
-    localInferenceReasoningPreferenceHint: 'Controls whether the model uses extended thinking before responding.',
+    localInferenceReasoningPreferenceHint:
+      'Controls whether the model uses extended thinking before responding.',
     localInferenceReasoningPreferenceLow: 'Disabled',
     localInferenceReasoningPreferenceAuto: 'Auto',
     localInferenceReasoningPreferenceHigh: 'Enabled',
     localInferenceSystemPromptHint: 'Use this only when you need a fixed role or response style.',
     localInferenceOptionCachePromptLabel: 'Prompt cache',
-    localInferenceOptionCachePromptHint: 'Whether this request reuses the KV prompt cache. Auto uses the server default.',
+    localInferenceOptionCachePromptHint:
+      'Whether this request reuses the KV prompt cache. Auto uses the server default.',
     localInferenceOptionSeedLabel: 'Seed',
     localInferenceOptionSeedHint: '-1 is random. Use a non-negative seed for reproducible tests.',
     localInferenceOptionStopLabel: 'Stop sequences',
@@ -2604,10 +2799,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceTokenRemaining: 'Remaining',
     localInferenceContextOverflowTitle: 'Model ran out of context size',
     localInferenceContextOverflowDescription: 'The request exceeds the available context size.',
-    localInferenceContextOverflowDetails: 'This request is about {requested} tokens, while the available context is about {available} tokens.',
+    localInferenceContextOverflowDetails:
+      'This request is about {requested} tokens, while the available context is about {available} tokens.',
     localInferenceContextOverflowAction: 'Increase Context Size',
-    localInferenceHiddenThinkingOnly: 'This model template forces thinking output. Thinking is hidden because Thinking mode is disabled, but no visible reply was generated. Enable Thinking or raise max generated tokens and try again.',
-    localInferenceNoVisibleReply: 'The model did not return a visible answer. Try again or raise the max generated tokens.',
+    localInferenceHiddenThinkingOnly:
+      'This model template forces thinking output. Thinking is hidden because Thinking mode is disabled, but no visible reply was generated. Enable Thinking or raise max generated tokens and try again.',
+    localInferenceNoVisibleReply:
+      'The model did not return a visible answer. Try again or raise the max generated tokens.',
     localInferenceMetricsSpeed: '{speed} tokens/s',
     localInferenceDetails: 'Details',
     localInferenceSize: 'Size',
@@ -2616,41 +2814,54 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceVram: 'VRAM',
     localInferenceLaunchTitle: 'Launch Model',
     localInferenceLaunchLifecycleTitle: 'Launch a desktop model instance',
-    localInferenceLaunchLifecycleDescription: 'Configure how this model is loaded. Changing the GPU preset restarts local inference and then reloads the model.',
+    localInferenceLaunchLifecycleDescription:
+      'Configure how this model is loaded. Changing the GPU preset restarts local inference and then reloads the model.',
     localInferenceLaunchAutoTitle: 'Auto Optimize',
-    localInferenceLaunchAutoDescription: 'Fill conservative values from model size, available VRAM, and CPU threads.',
-    localInferenceLaunchAutoFormula: 'Formula: context is estimated from model size; threads=min(logical threads-2, 16).',
+    localInferenceLaunchAutoDescription:
+      'Fill conservative values from model size, available VRAM, and CPU threads.',
+    localInferenceLaunchAutoFormula:
+      'Formula: context is estimated from model size; threads=min(logical threads-2, 16).',
     localInferenceLaunchAutoOptimize: 'Auto Optimize',
-    localInferenceLaunchAutoAppliedFallback: 'Applied conservative parameters: context {context}, GPU acceleration {gpuLayers}, threads {threads}, batch {batch}.',
-    localInferenceLaunchAutoAppliedWithGpu: 'Detected {memory} available GPU memory: context {context}, GPU acceleration {gpuLayers}, threads {threads}, batch {batch}.',
+    localInferenceLaunchAutoAppliedFallback:
+      'Applied conservative parameters: context {context}, GPU acceleration {gpuLayers}, threads {threads}, batch {batch}.',
+    localInferenceLaunchAutoAppliedWithGpu:
+      'Detected {memory} available GPU memory: context {context}, GPU acceleration {gpuLayers}, threads {threads}, batch {batch}.',
     localInferenceLaunchKeepAlive: 'Residency',
     localInferenceLaunchKeepAliveForever: 'Resident until manually unloaded',
     localInferenceLaunchGpuPresetTitle: 'Workstation GPU Preset',
-    localInferenceLaunchGpuPresetDescription: 'Choose which GPUs local inference can use and how multi-GPU splitting works.',
+    localInferenceLaunchGpuPresetDescription:
+      'Choose which GPUs local inference can use and how multi-GPU splitting works.',
     localInferenceLaunchGpuServiceDefault: 'Follow service settings',
-    localInferenceLaunchGpuServiceDefaultHint: 'Do not change the current local inference service parameters.',
+    localInferenceLaunchGpuServiceDefaultHint:
+      'Do not change the current local inference service parameters.',
     localInferenceLaunchGpuSingleAuto: 'GPU 0 only',
-    localInferenceLaunchGpuSingleAutoHint: 'Pin local inference to CUDA0 and disable multi-GPU splitting.',
+    localInferenceLaunchGpuSingleAutoHint:
+      'Pin local inference to CUDA0 and disable multi-GPU splitting.',
     localInferenceLaunchGpu0: 'GPU 0 only',
     localInferenceLaunchGpu0Hint: 'Allow local inference to use only the first GPU.',
     localInferenceLaunchGpu1: 'GPU 1 only',
     localInferenceLaunchGpu1Hint: 'Allow local inference to use only the second GPU.',
     localInferenceLaunchGpuDual: 'Use both GPUs',
-    localInferenceLaunchGpuDualHint: 'Pin local inference to CUDA0 and CUDA1, then split layers across both GPUs.',
+    localInferenceLaunchGpuDualHint:
+      'Pin local inference to CUDA0 and CUDA1, then split layers across both GPUs.',
     localInferenceLaunchGpuCustom: 'Custom',
     localInferenceLaunchGpuCustomHint: 'Manually choose which devices local inference can use.',
     localInferenceLaunchGpuCustomValue: 'GPU devices',
-    localInferenceLaunchGpuCustomValueHint: 'Use indexes like 0,1 or exact device names, comma-separated. Leave empty to keep the current service setting.',
+    localInferenceLaunchGpuCustomValueHint:
+      'Use indexes like 0,1 or exact device names, comma-separated. Leave empty to keep the current service setting.',
     localInferenceLaunchGpuCurrent: 'Current service',
     localInferenceLaunchGpuWillUse: 'This launch',
     localInferenceLaunchGpuAutoVisible: 'Auto-select',
     localInferenceLaunchGpuKeepService: 'Keep current service settings',
     localInferenceLaunchGpuSpreadOn: 'cross-GPU scheduling on',
     localInferenceLaunchGpuSpreadOff: 'cross-GPU scheduling off',
-    localInferenceLaunchGpuRestartNotice: 'This preset restarts local inference and unloads currently loaded models.',
-    localInferenceLaunchRestartFailed: 'local inference did not enter the running state after restart',
+    localInferenceLaunchGpuRestartNotice:
+      'This preset restarts local inference and unloads currently loaded models.',
+    localInferenceLaunchRestartFailed:
+      'local inference did not enter the running state after restart',
     localInferenceLaunchBasicTitle: 'Basic Parameters',
-    localInferenceLaunchBasicDescription: 'Only the common model startup parameters are shown here. Keep defaults if unsure.',
+    localInferenceLaunchBasicDescription:
+      'Only the common model startup parameters are shown here. Keep defaults if unsure.',
     localInferenceLaunchNumCtx: 'Context Length',
     localInferenceLaunchNumCtxHint: 'Longer context uses more VRAM and memory.',
     localInferenceLaunchContextExceedsTrainingLimit:
@@ -2659,32 +2870,37 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceLaunchAccelerationAuto: 'Auto',
     localInferenceLaunchAccelerationCpu: 'CPU only',
     localInferenceLaunchAccelerationCustom: 'Custom layers',
-    localInferenceLaunchAccelerationHint: 'Auto leaves this to local inference. CPU only writes n-gpu-layers=0.',
+    localInferenceLaunchAccelerationHint:
+      'Auto leaves this to local inference. CPU only writes n-gpu-layers=0.',
     localInferenceLaunchNumGpu: 'GPU Acceleration Layers',
-    localInferenceLaunchNumGpuHint: 'Written as local inference n-gpu-layers. 0 means CPU, empty uses automatic selection.',
+    localInferenceLaunchNumGpuHint:
+      'Written as local inference n-gpu-layers. 0 means CPU, empty uses automatic selection.',
     localInferenceLaunchNumThread: 'Threads',
-    localInferenceLaunchNumThreadHint: 'CPU inference threads; too high can hurt desktop responsiveness.',
+    localInferenceLaunchNumThreadHint:
+      'CPU inference threads; too high can hurt desktop responsiveness.',
     localInferenceLaunchAdvancedTitle: 'Advanced Parameters',
-    localInferenceLaunchAdvancedDescription: 'These model loading parameters are written to the local inference preset. Keep defaults if unsure.',
+    localInferenceLaunchAdvancedDescription:
+      'These model loading parameters are written to the local inference preset. Keep defaults if unsure.',
     localInferenceLaunchNumBatch: 'Batch Size',
     localInferenceLaunchNumBatchHint: 'Prompt processing batch size; lower it when VRAM is tight.',
     localInferenceLaunchUseMmap: 'Memory Mapping',
-    localInferenceLaunchUseMmapHint: 'Written as local inference mmap. Disabled is equivalent to no-mmap.',
+    localInferenceLaunchUseMmapHint:
+      'Written as local inference mmap. Disabled is equivalent to no-mmap.',
     localInferenceLaunchDefault: 'Default',
     localInferenceLaunchBooleanDefault: 'Default',
     localInferenceLaunchBooleanEnabled: 'Enabled',
     localInferenceLaunchBooleanDisabled: 'Disabled',
     localInferenceLaunchLoadOnly: 'Preload',
     localInferenceLaunchLoadAndDebug: 'Start Debugging',
-    'localInferenceStatus_unknown': 'Unknown',
+    localInferenceStatus_unknown: 'Unknown',
     'localInferenceStatus_not-installed': 'Not installed',
-    'localInferenceStatus_installing': 'Installing',
-    'localInferenceStatus_installed': 'Installed',
-    'localInferenceStatus_starting': 'Starting',
-    'localInferenceStatus_running': 'Running',
+    localInferenceStatus_installing: 'Installing',
+    localInferenceStatus_installed: 'Installed',
+    localInferenceStatus_starting: 'Starting',
+    localInferenceStatus_running: 'Running',
     localInferenceContextShort: 'context',
-    'localInferenceStatus_stopped': 'Stopped',
-    'localInferenceStatus_error': 'Error',
+    localInferenceStatus_stopped: 'Stopped',
+    localInferenceStatus_error: 'Error',
 
     // Settings
     settings: 'Settings',
@@ -2755,7 +2971,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamaCppProviderStatusStarting: 'starting',
     llamaCppProviderStatusStopped: 'service stopped',
     llamaCppProviderSettingsTitle: 'local inference is a local runtime model source',
-    llamaCppProviderSettingsDescription: 'API keys and model lists are not managed here. Only models that are currently loaded into VRAM and available from the service appear in Agent / Agent engine model pickers.',
+    llamaCppProviderSettingsDescription:
+      'API keys and model lists are not managed here. Only models that are currently loaded into VRAM and available from the service appear in Agent / Agent engine model pickers.',
     llamaCppProviderServiceStatus: 'Service status',
     llamaCppProviderRunningModels: 'Running models',
     llamaCppProviderOpenLocalInference: 'Open Local Inference',
@@ -2830,8 +3047,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'When enabled, uses the Baidu Qianfan Coding Plan dedicated API endpoint',
     qianfanCodingPlanEndpointHint:
       'When using Coding Plan, the system will automatically switch to the dedicated Coding endpoint',
-    xiaomiCodingPlanHint:
-      'When enabled, uses the Xiaomi Coding Plan dedicated API endpoint',
+    xiaomiCodingPlanHint: 'When enabled, uses the Xiaomi Coding Plan dedicated API endpoint',
     xiaomiCodingPlanEndpointHint:
       'When using Coding Plan, the system will automatically switch to the dedicated Coding endpoint',
     minimaxOAuthTabApiKey: 'API Key',
@@ -3134,13 +3350,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkAgentEngineOpenClaw: 'Agent engine (Default)',
     coworkAgentEngineOpenClawHint: 'Personal AI assistant',
     coworkAgentEnginePi: 'Pi (Beta)',
-    coworkAgentEnginePiHint: 'Minimal agent loop, runs in-process. Dedicated for Work/Chat mode. No extra startup required.',
-    coworkEngineArchInfo: 'ZhiYuan Agent runs a dual-kernel architecture with both engines running simultaneously, each with fixed responsibilities:',
-    coworkEnginePiRole: 'Handles Cowork Work (Agent mode) and Chat (direct LLM). Runs in-process, no extra startup required.',
-    coworkEngineOpenClawRole: 'Handles IM channels (DingTalk/Feishu/WeCom/WeChat etc.) and scheduled tasks. Requires Gateway subprocess.',
-    settingsSavedButOpenClawSyncFailed: 'Settings were saved locally, but applying them to the running Agent engine environment failed. Please save again or restart Agent engine.',
+    coworkAgentEnginePiHint:
+      'Minimal agent loop, runs in-process. Dedicated for Work/Chat mode. No extra startup required.',
+    coworkEngineArchInfo:
+      'ZhiYuan Agent runs a dual-kernel architecture with both engines running simultaneously, each with fixed responsibilities:',
+    coworkEnginePiRole:
+      'Handles Cowork Work (Agent mode) and Chat (direct LLM). Runs in-process, no extra startup required.',
+    coworkEngineOpenClawRole:
+      'Handles IM channels (DingTalk/Feishu/WeCom/WeChat etc.) and scheduled tasks. Requires Gateway subprocess.',
+    settingsSavedButOpenClawSyncFailed:
+      'Settings were saved locally, but applying them to the running Agent engine environment failed. Please save again or restart Agent engine.',
     openClawSessionKeepAlive: 'Session continuity',
-    openClawSessionKeepAliveHint: 'Determines how long a conversation can stay continuously idle before it is treated as a new session. As long as the gap does not exceed this duration, the existing context will continue to be used. Longer durations preserve more context, but may also increase token usage.',
+    openClawSessionKeepAliveHint:
+      'Determines how long a conversation can stay continuously idle before it is treated as a new session. As long as the gap does not exceed this duration, the existing context will continue to be used. Longer durations preserve more context, but may also increase token usage.',
     openClawSessionKeepAliveOneDay: '24 hours',
     openClawSessionKeepAliveSevenDays: '7 days',
     openClawSessionKeepAliveThirtyDays: '30 days (Recommended)',
@@ -3163,7 +3385,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkOpenClawStarting: 'AI engine is starting the gateway...',
     coworkOpenClawRunning: 'AI engine is ready.',
     coworkOpenClawError: 'Agent engine gateway failed to become healthy in time.',
-    coworkOpenClawErrorHint: 'Check your network connection or Agent engine configuration and try again.',
+    coworkOpenClawErrorHint:
+      'Check your network connection or Agent engine configuration and try again.',
     coworkMemoryTitle: 'Memory',
     coworkAgentTab: 'Personalization',
     coworkBootstrapIdentityTitle: 'Assistant Identity',
@@ -3183,7 +3406,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkMemoryLlmJudgeEnabled: 'Enable LLM secondary judge',
     coworkMemoryLlmJudgeEnabledHint:
       'Only borderline rule cases are reviewed by the model for better accuracy (adds a small number of API calls).',
-    coworkMemoryLegacyNotice: 'Agent engine engine mode is active. This page only applies to Cowork.',
+    coworkMemoryLegacyNotice:
+      'Agent engine engine mode is active. This page only applies to Cowork.',
     coworkMemoryAutoWrite: 'Auto-write memory',
     coworkMemoryCaptureEachTurn: 'Enable implicit updates',
     coworkMemoryGuardLevel: 'Write guard level',
@@ -3257,7 +3481,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkMemoryEmbeddingProviderMistral: 'Mistral',
     coworkMemoryEmbeddingProviderOllama: 'Ollama',
     coworkMemoryEmbeddingRemoteBaseUrl: 'API Base URL',
-    coworkMemoryEmbeddingRemoteBaseUrlHint: 'Base URL only — do not include /embeddings path. e.g. https://api.openai.com/v1',
+    coworkMemoryEmbeddingRemoteBaseUrlHint:
+      'Base URL only — do not include /embeddings path. e.g. https://api.openai.com/v1',
     coworkMemoryEmbeddingRemoteApiKey: 'API Key',
     coworkMemoryEmbeddingRemoteApiKeyHint: 'API key for the remote embedding service',
     coworkConfigSaveFailed: 'Failed to save ZhiYuan Agent settings. Please try again.',
@@ -3363,7 +3588,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentNamePlaceholder: 'Project name',
     agentAvatarPickerTitle: 'Choose avatar',
     agentAvatarPickerDone: 'Done',
-    agentAvatarSvgLobster: 'ZY',
+    agentAvatarSvgZhiyuan: 'ZY',
     agentAvatarSvgCode: 'Code',
     agentAvatarSvgRepair: 'Repair',
     agentAvatarSvgBriefcase: 'Briefcase',
@@ -3437,17 +3662,23 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentIdentityPlaceholder: 'Identity description (IDENTITY.md)...',
     agentDefaultModel: 'Agent Default Model',
     agentUseDefaultModel: 'Default model',
-    agentLlamaCppModelNotRunningHint: 'This local inference model is not running. Load it from Local Inference first.',
-    agentLlamaCppModelNotRunningBlocked: 'This local inference model is not running. Load it from Local Inference first or choose another model.',
-    agentLlamaCppContextInsufficientHint: 'This local inference model is currently unavailable for this task. Reload it with a context window of at least 32K (32768), or switch to another model.',
-    agentLlamaCppContextUnknownHint: 'This local inference model did not report its context window, so Agent engine cannot verify the 32K (32768) requirement. Reload the model with an explicit context size, or switch to another model.',
-    agentLlamaCppContextTooSmallHint: 'This local inference model is currently unavailable for this task. Reload it with a context window of at least 32K (32768), or switch to another model.',
-    agentLlamaCppTrainedContextTooSmallHint: 'This local inference model was trained with a context window below 32K (32768), so it cannot be used for this task. Switch to another model.',
+    agentLlamaCppModelNotRunningHint:
+      'This local inference model is not running. Load it from Local Inference first.',
+    agentLlamaCppModelNotRunningBlocked:
+      'This local inference model is not running. Load it from Local Inference first or choose another model.',
+    agentLlamaCppContextInsufficientHint:
+      'This local inference model is currently unavailable for this task. Reload it with a context window of at least 32K (32768), or switch to another model.',
+    agentLlamaCppContextUnknownHint:
+      'This local inference model did not report its context window, so Agent engine cannot verify the 32K (32768) requirement. Reload the model with an explicit context size, or switch to another model.',
+    agentLlamaCppContextTooSmallHint:
+      'This local inference model is currently unavailable for this task. Reload it with a context window of at least 32K (32768), or switch to another model.',
+    agentLlamaCppTrainedContextTooSmallHint:
+      'This local inference model was trained with a context window below 32K (32768), so it cannot be used for this task. Switch to another model.',
     agentDefaultWorkingDirectory: 'Agent Default Working Directory',
     agentDefaultWorkingDirectoryHint: 'New sessions run in this directory by default',
     agentModelInvalidHint: 'Model unavailable. Please select another',
     agentSystemPromptPlaceholder:
-      'Define this Agent\'s role, workflow, and response style. Example: you are a professional office document assistant who drafts reports, polishes emails, summarizes spreadsheet highlights, and keeps formatting clear.',
+      "Define this Agent's role, workflow, and response style. Example: you are a professional office document assistant who drafts reports, polishes emails, summarizes spreadsheet highlights, and keeps formatting clear.",
     agentSkills: 'Skills',
     agentSkillsHint:
       'Select skills available to this Agent. Leave empty to use all enabled skills.',
@@ -3469,12 +3700,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentTabIM: 'IM Channels',
     agentTabTriage: 'Routing',
     agentTriageEnable: 'Enable auto model routing',
-    agentTriageEnableHint: 'Automatically select lightweight, standard, or reasoning models based on message complexity. Global parameters (cooldown etc.) are in Settings → Model Routing.',
+    agentTriageEnableHint:
+      'Automatically select lightweight, standard, or reasoning models based on message complexity. Global parameters (cooldown etc.) are in Settings → Model Routing.',
     agentTriageLightModel: 'Lightweight model',
-    agentTriageLightModelHint: 'For greetings, simple Q&A, translations and other low-complexity messages',
+    agentTriageLightModelHint:
+      'For greetings, simple Q&A, translations and other low-complexity messages',
     agentTriageHeavyModel: 'Reasoning model',
-    agentTriageHeavyModelHint: 'For coding, architecture design, debugging and other complex tasks (optional, defaults to Agent model)',
-    agentTriageStandardNote: 'Standard messages use this Agent\'s default model — no extra configuration needed.',
+    agentTriageHeavyModelHint:
+      'For coding, architecture design, debugging and other complex tasks (optional, defaults to Agent model)',
+    agentTriageStandardNote:
+      "Standard messages use this Agent's default model — no extra configuration needed.",
     agentTriageCrossProvider: 'Allow cross-provider switching',
     agentTriageNoProviderModels: 'Select a model for this Agent and configure its provider first',
     agentIMConfigured: 'Configured',
@@ -3631,7 +3866,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     remoteSkillImportDescription:
       'Supports owner/repo, repository or zip URLs, GitHub subdirectory links, and ModelScope skill page URLs. If a repository contains multiple skills, all of them will be imported.',
     remoteSkillImportUrlLabel: 'URL',
-    remoteSkillImportPlaceholder: 'e.g. owner/repo, a zip URL, or https://modelscope.cn/skills/<skill-id>',
+    remoteSkillImportPlaceholder:
+      'e.g. owner/repo, a zip URL, or https://modelscope.cn/skills/<skill-id>',
     remoteSkillImportExamples:
       'Examples: owner/repo; https://github.com/owner/repo/tree/main/SKILLs/my-skill; https://modelscope.cn/skills/<skill-id>',
     importSkill: 'Import',
@@ -3657,7 +3893,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillAlreadyInstalled: 'Installed',
 
     // Security scan
-    lobsterGuardEnabled: 'Security Active',
+    zhiyuanGuardEnabled: 'Security Active',
     securityScanTitle: 'Skill Security Scan',
     securityRisk_safe: 'Risk Assessment',
     securityRisk_low: 'Risk Assessment',
@@ -4090,11 +4326,14 @@ const translations: Record<LanguageType, Record<string, string>> = {
     autoLaunch: 'Launch at Login',
     autoLaunchDescription: 'Automatically start the app when you log in',
     useSystemProxy: 'Use System Proxy',
-    useSystemProxyDescription: 'When enabled, network requests follow system proxy settings (applies after Save)',
+    useSystemProxyDescription:
+      'When enabled, network requests follow system proxy settings (applies after Save)',
     sqliteAutoBackupEnabled: 'Enable Auto Backup and Recovery',
-    sqliteAutoBackupEnabledDescription: 'When enabled, the app automatically backs up data and tries to restore corrupted data on startup',
+    sqliteAutoBackupEnabledDescription:
+      'When enabled, the app automatically backs up data and tries to restore corrupted data on startup',
     preventSleep: 'Prevent Sleep',
-    preventSleepDescription: 'Prevent the system from suspending the app process (does not block system sleep or display off)',
+    preventSleepDescription:
+      'Prevent the system from suspending the app process (does not block system sleep or display off)',
     skipMissedJobs: 'Skip Missed Scheduled Jobs',
     skipMissedJobsDescription:
       'Skip jobs that were missed while the app was offline (applies after Save)',
@@ -4109,17 +4348,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskTemplateFinanceNewsDesc: 'Daily summary of global financial headlines and market trends',
     taskTemplateFinanceNewsSchedule: 'Daily at 9:00',
     taskTemplateFinanceNewsPrompt:
-      'Use the web-search skill to find today\'s global financial news, combined with stock-analyzer for major index movements. Summarize key economic policies and tech company updates in concise bullet points.',
+      "Use the web-search skill to find today's global financial news, combined with stock-analyzer for major index movements. Summarize key economic policies and tech company updates in concise bullet points.",
     taskTemplateWeatherName: 'Weather Forecast',
     taskTemplateWeatherDesc: 'Daily weather forecast and air quality report',
     taskTemplateWeatherSchedule: 'Daily at 7:00',
     taskTemplateWeatherPrompt:
-      'Use the weather skill (based on wttr.in, no API key required) to check today\'s forecast, including temperature range, precipitation probability, air quality index, and outdoor recommendations.',
+      "Use the weather skill (based on wttr.in, no API key required) to check today's forecast, including temperature range, precipitation probability, air quality index, and outdoor recommendations.",
     taskTemplateNewsBriefingName: 'News Briefing',
     taskTemplateNewsBriefingDesc: 'Daily curated news headlines across categories',
     taskTemplateNewsBriefingSchedule: 'Daily at 8:00',
     taskTemplateNewsBriefingPrompt:
-      'Use the daily-trending skill to get today\'s trending topics across platforms, then use web-search to find details. Organize by category (politics, technology, society, world) with one to two sentence summaries each.',
+      "Use the daily-trending skill to get today's trending topics across platforms, then use web-search to find details. Organize by category (politics, technology, society, world) with one to two sentence summaries each.",
     taskTemplateKnowledgePushName: 'Knowledge Push',
     taskTemplateKnowledgePushDesc: 'Daily interesting fact or knowledge tidbit',
     taskTemplateKnowledgePushSchedule: 'Daily at 12:00',
@@ -4418,7 +4657,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailPasswordPlaceholder: 'Email password or app-specific password',
     emailApiKey: 'API Key',
     emailApiKeyPlaceholder: 'ck_live_xxxxxxxx',
-    apiKeyHint: 'Get the API Key from your email service configuration source or administrator, then paste it here.',
+    apiKeyHint:
+      'Get the API Key from your email service configuration source or administrator, then paste it here.',
     emailTransportMode: 'Transport Mode',
     emailTransportImap: 'IMAP/SMTP (Traditional)',
     emailTransportWs: 'WebSocket (Secure, no password required)',

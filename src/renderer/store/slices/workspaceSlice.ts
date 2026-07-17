@@ -20,7 +20,10 @@ const workspaceSlice = createSlice({
   reducers: {
     setWorkspaces(state, action: PayloadAction<Workspace[]>) {
       state.workspaces = action.payload;
-      if (state.currentWorkspaceId && !action.payload.some((workspace) => workspace.id === state.currentWorkspaceId)) {
+      if (
+        state.currentWorkspaceId &&
+        !action.payload.some(workspace => workspace.id === state.currentWorkspaceId)
+      ) {
         state.currentWorkspaceId = action.payload[0]?.id ?? null;
       }
     },

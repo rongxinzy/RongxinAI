@@ -22,13 +22,15 @@ export function registerOllamaIpcHandlers(
   },
 ): void {
   const broadcast = (channel: string, payload: unknown): void => {
-    BrowserWindow.getAllWindows().forEach((win) => {
+    BrowserWindow.getAllWindows().forEach(win => {
       if (win.isDestroyed()) return;
       win.webContents.send(channel, payload);
     });
   };
-  const sendStatus = (status: OllamaStatusSnapshot) => broadcast(OllamaIpcChannel.StatusChanged, status);
-  const sendProgress = (progress: OllamaInstallProgress) => broadcast(OllamaIpcChannel.InstallProgress, progress);
+  const sendStatus = (status: OllamaStatusSnapshot) =>
+    broadcast(OllamaIpcChannel.StatusChanged, status);
+  const sendProgress = (progress: OllamaInstallProgress) =>
+    broadcast(OllamaIpcChannel.InstallProgress, progress);
 
   manager.on('status', sendStatus);
   manager.on('install-progress', sendProgress);
@@ -39,7 +41,7 @@ export function registerOllamaIpcHandlers(
   ipcMain.handle(OllamaIpcChannel.Install, async () => {
     const status = await manager.install();
     if (status.status === 'not-installed' || status.status === 'error') {
-      await shell.openExternal('https://ollama.com/download').catch((error) => {
+      await shell.openExternal('https://ollama.com/download').catch(error => {
         console.warn('[Ollama] failed to open download page:', error);
       });
     }
@@ -48,7 +50,9 @@ export function registerOllamaIpcHandlers(
   ipcMain.handle(OllamaIpcChannel.Start, async () => manager.start());
   ipcMain.handle(OllamaIpcChannel.Stop, async () => manager.stop());
   ipcMain.handle(OllamaIpcChannel.Restart, async () => manager.restart());
-  ipcMain.handle(OllamaIpcChannel.GetServiceConfig, async () => getOllamaServiceConfig(options.getStore()));
+  ipcMain.handle(OllamaIpcChannel.GetServiceConfig, async () =>
+    getOllamaServiceConfig(options.getStore()),
+  );
   ipcMain.handle(OllamaIpcChannel.SetServiceConfig, async (_event, config: OllamaServiceConfig) => {
     const sanitized = sanitizeOllamaServiceConfig(config);
     options.getStore().set(OLLAMA_SERVICE_CONFIG_KEY, sanitized);
@@ -103,14 +107,21 @@ export function registerOllamaIpcHandlers(
     activePulls.set(modelName, controller);
     try {
       const client = await manager.client();
-      await client.pullModel(modelName, (chunk) => {
-        broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk });
-      }, { signal: controller.signal });
+      await client.pullModel(
+        modelName,
+        chunk => {
+          broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk });
+        },
+        { signal: controller.signal },
+      );
       broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk: { status: 'success' } });
       return { success: true };
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) {
-        broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk: { status: 'cancelled' } });
+        broadcast(OllamaIpcChannel.PullProgress, {
+          name: modelName,
+          chunk: { status: 'cancelled' },
+        });
         throw new Error('Pull cancelled', { cause: error });
       }
       throw error;
@@ -130,26 +141,35 @@ export function registerOllamaIpcHandlers(
     const client = await manager.client();
     return await client.chat({ ...payload, stream: false });
   });
-  ipcMain.handle(OllamaIpcChannel.ChatStream, async (_event, requestId: string, payload: OllamaChatPayload) => {
-    if (typeof requestId !== 'string' || !requestId.trim()) throw new Error('Request ID is required');
-    if (activeChats.has(requestId)) throw new Error(`Chat stream already in progress: ${requestId}`);
-    const controller = new AbortController();
-    activeChats.set(requestId, controller);
-    const client = await manager.client();
-    try {
-      await client.chat({ ...payload, stream: true }, (chunk) => {
-        broadcast(OllamaIpcChannel.ChatStreamChunk, { requestId, chunk });
-      }, { signal: controller.signal });
-      return { success: true };
-    } catch (error) {
-      if (controller.signal.aborted || isAbortError(error)) {
-        throw new Error('Generation cancelled', { cause: error });
+  ipcMain.handle(
+    OllamaIpcChannel.ChatStream,
+    async (_event, requestId: string, payload: OllamaChatPayload) => {
+      if (typeof requestId !== 'string' || !requestId.trim())
+        throw new Error('Request ID is required');
+      if (activeChats.has(requestId))
+        throw new Error(`Chat stream already in progress: ${requestId}`);
+      const controller = new AbortController();
+      activeChats.set(requestId, controller);
+      const client = await manager.client();
+      try {
+        await client.chat(
+          { ...payload, stream: true },
+          chunk => {
+            broadcast(OllamaIpcChannel.ChatStreamChunk, { requestId, chunk });
+          },
+          { signal: controller.signal },
+        );
+        return { success: true };
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          throw new Error('Generation cancelled', { cause: error });
+        }
+        throw error;
+      } finally {
+        activeChats.delete(requestId);
       }
-      throw error;
-    } finally {
-      activeChats.delete(requestId);
-    }
-  });
+    },
+  );
   ipcMain.handle(OllamaIpcChannel.CancelChatStream, async (_event, requestId: string) => {
     const controller = activeChats.get(requestId);
     if (!controller) return { success: true, cancelled: false };
@@ -159,7 +179,9 @@ export function registerOllamaIpcHandlers(
 }
 
 export function getOllamaServiceConfig(store: SqliteStore): OllamaServiceConfig {
-  return sanitizeOllamaServiceConfig(store.get<OllamaServiceConfig>(OLLAMA_SERVICE_CONFIG_KEY) ?? DEFAULT_OLLAMA_SERVICE_CONFIG);
+  return sanitizeOllamaServiceConfig(
+    store.get<OllamaServiceConfig>(OLLAMA_SERVICE_CONFIG_KEY) ?? DEFAULT_OLLAMA_SERVICE_CONFIG,
+  );
 }
 
 function sanitizeOllamaServiceConfig(config: OllamaServiceConfig | undefined): OllamaServiceConfig {
@@ -175,7 +197,10 @@ function sanitizeOllamaServiceConfig(config: OllamaServiceConfig | undefined): O
   return next;
 }
 
-function normalizeIntegerString(value: string | undefined, options: { allowMinusOne?: boolean } = {}): string | undefined {
+function normalizeIntegerString(
+  value: string | undefined,
+  options: { allowMinusOne?: boolean } = {},
+): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
   if (options.allowMinusOne && trimmed === '-1') return trimmed;
@@ -186,8 +211,11 @@ function normalizeIntegerString(value: string | undefined, options: { allowMinus
 function normalizeCsvIntegerList(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
-  const parts = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
-  if (parts.length === 0 || parts.some((part) => !/^\d+$/.test(part))) return undefined;
+  const parts = trimmed
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0 || parts.some(part => !/^\d+$/.test(part))) return undefined;
   return parts.join(',');
 }
 

@@ -15,12 +15,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": [
-    "server/**/*",
-    "cli/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["server/**/*", "cli/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

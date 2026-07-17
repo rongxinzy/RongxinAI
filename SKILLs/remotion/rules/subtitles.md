@@ -8,7 +8,7 @@ metadata:
 All captions must be processed in JSON. The captions must use the `Caption` type which is the following:
 
 ```ts
-import type { Caption } from "@remotion/captions";
+import type { Caption } from '@remotion/captions';
 ```
 
 This is the definition:

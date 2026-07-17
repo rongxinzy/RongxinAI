@@ -74,7 +74,7 @@ class IMService {
     });
 
     // Set up message listener (for logging/monitoring)
-    this.messageUnsubscribe = window.electron.im.onMessageReceived((message) => {
+    this.messageUnsubscribe = window.electron.im.onMessageReceived(message => {
       console.log('[IM Service] Message received:', message);
     });
 
@@ -145,7 +145,9 @@ class IMService {
   async updateConfig(config: Partial<IMGatewayConfig>): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result: IMGatewayResult = await window.electron.im.setConfig(config, { syncGateway: true });
+      const result: IMGatewayResult = await window.electron.im.setConfig(config, {
+        syncGateway: true,
+      });
       if (result.success) {
         // Reload config to get merged values
         await this.loadConfig();
@@ -169,7 +171,9 @@ class IMService {
    */
   async persistConfig(config: Partial<IMGatewayConfig>): Promise<boolean> {
     try {
-      const result: IMGatewayResult = await window.electron.im.setConfig(config, { syncGateway: false });
+      const result: IMGatewayResult = await window.electron.im.setConfig(config, {
+        syncGateway: false,
+      });
       if (result.success) {
         return true;
       } else {
@@ -212,7 +216,8 @@ class IMService {
         return false;
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to start ${platform} gateway`;
+      const message =
+        error instanceof Error ? error.message : `Failed to start ${platform} gateway`;
       store.dispatch(setError(message));
       return false;
     } finally {
@@ -248,18 +253,22 @@ class IMService {
    */
   async testGateway(
     platform: Platform,
-    configOverride?: Partial<IMGatewayConfig>
+    configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult | null> {
     try {
       store.dispatch(setLoading(true));
-      const result: IMConnectivityTestResponse = await window.electron.im.testGateway(platform, configOverride);
+      const result: IMConnectivityTestResponse = await window.electron.im.testGateway(
+        platform,
+        configOverride,
+      );
       if (result.success && result.result) {
         return result.result;
       }
       store.dispatch(setError(result.error || `Failed to test ${platform} connectivity`));
       return null;
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to test ${platform} connectivity`;
+      const message =
+        error instanceof Error ? error.message : `Failed to test ${platform} connectivity`;
       store.dispatch(setError(message));
       return null;
     } finally {
@@ -319,7 +328,10 @@ class IMService {
   /**
    * Fetch the OpenClaw config schema (JSON Schema + uiHints) from the gateway.
    */
-  async getOpenClawConfigSchema(): Promise<{ schema: Record<string, unknown>; uiHints: Record<string, Record<string, unknown>> } | null> {
+  async getOpenClawConfigSchema(): Promise<{
+    schema: Record<string, unknown>;
+    uiHints: Record<string, Record<string, unknown>>;
+  } | null> {
     try {
       const result = await window.electron.im.getOpenClawConfigSchema();
       if (result.success && result.result) {
@@ -363,9 +375,14 @@ class IMService {
     }
   }
 
-  async persistDingTalkInstanceConfig(instanceId: string, config: Partial<DingTalkOpenClawConfig>): Promise<boolean> {
+  async persistDingTalkInstanceConfig(
+    instanceId: string,
+    config: Partial<DingTalkOpenClawConfig>,
+  ): Promise<boolean> {
     try {
-      const result = await window.electron.im.setDingTalkInstanceConfig(instanceId, config, { syncGateway: false });
+      const result = await window.electron.im.setDingTalkInstanceConfig(instanceId, config, {
+        syncGateway: false,
+      });
       if (result.success) {
         store.dispatch(setDingTalkInstanceConfig({ instanceId, config }));
         return true;
@@ -378,10 +395,15 @@ class IMService {
     }
   }
 
-  async updateDingTalkInstanceConfig(instanceId: string, config: Partial<DingTalkOpenClawConfig>): Promise<boolean> {
+  async updateDingTalkInstanceConfig(
+    instanceId: string,
+    config: Partial<DingTalkOpenClawConfig>,
+  ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result = await window.electron.im.setDingTalkInstanceConfig(instanceId, config, { syncGateway: true });
+      const result = await window.electron.im.setDingTalkInstanceConfig(instanceId, config, {
+        syncGateway: true,
+      });
       if (result.success) {
         await this.loadConfig();
         await this.loadStatus();
@@ -390,7 +412,8 @@ class IMService {
       store.dispatch(setError(result.error || 'Failed to update DingTalk instance config'));
       return false;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update DingTalk instance config';
+      const message =
+        error instanceof Error ? error.message : 'Failed to update DingTalk instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
@@ -430,9 +453,14 @@ class IMService {
     }
   }
 
-  async persistQQInstanceConfig(instanceId: string, config: Partial<QQOpenClawConfig>): Promise<boolean> {
+  async persistQQInstanceConfig(
+    instanceId: string,
+    config: Partial<QQOpenClawConfig>,
+  ): Promise<boolean> {
     try {
-      const result = await window.electron.im.setQQInstanceConfig(instanceId, config, { syncGateway: false });
+      const result = await window.electron.im.setQQInstanceConfig(instanceId, config, {
+        syncGateway: false,
+      });
       if (result.success) {
         store.dispatch(setQQInstanceConfig({ instanceId, config }));
         return true;
@@ -445,10 +473,15 @@ class IMService {
     }
   }
 
-  async updateQQInstanceConfig(instanceId: string, config: Partial<QQOpenClawConfig>): Promise<boolean> {
+  async updateQQInstanceConfig(
+    instanceId: string,
+    config: Partial<QQOpenClawConfig>,
+  ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result = await window.electron.im.setQQInstanceConfig(instanceId, config, { syncGateway: true });
+      const result = await window.electron.im.setQQInstanceConfig(instanceId, config, {
+        syncGateway: true,
+      });
       if (result.success) {
         await this.loadConfig();
         await this.loadStatus();
@@ -457,7 +490,8 @@ class IMService {
       store.dispatch(setError(result.error || 'Failed to update QQ instance config'));
       return false;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update QQ instance config';
+      const message =
+        error instanceof Error ? error.message : 'Failed to update QQ instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
@@ -497,9 +531,14 @@ class IMService {
     }
   }
 
-  async persistFeishuInstanceConfig(instanceId: string, config: Partial<FeishuOpenClawConfig>): Promise<boolean> {
+  async persistFeishuInstanceConfig(
+    instanceId: string,
+    config: Partial<FeishuOpenClawConfig>,
+  ): Promise<boolean> {
     try {
-      const result = await window.electron.im.setFeishuInstanceConfig(instanceId, config, { syncGateway: false });
+      const result = await window.electron.im.setFeishuInstanceConfig(instanceId, config, {
+        syncGateway: false,
+      });
       if (result.success) {
         store.dispatch(setFeishuInstanceConfig({ instanceId, config }));
         return true;
@@ -512,10 +551,15 @@ class IMService {
     }
   }
 
-  async updateFeishuInstanceConfig(instanceId: string, config: Partial<FeishuOpenClawConfig>): Promise<boolean> {
+  async updateFeishuInstanceConfig(
+    instanceId: string,
+    config: Partial<FeishuOpenClawConfig>,
+  ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result = await window.electron.im.setFeishuInstanceConfig(instanceId, config, { syncGateway: true });
+      const result = await window.electron.im.setFeishuInstanceConfig(instanceId, config, {
+        syncGateway: true,
+      });
       if (result.success) {
         await this.loadConfig();
         await this.loadStatus();
@@ -524,7 +568,8 @@ class IMService {
       store.dispatch(setError(result.error || 'Failed to update Feishu instance config'));
       return false;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update Feishu instance config';
+      const message =
+        error instanceof Error ? error.message : 'Failed to update Feishu instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
@@ -564,9 +609,14 @@ class IMService {
     }
   }
 
-  async persistWecomInstanceConfig(instanceId: string, config: Partial<WecomOpenClawConfig>): Promise<boolean> {
+  async persistWecomInstanceConfig(
+    instanceId: string,
+    config: Partial<WecomOpenClawConfig>,
+  ): Promise<boolean> {
     try {
-      const result = await window.electron.im.setWecomInstanceConfig(instanceId, config, { syncGateway: false });
+      const result = await window.electron.im.setWecomInstanceConfig(instanceId, config, {
+        syncGateway: false,
+      });
       if (result.success) {
         store.dispatch(setWecomInstanceConfig({ instanceId, config }));
         return true;
@@ -579,10 +629,15 @@ class IMService {
     }
   }
 
-  async updateWecomInstanceConfig(instanceId: string, config: Partial<WecomOpenClawConfig>): Promise<boolean> {
+  async updateWecomInstanceConfig(
+    instanceId: string,
+    config: Partial<WecomOpenClawConfig>,
+  ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result = await window.electron.im.setWecomInstanceConfig(instanceId, config, { syncGateway: true });
+      const result = await window.electron.im.setWecomInstanceConfig(instanceId, config, {
+        syncGateway: true,
+      });
       if (result.success) {
         await this.loadConfig();
         await this.loadStatus();
@@ -591,7 +646,8 @@ class IMService {
       store.dispatch(setError(result.error || 'Failed to update WeCom instance config'));
       return false;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update WeCom instance config';
+      const message =
+        error instanceof Error ? error.message : 'Failed to update WeCom instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
@@ -631,9 +687,14 @@ class IMService {
     }
   }
 
-  async persistTelegramInstanceConfig(instanceId: string, config: Partial<TelegramOpenClawConfig>): Promise<boolean> {
+  async persistTelegramInstanceConfig(
+    instanceId: string,
+    config: Partial<TelegramOpenClawConfig>,
+  ): Promise<boolean> {
     try {
-      const result = await window.electron.im.setTelegramInstanceConfig(instanceId, config, { syncGateway: false });
+      const result = await window.electron.im.setTelegramInstanceConfig(instanceId, config, {
+        syncGateway: false,
+      });
       if (result.success) {
         store.dispatch(setTelegramInstanceConfig({ instanceId, config }));
         return true;
@@ -646,10 +707,15 @@ class IMService {
     }
   }
 
-  async updateTelegramInstanceConfig(instanceId: string, config: Partial<TelegramOpenClawConfig>): Promise<boolean> {
+  async updateTelegramInstanceConfig(
+    instanceId: string,
+    config: Partial<TelegramOpenClawConfig>,
+  ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result = await window.electron.im.setTelegramInstanceConfig(instanceId, config, { syncGateway: true });
+      const result = await window.electron.im.setTelegramInstanceConfig(instanceId, config, {
+        syncGateway: true,
+      });
       if (result.success) {
         await this.loadConfig();
         await this.loadStatus();
@@ -658,7 +724,8 @@ class IMService {
       store.dispatch(setError(result.error || 'Failed to update Telegram instance config'));
       return false;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update Telegram instance config';
+      const message =
+        error instanceof Error ? error.message : 'Failed to update Telegram instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
@@ -698,9 +765,14 @@ class IMService {
     }
   }
 
-  async persistDiscordInstanceConfig(instanceId: string, config: Partial<DiscordOpenClawConfig>): Promise<boolean> {
+  async persistDiscordInstanceConfig(
+    instanceId: string,
+    config: Partial<DiscordOpenClawConfig>,
+  ): Promise<boolean> {
     try {
-      const result = await window.electron.im.setDiscordInstanceConfig(instanceId, config, { syncGateway: false });
+      const result = await window.electron.im.setDiscordInstanceConfig(instanceId, config, {
+        syncGateway: false,
+      });
       if (result.success) {
         store.dispatch(setDiscordInstanceConfig({ instanceId, config }));
         return true;
@@ -713,10 +785,15 @@ class IMService {
     }
   }
 
-  async updateDiscordInstanceConfig(instanceId: string, config: Partial<DiscordOpenClawConfig>): Promise<boolean> {
+  async updateDiscordInstanceConfig(
+    instanceId: string,
+    config: Partial<DiscordOpenClawConfig>,
+  ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
-      const result = await window.electron.im.setDiscordInstanceConfig(instanceId, config, { syncGateway: true });
+      const result = await window.electron.im.setDiscordInstanceConfig(instanceId, config, {
+        syncGateway: true,
+      });
       if (result.success) {
         await this.loadConfig();
         await this.loadStatus();
@@ -725,14 +802,14 @@ class IMService {
       store.dispatch(setError(result.error || 'Failed to update Discord instance config'));
       return false;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update Discord instance config';
+      const message =
+        error instanceof Error ? error.message : 'Failed to update Discord instance config';
       store.dispatch(setError(message));
       return false;
     } finally {
       store.dispatch(setLoading(false));
     }
   }
-
 }
 
 export const imService = new IMService();

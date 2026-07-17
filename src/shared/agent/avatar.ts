@@ -2,14 +2,15 @@ export const AgentAvatarIconFormat = {
   Svg: 'agent-avatar-svg',
 } as const;
 
-export type AgentAvatarIconFormat = typeof AgentAvatarIconFormat[keyof typeof AgentAvatarIconFormat];
+export type AgentAvatarIconFormat =
+  (typeof AgentAvatarIconFormat)[keyof typeof AgentAvatarIconFormat];
 
 export const AgentAvatarIconSeparator = {
   Value: ':',
 } as const;
 
 export const AgentAvatarSvg = {
-  Lobster: 'lobster',
+  Zhiyuan: 'zhiyuan',
   Code: 'code',
   Repair: 'repair',
   Briefcase: 'briefcase',
@@ -41,7 +42,7 @@ export const AgentAvatarSvg = {
   Pet: 'pet',
 } as const;
 
-export type AgentAvatarSvg = typeof AgentAvatarSvg[keyof typeof AgentAvatarSvg];
+export type AgentAvatarSvg = (typeof AgentAvatarSvg)[keyof typeof AgentAvatarSvg];
 
 export interface DesignedAgentAvatar {
   svg: AgentAvatarSvg;
@@ -52,7 +53,7 @@ const AGENT_AVATAR_PART_COUNT = 2;
 const AGENT_AVATAR_SVGS = new Set<string>(Object.values(AgentAvatarSvg));
 
 export const DefaultAgentAvatar = {
-  svg: AgentAvatarSvg.Lobster,
+  svg: AgentAvatarSvg.Zhiyuan,
 } as const satisfies DesignedAgentAvatar;
 
 export const isAgentAvatarSvg = (value: string): value is AgentAvatarSvg => {
@@ -64,15 +65,14 @@ const LegacyAgentAvatarIconFormat = {
 } as const;
 
 export const encodeAgentAvatarIcon = (avatar: DesignedAgentAvatar): string => {
-  return [
-    AgentAvatarIconFormat.Svg,
-    avatar.svg,
-  ].join(AgentAvatarIconSeparator.Value);
+  return [AgentAvatarIconFormat.Svg, avatar.svg].join(AgentAvatarIconSeparator.Value);
 };
 
 export const DefaultAgentAvatarIcon = encodeAgentAvatarIcon(DefaultAgentAvatar);
 
-export const parseAgentAvatarIcon = (value: string | null | undefined): DesignedAgentAvatar | null => {
+export const parseAgentAvatarIcon = (
+  value: string | null | undefined,
+): DesignedAgentAvatar | null => {
   const normalized = value?.trim() ?? '';
   if (!normalized) return null;
 

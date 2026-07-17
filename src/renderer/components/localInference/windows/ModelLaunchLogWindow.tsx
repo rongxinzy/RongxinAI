@@ -127,11 +127,12 @@ export function ModelLaunchLogWindow() {
   }, [readSessionLog, resolveLatestSession, state.modelName, state.sessionId]);
 
   useEffect(() => {
-    const unsubscribe = window.electron.llamacpp.onModelLaunchLogWindowTargetChanged((target) => {
+    const unsubscribe = window.electron.llamacpp.onModelLaunchLogWindowTargetChanged(target => {
       const nextSessionId = normalizeOptionalTargetValue(target.sessionId);
       const nextModelName = normalizeOptionalTargetValue(target.modelName);
       setState(current => {
-        const unchanged = current.sessionId === nextSessionId && current.modelName === nextModelName;
+        const unchanged =
+          current.sessionId === nextSessionId && current.modelName === nextModelName;
         return {
           ...current,
           sessionId: nextSessionId,
@@ -147,7 +148,7 @@ export function ModelLaunchLogWindow() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = window.electron.llamacpp.onModelLaunchLogCleared((event) => {
+    const unsubscribe = window.electron.llamacpp.onModelLaunchLogCleared(event => {
       setState(current => {
         if (!shouldClearLaunchLog(event, current.session, current.modelName)) return current;
         readVersionRef.current += 1;
@@ -166,7 +167,7 @@ export function ModelLaunchLogWindow() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = window.electron.llamacpp.onModelLaunchLog((event) => {
+    const unsubscribe = window.electron.llamacpp.onModelLaunchLog(event => {
       if (!shouldFollowLaunchLogEvent(event, state.sessionId, state.modelName)) return;
       setState(current => ({
         ...current,
@@ -210,7 +211,9 @@ export function ModelLaunchLogWindow() {
           <Card className="min-h-0 flex-1 gap-0 overflow-hidden border-slate-800 bg-slate-950 p-0 shadow-sm">
             <CardContent className="min-h-0 flex-1 p-0">
               <ScrollArea className="h-full min-h-0 bg-slate-950">
-                <pre className="min-h-full whitespace-pre-wrap wrap-break-word p-4 font-mono text-xs leading-5 text-slate-100 selection:bg-slate-700 selection:text-white">{body}</pre>
+                <pre className="min-h-full whitespace-pre-wrap wrap-break-word p-4 font-mono text-xs leading-5 text-slate-100 selection:bg-slate-700 selection:text-white">
+                  {body}
+                </pre>
                 <div ref={endRef} aria-hidden="true" />
               </ScrollArea>
             </CardContent>
@@ -235,9 +238,13 @@ function LogWindowAvatar({ compact = false }: { compact?: boolean }) {
   };
 
   return (
-    <span className={compact
-      ? 'inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary'
-      : 'inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary'}>
+    <span
+      className={
+        compact
+          ? 'inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary'
+          : 'inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary'
+      }
+    >
       <span
         aria-hidden="true"
         className={compact ? 'inline-block size-4' : 'inline-block size-6'}
@@ -247,7 +254,9 @@ function LogWindowAvatar({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function normalizeOptionalTargetValue(value: LlamaCppModelLaunchLogWindowTarget[keyof LlamaCppModelLaunchLogWindowTarget]): string | null {
+function normalizeOptionalTargetValue(
+  value: LlamaCppModelLaunchLogWindowTarget[keyof LlamaCppModelLaunchLogWindowTarget],
+): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
   return normalized || null;
@@ -285,7 +294,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
     return (
       <Badge
         variant="outline"
-        className="border-[color-mix(in_srgb,var(--lobster-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-success)_12%,transparent)] text-(--lobster-success)"
+        className="border-[color-mix(in_srgb,var(--zy-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--zy-success)_12%,transparent)] text-(--zy-success)"
       >
         {i18nService.t('localInferenceModelLaunchSucceeded')}
       </Badge>
@@ -295,7 +304,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
     return (
       <Badge
         variant="outline"
-        className="border-[color-mix(in_srgb,var(--lobster-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-destructive)_12%,transparent)] text-(--lobster-destructive)"
+        className="border-[color-mix(in_srgb,var(--zy-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--zy-destructive)_12%,transparent)] text-(--zy-destructive)"
       >
         {i18nService.t('localInferenceModelLaunchFailed')}
       </Badge>
@@ -304,7 +313,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
   return (
     <Badge
       variant="outline"
-      className="border-[color-mix(in_srgb,var(--lobster-primary)_28%,transparent)] bg-(--lobster-primary-muted) text-(--lobster-primary)"
+      className="border-[color-mix(in_srgb,var(--zy-primary)_28%,transparent)] bg-(--zy-primary-muted) text-(--zy-primary)"
     >
       {i18nService.t('localInferenceModelLaunchStarting')}
     </Badge>

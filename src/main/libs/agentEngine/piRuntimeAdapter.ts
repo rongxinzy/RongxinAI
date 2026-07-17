@@ -24,7 +24,7 @@ import path from 'path';
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
-import { isLocalProviderName,ProviderName } from '../../../shared/providers';
+import { isLocalProviderName, ProviderName } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
 import {
@@ -151,7 +151,8 @@ async function getPiModules(): Promise<PiModules> {
       const compat = await import('@earendil-works/pi-ai/compat');
       _piModules = {
         createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
-        DefaultResourceLoader: codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
+        DefaultResourceLoader:
+          codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
         getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
         AuthStorage: codingAgent.AuthStorage as PiModules['AuthStorage'],
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
@@ -161,7 +162,7 @@ async function getPiModules(): Promise<PiModules> {
     } catch (err) {
       throw new Error(
         `[PiRuntime] Pi engine packages not found. ` +
-        `Ensure @earendil-works/pi-coding-agent and @earendil-works/pi-ai are installed.\n${err}`,
+          `Ensure @earendil-works/pi-coding-agent and @earendil-works/pi-ai are installed.\n${err}`,
       );
     }
   }
@@ -193,18 +194,31 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
 
-  setCoworkStore(store: CoworkStore): void { this.store = store; }
-  setMcpServerManager(mgr: McpServerManager): void { this.mcpServerManager = mgr; this.mcpInjected = true; }
-  hasMcpServerManager(): boolean { return this.mcpInjected; }
+  setCoworkStore(store: CoworkStore): void {
+    this.store = store;
+  }
+  setMcpServerManager(mgr: McpServerManager): void {
+    this.mcpServerManager = mgr;
+    this.mcpInjected = true;
+  }
+  hasMcpServerManager(): boolean {
+    return this.mcpInjected;
+  }
   private mcpInjected = false;
 
   // Throttle state
   private readonly lastMessageUpdateEmitTime = new Map<string, number>();
   private readonly pendingMessageUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly pendingMessageUpdate = new Map<string, { content: string; metadata?: Record<string, unknown> }>();
+  private readonly pendingMessageUpdate = new Map<
+    string,
+    { content: string; metadata?: Record<string, unknown> }
+  >();
   // Separate throttle for synchronous SQLite writes (see STORE_UPDATE_THROTTLE_MS).
   private readonly lastStoreUpdateTime = new Map<string, number>();
-  private readonly pendingStoreUpdate = new Map<string, { content: string; metadata: Record<string, unknown> }>();
+  private readonly pendingStoreUpdate = new Map<
+    string,
+    { content: string; metadata: Record<string, unknown> }
+  >();
   private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
 
   // ── CoworkRuntime.on/off ──
@@ -230,7 +244,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     prompt: string,
     options: CoworkStartOptions = {},
   ): Promise<void> {
-    const hasContent = prompt.trim() || (options.imageAttachments && options.imageAttachments.length > 0);
+    const hasContent =
+      prompt.trim() || (options.imageAttachments && options.imageAttachments.length > 0);
     if (!hasContent) {
       throw new Error('Prompt is required.');
     }
@@ -253,9 +268,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         timestamp: Date.now(),
         metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
       };
-      const persisted = this.store
-        ? this.store.addMessage(sessionId, userMsg)
-        : userMsg;
+      const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
       this.emit('message', sessionId, persisted);
     }
 
@@ -271,13 +284,14 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       // duplicating the skills section.
       const basePrompt = options.systemPrompt?.trim() || '';
       const history = options.conversationHistory;
-      const historyBlock = history && history.length > 0
-        ? [
-            '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
-            ...history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
-            '=== END PREVIOUS CONVERSATION ===',
-          ].join('\n')
-        : '';
+      const historyBlock =
+        history && history.length > 0
+          ? [
+              '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
+              ...history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
+              '=== END PREVIOUS CONVERSATION ===',
+            ].join('\n')
+          : '';
       const effectiveSystemPrompt = [basePrompt, historyBlock].filter(Boolean).join('\n\n');
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
@@ -311,10 +325,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       if (this.store) {
         const candidateAgentIds = options.expertIds?.length
           ? options.expertIds
-          : options.agentId ? [options.agentId] : [];
+          : options.agentId
+            ? [options.agentId]
+            : [];
         const agent = candidateAgentIds
-          .map((agentId) => this.store?.getAgent(agentId))
-          .find((candidate) => candidate?.source === CoworkSessionExpertSource.Package && candidate.presetId);
+          .map(agentId => this.store?.getAgent(agentId))
+          .find(
+            candidate =>
+              candidate?.source === CoworkSessionExpertSource.Package && candidate.presetId,
+          );
         if (agent && agent.source === CoworkSessionExpertSource.Package && agent.presetId) {
           // Check if any member agents exist for this team
           const allAgents = this.store.listAgents();
@@ -322,7 +341,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             a => a.source === CoworkSessionExpertSource.Member && a.presetId === agent.presetId,
           );
           if (hasMembers) {
-            const subagentTool = this.buildSubagentTool(agent.presetId, resolvedModel, options.workspaceRoot);
+            const subagentTool = this.buildSubagentTool(
+              agent.presetId,
+              resolvedModel,
+              options.workspaceRoot,
+            );
             if (subagentTool) {
               customTools.push(subagentTool);
             }
@@ -358,7 +381,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       };
 
       // Subscribe to Pi events before sending the prompt
-      active.unsubscribe = session.subscribe((event) => {
+      active.unsubscribe = session.subscribe(event => {
         if (abortController.signal.aborted) return;
         this.handlePiEvent(sessionId, active, event);
       });
@@ -367,7 +390,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
       // Send the prompt (may include conversation history for restart restores)
       await session.prompt(options._piPromptOverride || prompt);
-
     } catch (error) {
       this.activeSessions.delete(sessionId);
       if (abortController.signal.aborted) {
@@ -387,7 +409,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   ): Promise<void> {
     const active = this.activeSessions.get(sessionId);
     if (!active) {
-      console.log(`[PiRuntime] continueSession: session ${sessionId} not active, restoring context via prompt`);
+      console.log(
+        `[PiRuntime] continueSession: session ${sessionId} not active, restoring context via prompt`,
+      );
       const storedSession = this.store?.getSession(sessionId);
       // Load previous messages and embed them as context prepended to the PI prompt.
       // The user message saved/emitted to the renderer stays the clean original prompt.
@@ -395,9 +419,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const contextParts = history
         .filter(m => m.type === 'user' || m.type === 'assistant')
         .map(m => `${m.type === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
-      const piPrompt = contextParts.length > 0
-        ? `${contextParts.join('\n\n')}\n\nUser: ${prompt}`
-        : prompt;
+      const piPrompt =
+        contextParts.length > 0 ? `${contextParts.join('\n\n')}\n\nUser: ${prompt}` : prompt;
       return this.startSession(sessionId, prompt, {
         ...options,
         systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
@@ -410,14 +433,18 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     }
 
     const requestedSystemPrompt = options.systemPrompt?.trim();
-    if (requestedSystemPrompt !== undefined && requestedSystemPrompt !== active.requestedSystemPrompt) {
+    if (
+      requestedSystemPrompt !== undefined &&
+      requestedSystemPrompt !== active.requestedSystemPrompt
+    ) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       return this.startSession(sessionId, prompt, {
         ...options,
         conversationHistory: history
-          .filter((message): message is CoworkMessage & { type: 'user' | 'assistant' } => (
-            message.type === 'user' || message.type === 'assistant'
-          ))
+          .filter(
+            (message): message is CoworkMessage & { type: 'user' | 'assistant' } =>
+              message.type === 'user' || message.type === 'assistant',
+          )
           .map(message => ({ role: message.type, content: message.content })),
       });
     }
@@ -437,9 +464,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       timestamp: Date.now(),
       metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
     };
-    const persisted = this.store
-      ? this.store.addMessage(sessionId, userMsg)
-      : userMsg;
+    const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
     this.emit('message', sessionId, persisted);
 
     try {
@@ -532,19 +557,20 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const resourceLoader = new pi.DefaultResourceLoader({
       cwd,
       agentDir: pi.getAgentDir(),
-      // RongxinAI skills come exclusively from the app-managed SKILLs dirs —
+      // ZhiYuanAgent skills come exclusively from the app-managed SKILLs dirs —
       // never from the developer's global ~/.agents/skills (which would leak
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
       noSkills: true,
-      additionalSkillPaths: this.resolveRongxinAiSkillDirs(),
-      skillsOverride: skillIds === undefined
-        ? undefined
-        : (base: { skills: Array<{ name?: string; id?: string }>; diagnostics: unknown[] }) => ({
-          ...base,
-          skills: base.skills.filter((skill) => (
-            skillIds.includes(skill.id || '') || skillIds.includes(skill.name || '')
-          )),
-        }),
+      additionalSkillPaths: this.resolveZhiyuanSkillDirs(),
+      skillsOverride:
+        skillIds === undefined
+          ? undefined
+          : (base: { skills: Array<{ name?: string; id?: string }>; diagnostics: unknown[] }) => ({
+              ...base,
+              skills: base.skills.filter(
+                skill => skillIds.includes(skill.id || '') || skillIds.includes(skill.name || ''),
+              ),
+            }),
       systemPromptOverride: () => systemPrompt || '',
       appendSystemPromptOverride: (): string[] => [],
     });
@@ -558,7 +584,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    * (may exist from a previous packaged run). Production: userData/SKILLs only
    * (getSkillsRoot already resolves there).
    */
-  private resolveRongxinAiSkillDirs(): string[] {
+  private resolveZhiyuanSkillDirs(): string[] {
     const dirs: string[] = [];
     const push = (dir: string): void => {
       if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
@@ -584,22 +610,21 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     );
     return result.content
       .filter((c): c is { text: string } => 'text' in c)
-      .map((c) => c.text)
+      .map(c => c.text)
       .join('');
   }
 
   // ── Private: event mapping ──
 
-  private handlePiEvent(
-    sessionId: string,
-    active: ActivePiSession,
-    event: PiEvent,
-  ): void {
+  private handlePiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
     // Debug: log all Pi events to diagnose frontend rendering issues
     if (event.type !== 'message_update') {
-      console.log('[PiRuntime] Event:', event.type,
+      console.log(
+        '[PiRuntime] Event:',
+        event.type,
         event.message?.role ? `role=${event.message.role}` : '',
-        event.message?.stopReason ? `stopReason=${event.message.stopReason}` : '');
+        event.message?.stopReason ? `stopReason=${event.message.stopReason}` : '',
+      );
     }
     switch (event.type) {
       case 'agent_start':
@@ -637,7 +662,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           if (event.message.stopReason === 'error') {
             const errMsg = event.message.errorMessage || 'Pi agent error';
             const errDetail = event.message.content
-              ? (typeof event.message.content === 'string' ? event.message.content : JSON.stringify(event.message.content))
+              ? typeof event.message.content === 'string'
+                ? event.message.content
+                : JSON.stringify(event.message.content)
               : '(no content)';
             console.error('[PiRuntime] Assistant error:', errMsg, 'detail:', errDetail);
             // Persist a system error message so the error survives session
@@ -797,9 +824,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       type: 'assistant',
       content: initialContent,
       timestamp: Date.now(),
-      metadata: kind === 'thinking'
-        ? { isStreaming: true, isFinal: false, isThinking: true }
-        : { isStreaming: true, isFinal: false },
+      metadata:
+        kind === 'thinking'
+          ? { isStreaming: true, isFinal: false, isThinking: true }
+          : { isStreaming: true, isFinal: false },
     };
     const created = this.store ? this.store.addMessage(sessionId, seed) : seed;
     if (kind === 'thinking') active.thinkingMessageId = created.id;
@@ -816,9 +844,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     content: string,
   ): void {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
-    const metadata = kind === 'thinking'
-      ? { isStreaming: true, isFinal: false, isThinking: true }
-      : { isStreaming: true, isFinal: false };
+    const metadata =
+      kind === 'thinking'
+        ? { isStreaming: true, isFinal: false, isThinking: true }
+        : { isStreaming: true, isFinal: false };
     // Throttle the synchronous SQLite write separately from the IPC emit so a
     // fast Pi stream doesn't block the main-process event loop every frame.
     this.throttledStoreUpdate(sessionId, messageId, content, metadata);
@@ -835,9 +864,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.clearPendingMessageUpdate(messageId);
     this.clearPendingStoreUpdate(messageId);
-    const metadata = kind === 'thinking'
-      ? { isStreaming: false, isFinal: true, isThinking: true }
-      : { isStreaming: false, isFinal: true };
+    const metadata =
+      kind === 'thinking'
+        ? { isStreaming: false, isFinal: true, isThinking: true }
+        : { isStreaming: false, isFinal: true };
     if (this.store) {
       this.store.updateMessage(sessionId, messageId, { content, metadata });
     }
@@ -973,7 +1003,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    *
    * One proxy tool costs ~200 system-prompt tokens regardless of how many
    * MCP servers/tools are configured, vs N × ~200 tokens for per-tool
-   * registration. Uses RongxinAI's McpServerManager for tool execution
+   * registration. Uses ZhiYuanAgent's McpServerManager for tool execution
    * rather than creating duplicate MCP connections.
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
@@ -983,7 +1013,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     const mgr = this.mcpServerManager;
 
-    const toolIndex = manifest.map((e) => ({
+    const toolIndex = manifest.map(e => ({
       server: e.server,
       name: e.name,
       description: e.description,
@@ -991,13 +1021,17 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     const buildStatusLine = (): string => {
       const servers = this.mcpServerManager?.toolManifest ?? [];
-      const serverNames = [...new Set(servers.map((t) => t.server))];
+      const serverNames = [...new Set(servers.map(t => t.server))];
       const running = this.mcpServerManager?.isRunning ? 'running' : 'stopped';
-      return `MCP ${running} — ${serverNames.length} server(s), ${servers.length} tool(s):\n` +
-        serverNames.map((s) => {
-          const count = servers.filter((t) => t.server === s).length;
-          return `  ${s}: ${count} tool(s)`;
-        }).join('\n');
+      return (
+        `MCP ${running} — ${serverNames.length} server(s), ${servers.length} tool(s):\n` +
+        serverNames
+          .map(s => {
+            const count = servers.filter(t => t.server === s).length;
+            return `  ${s}: ${count} tool(s)`;
+          })
+          .join('\n')
+      );
     };
 
     return {
@@ -1013,10 +1047,22 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         type: 'object',
         properties: {
           tool: { type: 'string', description: 'Tool name to call (e.g. "read_file")' },
-          args: { type: 'string', description: 'Arguments as JSON string (e.g. {"path":"/tmp/x"})' },
-          server: { type: 'string', description: 'Filter to a specific server, or disambiguate tool calls' },
-          search: { type: 'string', description: 'Search tools by name or description (substring match)' },
-          describe: { type: 'string', description: 'Tool name to describe — returns parameter schema' },
+          args: {
+            type: 'string',
+            description: 'Arguments as JSON string (e.g. {"path":"/tmp/x"})',
+          },
+          server: {
+            type: 'string',
+            description: 'Filter to a specific server, or disambiguate tool calls',
+          },
+          search: {
+            type: 'string',
+            description: 'Search tools by name or description (substring match)',
+          },
+          describe: {
+            type: 'string',
+            description: 'Tool name to describe — returns parameter schema',
+          },
         },
         additionalProperties: false,
       },
@@ -1042,7 +1088,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
                 parsedArgs = JSON.parse(argsStr);
                 if (!parsedArgs || typeof parsedArgs !== 'object' || Array.isArray(parsedArgs)) {
                   return {
-                    content: [{ type: 'text', text: 'args must be a JSON object, e.g. {"key":"value"}' }],
+                    content: [
+                      { type: 'text', text: 'args must be a JSON object, e.g. {"key":"value"}' },
+                    ],
                     details: {},
                   };
                 }
@@ -1055,16 +1103,26 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             }
             let resolvedServer: string | undefined = server;
             if (!resolvedServer) {
-              const candidates = manifest.filter((e) => e.name === tool);
+              const candidates = manifest.filter(e => e.name === tool);
               if (candidates.length === 0) {
                 return {
-                  content: [{ type: 'text', text: `Tool "${tool}" not found. Use mcp({ search: "..." }) to discover tools.` }],
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Tool "${tool}" not found. Use mcp({ search: "..." }) to discover tools.`,
+                    },
+                  ],
                   details: {},
                 };
               }
               if (candidates.length > 1) {
                 return {
-                  content: [{ type: 'text', text: `Tool "${tool}" exists on multiple servers: ${candidates.map((c) => c.server).join(', ')}. Use {server} to disambiguate.` }],
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Tool "${tool}" exists on multiple servers: ${candidates.map(c => c.server).join(', ')}. Use {server} to disambiguate.`,
+                    },
+                  ],
                   details: {},
                 };
               }
@@ -1078,7 +1136,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           if (search) {
             const q = search.toLowerCase();
             const matches = toolIndex.filter(
-              (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
+              t => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
             );
             if (matches.length === 0) {
               return {
@@ -1087,16 +1145,24 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               };
             }
             return {
-              content: [{ type: 'text', text: matches.slice(0, 30).map(
-                (t) => `[${t.server}] ${t.name}: ${t.description}`,
-              ).join('\n') + (matches.length > 30 ? `\n... and ${matches.length - 30} more` : '') }],
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    matches
+                      .slice(0, 30)
+                      .map(t => `[${t.server}] ${t.name}: ${t.description}`)
+                      .join('\n') +
+                    (matches.length > 30 ? `\n... and ${matches.length - 30} more` : ''),
+                },
+              ],
               details: {},
             };
           }
 
           // ── describe: show tool parameter schema ──
           if (describe) {
-            const match = manifest.find((e) => e.name === describe);
+            const match = manifest.find(e => e.name === describe);
             if (!match) {
               return {
                 content: [{ type: 'text', text: `Tool "${describe}" not found.` }],
@@ -1104,14 +1170,19 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               };
             }
             return {
-              content: [{ type: 'text', text: `[${match.server}] ${match.name}\n${match.description}\nParameters: ${JSON.stringify(match.inputSchema, null, 2)}` }],
+              content: [
+                {
+                  type: 'text',
+                  text: `[${match.server}] ${match.name}\n${match.description}\nParameters: ${JSON.stringify(match.inputSchema, null, 2)}`,
+                },
+              ],
               details: {},
             };
           }
 
           // ── server: list tools on a specific server ──
           if (server) {
-            const serverTools = manifest.filter((e) => e.server === server);
+            const serverTools = manifest.filter(e => e.server === server);
             if (serverTools.length === 0) {
               return {
                 content: [{ type: 'text', text: `Server "${server}" not found or has no tools.` }],
@@ -1119,7 +1190,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               };
             }
             return {
-              content: [{ type: 'text', text: `${server} (${serverTools.length} tools):\n${serverTools.map((t) => `  ${t.name}: ${t.description}`).join('\n')}` }],
+              content: [
+                {
+                  type: 'text',
+                  text: `${server} (${serverTools.length} tools):\n${serverTools.map(t => `  ${t.name}: ${t.description}`).join('\n')}`,
+                },
+              ],
               details: {},
             };
           }
@@ -1131,7 +1207,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           };
         } catch (err) {
           return {
-            content: [{ type: 'text', text: `MCP error: ${err instanceof Error ? err.message : String(err)}` }],
+            content: [
+              {
+                type: 'text',
+                text: `MCP error: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
             details: {},
           };
         }
@@ -1190,7 +1271,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       label: 'Subagent',
       description:
         'Delegate tasks to specialized team members with isolated context. ' +
-        'Available members:\n' + agentList + '\n\n' +
+        'Available members:\n' +
+        agentList +
+        '\n\n' +
         'Use {agent, task} for single-member delegation. ' +
         'The member will execute independently and return results to you.',
       parameters: {
@@ -1224,10 +1307,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         const agentFile = availableAgents.find(a => a.id === agentId);
         if (!agentFile) {
           return {
-            content: [{
-              type: 'text',
-              text: `Unknown agent "${agentId}". Available agents: ${availableAgents.map(a => a.id).join(', ') || 'none'}`,
-            }],
+            content: [
+              {
+                type: 'text',
+                text: `Unknown agent "${agentId}". Available agents: ${availableAgents.map(a => a.id).join(', ') || 'none'}`,
+              },
+            ],
             details: {},
           };
         }
@@ -1241,7 +1326,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           systemPrompt = bodyMatch ? bodyMatch[1].trim() : content;
         } catch (err) {
           return {
-            content: [{ type: 'text', text: `Failed to read agent definition for "${agentId}": ${err instanceof Error ? err.message : String(err)}` }],
+            content: [
+              {
+                type: 'text',
+                text: `Failed to read agent definition for "${agentId}": ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
             details: {},
           };
         }
@@ -1257,7 +1347,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           };
           subOptions.resourceLoader = await this.createPiResourceLoader(
             pi,
-            (subOptions.cwd as string),
+            subOptions.cwd as string,
             systemPrompt,
           );
           if (authStorage) {
@@ -1292,7 +1382,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
                 }
               }
 
-              if (event.type === 'error' || (event.type === 'message_end' && event.message?.stopReason === 'error')) {
+              if (
+                event.type === 'error' ||
+                (event.type === 'message_end' && event.message?.stopReason === 'error')
+              ) {
                 clearTimeout(timeout);
                 unsubscribe();
                 const errorMsg = event.message?.errorMessage || 'Subagent encountered an error';
@@ -1314,7 +1407,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           };
         } catch (err) {
           return {
-            content: [{ type: 'text', text: `Subagent "${agentId}" failed: ${err instanceof Error ? err.message : String(err)}` }],
+            content: [
+              {
+                type: 'text',
+                text: `Subagent "${agentId}" failed: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
             details: { agentId },
           };
         } finally {
@@ -1336,7 +1434,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
 /**
  * Infer the Pi provider name from environment variables.
- * RongxinAI stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
+ * ZhiYuanAgent stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
  * Pi SDK looks up providers by name (deepseek, anthropic, openai, etc.).
  */
 const DEFAULT_PI_CONTEXT_WINDOW = 32768;
@@ -1381,9 +1479,8 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
       cacheRead: 0,
       cacheWrite: 0,
     },
-    contextWindow: providerMetadata.contextWindow
-      || providerMetadata.contextTokens
-      || DEFAULT_PI_CONTEXT_WINDOW,
+    contextWindow:
+      providerMetadata.contextWindow || providerMetadata.contextTokens || DEFAULT_PI_CONTEXT_WINDOW,
     maxTokens: providerMetadata.maxTokens || DEFAULT_PI_MAX_TOKENS,
   };
 }
@@ -1423,7 +1520,7 @@ function buildPiBuiltinModel(
   try {
     const builtinModel = pi.getModel(providerId, config.model);
     return builtinModel && typeof builtinModel === 'object'
-      ? builtinModel as Record<string, unknown>
+      ? (builtinModel as Record<string, unknown>)
       : null;
   } catch {
     return null;
@@ -1462,11 +1559,17 @@ function resolvePiModel(
  * (array of {type:'text',text} / {type:'thinking',thinking} blocks), NOT a delta.
  * We concatenate each kind so callers can SET (not append) their buffers.
  */
-function extractStreamingSnapshot(message?: PiEvent['message']): { text: string; thinking: string } {
+function extractStreamingSnapshot(message?: PiEvent['message']): {
+  text: string;
+  thinking: string;
+} {
   if (!message?.content) return { text: '', thinking: '' };
   if (typeof message.content === 'string') return { text: message.content, thinking: '' };
   if (typeof message.content[Symbol.iterator] !== 'function') {
-    console.warn('[PiRuntime] message.content is not iterable (type=%s), returning empty snapshot', typeof message.content);
+    console.warn(
+      '[PiRuntime] message.content is not iterable (type=%s), returning empty snapshot',
+      typeof message.content,
+    );
     return { text: '', thinking: '' };
   }
 
@@ -1494,7 +1597,7 @@ function extractToolResultText(result: unknown): string {
   if (typeof result === 'string') return result;
   if (Array.isArray(result)) {
     return result
-      .map((b) => extractToolResultText(b))
+      .map(b => extractToolResultText(b))
       .filter(Boolean)
       .join('\n');
   }

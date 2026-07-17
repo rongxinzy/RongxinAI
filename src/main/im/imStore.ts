@@ -114,9 +114,7 @@ export class IMStore {
         .run();
     }
     if (!mappingColNames.includes('openclaw_session_key')) {
-      this.db
-        .prepare('ALTER TABLE im_session_mappings ADD COLUMN openclaw_session_key TEXT')
-        .run();
+      this.db.prepare('ALTER TABLE im_session_mappings ADD COLUMN openclaw_session_key TEXT').run();
     }
   }
 
@@ -244,9 +242,7 @@ export class IMStore {
         };
         const now = Date.now();
         this.db
-          .prepare(
-            'INSERT INTO im_config (key, value, updated_at) VALUES (?, ?, ?)',
-          )
+          .prepare('INSERT INTO im_config (key, value, updated_at) VALUES (?, ?, ?)')
           .run(`telegram:${instanceId}`, JSON.stringify(instanceConfig), now);
         this.db.prepare('DELETE FROM im_config WHERE key = ?').run('telegramOpenClaw');
         // Migrate session mappings
@@ -330,9 +326,7 @@ export class IMStore {
         };
         const now = Date.now();
         this.db
-          .prepare(
-            'INSERT INTO im_config (key, value, updated_at) VALUES (?, ?, ?)',
-          )
+          .prepare('INSERT INTO im_config (key, value, updated_at) VALUES (?, ?, ?)')
           .run(`discord:${instanceId}`, JSON.stringify(instanceConfig), now);
         this.db.prepare('DELETE FROM im_config WHERE key = ?').run('discordOpenClaw');
         // Migrate session mappings
@@ -613,9 +607,9 @@ export class IMStore {
     }
 
     // Migrate single WeCom config to multi-instance format
-    const oldWecomSingleRow = this.db.prepare('SELECT value FROM im_config WHERE key = ?').get('wecomOpenClaw') as
-      | { value: string }
-      | undefined;
+    const oldWecomSingleRow = this.db
+      .prepare('SELECT value FROM im_config WHERE key = ?')
+      .get('wecomOpenClaw') as { value: string } | undefined;
     const existingWecomInstances = this.db
       .prepare('SELECT key FROM im_config WHERE key LIKE ?')
       .all('wecom:%') as Array<{ key: string }>;
@@ -958,7 +952,9 @@ export class IMStore {
 
   deleteDiscordInstance(instanceId: string): void {
     this.db.prepare('DELETE FROM im_config WHERE key = ?').run(`discord:${instanceId}`);
-    this.db.prepare('DELETE FROM im_session_mappings WHERE platform = ?').run(`discord:${instanceId}`);
+    this.db
+      .prepare('DELETE FROM im_session_mappings WHERE platform = ?')
+      .run(`discord:${instanceId}`);
   }
 
   getDiscordMultiInstanceConfig(): DiscordMultiInstanceConfig {
@@ -1028,7 +1024,9 @@ export class IMStore {
 
   deleteTelegramInstance(instanceId: string): void {
     this.db.prepare('DELETE FROM im_config WHERE key = ?').run(`telegram:${instanceId}`);
-    this.db.prepare('DELETE FROM im_session_mappings WHERE platform = ?').run(`telegram:${instanceId}`);
+    this.db
+      .prepare('DELETE FROM im_session_mappings WHERE platform = ?')
+      .run(`telegram:${instanceId}`);
   }
 
   getTelegramMultiInstanceConfig(): TelegramMultiInstanceConfig {
@@ -1169,7 +1167,9 @@ export class IMStore {
   deleteWecomInstance(instanceId: string): void {
     this.db.prepare('DELETE FROM im_config WHERE key = ?').run(`wecom:${instanceId}`);
     // Clean up session mappings for this instance
-    this.db.prepare('DELETE FROM im_session_mappings WHERE platform = ?').run(`wecom:${instanceId}`);
+    this.db
+      .prepare('DELETE FROM im_session_mappings WHERE platform = ?')
+      .run(`wecom:${instanceId}`);
   }
 
   getWecomMultiInstanceConfig(): WecomMultiInstanceConfig {
@@ -1230,14 +1230,7 @@ export class IMStore {
     const hasDiscord = config.discord?.instances?.some(i => !!i.botToken) ?? false;
     const hasQQ = config.qq?.instances?.some(i => !!(i.appId && i.appSecret)) ?? false;
     const hasWecom = config.wecom?.instances?.some(i => !!(i.botId && i.secret)) ?? false;
-    return (
-      hasDingTalk ||
-      hasFeishu ||
-      hasTelegram ||
-      hasDiscord ||
-      hasQQ ||
-      hasWecom
-    );
+    return hasDingTalk || hasFeishu || hasTelegram || hasDiscord || hasQQ || hasWecom;
   }
 
   // ==================== Notification Target Persistence ====================
@@ -1343,7 +1336,15 @@ export class IMStore {
       .prepare(
         'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, agent_id, openclaw_session_key, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .run(imConversationId, platform, coworkSessionId, agentId, normalizedOpenClawSessionKey || null, now, now);
+      .run(
+        imConversationId,
+        platform,
+        coworkSessionId,
+        agentId,
+        normalizedOpenClawSessionKey || null,
+        now,
+        now,
+      );
     return {
       imConversationId,
       platform,
@@ -1384,7 +1385,14 @@ export class IMStore {
       .prepare(
         'UPDATE im_session_mappings SET cowork_session_id = ?, agent_id = ?, openclaw_session_key = COALESCE(?, openclaw_session_key), last_active_at = ? WHERE im_conversation_id = ? AND platform = ?',
       )
-      .run(newCoworkSessionId, newAgentId, normalizedOpenClawSessionKey, now, imConversationId, platform);
+      .run(
+        newCoworkSessionId,
+        newAgentId,
+        normalizedOpenClawSessionKey,
+        now,
+        imConversationId,
+        platform,
+      );
   }
 
   updateSessionOpenClawSessionKey(
@@ -1448,7 +1456,7 @@ export class IMStore {
         WHERE platform = ?
           AND (${directClauses.join(' OR ')} OR im_conversation_id LIKE 'group:%')
         ORDER BY last_active_at DESC`;
-      params = [platform, ...Array.from(directPrefixes).map((prefix) => `${prefix}:%`)];
+      params = [platform, ...Array.from(directPrefixes).map(prefix => `${prefix}:%`)];
     } else if (platform) {
       query =
         'SELECT im_conversation_id, platform, cowork_session_id, agent_id, openclaw_session_key, created_at, last_active_at FROM im_session_mappings WHERE platform = ? ORDER BY last_active_at DESC';

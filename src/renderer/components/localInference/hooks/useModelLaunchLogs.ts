@@ -12,7 +12,7 @@ export const ModelLaunchLogPanelStatus = {
 } as const;
 
 export type ModelLaunchLogPanelStatus =
-  typeof ModelLaunchLogPanelStatus[keyof typeof ModelLaunchLogPanelStatus];
+  (typeof ModelLaunchLogPanelStatus)[keyof typeof ModelLaunchLogPanelStatus];
 
 export type ModelLaunchLogPanelState = {
   visible: boolean;
@@ -83,9 +83,10 @@ export function useModelLaunchLogs() {
   const markModelLaunchSucceeded = useCallback(() => {
     setState(current => ({
       ...current,
-      status: current.status === ModelLaunchLogPanelStatus.Failed
-        ? current.status
-        : ModelLaunchLogPanelStatus.Succeeded,
+      status:
+        current.status === ModelLaunchLogPanelStatus.Failed
+          ? current.status
+          : ModelLaunchLogPanelStatus.Succeeded,
     }));
   }, []);
 
@@ -167,9 +168,11 @@ function isSameRenderableLaunchLog(
   first: LlamaCppModelLaunchLogEvent,
   second: LlamaCppModelLaunchLogEvent,
 ): boolean {
-  return first.level === second.level
-    && first.phase === second.phase
-    && getLaunchLogText(first) === getLaunchLogText(second);
+  return (
+    first.level === second.level &&
+    first.phase === second.phase &&
+    getLaunchLogText(first) === getLaunchLogText(second)
+  );
 }
 
 function hasLaunchLogText(event: LlamaCppModelLaunchLogEvent): boolean {

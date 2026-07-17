@@ -63,7 +63,7 @@ export function ModelContextSettingsModal({
               {contextPresets.map((preset, index) => (
                 <span
                   key={preset}
-                  className="absolute h-3 w-0.5 -translate-x-1/2 bg-(--lobster-primary)"
+                  className="absolute h-3 w-0.5 -translate-x-1/2 bg-(--zy-primary)"
                   style={{ left: `${getContextPresetPosition(index, contextPresets.length)}%` }}
                 />
               ))}
@@ -75,12 +75,12 @@ export function ModelContextSettingsModal({
               step={1}
               value={Math.max(0, selectedPresetIndex)}
               className="relative z-10"
-              onValueChange={nextPresetIndex => setContextSize(contextPresets[nextPresetIndex] ?? contextPresets[0])}
+              onValueChange={nextPresetIndex =>
+                setContextSize(contextPresets[nextPresetIndex] ?? contextPresets[0])
+              }
             />
           </div>
-          <div
-            className={`relative h-4 text-xs ${localInferenceMutedTextClass}`}
-          >
+          <div className={`relative h-4 text-xs ${localInferenceMutedTextClass}`}>
             {contextPresets.map((preset, index) => (
               <span
                 key={preset}

@@ -3,7 +3,10 @@ import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { i18nService } from '../../../services/i18n';
 import type { LocalInferenceTab } from '../types';
 
-const tabOptions: Array<{ value: LocalInferenceTab; labelKey: 'localInferenceTabModels' | 'localInferenceTabMarketplace' }> = [
+const tabOptions: Array<{
+  value: LocalInferenceTab;
+  labelKey: 'localInferenceTabModels' | 'localInferenceTabMarketplace';
+}> = [
   { value: 'models', labelKey: 'localInferenceTabModels' },
   { value: 'marketplace', labelKey: 'localInferenceTabMarketplace' },
 ];

@@ -2,21 +2,30 @@ import type { Workspace } from '../../shared/workspace';
 import { WorkspaceDefault } from '../../shared/workspace';
 import { store } from '../store';
 import { clearCurrentSession } from '../store/slices/coworkSlice';
-import { setCurrentWorkspaceId, setWorkspaceLoading, setWorkspaces } from '../store/slices/workspaceSlice';
+import {
+  setCurrentWorkspaceId,
+  setWorkspaceLoading,
+  setWorkspaces,
+} from '../store/slices/workspaceSlice';
 import { localStore } from './store';
 
 const CURRENT_WORKSPACE_KEY = 'workspace.currentId';
 
 type LegacyCompatibleCoworkApi = {
   listWorkspaces?: () => Promise<{ success: boolean; workspaces?: Workspace[] }>;
-  ensureWorkspace?: (options: { path: string; name?: string }) => Promise<{ success: boolean; workspace?: Workspace }>;
-  renameWorkspace?: (id: string, name: string) => Promise<{ success: boolean; workspace?: Workspace }>;
+  ensureWorkspace?: (options: {
+    path: string;
+    name?: string;
+  }) => Promise<{ success: boolean; workspace?: Workspace }>;
+  renameWorkspace?: (
+    id: string,
+    name: string,
+  ) => Promise<{ success: boolean; workspace?: Workspace }>;
   getConfig?: () => Promise<{ success: boolean; config?: { workingDirectory?: string } }>;
 };
 
-const getCompatibleCoworkApi = (): LegacyCompatibleCoworkApi | undefined => (
-  window.electron?.cowork as unknown as LegacyCompatibleCoworkApi | undefined
-);
+const getCompatibleCoworkApi = (): LegacyCompatibleCoworkApi | undefined =>
+  window.electron?.cowork as unknown as LegacyCompatibleCoworkApi | undefined;
 
 const createLegacyWorkspace = (workspacePath: string): Workspace => {
   const normalizedPath = workspacePath.trim();
@@ -46,10 +55,13 @@ class WorkspaceService {
         try {
           const result = await cowork.listWorkspaces();
           this.workspaceApiAvailable = result.success;
-          workspaces = result.success ? result.workspaces ?? [] : [];
+          workspaces = result.success ? (result.workspaces ?? []) : [];
         } catch (error) {
           this.workspaceApiAvailable = false;
-          console.warn('[WorkspaceService] Workspace IPC is unavailable, using legacy session fallback:', error);
+          console.warn(
+            '[WorkspaceService] Workspace IPC is unavailable, using legacy session fallback:',
+            error,
+          );
         }
       }
 
@@ -66,9 +78,9 @@ class WorkspaceService {
       store.dispatch(setWorkspaces(workspaces));
 
       const savedId = await localStore.getItem<string>(CURRENT_WORKSPACE_KEY);
-      const currentId = workspaces.some((workspace) => workspace.id === savedId)
+      const currentId = workspaces.some(workspace => workspace.id === savedId)
         ? savedId
-        : workspaces[0]?.id ?? null;
+        : (workspaces[0]?.id ?? null);
       store.dispatch(setCurrentWorkspaceId(currentId));
       if (currentId) await localStore.setItem(CURRENT_WORKSPACE_KEY, currentId);
       return workspaces;
@@ -86,18 +98,25 @@ class WorkspaceService {
         workspace = result.success ? result.workspace : undefined;
       } catch (error) {
         this.workspaceApiAvailable = false;
-        console.warn('[WorkspaceService] Failed to create Workspace through IPC, using local fallback:', error);
+        console.warn(
+          '[WorkspaceService] Failed to create Workspace through IPC, using local fallback:',
+          error,
+        );
       }
     }
     workspace ??= createLegacyWorkspace(path);
     const current = store.getState().workspace.workspaces;
-    const next = [...current.filter((item) => item.id !== workspace!.id), { ...workspace, name: name?.trim() || workspace.name }];
+    const next = [
+      ...current.filter(item => item.id !== workspace!.id),
+      { ...workspace, name: name?.trim() || workspace.name },
+    ];
     store.dispatch(setWorkspaces(next));
     return next[next.length - 1];
   }
 
   async selectWorkspace(workspaceId: string): Promise<void> {
-    if (!store.getState().workspace.workspaces.some((workspace) => workspace.id === workspaceId)) return;
+    if (!store.getState().workspace.workspaces.some(workspace => workspace.id === workspaceId))
+      return;
     if (store.getState().workspace.currentWorkspaceId !== workspaceId) {
       store.dispatch(clearCurrentSession());
     }
@@ -112,14 +131,18 @@ class WorkspaceService {
       const result = await cowork.renameWorkspace(workspaceId, name);
       workspace = result.success ? result.workspace : undefined;
     }
-    workspace ??= store.getState().workspace.workspaces.find((item) => item.id === workspaceId);
+    workspace ??= store.getState().workspace.workspaces.find(item => item.id === workspaceId);
     if (!workspace) return null;
     const renamedWorkspace = { ...workspace, name: name.trim(), updatedAt: Date.now() };
-    store.dispatch(setWorkspaces(
-      store.getState().workspace.workspaces.map((item) => (
-        item.id === renamedWorkspace.id ? renamedWorkspace : item
-      )),
-    ));
+    store.dispatch(
+      setWorkspaces(
+        store
+          .getState()
+          .workspace.workspaces.map(item =>
+            item.id === renamedWorkspace.id ? renamedWorkspace : item,
+          ),
+      ),
+    );
     return renamedWorkspace;
   }
 }

@@ -55,7 +55,7 @@ describe('enterpriseConfigSync', () => {
         name: 'Test',
         ui: { hideTabs: [], disableUpdate: false },
         sync: { openclaw: false, skills: false, agents: false, mcp: false },
-      })
+      }),
     );
     const raw = fs.readFileSync(path.join(manifestDir, 'manifest.json'), 'utf-8');
     const manifest = JSON.parse(raw);
@@ -67,7 +67,9 @@ describe('enterpriseConfigSync', () => {
     const appConfig = {
       api: { key: 'sk-test', baseUrl: 'https://api.example.com' },
       model: { defaultModel: 'test-model', defaultModelProvider: 'test' },
-      providers: { test: { enabled: true, apiKey: 'sk-test', baseUrl: 'https://api.example.com', models: [] } },
+      providers: {
+        test: { enabled: true, apiKey: 'sk-test', baseUrl: 'https://api.example.com', models: [] },
+      },
       theme: 'dark',
       language: 'zh',
     };
@@ -86,9 +88,13 @@ describe('enterpriseConfigSync', () => {
 
   test('channel key mapping covers all platform aliases used by enterprise import', () => {
     const map: Record<string, string> = {
-      telegram: 'telegramOpenClaw', discord: 'discordOpenClaw',
-      feishu: 'feishuOpenClaw', dingtalk: 'dingtalkOpenClaw', 'dingtalk-connector': 'dingtalkOpenClaw',
-      qqbot: 'qq', wecom: 'wecomOpenClaw',
+      telegram: 'telegramOpenClaw',
+      discord: 'discordOpenClaw',
+      feishu: 'feishuOpenClaw',
+      dingtalk: 'dingtalkOpenClaw',
+      'dingtalk-connector': 'dingtalkOpenClaw',
+      qqbot: 'qq',
+      wecom: 'wecomOpenClaw',
       'openclaw-weixin': 'weixin',
     };
     expect(Object.keys(map)).toHaveLength(8);
@@ -150,7 +156,7 @@ describe('enterpriseConfigSync', () => {
       } as any,
       () => undefined,
       () => undefined,
-      (updates) => {
+      updates => {
         coworkUpdates.push(updates);
       },
       () => undefined,
@@ -194,7 +200,10 @@ describe('enterpriseConfigSync', () => {
       set: () => undefined,
     };
     const setWecomConfigCalls: Array<Record<string, unknown>> = [];
-    const setWecomInstanceConfigCalls: Array<{ instanceId: string; config: Record<string, unknown> }> = [];
+    const setWecomInstanceConfigCalls: Array<{
+      instanceId: string;
+      config: Record<string, unknown>;
+    }> = [];
     const imStore = {
       getWecomInstances: () => [
         {
@@ -258,7 +267,10 @@ describe('enterpriseConfigSync', () => {
         sync: { openclaw: false, skills: false, agents: false, mcp: false, plugins: true },
       }),
     );
-    fs.writeFileSync(path.join(pluginDir, 'openclaw.plugin.json'), JSON.stringify({ id: 'enterprise-test-plugin' }));
+    fs.writeFileSync(
+      path.join(pluginDir, 'openclaw.plugin.json'),
+      JSON.stringify({ id: 'enterprise-test-plugin' }),
+    );
     fs.writeFileSync(path.join(pluginDir, 'index.js'), 'export default {};');
 
     const mod = await import('./enterpriseConfigSync');
@@ -297,13 +309,21 @@ describe('enterpriseConfigSync', () => {
         sync: { openclaw: false, skills: false, agents: true, mcp: false, plugins: true },
       }),
     );
-    fs.writeFileSync(path.join(pluginDir, 'openclaw.plugin.json'), JSON.stringify({ id: 'enterprise-test-plugin' }));
+    fs.writeFileSync(
+      path.join(pluginDir, 'openclaw.plugin.json'),
+      JSON.stringify({ id: 'enterprise-test-plugin' }),
+    );
     fs.writeFileSync(path.join(pluginDir, 'index.js'), 'export default {};');
 
     const originalMkdirSync = fs.mkdirSync.bind(fs);
-    vi.spyOn(fs, 'mkdirSync').mockImplementation(((target: fs.PathLike, options?: fs.MakeDirectoryOptions & { recursive?: boolean }) => {
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(((
+      target: fs.PathLike,
+      options?: fs.MakeDirectoryOptions & { recursive?: boolean },
+    ) => {
       if (String(target) === blockedWorkspace) {
-        const error = new Error(`EACCES: permission denied, mkdir '${blockedWorkspace}'`) as NodeJS.ErrnoException;
+        const error = new Error(
+          `EACCES: permission denied, mkdir '${blockedWorkspace}'`,
+        ) as NodeJS.ErrnoException;
         error.code = 'EACCES';
         throw error;
       }
@@ -383,7 +403,10 @@ describe('enterpriseConfigSync', () => {
       set: () => undefined,
     };
     const setFeishuOpenClawConfigCalls: Array<Record<string, unknown>> = [];
-    const setFeishuInstanceConfigCalls: Array<{ instanceId: string; config: Record<string, unknown> }> = [];
+    const setFeishuInstanceConfigCalls: Array<{
+      instanceId: string;
+      config: Record<string, unknown>;
+    }> = [];
     const imStore = {
       getFeishuInstances: () => [
         {
@@ -499,7 +522,10 @@ describe('enterpriseConfigSync', () => {
       get: () => undefined,
       set: () => undefined,
     };
-    const setFeishuInstanceConfigCalls: Array<{ instanceId: string; config: Record<string, unknown> }> = [];
+    const setFeishuInstanceConfigCalls: Array<{
+      instanceId: string;
+      config: Record<string, unknown>;
+    }> = [];
     const imStore = {
       getFeishuInstances: () => [
         {
@@ -552,7 +578,6 @@ describe('enterpriseConfigSync', () => {
     ]);
   });
 
-
   test('mergeOpenClawConfigs preserves runtime plugin load paths and appends enterprise paths', async () => {
     const mod = await import('./enterpriseConfigSync');
     const merged = mod.mergeOpenClawConfigs(
@@ -575,10 +600,7 @@ describe('enterpriseConfigSync', () => {
     expect(merged).toEqual({
       plugins: {
         load: {
-          paths: [
-            '/runtime/plugins',
-            '/enterprise/custom-plugins',
-          ],
+          paths: ['/runtime/plugins', '/enterprise/custom-plugins'],
         },
       },
     });
@@ -625,10 +647,7 @@ describe('enterpriseConfigSync', () => {
     expect(merged).toEqual({
       plugins: {
         load: {
-          paths: [
-            '/runtime/plugins',
-            '/enterprise/custom-plugins',
-          ],
+          paths: ['/runtime/plugins', '/enterprise/custom-plugins'],
         },
       },
     });

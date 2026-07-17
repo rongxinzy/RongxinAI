@@ -7,9 +7,7 @@ import { Button } from '@shared/components/ui/button';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import AgentAvatarIcon, {
-  AGENT_AVATAR_SVG_OPTIONS,
-} from './AgentAvatarIcon';
+import AgentAvatarIcon, { AGENT_AVATAR_SVG_OPTIONS } from './AgentAvatarIcon';
 
 interface AgentAvatarPickerProps {
   value: string;
@@ -61,7 +59,7 @@ const AgentAvatarPicker: React.FC<AgentAvatarPickerProps> = ({ value, onChange }
         type="button"
         variant="ghost"
         size="icon-lg"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => setIsOpen(prev => !prev)}
         title={i18nService.t('agentAvatarPickerTitle')}
         aria-label={i18nService.t('agentAvatarPickerTitle')}
         className={`rounded-full transition-shadow hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50 ${
@@ -77,11 +75,9 @@ const AgentAvatarPicker: React.FC<AgentAvatarPickerProps> = ({ value, onChange }
       </Button>
 
       {isOpen && (
-        <div
-          className="absolute left-0 top-full z-50 mt-2 w-[324px] overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
-        >
+        <div className="absolute left-0 top-full z-50 mt-2 w-[324px] overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
           <div className="grid max-h-[360px] grid-cols-6 gap-x-4 gap-y-4 overflow-y-auto px-6 py-5">
-            {AGENT_AVATAR_SVG_OPTIONS.map((option) => {
+            {AGENT_AVATAR_SVG_OPTIONS.map(option => {
               const optionValue = encodeAgentAvatarIcon({ svg: option.svg });
               const isSelected = draftAvatar.svg === option.svg;
 

@@ -8,7 +8,7 @@
  * Electron main process.  Any change to logger.ts constants or regexes must be
  * reflected here.
  */
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mirrors from logger.ts
@@ -32,18 +32,18 @@ function isRecent(mtimeMs: number, nowMs: number): boolean {
 /** Simulates getRecentMainLogEntries over a virtual directory. */
 function recentEntries(files: FileEntry[], nowMs: number): Array<{ archiveName: string }> {
   return files
-    .filter((f) => LOG_FILE_RE.test(f.name))
-    .filter((f) => isRecent(f.mtimeMs, nowMs))
-    .map((f) => ({ archiveName: f.name }))
+    .filter(f => LOG_FILE_RE.test(f.name))
+    .filter(f => isRecent(f.mtimeMs, nowMs))
+    .map(f => ({ archiveName: f.name }))
     .sort((a, b) => a.archiveName.localeCompare(b.archiveName));
 }
 
 /** Simulates pruneOldLogs: returns names of files that would be deleted. */
 function filesToPrune(files: FileEntry[], nowMs: number): string[] {
   return files
-    .filter((f) => LOG_FILE_RE.test(f.name))
-    .filter((f) => isPrunable(f.mtimeMs, nowMs))
-    .map((f) => f.name);
+    .filter(f => LOG_FILE_RE.test(f.name))
+    .filter(f => isPrunable(f.mtimeMs, nowMs))
+    .map(f => f.name);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,19 +139,19 @@ test('prune: .old variant from 8 days ago is deleted', () => {
 
 test('prune: non-matching files are never pruned', () => {
   const files = [
-    { name: 'cowork.log',   mtimeMs: daysAgo(30) },
+    { name: 'cowork.log', mtimeMs: daysAgo(30) },
     { name: 'renderer.log', mtimeMs: daysAgo(30) },
-    { name: 'main.log',     mtimeMs: daysAgo(30) },
+    { name: 'main.log', mtimeMs: daysAgo(30) },
   ];
   expect(filesToPrune(files, NOW)).toEqual([]);
 });
 
 test('prune: mixed — only old main-date files are deleted', () => {
   const files = [
-    { name: 'main-2026-03-20.log', mtimeMs: daysAgo(0) },  // keep
-    { name: 'main-2026-03-15.log', mtimeMs: daysAgo(5) },  // keep
-    { name: 'main-2026-03-12.log', mtimeMs: daysAgo(8) },  // delete
-    { name: 'cowork.log',          mtimeMs: daysAgo(30) }, // ignore
+    { name: 'main-2026-03-20.log', mtimeMs: daysAgo(0) }, // keep
+    { name: 'main-2026-03-15.log', mtimeMs: daysAgo(5) }, // keep
+    { name: 'main-2026-03-12.log', mtimeMs: daysAgo(8) }, // delete
+    { name: 'cowork.log', mtimeMs: daysAgo(30) }, // ignore
   ];
   expect(filesToPrune(files, NOW)).toEqual(['main-2026-03-12.log']);
 });
@@ -167,7 +167,7 @@ test('entries: empty dir returns empty array', () => {
 test('entries: only non-matching files returns empty array', () => {
   const files = [
     { name: 'cowork.log', mtimeMs: daysAgo(1) },
-    { name: 'main.log',   mtimeMs: daysAgo(1) },
+    { name: 'main.log', mtimeMs: daysAgo(1) },
   ];
   expect(recentEntries(files, NOW)).toEqual([]);
 });
@@ -204,7 +204,7 @@ test('entries: results are sorted alphabetically', () => {
     { name: 'main-2026-03-19.log', mtimeMs: daysAgo(1) },
     { name: 'main-2026-03-18.log', mtimeMs: daysAgo(2) },
   ];
-  const names = recentEntries(files, NOW).map((e) => e.archiveName);
+  const names = recentEntries(files, NOW).map(e => e.archiveName);
   expect(names).toEqual([
     'main-2026-03-17.log',
     'main-2026-03-18.log',
@@ -220,5 +220,5 @@ test('entries: full 7-day window all included, day 8 excluded', () => {
   }));
   const result = recentEntries(files, NOW);
   expect(result.length >= 7).toBeTruthy();
-  expect(result.some((e) => e.archiveName === 'main-2026-03-12.log')).toBeFalsy();
+  expect(result.some(e => e.archiveName === 'main-2026-03-12.log')).toBeFalsy();
 });

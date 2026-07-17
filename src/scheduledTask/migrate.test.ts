@@ -26,16 +26,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { MigrationKey } from './constants';
-import { migrateScheduledTaskRunsToOpenclaw,migrateScheduledTasksToOpenclaw } from './migrate';
+import { migrateScheduledTaskRunsToOpenclaw, migrateScheduledTasksToOpenclaw } from './migrate';
 import type { ScheduledTaskInput } from './types';
 
 // ---- fake helpers -----------------------------------------------------------
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-migrate-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-migrate-test-'));
 }
 function cleanupDir(dir: string) {
   fs.rmSync(dir, { recursive: true, force: true });
@@ -71,7 +71,11 @@ function fakeDb({
             return taskNameRows;
           }
           // Legacy task rows
-          if (sql.includes('FROM scheduled_tasks') && !sql.includes('task_runs') && !sql.includes('sqlite_master')) {
+          if (
+            sql.includes('FROM scheduled_tasks') &&
+            !sql.includes('task_runs') &&
+            !sql.includes('sqlite_master')
+          ) {
             return taskRows;
           }
           // Legacy run rows
@@ -89,7 +93,9 @@ function makeKv(initial: Record<string, string> = {}) {
   const store: Record<string, string> = { ...initial };
   return {
     getKv: (key: string) => store[key],
-    setKv: (key: string, val: string) => { store[key] = val; },
+    setKv: (key: string, val: string) => {
+      store[key] = val;
+    },
     store,
   };
 }
@@ -102,7 +108,9 @@ function makeCronService() {
       if (shouldThrow) throw new Error('gateway unavailable');
       jobs.push(input);
     },
-    forceError: () => { shouldThrow = true; },
+    forceError: () => {
+      shouldThrow = true;
+    },
     jobs,
   };
 }
@@ -114,7 +122,12 @@ test('migration tasks: idempotency guard — no-op when already done', async () 
   const cron = makeCronService();
   const db = fakeDb({ tables: new Set(['scheduled_tasks']) });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(cron.jobs.length).toBe(0);
 });
@@ -124,7 +137,12 @@ test('migration tasks: fresh install — no legacy table -> marks done', async (
   const cron = makeCronService();
   const db = fakeDb(); // no tables
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(kv.store[MigrationKey.TasksToOpenclaw]).toBe('true');
   expect(cron.jobs.length).toBe(0);
@@ -135,7 +153,12 @@ test('migration tasks: empty legacy table -> marks done without calling addJob',
   const cron = makeCronService();
   const db = fakeDb({ tables: new Set(['scheduled_tasks']), taskRows: [] });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(kv.store[MigrationKey.TasksToOpenclaw]).toBe('true');
   expect(cron.jobs.length).toBe(0);
@@ -146,18 +169,25 @@ test('migration tasks: valid cron task is migrated via addJob', async () => {
   const cron = makeCronService();
   const db = fakeDb({
     tables: new Set(['scheduled_tasks']),
-    taskRows: [{
-      id: 'task-1',
-      name: 'Daily standup',
-      description: 'Morning standup reminder',
-      enabled: 1,
-      schedule_json: JSON.stringify({ type: 'cron', expression: '0 9 * * 1-5' }),
-      prompt: 'Remind me of the standup meeting',
-      notify_platforms_json: '["dingtalk"]',
-    }],
+    taskRows: [
+      {
+        id: 'task-1',
+        name: 'Daily standup',
+        description: 'Morning standup reminder',
+        enabled: 1,
+        schedule_json: JSON.stringify({ type: 'cron', expression: '0 9 * * 1-5' }),
+        prompt: 'Remind me of the standup meeting',
+        notify_platforms_json: '["dingtalk"]',
+      },
+    ],
   });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(cron.jobs.length).toBe(1);
   expect(cron.jobs[0].name).toBe('Daily standup');
@@ -171,18 +201,25 @@ test('migration tasks: interval task is migrated with everyMs', async () => {
   const cron = makeCronService();
   const db = fakeDb({
     tables: new Set(['scheduled_tasks']),
-    taskRows: [{
-      id: 'task-2',
-      name: 'Hourly check',
-      description: '',
-      enabled: 1,
-      schedule_json: JSON.stringify({ type: 'interval', intervalMs: 3_600_000 }),
-      prompt: 'Check emails',
-      notify_platforms_json: '[]',
-    }],
+    taskRows: [
+      {
+        id: 'task-2',
+        name: 'Hourly check',
+        description: '',
+        enabled: 1,
+        schedule_json: JSON.stringify({ type: 'interval', intervalMs: 3_600_000 }),
+        prompt: 'Check emails',
+        notify_platforms_json: '[]',
+      },
+    ],
   });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(cron.jobs.length).toBe(1);
   expect(cron.jobs[0].schedule.kind).toBe('every');
@@ -195,18 +232,25 @@ test('migration tasks: past one-time "at" task is skipped (not sent to gateway)'
   const pastTime = new Date(Date.now() - 86_400_000).toISOString(); // yesterday
   const db = fakeDb({
     tables: new Set(['scheduled_tasks']),
-    taskRows: [{
-      id: 'task-past',
-      name: 'Expired reminder',
-      description: '',
-      enabled: 1,
-      schedule_json: JSON.stringify({ type: 'at', datetime: pastTime }),
-      prompt: 'Long gone reminder',
-      notify_platforms_json: '[]',
-    }],
+    taskRows: [
+      {
+        id: 'task-past',
+        name: 'Expired reminder',
+        description: '',
+        enabled: 1,
+        schedule_json: JSON.stringify({ type: 'at', datetime: pastTime }),
+        prompt: 'Long gone reminder',
+        notify_platforms_json: '[]',
+      },
+    ],
   });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(cron.jobs.length).toBe(0);
   expect(kv.store[MigrationKey.TasksToOpenclaw]).toBe('true');
@@ -239,7 +283,12 @@ test('migration tasks: invalid schedule_json causes task to be skipped', async (
     ],
   });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(cron.jobs.length).toBe(1);
   expect(cron.jobs[0].name).toBe('Good schedule');
@@ -253,18 +302,25 @@ test('migration tasks: gateway errors prevent kv flag from being set (allows ret
 
   const db = fakeDb({
     tables: new Set(['scheduled_tasks']),
-    taskRows: [{
-      id: 'task-err',
-      name: 'Will fail',
-      description: '',
-      enabled: 1,
-      schedule_json: JSON.stringify({ type: 'cron', expression: '*/5 * * * *' }),
-      prompt: 'periodic job',
-      notify_platforms_json: '[]',
-    }],
+    taskRows: [
+      {
+        id: 'task-err',
+        name: 'Will fail',
+        description: '',
+        enabled: 1,
+        schedule_json: JSON.stringify({ type: 'cron', expression: '*/5 * * * *' }),
+        prompt: 'periodic job',
+        notify_platforms_json: '[]',
+      },
+    ],
   });
 
-  await migrateScheduledTasksToOpenclaw({ db: db as never, getKv: kv.getKv, setKv: kv.setKv, cronJobService: cron as never });
+  await migrateScheduledTasksToOpenclaw({
+    db: db as never,
+    getKv: kv.getKv,
+    setKv: kv.setKv,
+    cronJobService: cron as never,
+  });
 
   expect(kv.store[MigrationKey.TasksToOpenclaw]).not.toBe('true');
 });
@@ -278,7 +334,10 @@ test('migration runs: idempotency guard — no-op when already done', async () =
     const db = fakeDb({ tables: new Set(['scheduled_task_runs']) });
 
     await migrateScheduledTaskRunsToOpenclaw({
-      db: db as never, getKv: kv.getKv, setKv: kv.setKv, openclawStateDir: dir,
+      db: db as never,
+      getKv: kv.getKv,
+      setKv: kv.setKv,
+      openclawStateDir: dir,
     });
 
     // No JSONL files written
@@ -296,7 +355,10 @@ test('migration runs: no legacy table -> marks done', async () => {
     const db = fakeDb(); // no tables
 
     await migrateScheduledTaskRunsToOpenclaw({
-      db: db as never, getKv: kv.getKv, setKv: kv.setKv, openclawStateDir: dir,
+      db: db as never,
+      getKv: kv.getKv,
+      setKv: kv.setKv,
+      openclawStateDir: dir,
     });
 
     expect(kv.store[MigrationKey.RunsToOpenclaw]).toBe('true');
@@ -314,20 +376,25 @@ test('migration runs: run rows written to per-task JSONL files', async () => {
 
     const db = fakeDb({
       tables: new Set(['scheduled_task_runs', 'scheduled_tasks']),
-      runRows: [{
-        id: 'run-1',
-        task_id: 'task-abc',
-        session_id: 'sess-xyz',
-        status: 'success',
-        started_at: startedAt,
-        finished_at: finishedAt,
-        duration_ms: 1000,
-        error: null,
-      }],
+      runRows: [
+        {
+          id: 'run-1',
+          task_id: 'task-abc',
+          session_id: 'sess-xyz',
+          status: 'success',
+          started_at: startedAt,
+          finished_at: finishedAt,
+          duration_ms: 1000,
+          error: null,
+        },
+      ],
     });
 
     await migrateScheduledTaskRunsToOpenclaw({
-      db: db as never, getKv: kv.getKv, setKv: kv.setKv, openclawStateDir: dir,
+      db: db as never,
+      getKv: kv.getKv,
+      setKv: kv.setKv,
+      openclawStateDir: dir,
     });
 
     const jsonlPath = path.join(dir, 'cron', 'runs', 'task-abc.jsonl');
@@ -358,25 +425,34 @@ test('migration runs: duplicate timestamps are not written twice on re-run', asy
     const runsDir = path.join(dir, 'cron', 'runs');
     fs.mkdirSync(runsDir, { recursive: true });
     const jsonlPath = path.join(runsDir, 'task-dup.jsonl');
-    fs.writeFileSync(jsonlPath, JSON.stringify({ ts: finishedMs, jobId: 'task-dup', action: 'finished', status: 'ok' }) + '\n');
+    fs.writeFileSync(
+      jsonlPath,
+      JSON.stringify({ ts: finishedMs, jobId: 'task-dup', action: 'finished', status: 'ok' }) +
+        '\n',
+    );
 
     const kv = makeKv();
     const db = fakeDb({
       tables: new Set(['scheduled_task_runs']),
-      runRows: [{
-        id: 'run-dup',
-        task_id: 'task-dup',
-        session_id: null,
-        status: 'success',
-        started_at: new Date(finishedMs - 1000).toISOString(),
-        finished_at: finishedAt,
-        duration_ms: 1000,
-        error: null,
-      }],
+      runRows: [
+        {
+          id: 'run-dup',
+          task_id: 'task-dup',
+          session_id: null,
+          status: 'success',
+          started_at: new Date(finishedMs - 1000).toISOString(),
+          finished_at: finishedAt,
+          duration_ms: 1000,
+          error: null,
+        },
+      ],
     });
 
     await migrateScheduledTaskRunsToOpenclaw({
-      db: db as never, getKv: kv.getKv, setKv: kv.setKv, openclawStateDir: dir,
+      db: db as never,
+      getKv: kv.getKv,
+      setKv: kv.setKv,
+      openclawStateDir: dir,
     });
 
     const lines = fs.readFileSync(jsonlPath, 'utf-8').trim().split('\n').filter(Boolean);
@@ -395,20 +471,25 @@ test('migration runs: error status maps to "error" in JSONL', async () => {
 
     const db = fakeDb({
       tables: new Set(['scheduled_task_runs']),
-      runRows: [{
-        id: 'run-err',
-        task_id: 'task-err',
-        session_id: null,
-        status: 'error',
-        started_at: startedAt,
-        finished_at: finishedAt,
-        duration_ms: 1000,
-        error: 'timeout exceeded',
-      }],
+      runRows: [
+        {
+          id: 'run-err',
+          task_id: 'task-err',
+          session_id: null,
+          status: 'error',
+          started_at: startedAt,
+          finished_at: finishedAt,
+          duration_ms: 1000,
+          error: 'timeout exceeded',
+        },
+      ],
     });
 
     await migrateScheduledTaskRunsToOpenclaw({
-      db: db as never, getKv: kv.getKv, setKv: kv.setKv, openclawStateDir: dir,
+      db: db as never,
+      getKv: kv.getKv,
+      setKv: kv.setKv,
+      openclawStateDir: dir,
     });
 
     const jsonlPath = path.join(dir, 'cron', 'runs', 'task-err.jsonl');

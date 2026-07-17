@@ -191,29 +191,28 @@ test('fetchModelScopeSkillMarketplace keeps only featured skills', async () => {
 
 test('resolveModelScopeSkillInstallSource prefers source_url from skill detail', async () => {
   const requestedUrls: string[] = [];
-  await expect(resolveModelScopeSkillInstallSource(
-    'https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
-    {
-      fetchImpl: async (input) => {
+  await expect(
+    resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill', {
+      fetchImpl: async input => {
         requestedUrls.push(input);
         return {
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({
-          data: {
-            id: '@AMap-Web/amap-lbs-skill',
-            source_url: 'https://github.com/AMap-Web/amap-lbs-skill',
-            install_command: [
-              'npx skills add https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
-            ],
-          },
-        }),
-        text: async () => '',
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            data: {
+              id: '@AMap-Web/amap-lbs-skill',
+              source_url: 'https://github.com/AMap-Web/amap-lbs-skill',
+              install_command: [
+                'npx skills add https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
+              ],
+            },
+          }),
+          text: async () => '',
         };
       },
-    },
-  )).resolves.toBe('https://github.com/AMap-Web/amap-lbs-skill');
+    }),
+  ).resolves.toBe('https://github.com/AMap-Web/amap-lbs-skill');
   expect(requestedUrls).toEqual([
     'https://modelscope.cn/openapi/v1/skills/@AMap-Web/amap-lbs-skill',
   ]);
@@ -227,12 +226,14 @@ test('fetchModelScopeSkillMarketplace omits an install source when the skill onl
       statusText: 'OK',
       json: async () => ({
         data: {
-          skills: [{
-            id: '@demo/platform-only',
-            display_name: 'Platform only',
-            downloads: 10,
-            install_command: ['npx skills add https://modelscope.cn/skills/@demo/platform-only'],
-          }],
+          skills: [
+            {
+              id: '@demo/platform-only',
+              display_name: 'Platform only',
+              downloads: 10,
+              install_command: ['npx skills add https://modelscope.cn/skills/@demo/platform-only'],
+            },
+          ],
         },
       }),
       text: async () => '',
@@ -245,9 +246,8 @@ test('fetchModelScopeSkillMarketplace omits an install source when the skill onl
 });
 
 test('resolveModelScopeSkillInstallSource returns null when no supported source is published', async () => {
-  await expect(resolveModelScopeSkillInstallSource(
-    'https://modelscope.cn/skills/@demo/platform-only',
-    {
+  await expect(
+    resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@demo/platform-only', {
       fetchImpl: async () => ({
         ok: true,
         status: 200,
@@ -260,6 +260,6 @@ test('resolveModelScopeSkillInstallSource returns null when no supported source 
         }),
         text: async () => '',
       }),
-    },
-  )).resolves.toBeNull();
+    }),
+  ).resolves.toBeNull();
 });

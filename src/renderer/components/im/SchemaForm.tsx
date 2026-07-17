@@ -14,7 +14,7 @@ import {
 } from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
 import { Textarea } from '@shared/components/ui/textarea';
-import { ChevronRight, Eye, EyeOff,XCircle } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, XCircle } from 'lucide-react';
 import React from 'react';
 
 /** A single uiHint entry from the gateway */
@@ -47,13 +47,19 @@ export interface SchemaFormProps {
 
 /** Deep-get a value from nested object by dot path */
 function deepGet(obj: Record<string, unknown>, path: string): unknown {
-  return path.split('.').reduce((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), obj as unknown);
+  return path
+    .split('.')
+    .reduce(
+      (o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined),
+      obj as unknown,
+    );
 }
 
-
-
 /** Get JSON Schema property descriptor at a dot path */
-function getSchemaProperty(schema: Record<string, unknown>, path: string): Record<string, unknown> | null {
+function getSchemaProperty(
+  schema: Record<string, unknown>,
+  path: string,
+): Record<string, unknown> | null {
   const keys = path.split('.');
   let current = schema;
   for (const key of keys) {
@@ -81,8 +87,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
 
   // Sort all hint keys by order
   const sortedKeys = Object.keys(hints)
-    .filter((key) => includePath ? includePath(key, hints[key]) : true)
-    .sort((a, b) => (hints[a].order ?? Number.MAX_SAFE_INTEGER) - (hints[b].order ?? Number.MAX_SAFE_INTEGER));
+    .filter(key => (includePath ? includePath(key, hints[key]) : true))
+    .sort(
+      (a, b) =>
+        (hints[a].order ?? Number.MAX_SAFE_INTEGER) - (hints[b].order ?? Number.MAX_SAFE_INTEGER),
+    );
 
   for (const key of sortedKeys) {
     // Skip 'enabled' field
@@ -125,13 +134,8 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const boolValue = Boolean(fieldValue);
       return (
         <div key={path} className="flex items-center justify-between py-1">
-          <label className="text-xs font-medium text-muted-foreground">
-            {hint.label}
-          </label>
-          <Switch
-            checked={boolValue}
-            onCheckedChange={(checked) => handleChange(checked)}
-          />
+          <label className="text-xs font-medium text-muted-foreground">{hint.label}</label>
+          <Switch checked={boolValue} onCheckedChange={checked => handleChange(checked)} />
         </div>
       );
     }
@@ -140,13 +144,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     if (type === 'string' && enumValues) {
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">
-            {hint.label}
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
           <Select
             value={String(fieldValue || '')}
-            onValueChange={(value) => handleChange(value)}
-            onOpenChange={(open) => {
+            onValueChange={value => handleChange(value)}
+            onOpenChange={open => {
               if (!open) onBlur?.();
             }}
           >
@@ -154,7 +156,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {enumValues.map((v) => (
+              {enumValues.map(v => (
                 <SelectItem key={v} value={v}>
                   {v}
                 </SelectItem>
@@ -171,14 +173,12 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const strValue = String(fieldValue || '');
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">
-            {hint.label}
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
           <div className="relative">
             <Input
               type={shown ? 'text' : 'password'}
               value={strValue}
-              onChange={(e) => handleChange(e.target.value)}
+              onChange={e => handleChange(e.target.value)}
               onBlur={onBlur}
               className="pr-16"
               placeholder="••••••••••••"
@@ -216,14 +216,12 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const strValue = String(fieldValue || '');
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">
-            {hint.label}
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
           <div className="relative">
             <Input
               type="text"
               value={strValue}
-              onChange={(e) => handleChange(e.target.value)}
+              onChange={e => handleChange(e.target.value)}
               onBlur={onBlur}
               className="pr-8"
             />
@@ -251,13 +249,14 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const arrValue = Array.isArray(fieldValue) ? fieldValue.map(String).join('\n') : '';
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">
-            {hint.label}
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
           <Textarea
             value={arrValue}
-            onChange={(e) => {
-              const lines = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
+            onChange={e => {
+              const lines = e.target.value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(Boolean);
               handleChange(lines);
             }}
             onBlur={onBlur}
@@ -272,13 +271,11 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const numValue = typeof fieldValue === 'number' ? fieldValue : '';
       return (
         <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">
-            {hint.label}
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
           <Input
             type="number"
             value={numValue}
-            onChange={(e) => handleChange(e.target.value ? Number(e.target.value) : undefined)}
+            onChange={e => handleChange(e.target.value ? Number(e.target.value) : undefined)}
             onBlur={onBlur}
           />
         </div>
@@ -294,7 +291,9 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     if (!groupHint) return null;
 
     // Find all child fields
-    const childFields = sortedKeys.filter((key) => key.startsWith(`${groupKey}.`) && key.split('.').length === 2);
+    const childFields = sortedKeys.filter(
+      key => key.startsWith(`${groupKey}.`) && key.split('.').length === 2,
+    );
 
     return (
       <details key={groupKey} className="group">
@@ -303,7 +302,7 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
           {groupHint.label}
         </summary>
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
-          {childFields.map((field) => renderField(field, hints[field]))}
+          {childFields.map(field => renderField(field, hints[field]))}
         </div>
       </details>
     );
@@ -312,10 +311,10 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
   return (
     <div className="space-y-3">
       {/* Top-level fields */}
-      {topLevelFields.map((field) => renderField(field, hints[field]))}
+      {topLevelFields.map(field => renderField(field, hints[field]))}
 
       {/* Groups */}
-      {groups.map((group) => renderGroup(group))}
+      {groups.map(group => renderGroup(group))}
     </div>
   );
 };

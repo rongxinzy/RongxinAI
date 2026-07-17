@@ -2,7 +2,7 @@ export const AgentId = {
   Main: 'main',
 } as const;
 
-export type AgentId = typeof AgentId[keyof typeof AgentId];
+export type AgentId = (typeof AgentId)[keyof typeof AgentId];
 
 export const AgentIpcChannel = {
   List: 'agents:list',
@@ -17,7 +17,7 @@ export const AgentIpcChannel = {
   GetPresetExperts: 'agents:getPresetExperts',
 } as const;
 
-export type AgentIpcChannel = typeof AgentIpcChannel[keyof typeof AgentIpcChannel];
+export type AgentIpcChannel = (typeof AgentIpcChannel)[keyof typeof AgentIpcChannel];
 
 export const LegacyAgentName = {
   Main: 'main',

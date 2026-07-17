@@ -4,14 +4,14 @@
 } as const;
 
 export type RendererPrototypeQuery =
-  typeof RendererPrototypeQuery[keyof typeof RendererPrototypeQuery];
+  (typeof RendererPrototypeQuery)[keyof typeof RendererPrototypeQuery];
 
 export const RendererPrototypeView = {
   LocalInferenceModelCard: 'local-inference-model-card',
 } as const;
 
 export type RendererPrototypeView =
-  typeof RendererPrototypeView[keyof typeof RendererPrototypeView];
+  (typeof RendererPrototypeView)[keyof typeof RendererPrototypeView];
 
 export const LocalInferenceModelCardPrototypeState = {
   Idle: 'idle',
@@ -21,4 +21,4 @@ export const LocalInferenceModelCardPrototypeState = {
 } as const;
 
 export type LocalInferenceModelCardPrototypeState =
-  typeof LocalInferenceModelCardPrototypeState[keyof typeof LocalInferenceModelCardPrototypeState];
+  (typeof LocalInferenceModelCardPrototypeState)[keyof typeof LocalInferenceModelCardPrototypeState];

@@ -3,4 +3,4 @@ export { getCronJobService, initCronJobServiceManager } from './cronJobServiceMa
 export type { ScheduledTaskHandlerDeps } from './handlers';
 export { registerScheduledTaskHandlers } from './handlers';
 export type { ScheduledTaskHelperDeps } from './helpers';
-export { initScheduledTaskHelpers,listScheduledTaskChannels } from './helpers';
+export { initScheduledTaskHelpers, listScheduledTaskChannels } from './helpers';

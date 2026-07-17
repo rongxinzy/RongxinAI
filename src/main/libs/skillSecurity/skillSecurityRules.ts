@@ -21,11 +21,7 @@ const FILE_ACCESS_RULES: SecurityRule[] = [
     dimension: 'file_access',
     severity: 'critical',
     filePatterns: ['**/*.sh', '**/*.js', '**/*.ts', '**/*.ps1'],
-    patterns: [
-      /\.aws\/(credentials|config)\b/,
-      /AWS_SECRET_ACCESS_KEY/,
-      /AWS_SESSION_TOKEN/,
-    ],
+    patterns: [/\.aws\/(credentials|config)\b/, /AWS_SECRET_ACCESS_KEY/, /AWS_SESSION_TOKEN/],
     description: 'securityFindingAwsCredentials',
   },
   {
@@ -65,10 +61,7 @@ const FILE_ACCESS_RULES: SecurityRule[] = [
     dimension: 'file_access',
     severity: 'critical',
     filePatterns: ['**/*.sh', '**/*.bash', '**/*.js'],
-    patterns: [
-      /security\s+find-(generic|internet)-password/,
-      /security\s+dump-keychain/,
-    ],
+    patterns: [/security\s+find-(generic|internet)-password/, /security\s+dump-keychain/],
     description: 'securityFindingKeychainAccess',
   },
   {
@@ -121,11 +114,7 @@ const DANGEROUS_COMMAND_RULES: SecurityRule[] = [
     dimension: 'dangerous_command',
     severity: 'danger',
     filePatterns: ['**/*.sh', '**/*.bash'],
-    patterns: [
-      /\bsudo\b/,
-      /\bsu\s+-\b/,
-      /\bpkexec\b/,
-    ],
+    patterns: [/\bsudo\b/, /\bsu\s+-\b/, /\bpkexec\b/],
     description: 'securityFindingSudo',
   },
   {
@@ -164,10 +153,7 @@ const DANGEROUS_COMMAND_RULES: SecurityRule[] = [
     dimension: 'dangerous_command',
     severity: 'critical',
     filePatterns: ['**/*.sh', '**/*.bash', '**/*.bat', '**/*.cmd'],
-    patterns: [
-      /:\(\)\s*\{\s*:\|:\s*&\s*\}\s*;/,
-      /%0\|%0/,
-    ],
+    patterns: [/:\(\)\s*\{\s*:\|:\s*&\s*\}\s*;/, /%0\|%0/],
     description: 'securityFindingForkBomb',
   },
 ];
@@ -204,11 +190,7 @@ const NETWORK_RULES: SecurityRule[] = [
     dimension: 'network',
     severity: 'warning',
     filePatterns: ['**/*.sh', '**/*.js', '**/*.ts', '**/*.ps1'],
-    patterns: [
-      /discord\.com\/api\/webhooks\//,
-      /hooks\.slack\.com/,
-      /api\.telegram\.org\/bot/,
-    ],
+    patterns: [/discord\.com\/api\/webhooks\//, /hooks\.slack\.com/, /api\.telegram\.org\/bot/],
     description: 'securityFindingWebhookExfil',
   },
   {
@@ -384,12 +366,7 @@ const WEB_CONTENT_RULES: SecurityRule[] = [
     dimension: 'web_content',
     severity: 'danger',
     filePatterns: ['**/*.svg'],
-    patterns: [
-      /<script\b/i,
-      /on(load|error|click)\s*=/i,
-      /<foreignObject\b/i,
-      /javascript:/i,
-    ],
+    patterns: [/<script\b/i, /on(load|error|click)\s*=/i, /<foreignObject\b/i, /javascript:/i],
     description: 'securityFindingSvgScript',
   },
   {
@@ -397,9 +374,7 @@ const WEB_CONTENT_RULES: SecurityRule[] = [
     dimension: 'web_content',
     severity: 'warning',
     filePatterns: ['**/*.html', '**/*.htm'],
-    patterns: [
-      /<(script|iframe|object|embed)\s[^>]*src\s*=\s*["']https?:\/\//i,
-    ],
+    patterns: [/<(script|iframe|object|embed)\s[^>]*src\s*=\s*["']https?:\/\//i],
     description: 'securityFindingExternalResource',
   },
 ];
@@ -423,7 +398,7 @@ export const ALL_SECURITY_RULES: SecurityRule[] = [
 export function getRulesForFile(relativePath: string): SecurityRule[] {
   const ext = getExtension(relativePath);
   return ALL_SECURITY_RULES.filter(rule =>
-    rule.filePatterns.some(pattern => matchesGlobSuffix(pattern, ext, relativePath))
+    rule.filePatterns.some(pattern => matchesGlobSuffix(pattern, ext, relativePath)),
   );
 }
 

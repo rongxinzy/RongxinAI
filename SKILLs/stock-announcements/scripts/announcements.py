@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterAI Stock Announcement Fetcher
+ZhiYuanAgent Stock Announcement Fetcher
 Fetches A-share company announcements from Eastmoney via AkShare.
 
 Dependencies: pip install akshare pandas requests PyPDF2
@@ -159,7 +159,7 @@ def print_json(items: list):
 # ---------------------------------------------------------------------------
 
 def main():
-    ap = argparse.ArgumentParser(description="LobsterAI A股公告查询")
+    ap = argparse.ArgumentParser(description="知远智能体 A股公告查询")
     ap.add_argument("stock_code", help="股票代码 (如 000858, 600519.SS)")
     ap.add_argument("--days", type=int, default=30, help="查询最近N天 (默认30)")
     ap.add_argument("--keyword", default=None, help="标题关键词筛选")

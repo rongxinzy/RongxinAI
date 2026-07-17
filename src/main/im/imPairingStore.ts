@@ -103,7 +103,12 @@ function readAllowFromFile(channel: string, stateDir: string, accountId?: string
   return Array.isArray(file.allowFrom) ? file.allowFrom : [];
 }
 
-function writeAllowFromFile(channel: string, stateDir: string, allowFrom: string[], accountId?: string): void {
+function writeAllowFromFile(
+  channel: string,
+  stateDir: string,
+  allowFrom: string[],
+  accountId?: string,
+): void {
   const filePath = resolveAllowFromPath(channel, stateDir, accountId);
   writeJsonFileSync(filePath, { version: 1, allowFrom });
 }
@@ -116,7 +121,7 @@ function writeAllowFromFile(channel: string, stateDir: string, allowFrom: string
 export function listPairingRequests(channel: string, stateDir: string): PairingRequest[] {
   const requests = readPairingFile(channel, stateDir);
   const now = Date.now();
-  return requests.filter((r) => {
+  return requests.filter(r => {
     const createdAt = new Date(r.createdAt).getTime();
     return !isNaN(createdAt) && now - createdAt < PAIRING_PENDING_TTL_MS;
   });
@@ -142,7 +147,7 @@ export function approvePairingCode(
   const requests = readPairingFile(channel, stateDir);
 
   const upperCode = code.toUpperCase().trim();
-  const idx = requests.findIndex((r) => r.code === upperCode);
+  const idx = requests.findIndex(r => r.code === upperCode);
   if (idx === -1) return null;
 
   const [approved] = requests.splice(idx, 1);
@@ -176,7 +181,7 @@ export function rejectPairingRequest(
   const requests = readPairingFile(channel, stateDir);
 
   const upperCode = code.toUpperCase().trim();
-  const idx = requests.findIndex((r) => r.code === upperCode);
+  const idx = requests.findIndex(r => r.code === upperCode);
   if (idx === -1) return null;
 
   const [rejected] = requests.splice(idx, 1);

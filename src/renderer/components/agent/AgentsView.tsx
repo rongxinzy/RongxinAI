@@ -44,10 +44,15 @@ const AgentsView: React.FC<AgentsViewProps> = ({
     agentService.getPresets().then(setPresets);
   }, [agents]);
 
-  const enabledAgents = agents.filter((a) => a.enabled && a.id !== 'main');
-  const presetAgents = enabledAgents.filter((a) => a.source === 'preset');
-  const customAgents = enabledAgents.filter((a) => a.source === 'custom' || a.source === 'expert-package' || a.source === 'expert-package-member');
-  const uninstalledPresets = presets.filter((p) => !p.installed);
+  const enabledAgents = agents.filter(a => a.enabled && a.id !== 'main');
+  const presetAgents = enabledAgents.filter(a => a.source === 'preset');
+  const customAgents = enabledAgents.filter(
+    a =>
+      a.source === 'custom' ||
+      a.source === 'expert-package' ||
+      a.source === 'expert-package-member',
+  );
+  const uninstalledPresets = presets.filter(p => !p.installed);
 
   const handleAddPreset = async (presetId: string) => {
     setAddingPreset(presetId);
@@ -67,12 +72,22 @@ const AgentsView: React.FC<AgentsViewProps> = ({
       setImportingExpert(true);
       const importResult = await agentService.importExpertPackage(expertDir);
       if (importResult?.success) {
-        window.alert(i18nService.t('importExpertPackageSuccess').replace('{name}', importResult.name || ''));
+        window.alert(
+          i18nService.t('importExpertPackageSuccess').replace('{name}', importResult.name || ''),
+        );
       } else {
-        window.alert(i18nService.t('importExpertPackageError').replace('{error}', importResult?.error || 'Unknown error'));
+        window.alert(
+          i18nService
+            .t('importExpertPackageError')
+            .replace('{error}', importResult?.error || 'Unknown error'),
+        );
       }
     } catch (error) {
-      window.alert(i18nService.t('importExpertPackageError').replace('{error}', error instanceof Error ? error.message : 'Unknown error'));
+      window.alert(
+        i18nService
+          .t('importExpertPackageError')
+          .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
+      );
     } finally {
       setImportingExpert(false);
     }
@@ -106,9 +121,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
               {updateBadge}
             </div>
           )}
-          <h1 className="text-lg font-semibold text-foreground">
-            {i18nService.t('myAgents')}
-          </h1>
+          <h1 className="text-lg font-semibold text-foreground">{i18nService.t('myAgents')}</h1>
         </div>
         <WindowTitleBar inline />
       </div>
@@ -117,9 +130,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
       <div className="flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Subtitle */}
-          <p className="text-sm text-muted-foreground mb-6">
-            {i18nService.t('agentsSubtitle')}
-          </p>
+          <p className="text-sm text-muted-foreground mb-6">{i18nService.t('agentsSubtitle')}</p>
 
           {/* Preset Agents Section */}
           {(presetAgents.length > 0 || uninstalledPresets.length > 0) && (
@@ -129,7 +140,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {/* Installed presets */}
-                {presetAgents.map((agent) => (
+                {presetAgents.map(agent => (
                   <AgentCard
                     key={agent.id}
                     icon={agent.icon}
@@ -140,14 +151,16 @@ const AgentsView: React.FC<AgentsViewProps> = ({
                   />
                 ))}
                 {/* Uninstalled presets */}
-                {uninstalledPresets.map((preset) => {
+                {uninstalledPresets.map(preset => {
                   const isEn = i18nService.getLanguage() === 'en';
                   return (
                     <UninstalledPresetCard
                       key={preset.id}
                       icon={preset.icon}
                       name={isEn && preset.nameEn ? preset.nameEn : preset.name}
-                      description={isEn && preset.descriptionEn ? preset.descriptionEn : preset.description}
+                      description={
+                        isEn && preset.descriptionEn ? preset.descriptionEn : preset.description
+                      }
                       isAdding={addingPreset === preset.id}
                       onAdd={() => handleAddPreset(preset.id)}
                     />
@@ -163,7 +176,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
               {i18nService.t('myCustomAgents')}
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-              {customAgents.map((agent) => (
+              {customAgents.map(agent => (
                 <AgentCard
                   key={agent.id}
                   icon={agent.icon}
@@ -210,10 +223,7 @@ const AgentsView: React.FC<AgentsViewProps> = ({
 
       {/* Modals */}
       <AgentCreateModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
-      <AgentSettingsPanel
-        agentId={settingsAgentId}
-        onClose={() => setSettingsAgentId(null)}
-      />
+      <AgentSettingsPanel agentId={settingsAgentId} onClose={() => setSettingsAgentId(null)} />
     </div>
   );
 };
@@ -232,9 +242,7 @@ const AgentCard: React.FC<{
     variant="outline"
     onClick={onClick}
     className={`flex flex-col items-start gap-2 p-4 rounded-xl border-2 text-left transition-all min-h-[140px] hover:shadow-md hover:bg-surface-raised h-auto ${
-      isActive
-        ? 'border-primary bg-primary/5'
-        : 'border-border'
+      isActive ? 'border-primary bg-primary/5' : 'border-border'
     }`}
   >
     <AgentAvatarIcon
@@ -244,13 +252,9 @@ const AgentCard: React.FC<{
       legacyClassName="text-3xl"
     />
     <div className="min-w-0 w-full">
-      <div className="text-sm font-semibold text-foreground truncate">
-        {name}
-      </div>
+      <div className="text-sm font-semibold text-foreground truncate">{name}</div>
       {description && (
-        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-          {description}
-        </div>
+        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</div>
       )}
     </div>
   </Button>
@@ -273,13 +277,9 @@ const UninstalledPresetCard: React.FC<{
       legacyClassName="text-3xl"
     />
     <div className="min-w-0 w-full flex-1">
-      <div className="text-sm font-semibold text-foreground truncate">
-        {name}
-      </div>
+      <div className="text-sm font-semibold text-foreground truncate">{name}</div>
       {description && (
-        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-          {description}
-        </div>
+        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{description}</div>
       )}
     </div>
     <Button

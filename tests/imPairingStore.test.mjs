@@ -34,7 +34,7 @@ const {
 // ── test helpers ─────────────────────────────────────────────────────────────
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-pairing-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-pairing-test-'));
 }
 
 function cleanupDir(dir) {
@@ -335,7 +335,7 @@ test('approvePairingCode does not add a duplicate entry to allowFrom', () => {
     writePairingFile(stateDir, 'dingtalk', [request]);
     approvePairingCode('dingtalk', 'DUPL01', stateDir);
     const allowed = readAllowFromFile(stateDir, 'dingtalk');
-    assert.equal(allowed.filter((id) => id === 'user:ken').length, 1);
+    assert.equal(allowed.filter(id => id === 'user:ken').length, 1);
   } finally {
     cleanupDir(stateDir);
   }

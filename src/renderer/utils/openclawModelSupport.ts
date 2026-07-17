@@ -15,7 +15,7 @@ export const OpenClawModelSupportReason = {
 } as const;
 
 export type OpenClawModelSupportReason =
-  typeof OpenClawModelSupportReason[keyof typeof OpenClawModelSupportReason];
+  (typeof OpenClawModelSupportReason)[keyof typeof OpenClawModelSupportReason];
 
 export const OpenClawModelValidationTargetKind = {
   Primary: 'primary',
@@ -24,7 +24,7 @@ export const OpenClawModelValidationTargetKind = {
 } as const;
 
 export type OpenClawModelValidationTargetKind =
-  typeof OpenClawModelValidationTargetKind[keyof typeof OpenClawModelValidationTargetKind];
+  (typeof OpenClawModelValidationTargetKind)[keyof typeof OpenClawModelValidationTargetKind];
 
 export type OpenClawModelValidationTarget = {
   kind: OpenClawModelValidationTargetKind;
@@ -44,10 +44,7 @@ function normalizeModelRef(modelRef?: string | null): string {
   return modelRef?.trim() ?? '';
 }
 
-export function resolveDraftOpenClawModelRef(
-  model: Model | null,
-  preservedModelRef = '',
-): string {
+export function resolveDraftOpenClawModelRef(model: Model | null, preservedModelRef = ''): string {
   if (model?.providerKey) {
     return toOpenClawModelRef(model);
   }
@@ -133,12 +130,9 @@ export function buildOpenClawModelValidationTargets(input: {
   const primaryModelRef =
     normalizeModelRef(input.primaryModelRef) || normalizeModelRef(input.fallbackModelRef);
 
-  const pushTarget = (
-    kind: OpenClawModelValidationTargetKind,
-    modelRef: string,
-  ): void => {
+  const pushTarget = (kind: OpenClawModelValidationTargetKind, modelRef: string): void => {
     if (!modelRef) return;
-    if (targets.some((target) => target.modelRef === modelRef)) {
+    if (targets.some(target => target.modelRef === modelRef)) {
       return;
     }
     targets.push({ kind, modelRef });
@@ -179,9 +173,7 @@ export function resolveFirstUnsupportedOpenClawModel(
   return null;
 }
 
-export function resolveOpenClawModelSupportMessageKey(
-  reason: OpenClawModelSupportReason,
-): string {
+export function resolveOpenClawModelSupportMessageKey(reason: OpenClawModelSupportReason): string {
   switch (reason) {
     case OpenClawModelSupportReason.LocalModelNotRunning:
       return 'agentLlamaCppModelNotRunningHint';

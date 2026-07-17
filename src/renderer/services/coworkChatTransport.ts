@@ -25,12 +25,14 @@ export interface CoworkChatTransportOptions {
 function extractText(message: UIMessage): string {
   return message.parts
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
+    .map(p => p.text)
     .join('');
 }
 
 /** Extract image parts from a UIMessage. */
-function extractImages(message: UIMessage): Array<{ name: string; mimeType: string; base64Data: string }> {
+function extractImages(
+  message: UIMessage,
+): Array<{ name: string; mimeType: string; base64Data: string }> {
   const result: Array<{ name: string; mimeType: string; base64Data: string }> = [];
   for (const part of message.parts) {
     if (part.type === 'file' && part.mediaType?.startsWith('image/')) {
@@ -103,7 +105,7 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
     const cowork = window.electron?.cowork;
     if (!cowork) throw new Error('Cowork IPC bridge is not available.');
 
-    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    const lastUser = [...messages].reverse().find(m => m.role === 'user');
     const prompt = lastUser ? extractText(lastUser) : '';
     const images = lastUser ? extractImages(lastUser) : [];
 
@@ -184,10 +186,10 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
           if (reasoningId) enqueue({ type: 'reasoning-end', id: reasoningId });
           enqueue({
             type: 'finish',
-            finishReason: reason === 'error' ? 'error' as const : 'stop' as const,
+            finishReason: reason === 'error' ? ('error' as const) : ('stop' as const),
           });
           controller.close();
-          cleanup.forEach((fn) => fn());
+          cleanup.forEach(fn => fn());
         };
 
         const cleanup: Array<() => void> = [];

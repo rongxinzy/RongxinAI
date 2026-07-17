@@ -12,7 +12,8 @@
 
 // Placeholder line — e.g. "[图片] https://example.com/..."
 // Capture the URL (group 2) so we can preserve it as plain text instead of stripping it.
-const MEDIA_PLACEHOLDER_RE = /^\[(图片|语音消息|视频|文件|多媒体消息)\](?:\s+(https?:\/\/\S+))?\s*$/m;
+const MEDIA_PLACEHOLDER_RE =
+  /^\[(图片|语音消息|视频|文件|多媒体消息)\](?:\s+(https?:\/\/\S+))?\s*$/m;
 
 // [附件信息] block — header line followed by "- ..." lines
 const ATTACHMENT_INFO_BLOCK_RE = /\n?\[附件信息\]\n(?:- .+(?:\n|$))+/;
@@ -23,7 +24,8 @@ const ATTACHMENT_INFO_BLOCK_RE = /\n?\[附件信息\]\n(?:- .+(?:\n|$))+/;
 const OPENCLAW_MEDIA_RE = /\[media attached:\s*(.+?)\s*\(([^)]+)\)(?:\s*\|\s*(.+?))?\s*\]/g;
 
 // Instructional text from openclaw plugins (spans to next blank line or end)
-const OPENCLAW_INSTRUCTION_RE = /To send an image back, prefer the message tool[^\n]*(?:\n(?!\n)[^\n]*)*/gi;
+const OPENCLAW_INSTRUCTION_RE =
+  /To send an image back, prefer the message tool[^\n]*(?:\n(?!\n)[^\n]*)*/gi;
 
 // "media:image" or "media:<type>" on its own line
 const MEDIA_TAG_RE = /^\s*media:\w+\s*$/gm;
@@ -33,10 +35,12 @@ const MEDIA_TAG_RE = /^\s*media:\w+\s*$/gm;
 // System: [timestamp ...] metadata lines — injected by various openclaw plugins
 // (feishu, dingtalk, popo, etc.) Matches timestamps like [2026-04-28 11:53:25 GMT+8].
 // Also matches System (untrusted): for scheduled-task exec outputs from the gateway.
-const SYSTEM_TIMESTAMP_LINE_RE = /^System(?:\s*\(untrusted\))?:\s*\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[^\]]*\].*$/gm;
+const SYSTEM_TIMESTAMP_LINE_RE =
+  /^System(?:\s*\(untrusted\))?:\s*\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[^\]]*\].*$/gm;
 
 // Bare path in the openclaw inbound media directory — highly specific, safe to match
-const OPENCLAW_INBOUND_IMAGE_RE = /^((?:[A-Za-z]:\\|\/)[^\n]*[/\\]openclaw[/\\]state[/\\]media[/\\]inbound[/\\][^\n]+\.(?:jpg|jpeg|png|gif|bmp|webp))\s*$/gm;
+const OPENCLAW_INBOUND_IMAGE_RE =
+  /^((?:[A-Za-z]:\\|\/)[^\n]*[/\\]openclaw[/\\]state[/\\]media[/\\]inbound[/\\][^\n]+\.(?:jpg|jpeg|png|gif|bmp|webp))\s*$/gm;
 
 const IMAGE_EXTENSIONS = /\.(?:jpg|jpeg|png|gif|bmp|webp)$/i;
 
@@ -59,9 +63,14 @@ export function parseUserMessageForDisplay(content: string): string {
 
   // --- Pattern A: Legacy media placeholders ---
 
-  if (result.includes('[图片]') || result.includes('[语音消息]') || result.includes('[视频]')
-    || result.includes('[文件]') || result.includes('[多媒体消息]') || result.includes('[附件信息]')) {
-
+  if (
+    result.includes('[图片]') ||
+    result.includes('[语音消息]') ||
+    result.includes('[视频]') ||
+    result.includes('[文件]') ||
+    result.includes('[多媒体消息]') ||
+    result.includes('[附件信息]')
+  ) {
     // Strip [图片] etc. but preserve the URL as plain text
     result = result.replace(MEDIA_PLACEHOLDER_RE, (_match, _type, url) => url || '');
     result = result.replace(ATTACHMENT_INFO_BLOCK_RE, '');
@@ -103,7 +112,7 @@ export function parseUserMessageForDisplay(content: string): string {
     const p = path.trim();
     if (IMAGE_EXTENSIONS.test(p)) {
       const alreadyExtracted = imagePaths.some(
-        existing => existing.toLowerCase() === p.toLowerCase()
+        existing => existing.toLowerCase() === p.toLowerCase(),
       );
       if (!alreadyExtracted) {
         imagePaths.push(p);

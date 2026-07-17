@@ -13,15 +13,11 @@ import type {
   CoworkSessionExpertSnapshot,
 } from '../shared/cowork/sessionExperts';
 import type { Workspace } from '../shared/workspace';
-import {
-  normalizeWorkspacePath,
-  workspaceIdForPath,
-  workspaceNameForPath,
-} from './workspaceUtils';
+import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 // Default working directory for new users
 const getDefaultWorkingDirectory = (): string => {
-  return path.join(os.homedir(), 'rongxinai', 'project');
+  return path.join(os.homedir(), 'zhiyuan', 'project');
 };
 
 const DEFAULT_MEMORY_ENABLED = true;
@@ -47,15 +43,21 @@ const DEFAULT_EMBEDDING_REMOTE_API_KEY = '';
 
 // Regexes and helper inlined from the removed coworkMemoryExtractor module.
 // Used only by shouldAutoDeleteMemoryText() during startup memory cleanup.
-const CHINESE_QUESTION_PREFIX_RE = /^(?:请问|问下|问一下|是否|能否|可否|为什么|为何|怎么|如何|谁|什么|哪(?:里|儿|个)?|几|多少|要不要|会不会|是不是|能不能|可不可以|行不行|对不对|好不好)/u;
-const ENGLISH_QUESTION_PREFIX_RE = /^(?:what|who|why|how|when|where|which|is|are|am|do|does|did|can|could|would|will|should)\b/i;
+const CHINESE_QUESTION_PREFIX_RE =
+  /^(?:请问|问下|问一下|是否|能否|可否|为什么|为何|怎么|如何|谁|什么|哪(?:里|儿|个)?|几|多少|要不要|会不会|是不是|能不能|可不可以|行不行|对不对|好不好)/u;
+const ENGLISH_QUESTION_PREFIX_RE =
+  /^(?:what|who|why|how|when|where|which|is|are|am|do|does|did|can|could|would|will|should)\b/i;
 const QUESTION_INLINE_RE = /(是不是|能不能|可不可以|要不要|会不会|有没有|对不对|好不好)/i;
 const QUESTION_SUFFIX_RE = /(吗|么|呢|嘛)\s*$/u;
 
 function isQuestionLikeMemoryText(text: string): boolean {
   // This function has its own normalization (strips trailing punctuation)
   // that differs from normalizeMemoryText, so it cannot reuse that helper.
-  const normalized = text.replace(/\s+/g, ' ').trim().replace(/[。！!]+$/g, '').trim();
+  const normalized = text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[。！!]+$/g, '')
+    .trim();
   if (!normalized) return false;
   if (/[？?]\s*$/.test(normalized)) return true;
   if (CHINESE_QUESTION_PREFIX_RE.test(normalized)) return true;
@@ -362,7 +364,6 @@ export interface UpdateAgentRequest {
   triageOverride?: import('../shared/triage').AgentTriageOverride | null;
 }
 
-
 export interface CoworkMessageMetadata {
   toolName?: string;
   toolInput?: Record<string, unknown>;
@@ -507,26 +508,27 @@ export interface CoworkConfig {
   embeddingRemoteApiKey: string;
 }
 
-export type CoworkConfigUpdate = Partial<Pick<
-CoworkConfig,
-  | 'workingDirectory'
-  | 'executionMode'
-  | 'agentEngine'
-  | 'memoryEnabled'
-  | 'memoryImplicitUpdateEnabled'
-  | 'memoryLlmJudgeEnabled'
-  | 'memoryGuardLevel'
-  | 'memoryUserMemoriesMaxItems'
-  | 'skipMissedJobs'
-  | 'embeddingEnabled'
-  | 'embeddingProvider'
-  | 'embeddingModel'
-  | 'embeddingLocalModelPath'
-  | 'embeddingVectorWeight'
-  | 'embeddingRemoteBaseUrl'
-  | 'embeddingRemoteApiKey'
->>;
-
+export type CoworkConfigUpdate = Partial<
+  Pick<
+    CoworkConfig,
+    | 'workingDirectory'
+    | 'executionMode'
+    | 'agentEngine'
+    | 'memoryEnabled'
+    | 'memoryImplicitUpdateEnabled'
+    | 'memoryLlmJudgeEnabled'
+    | 'memoryGuardLevel'
+    | 'memoryUserMemoriesMaxItems'
+    | 'skipMissedJobs'
+    | 'embeddingEnabled'
+    | 'embeddingProvider'
+    | 'embeddingModel'
+    | 'embeddingLocalModelPath'
+    | 'embeddingVectorWeight'
+    | 'embeddingRemoteBaseUrl'
+    | 'embeddingRemoteApiKey'
+  >
+>;
 
 let cachedDefaultSystemPrompt: string | null = null;
 
@@ -601,7 +603,7 @@ export class CoworkStore {
     }>(
       'SELECT id, name, path, created_at, updated_at FROM workspaces ORDER BY updated_at DESC, name ASC',
     );
-    return rows.map((row) => ({
+    return rows.map(row => ({
       id: row.id,
       name: row.name,
       path: row.path,
@@ -650,11 +652,9 @@ export class CoworkStore {
   renameWorkspace(id: string, name: string): Workspace | null {
     const normalizedName = name.trim();
     if (!normalizedName) throw new Error('Workspace name is required');
-    this.db.prepare('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?').run(
-      normalizedName,
-      Date.now(),
-      id,
-    );
+    this.db
+      .prepare('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?')
+      .run(normalizedName, Date.now(), id);
     return this.getWorkspace(id);
   }
 
@@ -732,7 +732,7 @@ export class CoworkStore {
       activeSkillIds,
       workspaceId: workspace.id,
       agentId,
-      experts: expertSnapshots.map((expert) => ({
+      experts: expertSnapshots.map(expert => ({
         ...expert,
         capabilityPolicy: expert.capabilityPolicy ?? {},
         createdAt: now,
@@ -793,13 +793,15 @@ export class CoworkStore {
       }
     }
 
-    const expertRows = this.db.prepare(
-      `SELECT expert_id, package_id, expert_name, source, prompt_snapshot,
+    const expertRows = this.db
+      .prepare(
+        `SELECT expert_id, package_id, expert_name, source, prompt_snapshot,
               skill_ids, capability_policy, content_hash, created_at
        FROM cowork_session_experts
        WHERE session_id = ?
        ORDER BY created_at ASC, expert_id ASC`,
-    ).all(id) as Array<{
+      )
+      .all(id) as Array<{
       expert_id: string;
       package_id: string;
       expert_name: string;
@@ -871,7 +873,14 @@ export class CoworkStore {
     updates: Partial<
       Pick<
         CoworkSession,
-        'title' | 'claudeSessionId' | 'status' | 'cwd' | 'systemPrompt' | 'modelOverride' | 'executionMode' | 'activeSkillIds'
+        | 'title'
+        | 'claudeSessionId'
+        | 'status'
+        | 'cwd'
+        | 'systemPrompt'
+        | 'modelOverride'
+        | 'executionMode'
+        | 'activeSkillIds'
       >
     >,
     options: { touchUpdatedAt?: boolean } = {},
@@ -932,7 +941,9 @@ export class CoworkStore {
   }
 
   replaceSessionExperts(id: string, expertSnapshots: CoworkSessionExpertInput[]): void {
-    const deleteExperts = this.db.prepare('DELETE FROM cowork_session_experts WHERE session_id = ?');
+    const deleteExperts = this.db.prepare(
+      'DELETE FROM cowork_session_experts WHERE session_id = ?',
+    );
     const insertExpert = this.db.prepare(`
       INSERT INTO cowork_session_experts
         (session_id, expert_id, package_id, expert_name, source, prompt_snapshot, skill_ids, capability_policy, content_hash, created_at)
@@ -988,7 +999,9 @@ export class CoworkStore {
 
   setSessionPinned(id: string, pinned: boolean): number | null {
     if (!pinned) {
-      this.db.prepare('UPDATE cowork_sessions SET pinned = 0, pin_order = NULL WHERE id = ?').run(id);
+      this.db
+        .prepare('UPDATE cowork_sessions SET pinned = 0, pin_order = NULL WHERE id = ?')
+        .run(id);
       return null;
     }
 
@@ -1229,7 +1242,11 @@ export class CoworkStore {
     });
   }
 
-  addMessage(sessionId: string, message: Omit<CoworkMessage, 'id' | 'timestamp'>, timestamp?: number): CoworkMessage {
+  addMessage(
+    sessionId: string,
+    message: Omit<CoworkMessage, 'id' | 'timestamp'>,
+    timestamp?: number,
+  ): CoworkMessage {
     const id = uuidv4();
     const now = timestamp ?? Date.now();
 
@@ -1362,7 +1379,11 @@ export class CoworkStore {
           ORDER BY COALESCE(sequence, created_at) ASC, created_at ASC, ROWID ASC
         `,
         )
-        .all(sessionId) as Array<{ type: 'user' | 'assistant'; content: string; created_at: number }>;
+        .all(sessionId) as Array<{
+        type: 'user' | 'assistant';
+        content: string;
+        created_at: number;
+      }>;
       const existingTimestamps = new Map<string, number[]>();
       for (const row of existingRows) {
         const timestamp = normalizeMessageTimestamp(Number(row.created_at));
@@ -1399,9 +1420,8 @@ export class CoworkStore {
         const existingKey = `${entry.role}\x1f${entry.text}`;
         const matchingExistingTimestamps = existingTimestamps.get(existingKey);
         const existingTimestamp = matchingExistingTimestamps?.shift();
-        const messageTimestamp = normalizeMessageTimestamp(entry.timestamp)
-          ?? existingTimestamp
-          ?? now;
+        const messageTimestamp =
+          normalizeMessageTimestamp(entry.timestamp) ?? existingTimestamp ?? now;
         insertedTimestamps.push(messageTimestamp);
         this.db
           .prepare(
@@ -1421,10 +1441,11 @@ export class CoworkStore {
           );
       }
 
-      const updatedAt = insertedTimestamps.length > 0
-        ? insertedTimestamps[insertedTimestamps.length - 1]
-        : now;
-      this.db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(updatedAt, sessionId);
+      const updatedAt =
+        insertedTimestamps.length > 0 ? insertedTimestamps[insertedTimestamps.length - 1] : now;
+      this.db
+        .prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?')
+        .run(updatedAt, sessionId);
     })();
   }
 
@@ -1512,9 +1533,11 @@ export class CoworkStore {
       embeddingEnabled: parseBooleanConfig(cfg.get('embeddingEnabled'), DEFAULT_EMBEDDING_ENABLED),
       embeddingProvider: cfg.get('embeddingProvider') || DEFAULT_EMBEDDING_PROVIDER,
       embeddingModel: cfg.get('embeddingModel') || DEFAULT_EMBEDDING_MODEL,
-      embeddingLocalModelPath: cfg.get('embeddingLocalModelPath') || DEFAULT_EMBEDDING_LOCAL_MODEL_PATH,
+      embeddingLocalModelPath:
+        cfg.get('embeddingLocalModelPath') || DEFAULT_EMBEDDING_LOCAL_MODEL_PATH,
       embeddingVectorWeight: parseEmbeddingVectorWeight(cfg.get('embeddingVectorWeight')),
-      embeddingRemoteBaseUrl: cfg.get('embeddingRemoteBaseUrl') || DEFAULT_EMBEDDING_REMOTE_BASE_URL,
+      embeddingRemoteBaseUrl:
+        cfg.get('embeddingRemoteBaseUrl') || DEFAULT_EMBEDDING_REMOTE_BASE_URL,
       embeddingRemoteApiKey: cfg.get('embeddingRemoteApiKey') || DEFAULT_EMBEDDING_REMOTE_API_KEY,
     };
   }
@@ -1535,16 +1558,28 @@ export class CoworkStore {
       this.upsertConfig('memoryEnabled', config.memoryEnabled ? '1' : '0', now);
     }
     if (config.memoryImplicitUpdateEnabled !== undefined) {
-      this.upsertConfig('memoryImplicitUpdateEnabled', config.memoryImplicitUpdateEnabled ? '1' : '0', now);
+      this.upsertConfig(
+        'memoryImplicitUpdateEnabled',
+        config.memoryImplicitUpdateEnabled ? '1' : '0',
+        now,
+      );
     }
     if (config.memoryLlmJudgeEnabled !== undefined) {
       this.upsertConfig('memoryLlmJudgeEnabled', config.memoryLlmJudgeEnabled ? '1' : '0', now);
     }
     if (config.memoryGuardLevel !== undefined) {
-      this.upsertConfig('memoryGuardLevel', normalizeMemoryGuardLevel(config.memoryGuardLevel), now);
+      this.upsertConfig(
+        'memoryGuardLevel',
+        normalizeMemoryGuardLevel(config.memoryGuardLevel),
+        now,
+      );
     }
     if (config.memoryUserMemoriesMaxItems !== undefined) {
-      this.upsertConfig('memoryUserMemoriesMaxItems', String(clampMemoryUserMemoriesMaxItems(config.memoryUserMemoriesMaxItems)), now);
+      this.upsertConfig(
+        'memoryUserMemoriesMaxItems',
+        String(clampMemoryUserMemoriesMaxItems(config.memoryUserMemoriesMaxItems)),
+        now,
+      );
     }
     if (config.skipMissedJobs !== undefined) {
       this.upsertConfig('skipMissedJobs', config.skipMissedJobs ? '1' : '0', now);
@@ -1562,7 +1597,11 @@ export class CoworkStore {
       this.upsertConfig('embeddingLocalModelPath', String(config.embeddingLocalModelPath), now);
     }
     if (config.embeddingVectorWeight !== undefined) {
-      this.upsertConfig('embeddingVectorWeight', String(Math.max(0, Math.min(1, config.embeddingVectorWeight))), now);
+      this.upsertConfig(
+        'embeddingVectorWeight',
+        String(Math.max(0, Math.min(1, config.embeddingVectorWeight))),
+        now,
+      );
     }
     if (config.embeddingRemoteBaseUrl !== undefined) {
       this.upsertConfig('embeddingRemoteBaseUrl', String(config.embeddingRemoteBaseUrl), now);
@@ -2214,7 +2253,7 @@ export class CoworkStore {
 
     // 名称去重校验（大小写不敏感）
     const dupName = this.getOne<{ id: string }>(
-      "SELECT id FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0",
+      'SELECT id FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0',
       [request.name.trim()],
     );
     if (dupName) {

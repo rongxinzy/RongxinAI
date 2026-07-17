@@ -15,9 +15,7 @@ export type LlamaCppModelLaunchLogInput = {
   detail?: unknown;
 };
 
-export type LlamaCppModelLaunchLogReporter = (
-  input: LlamaCppModelLaunchLogInput,
-) => void;
+export type LlamaCppModelLaunchLogReporter = (input: LlamaCppModelLaunchLogInput) => void;
 
 export type LlamaCppModelLaunchLogger = {
   readonly sessionId: string;
@@ -53,9 +51,10 @@ export function createLlamaCppModelLaunchLogger(input: {
 
   const report: LlamaCppModelLaunchLogReporter = eventInput => {
     const message = eventInput.message ? sanitizeLogText(eventInput.message) : undefined;
-    const detail = eventInput.detail !== undefined
-      ? sanitizeLogText(stringifyDetail(eventInput.detail))
-      : undefined;
+    const detail =
+      eventInput.detail !== undefined
+        ? sanitizeLogText(stringifyDetail(eventInput.detail))
+        : undefined;
     const logKey = [eventInput.level, eventInput.phase, message ?? '', detail ?? ''].join('\u0000');
     if (emittedLogKeys.has(logKey)) return;
     emittedLogKeys.add(logKey);
@@ -78,30 +77,34 @@ export function createLlamaCppModelLaunchLogger(input: {
     sessionId,
     modelName,
     report,
-    debug: (phase, message, detail) => report({
-      level: LlamaCppModelLaunchLogLevel.Debug,
-      phase,
-      message,
-      detail,
-    }),
-    info: (phase, message, detail) => report({
-      level: LlamaCppModelLaunchLogLevel.Info,
-      phase,
-      message,
-      detail,
-    }),
-    warn: (phase, message, detail) => report({
-      level: LlamaCppModelLaunchLogLevel.Warn,
-      phase,
-      message,
-      detail,
-    }),
-    error: (phase, message, detail) => report({
-      level: LlamaCppModelLaunchLogLevel.Error,
-      phase,
-      message,
-      detail,
-    }),
+    debug: (phase, message, detail) =>
+      report({
+        level: LlamaCppModelLaunchLogLevel.Debug,
+        phase,
+        message,
+        detail,
+      }),
+    info: (phase, message, detail) =>
+      report({
+        level: LlamaCppModelLaunchLogLevel.Info,
+        phase,
+        message,
+        detail,
+      }),
+    warn: (phase, message, detail) =>
+      report({
+        level: LlamaCppModelLaunchLogLevel.Warn,
+        phase,
+        message,
+        detail,
+      }),
+    error: (phase, message, detail) =>
+      report({
+        level: LlamaCppModelLaunchLogLevel.Error,
+        phase,
+        message,
+        detail,
+      }),
   };
 }
 

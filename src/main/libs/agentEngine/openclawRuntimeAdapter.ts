@@ -47,7 +47,12 @@ import {
   AgentLifecyclePhase,
   type AgentLifecyclePhase as AgentLifecyclePhaseValue,
 } from './constants';
-import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
+import {
+  classifyMessage,
+  createTriageState,
+  extractProviderId,
+  shouldAllowSwitch,
+} from './modelTriage';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -131,7 +136,9 @@ type OpenClawRuntimeAdapterOptions = {
   isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
   getModelContextWindow?: (modelRef: string) => number | undefined;
   getTriageConfig?: () => TriageConfig;
-  getAgent?: (agentId: string) => { triageOverride?: import('../../../shared/triage').AgentTriageOverride } | null;
+  getAgent?: (
+    agentId: string,
+  ) => { triageOverride?: import('../../../shared/triage').AgentTriageOverride } | null;
 };
 
 type ChatEventState = 'delta' | 'final' | 'aborted' | 'error';
@@ -979,7 +986,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   /**
    * Server-side agent timeout in seconds (mirrors agents.defaults.timeoutSeconds in openclaw config).
    * Used to set a client-side fallback timer that fires slightly after the server timeout,
-   * so RongxinAI can recover even when the gateway fails to deliver the abort event.
+   * so ZhiYuanAgent can recover even when the gateway fails to deliver the abort event.
    */
   agentTimeoutSeconds = OPENCLAW_AGENT_TIMEOUT_SECONDS;
   private static readonly CLIENT_TIMEOUT_GRACE_MS = 30_000;
@@ -1351,7 +1358,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
    * Ensure the gateway WebSocket client is connected.
    * Called when IM channels (e.g. Telegram) are enabled in OpenClaw mode
    * so that channel-originated events can be received without waiting
-   * for a RongxinAI-initiated session.
+   * for a ZhiYuanAgent-initiated session.
    */
   async connectGatewayIfNeeded(): Promise<void> {
     if (this.gatewayClient) {
@@ -1937,29 +1944,47 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     // Merge Agent-level triage override with global defaults
     const agentRecord = agentId ? this.options.getAgent?.(agentId) : null;
     const agentTriage = agentRecord?.triageOverride;
-    const triageConfig: TriageConfig | null = (agentTriage?.enabled || globalTriage?.enabled) ? {
-      ...globalTriage,
-      enabled: agentTriage?.enabled ?? globalTriage?.enabled ?? false,
-      rules: {
-        ...globalTriage?.rules,
-        ...(agentTriage?.lightModelRef !== undefined ? { lightModelRef: agentTriage.lightModelRef } : {}),
-        ...(agentTriage?.heavyModelRef !== undefined ? { heavyModelRef: agentTriage.heavyModelRef } : {}),
-        ...(agentTriage?.allowCrossProviderSwitch !== undefined ? { allowCrossProviderSwitch: agentTriage.allowCrossProviderSwitch } : {}),
-      },
-    } as TriageConfig : null;
+    const triageConfig: TriageConfig | null =
+      agentTriage?.enabled || globalTriage?.enabled
+        ? ({
+            ...globalTriage,
+            enabled: agentTriage?.enabled ?? globalTriage?.enabled ?? false,
+            rules: {
+              ...globalTriage?.rules,
+              ...(agentTriage?.lightModelRef !== undefined
+                ? { lightModelRef: agentTriage.lightModelRef }
+                : {}),
+              ...(agentTriage?.heavyModelRef !== undefined
+                ? { heavyModelRef: agentTriage.heavyModelRef }
+                : {}),
+              ...(agentTriage?.allowCrossProviderSwitch !== undefined
+                ? { allowCrossProviderSwitch: agentTriage.allowCrossProviderSwitch }
+                : {}),
+            },
+          } as TriageConfig)
+        : null;
     if (!triageConfig?.enabled) {
-      console.debug('[ModelTriage] skipped: triage not enabled', `agentId=${agentId}`, `agentTriageEnabled=${agentTriage?.enabled}`, `globalEnabled=${globalTriage?.enabled}`);
+      console.debug(
+        '[ModelTriage] skipped: triage not enabled',
+        `agentId=${agentId}`,
+        `agentTriageEnabled=${agentTriage?.enabled}`,
+        `globalEnabled=${globalTriage?.enabled}`,
+      );
     } else if (session.modelOverride) {
-      console.debug('[ModelTriage] skipped: session has modelOverride', `sessionId=${sessionId}`, `override=${session.modelOverride}`);
+      console.debug(
+        '[ModelTriage] skipped: session has modelOverride',
+        `sessionId=${sessionId}`,
+        `override=${session.modelOverride}`,
+      );
     } else if (!currentModel) {
-      console.debug('[ModelTriage] skipped: no currentModel', `sessionId=${sessionId}`, `agentId=${agentId}`);
+      console.debug(
+        '[ModelTriage] skipped: no currentModel',
+        `sessionId=${sessionId}`,
+        `agentId=${agentId}`,
+      );
     }
-    if (
-      triageConfig?.enabled &&
-      !session.modelOverride &&
-      currentModel
-    ) {
-      const conversationDepth = (session.messages?.length ?? 0);
+    if (triageConfig?.enabled && !session.modelOverride && currentModel) {
+      const conversationDepth = session.messages?.length ?? 0;
       const classification = await classifyMessage(prompt, conversationDepth, triageConfig);
 
       if (classification.modelRef) {
@@ -2243,16 +2268,14 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
 
   private buildSystemPromptPrefix(systemPrompt: string): string {
     return [
-      '[LEO system instructions]',
+      '[ZhiYuan Agent system instructions]',
       'Apply the instructions below as the highest-priority guidance for this session.',
-      'If earlier LEO system instructions exist, replace them with this version.',
-      'You are LEO.',
-      'The official Chinese product name is 李知远智能体, and the official English product name is LEO.',
-      '李知远智能体 / LEO is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
-      'Treat 李知远智能体 and LEO as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
-      'When asked who you are, answer with the official product identity only. In Chinese, say "我是李知远智能体。" You may add "英文名是 LEO。". In English, say "I am LEO." You may add "My Chinese product name is 李知远智能体."',
-      'Do not present RongxinAI as the current product identity. If asked about RongxinAI, say only that it is a legacy name or compatibility identifier that may still appear in some technical paths, while the current product identity is 李知远智能体 / LEO.',
-      'Do not describe LobsterAI as the current product identity. If asked about LobsterAI, say only that it is a historical internal or compatibility identifier in some technical paths, while the current product identity is 李知远智能体 / LEO.',
+      'If earlier ZhiYuan Agent system instructions exist, replace them with this version.',
+      'You are 知远智能体 (ZhiYuan Agent).',
+      'The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent.',
+      '知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+      'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
+      'When asked who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
       'Do not use any other product name, model name, runtime name, or preset role as your identity.',
       systemPrompt,
     ].join('\n');
@@ -2302,7 +2325,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     });
 
     return [
-      '[Context bridge from previous LEO conversation]',
+      '[Context bridge from previous ZhiYuan Agent conversation]',
       'Use this prior context for continuity. Focus your final answer on the current request.',
       ...lines,
     ].join('\n');
@@ -2418,7 +2441,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const client = new GatewayClient({
       url: connection.url,
       token: connection.token,
-      clientDisplayName: 'LEO',
+      clientDisplayName: 'ZhiYuanAgent',
       clientVersion: app.getVersion(),
       mode: 'backend',
       caps: [OPENCLAW_GATEWAY_TOOL_EVENTS_CAP],
@@ -3004,7 +3027,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       stream !== 'error' &&
       !this.terminatedRunIds.has(runId)
     ) {
-      // Desktop sessions (lobsterai:*) that were manually stopped must not be
+      // Desktop sessions (zhiyuan:*) that were manually stopped must not be
       // re-activated by late-arriving gateway events (e.g. MCP tool results that
       // arrive after the user clicked Stop).  Only channel/cron sessions are
       // allowed to re-create turns after the stop cooldown expires.
@@ -5400,7 +5423,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   /**
    * Sync user messages from gateway chat.history that haven't been added to the local store yet.
    * Used for channel-originated sessions (e.g. Telegram) where user messages arrive via the
-   * gateway rather than the RongxinAI UI.
+   * gateway rather than the ZhiYuanAgent UI.
    *
    * Called at the start of a new turn (via prefetchChannelUserMessages) so that user messages
    * appear before the assistant's streaming response. Both chat and agent events are buffered
@@ -5767,7 +5790,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     // `manuallyStoppedSessions` (a permanent Set) would block all future
     // channel events for this session until `runTurn` or `onSessionDeleted`
     // happens to clear it.
-    // Only clear for channel/cron sessions.  Desktop sessions (lobsterai:*)
+    // Only clear for channel/cron sessions.  Desktop sessions (zhiyuan:*)
     // must stay suppressed — the gateway may still push late MCP tool results
     // long after the 10s cooldown expires.
     if (this.manuallyStoppedSessions.has(sessionId)) {
@@ -6123,7 +6146,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         {
           raw: rawConfig,
           baseHash,
-          note: `lobsterai:${reason}`,
+          note: `zhiyuan:${reason}`,
         },
         { timeoutMs: 10_000, expectFinal: true },
       );

@@ -24,7 +24,7 @@ async function testSearchIntegration() {
     console.log('Step 2: Launching browser via API...');
     const launchResponse = await fetch('http://127.0.0.1:8923/api/browser/launch', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
     const launchData = await launchResponse.json();
     console.log(`✓ Browser launched: PID ${launchData.data.pid}\n`);
@@ -34,7 +34,7 @@ async function testSearchIntegration() {
     const connectResponse = await fetch('http://127.0.0.1:8923/api/browser/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     });
     const connectData = await connectResponse.json();
     connectionId = connectData.data.connectionId;
@@ -48,8 +48,8 @@ async function testSearchIntegration() {
       body: JSON.stringify({
         connectionId,
         query: 'TypeScript tutorial',
-        maxResults: 5
-      })
+        maxResults: 5,
+      }),
     });
     const searchData = await searchResponse.json();
     console.log(`✓ Search completed in ${searchData.data.duration}ms\n`);
@@ -71,8 +71,8 @@ async function testSearchIntegration() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         connectionId,
-        format: 'png'
-      })
+        format: 'png',
+      }),
     });
     const screenshotData = await screenshotResponse.json();
     console.log(`✓ Screenshot captured: ${screenshotData.data.size} bytes\n`);
@@ -82,7 +82,7 @@ async function testSearchIntegration() {
     const textResponse = await fetch('http://127.0.0.1:8923/api/page/text', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ connectionId })
+      body: JSON.stringify({ connectionId }),
     });
     const textData = await textResponse.json();
     console.log(`✓ Page text retrieved: ${textData.data.text.length} chars\n`);
@@ -105,7 +105,7 @@ async function testSearchIntegration() {
         await fetch('http://127.0.0.1:8923/api/browser/disconnect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ connectionId })
+          body: JSON.stringify({ connectionId }),
         });
       } catch (error) {
         console.warn('Failed to disconnect:', error.message);

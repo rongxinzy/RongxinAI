@@ -96,7 +96,7 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
   const response = await session.defaultSession.fetch(DEVICE_CODE_URL, {
     method: 'POST',
     headers: {
-      'Accept': 'application/json',
+      Accept: 'application/json',
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: body.toString(),
@@ -134,7 +134,7 @@ export async function pollForAccessToken(
       throw new Error('Polling cancelled');
     }
 
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
 
     if (controller.signal.aborted) {
       throw new Error('Polling cancelled');
@@ -150,14 +150,14 @@ export async function pollForAccessToken(
       const response = await session.defaultSession.fetch(ACCESS_TOKEN_URL, {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: body.toString(),
         signal: controller.signal,
       });
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
 
       if (data.access_token) {
         currentPollAbort = null;
@@ -171,7 +171,7 @@ export async function pollForAccessToken(
 
       if (data.error === 'slow_down') {
         // GitHub asks us to slow down — add 5 seconds
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
         continue;
       }
 
@@ -212,8 +212,8 @@ export async function getCopilotToken(githubAccessToken: string): Promise<{
   const response = await session.defaultSession.fetch(COPILOT_TOKEN_URL, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${githubAccessToken}`,
-      'Accept': 'application/json',
+      Authorization: `Bearer ${githubAccessToken}`,
+      Accept: 'application/json',
       'Editor-Version': 'vscode/1.96.2',
       'Editor-Plugin-Version': 'copilot-chat/0.26.7',
       'User-Agent': 'GitHubCopilotChat/0.26.7',
@@ -231,7 +231,7 @@ export async function getCopilotToken(githubAccessToken: string): Promise<{
     throw new Error(`Failed to get Copilot token: HTTP ${response.status} - ${text}`);
   }
 
-  const data = await response.json() as any;
+  const data = (await response.json()) as any;
   const token: string = data.token ?? '';
 
   // Parse expires_at: GitHub returns unix timestamp (seconds), but we accept ms too.
@@ -261,9 +261,9 @@ export async function getCopilotToken(githubAccessToken: string): Promise<{
 export async function getGitHubUser(accessToken: string): Promise<string> {
   const data = await fetchJson<any>('https://api.github.com/user', {
     headers: {
-      'Authorization': `token ${accessToken}`,
-      'Accept': 'application/json',
-      'User-Agent': 'RongxinAI',
+      Authorization: `token ${accessToken}`,
+      Accept: 'application/json',
+      'User-Agent': 'ZhiYuanAgent',
     },
   });
   return data.login || 'unknown';

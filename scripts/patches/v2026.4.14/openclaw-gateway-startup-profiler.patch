@@ -35,7 +35,7 @@ index 6e8fc9fe19..8b5675a0b5 100644
      description: "raw stream log path override",
    });
  
-+  // ── LobsterAI patch: startup profiler ──
++  // ── ZhiYuanAgent patch: startup profiler ──
 +  // Measures wall-clock time of each initialisation phase and prints a
 +  // summary table.  Remove this patch when no longer needed.
 +  const _profT0 = performance.now();

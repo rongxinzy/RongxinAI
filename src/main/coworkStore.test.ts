@@ -20,7 +20,11 @@ vi.mock('electron', () => ({
 // ---------------------------------------------------------------------------
 import BetterSqlite3 from 'better-sqlite3';
 
-import { AgentAvatarSvg, DefaultAgentAvatarIcon, encodeAgentAvatarIcon } from '../shared/agent/avatar';
+import {
+  AgentAvatarSvg,
+  DefaultAgentAvatarIcon,
+  encodeAgentAvatarIcon,
+} from '../shared/agent/avatar';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { CoworkStore } from './coworkStore';
 
@@ -188,17 +192,17 @@ test('getSession returns all messages when one has corrupt metadata', () => {
   expect(session!.messages).toHaveLength(3);
 
   // Valid metadata preserved
-  const validMsg = session!.messages.find((m) => m.id === 'msg-valid')!;
+  const validMsg = session!.messages.find(m => m.id === 'msg-valid')!;
   expect(validMsg.metadata).toEqual({ key: 'value' });
 
   // Corrupt metadata discarded
-  const corruptMsg = session!.messages.find((m) => m.id === 'msg-corrupt')!;
+  const corruptMsg = session!.messages.find(m => m.id === 'msg-corrupt')!;
   expect(corruptMsg.metadata).toBeUndefined();
   expect(corruptMsg.content).toBe('do something');
   expect(corruptMsg.type).toBe('tool_use');
 
   // Null metadata → undefined
-  const nullMsg = session!.messages.find((m) => m.id === 'msg-null')!;
+  const nullMsg = session!.messages.find(m => m.id === 'msg-null')!;
   expect(nullMsg.metadata).toBeUndefined();
 });
 
@@ -210,9 +214,9 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(first.workspaceId).toBe(second.workspaceId);
   expect(first.agentId).not.toBe(second.agentId);
   expect(store.countSessions(undefined, first.workspaceId)).toBe(2);
-  expect(store.listSessions(10, 0, undefined, first.workspaceId).map((session) => session.id)).toEqual(
-    expect.arrayContaining([first.id, second.id]),
-  );
+  expect(
+    store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
+  ).toEqual(expect.arrayContaining([first.id, second.id]));
 });
 
 test('session expert snapshots persist independently from workspace and agent state', () => {
@@ -269,11 +273,13 @@ test('replaceConversationMessages preserves existing timestamps and uses gateway
   ]);
 
   const session = store.getSession(sid);
-  expect(session?.messages.map((message) => ({
-    type: message.type,
-    content: message.content,
-    timestamp: message.timestamp,
-  }))).toEqual([
+  expect(
+    session?.messages.map(message => ({
+      type: message.type,
+      content: message.content,
+      timestamp: message.timestamp,
+    })),
+  ).toEqual([
     { type: 'user', content: 'old user', timestamp: 1000 },
     { type: 'assistant', content: 'old assistant', timestamp: 2000 },
     { type: 'user', content: 'new user', timestamp: 3000 },
@@ -375,12 +381,12 @@ test('updateSession can patch model override without refreshing the session upda
 
   store.updateSession(
     sid,
-    { modelOverride: 'lobsterai-server/qwen3.6-plus' },
+    { modelOverride: 'zhiyuan-server/qwen3.6-plus' },
     { touchUpdatedAt: false },
   );
 
   const session = store.getSession(sid);
-  expect(session?.modelOverride).toBe('lobsterai-server/qwen3.6-plus');
+  expect(session?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
   expect(session?.updatedAt).toBe(1000);
 });
 
@@ -464,7 +470,12 @@ test('backfillEmptyAgentModels assigns the current default model to empty agents
 
   expect(store.backfillEmptyAgentModels('deepseek-v3.2')).toBe(2);
 
-  const rows = (db.prepare(`SELECT id, model FROM agents ORDER BY id`).all() as Array<{ id: string; model: string }>).map((r) => [r.id, r.model]);
+  const rows = (
+    db.prepare(`SELECT id, model FROM agents ORDER BY id`).all() as Array<{
+      id: string;
+      model: string;
+    }>
+  ).map(r => [r.id, r.model]);
   expect(rows).toEqual([
     ['main', 'deepseek-v3.2'],
     ['stockexpert', 'qwen3.5-plus'],

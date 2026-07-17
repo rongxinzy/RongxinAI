@@ -1,7 +1,14 @@
-import { type ApiFormat,isProviderEnabled, type ProviderConfig, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import {
+  type ApiFormat,
+  isProviderEnabled,
+  type ProviderConfig,
+  ProviderName,
+  ProviderRegistry,
+  resolveCodingPlanBaseUrl,
+} from '../../shared/providers';
 import type { SqliteStore } from '../sqliteStore';
 import type { CoworkApiConfig } from './coworkConfigStore';
-import { type AnthropicApiFormat,normalizeProviderApiFormat } from './coworkFormatTransform';
+import { type AnthropicApiFormat, normalizeProviderApiFormat } from './coworkFormatTransform';
 import {
   configureCoworkOpenAICompatProxy,
   getCoworkOpenAICompatProxyBaseURL,
@@ -75,7 +82,9 @@ export function setStoreGetter(getter: () => SqliteStore | null): void {
 // Auth token getter injected from main.ts for server model provider
 let authTokensGetter: (() => { accessToken: string; refreshToken: string } | null) | null = null;
 
-export function setAuthTokensGetter(getter: () => { accessToken: string; refreshToken: string } | null): void {
+export function setAuthTokensGetter(
+  getter: () => { accessToken: string; refreshToken: string } | null,
+): void {
   authTokensGetter = getter;
 }
 
@@ -93,22 +102,27 @@ let llamaCppRunningModelCache: ProviderModelConfig[] = [];
 
 const serializeServerModelMetadata = (
   models: Array<{ modelId: string; supportsImage?: boolean }>,
-): string => JSON.stringify(
-  models
-    .map((model) => ({
-      modelId: model.modelId,
-      supportsImage: model.supportsImage,
-    }))
-    .sort((a, b) => a.modelId.localeCompare(b.modelId)),
-);
+): string =>
+  JSON.stringify(
+    models
+      .map(model => ({
+        modelId: model.modelId,
+        supportsImage: model.supportsImage,
+      }))
+      .sort((a, b) => a.modelId.localeCompare(b.modelId)),
+  );
 
-export function updateServerModelMetadata(models: Array<{ modelId: string; supportsImage?: boolean }>): boolean {
+export function updateServerModelMetadata(
+  models: Array<{ modelId: string; supportsImage?: boolean }>,
+): boolean {
   const previous = serializeServerModelMetadata(getAllServerModelMetadata());
   const nextCache = new Map(models.map(m => [m.modelId, { supportsImage: m.supportsImage }]));
-  const next = serializeServerModelMetadata(Array.from(nextCache.entries()).map(([modelId, meta]) => ({
-    modelId,
-    supportsImage: meta.supportsImage,
-  })));
+  const next = serializeServerModelMetadata(
+    Array.from(nextCache.entries()).map(([modelId, meta]) => ({
+      modelId,
+      supportsImage: meta.supportsImage,
+    })),
+  );
   serverModelMetadataCache = nextCache;
   return previous !== next;
 }
@@ -127,7 +141,7 @@ export function getAllServerModelMetadata(): Array<{ modelId: string; supportsIm
 function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
   return JSON.stringify(
     models
-      .map((model) => ({
+      .map(model => ({
         id: model.id,
         name: model.name,
         supportsImage: model.supportsImage,
@@ -149,18 +163,16 @@ export function updateLlamaCppRunningModels(models: ProviderModelInputConfig[]):
 }
 
 export function getLlamaCppRunningModels(): ProviderModelConfig[] {
-  return llamaCppRunningModelCache.map((model) => ({
+  return llamaCppRunningModelCache.map(model => ({
     ...model,
-    openClawEligibility: model.openClawEligibility
-      ? { ...model.openClawEligibility }
-      : undefined,
+    openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
   }));
 }
 
 function findLlamaCppRunningModel(modelId: string): ProviderModelConfig | undefined {
   const normalized = modelId.trim();
   if (!normalized) return undefined;
-  return llamaCppRunningModelCache.find((model) => model.id === normalized);
+  return llamaCppRunningModelCache.find(model => model.id === normalized);
 }
 
 export function isLlamaCppModelRunning(modelId: string): boolean {
@@ -178,8 +190,10 @@ export function getLlamaCppModelOpenClawEligibility(
   return eligibility ? { ...eligibility } : undefined;
 }
 
-function buildServerFallbackModels(effectiveModelId: string): NonNullable<LocalProviderConfig['models']> {
-  const models = getAllServerModelMetadata().map((model) => ({
+function buildServerFallbackModels(
+  effectiveModelId: string,
+): NonNullable<LocalProviderConfig['models']> {
+  const models = getAllServerModelMetadata().map(model => ({
     id: model.modelId,
     name: model.modelId,
     supportsImage: model.supportsImage,
@@ -197,7 +211,10 @@ function buildServerFallbackModels(effectiveModelId: string): NonNullable<LocalP
   return models;
 }
 
-function normalizeProviderModels(providerName: string, models?: ProviderModelInputConfig[]): ProviderModelConfig[] {
+function normalizeProviderModels(
+  providerName: string,
+  models?: ProviderModelInputConfig[],
+): ProviderModelConfig[] {
   return (models ?? [])
     .filter(model => model.id?.trim())
     .map(model => ({
@@ -208,18 +225,17 @@ function normalizeProviderModels(providerName: string, models?: ProviderModelInp
         model.id,
         model.supportsImage,
       ),
-      contextWindow: typeof model.contextWindow === 'number' && model.contextWindow > 0
-        ? model.contextWindow
-        : undefined,
-      contextTokens: typeof model.contextTokens === 'number' && model.contextTokens > 0
-        ? model.contextTokens
-        : undefined,
-      maxTokens: typeof model.maxTokens === 'number' && model.maxTokens > 0
-        ? model.maxTokens
-        : undefined,
-      openClawEligibility: model.openClawEligibility
-        ? { ...model.openClawEligibility }
-        : undefined,
+      contextWindow:
+        typeof model.contextWindow === 'number' && model.contextWindow > 0
+          ? model.contextWindow
+          : undefined,
+      contextTokens:
+        typeof model.contextTokens === 'number' && model.contextTokens > 0
+          ? model.contextTokens
+          : undefined,
+      maxTokens:
+        typeof model.maxTokens === 'number' && model.maxTokens > 0 ? model.maxTokens : undefined,
+      openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
     }));
 }
 
@@ -243,8 +259,16 @@ type MatchedProvider = {
   maxTokens?: number;
 };
 
-function getEffectiveProviderApiFormat(providerName: string, apiFormat: unknown): AnthropicApiFormat {
-  if (providerName === ProviderName.OpenAI || providerName === ProviderName.Gemini || providerName === ProviderName.StepFun || providerName === ProviderName.Copilot) {
+function getEffectiveProviderApiFormat(
+  providerName: string,
+  apiFormat: unknown,
+): AnthropicApiFormat {
+  if (
+    providerName === ProviderName.OpenAI ||
+    providerName === ProviderName.Gemini ||
+    providerName === ProviderName.StepFun ||
+    providerName === ProviderName.Copilot
+  ) {
     return 'openai';
   }
   if (providerName === ProviderName.Anthropic) {
@@ -275,10 +299,13 @@ function getOpenClawEligibleProviderModels(
   if (providerName !== ProviderName.LlamaCpp) {
     return models;
   }
-  return models.filter((model) => model.openClawEligibility?.eligible === true);
+  return models.filter(model => model.openClawEligibility?.eligible === true);
 }
 
-function shouldUseOpenAICodexOAuth(providerName: string, providerConfig: LocalProviderConfig): boolean {
+function shouldUseOpenAICodexOAuth(
+  providerName: string,
+  providerConfig: LocalProviderConfig,
+): boolean {
   if (providerName !== ProviderName.OpenAI) {
     return false;
   }
@@ -291,7 +318,7 @@ function shouldUseOpenAICodexOAuth(providerName: string, providerConfig: LocalPr
   return readOpenAICodexAuthFile() !== null;
 }
 
-function tryLobsteraiServerFallback(modelId?: string): MatchedProvider | null {
+function tryZhiyuanServerFallback(modelId?: string): MatchedProvider | null {
   const tokens = authTokensGetter?.();
   const serverBaseUrl = serverBaseUrlGetter?.();
   if (!tokens?.accessToken || !serverBaseUrl) return null;
@@ -299,10 +326,20 @@ function tryLobsteraiServerFallback(modelId?: string): MatchedProvider | null {
   if (!effectiveModelId) return null;
   const baseURL = `${serverBaseUrl}/api/proxy/v1`;
   const cachedMeta = serverModelMetadataCache.get(effectiveModelId);
-  console.log('[ClaudeSettings] lobsterai-server fallback activated:', { baseURL, modelId: effectiveModelId, supportsImage: cachedMeta?.supportsImage });
+  console.log('[ClaudeSettings] zhiyuan-server fallback activated:', {
+    baseURL,
+    modelId: effectiveModelId,
+    supportsImage: cachedMeta?.supportsImage,
+  });
   return {
-    providerName: ProviderName.LobsteraiServer,
-    providerConfig: { enabled: true, apiKey: tokens.accessToken, baseUrl: baseURL, apiFormat: 'openai', models: buildServerFallbackModels(effectiveModelId) },
+    providerName: ProviderName.ZhiyuanServer,
+    providerConfig: {
+      enabled: true,
+      apiKey: tokens.accessToken,
+      baseUrl: baseURL,
+      apiFormat: 'openai',
+      models: buildServerFallbackModels(effectiveModelId),
+    },
     modelId: effectiveModelId,
     apiFormat: 'openai',
     baseURL,
@@ -323,11 +360,11 @@ function resolveMatchedProviderFromSelection(
   // MiniMax OAuth mode guard: if OAuth is selected but login has not been completed
   // (no access token), do not use the stale API key as an OAuth token.
   if (
-    providerName === ProviderName.Minimax
-    && (providerConfig as any).authType === 'oauth'
-    && !(providerConfig as any).oauthAccessToken
+    providerName === ProviderName.Minimax &&
+    (providerConfig as any).authType === 'oauth' &&
+    !(providerConfig as any).oauthAccessToken
   ) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: 'MiniMax OAuth mode selected but login not completed.' };
   }
@@ -342,25 +379,25 @@ function resolveMatchedProviderFromSelection(
   }
 
   if (!baseURL) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: `Provider ${providerName} is missing base URL.` };
   }
 
   const hasApiKey = providerConfig.apiKey?.trim();
   const hasOAuthCreds =
-    (providerName === ProviderName.Minimax
-      && (providerConfig as any).authType === 'oauth'
-      && !!(providerConfig as any).oauthAccessToken?.trim())
-    || shouldUseOpenAICodexOAuth(providerName, providerConfig);
+    (providerName === ProviderName.Minimax &&
+      (providerConfig as any).authType === 'oauth' &&
+      !!(providerConfig as any).oauthAccessToken?.trim()) ||
+    shouldUseOpenAICodexOAuth(providerName, providerConfig);
   if (
-    apiFormat === 'anthropic'
-    && providerRequiresApiKey(providerName)
-    && !providerConfig.apiKey?.trim()
-    && !hasApiKey
-    && !hasOAuthCreds
+    apiFormat === 'anthropic' &&
+    providerRequiresApiKey(providerName) &&
+    !providerConfig.apiKey?.trim() &&
+    !hasApiKey &&
+    !hasOAuthCreds
   ) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return {
       matched: null,
@@ -368,9 +405,9 @@ function resolveMatchedProviderFromSelection(
     };
   }
 
-  const matchedModel = normalizedProviderModels.find((m) => m.id === modelId);
+  const matchedModel = normalizedProviderModels.find(m => m.id === modelId);
   if (!matchedModel) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
@@ -413,8 +450,8 @@ function resolveMatchedProviderForModelRef(
     return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
   }
 
-  if (providerName === ProviderName.LobsteraiServer) {
-    const serverMatch = tryLobsteraiServerFallback(modelId);
+  if (providerName === ProviderName.ZhiyuanServer) {
+    const serverMatch = tryZhiyuanServerFallback(modelId);
     if (serverMatch) return { matched: serverMatch };
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
@@ -434,8 +471,8 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
 
   // Handle MiniMax OAuth: use oauthAccessToken and oauthBaseUrl (independent of apiKey)
   if (
-    matched.providerName === ProviderName.Minimax
-    && (matched.providerConfig as any).authType === 'oauth'
+    matched.providerName === ProviderName.Minimax &&
+    (matched.providerConfig as any).authType === 'oauth'
   ) {
     const oauthToken = (matched.providerConfig as any).oauthAccessToken?.trim();
     const oauthBaseUrl = (matched.providerConfig as any).oauthBaseUrl?.trim();
@@ -446,12 +483,15 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
     }
   }
 
-  console.log('[ClaudeSettings] resolved raw API config:', JSON.stringify({
-    ...matched,
-    providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
-  }));
+  console.log(
+    '[ClaudeSettings] resolved raw API config:',
+    JSON.stringify({
+      ...matched,
+      providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
+    }),
+  );
   const effectiveApiKey =
-    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
   return {
     config: {
       apiKey: effectiveApiKey,
@@ -472,7 +512,10 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
   };
 }
 
-function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvider | null; error?: string } {
+function resolveMatchedProvider(appConfig: AppConfig): {
+  matched: MatchedProvider | null;
+  error?: string;
+} {
   const providers = appConfig.providers ?? {};
 
   const resolveFallbackModel = (): {
@@ -485,7 +528,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       if (!isProviderEnabled(providerName, providerConfig) || models.length === 0) {
         continue;
       }
-      const fallbackModel = models.find((model) => model.id?.trim());
+      const fallbackModel = models.find(model => model.id?.trim());
       if (!fallbackModel) {
         continue;
       }
@@ -503,7 +546,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   if (!modelId) {
     const fallback = resolveFallbackModel();
     if (!fallback) {
-      const serverFallback = tryLobsteraiServerFallback(configuredModelId);
+      const serverFallback = tryZhiyuanServerFallback(configuredModelId);
       if (serverFallback) return { matched: serverFallback };
       return { matched: null, error: 'No available model configured in enabled providers.' };
     }
@@ -513,9 +556,9 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   let providerEntry: [string, LocalProviderConfig] | undefined;
   const preferredProviderName = appConfig.model?.defaultModelProvider?.trim();
 
-  // Handle lobsterai-server provider: dynamically construct from auth tokens
-  if (preferredProviderName === ProviderName.LobsteraiServer) {
-    const serverMatch = tryLobsteraiServerFallback(modelId);
+  // Handle zhiyuan-server provider: dynamically construct from auth tokens
+  if (preferredProviderName === ProviderName.ZhiyuanServer) {
+    const serverMatch = tryZhiyuanServerFallback(modelId);
     if (serverMatch) {
       return { matched: serverMatch };
     }
@@ -527,8 +570,8 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       ? getEffectiveProviderModels(preferredProviderName, preferredProvider)
       : [];
     if (
-      isProviderEnabled(preferredProviderName, preferredProvider)
-      && preferredModels.some((model) => model.id === modelId)
+      isProviderEnabled(preferredProviderName, preferredProvider) &&
+      preferredModels.some(model => model.id === modelId)
     ) {
       providerEntry = [preferredProviderName, preferredProvider];
     }
@@ -540,7 +583,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       if (!isProviderEnabled(providerName, provider) || models.length === 0) {
         return false;
       }
-      return models.some((model) => model.id === modelId);
+      return models.some(model => model.id === modelId);
     });
   }
 
@@ -550,7 +593,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       modelId = fallback.modelId;
       providerEntry = [fallback.providerName, fallback.providerConfig];
     } else {
-      const serverFallback = tryLobsteraiServerFallback(modelId);
+      const serverFallback = tryZhiyuanServerFallback(modelId);
       if (serverFallback) return { matched: serverFallback };
       return { matched: null, error: `No enabled provider found for model: ${modelId}` };
     }
@@ -560,7 +603,9 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   return resolveMatchedProviderFromSelection(providerName, storedProviderConfig, modelId);
 }
 
-export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local'): ApiConfigResolution {
+export function resolveCurrentApiConfig(
+  target: OpenAICompatProxyTarget = 'local',
+): ApiConfigResolution {
   const sqliteStore = getStore();
   if (!sqliteStore) {
     return {
@@ -591,8 +636,8 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
   // Providers that don't require auth (e.g. Ollama) still need a non-empty
   // placeholder so downstream components (OpenClaw gateway, compat proxy)
   // don't reject the request with "No API key found for provider".
-  const effectiveApiKey = resolvedApiKey
-    || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+  const effectiveApiKey =
+    resolvedApiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
 
   if (matched.apiFormat === 'anthropic') {
     return {
@@ -639,7 +684,7 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
 
   return {
     config: {
-      apiKey: resolvedApiKey || 'lobsterai-openai-compat',
+      apiKey: resolvedApiKey || 'zhiyuan-openai-compat',
       baseURL: proxyBaseURL,
       model: matched.modelId,
       apiType: 'openai',
@@ -656,7 +701,9 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
   };
 }
 
-export function getCurrentApiConfig(target: OpenAICompatProxyTarget = 'local'): CoworkApiConfig | null {
+export function getCurrentApiConfig(
+  target: OpenAICompatProxyTarget = 'local',
+): CoworkApiConfig | null {
   return resolveCurrentApiConfig(target).config;
 }
 
@@ -681,7 +728,9 @@ export function resolveRawApiConfig(): ApiConfigResolution {
     const providerKeys = Object.keys(appConfig.providers ?? {});
     const defaultModel = appConfig.model?.defaultModel;
     const defaultProvider = appConfig.model?.defaultModelProvider;
-    console.debug(`[ClaudeSettings] resolveRawApiConfig: no matched provider, error=${error}, providers=[${providerKeys.join(',')}], defaultModel=${defaultModel}, defaultProvider=${defaultProvider}`);
+    console.debug(
+      `[ClaudeSettings] resolveRawApiConfig: no matched provider, error=${error}, providers=[${providerKeys.join(',')}], defaultModel=${defaultModel}, defaultProvider=${defaultProvider}`,
+    );
     return { config: null, error };
   }
   let apiKey = matched.providerConfig.apiKey?.trim() || '';
@@ -689,7 +738,10 @@ export function resolveRawApiConfig(): ApiConfigResolution {
   let effectiveApiFormat = matched.apiFormat;
 
   // Handle MiniMax OAuth: use oauthAccessToken and oauthBaseUrl (independent of apiKey)
-  if (matched.providerName === ProviderName.Minimax && (matched.providerConfig as any).authType === 'oauth') {
+  if (
+    matched.providerName === ProviderName.Minimax &&
+    (matched.providerConfig as any).authType === 'oauth'
+  ) {
     const oauthToken = (matched.providerConfig as any).oauthAccessToken?.trim();
     const oauthBaseUrl = (matched.providerConfig as any).oauthBaseUrl?.trim();
     if (oauthToken) {
@@ -699,16 +751,19 @@ export function resolveRawApiConfig(): ApiConfigResolution {
     }
   }
 
-  console.log('[ClaudeSettings] resolved raw API config:', JSON.stringify({
-    ...matched,
-    providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
-  }));
+  console.log(
+    '[ClaudeSettings] resolved raw API config:',
+    JSON.stringify({
+      ...matched,
+      providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
+    }),
+  );
   // OpenClaw's gateway requires a non-empty apiKey for every provider — even
   // local servers (Ollama, vLLM, etc.) that don't enforce auth.  When the user
   // leaves the key blank we supply a placeholder so the gateway doesn't reject
   // the request with "No API key found for provider".
-  const effectiveApiKey = apiKey
-    || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+  const effectiveApiKey =
+    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
   return {
     config: {
       apiKey: effectiveApiKey,
@@ -745,56 +800,59 @@ export function resolveRawApiConfigForModelRef(modelRef: string): ApiConfigResol
   return buildRawApiResolutionFromMatched(matched);
 }
 
-  /**
-   * Collect apiKeys for ALL configured providers (not just the currently selected one).
-   * Used by OpenClaw config sync to pre-register all apiKeys as env vars at gateway
-   * startup, so switching between providers doesn't require a process restart.
-   *
-   * Returns a map of env-var-safe provider name → apiKey.
-   */
+/**
+ * Collect apiKeys for ALL configured providers (not just the currently selected one).
+ * Used by OpenClaw config sync to pre-register all apiKeys as env vars at gateway
+ * startup, so switching between providers doesn't require a process restart.
+ *
+ * Returns a map of env-var-safe provider name → apiKey.
+ */
 export function resolveAllProviderApiKeys(): Record<string, string> {
   const result: Record<string, string> = {};
 
-  // lobsterai-server token is now managed by the token proxy
+  // zhiyuan-server token is now managed by the token proxy
   // (openclawTokenProxy.ts) — no longer injected as an env var.
 
-    // lobsterai-server: uses auth accessToken
-    const tokens = authTokensGetter?.();
-    const serverBaseUrl = serverBaseUrlGetter?.();
-    if (tokens?.accessToken && serverBaseUrl) {
-      result.SERVER = tokens.accessToken;
-    }
-
-    // All configured custom providers
-    const sqliteStore = getStore();
-    if (!sqliteStore) return result;
-    const appConfig = sqliteStore.get<AppConfig>('app_config');
-    if (!appConfig?.providers) return result;
-
-    for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
-      if (!isProviderEnabled(providerName, providerConfig)) continue;
-      if (shouldUseOpenAICodexOAuth(providerName, providerConfig)) {
-        continue;
-      }
-      // For MiniMax OAuth, inject oauthAccessToken instead of apiKey
-      let apiKey = providerConfig.apiKey?.trim();
-      if (providerName === ProviderName.Minimax && (providerConfig as any).authType === 'oauth') {
-        const oauthToken = (providerConfig as any).oauthAccessToken?.trim();
-        if (!oauthToken) continue; // OAuth not completed, skip
-        apiKey = oauthToken;
-      } else if (!apiKey && providerRequiresApiKey(providerName)) {
-        continue;
-      }
-      const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-      result[envName] = apiKey || 'sk-lobsterai-local';
-    }
-
-    const D = gwDiagTs;
-    console.log(`${D()} resolveAllProviderApiKeys: hasServer=${!!result.SERVER} providers=[${Object.keys(result).filter(k => k !== 'SERVER').join(',')}]`);
-
-    return result;
+  // zhiyuan-server: uses auth accessToken
+  const tokens = authTokensGetter?.();
+  const serverBaseUrl = serverBaseUrlGetter?.();
+  if (tokens?.accessToken && serverBaseUrl) {
+    result.SERVER = tokens.accessToken;
   }
-  
+
+  // All configured custom providers
+  const sqliteStore = getStore();
+  if (!sqliteStore) return result;
+  const appConfig = sqliteStore.get<AppConfig>('app_config');
+  if (!appConfig?.providers) return result;
+
+  for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
+    if (!isProviderEnabled(providerName, providerConfig)) continue;
+    if (shouldUseOpenAICodexOAuth(providerName, providerConfig)) {
+      continue;
+    }
+    // For MiniMax OAuth, inject oauthAccessToken instead of apiKey
+    let apiKey = providerConfig.apiKey?.trim();
+    if (providerName === ProviderName.Minimax && (providerConfig as any).authType === 'oauth') {
+      const oauthToken = (providerConfig as any).oauthAccessToken?.trim();
+      if (!oauthToken) continue; // OAuth not completed, skip
+      apiKey = oauthToken;
+    } else if (!apiKey && providerRequiresApiKey(providerName)) {
+      continue;
+    }
+    const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+    result[envName] = apiKey || 'sk-zhiyuan-local';
+  }
+
+  const D = gwDiagTs;
+  console.log(
+    `${D()} resolveAllProviderApiKeys: hasServer=${!!result.SERVER} providers=[${Object.keys(result)
+      .filter(k => k !== 'SERVER')
+      .join(',')}]`,
+  );
+
+  return result;
+}
 
 export function buildEnvForConfig(config: CoworkApiConfig): Record<string, string> {
   const baseEnv = { ...process.env } as Record<string, string>;
@@ -826,7 +884,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
   for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
     if (!isProviderEnabled(providerName, providerConfig)) continue;
-    if (providerName === ProviderName.LobsteraiServer) continue;
+    if (providerName === ProviderName.ZhiyuanServer) continue;
 
     // When minimax is in OAuth mode, use oauthAccessToken and oauthBaseUrl
     // (independent from the user's manually entered apiKey/baseUrl).
@@ -834,7 +892,8 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
     if (providerName === ProviderName.Minimax && (providerConfig as any).authType === 'oauth') {
       const oauthToken = (providerConfig as any).oauthAccessToken?.trim();
       if (!oauthToken) continue; // OAuth not completed, skip
-      const oauthBaseUrl = ((providerConfig as any).oauthBaseUrl?.trim()) || providerConfig.baseUrl?.trim() || '';
+      const oauthBaseUrl =
+        (providerConfig as any).oauthBaseUrl?.trim() || providerConfig.baseUrl?.trim() || '';
       if (!oauthBaseUrl) continue;
       const models = getEffectiveProviderModels(providerName, providerConfig);
       if (models.length === 0) continue;
@@ -875,7 +934,12 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
     let effectiveApiFormat = getEffectiveProviderApiFormat(providerName, providerConfig.apiFormat);
 
     if (providerConfig.codingPlanEnabled) {
-      const resolved = resolveCodingPlanBaseUrl(providerName, true, effectiveApiFormat, effectiveBaseURL);
+      const resolved = resolveCodingPlanBaseUrl(
+        providerName,
+        true,
+        effectiveApiFormat,
+        effectiveBaseURL,
+      );
       effectiveBaseURL = resolved.baseUrl;
       effectiveApiFormat = resolved.effectiveFormat;
     }
@@ -888,7 +952,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
     result.push({
       providerName,
       baseURL: effectiveBaseURL,
-      apiKey: apiKey || 'sk-lobsterai-local',
+      apiKey: apiKey || 'sk-zhiyuan-local',
       apiType: effectiveApiFormat === 'anthropic' ? 'anthropic' : 'openai',
       authType: providerConfig.authType,
       codingPlanEnabled: !!providerConfig.codingPlanEnabled,

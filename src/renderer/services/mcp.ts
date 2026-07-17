@@ -1,4 +1,12 @@
-import { McpCategory, McpConnectionTestResult, McpMarketplaceCategoryInfo, McpMarketplaceServer,McpRegistryEntry, McpServerConfig, McpServerFormData } from '../types/mcp';
+import {
+  McpCategory,
+  McpConnectionTestResult,
+  McpMarketplaceCategoryInfo,
+  McpMarketplaceServer,
+  McpRegistryEntry,
+  McpServerConfig,
+  McpServerFormData,
+} from '../types/mcp';
 
 export function normalizeMcpErrorMessage(message: string): string {
   const trimmed = message.trim();
@@ -31,10 +39,8 @@ export function normalizeMcpErrorMessage(message: string): string {
 /**
  * Convert remote marketplace server data to McpRegistryEntry format.
  */
-function convertMarketplaceToRegistry(
-  servers: McpMarketplaceServer[],
-): McpRegistryEntry[] {
-  return servers.map((s) => ({
+function convertMarketplaceToRegistry(servers: McpMarketplaceServer[]): McpRegistryEntry[] {
+  return servers.map(s => ({
     id: s.id,
     name: s.name,
     descriptionKey: '',
@@ -76,7 +82,9 @@ class McpService {
     }
   }
 
-  async createServer(data: McpServerFormData): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
+  async createServer(
+    data: McpServerFormData,
+  ): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
     try {
       const result = await window.electron.mcp.create(data);
       if (result.success && result.servers) {
@@ -91,7 +99,10 @@ class McpService {
     }
   }
 
-  async updateServer(id: string, data: Partial<McpServerFormData>): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
+  async updateServer(
+    id: string,
+    data: Partial<McpServerFormData>,
+  ): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
     try {
       const result = await window.electron.mcp.update(id, data);
       if (result.success && result.servers) {
@@ -106,7 +117,9 @@ class McpService {
     }
   }
 
-  async deleteServer(id: string): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
+  async deleteServer(
+    id: string,
+  ): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
     try {
       const result = await window.electron.mcp.delete(id);
       if (result.success && result.servers) {

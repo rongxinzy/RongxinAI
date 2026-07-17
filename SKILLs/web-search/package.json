@@ -1,5 +1,5 @@
 {
-  "name": "@lobsterai/skill-web-search",
+  "name": "@zhiyuan/skill-web-search",
   "version": "1.0.2",
   "description": "Web search skill using Playwright-controlled browser for real-time information retrieval",
   "main": "dist/server/index.js",
@@ -9,13 +9,13 @@
     "dev": "tsc && node dist/server/index.js"
   },
   "keywords": [
-    "lobsterai",
+    "zhiyuan",
     "skill",
     "web-search",
     "playwright",
     "cdp"
   ],
-  "author": "LobsterAI",
+  "author": "ZhiYuanAgent",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",

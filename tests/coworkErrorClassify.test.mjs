@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { classifyErrorKey } = require('../dist-electron/common/coworkErrorClassify.js');
 
-const classifyError = (error) => classifyErrorKey(error) ?? error;
+const classifyError = error => classifyErrorKey(error) ?? error;
 
 // ==================== Auth errors ====================
 
@@ -18,7 +18,12 @@ test('auth: DeepSeek authentication_fails', () => {
 });
 
 test('auth: OpenAI api key not valid', () => {
-  assert.equal(classifyError('Incorrect API key provided: sk-xxx. You can find your API key at https://platform.openai.com/account/api-keys.'), 'coworkErrorAuthInvalid');
+  assert.equal(
+    classifyError(
+      'Incorrect API key provided: sk-xxx. You can find your API key at https://platform.openai.com/account/api-keys.',
+    ),
+    'coworkErrorAuthInvalid',
+  );
 });
 
 test('auth: OpenAI api_key invalid', () => {
@@ -40,11 +45,19 @@ test('auth: unauthorized', () => {
 // ==================== Billing errors ====================
 
 test('billing: DeepSeek insufficient_balance', () => {
-  assert.equal(classifyError('insufficient_balance: Your account does not have enough balance'), 'coworkErrorInsufficientBalance');
+  assert.equal(
+    classifyError('insufficient_balance: Your account does not have enough balance'),
+    'coworkErrorInsufficientBalance',
+  );
 });
 
 test('billing: OpenAI insufficient_quota', () => {
-  assert.equal(classifyError('You exceeded your current quota, please check your plan and billing details. insufficient_quota'), 'coworkErrorInsufficientBalance');
+  assert.equal(
+    classifyError(
+      'You exceeded your current quota, please check your plan and billing details. insufficient_quota',
+    ),
+    'coworkErrorInsufficientBalance',
+  );
 });
 
 test('billing: OpenRouter insufficient credits', () => {
@@ -66,15 +79,24 @@ test('billing: HTTP 402', () => {
 // ==================== Input too long ====================
 
 test('input: context length exceeded', () => {
-  assert.equal(classifyError("This model's maximum context length is 8192 tokens. context length exceeded"), 'coworkErrorInputTooLong');
+  assert.equal(
+    classifyError("This model's maximum context length is 8192 tokens. context length exceeded"),
+    'coworkErrorInputTooLong',
+  );
 });
 
 test('input: input too long', () => {
-  assert.equal(classifyError('input too long, please reduce your input'), 'coworkErrorInputTooLong');
+  assert.equal(
+    classifyError('input too long, please reduce your input'),
+    'coworkErrorInputTooLong',
+  );
 });
 
 test('input: Qwen Range of input length', () => {
-  assert.equal(classifyError('Range of input length should be [1, 6000]'), 'coworkErrorInputTooLong');
+  assert.equal(
+    classifyError('Range of input length should be [1, 6000]'),
+    'coworkErrorInputTooLong',
+  );
 });
 
 test('input: HTTP 413', () => {
@@ -112,7 +134,10 @@ test('model: Ollama model xxx not found', () => {
 // ==================== Gateway / connection ====================
 
 test('gateway: disconnect', () => {
-  assert.equal(classifyError('gateway disconnected unexpectedly'), 'coworkErrorGatewayDisconnected');
+  assert.equal(
+    classifyError('gateway disconnected unexpectedly'),
+    'coworkErrorGatewayDisconnected',
+  );
 });
 
 test('gateway: client disconnected', () => {

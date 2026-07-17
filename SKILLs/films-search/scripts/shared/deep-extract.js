@@ -115,10 +115,11 @@ async function fetchPageContent(url, timeout = 8000) {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Referer': 'https://www.baidu.com/',
+        Referer: 'https://www.baidu.com/',
         'Accept-Encoding': 'gzip, deflate',
       },
       signal: controller.signal,
@@ -243,7 +244,8 @@ async function searchBaidu(queries, maxResults = 10) {
       const html = await fetchPageContent(searchUrl, 15000);
 
       // 百度结果: <h3 class="...t/c-title..."><a href="URL">title</a></h3>
-      const pattern = /<h3[^>]*class="[^"]*(?:\bt\b|c-title)[^"]*"[^>]*>\s*<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      const pattern =
+        /<h3[^>]*class="[^"]*(?:\bt\b|c-title)[^"]*"[^>]*>\s*<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
       let match;
       while ((match = pattern.exec(html)) !== null) {
         const pageUrl = match[1];
@@ -280,7 +282,7 @@ async function batchFetchAndExtract(pages, concurrency = 4) {
   let activeCount = 0;
   let queueIndex = 0;
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const processNext = async () => {
       if (queueIndex >= queue.length) {
         activeCount--;

@@ -1,7 +1,21 @@
 import { buildManagedSessionKey } from '../../main/libs/openclawChannelSessionSync';
-import { BindingKind, DeliveryChannel, DeliveryMode, OriginKind, RunBehavior,SessionTarget, WakeMode } from '../constants';
-import type { ExecutionBinding,TaskOrigin } from '../origin';
-import type { PolicyDelivery, PolicyTaskInput, PolicyTaskModel, TaskPolicy, WireBinding } from './types';
+import {
+  BindingKind,
+  DeliveryChannel,
+  DeliveryMode,
+  OriginKind,
+  RunBehavior,
+  SessionTarget,
+  WakeMode,
+} from '../constants';
+import type { ExecutionBinding, TaskOrigin } from '../origin';
+import type {
+  PolicyDelivery,
+  PolicyTaskInput,
+  PolicyTaskModel,
+  TaskPolicy,
+  WireBinding,
+} from './types';
 
 export class CoworkTaskPolicy implements TaskPolicy {
   readonly kind = OriginKind.Cowork;
@@ -28,7 +42,10 @@ export class CoworkTaskPolicy implements TaskPolicy {
 
   toWireBinding(binding: ExecutionBinding): WireBinding {
     if (binding.kind === BindingKind.UISession) {
-      return { sessionTarget: SessionTarget.Main, sessionKey: buildManagedSessionKey(binding.sessionId) };
+      return {
+        sessionTarget: SessionTarget.Main,
+        sessionKey: buildManagedSessionKey(binding.sessionId),
+      };
     }
     if (binding.kind === BindingKind.SessionKey) {
       return { sessionTarget: SessionTarget.Isolated, sessionKey: binding.sessionKey };

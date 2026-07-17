@@ -23,4 +23,3 @@ export type LocalInferenceSessionState = {
 };
 
 export type InstallProgressState = Record<string, LlamaCppInstallProgress>;
-

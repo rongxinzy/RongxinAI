@@ -12,7 +12,7 @@ import path from 'path';
 export function cpRecursiveSync(
   src: string,
   dest: string,
-  opts: { dereference?: boolean; force?: boolean; errorOnExist?: boolean } = {}
+  opts: { dereference?: boolean; force?: boolean; errorOnExist?: boolean } = {},
 ): void {
   const { dereference = false, force = false } = opts;
   const stat = dereference ? fs.statSync(src) : fs.lstatSync(src);

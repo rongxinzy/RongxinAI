@@ -24,7 +24,7 @@ pnpm exec remotion add @remotion/google-fonts # If project uses pnpm
 ```
 
 ```tsx
-import { loadFont } from "@remotion/google-fonts/Lobster";
+import { loadFont } from '@remotion/google-fonts/Bangers';
 
 const { fontFamily } = loadFont();
 
@@ -36,11 +36,11 @@ export const MyComposition = () => {
 Preferrably, specify only needed weights and subsets to reduce file size:
 
 ```tsx
-import { loadFont } from "@remotion/google-fonts/Roboto";
+import { loadFont } from '@remotion/google-fonts/Roboto';
 
-const { fontFamily } = loadFont("normal", {
-  weights: ["400", "700"],
-  subsets: ["latin"],
+const { fontFamily } = loadFont('normal', {
+  weights: ['400', '700'],
+  subsets: ['latin'],
 });
 ```
 
@@ -49,7 +49,7 @@ const { fontFamily } = loadFont("normal", {
 Use `waitUntilDone()` if you need to know when the font is ready:
 
 ```tsx
-import { loadFont } from "@remotion/google-fonts/Lobster";
+import { loadFont } from '@remotion/google-fonts/Bangers';
 
 const { fontFamily, waitUntilDone } = loadFont();
 
@@ -76,16 +76,16 @@ pnpm exec remotion add @remotion/fonts # If project uses pnpm
 Place your font file in the `public/` folder and use `loadFont()`:
 
 ```tsx
-import { loadFont } from "@remotion/fonts";
-import { staticFile } from "remotion";
+import { loadFont } from '@remotion/fonts';
+import { staticFile } from 'remotion';
 
 await loadFont({
-  family: "MyFont",
-  url: staticFile("MyFont-Regular.woff2"),
+  family: 'MyFont',
+  url: staticFile('MyFont-Regular.woff2'),
 });
 
 export const MyComposition = () => {
-  return <div style={{ fontFamily: "MyFont" }}>Hello World</div>;
+  return <div style={{ fontFamily: 'MyFont' }}>Hello World</div>;
 };
 ```
 
@@ -94,19 +94,19 @@ export const MyComposition = () => {
 Load each weight separately with the same family name:
 
 ```tsx
-import { loadFont } from "@remotion/fonts";
-import { staticFile } from "remotion";
+import { loadFont } from '@remotion/fonts';
+import { staticFile } from 'remotion';
 
 await Promise.all([
   loadFont({
-    family: "Inter",
-    url: staticFile("Inter-Regular.woff2"),
-    weight: "400",
+    family: 'Inter',
+    url: staticFile('Inter-Regular.woff2'),
+    weight: '400',
   }),
   loadFont({
-    family: "Inter",
-    url: staticFile("Inter-Bold.woff2"),
-    weight: "700",
+    family: 'Inter',
+    url: staticFile('Inter-Bold.woff2'),
+    weight: '700',
   }),
 ]);
 ```
@@ -115,12 +115,12 @@ await Promise.all([
 
 ```tsx
 loadFont({
-  family: "MyFont", // Required: name to use in CSS
-  url: staticFile("font.woff2"), // Required: font file URL
-  format: "woff2", // Optional: auto-detected from extension
-  weight: "400", // Optional: font weight
-  style: "normal", // Optional: normal or italic
-  display: "block", // Optional: font-display behavior
+  family: 'MyFont', // Required: name to use in CSS
+  url: staticFile('font.woff2'), // Required: font file URL
+  format: 'woff2', // Optional: auto-detected from extension
+  weight: '400', // Optional: font weight
+  style: 'normal', // Optional: normal or italic
+  display: 'block', // Optional: font-display behavior
 });
 ```
 
@@ -129,11 +129,11 @@ loadFont({
 Call `loadFont()` at the top level of your component or in a separate file that's imported early:
 
 ```tsx
-import { loadFont } from "@remotion/google-fonts/Montserrat";
+import { loadFont } from '@remotion/google-fonts/Montserrat';
 
-const { fontFamily } = loadFont("normal", {
-  weights: ["400", "700"],
-  subsets: ["latin"],
+const { fontFamily } = loadFont('normal', {
+  weights: ['400', '700'],
+  subsets: ['latin'],
 });
 
 export const Title: React.FC<{ text: string }> = ({ text }) => {
@@ -142,7 +142,7 @@ export const Title: React.FC<{ text: string }> = ({ text }) => {
       style={{
         fontFamily,
         fontSize: 80,
-        fontWeight: "bold",
+        fontWeight: 'bold',
       }}
     >
       {text}

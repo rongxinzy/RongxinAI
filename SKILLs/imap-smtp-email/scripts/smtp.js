@@ -47,10 +47,14 @@ function createTransporter() {
     },
   };
 
-  console.error(`[smtp-debug] Config: host=${config.host}, port=${config.port}, user=${config.auth.user}, secure=${config.secure}, rejectUnauthorized=${config.tls.rejectUnauthorized}, hasPassword=${!!config.auth.pass}`);
+  console.error(
+    `[smtp-debug] Config: host=${config.host}, port=${config.port}, user=${config.auth.user}, secure=${config.secure}, rejectUnauthorized=${config.tls.rejectUnauthorized}, hasPassword=${!!config.auth.pass}`,
+  );
 
   if (!config.host || !config.auth.user || !config.auth.pass) {
-    throw new Error('Missing SMTP configuration. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env');
+    throw new Error(
+      'Missing SMTP configuration. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env',
+    );
   }
 
   return nodemailer.createTransport(config);
@@ -154,7 +158,14 @@ async function verifyConnection() {
       message: 'SMTP verification successful',
     };
   } catch (err) {
-    console.error('[smtp-debug] SMTP verify failed:', err.message, 'code:', err.code, 'responseCode:', err.responseCode);
+    console.error(
+      '[smtp-debug] SMTP verify failed:',
+      err.message,
+      'code:',
+      err.code,
+      'responseCode:',
+      err.responseCode,
+    );
     throw new Error(`SMTP verify failed: ${err.message}`);
   }
 }
@@ -212,8 +223,12 @@ async function main() {
         console.error('Unknown command:', command);
         console.error('Available commands: send, test, verify');
         console.error('\nUsage:');
-        console.error('  send   --to <email> --subject <text> [--body <text>] [--html] [--cc <email>] [--bcc <email>] [--attach <file>]');
-        console.error('  send   --to <email> --subject <text> --body-file <file> [--html-file <file>] [--attach <file>]');
+        console.error(
+          '  send   --to <email> --subject <text> [--body <text>] [--html] [--cc <email>] [--bcc <email>] [--attach <file>]',
+        );
+        console.error(
+          '  send   --to <email> --subject <text> --body-file <file> [--html-file <file>] [--attach <file>]',
+        );
         console.error('  test   Test SMTP connection');
         console.error('  verify Verify SMTP connection without sending email');
         process.exit(1);

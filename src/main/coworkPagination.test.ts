@@ -7,7 +7,7 @@
  */
 import initSqlJs, { Database } from 'sql.js';
 import { v4 as uuidv4 } from 'uuid';
-import { afterAll,beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Helpers that mirror coworkStore.ts query logic
@@ -17,21 +17,35 @@ function getAll<T>(db: Database, sql: string, params: (string | number | null)[]
   const result = db.exec(sql, params);
   if (!result[0]?.values) return [];
   const columns = result[0].columns;
-  return result[0].values.map((values) => {
+  return result[0].values.map(values => {
     const row: Record<string, unknown> = {};
-    columns.forEach((col, i) => { row[col] = values[i]; });
+    columns.forEach((col, i) => {
+      row[col] = values[i];
+    });
     return row as T;
   });
 }
 
-function countRows(db: Database, table: string, where = '1=1', params: (string | number | null)[] = []): number {
+function countRows(
+  db: Database,
+  table: string,
+  where = '1=1',
+  params: (string | number | null)[] = [],
+): number {
   const result = db.exec(`SELECT COUNT(*) FROM ${table} WHERE ${where}`, params);
   return (result[0]?.values[0]?.[0] as number) || 0;
 }
 
 /** Mirror of listSessions(limit, offset) */
 function listSessions(db: Database, limit: number, offset: number) {
-  return getAll<{ id: string; title: string; status: string; pinned: number; pin_order: number | null; updated_at: number }>(
+  return getAll<{
+    id: string;
+    title: string;
+    status: string;
+    pinned: number;
+    pin_order: number | null;
+    updated_at: number;
+  }>(
     db,
     `SELECT id, title, status, pinned, pin_order, updated_at
      FROM cowork_sessions
@@ -134,7 +148,14 @@ function seedData(database: Database): void {
     database.run(
       `INSERT INTO cowork_sessions (id, title, status, pinned, pin_order, cwd, created_at, updated_at)
        VALUES (?, ?, 'idle', ?, ?, '/tmp', ?, ?)`,
-      [id, `Session ${i}`, pinned, pinned ? i : null, now - (120 - i) * 1000, now - (120 - i) * 1000],
+      [
+        id,
+        `Session ${i}`,
+        pinned,
+        pinned ? i : null,
+        now - (120 - i) * 1000,
+        now - (120 - i) * 1000,
+      ],
     );
   }
   seedSessionId = 'session-0001';

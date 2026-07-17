@@ -3,7 +3,11 @@ import { Button } from '@shared/components/ui/button';
 import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { CoworkImageAttachment, CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
+import type {
+  CoworkImageAttachment,
+  CoworkMessage,
+  CoworkMessageMetadata,
+} from '../../../types/cowork';
 import type { Skill } from '../../../types/skill';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
@@ -12,12 +16,11 @@ import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
   if (!model) return null;
-  return model.includes('/') ? (model.split('/').pop() || model) : model;
+  return model.includes('/') ? model.split('/').pop() || model : model;
 };
 
-const hasFocusWithin = (element: HTMLElement): boolean => (
-  document.activeElement instanceof Node && element.contains(document.activeElement)
-);
+const hasFocusWithin = (element: HTMLElement): boolean =>
+  document.activeElement instanceof Node && element.contains(document.activeElement);
 
 export const UserBubble: React.FC<{
   message: CoworkMessage;
@@ -44,7 +47,8 @@ export const UserBubble: React.FC<{
   const messageSkills = messageSkillIds
     .map(id => skills.find(s => s.id === id))
     .filter((s): s is NonNullable<typeof s> => s !== undefined);
-  const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ?? []) as CoworkImageAttachment[];
+  const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ??
+    []) as CoworkImageAttachment[];
 
   return (
     <div
@@ -68,19 +72,37 @@ export const UserBubble: React.FC<{
                 key={idx}
                 variant="ghost"
                 className="block max-w-[200px] rounded-lg overflow-hidden border border-border hover:border-primary/50 p-0"
-                onClick={() => setExpandedImage({ src: `data:${img.mimeType};base64,${img.base64Data}`, alt: img.name, name: img.name })}
+                onClick={() =>
+                  setExpandedImage({
+                    src: `data:${img.mimeType};base64,${img.base64Data}`,
+                    alt: img.name,
+                    name: img.name,
+                  })
+                }
               >
-                <img src={`data:${img.mimeType};base64,${img.base64Data}`} alt={img.name || 'image'} className="max-h-32 object-cover" />
+                <img
+                  src={`data:${img.mimeType};base64,${img.base64Data}`}
+                  alt={img.name || 'image'}
+                  className="max-h-32 object-cover"
+                />
               </Button>
             ))}
           </div>
         )}
 
-        <div className={`flex items-center gap-2 mt-1 text-[11px] text-zinc-400 dark:text-zinc-500 select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!isHovered}>
+        <div
+          className={`flex items-center gap-2 mt-1 text-[11px] text-zinc-400 dark:text-zinc-500 select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          aria-hidden={!isHovered}
+        >
           {messageSkills.length > 0 && (
             <div className="flex items-center gap-1">
               {messageSkills.map(skill => (
-                <span key={skill.id} className="px-1.5 py-0.5 text-[10px] rounded bg-surface-raised text-muted-foreground">{skill.name}</span>
+                <span
+                  key={skill.id}
+                  className="px-1.5 py-0.5 text-[10px] rounded bg-surface-raised text-muted-foreground"
+                >
+                  {skill.name}
+                </span>
               ))}
             </div>
           )}
@@ -88,10 +110,11 @@ export const UserBubble: React.FC<{
           {modelLabel && <span className="opacity-70">{modelLabel}</span>}
         </div>
       </div>
-      {expandedImage && createPortal(
-        <ImagePreviewModal image={expandedImage} onClose={() => setExpandedImage(null)} />,
-        document.body,
-      )}
+      {expandedImage &&
+        createPortal(
+          <ImagePreviewModal image={expandedImage} onClose={() => setExpandedImage(null)} />,
+          document.body,
+        )}
     </div>
   );
 });

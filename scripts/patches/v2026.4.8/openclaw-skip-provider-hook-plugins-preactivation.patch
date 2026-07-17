@@ -14,7 +14,7 @@ index b59f66ab21..c4e56e4bc7 100644
    onlyPluginIds?: string[];
    providerRefs?: string[];
  }): ProviderPlugin[] {
-+  // LobsterAI patch: during gateway startup (pre-activation),
++  // ZhiYuanAgent patch: during gateway startup (pre-activation),
 +  // getActivePluginRegistry() is null; skip JITI provider plugin loading
 +  // entirely.  After full activation, getCompatibleActivePluginRegistry
 +  // resolves from the active registry without JITI.  Early return (before

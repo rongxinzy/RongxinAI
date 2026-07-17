@@ -1,5 +1,5 @@
 {
-  "name": "@lobsterai/openclaw-mcp-bridge",
+  "name": "@zhiyuan/openclaw-mcp-bridge",
   "version": "0.0.0",
   "description": "Expose RongxinAI-managed MCP servers as native OpenClaw tools.",
   "type": "module",

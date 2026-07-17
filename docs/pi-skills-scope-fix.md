@@ -2,15 +2,15 @@
 
 ## 背景
 
-Work 模式对话由 Pi SDK（`@earendil-works/pi-coding-agent`，in-process agent loop）驱动。用户反馈：在应用内询问 agent "你有什么技能" 时，agent 只返回 5 个开发用技能（`ai-sdk`、`migrate-ai-sdk-v6-to-v7`、`ai-elements`、`rongxinai-ui-adapter`、`shadcn`），而项目预设的 39 个内置技能（`SKILLs/` 目录，如 `docx`、`xlsx`、`pptx`、`pdf` 等）完全检索不到。
+Work 模式对话由 Pi SDK（`@earendil-works/pi-coding-agent`，in-process agent loop）驱动。用户反馈：在应用内询问 agent "你有什么技能" 时，agent 只返回 5 个开发用技能（`ai-sdk`、`migrate-ai-sdk-v6-to-v7`、`ai-elements`、`zhiyuan-ui-adapter`、`shadcn`），而项目预设的 39 个内置技能（`SKILLs/` 目录，如 `docx`、`xlsx`、`pptx`、`pdf` 等）完全检索不到。
 
-这 5 个技能来自开发者机器的全局目录 `~/.agents/skills`（Windows: `C:\Users\<user>\.agents\skills`），是开发工具的 User scope 技能，不应出现在面向最终用户的 RongxinAI 应用会话中。
+这 5 个技能来自开发者机器的全局目录 `~/.agents/skills`（Windows: `C:\Users\<user>\.agents\skills`），是开发工具的 User scope 技能，不应出现在面向最终用户的 知远智能体 应用会话中。
 
 ## 根因分析
 
 Pi SDK 的 `DefaultResourceLoader` 在 `reload()` 时会自动从 `agentDir` 的 `skills/` 子目录加载技能，并通过 `formatSkillsForPrompt()` 拼入系统提示。`PiRuntimeAdapter.createPiResourceLoader()` 创建 loader 时传入 `agentDir: pi.getAgentDir()`（默认解析为 `~/.agents`），导致开发者全局技能泄漏进所有用户会话。
 
-与此同时，RongxinAI 自己的技能注入走的是一条独立路径：`buildSkillsPrompt()` 手动扫描 `userData/SKILLs` 并拼接进 `systemPromptOverride`。这带来两个问题：
+与此同时，知远智能体 自己的技能注入走的是一条独立路径：`buildSkillsPrompt()` 手动扫描 `userData/SKILLs` 并拼接进 `systemPromptOverride`。这带来两个问题：
 
 1. **与 loader 自动渲染的技能段重复**——pi 的 `buildSystemPrompt` 在 `customPrompt` 分支里也会对 resource-loader 发现的 skills 调 `formatSkillsForPrompt`，手动注入与自动注入并存会产生两份技能清单。
 2. **生产模式下 agent 实际"感知"的是 loader 加载的那份**（`~/.agents/skills`），手动拼进 prompt 的那份因与会话系统提示其余部分的相对位置及渲染时序问题，agent 并未将其识别为自己的技能。
@@ -23,7 +23,7 @@ Pi SDK 的 `DefaultResourceLoader` 在 `reload()` 时会自动从 `agentDir` 的
 
 1. **`createPiResourceLoader()` 新增 loader 选项**：
    - `noSkills: true` — 禁止 resource-loader 从 `agentDir`（`~/.agents/skills`）自动加载技能。注意此选项不影响 `additionalSkillPaths`，仅屏蔽默认的 user/project 技能根。
-   - `additionalSkillPaths: this.resolveRongxinAiSkillDirs()` — 显式声明 RongxinAI 的技能目录，由 pi 统一加载、去重、渲染。
+   - `additionalSkillPaths: this.resolveRongxinAiSkillDirs()` — 显式声明 知远智能体 的技能目录，由 pi 统一加载、去重、渲染。
    - `skillsOverride` — 将会话级 `skillIds` 过滤从手动 prompt 构建迁移到 loader 层（`skillIds === undefined` 表示不过滤，暴露全部技能）。
 
 2. **新增 `resolveRongxinAiSkillDirs()`**：按优先级返回技能目录列表（仅返回存在的目录）：

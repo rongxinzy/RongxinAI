@@ -23,12 +23,12 @@ bash "$SKILLS_ROOT/films-search/scripts/film-search.sh" search "关键词" [选�
 
 **选项：**
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--pan <type>` | 筛选网盘类型: `quark`, `baidu`, `aliyun`, `uc`, `all` | `all` |
-| `--quality <q>` | 筛选画质: `4k`, `1080p`, `720p`, `all` | `all` |
-| `--limit <n>` | 每个平台最大结果数 | `5` |
-| `--engine <e>` | 搜索引擎: `deep`, `web` | `deep` |
+| 参数            | 说明                                                  | 默认值 |
+| --------------- | ----------------------------------------------------- | ------ |
+| `--pan <type>`  | 筛选网盘类型: `quark`, `baidu`, `aliyun`, `uc`, `all` | `all`  |
+| `--quality <q>` | 筛选画质: `4k`, `1080p`, `720p`, `all`                | `all`  |
+| `--limit <n>`   | 每个平台最大结果数                                    | `5`    |
+| `--engine <e>`  | 搜索引擎: `deep`, `web`                               | `deep` |
 
 **引擎说明：**
 
@@ -52,6 +52,7 @@ bash "$SKILLS_ROOT/films-search/scripts/film-search.sh" search "流浪地球2" -
 ```
 
 Windows 系统使用 PowerShell 脚本：
+
 ```powershell
 powershell -File "$SKILLS_ROOT/films-search/scripts/film-search.ps1" search "流浪地球2" --pan quark
 ```
@@ -85,6 +86,7 @@ bash "$SKILLS_ROOT/films-search/scripts/film-search.sh" resolve "https://example
 > 用户：帮我找一下流浪地球2的夸克网盘资源，要4K的
 >
 > Agent：
+>
 > 1. 执行 `search "流浪地球2" --pan quark --quality 4k`
 > 2. 从 JSON 结果中取出匹配项
 > 3. 返回：标题 + 画质 + 夸克网盘链接 + 提取码（如有）
@@ -115,6 +117,7 @@ bash "$SKILLS_ROOT/films-search/scripts/film-search.sh" resolve "https://example
 ```
 
 **字段说明：**
+
 - `pan`: 网盘类型 — `quark`(夸克), `baidu`(百度), `aliyun`(阿里), `uc`(UC), `magnet`(磁力)
 - `quality`: 检测到的画质 — `4K`, `1080P`, `720P`, 空字符串表示未检测到
 - `source`: 结果来源 — `deep-search`(深度抓取), `web-search`(搜索摘要)

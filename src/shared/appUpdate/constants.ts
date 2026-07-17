@@ -8,14 +8,14 @@ export const AppUpdateStatus = {
   Error: 'error',
 } as const;
 
-export type AppUpdateStatus = typeof AppUpdateStatus[keyof typeof AppUpdateStatus];
+export type AppUpdateStatus = (typeof AppUpdateStatus)[keyof typeof AppUpdateStatus];
 
 export const AppUpdateSource = {
   Auto: 'auto',
   Manual: 'manual',
 } as const;
 
-export type AppUpdateSource = typeof AppUpdateSource[keyof typeof AppUpdateSource];
+export type AppUpdateSource = (typeof AppUpdateSource)[keyof typeof AppUpdateSource];
 
 export const AppUpdateIpc = {
   GetState: 'appUpdate:getState',
@@ -74,4 +74,4 @@ export const AppUpdateAction = {
   None: 'none',
 } as const;
 
-export type AppUpdateAction = typeof AppUpdateAction[keyof typeof AppUpdateAction];
+export type AppUpdateAction = (typeof AppUpdateAction)[keyof typeof AppUpdateAction];

@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest';
 
-import { getToolTextPreview, looksLikeTransportErrorText, serializeForLog, serializeToolContentForLog } from './mcpLog';
+import {
+  getToolTextPreview,
+  looksLikeTransportErrorText,
+  serializeForLog,
+  serializeToolContentForLog,
+} from './mcpLog';
 
 test('serializeForLog redacts sensitive fields', () => {
   const preview = serializeForLog({
@@ -17,9 +22,7 @@ test('serializeForLog redacts sensitive fields', () => {
 });
 
 test('serializeToolContentForLog keeps a readable preview', () => {
-  const preview = serializeToolContentForLog([
-    { type: 'text', text: 'fetch failed' },
-  ]);
+  const preview = serializeToolContentForLog([{ type: 'text', text: 'fetch failed' }]);
 
   expect(preview).toContain('fetch failed');
   expect(preview).toContain('"type":"text"');

@@ -9,7 +9,16 @@ import type Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
-import { DefaultAgentId,DeliveryMode, GatewayStatus, MigrationKey, PayloadKind, ScheduleKind, SessionTarget, WakeMode } from './constants';
+import {
+  DefaultAgentId,
+  DeliveryMode,
+  GatewayStatus,
+  MigrationKey,
+  PayloadKind,
+  ScheduleKind,
+  SessionTarget,
+  WakeMode,
+} from './constants';
 import type { CronJobService } from './cronJobService';
 import type { Schedule, ScheduledTaskDelivery, ScheduledTaskInput } from './types';
 
@@ -42,7 +51,9 @@ function formatLocalTimezoneOffset(): string {
   const offsetMinutes = -new Date().getTimezoneOffset();
   const sign = offsetMinutes >= 0 ? '+' : '-';
   const absMinutes = Math.abs(offsetMinutes);
-  const hours = Math.floor(absMinutes / 60).toString().padStart(2, '0');
+  const hours = Math.floor(absMinutes / 60)
+    .toString()
+    .padStart(2, '0');
   const minutes = (absMinutes % 60).toString().padStart(2, '0');
   return `${sign}${hours}:${minutes}`;
 }
@@ -105,7 +116,10 @@ function rowToInput(row: LegacyTaskRow): ScheduledTaskInput | null {
 
   const schedule = convertSchedule(legacySchedule);
   if (!schedule) {
-    console.warn(`[MigrateScheduledTasks] Skipping task "${row.name}" — cannot convert schedule`, legacySchedule);
+    console.warn(
+      `[MigrateScheduledTasks] Skipping task "${row.name}" — cannot convert schedule`,
+      legacySchedule,
+    );
     return null;
   }
 
@@ -183,7 +197,10 @@ export async function migrateScheduledTasksToOpenclaw(deps: MigrationDeps): Prom
   let gatewayErrors = 0;
   for (const row of rows) {
     const input = rowToInput(row);
-    if (!input) { skipped++; continue; }
+    if (!input) {
+      skipped++;
+      continue;
+    }
 
     try {
       await cronJobService.addJob(input);
@@ -195,7 +212,9 @@ export async function migrateScheduledTasksToOpenclaw(deps: MigrationDeps): Prom
     }
   }
 
-  console.log(`[MigrateScheduledTasks] Done. succeeded=${succeeded}, skipped=${skipped}, gatewayErrors=${gatewayErrors}`);
+  console.log(
+    `[MigrateScheduledTasks] Done. succeeded=${succeeded}, skipped=${skipped}, gatewayErrors=${gatewayErrors}`,
+  );
 
   // 5. Mark as done only when there are no gateway errors.
   // Skipped tasks (invalid schedule etc.) are unrecoverable and don't block completion.
@@ -304,7 +323,10 @@ export async function migrateScheduledTaskRunsToOpenclaw(
   const runsByTaskId = new Map<string, LegacyRunRow[]>();
   for (const run of runs) {
     let arr = runsByTaskId.get(run.task_id);
-    if (!arr) { arr = []; runsByTaskId.set(run.task_id, arr); }
+    if (!arr) {
+      arr = [];
+      runsByTaskId.set(run.task_id, arr);
+    }
     arr.push(run);
   }
 
@@ -321,16 +343,23 @@ export async function migrateScheduledTaskRunsToOpenclaw(
         try {
           const entry = JSON.parse(trimmed) as { ts?: number };
           if (typeof entry.ts === 'number') existingTs.add(entry.ts);
-        } catch { /* ignore malformed lines */ }
+        } catch {
+          /* ignore malformed lines */
+        }
       }
-    } catch { /* file doesn't exist yet — that's fine */ }
+    } catch {
+      /* file doesn't exist yet — that's fine */
+    }
 
     const lines: string[] = [];
     for (const run of taskRuns) {
       const startedMs = new Date(run.started_at).getTime();
       const finishedMs = run.finished_at ? new Date(run.finished_at).getTime() : startedMs;
 
-      if (existingTs.has(finishedMs)) { skipped++; continue; }
+      if (existingTs.has(finishedMs)) {
+        skipped++;
+        continue;
+      }
 
       const entry: Record<string, unknown> = {
         ts: finishedMs,

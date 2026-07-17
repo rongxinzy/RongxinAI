@@ -1,13 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import type {
-  LlamaCppModelLaunchInput,
-  LlamaCppRunningModel,
-} from '../../shared/llamacpp';
-import {
-  LlamaCppModelLoadError,
-  LlamaCppModelLoadFailureReason,
-} from './llamacppModelLoadErrors';
+import type { LlamaCppModelLaunchInput, LlamaCppRunningModel } from '../../shared/llamacpp';
+import { LlamaCppModelLoadError, LlamaCppModelLoadFailureReason } from './llamacppModelLoadErrors';
 import {
   halveLlamaCppModelLoadContext,
   LlamaCppModelLoadRetryDefaults,
@@ -42,10 +36,12 @@ describe('llamacppModelLoadRetry', () => {
       });
     });
 
-    await expect(loadLlamaCppModelWithRetry({
-      initialInput: inputWithContext(8192),
-      attemptLoad,
-    })).rejects.toMatchObject({
+    await expect(
+      loadLlamaCppModelWithRetry({
+        initialInput: inputWithContext(8192),
+        attemptLoad,
+      }),
+    ).rejects.toMatchObject({
       reason: LlamaCppModelLoadFailureReason.ModelFileInvalid,
     });
 
@@ -53,15 +49,19 @@ describe('llamacppModelLoadRetry', () => {
   });
 
   test('keeps context size at the minimum when halving', () => {
-    expect(halveLlamaCppModelLoadContext(
-      inputWithContext(256),
-      LlamaCppModelLoadRetryDefaults.MinContextSize,
-    ).options?.ctxSize).toBe(128);
+    expect(
+      halveLlamaCppModelLoadContext(
+        inputWithContext(256),
+        LlamaCppModelLoadRetryDefaults.MinContextSize,
+      ).options?.ctxSize,
+    ).toBe(128);
 
-    expect(halveLlamaCppModelLoadContext(
-      inputWithContext(128),
-      LlamaCppModelLoadRetryDefaults.MinContextSize,
-    ).options?.ctxSize).toBe(128);
+    expect(
+      halveLlamaCppModelLoadContext(
+        inputWithContext(128),
+        LlamaCppModelLoadRetryDefaults.MinContextSize,
+      ).options?.ctxSize,
+    ).toBe(128);
   });
 
   test('retries without changing input when ctxSize is absent', async () => {

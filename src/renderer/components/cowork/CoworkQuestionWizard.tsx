@@ -22,10 +22,7 @@ type QuestionItem = {
   multiSelect?: boolean;
 };
 
-const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
-  permission,
-  onRespond,
-}) => {
+const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission, onRespond }) => {
   const toolInput = useMemo(() => permission.toolInput ?? {}, [permission.toolInput]);
 
   const questions = useMemo<QuestionItem[]>(() => {
@@ -35,23 +32,24 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
     if (!Array.isArray(rawQuestions)) return [];
 
     return rawQuestions
-      .map((question) => {
+      .map(question => {
         if (!question || typeof question !== 'object') return null;
         const record = question as Record<string, unknown>;
         const options = Array.isArray(record.options)
-          ? record.options
-              .map((option) => {
+          ? (record.options
+              .map(option => {
                 if (!option || typeof option !== 'object') return null;
                 const optionRecord = option as Record<string, unknown>;
                 if (typeof optionRecord.label !== 'string') return null;
                 return {
                   label: optionRecord.label,
-                  description: typeof optionRecord.description === 'string'
-                    ? optionRecord.description
-                    : undefined,
+                  description:
+                    typeof optionRecord.description === 'string'
+                      ? optionRecord.description
+                      : undefined,
                 } as QuestionOption;
               })
-              .filter(Boolean) as QuestionOption[]
+              .filter(Boolean) as QuestionOption[])
           : [];
 
         if (typeof record.question !== 'string' || options.length === 0) {
@@ -102,13 +100,13 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
     if (!question.multiSelect) return [rawValue];
     return rawValue
       .split('|||')
-      .map((value) => value.trim())
+      .map(value => value.trim())
       .filter(Boolean);
   };
 
   const handleSelectOption = (question: QuestionItem, optionLabel: string) => {
     if (!question.multiSelect) {
-      setAnswers((prev) => ({
+      setAnswers(prev => ({
         ...prev,
         [question.question]: optionLabel,
       }));
@@ -116,7 +114,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
       // 单选题选择后自动跳转到下一题（延迟执行以显示选中效果）
       setTimeout(() => {
         // 使用函数式更新获取最新的 currentStep
-        setCurrentStep((prevStep) => {
+        setCurrentStep(prevStep => {
           const nextStep = prevStep + 1;
           // 只有不是最后一题才跳转
           if (nextStep < questions.length) {
@@ -126,7 +124,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
         });
       }, 150);
     } else {
-      setAnswers((prev) => {
+      setAnswers(prev => {
         const rawValue = prev[question.question] ?? '';
 
         if (!rawValue.trim()) {
@@ -139,8 +137,8 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
         const current = new Set(
           rawValue
             .split('|||')
-            .map((value) => value.trim())
-            .filter(Boolean)
+            .map(value => value.trim())
+            .filter(Boolean),
         );
 
         if (current.has(optionLabel)) {
@@ -164,7 +162,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
   };
 
   const handleOtherInputChange = (value: string) => {
-    setOtherInputs((prev) => ({
+    setOtherInputs(prev => ({
       ...prev,
       [currentStep]: value,
     }));
@@ -172,24 +170,24 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
 
   const handlePrevious = () => {
     if (!isFirstStep) {
-      setCurrentStep((prev) => prev - 1);
+      setCurrentStep(prev => prev - 1);
     }
   };
 
   const handleNext = () => {
     if (!isLastStep) {
-      setCurrentStep((prev) => prev + 1);
+      setCurrentStep(prev => prev + 1);
     }
   };
 
   const handleSkip = () => {
     // Clear the answer for the current question
-    setAnswers((prev) => {
+    setAnswers(prev => {
       const newAnswers = { ...prev };
       delete newAnswers[currentQuestion.question];
       return newAnswers;
     });
-    setOtherInputs((prev) => {
+    setOtherInputs(prev => {
       const newInputs = { ...prev };
       delete newInputs[currentStep];
       return newInputs;
@@ -207,7 +205,11 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
       const question = questions[Number(stepIndex)];
       if (question && otherValue.trim()) {
         if (question.multiSelect) {
-          const existingAnswers = finalAnswers[question.question]?.split('|||').map(a => a.trim()).filter(Boolean) || [];
+          const existingAnswers =
+            finalAnswers[question.question]
+              ?.split('|||')
+              .map(a => a.trim())
+              .filter(Boolean) || [];
           finalAnswers[question.question] = [...existingAnswers, otherValue.trim()].join('|||');
         } else {
           finalAnswers[question.question] = otherValue.trim();
@@ -284,7 +286,12 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
               <div className="flex items-center gap-2">
                 {/* Previous button */}
                 {!isFirstStep && (
-                  <Button variant="ghost" size="icon" onClick={handlePrevious} title={i18nService.t('coworkQuestionWizardPrevious')}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePrevious}
+                    title={i18nService.t('coworkQuestionWizardPrevious')}
+                  >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
                 )}
@@ -293,7 +300,9 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                 <div className="flex items-center gap-1.5">
                   {questions.map((question, index) => {
                     const isActive = index === currentStep;
-                    const isAnswered = Boolean(answers[question.question]?.trim() || otherInputs[index]?.trim());
+                    const isAnswered = Boolean(
+                      answers[question.question]?.trim() || otherInputs[index]?.trim(),
+                    );
 
                     return (
                       <button
@@ -304,14 +313,20 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                           isActive
                             ? 'bg-primary text-white shadow-md'
                             : isAnswered
-                            ? 'bg-green-500/20 dark:bg-green-600/20 text-green-700 dark:text-green-400 border border-green-500 dark:border-green-600 hover:scale-105'
-                            : 'bg-surface-raised text-muted-foreground hover:bg-primary/20 dark:hover:bg-primary/20 hover:scale-105'
+                              ? 'bg-green-500/20 dark:bg-green-600/20 text-green-700 dark:text-green-400 border border-green-500 dark:border-green-600 hover:scale-105'
+                              : 'bg-surface-raised text-muted-foreground hover:bg-primary/20 dark:hover:bg-primary/20 hover:scale-105'
                         }`}
                         title={question.question}
                       >
                         {isAnswered && !isActive ? (
                           <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
-                            <path d="M13 4L6 11L3 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path
+                              d="M13 4L6 11L3 8"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
                           </svg>
                         ) : (
                           index + 1
@@ -323,7 +338,12 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
 
                 {/* Next button */}
                 {!isLastStep && (
-                  <Button variant="ghost" size="icon" onClick={handleNext} title={i18nService.t('coworkQuestionWizardNext')}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleNext}
+                    title={i18nService.t('coworkQuestionWizardNext')}
+                  >
                     <ChevronRight className="h-5 w-5" />
                   </Button>
                 )}
@@ -332,7 +352,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
 
             {/* Options */}
             <div className="space-y-2">
-              {currentQuestion.options.map((option) => {
+              {currentQuestion.options.map(option => {
                 const isSelected = selectedValues.includes(option.label);
                 return (
                   <Button
@@ -343,23 +363,33 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                   >
                     <div className="flex items-start gap-3">
                       {currentQuestion.multiSelect ? (
-                        <div className={`mt-0.5 shrink-0 w-4 h-4 rounded border-2 transition-colors ${
-                          isSelected
-                            ? 'bg-primary border-primary'
-                            : 'border-border'
-                        }`}>
+                        <div
+                          className={`mt-0.5 shrink-0 w-4 h-4 rounded border-2 transition-colors ${
+                            isSelected ? 'bg-primary border-primary' : 'border-border'
+                          }`}
+                        >
                           {isSelected && (
-                            <svg className="w-full h-full text-white" viewBox="0 0 16 16" fill="none">
-                              <path d="M13 4L6 11L3 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <svg
+                              className="w-full h-full text-white"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                            >
+                              <path
+                                d="M13 4L6 11L3 8"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
                             </svg>
                           )}
                         </div>
                       ) : (
-                        <div className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
-                          isSelected
-                            ? 'border-primary'
-                            : 'border-border'
-                        }`}>
+                        <div
+                          className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
+                            isSelected ? 'border-primary' : 'border-border'
+                          }`}
+                        >
                           {isSelected && (
                             <div className="w-full h-full rounded-full bg-primary scale-50" />
                           )}
@@ -382,18 +412,22 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
               <input
                 type="text"
                 value={otherInputs[currentStep] || ''}
-                onChange={(e) => handleOtherInputChange(e.target.value)}
+                onChange={e => handleOtherInputChange(e.target.value)}
                 placeholder={i18nService.t('coworkQuestionWizardOther')}
                 className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground dark:placeholder:text-foregroundSecondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
               />
-              <Button variant="ghost" onClick={handleSkip}>{i18nService.t('coworkQuestionWizardSkip')}</Button>
+              <Button variant="ghost" onClick={handleSkip}>
+                {i18nService.t('coworkQuestionWizardSkip')}
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end px-6 py-4 border-t border-border bg-surface-raised">
-          <Button onClick={handleSubmit} disabled={!allAnswered}>{i18nService.t('coworkQuestionWizardSubmit')}</Button>
+          <Button onClick={handleSubmit} disabled={!allAnswered}>
+            {i18nService.t('coworkQuestionWizardSubmit')}
+          </Button>
         </div>
       </div>
     </div>

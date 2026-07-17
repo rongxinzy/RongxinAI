@@ -1,7 +1,7 @@
-import { type ChildProcess,spawn } from 'child_process';
+import { type ChildProcess, spawn } from 'child_process';
 import { CronExpressionParser } from 'cron-parser';
 import crypto from 'crypto';
-import { app, type UtilityProcess,utilityProcess } from 'electron';
+import { app, type UtilityProcess, utilityProcess } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import net from 'net';
@@ -18,7 +18,11 @@ import {
   pruneGatewayLogs,
 } from './gatewayLogRotation';
 import { getCodexHomeDir } from './openaiCodexAuth';
-import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
+import {
+  cleanupStaleThirdPartyPluginsFromBundledDir,
+  listLocalOpenClawExtensionIds,
+  syncLocalOpenClawExtensionsIntoRuntime,
+} from './openclawLocalExtensions';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 
 const gwDiagTs = (): string => {
@@ -102,7 +106,7 @@ const findPath = (candidates: string[]): string | null => {
 };
 
 const isPortAvailable = async (port: number): Promise<boolean> => {
-  return await new Promise((resolve) => {
+  return await new Promise(resolve => {
     const server = net.createServer();
     server.once('error', () => resolve(false));
     server.once('listening', () => {
@@ -113,7 +117,7 @@ const isPortAvailable = async (port: number): Promise<boolean> => {
 };
 
 const isPortReachable = (host: string, port: number, timeoutMs = 1200): Promise<boolean> => {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const socket = new net.Socket();
     let settled = false;
 
@@ -177,7 +181,7 @@ function isFileReadable(filePath: string): boolean {
   } catch {
     return false;
   }
-};
+}
 
 interface CronJobSnapshot {
   id: string;
@@ -232,7 +236,9 @@ function enumerateMissedCycleBoundaries(
     }
   } else if (schedule.kind === 'cron' && typeof schedule.expr === 'string') {
     try {
-      const opts: { currentDate: Date; tz?: string } = { currentDate: new Date(firstMissedAtMs + 1) };
+      const opts: { currentDate: Date; tz?: string } = {
+        currentDate: new Date(firstMissedAtMs + 1),
+      };
       if (schedule.tz) opts.tz = schedule.tz;
       const interval = CronExpressionParser.parse(schedule.expr, opts);
       while (interval.hasNext() && result.length < MAX_SKIPPED_ENTRIES_PER_JOB) {
@@ -272,7 +278,8 @@ export class OpenClawEngineManager extends EventEmitter {
   private cronJobsAtFork: CronJobSnapshot[] | null = null;
 
   // ── Startup phase tracking (phased health probes) ──
-  private startupPhase: 'compiling' | 'modules-loading' | 'health-waiting' | 'running' = 'compiling';
+  private startupPhase: 'compiling' | 'modules-loading' | 'health-waiting' | 'running' =
+    'compiling';
   private startupPhaseLogged: Set<string> = new Set();
   private startupStderrBuffer = '';
 
@@ -414,9 +421,13 @@ export class OpenClawEngineManager extends EventEmitter {
     try {
       if (!fs.existsSync(cacheDir)) return false;
       const entries = fs.readdirSync(cacheDir);
-      const hasFiles = entries.some((entry) => {
+      const hasFiles = entries.some(entry => {
         const full = path.join(cacheDir, entry);
-        try { return fs.statSync(full).isFile(); } catch { return false; }
+        try {
+          return fs.statSync(full).isFile();
+        } catch {
+          return false;
+        }
       });
       if (!hasFiles) return false;
       // v8-compat marker must exist — without it, the warmup was interrupted
@@ -443,7 +454,7 @@ export class OpenClawEngineManager extends EventEmitter {
         console.warn('[OpenClaw] waited for cache warmup lock >2min, proceeding without it');
         break;
       }
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 500));
     }
     console.log(`[OpenClaw] cache warmup lock released after ${Date.now() - t0}ms`);
   }
@@ -514,7 +525,7 @@ export class OpenClawEngineManager extends EventEmitter {
       fs.writeFileSync(launcherPath, launcherSrc, 'utf8');
     }
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       const child = spawn(process.execPath, [launcherPath], {
         env: {
           ...process.env,
@@ -540,12 +551,16 @@ export class OpenClawEngineManager extends EventEmitter {
         console.log(`[OpenClaw] cache warmup finished (exitCode=${exitCode})`);
         this.cleanupWarmingLock();
         // Remove the temp launcher on success.
-        try { if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath); } catch { /* ignore cleanup errors */ }
+        try {
+          if (fs.existsSync(launcherPath)) fs.unlinkSync(launcherPath);
+        } catch {
+          /* ignore cleanup errors */
+        }
         resolve(exitCode === 0);
       };
 
       child.once('exit', done);
-      child.once('error', (err) => {
+      child.once('error', err => {
         if (settled) return;
         settled = true;
         console.warn(`[OpenClaw] cache warmup error: ${err.message}`);
@@ -560,7 +575,11 @@ export class OpenClawEngineManager extends EventEmitter {
         settled = true;
         if (this.warmupProcess === child) {
           console.warn('[OpenClaw] cache warmup timed out after 120s, killing');
-          try { child.kill(); } catch { /* process already exited */ }
+          try {
+            child.kill();
+          } catch {
+            /* process already exited */
+          }
           this.warmupProcess = null;
           this.cleanupWarmingLock();
           resolve(false);
@@ -601,19 +620,30 @@ export class OpenClawEngineManager extends EventEmitter {
     if (!fs.existsSync(baseDir)) return;
 
     try {
-      const entries = fs.readdirSync(baseDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && e.name.startsWith('v8-'))
-        .map((e) => ({
+      const entries = fs
+        .readdirSync(baseDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && e.name.startsWith('v8-'))
+        .map(e => ({
           name: e.name,
           path: path.join(baseDir, e.name),
-          mtime: (() => { try { return fs.statSync(path.join(baseDir, e.name)).mtimeMs; } catch { return 0; } })(),
+          mtime: (() => {
+            try {
+              return fs.statSync(path.join(baseDir, e.name)).mtimeMs;
+            } catch {
+              return 0;
+            }
+          })(),
         }))
         .sort((a, b) => b.mtime - a.mtime); // newest first
 
       const toDelete = entries.slice(2);
       for (const entry of toDelete) {
         console.log(`[OpenClaw] Pruning old compile cache: ${entry.name}`);
-        try { fs.rmSync(entry.path, { recursive: true, force: true }); } catch { /* best-effort */ }
+        try {
+          fs.rmSync(entry.path, { recursive: true, force: true });
+        } catch {
+          /* best-effort */
+        }
       }
     } catch (err) {
       console.warn('[OpenClaw] Failed to prune old cache versions:', err);
@@ -690,7 +720,9 @@ export class OpenClawEngineManager extends EventEmitter {
         const fallback = path.join(os.tmpdir(), `openclaw-${uid}`);
         if (fs.existsSync(fallback)) return fallback;
       }
-    } catch { /* getuid unavailable */ }
+    } catch {
+      /* getuid unavailable */
+    }
     return null;
   }
 
@@ -741,7 +773,9 @@ export class OpenClawEngineManager extends EventEmitter {
       const allNonBundledIds = [...new Set([...thirdPartyIds, ...localIds, ...renamedIds])];
       const cleaned = cleanupStaleThirdPartyPluginsFromBundledDir(runtime.root, allNonBundledIds);
       if (cleaned.length > 0) {
-        console.log(`[OpenClaw] cleaned stale plugins from bundled scan dirs: ${cleaned.join(', ')}`);
+        console.log(
+          `[OpenClaw] cleaned stale plugins from bundled scan dirs: ${cleaned.join(', ')}`,
+        );
       }
     } catch {
       // Best-effort cleanup; don't block startup.
@@ -762,10 +796,14 @@ export class OpenClawEngineManager extends EventEmitter {
 
   async startGateway(reason = 'unknown'): Promise<OpenClawEngineStatus> {
     if (this.startGatewayPromise) {
-      console.log(`${gwDiagTs()} startGateway: already in progress, reusing existing promise (new reason=${reason})`);
+      console.log(
+        `${gwDiagTs()} startGateway: already in progress, reusing existing promise (new reason=${reason})`,
+      );
       return this.startGatewayPromise;
     }
-    console.log(`${gwDiagTs()} startGateway: reason=${reason}, currentPhase=${this.status.phase}, port=${this.gatewayPort ?? 'none'}`);
+    console.log(
+      `${gwDiagTs()} startGateway: reason=${reason}, currentPhase=${this.status.phase}, port=${this.gatewayPort ?? 'none'}`,
+    );
     this.startGatewayPromise = this.doStartGateway().finally(() => {
       this.startGatewayPromise = null;
     });
@@ -791,7 +829,9 @@ export class OpenClawEngineManager extends EventEmitter {
       const port = this.gatewayPort ?? this.readGatewayPort();
       if (port) {
         const healthy = await this.isGatewayHealthy(port);
-        console.log(`[OpenClaw] startGateway: existing process health check (${elapsed()}), healthy=${healthy}`);
+        console.log(
+          `[OpenClaw] startGateway: existing process health check (${elapsed()}), healthy=${healthy}`,
+        );
         if (healthy) {
           if (this.status.phase !== 'running') {
             this.setStatus({
@@ -803,9 +843,13 @@ export class OpenClawEngineManager extends EventEmitter {
           }
           return this.getStatus();
         }
-        console.warn(`${gwDiagTs()} startGateway: existing process unhealthy on port=${port}, stopping it (${elapsed()})`);
+        console.warn(
+          `${gwDiagTs()} startGateway: existing process unhealthy on port=${port}, stopping it (${elapsed()})`,
+        );
       } else {
-        console.warn(`${gwDiagTs()} startGateway: existing process alive but port unknown, stopping it (${elapsed()})`);
+        console.warn(
+          `${gwDiagTs()} startGateway: existing process alive but port unknown, stopping it (${elapsed()})`,
+        );
       }
 
       await this.stopGatewayProcess(this.gatewayProcess);
@@ -813,7 +857,9 @@ export class OpenClawEngineManager extends EventEmitter {
     }
 
     const runtime = this.resolveRuntimeMetadata();
-    console.log(`[OpenClaw] startGateway: resolveRuntimeMetadata done (${elapsed()}), root=${runtime.root ? 'found' : 'missing'}`);
+    console.log(
+      `[OpenClaw] startGateway: resolveRuntimeMetadata done (${elapsed()}), root=${runtime.root ? 'found' : 'missing'}`,
+    );
     if (!runtime.root) {
       this.setStatus({
         phase: 'not_installed',
@@ -827,7 +873,9 @@ export class OpenClawEngineManager extends EventEmitter {
     this.ensureBareEntryFiles(runtime.root);
     console.log(`[OpenClaw] startGateway: ensureBareEntryFiles done (${elapsed()})`);
     const openclawEntry = this.resolveOpenClawEntry(runtime.root);
-    console.log(`[OpenClaw] startGateway: resolveOpenClawEntry done (${elapsed()}), entry=${openclawEntry}`);
+    console.log(
+      `[OpenClaw] startGateway: resolveOpenClawEntry done (${elapsed()}), entry=${openclawEntry}`,
+    );
     if (!openclawEntry) {
       this.setStatus({
         phase: 'error',
@@ -893,7 +941,7 @@ export class OpenClawEngineManager extends EventEmitter {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       SKILLS_ROOT: skillsRoot,
-      LOBSTERAI_SKILLS_ROOT: skillsRoot,
+      ZHIYUAN_SKILLS_ROOT: skillsRoot,
       OPENCLAW_HOME: this.baseDir,
       OPENCLAW_STATE_DIR: this.stateDir,
       OPENCLAW_CONFIG_PATH: this.configPath,
@@ -914,7 +962,7 @@ export class OpenClawEngineManager extends EventEmitter {
       // regions with slow external API access.  See openclaw/openclaw#60116.
       // Requires the v2026.4.5 source patch (scripts/patches/v2026.4.5/).
       OPENCLAW_SKIP_MODEL_PRICING: '1',
-      // Disable Bonjour/mDNS LAN discovery advertising.  LobsterAI is a
+      // Disable Bonjour/mDNS LAN discovery advertising.  ZhiYuanAgent is a
       // desktop app with a loopback-only gateway — LAN service broadcast is
       // unnecessary and its watchdog can flood stderr with re-advertise
       // warnings on Windows.  See openclaw/openclaw#33609, #63153.
@@ -924,8 +972,8 @@ export class OpenClawEngineManager extends EventEmitter {
       // Enable V8 compile cache for both CJS and ESM modules.
       // This env var works for import() (ESM), unlike enableCompileCache() which is CJS-only.
       NODE_COMPILE_CACHE: compileCacheDir,
-      LOBSTERAI_ELECTRON_PATH: electronNodeRuntimePath.replace(/\\/g, '/'),
-      LOBSTERAI_OPENCLAW_ENTRY: openclawEntry.replace(/\\/g, '/'),
+      ZHIYUAN_ELECTRON_PATH: electronNodeRuntimePath.replace(/\\/g, '/'),
+      ZHIYUAN_OPENCLAW_ENTRY: openclawEntry.replace(/\\/g, '/'),
       // Inject secret values for ${VAR} placeholders in openclaw.json.
       // This keeps plaintext credentials out of the config file on disk.
       ...this.secretEnvVars,
@@ -950,7 +998,7 @@ export class OpenClawEngineManager extends EventEmitter {
     }
 
     // Prepend bundled/user Python runtime paths so gateway exec commands
-    // find the RongxinAI-managed Python instead of the Windows Store stub.
+    // find the ZhiYuanAgent-managed Python instead of the Windows Store stub.
     appendPythonRuntimeToEnv(env as Record<string, string | undefined>);
 
     // Inject node/npm/npx shims so gateway exec commands can use them.
@@ -966,10 +1014,16 @@ export class OpenClawEngineManager extends EventEmitter {
       if (fs.existsSync(shimDir)) {
         for (const file of ['npm.cmd', 'npm', 'npx.cmd', 'npx']) {
           const fp = path.join(shimDir, file);
-          try { fs.unlinkSync(fp); } catch { /* may not exist */ }
+          try {
+            fs.unlinkSync(fp);
+          } catch {
+            /* may not exist */
+          }
         }
       }
-    } catch { /* ignore cleanup errors */ }
+    } catch {
+      /* ignore cleanup errors */
+    }
 
     const npmBinDir = app.isPackaged
       ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin')
@@ -978,7 +1032,7 @@ export class OpenClawEngineManager extends EventEmitter {
     if (nodeShimDir) {
       const curPath = env.PATH || env.Path || '';
       env.PATH = [nodeShimDir, curPath].filter(Boolean).join(path.delimiter);
-      env.LOBSTERAI_NPM_BIN_DIR = npmBinDir || '';
+      env.ZHIYUAN_NPM_BIN_DIR = npmBinDir || '';
     }
 
     if (isSystemProxyEnabled()) {
@@ -995,37 +1049,42 @@ export class OpenClawEngineManager extends EventEmitter {
     // Snapshot cron store before gateway startup to detect missed jobs later.
     this.cronJobsAtFork = this.readGatewayCronJobs();
 
-    const forkArgs = ['gateway', '--bind', 'loopback', '--port', String(port), '--token', token, '--verbose'];
-    console.log(`[OpenClaw] forking gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}, args=${JSON.stringify(forkArgs)}`);
+    const forkArgs = [
+      'gateway',
+      '--bind',
+      'loopback',
+      '--port',
+      String(port),
+      '--token',
+      token,
+      '--verbose',
+    ];
+    console.log(
+      `[OpenClaw] forking gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}, args=${JSON.stringify(forkArgs)}`,
+    );
 
     // On Windows, use child_process.spawn with ELECTRON_RUN_AS_NODE=1 instead of
     // utilityProcess.fork(). Benchmark shows utilityProcess has ~5x overhead for
     // cold ESM compilation on Windows (163s vs 34s for a 28MB bundle).
     let child: GatewayProcess;
     if (process.platform === 'win32') {
-      child = spawn(
-        process.execPath,
-        [openclawEntry, ...forkArgs],
-        {
-          cwd: runtime.root,
-          env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-          windowsHide: true,
-        },
-      );
+      child = spawn(process.execPath, [openclawEntry, ...forkArgs], {
+        cwd: runtime.root,
+        env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
     } else {
-      child = utilityProcess.fork(
-        openclawEntry,
-        forkArgs,
-        {
-          cwd: runtime.root,
-          env,
-          stdio: 'pipe',
-          serviceName: 'OpenClaw Gateway',
-        },
-      );
+      child = utilityProcess.fork(openclawEntry, forkArgs, {
+        cwd: runtime.root,
+        env,
+        stdio: 'pipe',
+        serviceName: 'OpenClaw Gateway',
+      });
     }
-    console.log(`[OpenClaw] startGateway: gateway process created (${elapsed()}), platform=${process.platform}`);
+    console.log(
+      `[OpenClaw] startGateway: gateway process created (${elapsed()}), platform=${process.platform}`,
+    );
 
     this.gatewayProcess = child;
     this.gatewaySpawnedAt = Date.now();
@@ -1042,9 +1101,13 @@ export class OpenClawEngineManager extends EventEmitter {
     const bootTimeoutMs = this.isCompileCachePopulated()
       ? GATEWAY_BOOT_TIMEOUT_MS_WARM
       : GATEWAY_BOOT_TIMEOUT_MS_COLD;
-    console.log(`[OpenClaw] boot timeout: ${bootTimeoutMs}ms (cache=${this.isCompileCachePopulated() ? 'warm' : 'cold'})`);
+    console.log(
+      `[OpenClaw] boot timeout: ${bootTimeoutMs}ms (cache=${this.isCompileCachePopulated() ? 'warm' : 'cold'})`,
+    );
     const ready = await this.waitForGatewayReady(port, bootTimeoutMs);
-    console.log(`[OpenClaw] startGateway: waitForGatewayReady returned (${elapsed()}), ready=${ready}`);
+    console.log(
+      `[OpenClaw] startGateway: waitForGatewayReady returned (${elapsed()}), ready=${ready}`,
+    );
     if (!ready) {
       this.setStatus({
         phase: 'error',
@@ -1084,8 +1147,14 @@ export class OpenClawEngineManager extends EventEmitter {
     // Also clear the compile cache to prevent corrupted/partial files
     // from being treated as valid on the next start (see doStartGateway).
     if (this.warmupProcess) {
-      console.log('[OpenClaw] killing in-progress compile cache warmup, clearing cache to avoid corruption');
-      try { this.warmupProcess.kill(); } catch { /* ignore */ }
+      console.log(
+        '[OpenClaw] killing in-progress compile cache warmup, clearing cache to avoid corruption',
+      );
+      try {
+        this.warmupProcess.kill();
+      } catch {
+        /* ignore */
+      }
       this.warmupProcess = null;
       this.cleanupWarmingLock();
       this.clearCompileCache();
@@ -1110,8 +1179,11 @@ export class OpenClawEngineManager extends EventEmitter {
   }
 
   async restartGateway(reason = 'unknown'): Promise<OpenClawEngineStatus> {
-    const pid = this.gatewayProcess && 'pid' in this.gatewayProcess ? this.gatewayProcess.pid : 'none';
-    console.log(`${gwDiagTs()} restartGateway: reason=${reason}, pid=${pid}, port=${this.gatewayPort ?? 'none'}`);
+    const pid =
+      this.gatewayProcess && 'pid' in this.gatewayProcess ? this.gatewayProcess.pid : 'none';
+    console.log(
+      `${gwDiagTs()} restartGateway: reason=${reason}, pid=${pid}, port=${this.gatewayPort ?? 'none'}`,
+    );
     console.log(`${gwDiagTs()} restartGateway: stopping existing gateway...`);
     await this.stopGateway();
     // Reset restart counter on manual restart so user can always retry
@@ -1133,7 +1205,11 @@ export class OpenClawEngineManager extends EventEmitter {
     const runtimeRoot = (() => {
       const found = findPath(candidateRoots);
       if (!found) return null;
-      try { return fs.realpathSync(found); } catch { return found; }
+      try {
+        return fs.realpathSync(found);
+      } catch {
+        return found;
+      }
     })();
     const expectedPathHint = app.isPackaged
       ? path.join(process.resourcesPath, 'cfmind')
@@ -1155,7 +1231,9 @@ export class OpenClawEngineManager extends EventEmitter {
   }
 
   private readRuntimeVersion(runtimeRoot: string): string | null {
-    const fromRootPackage = parseJsonFile<{ version?: string }>(path.join(runtimeRoot, 'package.json'))?.version;
+    const fromRootPackage = parseJsonFile<{ version?: string }>(
+      path.join(runtimeRoot, 'package.json'),
+    )?.version;
     if (typeof fromRootPackage === 'string' && fromRootPackage.trim()) {
       return fromRootPackage.trim();
     }
@@ -1167,7 +1245,9 @@ export class OpenClawEngineManager extends EventEmitter {
       return fromOpenClawPackage.trim();
     }
 
-    const fromBuildInfo = parseJsonFile<{ version?: string }>(path.join(runtimeRoot, 'runtime-build-info.json'))?.version;
+    const fromBuildInfo = parseJsonFile<{ version?: string }>(
+      path.join(runtimeRoot, 'runtime-build-info.json'),
+    )?.version;
     if (typeof fromBuildInfo === 'string' && fromBuildInfo.trim()) {
       return fromBuildInfo.trim();
     }
@@ -1253,32 +1333,32 @@ export class OpenClawEngineManager extends EventEmitter {
     const shimDir = path.join(this.stateDir, 'bin');
     const shellWrapper = [
       '#!/usr/bin/env bash',
-      'if [ -z "${LOBSTERAI_OPENCLAW_ENTRY:-}" ]; then',
-      '  echo "LOBSTERAI_OPENCLAW_ENTRY is not set" >&2',
+      'if [ -z "${ZHIYUAN_OPENCLAW_ENTRY:-}" ]; then',
+      '  echo "ZHIYUAN_OPENCLAW_ENTRY is not set" >&2',
       '  exit 127',
       'fi',
-      'if [ -n "${LOBSTERAI_ELECTRON_PATH:-}" ]; then',
-      '  exec env ELECTRON_RUN_AS_NODE=1 "${LOBSTERAI_ELECTRON_PATH}" "${LOBSTERAI_OPENCLAW_ENTRY}" "$@"',
+      'if [ -n "${ZHIYUAN_ELECTRON_PATH:-}" ]; then',
+      '  exec env ELECTRON_RUN_AS_NODE=1 "${ZHIYUAN_ELECTRON_PATH}" "${ZHIYUAN_OPENCLAW_ENTRY}" "$@"',
       'fi',
       'if command -v node >/dev/null 2>&1; then',
-      '  exec node "${LOBSTERAI_OPENCLAW_ENTRY}" "$@"',
+      '  exec node "${ZHIYUAN_OPENCLAW_ENTRY}" "$@"',
       'fi',
-      'echo "Neither LOBSTERAI_ELECTRON_PATH nor node is available for OpenClaw CLI." >&2',
+      'echo "Neither ZHIYUAN_ELECTRON_PATH nor node is available for OpenClaw CLI." >&2',
       'exit 127',
       '',
     ].join('\n');
     const windowsWrapper = [
       '@echo off',
-      'if "%LOBSTERAI_OPENCLAW_ENTRY%"=="" (',
-      '  echo LOBSTERAI_OPENCLAW_ENTRY is not set 1>&2',
+      'if "%ZHIYUAN_OPENCLAW_ENTRY%"=="" (',
+      '  echo ZHIYUAN_OPENCLAW_ENTRY is not set 1>&2',
       '  exit /b 127',
       ')',
-      'if not "%LOBSTERAI_ELECTRON_PATH%"=="" (',
+      'if not "%ZHIYUAN_ELECTRON_PATH%"=="" (',
       '  set ELECTRON_RUN_AS_NODE=1',
-      '  "%LOBSTERAI_ELECTRON_PATH%" "%LOBSTERAI_OPENCLAW_ENTRY%" %*',
+      '  "%ZHIYUAN_ELECTRON_PATH%" "%ZHIYUAN_OPENCLAW_ENTRY%" %*',
       '  exit /b %ERRORLEVEL%',
       ')',
-      'node "%LOBSTERAI_OPENCLAW_ENTRY%" %*',
+      'node "%ZHIYUAN_OPENCLAW_ENTRY%" %*',
       '',
     ].join('\r\n');
 
@@ -1335,7 +1415,9 @@ export class OpenClawEngineManager extends EventEmitter {
           console.log('[OpenClaw] resolveOpenClawEntry: using bundle fast path');
           return this.ensureGatewayLauncherCjsForBundle(runtimeRoot);
         }
-        console.warn('[OpenClaw] resolveOpenClawEntry: bundle exists but is locked (Windows Defender?), falling back to ESM path');
+        console.warn(
+          '[OpenClaw] resolveOpenClawEntry: bundle exists but is locked (Windows Defender?), falling back to ESM path',
+        );
       }
     }
 
@@ -1509,7 +1591,9 @@ export class OpenClawEngineManager extends EventEmitter {
       const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : '';
       if (existing !== expectedContent) {
         if (existing) {
-          console.log('[OpenClaw] Overwriting existing gateway-launcher.cjs (switching to bundle-only mode)');
+          console.log(
+            '[OpenClaw] Overwriting existing gateway-launcher.cjs (switching to bundle-only mode)',
+          );
         }
         fs.writeFileSync(launcherPath, expectedContent, 'utf8');
         console.log('[OpenClaw] Generated gateway-launcher.cjs for bundle-only mode');
@@ -1574,8 +1658,9 @@ export class OpenClawEngineManager extends EventEmitter {
         return null;
       }
 
-      const candidates = fs.readdirSync(distRoot)
-        .filter((name) => /^client(?:-.*)?\.js$/i.test(name))
+      const candidates = fs
+        .readdirSync(distRoot)
+        .filter(name => /^client(?:-.*)?\.js$/i.test(name))
         .sort();
       if (candidates.length > 0) {
         return path.join(distRoot, candidates[0]);
@@ -1619,7 +1704,11 @@ export class OpenClawEngineManager extends EventEmitter {
   private ensureConfigFile(): void {
     ensureDir(path.dirname(this.configPath));
     if (!fs.existsSync(this.configPath)) {
-      fs.writeFileSync(this.configPath, JSON.stringify({ gateway: { mode: 'local' } }, null, 2) + '\n', 'utf8');
+      fs.writeFileSync(
+        this.configPath,
+        JSON.stringify({ gateway: { mode: 'local' } }, null, 2) + '\n',
+        'utf8',
+      );
       return;
     }
     // Ensure gateway.mode is set even if config already exists
@@ -1636,7 +1725,11 @@ export class OpenClawEngineManager extends EventEmitter {
   }
 
   private writeGatewayPort(port: number): void {
-    fs.writeFileSync(this.gatewayPortPath, JSON.stringify({ port, updatedAt: Date.now() }, null, 2), 'utf8');
+    fs.writeFileSync(
+      this.gatewayPortPath,
+      JSON.stringify({ port, updatedAt: Date.now() }, null, 2),
+      'utf8',
+    );
   }
 
   private readGatewayPort(): number | null {
@@ -1669,12 +1762,15 @@ export class OpenClawEngineManager extends EventEmitter {
     const BATCH_SIZE = 10;
     for (let batch = 0; batch * BATCH_SIZE < GATEWAY_PORT_SCAN_LIMIT; batch += 1) {
       const batchStart = DEFAULT_GATEWAY_PORT + batch * BATCH_SIZE + 1;
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, DEFAULT_GATEWAY_PORT + GATEWAY_PORT_SCAN_LIMIT + 1);
+      const batchEnd = Math.min(
+        batchStart + BATCH_SIZE,
+        DEFAULT_GATEWAY_PORT + GATEWAY_PORT_SCAN_LIMIT + 1,
+      );
       const portBatch = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i);
       const results = await Promise.all(
-        portBatch.map(async (p) => (await isPortAvailable(p)) ? p : null),
+        portBatch.map(async p => ((await isPortAvailable(p)) ? p : null)),
       );
-      const available = results.find((p) => p !== null);
+      const available = results.find(p => p !== null);
       if (available != null) {
         return available;
       }
@@ -1720,7 +1816,7 @@ export class OpenClawEngineManager extends EventEmitter {
   private waitForGatewayReady(port: number, timeoutMs: number): Promise<boolean> {
     const startedAt = Date.now();
     let pollCount = 0;
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const tick = async () => {
         if (this.shutdownRequested) {
           console.log('[OpenClaw] waitForGatewayReady: shutdown requested, giving up');
@@ -1729,7 +1825,9 @@ export class OpenClawEngineManager extends EventEmitter {
         }
 
         if (!this.gatewayProcess) {
-          console.log('[OpenClaw] waitForGatewayReady: gateway process is gone (exited early), giving up');
+          console.log(
+            '[OpenClaw] waitForGatewayReady: gateway process is gone (exited early), giving up',
+          );
           resolve(false);
           return;
         }
@@ -1741,13 +1839,17 @@ export class OpenClawEngineManager extends EventEmitter {
         const verboseProbe = pollCount % 10 === 0;
         const healthy = await this.isGatewayHealthy(port, verboseProbe);
         if (healthy) {
-          console.log(`[OpenClaw] waitForGatewayReady: gateway healthy after ${elapsedMs}ms (${pollCount} polls)`);
+          console.log(
+            `[OpenClaw] waitForGatewayReady: gateway healthy after ${elapsedMs}ms (${pollCount} polls)`,
+          );
           resolve(true);
           return;
         }
 
         if (elapsedMs >= timeoutMs) {
-          console.log(`[OpenClaw] waitForGatewayReady: timed out after ${timeoutMs}ms (${pollCount} polls)`);
+          console.log(
+            `[OpenClaw] waitForGatewayReady: timed out after ${timeoutMs}ms (${pollCount} polls)`,
+          );
           resolve(false);
           return;
         }
@@ -1770,9 +1872,10 @@ export class OpenClawEngineManager extends EventEmitter {
           progressPct = Math.min(90, 10 + Math.round((elapsedMs / timeoutMs) * 80));
           phaseLabel = `${t('gatewayStartupStarting')} (${Math.round(elapsedMs / 1000)}s)`;
         }
-        const retrySuffix = this.gatewayRestartAttempt > 0
-          ? ` (${t('gatewayStartupRetryAttempt') || 'auto-retry'} ${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS})`
-          : '';
+        const retrySuffix =
+          this.gatewayRestartAttempt > 0
+            ? ` (${t('gatewayStartupRetryAttempt') || 'auto-retry'} ${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS})`
+            : '';
         this.setStatus({
           phase: this.startupPhase === 'compiling' ? 'compiling' : 'starting',
           version: this.status.version,
@@ -1782,7 +1885,9 @@ export class OpenClawEngineManager extends EventEmitter {
         });
 
         if (pollCount % 5 === 0) {
-          console.log(`[OpenClaw] waitForGatewayReady: poll #${pollCount}, elapsed=${elapsedMs}ms, progress=${progressPct}%`);
+          console.log(
+            `[OpenClaw] waitForGatewayReady: poll #${pollCount}, elapsed=${elapsedMs}ms, progress=${progressPct}%`,
+          );
         }
 
         setTimeout(() => {
@@ -1799,7 +1904,7 @@ export class OpenClawEngineManager extends EventEmitter {
     console.log(`${gwDiagTs()} stopGatewayProcess: sending graceful kill to pid=${pid}`);
     this.expectedGatewayExits.add(child);
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>(resolve => {
       // Already exited — resolve immediately.
       if ('exitCode' in child && child.exitCode !== null) {
         resolve();
@@ -1828,7 +1933,9 @@ export class OpenClawEngineManager extends EventEmitter {
 
       // Fallback: force-kill after 1.2s if still alive, then hard-timeout at 5s.
       const forceTimer = setTimeout(() => {
-        console.log(`${gwDiagTs()} stopGatewayProcess: graceful kill timed out after 1.2s, force-killing pid=${pid}`);
+        console.log(
+          `${gwDiagTs()} stopGatewayProcess: graceful kill timed out after 1.2s, force-killing pid=${pid}`,
+        );
         try {
           if ('pid' in child && typeof child.pid === 'number') {
             child.kill();
@@ -1847,20 +1954,17 @@ export class OpenClawEngineManager extends EventEmitter {
 
   // Workaround: Electron utilityProcess V8 isolate reports getTimezoneOffset()=0.
   private static rewriteUtcTimestamps(text: string): string {
-    return text.replace(
-      /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g,
-      (utc) => {
-        const d = new Date(utc);
-        if (Number.isNaN(d.getTime())) return utc;
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const ms = String(d.getMilliseconds()).padStart(3, '0');
-        const offsetMin = -d.getTimezoneOffset();
-        const sign = offsetMin >= 0 ? '+' : '-';
-        const absH = Math.floor(Math.abs(offsetMin) / 60);
-        const absM = Math.abs(offsetMin) % 60;
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}${sign}${pad(absH)}:${pad(absM)}`;
-      },
-    );
+    return text.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, utc => {
+      const d = new Date(utc);
+      if (Number.isNaN(d.getTime())) return utc;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const ms = String(d.getMilliseconds()).padStart(3, '0');
+      const offsetMin = -d.getTimezoneOffset();
+      const sign = offsetMin >= 0 ? '+' : '-';
+      const absH = Math.floor(Math.abs(offsetMin) / 60);
+      const absM = Math.abs(offsetMin) % 60;
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}${sign}${pad(absH)}:${pad(absM)}`;
+    });
   }
 
   /**
@@ -1886,7 +1990,7 @@ export class OpenClawEngineManager extends EventEmitter {
 
       if (
         (trimmed.includes('[openclaw-launcher] loading bundle') ||
-         trimmed.includes('[openclaw-launcher] falling back to import')) &&
+          trimmed.includes('[openclaw-launcher] falling back to import')) &&
         !this.startupPhaseLogged.has('compiling')
       ) {
         this.startupPhaseLogged.add('compiling');
@@ -1902,7 +2006,7 @@ export class OpenClawEngineManager extends EventEmitter {
 
       if (
         (trimmed.includes('[openclaw-launcher] import ok') ||
-         (trimmed.includes('[openclaw-launcher] import') && trimmed.includes(' ok '))) &&
+          (trimmed.includes('[openclaw-launcher] import') && trimmed.includes(' ok '))) &&
         !this.startupPhaseLogged.has('modules-loading')
       ) {
         this.startupPhaseLogged.add('modules-loading');
@@ -1946,14 +2050,14 @@ export class OpenClawEngineManager extends EventEmitter {
       }
     };
 
-    child.stdout?.on('data', (chunk) => {
+    child.stdout?.on('data', chunk => {
       appendLog(chunk, 'stdout');
       const text = typeof chunk === 'string' ? chunk : chunk.toString();
       this.handleStartupStderrLine(text);
       logStartupMilestone(text);
       console.log(`[OpenClaw stdout] ${OpenClawEngineManager.rewriteUtcTimestamps(text)}`);
     });
-    child.stderr?.on('data', (chunk) => {
+    child.stderr?.on('data', chunk => {
       appendLog(chunk, 'stderr');
       const text = typeof chunk === 'string' ? chunk : chunk.toString();
       this.handleStartupStderrLine(text);
@@ -1966,9 +2070,8 @@ export class OpenClawEngineManager extends EventEmitter {
     child.once('error', (...args: unknown[]) => {
       // UtilityProcess error: (type: string, location: string)
       // ChildProcess error: (err: Error)
-      const errorMsg = args[0] instanceof Error
-        ? args[0].message
-        : `${args[0]}${args[1] ? ` (${args[1]})` : ''}`;
+      const errorMsg =
+        args[0] instanceof Error ? args[0].message : `${args[0]}${args[1] ? ` (${args[1]})` : ''}`;
       console.error(`${gwDiagTs()} gateway process error event: ${errorMsg}`);
       // Don't delete from expectedGatewayExits here — the 'exit' event always
       // follows and handles cleanup. Deleting here would cause 'exit' to miss
@@ -1984,7 +2087,9 @@ export class OpenClawEngineManager extends EventEmitter {
     });
 
     (child as NodeJS.EventEmitter).once('exit', (code: number | null, signal?: string) => {
-      console.log(`${gwDiagTs()} gateway process exited with code=${code}, signal=${signal ?? 'none'}`);
+      console.log(
+        `${gwDiagTs()} gateway process exited with code=${code}, signal=${signal ?? 'none'}`,
+      );
       if (this.gatewayProcess === child) {
         this.gatewayProcess = null;
       }
@@ -1995,9 +2100,15 @@ export class OpenClawEngineManager extends EventEmitter {
       if (this.shutdownRequested) return;
 
       try {
-        const tail = fs.readFileSync(this.getGatewayLogPath(), 'utf8').split('\n').slice(-30).join('\n');
+        const tail = fs
+          .readFileSync(this.getGatewayLogPath(), 'utf8')
+          .split('\n')
+          .slice(-30)
+          .join('\n');
         console.error(`${gwDiagTs()} gateway log tail (last 30 lines before crash):\n${tail}`);
-      } catch { /* log file may not exist */ }
+      } catch {
+        /* log file may not exist */
+      }
 
       this.setStatus({
         phase: 'error',
@@ -2014,7 +2125,9 @@ export class OpenClawEngineManager extends EventEmitter {
     if (this.gatewayRestartTimer) return;
 
     if (this.gatewayRestartAttempt >= GATEWAY_MAX_RESTART_ATTEMPTS) {
-      console.error(`${gwDiagTs()} gateway auto-restart limit reached (${GATEWAY_MAX_RESTART_ATTEMPTS} attempts), giving up`);
+      console.error(
+        `${gwDiagTs()} gateway auto-restart limit reached (${GATEWAY_MAX_RESTART_ATTEMPTS} attempts), giving up`,
+      );
       // Last resort: clear potentially corrupt compile cache so manual restart works
       this.clearCompileCache();
       this.setStatus({
@@ -2033,10 +2146,17 @@ export class OpenClawEngineManager extends EventEmitter {
       this.clearCompileCache();
     }
 
-    const delay = GATEWAY_RESTART_DELAYS[Math.min(this.gatewayRestartAttempt, GATEWAY_RESTART_DELAYS.length - 1)];
+    const delay =
+      GATEWAY_RESTART_DELAYS[
+        Math.min(this.gatewayRestartAttempt, GATEWAY_RESTART_DELAYS.length - 1)
+      ];
     this.gatewayRestartAttempt++;
-    console.log(`${gwDiagTs()} scheduling gateway restart attempt ${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS} in ${delay}ms`);
-    console.log(`${gwDiagTs()} restart context: port=${this.gatewayPort ?? 'none'}, configPath=${this.configPath}, stateDir=${this.stateDir}`);
+    console.log(
+      `${gwDiagTs()} scheduling gateway restart attempt ${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS} in ${delay}ms`,
+    );
+    console.log(
+      `${gwDiagTs()} restart context: port=${this.gatewayPort ?? 'none'}, configPath=${this.configPath}, stateDir=${this.stateDir}`,
+    );
 
     this.gatewayRestartTimer = setTimeout(() => {
       this.gatewayRestartTimer = null;
@@ -2057,9 +2177,9 @@ export class OpenClawEngineManager extends EventEmitter {
           id: j.id as string,
           name: (j.name as string) ?? '',
           enabled: j.enabled !== false,
-          lastRunAtMs: (j.state as Record<string, unknown>)?.lastRunAtMs as number | null ?? null,
-          nextRunAtMs: (j.state as Record<string, unknown>)?.nextRunAtMs as number | null ?? null,
-          runningAtMs: (j.state as Record<string, unknown>)?.runningAtMs as number | null ?? null,
+          lastRunAtMs: ((j.state as Record<string, unknown>)?.lastRunAtMs as number | null) ?? null,
+          nextRunAtMs: ((j.state as Record<string, unknown>)?.nextRunAtMs as number | null) ?? null,
+          runningAtMs: ((j.state as Record<string, unknown>)?.runningAtMs as number | null) ?? null,
           schedule: rawSchedule
             ? {
                 kind: (rawSchedule.kind as string) ?? '',
@@ -2105,7 +2225,9 @@ export class OpenClawEngineManager extends EventEmitter {
     }
 
     if (total > 0) {
-      console.log(`[OpenClaw] Wrote ${total} skipped cron run log entries total (skipMissedJobs=true)`);
+      console.log(
+        `[OpenClaw] Wrote ${total} skipped cron run log entries total (skipMissedJobs=true)`,
+      );
     }
   }
 
@@ -2162,7 +2284,8 @@ export class OpenClawEngineManager extends EventEmitter {
       if (!job.enabled || !job.nextRunAtMs || job.nextRunAtMs >= endMs) continue;
       total += this.writeSkippedEntriesForJob(job, runsDir, endMs, 'system-suspend');
     }
-    if (total > 0) console.log(`[OpenClaw] Wrote ${total} skipped cron run log entries after system resume`);
+    if (total > 0)
+      console.log(`[OpenClaw] Wrote ${total} skipped cron run log entries after system resume`);
   }
 
   private setStatus(next: OpenClawEngineStatus): void {

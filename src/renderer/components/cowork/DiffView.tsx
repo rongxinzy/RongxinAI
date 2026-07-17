@@ -6,7 +6,7 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Card } from '@shared/components/ui/card';
-import React, { useMemo,useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 type DiffLineType = 'added' | 'removed' | 'context';
 
@@ -97,12 +97,22 @@ function greedyDiff(oldLines: string[], newLines: string[]): DiffLine[] {
 
       if (foundOld >= 0 && (foundNew < 0 || foundOld <= foundNew)) {
         for (let k = 0; k < foundOld; k++) {
-          result.push({ type: 'removed', text: oldLines[oi + k], oldLineNo: oi + k + 1, newLineNo: null });
+          result.push({
+            type: 'removed',
+            text: oldLines[oi + k],
+            oldLineNo: oi + k + 1,
+            newLineNo: null,
+          });
         }
         oi += foundOld;
       } else if (foundNew >= 0) {
         for (let k = 0; k < foundNew; k++) {
-          result.push({ type: 'added', text: newLines[ni + k], oldLineNo: null, newLineNo: ni + k + 1 });
+          result.push({
+            type: 'added',
+            text: newLines[ni + k],
+            oldLineNo: null,
+            newLineNo: ni + k + 1,
+          });
         }
         ni += foundNew;
       } else {
@@ -235,8 +245,20 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
         </div>
         {/* View mode toggle */}
         <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 rounded-md p-0.5 shrink-0">
-          <Button variant={viewMode === 'unified' ? 'secondary' : 'ghost'} size="xs" onClick={() => setViewMode('unified')}>Unified</Button>
-          <Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="xs" onClick={() => setViewMode('split')}>Split</Button>
+          <Button
+            variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
+            size="xs"
+            onClick={() => setViewMode('unified')}
+          >
+            Unified
+          </Button>
+          <Button
+            variant={viewMode === 'split' ? 'secondary' : 'ghost'}
+            size="xs"
+            onClick={() => setViewMode('split')}
+          >
+            Split
+          </Button>
         </div>
       </div>
 
@@ -270,23 +292,35 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
           <table className="w-full text-xs font-mono border-collapse table-fixed">
             <tbody>
               {splitPairs.map((pair, idx) => {
-                const leftColors = pair.left ? LINE_COLORS[pair.left.type === 'context' ? 'context' : 'removed'] : LINE_COLORS.context;
-                const rightColors = pair.right ? LINE_COLORS[pair.right.type === 'context' ? 'context' : 'added'] : LINE_COLORS.context;
+                const leftColors = pair.left
+                  ? LINE_COLORS[pair.left.type === 'context' ? 'context' : 'removed']
+                  : LINE_COLORS.context;
+                const rightColors = pair.right
+                  ? LINE_COLORS[pair.right.type === 'context' ? 'context' : 'added']
+                  : LINE_COLORS.context;
                 return (
                   <tr key={idx}>
                     {/* Left (old) */}
-                    <td className={`select-none text-right px-2 py-0 w-8 ${leftColors.gutter} ${pair.left ? leftColors.bg : ''}`}>
+                    <td
+                      className={`select-none text-right px-2 py-0 w-8 ${leftColors.gutter} ${pair.left ? leftColors.bg : ''}`}
+                    >
                       {pair.left?.oldLineNo ?? ''}
                     </td>
-                    <td className={`px-2 py-0 w-1/2 whitespace-pre-wrap break-all border-r dark:border-claude-darkBorder/50 border-claude-border/50 ${pair.left ? `${leftColors.bg} ${leftColors.text}` : 'dark:bg-claude-darkSurfaceInset/50 bg-claude-surfaceInset/50'}`}>
-                      {pair.left ? (pair.left.text || '\u00A0') : '\u00A0'}
+                    <td
+                      className={`px-2 py-0 w-1/2 whitespace-pre-wrap break-all border-r dark:border-claude-darkBorder/50 border-claude-border/50 ${pair.left ? `${leftColors.bg} ${leftColors.text}` : 'dark:bg-claude-darkSurfaceInset/50 bg-claude-surfaceInset/50'}`}
+                    >
+                      {pair.left ? pair.left.text || '\u00A0' : '\u00A0'}
                     </td>
                     {/* Right (new) */}
-                    <td className={`select-none text-right px-2 py-0 w-8 ${rightColors.gutter} ${pair.right ? rightColors.bg : ''}`}>
+                    <td
+                      className={`select-none text-right px-2 py-0 w-8 ${rightColors.gutter} ${pair.right ? rightColors.bg : ''}`}
+                    >
                       {pair.right?.newLineNo ?? ''}
                     </td>
-                    <td className={`px-2 py-0 w-1/2 whitespace-pre-wrap break-all ${pair.right ? `${rightColors.bg} ${rightColors.text}` : 'dark:bg-claude-darkSurfaceInset/50 bg-claude-surfaceInset/50'}`}>
-                      {pair.right ? (pair.right.text || '\u00A0') : '\u00A0'}
+                    <td
+                      className={`px-2 py-0 w-1/2 whitespace-pre-wrap break-all ${pair.right ? `${rightColors.bg} ${rightColors.text}` : 'dark:bg-claude-darkSurfaceInset/50 bg-claude-surfaceInset/50'}`}
+                    >
+                      {pair.right ? pair.right.text || '\u00A0' : '\u00A0'}
                     </td>
                   </tr>
                 );

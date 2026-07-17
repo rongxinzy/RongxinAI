@@ -42,7 +42,7 @@ const SDK_EXTERNALS = [
 const openclawInternalsPlugin = {
   name: 'externalize-openclaw-internals',
   setup(build) {
-    build.onResolve({ filter: /^\.\.\/.*\/src\// }, (args) => ({
+    build.onResolve({ filter: /^\.\.\/.*\/src\// }, args => ({
       path: args.path,
       external: true,
     }));
@@ -95,7 +95,8 @@ function resolvePluginEntry(pluginDir) {
 
 async function main() {
   const t0 = Date.now();
-  const dirs = fs.readdirSync(extensionsDir, { withFileTypes: true })
+  const dirs = fs
+    .readdirSync(extensionsDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
     .sort();
@@ -124,7 +125,7 @@ async function main() {
         format: 'esm',
         target: 'es2023',
         outfile: outFile,
-        packages: 'external',  // All node_modules deps stay external
+        packages: 'external', // All node_modules deps stay external
         external: SDK_EXTERNALS,
         plugins: [openclawInternalsPlugin],
         // Silence warnings about __dirname/__filename in ESM
@@ -157,12 +158,14 @@ async function main() {
   const elapsed = Date.now() - t0;
   console.log(
     `[precompile-extensions] Done in ${elapsed}ms: ` +
-    `${compiled} compiled, ${skipped} skipped, ${errors} errors`,
+      `${compiled} compiled, ${skipped} skipped, ${errors} errors`,
   );
 
   if (errors > 0) {
     // Non-fatal — plugins will fall back to jiti runtime compilation
-    console.warn('[precompile-extensions] Some plugins failed to compile. They will use jiti fallback.');
+    console.warn(
+      '[precompile-extensions] Some plugins failed to compile. They will use jiti fallback.',
+    );
   }
 }
 

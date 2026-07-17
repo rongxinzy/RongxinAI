@@ -6,7 +6,12 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { Server } from 'http';
 import { PlaywrightManager } from './playwright/manager';
-import { launchBrowser, closeBrowser, isBrowserRunning, BrowserInstance } from './playwright/browser';
+import {
+  launchBrowser,
+  closeBrowser,
+  isBrowserRunning,
+  BrowserInstance,
+} from './playwright/browser';
 import { BingSearch } from './search/bing';
 import { GoogleSearch } from './search/google';
 import { navigate, screenshot, getContent, getTextContent } from './playwright/operations';
@@ -90,15 +95,17 @@ export class BridgeServer {
   }
 
   private setupMiddleware(): void {
-    this.app.use(express.raw({
-      type: ['application/json', 'application/*+json'],
-      limit: '2mb',
-    }));
+    this.app.use(
+      express.raw({
+        type: ['application/json', 'application/*+json'],
+        limit: '2mb',
+      }),
+    );
 
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       const contentType = req.headers['content-type'];
       const isJsonRequest = Array.isArray(contentType)
-        ? contentType.some((value) => value.includes('application/json') || value.includes('+json'))
+        ? contentType.some(value => value.includes('application/json') || value.includes('+json'))
         : typeof contentType === 'string'
           ? contentType.includes('application/json') || contentType.includes('+json')
           : false;
@@ -125,7 +132,7 @@ export class BridgeServer {
       } catch (error) {
         res.status(400).json({
           success: false,
-          error: `Invalid JSON body: ${error instanceof Error ? error.message : String(error)}`
+          error: `Invalid JSON body: ${error instanceof Error ? error.message : String(error)}`,
         });
       }
     });
@@ -203,7 +210,7 @@ export class BridgeServer {
   private async isCdpReachable(port: number): Promise<boolean> {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-        signal: AbortSignal.timeout(1500)
+        signal: AbortSignal.timeout(1500),
       });
       return response.ok;
     } catch {
@@ -218,7 +225,9 @@ export class BridgeServer {
       try {
         await closeBrowser(this.browserInstance);
       } catch (error) {
-        console.warn(`[Bridge Server] Failed to close stale browser instance: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `[Bridge Server] Failed to close stale browser instance: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
       this.browserInstance = null;
     }
@@ -228,7 +237,7 @@ export class BridgeServer {
     await this.resetBrowserState();
     const headfulConfig: Config['browser'] = {
       ...this.config.browser,
-      headless: false
+      headless: false,
     };
     this.browserInstance = await launchBrowser(headfulConfig);
     return this.playwrightManager.connectToCDP(this.browserInstance.cdpPort);
@@ -237,7 +246,9 @@ export class BridgeServer {
   private async ensureBrowserReady(): Promise<{ instance: BrowserInstance; reused: boolean }> {
     if (this.browserInstance) {
       const processAlive = this.isBrowserProcessAlive(this.browserInstance);
-      const cdpReachable = processAlive ? await this.isCdpReachable(this.browserInstance.cdpPort) : false;
+      const cdpReachable = processAlive
+        ? await this.isCdpReachable(this.browserInstance.cdpPort)
+        : false;
 
       if (processAlive && cdpReachable) {
         return { instance: this.browserInstance, reused: true };
@@ -258,8 +269,8 @@ export class BridgeServer {
       data: {
         status: 'healthy',
         uptime: process.uptime(),
-        connections: this.playwrightManager.getConnectionCount()
-      }
+        connections: this.playwrightManager.getConnectionCount(),
+      },
     });
   }
 
@@ -274,8 +285,8 @@ export class BridgeServer {
           data: {
             message: 'Browser already running',
             pid: instance.pid,
-            cdpPort: instance.cdpPort
-          }
+            cdpPort: instance.cdpPort,
+          },
         });
         return;
       }
@@ -285,13 +296,13 @@ export class BridgeServer {
         data: {
           pid: instance.pid,
           cdpPort: instance.cdpPort,
-          startTime: instance.startTime
-        }
+          startTime: instance.startTime,
+        },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -314,13 +325,13 @@ export class BridgeServer {
         success: true,
         data: {
           connectionId,
-          cdpPort: port
-        }
+          cdpPort: port,
+        },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -333,7 +344,7 @@ export class BridgeServer {
       if (!connectionId) {
         res.status(400).json({
           success: false,
-          error: 'connectionId is required'
+          error: 'connectionId is required',
         });
         return;
       }
@@ -342,12 +353,12 @@ export class BridgeServer {
 
       res.json({
         success: true,
-        data: { message: 'Disconnected successfully' }
+        data: { message: 'Disconnected successfully' },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -359,12 +370,12 @@ export class BridgeServer {
 
       res.json({
         success: true,
-        data: { message: 'Browser closed successfully' }
+        data: { message: 'Browser closed successfully' },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -372,9 +383,10 @@ export class BridgeServer {
   // Get browser status
   private async handleBrowserStatus(req: Request, res: Response): Promise<void> {
     const processAlive = this.isBrowserProcessAlive(this.browserInstance);
-    const cdpReachable = processAlive && this.browserInstance
-      ? await this.isCdpReachable(this.browserInstance.cdpPort)
-      : false;
+    const cdpReachable =
+      processAlive && this.browserInstance
+        ? await this.isCdpReachable(this.browserInstance.cdpPort)
+        : false;
 
     res.json({
       success: true,
@@ -384,8 +396,8 @@ export class BridgeServer {
         cdpReachable,
         connections: this.playwrightManager.getConnectionCount(),
         pid: this.browserInstance?.pid,
-        cdpPort: this.browserInstance?.cdpPort
-      }
+        cdpPort: this.browserInstance?.cdpPort,
+      },
     });
   }
 
@@ -397,7 +409,7 @@ export class BridgeServer {
       if (!connectionId || !query) {
         res.status(400).json({
           success: false,
-          error: 'connectionId and query are required'
+          error: 'connectionId and query are required',
         });
         return;
       }
@@ -419,18 +431,18 @@ export class BridgeServer {
           fallbackConnectionId,
           query,
           maxResults,
-          preferredEngine
+          preferredEngine,
         );
       }
 
       res.json({
         success: true,
-        data: results
+        data: results,
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -449,7 +461,7 @@ export class BridgeServer {
     }
 
     const configuredOrder = this.config.search.fallbackOrder.filter(
-      (item): item is SearchEngine => item === 'google' || item === 'bing'
+      (item): item is SearchEngine => item === 'google' || item === 'bing',
     );
     const fullOrder: SearchEngine[] = [...configuredOrder, 'google', 'bing'];
     return Array.from(new Set<SearchEngine>(fullOrder));
@@ -459,7 +471,7 @@ export class BridgeServer {
     connectionId: string,
     query: string,
     maxResults: number | undefined,
-    preferredEngine: SearchEnginePreference
+    preferredEngine: SearchEnginePreference,
   ): Promise<SearchResponse> {
     const engineOrder = this.resolveSearchEngineOrder(preferredEngine);
     const errors: string[] = [];
@@ -497,7 +509,7 @@ export class BridgeServer {
       if (!connectionId || !url) {
         res.status(400).json({
           success: false,
-          error: 'connectionId and url are required'
+          error: 'connectionId and url are required',
         });
         return;
       }
@@ -508,12 +520,12 @@ export class BridgeServer {
 
       res.json({
         success: true,
-        data: { content }
+        data: { content },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -526,7 +538,7 @@ export class BridgeServer {
       if (!connectionId || !url) {
         res.status(400).json({
           success: false,
-          error: 'connectionId and url are required'
+          error: 'connectionId and url are required',
         });
         return;
       }
@@ -538,12 +550,12 @@ export class BridgeServer {
 
       res.json({
         success: true,
-        data: { url: page.url() }
+        data: { url: page.url() },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -556,7 +568,7 @@ export class BridgeServer {
       if (!connectionId) {
         res.status(400).json({
           success: false,
-          error: 'connectionId is required'
+          error: 'connectionId is required',
         });
         return;
       }
@@ -569,13 +581,13 @@ export class BridgeServer {
         data: {
           screenshot: buffer.toString('base64'),
           format,
-          size: buffer.length
-        }
+          size: buffer.length,
+        },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -588,7 +600,7 @@ export class BridgeServer {
       if (!connectionId) {
         res.status(400).json({
           success: false,
-          error: 'connectionId is required'
+          error: 'connectionId is required',
         });
         return;
       }
@@ -598,12 +610,12 @@ export class BridgeServer {
 
       res.json({
         success: true,
-        data: { content }
+        data: { content },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -616,7 +628,7 @@ export class BridgeServer {
       if (!connectionId) {
         res.status(400).json({
           success: false,
-          error: 'connectionId is required'
+          error: 'connectionId is required',
         });
         return;
       }
@@ -626,12 +638,12 @@ export class BridgeServer {
 
       res.json({
         success: true,
-        data: { text }
+        data: { text },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -642,7 +654,7 @@ export class BridgeServer {
 
     res.json({
       success: true,
-      data: { connections }
+      data: { connections },
     });
   }
 
@@ -654,14 +666,18 @@ export class BridgeServer {
       const server = this.app.listen(this.config.server.port, this.config.server.host);
       this.httpServer = server;
 
-      server.once('error', (error) => {
+      server.once('error', error => {
         this.httpServer = null;
         reject(error);
       });
 
       server.once('listening', () => {
-        console.log(`\n[Bridge Server] Started on http://${this.config.server.host}:${this.config.server.port}`);
-        console.log(`[Bridge Server] Health check: http://${this.config.server.host}:${this.config.server.port}/api/health\n`);
+        console.log(
+          `\n[Bridge Server] Started on http://${this.config.server.host}:${this.config.server.port}`,
+        );
+        console.log(
+          `[Bridge Server] Health check: http://${this.config.server.host}:${this.config.server.port}/api/health\n`,
+        );
         resolve();
       });
     });
@@ -715,7 +731,7 @@ if (require.main === module) {
   });
 
   // Start server
-  server.start().catch((error) => {
+  server.start().catch(error => {
     console.error('Failed to start server:', error);
     process.exit(1);
   });

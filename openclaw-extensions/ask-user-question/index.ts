@@ -6,9 +6,9 @@ import type { OpenClawPluginApi } from 'openclaw/plugin-sdk';
  *
  * Registers a structured tool that lets the model ask the user a question
  * with predefined options (single/multi select). The tool pauses execution
- * and waits for the user's response via an HTTP callback to LobsterAI.
+ * and waits for the user's response via an HTTP callback to ZhiYuanAgent.
  *
- * This enables delete-confirmation modals on the LobsterAI desktop app
+ * This enables delete-confirmation modals on the ZhiYuanAgent desktop app
  * without relying on OpenClaw's exec.approval mechanism.
  */
 
@@ -54,12 +54,21 @@ const parsePluginConfig = (value: unknown): PluginConfig => {
 
 const QuestionOptionSchema = Type.Object({
   label: Type.String({ description: 'Display text for this option (1-5 words).' }),
-  description: Type.Optional(Type.String({ description: 'Explanation of what this option means.' })),
+  description: Type.Optional(
+    Type.String({ description: 'Explanation of what this option means.' }),
+  ),
 });
 
 const QuestionSchema = Type.Object({
-  question: Type.String({ description: 'The question to ask. Should be clear and end with a question mark.' }),
-  header: Type.Optional(Type.String({ description: 'Short label displayed as a tag (max 12 chars). Examples: "Auth method", "Confirm".' })),
+  question: Type.String({
+    description: 'The question to ask. Should be clear and end with a question mark.',
+  }),
+  header: Type.Optional(
+    Type.String({
+      description:
+        'Short label displayed as a tag (max 12 chars). Examples: "Auth method", "Confirm".',
+    }),
+  ),
   options: Type.Array(QuestionOptionSchema, {
     minItems: 2,
     maxItems: 4,
@@ -76,10 +85,7 @@ const AskUserQuestionSchema = Type.Object({
   }),
 });
 
-async function askUser(
-  config: PluginConfig,
-  input: AskUserInput,
-): Promise<AskUserResponse> {
+async function askUser(config: PluginConfig, input: AskUserInput): Promise<AskUserResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
@@ -97,7 +103,9 @@ async function askUser(
     const text = await response.text();
 
     if (!response.ok) {
-      throw new Error(`AskUserQuestion callback HTTP ${response.status}: ${text.trim() || response.statusText}`);
+      throw new Error(
+        `AskUserQuestion callback HTTP ${response.status}: ${text.trim() || response.statusText}`,
+      );
     }
 
     if (!text.trim()) {
@@ -107,7 +115,7 @@ async function askUser(
     const parsed = JSON.parse(text);
     return {
       behavior: parsed?.behavior === 'allow' ? 'allow' : 'deny',
-      answers: isRecord(parsed?.answers) ? parsed.answers as Record<string, string> : undefined,
+      answers: isRecord(parsed?.answers) ? (parsed.answers as Record<string, string>) : undefined,
     };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -137,12 +145,12 @@ const plugin = {
 
     // Use a factory so the tool is only available for desktop (webchat) sessions.
     // IM channel sessions (qqbot, dingtalk, weixin, feishu, etc.) get null → tool hidden.
-    api.registerTool((ctx) => {
-      // Only enable for LobsterAI desktop sessions (sessionKey starts with 'agent:main:lobsterai:').
+    api.registerTool(ctx => {
+      // Only enable for ZhiYuanAgent desktop sessions (sessionKey starts with 'agent:main:zhiyuan:').
       // IM channel sessions (dingtalk, qqbot, weixin, feishu, wecom, etc.) should not have this tool
       // so the model executes delete commands directly without confirmation on IM.
       const sessionKey = ctx.sessionKey ?? '';
-      const isLocalDesktop = sessionKey.startsWith('agent:main:lobsterai:');
+      const isLocalDesktop = sessionKey.startsWith('agent:main:zhiyuan:');
       if (!isLocalDesktop) {
         return null;
       }
@@ -151,49 +159,49 @@ const plugin = {
         name: 'AskUserQuestion',
         label: 'Ask User Question',
         description: [
-        'Ask the user a question with predefined options and wait for their response.',
-        'Use this tool BEFORE executing any delete operation (rm, trash, rmdir, unlink, git clean).',
-        'The user will see a confirmation dialog with the options you provide.',
-        'Do NOT use this tool for non-delete commands.',
-      ].join(' '),
-      parameters: AskUserQuestionSchema,
-      async execute(_id: string, params: unknown) {
-        const input = params as AskUserInput;
-        if (!input?.questions?.length) {
-          return {
-            content: [{ type: 'text', text: 'No questions provided.' }],
-            isError: true,
-          };
-        }
-
-        try {
-          const response = await askUser(config, input);
-
-          if (response.behavior === 'deny') {
+          'Ask the user a question with predefined options and wait for their response.',
+          'Use this tool BEFORE executing any delete operation (rm, trash, rmdir, unlink, git clean).',
+          'The user will see a confirmation dialog with the options you provide.',
+          'Do NOT use this tool for non-delete commands.',
+        ].join(' '),
+        parameters: AskUserQuestionSchema,
+        async execute(_id: string, params: unknown) {
+          const input = params as AskUserInput;
+          if (!input?.questions?.length) {
             return {
-              content: [{ type: 'text', text: 'User denied the operation.' }],
+              content: [{ type: 'text', text: 'No questions provided.' }],
+              isError: true,
             };
           }
 
-          const answerLines = response.answers
-            ? Object.entries(response.answers)
-                .map(([q, a]) => `${q}: ${a}`)
-                .join('\n')
-            : 'User approved.';
+          try {
+            const response = await askUser(config, input);
 
-          return {
-            content: [{ type: 'text', text: answerLines }],
-          };
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return {
-            content: [{ type: 'text', text: `AskUserQuestion failed: ${message}` }],
-            isError: true,
-          };
-        }
-      },
-    };  // end of returned tool object
-    });  // end of factory function passed to registerTool
+            if (response.behavior === 'deny') {
+              return {
+                content: [{ type: 'text', text: 'User denied the operation.' }],
+              };
+            }
+
+            const answerLines = response.answers
+              ? Object.entries(response.answers)
+                  .map(([q, a]) => `${q}: ${a}`)
+                  .join('\n')
+              : 'User approved.';
+
+            return {
+              content: [{ type: 'text', text: answerLines }],
+            };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return {
+              content: [{ type: 'text', text: `AskUserQuestion failed: ${message}` }],
+              isError: true,
+            };
+          }
+        },
+      }; // end of returned tool object
+    }); // end of factory function passed to registerTool
 
     api.logger.info('[ask-user-question] registered AskUserQuestion tool factory.');
   },

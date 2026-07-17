@@ -83,8 +83,12 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
           aria-level={1}
           aria-expanded={workspace.isExpanded}
         >
-          <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground"><Folder className="size-4" /></span>
-          <span className="min-w-0 flex-1 truncate opacity-[0.76]" title={workspace.path}>{workspace.name}</span>
+          <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+            <Folder className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate opacity-[0.76]" title={workspace.path}>
+            {workspace.name}
+          </span>
         </Button>
         {showCreateTask && (
           <Button
@@ -100,21 +104,37 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
       </div>
 
       {shouldRenderTasks && (
-        <div className={`grid w-full min-w-0 max-w-full transition-all duration-200 ease-out ${isTaskGroupVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-          <div className={`min-h-0 min-w-0 max-w-full ${isTaskGroupVisible ? '' : 'pointer-events-none overflow-hidden'}`} role="group" aria-hidden={!workspace.isExpanded}>
+        <div
+          className={`grid w-full min-w-0 max-w-full transition-all duration-200 ease-out ${isTaskGroupVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+        >
+          <div
+            className={`min-h-0 min-w-0 max-w-full ${isTaskGroupVisible ? '' : 'pointer-events-none overflow-hidden'}`}
+            role="group"
+            aria-hidden={!workspace.isExpanded}
+          >
             <div className="min-w-0 max-w-full space-y-0.5">
               {workspace.hasLoadError && workspace.tasks.length === 0 && (
-                <Button variant="ghost" onClick={() => onRetryLoadTasks(workspace.id)} className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
+                <Button
+                  variant="ghost"
+                  onClick={() => onRetryLoadTasks(workspace.id)}
+                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10"
+                >
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
               )}
               {workspace.isLoadingTasks && workspace.tasks.length === 0 && (
-                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
+                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">
+                  {i18nService.t('loading')}
+                </div>
               )}
-              {!workspace.isLoadingTasks && !workspace.hasLoadError && workspace.tasks.length === 0 && (
-                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('myAgentSidebarNoTasks')}</div>
-              )}
-              {workspace.tasks.map((task) => (
+              {!workspace.isLoadingTasks &&
+                !workspace.hasLoadError &&
+                workspace.tasks.length === 0 && (
+                  <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">
+                    {i18nService.t('myAgentSidebarNoTasks')}
+                  </div>
+                )}
+              {workspace.tasks.map(task => (
                 <AgentTaskRow
                   key={task.id}
                   task={task}
@@ -124,14 +144,26 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                   onSelect={() => onSelectTask(task)}
                   onDelete={() => onDeleteTask(task)}
                   onShare={() => onShareTask(task)}
-                  onTogglePin={(pinned) => onToggleTaskPin(task, pinned)}
-                  onRename={(title) => onRenameTask(task, title)}
+                  onTogglePin={pinned => onToggleTaskPin(task, pinned)}
+                  onRename={title => onRenameTask(task, title)}
                   onToggleSelection={() => onToggleSelection(task.id)}
                   onEnterBatchMode={() => onEnterBatchMode(task)}
                 />
               ))}
-              {workspace.canExpandTasks && <ExpandAgentTasksRow isLoading={workspace.isLoadingTasks} label={i18nService.t('myAgentSidebarExpandMore')} onClick={() => onLoadMoreTasks(workspace.id)} />}
-              {workspace.canCollapseTasks && <ExpandAgentTasksRow isLoading={false} label={i18nService.t('myAgentSidebarCollapse')} onClick={() => onCollapseTasks(workspace.id)} />}
+              {workspace.canExpandTasks && (
+                <ExpandAgentTasksRow
+                  isLoading={workspace.isLoadingTasks}
+                  label={i18nService.t('myAgentSidebarExpandMore')}
+                  onClick={() => onLoadMoreTasks(workspace.id)}
+                />
+              )}
+              {workspace.canCollapseTasks && (
+                <ExpandAgentTasksRow
+                  isLoading={false}
+                  label={i18nService.t('myAgentSidebarCollapse')}
+                  onClick={() => onCollapseTasks(workspace.id)}
+                />
+              )}
             </div>
           </div>
         </div>

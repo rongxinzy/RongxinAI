@@ -47,7 +47,7 @@ index 0000000000..1ff9af6f3f
 + * Windows), the standard entry.ts path pulls in the entire Commander CLI
 + * module graph (~1100 files), which takes 80-100s to resolve on Windows/NTFS.
 + * This dedicated entry imports only the gateway-run codepath, cutting startup
-+ * to ~15-20s (LobsterAI patch; see openclaw/openclaw#65444, #61278).
++ * to ~15-20s (ZhiYuanAgent patch; see openclaw/openclaw#65444, #61278).
 + */
 +import { fileURLToPath } from "node:url";
 +import process from "node:process";
@@ -85,7 +85,7 @@ index 0000000000..1ff9af6f3f
 +  });
 +
 +  // Parse minimal gateway CLI args directly — skip Commander's ~1100-module
-+  // overhead.  Only the flags that LobsterAI (and standard gateway deployments)
++  // overhead.  Only the flags that ZhiYuanAgent (and standard gateway deployments)
 +  // actually pass are handled here.
 +  const argv = process.argv.slice(2);
 +  // Strip "gateway" and "run" subcommand tokens if present.
@@ -135,7 +135,7 @@ index 870b735b0a..815fc740db 100644
      index: "src/index.ts",
      entry: "src/entry.ts",
 +    // Dedicated gateway entry — skips Commander CLI module graph (~1100 files)
-+    // to cut Windows/NTFS startup from 80-100s to ~15-20s (LobsterAI patch).
++    // to cut Windows/NTFS startup from 80-100s to ~15-20s (ZhiYuanAgent patch).
 +    "gateway-entry": "src/gateway-entry.ts",
      // Ensure this module is bundled as an entry so legacy CLI shims can resolve its exports.
      "cli/daemon-cli": "src/cli/daemon-cli.ts",

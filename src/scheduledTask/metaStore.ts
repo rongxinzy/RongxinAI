@@ -18,7 +18,7 @@ export class ScheduledTaskMetaStore {
 
   private ensureTable(): void {
     this.db.exec(
-      'CREATE TABLE IF NOT EXISTS scheduled_task_meta (task_id TEXT PRIMARY KEY, origin TEXT NOT NULL, binding TEXT NOT NULL)'
+      'CREATE TABLE IF NOT EXISTS scheduled_task_meta (task_id TEXT PRIMARY KEY, origin TEXT NOT NULL, binding TEXT NOT NULL)',
     );
   }
 
@@ -46,6 +46,6 @@ export class ScheduledTaskMetaStore {
     const rows = this.db
       .prepare('SELECT task_id, origin, binding FROM scheduled_task_meta')
       .all() as Array<{ task_id: string; origin: string; binding: string }>;
-    return rows.map((row) => ({ taskId: row.task_id, origin: row.origin, binding: row.binding }));
+    return rows.map(row => ({ taskId: row.task_id, origin: row.origin, binding: row.binding }));
   }
 }

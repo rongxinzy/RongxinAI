@@ -121,7 +121,8 @@ export function stripFileLinksFromText(text: string): string {
   return text.replace(/\[([^\]]+)\]\(file:\/\/([^)]+)\)/g, '');
 }
 
-const BARE_FILE_PATH_RE = /(?:^|[\s"'`(])(\/?(?:[^\s"'`()\[\]]+\/)*[^\s"'`()\[\]]+\.(?:docx|xlsx|pptx|pdf|md|txt|log|csv))(?:[\s"'`)]|$)/gm;
+const BARE_FILE_PATH_RE =
+  /(?:^|[\s"'`(])(\/?(?:[^\s"'`()\[\]]+\/)*[^\s"'`()\[\]]+\.(?:docx|xlsx|pptx|pdf|md|txt|log|csv))(?:[\s"'`)]|$)/gm;
 
 export function parseFilePathsFromText(
   messageContent: string,
@@ -303,7 +304,8 @@ export function parseToolArtifact(
   const fileName = getFileName(filePath);
   const isImage = isImageExtension(ext);
   const isBinaryDoc = isBinaryDocumentExtension(ext);
-  const content = (isImage || isBinaryDoc) ? '' : (typeof toolInput.content === 'string' ? toolInput.content : '');
+  const content =
+    isImage || isBinaryDoc ? '' : typeof toolInput.content === 'string' ? toolInput.content : '';
 
   return {
     id: `artifact-tool-${toolUseMsg.id}`,
@@ -367,7 +369,12 @@ export function detectArtifactsFromMessages(
     }
 
     if (msg.type === 'tool_result' && msg.content) {
-      const pathArtifacts = parseFilePathsFromText(msg.content, msg.id, sessionId, 'artifact-toolresult');
+      const pathArtifacts = parseFilePathsFromText(
+        msg.content,
+        msg.id,
+        sessionId,
+        'artifact-toolresult',
+      );
       for (const pa of pathArtifacts) {
         const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
         if (pa.filePath && !seenFilePaths.has(normalized)) {
@@ -384,7 +391,9 @@ export function detectArtifactsFromMessages(
       const toolUseId = msg.metadata?.toolUseId;
       const toolResult = toolUseId
         ? messages.find(m => m.type === 'tool_result' && m.metadata?.toolUseId === toolUseId)
-        : messages[i + 1]?.type === 'tool_result' ? messages[i + 1] : undefined;
+        : messages[i + 1]?.type === 'tool_result'
+          ? messages[i + 1]
+          : undefined;
       const toolArtifact = parseToolArtifact(msg, toolResult, sessionId);
       if (toolArtifact && toolArtifact.filePath) {
         const normalized = normalizeFilePathForDedup(toolArtifact.filePath);

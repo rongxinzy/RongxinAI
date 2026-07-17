@@ -91,11 +91,13 @@ bash scripts/search.sh "AI news 2026" 10
 See [examples/basic-search.md](examples/basic-search.md) for complete API documentation.
 
 **Health Check:**
+
 ```bash
 curl http://127.0.0.1:8923/api/health
 ```
 
 **Search:**
+
 ```bash
 curl -X POST http://127.0.0.1:8923/api/search \
   -H "Content-Type: application/json" \
@@ -155,22 +157,26 @@ Claude: [Calls: bash SKILLs/web-search/scripts/search.sh "Next.js 14 features" 5
 ## API Endpoints
 
 ### Browser Management
+
 - `POST /api/browser/launch` - Launch Chrome
 - `POST /api/browser/connect` - Connect to browser
 - `POST /api/browser/disconnect` - Disconnect
 - `GET /api/browser/status` - Get status
 
 ### Search Operations
+
 - `POST /api/search` - Execute search
 - `POST /api/search/content` - Get URL content
 
 ### Page Operations
+
 - `POST /api/page/navigate` - Navigate to URL
 - `POST /api/page/screenshot` - Take screenshot
 - `POST /api/page/content` - Get HTML content
 - `POST /api/page/text` - Get text content
 
 ### Utility
+
 - `GET /api/health` - Health check
 - `GET /api/connections` - List connections
 
@@ -214,6 +220,7 @@ node scripts/test-basic.js
 ```
 
 Tests:
+
 - Browser launch and connection
 - Playwright connection management
 - Page navigation
@@ -228,6 +235,7 @@ node scripts/test-search.js
 ```
 
 Tests:
+
 - Bridge Server startup
 - Browser launch via API
 - Playwright connection
@@ -254,6 +262,7 @@ npm run build
 ### Chrome Not Found
 
 Install Chrome:
+
 - macOS: https://www.google.com/chrome/
 - Linux: `sudo apt install chromium-browser`
 - Windows: https://www.google.com/chrome/
@@ -305,11 +314,13 @@ MIT License - See LICENSE.txt
 ## Future Enhancements
 
 ### Phase 2 (Optional)
+
 - Advanced search options (date range, language, region)
 - Result caching
 - Deep content extraction
 
 ### Phase 3 (Optional)
+
 - Native Cowork tool integration
 - Form filling and multi-step automation
 - CAPTCHA handling
@@ -327,6 +338,7 @@ This skill is part of the RongxinAI project. For issues or suggestions:
 ## Credits
 
 Built with:
+
 - [Playwright](https://playwright.dev/) - Browser automation
 - [Express](https://expressjs.com/) - HTTP server
 - [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/) - Browser control
@@ -334,6 +346,7 @@ Built with:
 ## Support
 
 For help:
+
 1. Read [examples/basic-search.md](examples/basic-search.md)
 2. Check troubleshooting section
 3. Review `.server.log` for errors

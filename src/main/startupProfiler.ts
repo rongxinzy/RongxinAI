@@ -52,12 +52,7 @@ export class StartupProfiler {
   /** Pretty-print all recorded phases as a table. */
   summary(): string {
     const total = this.elapsed();
-    const lines: string[] = [
-      '',
-      '='.repeat(70),
-      '  STARTUP PERFORMANCE PROFILE',
-      '='.repeat(70),
-    ];
+    const lines: string[] = ['', '='.repeat(70), '  STARTUP PERFORMANCE PROFILE', '='.repeat(70)];
 
     for (const { name, duration } of this.phases) {
       const pct = total > 0 ? (duration / total) * 100 : 0;

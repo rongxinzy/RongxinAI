@@ -73,7 +73,7 @@ const initialState: CoworkState = {
 
 const markSessionRead = (state: CoworkState, sessionId: string | null) => {
   if (!sessionId) return;
-  state.unreadSessionIds = state.unreadSessionIds.filter((id) => id !== sessionId);
+  state.unreadSessionIds = state.unreadSessionIds.filter(id => id !== sessionId);
 };
 
 const markSessionUnread = (state: CoworkState, sessionId: string) => {
@@ -105,8 +105,8 @@ const coworkSlice = createSlice({
 
     setSessions(state, action: PayloadAction<CoworkSessionSummary[]>) {
       state.sessions = action.payload;
-      const validSessionIds = new Set(action.payload.map((session) => session.id));
-      state.unreadSessionIds = state.unreadSessionIds.filter((id) => {
+      const validSessionIds = new Set(action.payload.map(session => session.id));
+      state.unreadSessionIds = state.unreadSessionIds.filter(id => {
         return validSessionIds.has(id) && id !== state.currentSessionId;
       });
     },
@@ -115,7 +115,10 @@ const coworkSlice = createSlice({
       state.hasMoreSessions = action.payload;
     },
 
-    appendSessions(state, action: PayloadAction<{ sessions: CoworkSessionSummary[]; hasMore: boolean }>) {
+    appendSessions(
+      state,
+      action: PayloadAction<{ sessions: CoworkSessionSummary[]; hasMore: boolean }>,
+    ) {
       const { sessions, hasMore } = action.payload;
       const existingIds = new Set(state.sessions.map(s => s.id));
       const newSessions = sessions.filter(s => !existingIds.has(s.id));
@@ -141,12 +144,17 @@ const coworkSlice = createSlice({
           const newMsgs = session.messages;
           if (prevMsgs.length === newMsgs.length) {
             const firstMatch = prevMsgs.length === 0 || prevMsgs[0]?.id === newMsgs[0]?.id;
-            const lastMatch = prevMsgs.length === 0 || prevMsgs[prevMsgs.length - 1]?.id === newMsgs[newMsgs.length - 1]?.id;
-            if (firstMatch && lastMatch &&
-                prev.status === session.status &&
-                prev.title === session.title &&
-                prev.messagesOffset === (session.messagesOffset ?? 0) &&
-                prev.totalMessages === (session.totalMessages ?? session.messages.length)) {
+            const lastMatch =
+              prevMsgs.length === 0 ||
+              prevMsgs[prevMsgs.length - 1]?.id === newMsgs[newMsgs.length - 1]?.id;
+            if (
+              firstMatch &&
+              lastMatch &&
+              prev.status === session.status &&
+              prev.title === session.title &&
+              prev.messagesOffset === (session.messagesOffset ?? 0) &&
+              prev.totalMessages === (session.totalMessages ?? session.messages.length)
+            ) {
               return;
             }
           }
@@ -157,8 +165,8 @@ const coworkSlice = createSlice({
         // The DB snapshot may be stale (messages not yet persisted). Replacing
         // messages would cause streaming content and user messages to vanish
         // when switching sessions and coming back.
-        const preserveMessages = state.currentSession?.status === 'running' &&
-          state.currentSession.id === session.id;
+        const preserveMessages =
+          state.currentSession?.status === 'running' && state.currentSession.id === session.id;
 
         state.currentSession = {
           ...session,
@@ -173,7 +181,7 @@ const coworkSlice = createSlice({
         state.currentSessionId = action.payload.id;
         if (!action.payload.id.startsWith('temp-')) {
           const summary = toSessionSummary(action.payload);
-          const sessionIndex = state.sessions.findIndex((s) => s.id === summary.id);
+          const sessionIndex = state.sessions.findIndex(s => s.id === summary.id);
           if (sessionIndex !== -1) {
             state.sessions[sessionIndex] = {
               ...state.sessions[sessionIndex],
@@ -213,7 +221,10 @@ const coworkSlice = createSlice({
       markSessionRead(state, action.payload.id);
     },
 
-    updateSessionStatus(state, action: PayloadAction<{ sessionId: string; status: CoworkSessionStatus }>) {
+    updateSessionStatus(
+      state,
+      action: PayloadAction<{ sessionId: string; status: CoworkSessionStatus }>,
+    ) {
       const { sessionId, status } = action.payload;
 
       // Update in sessions list
@@ -248,7 +259,7 @@ const coworkSlice = createSlice({
       const { sessionId, message } = action.payload;
 
       if (state.currentSession?.id === sessionId) {
-        const exists = state.currentSession.messages.some((item) => item.id === message.id);
+        const exists = state.currentSession.messages.some(item => item.id === message.id);
         if (!exists) {
           state.currentSession.messages.push(message);
           state.currentSession.updatedAt = message.timestamp;
@@ -266,7 +277,10 @@ const coworkSlice = createSlice({
     },
 
     /** Prepend older messages when user scrolls up to load more history. */
-    prependMessages(state, action: PayloadAction<{ sessionId: string; messages: CoworkMessage[]; newOffset: number }>) {
+    prependMessages(
+      state,
+      action: PayloadAction<{ sessionId: string; messages: CoworkMessage[]; newOffset: number }>,
+    ) {
       const { sessionId, messages, newOffset } = action.payload;
       if (state.currentSession?.id !== sessionId) return;
       if (messages.length === 0) return;
@@ -276,7 +290,15 @@ const coworkSlice = createSlice({
       state.currentSession.messagesOffset = newOffset;
     },
 
-    updateMessageContent(state, action: PayloadAction<{ sessionId: string; messageId: string; content: string; metadata?: Record<string, unknown> }>) {
+    updateMessageContent(
+      state,
+      action: PayloadAction<{
+        sessionId: string;
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }>,
+    ) {
       const { sessionId, messageId, content, metadata } = action.payload;
       const updatedAt = Date.now();
 
@@ -310,16 +332,23 @@ const coworkSlice = createSlice({
       state.remoteManaged = action.payload;
     },
 
-    updateSessionPinned(state, action: PayloadAction<{ sessionId: string; pinned: boolean; pinOrder?: number | null }>) {
+    updateSessionPinned(
+      state,
+      action: PayloadAction<{ sessionId: string; pinned: boolean; pinOrder?: number | null }>,
+    ) {
       const { sessionId, pinned, pinOrder } = action.payload;
       const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
       if (sessionIndex !== -1) {
         state.sessions[sessionIndex].pinned = pinned;
-        state.sessions[sessionIndex].pinOrder = pinned ? (pinOrder ?? state.sessions[sessionIndex].pinOrder ?? null) : null;
+        state.sessions[sessionIndex].pinOrder = pinned
+          ? (pinOrder ?? state.sessions[sessionIndex].pinOrder ?? null)
+          : null;
       }
       if (state.currentSession?.id === sessionId) {
         state.currentSession.pinned = pinned;
-        state.currentSession.pinOrder = pinned ? (pinOrder ?? state.currentSession.pinOrder ?? null) : null;
+        state.currentSession.pinOrder = pinned
+          ? (pinOrder ?? state.currentSession.pinOrder ?? null)
+          : null;
       }
     },
 
@@ -336,7 +365,10 @@ const coworkSlice = createSlice({
       }
     },
 
-    updateCurrentSessionModelOverride(state, action: PayloadAction<{ sessionId: string; modelOverride: string }>) {
+    updateCurrentSessionModelOverride(
+      state,
+      action: PayloadAction<{ sessionId: string; modelOverride: string }>,
+    ) {
       const { sessionId, modelOverride } = action.payload;
       if (state.currentSession?.id !== sessionId) return;
       state.currentSession.modelOverride = modelOverride;
@@ -344,7 +376,7 @@ const coworkSlice = createSlice({
 
     enqueuePendingPermission(state, action: PayloadAction<CoworkPermissionRequest>) {
       const alreadyQueued = state.pendingPermissions.some(
-        (permission) => permission.requestId === action.payload.requestId
+        permission => permission.requestId === action.payload.requestId,
       );
       if (alreadyQueued) return;
       state.pendingPermissions.push(action.payload);
@@ -357,7 +389,7 @@ const coworkSlice = createSlice({
         return;
       }
       state.pendingPermissions = state.pendingPermissions.filter(
-        (permission) => permission.requestId !== requestId
+        permission => permission.requestId !== requestId,
       );
     },
 
@@ -380,7 +412,10 @@ const coworkSlice = createSlice({
       state.remoteManaged = false;
     },
 
-    setDraftAttachments(state, action: PayloadAction<{ draftKey: string; attachments: DraftAttachment[] }>) {
+    setDraftAttachments(
+      state,
+      action: PayloadAction<{ draftKey: string; attachments: DraftAttachment[] }>,
+    ) {
       const { draftKey, attachments } = action.payload;
       if (attachments.length === 0) {
         delete state.draftAttachments[draftKey];
@@ -389,7 +424,10 @@ const coworkSlice = createSlice({
       }
     },
 
-    addDraftAttachment(state, action: PayloadAction<{ draftKey: string; attachment: DraftAttachment }>) {
+    addDraftAttachment(
+      state,
+      action: PayloadAction<{ draftKey: string; attachment: DraftAttachment }>,
+    ) {
       const { draftKey, attachment } = action.payload;
       const existing = state.draftAttachments[draftKey] || [];
       if (existing.some(a => a.path === attachment.path)) return;

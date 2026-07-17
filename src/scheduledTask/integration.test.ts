@@ -1,11 +1,8 @@
 import Database from 'better-sqlite3';
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
-import {
-BindingKind,
-  DeliveryMode,   OriginKind, PayloadKind,
-ScheduleKind, } from './constants';
-import { makeModel,makeTask } from './fixtures';
+import { BindingKind, DeliveryMode, OriginKind, PayloadKind, ScheduleKind } from './constants';
+import { makeModel, makeTask } from './fixtures';
 import { ScheduledTaskMetaStore } from './metaStore';
 import { TaskModelMapper } from './modelMapper';
 import { taskPolicyRegistry } from './policies/registry';
@@ -33,7 +30,10 @@ test('integration: manual create -> edit delivery to IM -> binding auto-updates'
   const normalized = policy.normalizeDraft(draft);
 
   // 3. Edit delivery -> IM
-  const edited = policy.onDeliveryChanged(normalized, { mode: DeliveryMode.Announce, channel: 'telegram' });
+  const edited = policy.onDeliveryChanged(normalized, {
+    mode: DeliveryMode.Announce,
+    channel: 'telegram',
+  });
   expect(edited.binding.kind).toBe(BindingKind.IMSession);
   expect((edited.binding as any).platform).toBe('telegram');
 
@@ -49,9 +49,17 @@ test('integration: IM task -> switch to different IM platform -> binding platfor
   const policy = taskPolicyRegistry.get(origin);
   const defaults = policy.getCreateDefaults(origin);
   const draft = mapper.createDraft(origin, defaults);
-  draft.binding = { kind: BindingKind.IMSession, platform: 'telegram', conversationId: 'c1', sessionId: 'sess-1' };
+  draft.binding = {
+    kind: BindingKind.IMSession,
+    platform: 'telegram',
+    conversationId: 'c1',
+    sessionId: 'sess-1',
+  };
 
-  const edited = policy.onDeliveryChanged(draft, { mode: DeliveryMode.Announce, channel: 'discord' });
+  const edited = policy.onDeliveryChanged(draft, {
+    mode: DeliveryMode.Announce,
+    channel: 'discord',
+  });
   expect(edited.binding.kind).toBe(BindingKind.IMSession);
   expect((edited.binding as any).platform).toBe('discord');
 });
@@ -72,7 +80,7 @@ test('integration: cowork task -> delivery change to webhook -> binding stays', 
 
 test('integration: infer -> persist -> reload uses stored meta (not re-infer)', () => {
   const metaStore = createMetaStore();
-  const wire = makeTask({ sessionKey: 'agent:main:lobsterai:sess-99' });
+  const wire = makeTask({ sessionKey: 'agent:main:zhiyuan:sess-99' });
 
   // 1. First load -- infer
   const model1 = mapper.fromWire(wire);

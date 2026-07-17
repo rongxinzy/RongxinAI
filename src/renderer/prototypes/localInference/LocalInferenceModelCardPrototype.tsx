@@ -6,10 +6,7 @@ import type {
 } from '../../../shared/llamacpp';
 import { ModelsPanel } from '../../components/localInference/panels/ModelsPanel';
 import { i18nService } from '../../services/i18n';
-import {
-  LocalInferenceModelCardPrototypeState,
-  RendererPrototypeQuery,
-} from '../constants';
+import { LocalInferenceModelCardPrototypeState, RendererPrototypeQuery } from '../constants';
 
 const prototypeModelName = 'Qwen2.5-0.5B-Instruct-GGUF';
 
@@ -88,8 +85,12 @@ export function LocalInferenceModelCardPrototype() {
       <div className="mx-auto max-w-6xl">
         <ModelsPanel
           loading={false}
-          loadingModelName={state === LocalInferenceModelCardPrototypeState.Loading ? prototypeModelName : null}
-          unloadingModelName={state === LocalInferenceModelCardPrototypeState.Unloading ? prototypeModelName : null}
+          loadingModelName={
+            state === LocalInferenceModelCardPrototypeState.Loading ? prototypeModelName : null
+          }
+          unloadingModelName={
+            state === LocalInferenceModelCardPrototypeState.Unloading ? prototypeModelName : null
+          }
           localModels={prototypeModels}
           runningModels={runningModels}
           modelPreferences={prototypePreferences}
@@ -153,7 +154,9 @@ function createPrototypeModel({
   };
 }
 
-function resolveRunningModels(state: LocalInferenceModelCardPrototypeState): LlamaCppRunningModel[] {
+function resolveRunningModels(
+  state: LocalInferenceModelCardPrototypeState,
+): LlamaCppRunningModel[] {
   if (!isRunningState(state)) return [];
 
   const runningModel = prototypeModels.find(model => model.name === prototypeModelName);
@@ -168,7 +171,9 @@ function resolveRunningModels(state: LocalInferenceModelCardPrototypeState): Lla
 }
 
 function resolvePrototypeState(): LocalInferenceModelCardPrototypeState {
-  const state = new URLSearchParams(window.location.search).get(RendererPrototypeQuery.ModelCardState);
+  const state = new URLSearchParams(window.location.search).get(
+    RendererPrototypeQuery.ModelCardState,
+  );
   return isPrototypeState(state) ? state : LocalInferenceModelCardPrototypeState.Idle;
 }
 
@@ -177,6 +182,8 @@ function isPrototypeState(value: string | null): value is LocalInferenceModelCar
 }
 
 function isRunningState(state: LocalInferenceModelCardPrototypeState): boolean {
-  return state === LocalInferenceModelCardPrototypeState.Running
-    || state === LocalInferenceModelCardPrototypeState.Unloading;
+  return (
+    state === LocalInferenceModelCardPrototypeState.Running ||
+    state === LocalInferenceModelCardPrototypeState.Unloading
+  );
 }

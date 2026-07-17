@@ -3,9 +3,9 @@ import { TOKEN_CONTRACT, TOKEN_NAMES } from '../tokens/contract';
 
 /** Generate a single [data-theme="id"] block */
 export function generateThemeCSS(theme: ThemeDefinition): string {
-  const vars = TOKEN_NAMES
-    .map((name) => `  ${TOKEN_CONTRACT[name]}: ${theme.tokens[name]};`)
-    .join('\n');
+  const vars = TOKEN_NAMES.map(name => `  ${TOKEN_CONTRACT[name]}: ${theme.tokens[name]};`).join(
+    '\n',
+  );
   const colorScheme = theme.meta.appearance === 'dark' ? 'dark' : 'light';
   return `[data-theme="${theme.meta.id}"] {\n  color-scheme: ${colorScheme};\n${vars}\n}`;
 }
@@ -16,9 +16,9 @@ export function generateAllThemesCSS(themes: ThemeDefinition[]): string {
   if (themes.length === 0) return '';
 
   const defaultTheme = themes[0];
-  const defaultVars = TOKEN_NAMES
-    .map((name) => `  ${TOKEN_CONTRACT[name]}: ${defaultTheme.tokens[name]};`)
-    .join('\n');
+  const defaultVars = TOKEN_NAMES.map(
+    name => `  ${TOKEN_CONTRACT[name]}: ${defaultTheme.tokens[name]};`,
+  ).join('\n');
   const colorScheme = defaultTheme.meta.appearance === 'dark' ? 'dark' : 'light';
   const rootCSS = `:root, [data-theme="${defaultTheme.meta.id}"] {\n  color-scheme: ${colorScheme};\n${defaultVars}\n}`;
 

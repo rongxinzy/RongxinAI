@@ -16,6 +16,7 @@ This skill searches multiple technology news sources simultaneously, automatical
 **Total Sources: 75 (18 China + 57 Global, across 9 core technical domains)**
 
 **Automatic Network Adaptation**: The skill silently detects network accessibility and automatically adjusts source selection:
+
 - ✅ **Global network accessible**: Uses all 75 sources (China + Global)
 - 🇨🇳 **China-only network**: Automatically uses 18 China sources only
 - ⚡ **Completely transparent**: Detection is cached for 5 minutes, no user notification needed
@@ -57,6 +58,7 @@ This skill searches multiple technology news sources simultaneously, automatical
 **Enhanced with Domain Aliases + Network Adaptation**: The skill automatically detects technical domains from your keyword and searches only relevant sources. Network accessibility is detected silently in the background - if global sources are not accessible, the system automatically uses China sources only. Detection result is cached for 5 minutes.
 
 **How it works**:
+
 1. Silently detect network environment (cached for 5 minutes)
 2. Filter sources by network accessibility (global vs China-only)
 3. Analyze keyword (supports English and Chinese)
@@ -65,6 +67,7 @@ This skill searches multiple technology news sources simultaneously, automatical
 6. Rank by heat score and return results
 
 **Examples** (assuming global network accessible):
+
 - "**Electron 技术资讯**" → Detects: `{general, frontend}` → Searches: ~37 sources
 - "**web development**" → Detects: `{general, frontend}` → Searches: ~37 sources (alias: "web" → frontend)
 - "**前端框架**" → Detects: `{general, frontend}` → Searches: ~37 sources
@@ -80,12 +83,14 @@ This skill searches multiple technology news sources simultaneously, automatical
 - "**技术新闻**" (generic) → Detects: `{general}` → Searches: ~25 general sources only
 
 **Network Adaptation** (completely transparent to user):
+
 - 🌍 **Global accessible**: Uses all 75 sources
 - 🇨🇳 **China-only network**: Automatically switches to 18 China sources (掘金, InfoQ中文站, 开源中国, 博客园, SegmentFault, V2EX, 36氪, 虎嗅, IT之家, 机器之心, 量子位, 钛媒体, 极客公园, 爱范儿, PingWest品玩, 少数派, 雷锋网, 阿里云开发者)
 - ⚡ **Fast detection**: 3-second timeout with 5-minute cache
 - 🔇 **Silent operation**: No user notification, completely seamless
 
 To disable smart routing and search all available sources (respects network availability):
+
 ```bash
 bash "$SKILLS_ROOT/technology-news-search/scripts/search-news.sh" "keyword" --all-sources
 ```
@@ -105,6 +110,7 @@ The smart routing system recognizes keywords in these **9 core domains** (Englis
 9. **Blockchain**: Ethereum, Bitcoin, Web3, Smart Contract, Solana, DeFi, NFT, 区块链, 加密货币, 比特币, 以太坊
 
 **Domain Aliases** (auto-resolved):
+
 - **"web", "网站"** → Frontend
 - **"database", "db", "数据库", "存储"** → Backend
 - **"cloud", "云", "云服务"** → DevOps
@@ -120,11 +126,13 @@ The smart routing system recognizes keywords in these **9 core domains** (Englis
 When user asks: **"Search for Electron tech news"** or **"搜索 Electron 技术资讯"**
 
 Execute:
+
 ```bash
 bash "$SKILLS_ROOT/technology-news-search/scripts/search-news.sh" "Electron" --limit 15
 ```
 
 The script will:
+
 1. Detect domains: `{general, frontend}`
 2. Search 26 relevant sources (13 general + 13 frontend)
 3. Output JSON with articles ranked by heat score
@@ -138,6 +146,7 @@ Read the JSON and present results in Markdown format with translations.
    - Chinese examples: "搜索 苹果 的科技新闻", "查找 AI 相关资讯"
 
 2. **Run search script**
+
    ```bash
    bash "$SKILLS_ROOT/technology-news-search/scripts/search-news.sh" "[keyword]" --limit 15 --max-per-source 5
 
@@ -174,11 +183,13 @@ Read the JSON and present results in Markdown format with translations.
 **Default behavior:** The script limits each source to 5 articles to ensure diversity across different news sources.
 
 **Why balancing matters:**
+
 - Prevents single sources (like Hacker News) from dominating results
 - Ensures exposure to different editorial perspectives
 - Provides better coverage across international and Chinese sources
 
 **Customization:**
+
 ```bash
 # Show more articles per source
 bash "$SKILLS_ROOT/technology-news-search/scripts/search-news.sh" "AI" --max-per-source 10
@@ -188,6 +199,7 @@ bash "$SKILLS_ROOT/technology-news-search/scripts/search-news.sh" "AI" --no-bala
 ```
 
 **How it works:**
+
 1. Fetch articles from all sources (up to `--limit` per source)
 2. Calculate heat scores for all articles
 3. Sort by heat score (highest first)
@@ -209,17 +221,19 @@ Present search results in this Markdown format:
 ## 🔥 Hot News (Heat 90+)
 
 ### 1. OpenAI Announces GPT-5 Release Date / OpenAI 宣布 GPT-5 发布日期
+
 **Source**: TechCrunch | **Published**: 2h ago | **Heat**: ⭐⭐⭐⭐⭐ (95)
 
 **Summary**: OpenAI CEO Sam Altman revealed that GPT-5 will launch in Q2 2026... / OpenAI CEO Sam Altman 透露 GPT-5 将在 2026 年第二季度推出...
 
 🔗 [Read more](https://techcrunch.com/2026/02/18/openai-gpt5)
 
-*💡 Also on: The Verge, Wired, MIT Tech Review*
+_💡 Also on: The Verge, Wired, MIT Tech Review_
 
 ---
 
 ### 2. GPT-5 性能测试曝光：超越人类专家水平
+
 **Source**: 机器之心 | **Published**: 5h ago | **Heat**: ⭐⭐⭐⭐ (88)
 
 **Summary**: 据可靠消息源透露，GPT-5 在多项基准测试中已超越人类专家水平...
@@ -231,15 +245,18 @@ Present search results in this Markdown format:
 ## 📈 Trending News (Heat 60-89)
 
 ### 3. [Title] / [Translation]
+
 ...
 
 ## 📰 Related News (Heat <60)
 
 ### 10. [Title]
+
 ...
 ```
 
 **Format Notes:**
+
 - Group by heat score tiers (Hot 90+, Trending 60-89, Related <60)
 - Always translate English content to Chinese
 - Include source attribution and publish time
@@ -285,17 +302,20 @@ Articles appearing on multiple sources rank higher, indicating broader industry 
 ## Troubleshooting
 
 **No results found:**
+
 - Try broader keywords (e.g., "AI" instead of "GPT-5 benchmarks")
 - Check if sources are accessible (firewall/network issues)
 - Verify sources are enabled in [references/sources.json](references/sources.json)
 
 **Script errors:**
-- Ensure Node.js is available or RongxinAI Electron is running
+
+- Ensure Node.js is available or 知远智能体 Electron is running
 - Check network connectivity
 - Review stderr output for specific error messages
 - Some sources may be temporarily unavailable
 
 **Slow performance:**
+
 - Reduce `--limit` parameter (default is 15)
 - Disable some sources in references/sources.json
 - Network speed affects RSS fetching time

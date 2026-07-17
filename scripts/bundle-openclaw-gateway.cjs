@@ -52,7 +52,8 @@ console.log(`[bundle-openclaw-gateway] Output:   ${path.relative(runtimeDir, bun
 // These are resolved at runtime from node_modules/.
 const EXTERNAL_PACKAGES = [
   // Native image processing
-  'sharp', '@img/*',
+  'sharp',
+  '@img/*',
   // Native terminal
   '@lydell/*',
   // Native clipboard
@@ -70,7 +71,9 @@ const EXTERNAL_PACKAGES = [
   // FFmpeg binary (large, optional)
   'ffmpeg-static',
   // Browser automation (large, optional)
-  'chromium-bidi', 'playwright-core', 'playwright',
+  'chromium-bidi',
+  'playwright-core',
+  'playwright',
   // Native SQLite
   'better-sqlite3',
   // TypeScript runtime compiler — uses dynamic require("../dist/babel.cjs")
@@ -102,16 +105,17 @@ esbuild
     // Without this, CJS modules (e.g. @smithy/*) that call require("buffer")
     // fail with "Dynamic require of X is not supported" when loaded via import().
     banner: {
-      js: `import { createRequire as __bundleCreateRequire } from 'node:module';\n` +
-          `import { fileURLToPath as __bundleFileURLToPath } from 'node:url';\n` +
-          `const require = __bundleCreateRequire(import.meta.url);\n` +
-          `const __filename = __bundleFileURLToPath(import.meta.url);\n` +
-          `const __dirname = __bundleFileURLToPath(new URL('.', import.meta.url));\n`,
+      js:
+        `import { createRequire as __bundleCreateRequire } from 'node:module';\n` +
+        `import { fileURLToPath as __bundleFileURLToPath } from 'node:url';\n` +
+        `const require = __bundleCreateRequire(import.meta.url);\n` +
+        `const __filename = __bundleFileURLToPath(import.meta.url);\n` +
+        `const __dirname = __bundleFileURLToPath(new URL('.', import.meta.url));\n`,
     },
     // Silence warnings about __dirname/__filename in ESM (they're polyfilled above).
     logLevel: 'warning',
   })
-  .then((result) => {
+  .then(result => {
     const elapsed = Date.now() - t0;
     const sizeKB = Math.round(fs.statSync(bundleOutPath).size / 1024);
     console.log(
@@ -119,7 +123,7 @@ esbuild
         (result.warnings.length ? `, ${result.warnings.length} warnings` : ''),
     );
   })
-  .catch((err) => {
+  .catch(err => {
     console.error('[bundle-openclaw-gateway] esbuild failed:', err.message || err);
     process.exit(1);
   });

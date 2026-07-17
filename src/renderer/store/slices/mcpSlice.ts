@@ -26,9 +26,6 @@ const mcpSlice = createSlice({
   },
 });
 
-export const {
-  setMcpServers,
-  toggleMcpServer,
-} = mcpSlice.actions;
+export const { setMcpServers, toggleMcpServer } = mcpSlice.actions;
 
 export default mcpSlice.reducer;

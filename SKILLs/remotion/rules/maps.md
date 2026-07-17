@@ -51,9 +51,9 @@ REMOTION_MAPBOX_TOKEN==pk.your-mapbox-access-token
 Here is a basic example of a map in Remotion.
 
 ```tsx
-import {useEffect, useMemo, useRef, useState} from 'react';
-import {AbsoluteFill, useDelayRender, useVideoConfig} from 'remotion';
-import mapboxgl, {Map} from 'mapbox-gl';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AbsoluteFill, useDelayRender, useVideoConfig } from 'remotion';
+import mapboxgl, { Map } from 'mapbox-gl';
 
 export const lineCoordinates = [
   [6.56158447265625, 46.059891147620725],
@@ -69,9 +69,9 @@ mapboxgl.accessToken = process.env.REMOTION_MAPBOX_TOKEN as string;
 
 export const MyComposition = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const {delayRender, continueRender} = useDelayRender();
+  const { delayRender, continueRender } = useDelayRender();
 
-  const {width, height} = useVideoConfig();
+  const { width, height } = useVideoConfig();
   const [handle] = useState(() => delayRender('Loading map...'));
   const [map, setMap] = useState<Map | null>(null);
 
@@ -146,7 +146,10 @@ export const MyComposition = () => {
     });
   }, [handle, lineCoordinates]);
 
-  const style: React.CSSProperties = useMemo(() => ({width, height, position: 'absolute'}), [width, height]);
+  const style: React.CSSProperties = useMemo(
+    () => ({ width, height, position: 'absolute' }),
+    [width, height],
+  );
 
   return <AbsoluteFill ref={ref} style={style} />;
 };
@@ -209,9 +212,9 @@ Unless I ask for it, do not jump between camera angles.
 
 ```tsx
 import * as turf from '@turf/turf';
-import {interpolate} from 'remotion';
-import {Easing} from 'remotion';
-import {useCurrentFrame, useVideoConfig, useDelayRender} from 'remotion';
+import { interpolate } from 'remotion';
+import { Easing } from 'remotion';
+import { useCurrentFrame, useVideoConfig, useDelayRender } from 'remotion';
 
 const animationDuration = 20;
 const cameraAltitude = 4000;
@@ -219,8 +222,8 @@ const cameraAltitude = 4000;
 
 ```tsx
 const frame = useCurrentFrame();
-const {fps} = useVideoConfig();
-const {delayRender, continueRender} = useDelayRender();
+const { fps } = useVideoConfig();
+const { delayRender, continueRender } = useDelayRender();
 
 useEffect(() => {
   if (!map) {
@@ -238,7 +241,8 @@ useEffect(() => {
 
   const camera = map.getFreeCameraOptions();
 
-  const alongRoute = turf.along(turf.lineString(lineCoordinates), routeDistance * progress).geometry.coordinates;
+  const alongRoute = turf.along(turf.lineString(lineCoordinates), routeDistance * progress).geometry
+    .coordinates;
 
   camera.lookAtPoint({
     lng: alongRoute[0],
@@ -267,7 +271,7 @@ To animate a line that appears straight on the map, use linear interpolation bet
 
 ```tsx
 const frame = useCurrentFrame();
-const {durationInFrames} = useVideoConfig();
+const { durationInFrames } = useVideoConfig();
 
 useEffect(() => {
   if (!map) return;
@@ -335,8 +339,8 @@ _map.addSource('markers', {
     features: [
       {
         type: 'Feature',
-        properties: {name: 'Point 1'},
-        geometry: {type: 'Point', coordinates: [-118.2437, 34.0522]},
+        properties: { name: 'Point 1' },
+        geometry: { type: 'Point', coordinates: [-118.2437, 34.0522] },
       },
     ],
   },

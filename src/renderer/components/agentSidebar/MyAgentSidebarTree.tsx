@@ -5,7 +5,7 @@ import React, { useEffect } from 'react';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { workspaceService } from '../../services/workspace';
-import { type CoworkOpenShareOptionsEventDetail,CoworkUiEvent } from '../cowork/constants';
+import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
 import WorkspaceTreeNode from './WorkspaceTreeNode';
@@ -45,8 +45,8 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
 
   useEffect(() => {
     onVisibleSessionsChange?.([
-      ...workspaceNodes.flatMap((workspace) => workspace.tasks.map((task) => task.id)),
-      ...scheduledWorkspaceNodes.flatMap((workspace) => workspace.tasks.map((task) => task.id)),
+      ...workspaceNodes.flatMap(workspace => workspace.tasks.map(task => task.id)),
+      ...scheduledWorkspaceNodes.flatMap(workspace => workspace.tasks.map(task => task.id)),
     ]);
   }, [onVisibleSessionsChange, scheduledWorkspaceNodes, workspaceNodes]);
 
@@ -88,44 +88,65 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   const handleShareTask = async (task: AgentSidebarTaskNode) => {
     await handleSelectTask(task);
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent<CoworkOpenShareOptionsEventDetail>(CoworkUiEvent.OpenShareOptions, { detail: { sessionId: task.id } }));
+      window.dispatchEvent(
+        new CustomEvent<CoworkOpenShareOptionsEventDetail>(CoworkUiEvent.OpenShareOptions, {
+          detail: { sessionId: task.id },
+        }),
+      );
     }, 0);
   };
 
   return (
     <div className="pb-3" role="tree" aria-label={i18nService.t('workspaces')}>
       <div className="sticky top-0 z-30 flex h-10 items-center justify-between bg-surface-raised px-1.5">
-        <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">{i18nService.t('workspaces')}</h2>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={() => void handleCreateWorkspace()} className="text-foreground opacity-[0.34] hover:opacity-[0.5]" aria-label={i18nService.t('workspaceAdd')}>
+        <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+          {i18nService.t('workspaces')}
+        </h2>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => void handleCreateWorkspace()}
+          className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
+          aria-label={i18nService.t('workspaceAdd')}
+        >
           <FolderPlus className="size-4" />
         </Button>
       </div>
 
       {workspaceNodes.length === 0 ? (
         <div className="px-3 py-6 text-center">
-          <p className="text-xs font-medium text-muted-foreground">{i18nService.t('workspaceNoWorkspaces')}</p>
-          <Button type="button" onClick={() => void handleCreateWorkspace()} className="mt-3 h-auto px-3 py-1.5 text-xs">{i18nService.t('workspaceAdd')}</Button>
+          <p className="text-xs font-medium text-muted-foreground">
+            {i18nService.t('workspaceNoWorkspaces')}
+          </p>
+          <Button
+            type="button"
+            onClick={() => void handleCreateWorkspace()}
+            className="mt-3 h-auto px-3 py-1.5 text-xs"
+          >
+            {i18nService.t('workspaceAdd')}
+          </Button>
         </div>
       ) : (
         <div className="space-y-0.5 px-0">
-          {workspaceNodes.map((workspace) => (
+          {workspaceNodes.map(workspace => (
             <WorkspaceTreeNode
               key={workspace.id}
               workspace={workspace}
               isBatchMode={isBatchMode}
               selectedIds={selectedIds}
               onToggleExpanded={toggleExpanded}
-              onCreateTask={(selectedWorkspace) => void handleCreateTask(selectedWorkspace)}
-              onRetryLoadTasks={(workspaceId) => void retryLoadTasks(workspaceId)}
-              onLoadMoreTasks={(workspaceId) => void loadMoreTasks(workspaceId)}
+              onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
+              onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
+              onLoadMoreTasks={workspaceId => void loadMoreTasks(workspaceId)}
               onCollapseTasks={collapseTasks}
-              onSelectTask={(task) => void handleSelectTask(task)}
+              onSelectTask={task => void handleSelectTask(task)}
               onDeleteTask={handleDeleteTask}
               onShareTask={handleShareTask}
               onToggleTaskPin={handleToggleTaskPin}
               onRenameTask={handleRenameTask}
               onToggleSelection={onToggleSelection}
-              onEnterBatchMode={(task) => onEnterBatchMode(task.id)}
+              onEnterBatchMode={task => onEnterBatchMode(task.id)}
             />
           ))}
         </div>
@@ -134,14 +155,18 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
       {workMode === 'work' && (
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="flex h-10 items-center bg-surface-raised px-1.5">
-            <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">{i18nService.t('scheduledTasks')}</h2>
+            <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+              {i18nService.t('scheduledTasks')}
+            </h2>
           </div>
 
           {scheduledWorkspaceNodes.length === 0 ? (
-            <div className="px-3 py-3 text-xs text-muted-foreground">{i18nService.t('scheduledTasksEmptyState')}</div>
+            <div className="px-3 py-3 text-xs text-muted-foreground">
+              {i18nService.t('scheduledTasksEmptyState')}
+            </div>
           ) : (
             <div className="flex flex-col gap-0.5 px-0">
-              {scheduledWorkspaceNodes.map((workspace) => (
+              {scheduledWorkspaceNodes.map(workspace => (
                 <WorkspaceTreeNode
                   key={`scheduled-${workspace.id}`}
                   workspace={workspace}
@@ -149,16 +174,16 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
                   selectedIds={selectedIds}
                   onToggleExpanded={toggleScheduledExpanded}
                   onCreateTask={() => undefined}
-                  onRetryLoadTasks={(workspaceId) => void retryLoadTasks(workspaceId)}
-                  onLoadMoreTasks={(workspaceId) => void loadMoreScheduledTasks(workspaceId)}
+                  onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
+                  onLoadMoreTasks={workspaceId => void loadMoreScheduledTasks(workspaceId)}
                   onCollapseTasks={collapseScheduledTasks}
-                  onSelectTask={(task) => void handleSelectTask(task)}
+                  onSelectTask={task => void handleSelectTask(task)}
                   onDeleteTask={handleDeleteTask}
                   onShareTask={handleShareTask}
                   onToggleTaskPin={handleToggleTaskPin}
                   onRenameTask={handleRenameTask}
                   onToggleSelection={onToggleSelection}
-                  onEnterBatchMode={(task) => onEnterBatchMode(task.id)}
+                  onEnterBatchMode={task => onEnterBatchMode(task.id)}
                   showCreateTask={false}
                 />
               ))}

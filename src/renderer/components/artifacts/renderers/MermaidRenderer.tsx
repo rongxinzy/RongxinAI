@@ -46,7 +46,9 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ artifact }) => {
     };
 
     renderDiagram();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [artifact.content, artifact.id]);
 
   if (error) {

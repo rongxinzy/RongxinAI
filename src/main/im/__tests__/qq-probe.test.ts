@@ -4,7 +4,14 @@
 import { describe, test } from 'vitest';
 
 import { runChannelProbeContract } from './channel-probe.contract';
-import { buildProbeResult, makeAuthCheckFail, makeAuthCheckPass, makeCheck, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  buildProbeResult,
+  makeAuthCheckFail,
+  makeAuthCheckPass,
+  makeCheck,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 describe('Channel probe contract: qq', () => {
   test('missing_credentials path conforms to contract', () => {
@@ -15,7 +22,11 @@ describe('Channel probe contract: qq', () => {
     runChannelProbeContract({
       platform: 'qq',
       result: buildProbeResult('qq', {
-        checks: [makeAuthCheckPass('1020xxxx'), makeGatewayRunningCheck(), makeInboundActivityCheck('pass')],
+        checks: [
+          makeAuthCheckPass('1020xxxx'),
+          makeGatewayRunningCheck(),
+          makeInboundActivityCheck('pass'),
+        ],
       }),
     });
   });

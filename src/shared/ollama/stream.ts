@@ -43,8 +43,8 @@ export function reduceOllamaStreamChunk(
   }
 
   const message = chunk.message;
-  const thinkingDelta = readStringField(message, 'thinking')
-    || readStringField(message, 'reasoning_content');
+  const thinkingDelta =
+    readStringField(message, 'thinking') || readStringField(message, 'reasoning_content');
   const contentDelta = typeof message?.content === 'string' ? message.content : '';
   const rawContent = state.rawContent + contentDelta;
   const officialThinking = state.officialThinking + thinkingDelta;

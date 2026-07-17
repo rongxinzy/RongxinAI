@@ -57,13 +57,17 @@ test('validateLlamaCppStructuredServiceConfig accepts valid structured values', 
 });
 
 test('validateLlamaCppStructuredServiceConfig accepts only numeric device indexes', () => {
-  expect(validateLlamaCppStructuredServiceConfig({
-    device: '0,1,2',
-  }).fieldErrors.device).toBeUndefined();
+  expect(
+    validateLlamaCppStructuredServiceConfig({
+      device: '0,1,2',
+    }).fieldErrors.device,
+  ).toBeUndefined();
 
-  expect(validateLlamaCppStructuredServiceConfig({
-    device: 'CUDA0,CUDA1',
-  }).fieldErrors.device?.code).toBe('device-format');
+  expect(
+    validateLlamaCppStructuredServiceConfig({
+      device: 'CUDA0,CUDA1',
+    }).fieldErrors.device?.code,
+  ).toBe('device-format');
 });
 
 test('validateLlamaCppStructuredServiceConfig rejects device and mainGpu indexes outside detected accelerators', () => {
@@ -89,9 +93,7 @@ test('validateLlamaCppStructuredServiceConfig marks gpu selectors unavailable wh
     mainGpu: '0',
     runtimeDevices: {
       success: true,
-      devices: [
-        { id: 'CPU', name: 'CPU', backend: 'cpu' },
-      ],
+      devices: [{ id: 'CPU', name: 'CPU', backend: 'cpu' }],
     },
   });
 
@@ -115,18 +117,24 @@ test('validateLlamaCppStructuredServiceConfig marks gpu selectors unavailable wh
 
 test('getLlamaCppGpuDetectionState distinguishes available, unavailable, failed, and unknown states', () => {
   expect(getLlamaCppGpuDetectionState(null)).toBe(LlamaCppGpuDetectionState.Unknown);
-  expect(getLlamaCppGpuDetectionState({
-    success: false,
-    devices: [],
-  })).toBe(LlamaCppGpuDetectionState.DetectionFailed);
-  expect(getLlamaCppGpuDetectionState({
-    success: true,
-    devices: [{ id: 'CPU', name: 'CPU', backend: 'cpu' }],
-  })).toBe(LlamaCppGpuDetectionState.Unavailable);
-  expect(getLlamaCppGpuDetectionState({
-    success: true,
-    devices: [{ id: 'CUDA0', name: 'GPU 0', backend: 'cuda' }],
-  })).toBe(LlamaCppGpuDetectionState.Available);
+  expect(
+    getLlamaCppGpuDetectionState({
+      success: false,
+      devices: [],
+    }),
+  ).toBe(LlamaCppGpuDetectionState.DetectionFailed);
+  expect(
+    getLlamaCppGpuDetectionState({
+      success: true,
+      devices: [{ id: 'CPU', name: 'CPU', backend: 'cpu' }],
+    }),
+  ).toBe(LlamaCppGpuDetectionState.Unavailable);
+  expect(
+    getLlamaCppGpuDetectionState({
+      success: true,
+      devices: [{ id: 'CUDA0', name: 'GPU 0', backend: 'cuda' }],
+    }),
+  ).toBe(LlamaCppGpuDetectionState.Available);
 });
 
 test('validateLlamaCppStructuredServiceConfig requires tensor split mode for tensorSplit', () => {
@@ -157,4 +165,3 @@ test('validateLlamaCppStructuredServiceConfig keeps field coverage aligned with 
     'gpuLayers',
   ]);
 });
-

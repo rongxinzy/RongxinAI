@@ -24,8 +24,12 @@ class FakeRuntime extends EventEmitter {
   stopSession() {}
   stopAllSessions() {}
   respondToPermission() {}
-  isSessionActive() { return false; }
-  getSessionConfirmationMode() { return 'text'; }
+  isSessionActive() {
+    return false;
+  }
+  getSessionConfirmationMode() {
+    return 'text';
+  }
 }
 
 class FakeCoworkStore {
@@ -43,6 +47,10 @@ class FakeCoworkStore {
 
   getConfig() {
     return this.config;
+  }
+
+  getAgent() {
+    return null;
   }
 
   createSession(title, cwd, systemPrompt, executionMode) {
@@ -101,13 +109,15 @@ class FakeIMStore {
   }
 
   getSessionMapping(imConversationId, platform) {
-    return this.mappings.find((entry) => (
-      entry.imConversationId === imConversationId && entry.platform === platform
-    )) || null;
+    return (
+      this.mappings.find(
+        entry => entry.imConversationId === imConversationId && entry.platform === platform,
+      ) || null
+    );
   }
 
   getSessionMappingByCoworkSessionId(coworkSessionId) {
-    return this.mappings.find((entry) => entry.coworkSessionId === coworkSessionId) || null;
+    return this.mappings.find(entry => entry.coworkSessionId === coworkSessionId) || null;
   }
 
   createSessionMapping(imConversationId, platform, coworkSessionId) {
@@ -130,9 +140,9 @@ class FakeIMStore {
   }
 
   deleteSessionMapping(imConversationId, platform) {
-    this.mappings = this.mappings.filter((entry) => (
-      entry.imConversationId !== imConversationId || entry.platform !== platform
-    ));
+    this.mappings = this.mappings.filter(
+      entry => entry.imConversationId !== imConversationId || entry.platform !== platform,
+    );
   }
 }
 
@@ -172,13 +182,13 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
       payloadText: '⏰ 提醒：喝水',
       confirmationText: '好的，已设置好提醒！2分钟后（16:30）会提醒你喝水。',
     }),
-    createScheduledTask: async (params) => {
+    createScheduledTask: async params => {
       createdParams = params;
       return {
         id: 'job-1',
         name: params.request.taskName,
         agentId: 'main',
-        sessionKey: `agent:main:lobsterai:${params.sessionId}`,
+        sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
         payloadText: params.request.payloadText,
         scheduleAt: params.request.scheduleAt,
       };
@@ -197,7 +207,7 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
   const [session] = [...coworkStore.sessions.values()];
   assert.ok(session);
   assert.deepEqual(
-    session.messages.map((message) => message.type),
+    session.messages.map(message => message.type),
     ['user', 'tool_use', 'tool_result', 'assistant'],
   );
   assert.equal(session.messages[1].metadata.toolName, 'cron');
@@ -229,11 +239,11 @@ test('async reminder turns on IM-created sessions relay back to the original IM 
       payloadText: '⏰ 提醒：喝水',
       confirmationText: '好的，已设置好提醒！2分钟后（16:30）会提醒你喝水。',
     }),
-    createScheduledTask: async (params) => ({
+    createScheduledTask: async params => ({
       id: 'job-1',
       name: params.request.taskName,
       agentId: 'main',
-      sessionKey: `agent:main:lobsterai:${params.sessionId}`,
+      sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
       payloadText: params.request.payloadText,
       scheduleAt: params.request.scheduleAt,
     }),
@@ -245,6 +255,20 @@ test('async reminder turns on IM-created sessions relay back to the original IM 
 
   await handler.processMessage(createMessage());
   const [session] = [...coworkStore.sessions.values()];
+
+  // Simulate the scheduled reminder turn: the runtime reconciles the turn
+  // messages into the store (authoritative history) and streams them as events.
+  session.messages.length = 0;
+  coworkStore.addMessage(session.id, {
+    type: 'system',
+    content: '⏰ 提醒：喝水',
+    metadata: {},
+  });
+  coworkStore.addMessage(session.id, {
+    type: 'assistant',
+    content: '⏰ 该喝水啦！起身喝一杯水吧。',
+    metadata: {},
+  });
 
   runtime.emit('message', session.id, {
     id: 'system-1',
@@ -262,7 +286,7 @@ test('async reminder turns on IM-created sessions relay back to the original IM 
   });
   runtime.emit('complete', session.id, null);
 
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
 
   assert.deepEqual(relayedReplies, [
     {
@@ -310,7 +334,7 @@ test('async reminder turns on channel-synced sessions are tracked lazily and rel
   });
   runtime.emit('complete', session.id, null);
 
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
 
   assert.deepEqual(relayedReplies, [
     {
@@ -336,7 +360,7 @@ test('falls back to normal agent execution when detector does not recognize a sc
   });
 
   const pending = handler.processMessage(createMessage({ content: '帮我总结一下今天的会议纪要' }));
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
 
   assert.equal(runtime.startCalls.length, 1);
   assert.equal(runtime.startCalls[0].prompt, '帮我总结一下今天的会议纪要');

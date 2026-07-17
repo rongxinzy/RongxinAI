@@ -8,7 +8,9 @@ test('retries a transient llama.cpp request failure before succeeding', async ()
     .mockRejectedValueOnce(new TypeError('fetch failed'))
     .mockResolvedValueOnce('ready');
 
-  await expect(retryLlamaCppReadRequest(request, { attempts: 2, delayMs: 0 })).resolves.toBe('ready');
+  await expect(retryLlamaCppReadRequest(request, { attempts: 2, delayMs: 0 })).resolves.toBe(
+    'ready',
+  );
   expect(request).toHaveBeenCalledTimes(2);
 });
 

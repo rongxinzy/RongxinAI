@@ -28,7 +28,9 @@ export interface SkillSecurityReport {
   riskLevel: SecurityRiskLevel;
   riskScore: number;
   findings: SecurityFinding[];
-  dimensionSummary: Partial<Record<SecurityDimension, { count: number; maxSeverity: FindingSeverity }>>;
+  dimensionSummary: Partial<
+    Record<SecurityDimension, { count: number; maxSeverity: FindingSeverity }>
+  >;
   scanDurationMs: number;
 }
 

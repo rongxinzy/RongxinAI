@@ -4,10 +4,10 @@ export const WorkspaceIpc = {
   Rename: 'cowork:workspace:rename',
 } as const;
 
-export type WorkspaceIpc = typeof WorkspaceIpc[keyof typeof WorkspaceIpc];
+export type WorkspaceIpc = (typeof WorkspaceIpc)[keyof typeof WorkspaceIpc];
 
 export const WorkspaceDefault = {
   Main: 'main-workspace',
 } as const;
 
-export type WorkspaceDefault = typeof WorkspaceDefault[keyof typeof WorkspaceDefault];
+export type WorkspaceDefault = (typeof WorkspaceDefault)[keyof typeof WorkspaceDefault];

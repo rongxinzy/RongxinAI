@@ -175,9 +175,11 @@ export function isSameInstallRequest(
   previous: LlamaCppInstallModelInput,
   next: LlamaCppInstallModelInput,
 ): boolean {
-  return (previous.filePath?.trim() ?? '') === (next.filePath?.trim() ?? '')
-    && (previous.mmprojFilePath?.trim() ?? '') === (next.mmprojFilePath?.trim() ?? '')
-    && (previous.downloadUrl?.trim() ?? '') === (next.downloadUrl?.trim() ?? '');
+  return (
+    (previous.filePath?.trim() ?? '') === (next.filePath?.trim() ?? '') &&
+    (previous.mmprojFilePath?.trim() ?? '') === (next.mmprojFilePath?.trim() ?? '') &&
+    (previous.downloadUrl?.trim() ?? '') === (next.downloadUrl?.trim() ?? '')
+  );
 }
 
 export async function resolveModelScopeInstallRequest(input: LlamaCppInstallModelInput): Promise<{
@@ -254,7 +256,7 @@ export async function fetchModelScopeRepoFiles(
     response = await fetch(
       `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo/files?${params.toString()}`,
       {
-        headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-installer' },
+        headers: { 'User-Agent': 'ZhiYuanAgent/modelscope-gguf-installer' },
       },
     );
   } catch {
@@ -297,7 +299,9 @@ export function chooseModelScopeInstallFile(files: string[]): string | undefined
 }
 
 export function chooseModelScopeMmprojFile(files: string[]): string | undefined {
-  const mmprojFiles = files.filter(file => /^mmproj/i.test(path.basename(file)) && isGgufPath(file));
+  const mmprojFiles = files.filter(
+    file => /^mmproj/i.test(path.basename(file)) && isGgufPath(file),
+  );
   if (mmprojFiles.length === 0) return undefined;
   const preferred = mmprojFiles.find(file => /f16/i.test(path.basename(file)));
   return preferred ?? mmprojFiles.sort((a, b) => a.localeCompare(b))[0];

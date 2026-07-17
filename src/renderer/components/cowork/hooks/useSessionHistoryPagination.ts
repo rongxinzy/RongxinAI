@@ -1,4 +1,4 @@
-import { type RefObject,useEffect, useLayoutEffect, useRef } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
 
 import { coworkService } from '../../../services/cowork';
 
@@ -67,16 +67,19 @@ export function useSessionHistoryPagination({
         previousTop: element.scrollTop,
       };
 
-      void coworkService.loadMoreMessages(sessionId).then((loaded) => {
-        if (!loaded) {
+      void coworkService
+        .loadMoreMessages(sessionId)
+        .then(loaded => {
+          if (!loaded) {
+            snapshotRef.current = null;
+            isLoadingRef.current = false;
+          }
+        })
+        .catch(error => {
           snapshotRef.current = null;
           isLoadingRef.current = false;
-        }
-      }).catch((error) => {
-        snapshotRef.current = null;
-        isLoadingRef.current = false;
-        console.error('[CoworkHistory] failed to load older messages:', error);
-      });
+          console.error('[CoworkHistory] failed to load older messages:', error);
+        });
     };
 
     const handleScroll = () => {

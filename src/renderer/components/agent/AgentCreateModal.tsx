@@ -17,7 +17,14 @@ import { imService } from '../../services/im';
 import type { RootState } from '../../store';
 import type { Model } from '../../store/slices/modelSlice';
 import type { PresetAgent } from '../../types/agent';
-import type { DingTalkInstanceConfig, DiscordInstanceConfig, FeishuInstanceConfig, IMGatewayConfig, QQInstanceConfig, WecomInstanceConfig } from '../../types/im';
+import type {
+  DingTalkInstanceConfig,
+  DiscordInstanceConfig,
+  FeishuInstanceConfig,
+  IMGatewayConfig,
+  QQInstanceConfig,
+  WecomInstanceConfig,
+} from '../../types/im';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import {
@@ -36,9 +43,20 @@ import AgentSkillSelector from './AgentSkillSelector';
 import { AgentConfirmDialogVariant, AgentDetailTab } from './constants';
 
 type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'qq' | 'wecom' | 'discord';
-type MultiInstanceConfig = DingTalkInstanceConfig | FeishuInstanceConfig | QQInstanceConfig | WecomInstanceConfig | DiscordInstanceConfig;
+type MultiInstanceConfig =
+  | DingTalkInstanceConfig
+  | FeishuInstanceConfig
+  | QQInstanceConfig
+  | WecomInstanceConfig
+  | DiscordInstanceConfig;
 
-const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = ['dingtalk', 'feishu', 'qq', 'wecom', 'discord'];
+const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = [
+  'dingtalk',
+  'feishu',
+  'qq',
+  'wecom',
+  'discord',
+];
 
 const isMultiInstancePlatform = (platform: Platform): platform is MultiInstancePlatform =>
   MULTI_INSTANCE_PLATFORMS.includes(platform as MultiInstancePlatform);
@@ -85,18 +103,29 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
 
   const isDirty = useCallback((): boolean => {
     return !!(
-      name
-      || description
-      || systemPrompt
-      || identity
-      || userInfo !== initialUserInfoRef.current
-      || icon !== DefaultAgentAvatarIcon
-      || (model ? toOpenClawModelRef(model) : '') !== initialModelRef.current
-      || workingDirectory !== initialWorkingDirectoryRef.current
-      || skillIds.length > 0
-      || boundKeys.size > 0
+      name ||
+      description ||
+      systemPrompt ||
+      identity ||
+      userInfo !== initialUserInfoRef.current ||
+      icon !== DefaultAgentAvatarIcon ||
+      (model ? toOpenClawModelRef(model) : '') !== initialModelRef.current ||
+      workingDirectory !== initialWorkingDirectoryRef.current ||
+      skillIds.length > 0 ||
+      boundKeys.size > 0
     );
-  }, [name, description, systemPrompt, identity, userInfo, icon, model, workingDirectory, skillIds, boundKeys]);
+  }, [
+    name,
+    description,
+    systemPrompt,
+    identity,
+    userInfo,
+    icon,
+    model,
+    workingDirectory,
+    skillIds,
+    boundKeys,
+  ]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -112,8 +141,9 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
     setUserInfo('');
     initialUserInfoRef.current = '';
     setIcon(DefaultAgentAvatarIcon);
-    const currentAgent = agents.find((agent) => agent.id === currentAgentId);
-    const defaultWorkingDirectory = currentAgent?.workingDirectory?.trim() || coworkConfig.workingDirectory || '';
+    const currentAgent = agents.find(agent => agent.id === currentAgentId);
+    const defaultWorkingDirectory =
+      currentAgent?.workingDirectory?.trim() || coworkConfig.workingDirectory || '';
     initialWorkingDirectoryRef.current = defaultWorkingDirectory;
     initialModelRef.current = globalSelectedModel ? toOpenClawModelRef(globalSelectedModel) : '';
     setModel(globalSelectedModel ?? null);
@@ -123,15 +153,16 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
     setShowUnsavedConfirm(false);
     setShowTemplatePicker(false);
     setBoundKeys(new Set());
-    void coworkService.readBootstrapFile('USER.md').then((content) => {
+    void coworkService.readBootstrapFile('USER.md').then(content => {
       initialUserInfoRef.current = content;
       setUserInfo(content);
     });
-    imService.loadConfig().then((cfg) => {
+    imService.loadConfig().then(cfg => {
       if (cfg) setImConfig(cfg);
     });
     setTemplatesLoading(true);
-    agentService.getPresetTemplates()
+    agentService
+      .getPresetTemplates()
       .then(setPresetTemplates)
       .finally(() => setTemplatesLoading(false));
   }, [agents, coworkConfig.workingDirectory, currentAgentId, globalSelectedModel, isOpen]);
@@ -202,9 +233,11 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         availableModels,
       );
       if (unsupportedModel) {
-        window.dispatchEvent(new CustomEvent('app:showToast', {
-          detail: i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)),
-        }));
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)),
+          }),
+        );
         return;
       }
     }
@@ -212,21 +245,23 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
     // 禁止使用保留名称
     const reservedNames = ['主项目', 'Primary Project'];
     if (reservedNames.includes(name.trim())) {
-      window.dispatchEvent(new CustomEvent('app:showToast', {
-        detail: { message: i18nService.t('agentNameReserved'), autoClose: false },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: { message: i18nService.t('agentNameReserved'), autoClose: false },
+        }),
+      );
       return;
     }
 
     // 禁止重复名称（大小写不敏感）
     const trimmedLower = name.trim().toLowerCase();
-    const duplicate = agents.some(
-      (a) => a.name.trim().toLowerCase() === trimmedLower,
-    );
+    const duplicate = agents.some(a => a.name.trim().toLowerCase() === trimmedLower);
     if (duplicate) {
-      window.dispatchEvent(new CustomEvent('app:showToast', {
-        detail: { message: i18nService.t('agentNameDuplicate'), autoClose: false },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: { message: i18nService.t('agentNameDuplicate'), autoClose: false },
+        }),
+      );
       return;
     }
 
@@ -235,7 +270,9 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
       if (userInfo !== initialUserInfoRef.current) {
         const userInfoSaved = await coworkService.writeBootstrapFile('USER.md', userInfo);
         if (!userInfoSaved) {
-          window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentCreateFailed') }));
+          window.dispatchEvent(
+            new CustomEvent('app:showToast', { detail: i18nService.t('agentCreateFailed') }),
+          );
           return;
         }
       }
@@ -265,10 +302,14 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         onClose();
         resetForm();
       } else {
-        window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentCreateFailed') }));
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('agentCreateFailed') }),
+        );
       }
     } catch {
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentCreateFailed') }));
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', { detail: i18nService.t('agentCreateFailed') }),
+      );
     } finally {
       setCreating(false);
     }
@@ -322,12 +363,10 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
     hint: string,
   ) => (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <p className="shrink-0 text-xs leading-5 text-muted-foreground">
-        {hint}
-      </p>
+      <p className="shrink-0 text-xs leading-5 text-muted-foreground">{hint}</p>
       <Textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
         className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-muted-foreground/45 focus-visible:ring-0"
@@ -359,7 +398,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
               <Input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={e => setName(e.target.value)}
                 placeholder={i18nService.t('agentNamePlaceholder')}
                 aria-label={i18nService.t('agentName')}
                 className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0"
@@ -368,7 +407,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
               <Input
                 type="text"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={e => setDescription(e.target.value)}
                 placeholder={i18nService.t('agentDescriptionPlaceholder')}
                 aria-label={i18nService.t('agentDescription')}
                 className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
@@ -376,12 +415,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
             </div>
           </div>
           <div className="mt-1 flex shrink-0 items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-            >
+            <Button type="button" variant="ghost" size="icon" onClick={handleClose}>
               <X className="h-5 w-5 text-muted-foreground" />
             </Button>
           </div>
@@ -391,11 +425,14 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
       {/* Tab bar */}
       <Tabs
         value={activeTab}
-        onValueChange={(v) => setActiveTab(v as AgentDetailTab)}
+        onValueChange={v => setActiveTab(v as AgentDetailTab)}
         className="flex flex-col flex-1 min-h-0"
       >
-        <TabsList variant="line" className="shrink-0 w-full justify-start gap-0 rounded-none border-b border-border px-7">
-          {tabs.map((tab) => (
+        <TabsList
+          variant="line"
+          className="shrink-0 w-full justify-start gap-0 rounded-none border-b border-border px-7"
+        >
+          {tabs.map(tab => (
             <TabsTrigger key={tab.key} value={tab.key}>
               {tab.label}
             </TabsTrigger>
@@ -403,7 +440,10 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         </TabsList>
 
         {/* Tab content */}
-        <TabsContent value={AgentDetailTab.Prompt} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+        <TabsContent
+          value={AgentDetailTab.Prompt}
+          className="flex-1 overflow-y-auto min-h-0 px-7 py-7"
+        >
           {renderTextEditor(
             systemPrompt,
             setSystemPrompt,
@@ -413,7 +453,10 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           )}
         </TabsContent>
 
-        <TabsContent value={AgentDetailTab.Identity} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+        <TabsContent
+          value={AgentDetailTab.Identity}
+          className="flex-1 overflow-y-auto min-h-0 px-7 py-7"
+        >
           {renderTextEditor(
             identity,
             setIdentity,
@@ -423,7 +466,10 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           )}
         </TabsContent>
 
-        <TabsContent value={AgentDetailTab.User} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+        <TabsContent
+          value={AgentDetailTab.User}
+          className="flex-1 overflow-y-auto min-h-0 px-7 py-7"
+        >
           {renderTextEditor(
             userInfo,
             setUserInfo,
@@ -433,7 +479,10 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           )}
         </TabsContent>
 
-        <TabsContent value={AgentDetailTab.Skills} className="flex-1 overflow-y-auto min-h-0 px-7 py-7">
+        <TabsContent
+          value={AgentDetailTab.Skills}
+          className="flex-1 overflow-y-auto min-h-0 px-7 py-7"
+        >
           <AgentSkillSelector selectedSkillIds={skillIds} onChange={setSkillIds} />
         </TabsContent>
 
@@ -441,8 +490,12 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           <div className="h-full overflow-y-auto">
             <div className="space-y-1">
               {PlatformRegistry.platforms
-                .filter((platform) => (getVisibleIMPlatforms(i18nService.getLanguage()) as readonly string[]).includes(platform))
-                .map((platform) => {
+                .filter(platform =>
+                  (getVisibleIMPlatforms(i18nService.getLanguage()) as readonly string[]).includes(
+                    platform,
+                  ),
+                )
+                .map(platform => {
                   const logo = PlatformRegistry.logo(platform);
 
                   if (isMultiInstancePlatform(platform)) {
@@ -456,14 +509,19 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                         >
                           <div className="flex items-center gap-3">
                             <div className="flex h-8 w-8 items-center justify-center">
-                              <img src={logo} alt={i18nService.t(platform)} className="w-6 h-6 object-contain rounded" />
+                              <img
+                                src={logo}
+                                alt={i18nService.t(platform)}
+                                className="w-6 h-6 object-contain rounded"
+                              />
                             </div>
                             <div>
                               <div className="text-sm font-medium text-foreground">
                                 {i18nService.t(platform)}
                               </div>
                               <div className="text-xs text-muted-foreground/50">
-                                {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
+                                {i18nService.t('agentIMNotConfiguredHint') ||
+                                  'Please configure in Settings > IM Bots first'}
                               </div>
                             </div>
                           </div>
@@ -475,10 +533,17 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                     }
 
                     return (
-                      <div key={platform} className="rounded-lg border border-border overflow-hidden">
+                      <div
+                        key={platform}
+                        className="rounded-lg border border-border overflow-hidden"
+                      >
                         <div className="flex items-center gap-3 px-3 py-2.5 bg-surface-raised">
                           <div className="flex h-8 w-8 items-center justify-center">
-                            <img src={logo} alt={i18nService.t(platform)} className="w-6 h-6 object-contain rounded" />
+                            <img
+                              src={logo}
+                              alt={i18nService.t(platform)}
+                              className="w-6 h-6 object-contain rounded"
+                            />
                           </div>
                           <span className="text-sm font-semibold text-foreground">
                             {i18nService.t(platform)}
@@ -495,26 +560,25 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                             <div
                               key={inst.instanceId}
                               className={`flex items-center justify-between px-3 py-2 pl-14 transition-colors cursor-pointer hover:bg-surface-raised ${
-                                idx < enabledInstances.length - 1 ? 'border-b border-border-subtle' : ''
+                                idx < enabledInstances.length - 1
+                                  ? 'border-b border-border-subtle'
+                                  : ''
                               } ${boundToOther ? 'opacity-55' : ''}`}
                               onClick={() => !boundToOther && handleToggleIMBinding(bindingKey)}
                             >
                               <div className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                                <span className="text-sm text-foreground">
-                                  {inst.instanceName}
-                                </span>
+                                <span className="text-sm text-foreground">{inst.instanceName}</span>
                                 {boundToOther && otherAgentName && (
                                   <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                                    {(i18nService.t('agentIMBoundToOther') || '-> {agent}').replace('{agent}', otherAgentName)}
+                                    {(i18nService.t('agentIMBoundToOther') || '-> {agent}').replace(
+                                      '{agent}',
+                                      otherAgentName,
+                                    )}
                                   </span>
                                 )}
                               </div>
-                              {boundToOther ? (
-                                <div className="w-9 h-5" />
-                              ) : (
-                                renderToggle(isBound)
-                              )}
+                              {boundToOther ? <div className="w-9 h-5" /> : renderToggle(isBound)}
                             </div>
                           );
                         })}
@@ -535,13 +599,19 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                       className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${
                         configured && !boundToOther
                           ? 'hover:bg-surface-raised cursor-pointer'
-                          : boundToOther ? 'opacity-55' : 'opacity-50'
+                          : boundToOther
+                            ? 'opacity-55'
+                            : 'opacity-50'
                       }`}
                       onClick={() => configured && !boundToOther && handleToggleIMBinding(platform)}
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center">
-                          <img src={logo} alt={i18nService.t(platform)} className="w-6 h-6 object-contain rounded" />
+                          <img
+                            src={logo}
+                            alt={i18nService.t(platform)}
+                            className="w-6 h-6 object-contain rounded"
+                          />
                         </div>
                         <div>
                           <div className="text-sm font-medium text-foreground">
@@ -549,19 +619,27 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                           </div>
                           {!configured && (
                             <div className="text-xs text-muted-foreground/50">
-                              {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
+                              {i18nService.t('agentIMNotConfiguredHint') ||
+                                'Please configure in Settings > IM Bots first'}
                             </div>
                           )}
                         </div>
                         {boundToOther && otherAgentName && (
                           <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                            {(i18nService.t('agentIMBoundToOther') || '-> {agent}').replace('{agent}', otherAgentName)}
+                            {(i18nService.t('agentIMBoundToOther') || '-> {agent}').replace(
+                              '{agent}',
+                              otherAgentName,
+                            )}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
                         {configured ? (
-                          boundToOther ? <div className="w-9 h-5" /> : renderToggle(bound)
+                          boundToOther ? (
+                            <div className="w-9 h-5" />
+                          ) : (
+                            renderToggle(bound)
+                          )
                         ) : (
                           <span className="text-xs text-muted-foreground/50">
                             {i18nService.t('agentIMNotConfigured') || 'Not configured'}
@@ -671,12 +749,7 @@ const AgentTemplatePickerModal: React.FC<{
             {i18nService.t('agentTemplateNew')}
           </Button>
           */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
@@ -693,9 +766,10 @@ const AgentTemplatePickerModal: React.FC<{
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {presets.map((preset) => {
+            {presets.map(preset => {
               const name = isEn && preset.nameEn ? preset.nameEn : preset.name;
-              const description = isEn && preset.descriptionEn ? preset.descriptionEn : preset.description;
+              const description =
+                isEn && preset.descriptionEn ? preset.descriptionEn : preset.description;
 
               return (
                 <Button

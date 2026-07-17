@@ -21,7 +21,7 @@
 // ═══════════════════════════════════════════════════════
 
 // ─── Provider Name ──────────────────────────────────────────────────────
-// providerName identifies the LobsterAI internal provider (config key).
+// providerName identifies the ZhiYuanAgent internal provider (config key).
 export const ProviderName = {
   OpenAI: 'openai',
   Gemini: 'gemini',
@@ -39,15 +39,15 @@ export const ProviderName = {
   LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
   Custom: 'custom',
-  LobsteraiServer: 'lobsterai-server',
+  ZhiyuanServer: 'zhiyuan-server',
   Copilot: 'github-copilot',
 } as const;
-export type ProviderName = typeof ProviderName[keyof typeof ProviderName];
+export type ProviderName = (typeof ProviderName)[keyof typeof ProviderName];
 
 // ─── OpenClaw Provider ID ───────────────────────────────────────────────
 // OpenClaw gateway provider identifiers. May differ from ProviderName.
 export const OpenClawProviderId = {
-  LobsteraiServer: 'lobsterai-server',
+  ZhiyuanServer: 'zhiyuan-server',
   Moonshot: 'moonshot',
   Google: 'google',
   Anthropic: 'anthropic',
@@ -63,12 +63,12 @@ export const OpenClawProviderId = {
   Xiaomi: 'xiaomi',
   OpenRouter: 'openrouter',
   Copilot: 'github-copilot',
-  LobsteraiCopilot: 'lobsterai-copilot',
+  ZhiyuanCopilot: 'zhiyuan-copilot',
   LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
-  Lobster: 'lobster',
+  Zhiyuan: 'zhiyuan',
 } as const;
-export type OpenClawProviderId = typeof OpenClawProviderId[keyof typeof OpenClawProviderId];
+export type OpenClawProviderId = (typeof OpenClawProviderId)[keyof typeof OpenClawProviderId];
 
 // ─── OpenClaw API Protocol ──────────────────────────────────────────────
 export const OpenClawApi = {
@@ -79,7 +79,7 @@ export const OpenClawApi = {
   GoogleGenerativeAI: 'google-generative-ai',
   Ollama: 'ollama',
 } as const;
-export type OpenClawApi = typeof OpenClawApi[keyof typeof OpenClawApi];
+export type OpenClawApi = (typeof OpenClawApi)[keyof typeof OpenClawApi];
 
 // ─── API Format (provider default protocol format) ──────────────────────
 export const ApiFormat = {
@@ -87,14 +87,14 @@ export const ApiFormat = {
   Anthropic: 'anthropic',
   Gemini: 'gemini',
 } as const;
-export type ApiFormat = typeof ApiFormat[keyof typeof ApiFormat];
+export type ApiFormat = (typeof ApiFormat)[keyof typeof ApiFormat];
 
 // ─── Auth Type ──────────────────────────────────────────────────────────
 export const AuthType = {
   ApiKey: 'api-key',
   OAuth: 'oauth',
 } as const;
-export type AuthType = typeof AuthType[keyof typeof AuthType];
+export type AuthType = (typeof AuthType)[keyof typeof AuthType];
 
 // ═══════════════════════════════════════════════════════
 // 2. Provider Definition Shape
@@ -421,7 +421,7 @@ const PROVIDER_DEFINITIONS = [
   {
     id: ProviderName.Copilot,
     label: 'GitHub Copilot',
-    openClawProviderId: OpenClawProviderId.LobsteraiCopilot,
+    openClawProviderId: OpenClawProviderId.ZhiyuanCopilot,
     defaultBaseUrl: 'https://api.individual.githubcopilot.com',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -614,14 +614,19 @@ class ProviderRegistryImpl {
   }
 
   getOpenClawProviderId(providerName: string): string {
-    return this.idIndex.get(providerName)?.openClawProviderId ?? providerName ?? OpenClawProviderId.Lobster;
+    return (
+      this.idIndex.get(providerName)?.openClawProviderId ??
+      providerName ??
+      OpenClawProviderId.Zhiyuan
+    );
   }
 
   getProviderModelSupportsImage(providerName: string, modelId: string): boolean | undefined {
     const def = this.idIndex.get(providerName);
     if (!def) return undefined;
-    const model = [...def.defaultModels, ...(def.codingPlanModels ?? [])]
-      .find(candidate => candidate.id === modelId);
+    const model = [...def.defaultModels, ...(def.codingPlanModels ?? [])].find(
+      candidate => candidate.id === modelId,
+    );
     return model?.supportsImage;
   }
 

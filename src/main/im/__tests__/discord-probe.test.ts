@@ -4,7 +4,13 @@
 import { describe, test } from 'vitest';
 
 import { runChannelProbeContract } from './channel-probe.contract';
-import { buildProbeResult, makeAuthCheckFail, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  buildProbeResult,
+  makeAuthCheckFail,
+  makeAuthCheckPass,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 describe('Channel probe contract: discord', () => {
   test('missing_credentials path conforms to contract', () => {
@@ -15,7 +21,11 @@ describe('Channel probe contract: discord', () => {
     runChannelProbeContract({
       platform: 'discord',
       result: buildProbeResult('discord', {
-        checks: [makeAuthCheckPass('MyBot#1234'), makeGatewayRunningCheck(), makeInboundActivityCheck('pass')],
+        checks: [
+          makeAuthCheckPass('MyBot#1234'),
+          makeGatewayRunningCheck(),
+          makeInboundActivityCheck('pass'),
+        ],
       }),
     });
   });

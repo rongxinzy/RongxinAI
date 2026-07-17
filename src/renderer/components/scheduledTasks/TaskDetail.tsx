@@ -50,8 +50,10 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
   const taskModelRef = task.payload.kind === 'agentTurn' ? task.payload.model : undefined;
   const taskModelLabel = taskModelRef
     ? (() => {
-        const bareId = taskModelRef.includes('/') ? taskModelRef.slice(taskModelRef.indexOf('/') + 1) : taskModelRef;
-        return availableModels.find((m) => m.id === bareId)?.name ?? bareId;
+        const bareId = taskModelRef.includes('/')
+          ? taskModelRef.slice(taskModelRef.indexOf('/') + 1)
+          : taskModelRef;
+        return availableModels.find(m => m.id === bareId)?.name ?? bareId;
       })()
     : undefined;
 
@@ -145,16 +147,18 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
         </div>
       </div>
 
-      {preflight?.hasChannel && preflight.lastDeliveryErrors && preflight.lastDeliveryErrors.length > 0 && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-destructive">
-              Channel delivery issue detected
-            </span>
+      {preflight?.hasChannel &&
+        preflight.lastDeliveryErrors &&
+        preflight.lastDeliveryErrors.length > 0 && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-destructive">
+                Channel delivery issue detected
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-destructive/80">{preflight.lastDeliveryErrors[0]}</p>
           </div>
-          <p className="mt-1 text-xs text-destructive/80">{preflight.lastDeliveryErrors[0]}</p>
-        </div>
-      )}
+        )}
 
       <div className={sectionClass}>
         <h3 className={sectionTitleClass}>{i18nService.t('scheduledTasksStatus')}</h3>
@@ -173,9 +177,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
           <div>
             <div className={labelClass}>{i18nService.t('scheduledTasksNextRun')}</div>
             <div className={valueClass}>
-              {task.state.nextRunAtMs
-                ? formatDateTime(new Date(task.state.nextRunAtMs))
-                : '-'}
+              {task.state.nextRunAtMs ? formatDateTime(new Date(task.state.nextRunAtMs)) : '-'}
             </div>
           </div>
           <div>

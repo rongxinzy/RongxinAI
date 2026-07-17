@@ -1,7 +1,10 @@
 import { expect, test } from 'vitest';
 
 import { ProviderName } from '../../shared/providers';
-import { buildLocalThinkingRequestParams, type DirectChatRequestOptions } from './localThinkingRequest';
+import {
+  buildLocalThinkingRequestParams,
+  type DirectChatRequestOptions,
+} from './localThinkingRequest';
 
 test('sends a boolean thinking kwarg for llama.cpp', () => {
   expect(buildLocalThinkingRequestParams(ProviderName.LlamaCpp, true)).toEqual({

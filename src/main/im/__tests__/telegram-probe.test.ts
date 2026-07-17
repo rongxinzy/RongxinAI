@@ -4,7 +4,13 @@
 import { describe, test } from 'vitest';
 
 import { runChannelProbeContract } from './channel-probe.contract';
-import { buildProbeResult, makeAuthCheckFail, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  buildProbeResult,
+  makeAuthCheckFail,
+  makeAuthCheckPass,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 describe('Channel probe contract: telegram', () => {
   test('missing_credentials path conforms to contract', () => {
@@ -31,10 +37,7 @@ describe('Channel probe contract: telegram', () => {
     runChannelProbeContract({
       platform: 'telegram',
       result: buildProbeResult('telegram', {
-        checks: [
-          makeAuthCheckFail('Unauthorized'),
-          makeGatewayRunningCheck(),
-        ],
+        checks: [makeAuthCheckFail('Unauthorized'), makeGatewayRunningCheck()],
         verdict: 'fail',
       }),
     });

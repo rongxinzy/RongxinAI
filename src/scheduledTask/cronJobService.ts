@@ -577,7 +577,8 @@ export class CronJobService {
     if (input.schedule !== undefined) patch.schedule = toGatewaySchedule(input.schedule);
     if (input.sessionTarget !== undefined) patch.sessionTarget = input.sessionTarget;
     if (input.wakeMode !== undefined) patch.wakeMode = input.wakeMode;
-    if (input.payload !== undefined) patch.payload = toGatewayPayload(input.payload, input.delivery);
+    if (input.payload !== undefined)
+      patch.payload = toGatewayPayload(input.payload, input.delivery);
     if (input.delivery !== undefined)
       patch.delivery = toGatewayDelivery(input.delivery) ?? { mode: DeliveryMode.None };
     if (input.agentId !== undefined) patch.agentId = input.agentId?.trim() || null;
@@ -692,7 +693,8 @@ export class CronJobService {
       const jobs = await this.listJobs();
       for (const job of jobs) {
         nameMap.set(job.id, job.name);
-        const promptText = job.payload.kind === 'systemEvent' ? job.payload.text : job.payload.message;
+        const promptText =
+          job.payload.kind === 'systemEvent' ? job.payload.text : job.payload.message;
         if (promptText) payloadMap.set(job.id, promptText);
         if (job.state.runningAtMs) {
           runningRuns.push({
@@ -785,7 +787,7 @@ export class CronJobService {
             if (errors >= 3 && task.state.lastStatus === TaskStatus.Error) {
               console.warn(
                 `[CronJobService] Task "${task.name}" (${task.id}) has ${errors} consecutive errors. ` +
-                `Last error: ${task.state.lastError || '(none)'}`,
+                  `Last error: ${task.state.lastError || '(none)'}`,
               );
             }
           }

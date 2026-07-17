@@ -33,7 +33,10 @@ const artifactSlice = createSlice({
   name: 'artifact',
   initialState,
   reducers: {
-    setSessionArtifacts(state, action: PayloadAction<{ sessionId: string; artifacts: Artifact[] }>) {
+    setSessionArtifacts(
+      state,
+      action: PayloadAction<{ sessionId: string; artifacts: Artifact[] }>,
+    ) {
       state.artifactsBySession[action.payload.sessionId] = action.payload.artifacts;
     },
 
@@ -53,7 +56,7 @@ const artifactSlice = createSlice({
         if (artifact.filePath) {
           const normalizedPath = normalizeFilePathForDedup(artifact.filePath);
           const dupIndex = state.artifactsBySession[sessionId].findIndex(
-            a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedPath
+            a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedPath,
           );
           if (dupIndex >= 0) {
             const old = state.artifactsBySession[sessionId][dupIndex];
@@ -133,6 +136,6 @@ export const selectPanelWidth = (state: RootState): number => state.artifact.pan
 export const selectPanelView = (state: RootState): ArtifactPanelView => state.artifact.panelView;
 export const selectActiveTab = (state: RootState): ArtifactActiveTab => state.artifact.activeTab;
 
-export { DEFAULT_PANEL_WIDTH,MAX_PANEL_WIDTH, MIN_PANEL_WIDTH };
+export { DEFAULT_PANEL_WIDTH, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH };
 
 export default artifactSlice.reducer;

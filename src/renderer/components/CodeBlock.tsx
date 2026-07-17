@@ -36,16 +36,14 @@ import {
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import { Button } from '@shared/components/ui/button';
 // CopyIcon removed — using Copy from lucide-react instead
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@shared/components/ui/tooltip';
-import CodeMirror from '@uiw/react-codemirror';
 import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Download,
-  Search,
-} from 'lucide-react';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@shared/components/ui/tooltip';
+import CodeMirror from '@uiw/react-codemirror';
+import { Check, ChevronDown, ChevronUp, Copy, Download, Search } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -115,9 +113,7 @@ const resolveLanguage = (lang: string): LanguageDescription | null => {
 // ---------------------------------------------------------------------------
 
 function useIsDark() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark'),
-  );
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.classList.contains('dark'));
@@ -150,7 +146,7 @@ function useLanguageSupport(languageName: string | null): LanguageSupport | null
       setSupport(desc.support);
       return;
     }
-    desc.load().then((loaded) => {
+    desc.load().then(loaded => {
       if (!cancelled) setSupport(loaded);
     });
     return () => {
@@ -183,8 +179,8 @@ function parseDiff(raw: string): { original: string; modified: string } | null {
   let hasHunkHeader = false;
   let deletionCount = 0;
   let additionCount = 0;
-  let contextCount = 0;  // lines starting with a single space (diff context)
-  let headerCount = 0;   // --- / +++ file headers
+  let contextCount = 0; // lines starting with a single space (diff context)
+  let headerCount = 0; // --- / +++ file headers
   let totalNonEmpty = 0;
 
   for (const line of lines) {
@@ -349,9 +345,13 @@ function goToPrevMatch(view: EditorView): boolean {
     };
 
     const before = collectMatches(0, to);
-    const match = before.length > 0
-      ? before[before.length - 1]
-      : (() => { const all = collectMatches(to, doc.length); return all.length > 0 ? all[all.length - 1] : null; })();
+    const match =
+      before.length > 0
+        ? before[before.length - 1]
+        : (() => {
+            const all = collectMatches(to, doc.length);
+            return all.length > 0 ? all[all.length - 1] : null;
+          })();
 
     if (!match) return false;
 
@@ -391,13 +391,15 @@ function buildSearchPanel(view: EditorView): Panel {
   prevBtn.type = 'button';
   prevBtn.className = 'cm-search-nav-btn';
   prevBtn.title = t('codeSearchPrev');
-  prevBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+  prevBtn.innerHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
 
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
   nextBtn.className = 'cm-search-nav-btn';
   nextBtn.title = t('codeSearchNext');
-  nextBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  nextBtn.innerHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
 
   // Separator
   const sep = document.createElement('span');
@@ -425,7 +427,8 @@ function buildSearchPanel(view: EditorView): Panel {
   closeBtn.className = 'cm-search-close-btn';
   closeBtn.title = t('codeSearchClose');
   closeBtn.setAttribute('aria-label', t('codeSearchClose'));
-  closeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  closeBtn.innerHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
   dom.appendChild(searchInput);
   dom.appendChild(prevBtn);
@@ -477,8 +480,10 @@ function buildSearchPanel(view: EditorView): Panel {
   }
 
   // ── Event listeners ────────────────────────────────────────────────────────
-  searchInput.addEventListener('input', () => { commitQuery(); });
-  searchInput.addEventListener('keydown', (e) => {
+  searchInput.addEventListener('input', () => {
+    commitQuery();
+  });
+  searchInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (e.shiftKey) goToPrevMatch(view);
@@ -491,8 +496,14 @@ function buildSearchPanel(view: EditorView): Panel {
   caseCb.addEventListener('change', () => commitQuery());
   reCb.addEventListener('change', () => commitQuery());
 
-  prevBtn.addEventListener('click', () => { goToPrevMatch(view); searchInput.focus(); });
-  nextBtn.addEventListener('click', () => { goToNextMatch(view); searchInput.focus(); });
+  prevBtn.addEventListener('click', () => {
+    goToPrevMatch(view);
+    searchInput.focus();
+  });
+  nextBtn.addEventListener('click', () => {
+    goToNextMatch(view);
+    searchInput.focus();
+  });
   closeBtn.addEventListener('click', () => closeSearchPanel(view));
 
   // ── Panel interface ────────────────────────────────────────────────────────
@@ -511,8 +522,11 @@ function buildSearchPanel(view: EditorView): Panel {
       }
     },
     update(update) {
-      if (update.selectionSet || update.docChanged ||
-          update.transactions.some(tr => tr.effects.length > 0)) {
+      if (
+        update.selectionSet ||
+        update.docChanged ||
+        update.transactions.some(tr => tr.effects.length > 0)
+      ) {
         updateCount(update.state);
       }
     },
@@ -550,8 +564,8 @@ const baseTheme = EditorView.theme({
     alignItems: 'center',
     gap: '4px',
     padding: '5px 10px',
-    borderBottom: '1px solid var(--lobster-border)',
-    background: 'var(--lobster-surface-raised)',
+    borderBottom: '1px solid var(--zy-border)',
+    background: 'var(--zy-surface-raised)',
     fontFamily: "'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
     fontSize: '12px',
   },
@@ -560,20 +574,20 @@ const baseTheme = EditorView.theme({
     height: '26px',
     padding: '0 8px',
     borderRadius: '5px',
-    border: '1px solid var(--lobster-border)',
-    background: 'var(--lobster-surface)',
-    color: 'var(--lobster-foreground)',
+    border: '1px solid var(--zy-border)',
+    background: 'var(--zy-surface)',
+    color: 'var(--zy-foreground)',
     fontSize: '12px',
     outline: 'none',
   },
   '.cm-search-input:focus': {
-    borderColor: 'var(--lobster-primary)',
+    borderColor: 'var(--zy-primary)',
   },
   '.cm-search-count': {
     flex: '0 0 auto',
     minWidth: '36px',
     fontSize: '11px',
-    color: 'var(--lobster-text-secondary)',
+    color: 'var(--zy-text-secondary)',
     textAlign: 'center',
     fontVariantNumeric: 'tabular-nums',
   },
@@ -588,20 +602,20 @@ const baseTheme = EditorView.theme({
     height: '26px',
     padding: '0',
     borderRadius: '5px',
-    border: '1px solid var(--lobster-border)',
-    background: 'var(--lobster-surface-raised)',
-    color: 'var(--lobster-text-secondary)',
+    border: '1px solid var(--zy-border)',
+    background: 'var(--zy-surface-raised)',
+    color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
     transition: 'background 0.15s, color 0.15s',
   },
   '.cm-search-nav-btn:hover': {
-    background: 'var(--lobster-surface-hover)',
-    color: 'var(--lobster-foreground)',
+    background: 'var(--zy-surface-hover)',
+    color: 'var(--zy-foreground)',
   },
   '.cm-search-sep': {
     width: '1px',
     height: '16px',
-    background: 'var(--lobster-border)',
+    background: 'var(--zy-border)',
     margin: '0 2px',
     flex: '0 0 auto',
   },
@@ -614,20 +628,20 @@ const baseTheme = EditorView.theme({
     borderRadius: '5px',
     border: '1px solid transparent',
     fontSize: '12px',
-    color: 'var(--lobster-text-secondary)',
+    color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
     userSelect: 'none',
     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
     whiteSpace: 'nowrap',
   },
   '.cm-search-opt:hover': {
-    background: 'var(--lobster-surface-hover)',
-    color: 'var(--lobster-foreground)',
+    background: 'var(--zy-surface-hover)',
+    color: 'var(--zy-foreground)',
   },
   '.cm-search-opt input[type="checkbox"]': {
     margin: '0',
     cursor: 'pointer',
-    accentColor: 'var(--lobster-primary)',
+    accentColor: 'var(--zy-primary)',
   },
   '.cm-search-close-btn': {
     display: 'inline-flex',
@@ -640,13 +654,13 @@ const baseTheme = EditorView.theme({
     borderRadius: '5px',
     border: 'none',
     background: 'transparent',
-    color: 'var(--lobster-text-secondary)',
+    color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
     transition: 'background 0.15s, color 0.15s',
   },
   '.cm-search-close-btn:hover': {
-    background: 'var(--lobster-surface-hover)',
-    color: 'var(--lobster-foreground)',
+    background: 'var(--zy-surface-hover)',
+    color: 'var(--zy-foreground)',
   },
   '.cm-searchMatch': {
     backgroundColor: 'rgba(255,180,0,0.3)',
@@ -806,7 +820,12 @@ interface CodeFullscreenModalProps {
   onClose: () => void;
 }
 
-const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, isDark, onClose }) => {
+const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
+  code,
+  lang,
+  isDark,
+  onClose,
+}) => {
   const [wrap, setWrap] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -826,7 +845,9 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
   // Prevent body scroll while open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, []);
 
   const handleCopy = useCallback(async () => {
@@ -861,19 +882,25 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
     <div
       className="fixed inset-0 z-200 flex flex-col"
       style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       {/* Modal container */}
       <div
         className="flex flex-col m-8 rounded-xl overflow-hidden border border-border shadow-2xl"
         style={{ flex: 1, minHeight: 0, backgroundColor: isDark ? '#282c34' : '#f0f2f5' }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
         <div className="bg-surface-raised px-4 py-2 flex items-center justify-between border-b border-border shrink-0">
-          <span className="font-mono text-xs text-muted-foreground opacity-70">{lang ?? 'code'}</span>
+          <span className="font-mono text-xs text-muted-foreground opacity-70">
+            {lang ?? 'code'}
+          </span>
           <div className="flex items-center gap-0.5">
-            <CodeBlockTooltip content={searchOpen ? t('codeBlockSearchClose') : t('codeBlockSearch')}>
+            <CodeBlockTooltip
+              content={searchOpen ? t('codeBlockSearchClose') : t('codeBlockSearch')}
+            >
               <HeaderButton
                 onClick={handleToggleSearch}
                 ariaLabel={searchOpen ? t('codeBlockSearchClose') : t('codeBlockSearch')}
@@ -893,9 +920,11 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
             </CodeBlockTooltip>
             <CodeBlockTooltip content={t('copyToClipboard')}>
               <HeaderButton onClick={handleCopy} ariaLabel={t('copyToClipboard')}>
-                {isCopied
-                  ? <Check className="h-4 w-4 text-green-500" />
-                  : <Copy className="h-4 w-4" />}
+                {isCopied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
               </HeaderButton>
             </CodeBlockTooltip>
             {/* Divider */}
@@ -903,8 +932,18 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
             {/* Close */}
             <CodeBlockTooltip content={t('codeBlockFullscreenExit')}>
               <HeaderButton onClick={onClose} ariaLabel={t('codeBlockFullscreenExit')}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </HeaderButton>
             </CodeBlockTooltip>
@@ -1109,15 +1148,10 @@ function useCodeMirrorView({
         search({ createPanel: buildSearchPanel }),
 
         // Keymaps
-        keymap.of([
-          ...defaultKeymap,
-          ...historyKeymap,
-          ...foldKeymap,
-          ...searchKeymap,
-        ]),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, ...searchKeymap]),
 
         // Listener to sync searchOpen React state with editor panel state
-        EditorView.updateListener.of((update) => {
+        EditorView.updateListener.of(update => {
           if (update.transactions.length > 0) {
             onSearchOpenChangeRef.current(searchPanelOpen(update.state));
           }
@@ -1132,13 +1166,13 @@ function useCodeMirrorView({
 
     const view = new EditorView({ state, parent: container });
     viewRef.current = view;
-    forceUpdate((n) => n + 1); // tell consumers the view is ready
+    forceUpdate(n => n + 1); // tell consumers the view is ready
 
     return () => {
       view.destroy();
       viewRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [container]); // only re-create when the DOM container changes
 
   // Reconfigure theme compartment when isDark changes
@@ -1221,9 +1255,7 @@ const CodeMirrorEditor: React.FC<CodeMirrorEditorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  return (
-    <div ref={setContainer} />
-  );
+  return <div ref={setContainer} />;
 };
 
 // ---------------------------------------------------------------------------
@@ -1239,12 +1271,9 @@ interface CodeBlockProps {
 }
 
 const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...props }) => {
-  const normalizedClassName = Array.isArray(className)
-    ? className.join(' ')
-    : className || '';
+  const normalizedClassName = Array.isArray(className) ? className.join(' ') : className || '';
   const match = /language-([\w-]+)/.exec(normalizedClassName);
-  const hasPosition =
-    node?.position?.start?.line != null && node?.position?.end?.line != null;
+  const hasPosition = node?.position?.start?.line != null && node?.position?.end?.line != null;
   const isInline =
     typeof props.inline === 'boolean'
       ? props.inline
@@ -1259,8 +1288,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
 
   // Detect diff blocks: ```diff or ```diff:typescript
   const isDiffBlock = rawLang === 'diff' || rawLang?.startsWith('diff:') === true;
-  const diffInnerLang =
-    isDiffBlock && rawLang!.includes(':') ? rawLang!.split(':')[1] : null;
+  const diffInnerLang = isDiffBlock && rawLang!.includes(':') ? rawLang!.split(':')[1] : null;
 
   const shouldUseCodeMirror =
     !isInline &&
@@ -1350,7 +1378,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
   }, []);
 
   const handleToggleCollapse = useCallback(() => {
-    setCollapsed((v) => !v);
+    setCollapsed(v => !v);
   }, []);
 
   const handleViewReady = useCallback((view: EditorView | null) => {
@@ -1411,11 +1439,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
   // -------------------------------------------------------------------------
   // Language code block header
   // -------------------------------------------------------------------------
-  const displayLang = isDiffBlock
-    ? diffInnerLang
-      ? `diff · ${diffInnerLang}`
-      : 'diff'
-    : match[1];
+  const displayLang = isDiffBlock ? (diffInnerLang ? `diff · ${diffInnerLang}` : 'diff') : match[1];
 
   return (
     <div className="my-3 rounded-lg overflow-hidden border border-border-subtle bg-surface-raised/40 relative">
@@ -1433,25 +1457,37 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
         <span className="font-mono opacity-70">{displayLang}</span>
         <div className="flex items-center gap-0.5">
           {/* Collapse / expand the entire code body */}
-          <CodeBlockTooltip content={collapsed ? i18nService.t('codeBlockExpand') : i18nService.t('codeBlockCollapse')}>
+          <CodeBlockTooltip
+            content={
+              collapsed ? i18nService.t('codeBlockExpand') : i18nService.t('codeBlockCollapse')
+            }
+          >
             <HeaderButton
               onClick={handleToggleCollapse}
-              ariaLabel={collapsed ? i18nService.t('codeBlockExpand') : i18nService.t('codeBlockCollapse')}
+              ariaLabel={
+                collapsed ? i18nService.t('codeBlockExpand') : i18nService.t('codeBlockCollapse')
+              }
               active={collapsed}
             >
-              {collapsed ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
+              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </HeaderButton>
           </CodeBlockTooltip>
           {/* Search toggle - only for regular code blocks (not diff) */}
           {!isDiffBlock && (
-            <CodeBlockTooltip content={searchOpen ? i18nService.t('codeBlockSearchClose') : i18nService.t('codeBlockSearch')}>
+            <CodeBlockTooltip
+              content={
+                searchOpen
+                  ? i18nService.t('codeBlockSearchClose')
+                  : i18nService.t('codeBlockSearch')
+              }
+            >
               <HeaderButton
                 onClick={handleToggleSearch}
-                ariaLabel={searchOpen ? i18nService.t('codeBlockSearchClose') : i18nService.t('codeBlockSearch')}
+                ariaLabel={
+                  searchOpen
+                    ? i18nService.t('codeBlockSearchClose')
+                    : i18nService.t('codeBlockSearch')
+                }
                 active={searchOpen}
               >
                 <Search className="h-4 w-4" />
@@ -1459,10 +1495,16 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
             </CodeBlockTooltip>
           )}
           {/* Word wrap toggle */}
-          <CodeBlockTooltip content={wrap ? i18nService.t('codeBlockWordWrapOff') : i18nService.t('codeBlockWordWrap')}>
+          <CodeBlockTooltip
+            content={
+              wrap ? i18nService.t('codeBlockWordWrapOff') : i18nService.t('codeBlockWordWrap')
+            }
+          >
             <HeaderButton
-              onClick={() => setWrap((v) => !v)}
-              ariaLabel={wrap ? i18nService.t('codeBlockWordWrapOff') : i18nService.t('codeBlockWordWrap')}
+              onClick={() => setWrap(v => !v)}
+              ariaLabel={
+                wrap ? i18nService.t('codeBlockWordWrapOff') : i18nService.t('codeBlockWordWrap')
+              }
               active={wrap}
             >
               <WrapTextIcon className="h-4 w-4" />
@@ -1470,10 +1512,24 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
           </CodeBlockTooltip>
           {/* Fullscreen expand */}
           <CodeBlockTooltip content={i18nService.t('codeBlockFullscreen')}>
-            <HeaderButton onClick={() => setFullscreen(true)} ariaLabel={i18nService.t('codeBlockFullscreen')}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-                <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+            <HeaderButton
+              onClick={() => setFullscreen(true)}
+              ariaLabel={i18nService.t('codeBlockFullscreen')}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
               </svg>
             </HeaderButton>
           </CodeBlockTooltip>

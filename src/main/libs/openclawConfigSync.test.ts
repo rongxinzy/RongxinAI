@@ -1,47 +1,46 @@
-import { describe,expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
-import {
-  OpenClawApi,
-  OpenClawProviderId,
-  ProviderName,
-} from '../../shared/providers';
+import { OpenClawApi, OpenClawProviderId, ProviderName } from '../../shared/providers';
 
 const providerApiKeyEnvVar = (providerName: string): string => {
   const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `LOBSTER_APIKEY_${envName}`;
+  return `ZHIYUAN_APIKEY_${envName}`;
 };
 
 describe('providerApiKeyEnvVar', () => {
   test('converts simple provider names', () => {
-    expect(providerApiKeyEnvVar(ProviderName.Moonshot)).toBe('LOBSTER_APIKEY_MOONSHOT');
-    expect(providerApiKeyEnvVar(ProviderName.Anthropic)).toBe('LOBSTER_APIKEY_ANTHROPIC');
-    expect(providerApiKeyEnvVar(ProviderName.OpenAI)).toBe('LOBSTER_APIKEY_OPENAI');
-    expect(providerApiKeyEnvVar(ProviderName.LlamaCpp)).toBe('LOBSTER_APIKEY_LLAMACPP');
-    expect(providerApiKeyEnvVar(ProviderName.Ollama)).toBe('LOBSTER_APIKEY_OLLAMA');
+    expect(providerApiKeyEnvVar(ProviderName.Moonshot)).toBe('ZHIYUAN_APIKEY_MOONSHOT');
+    expect(providerApiKeyEnvVar(ProviderName.Anthropic)).toBe('ZHIYUAN_APIKEY_ANTHROPIC');
+    expect(providerApiKeyEnvVar(ProviderName.OpenAI)).toBe('ZHIYUAN_APIKEY_OPENAI');
+    expect(providerApiKeyEnvVar(ProviderName.LlamaCpp)).toBe('ZHIYUAN_APIKEY_LLAMACPP');
+    expect(providerApiKeyEnvVar(ProviderName.Ollama)).toBe('ZHIYUAN_APIKEY_OLLAMA');
   });
 
   test('replaces hyphens and special chars with underscores', () => {
-    expect(providerApiKeyEnvVar(ProviderName.LobsteraiServer)).toBe('LOBSTER_APIKEY_LOBSTERAI_SERVER');
-    expect(providerApiKeyEnvVar('my.provider')).toBe('LOBSTER_APIKEY_MY_PROVIDER');
+    expect(providerApiKeyEnvVar(ProviderName.ZhiyuanServer)).toBe('ZHIYUAN_APIKEY_ZHIYUAN_SERVER');
+    expect(providerApiKeyEnvVar('my.provider')).toBe('ZHIYUAN_APIKEY_MY_PROVIDER');
   });
 
   test('server key matches hardcoded convention', () => {
-    expect(providerApiKeyEnvVar('server')).toBe('LOBSTER_APIKEY_SERVER');
+    expect(providerApiKeyEnvVar('server')).toBe('ZHIYUAN_APIKEY_SERVER');
   });
 });
 
 describe('env var stability on model switch', () => {
-  const simulateCollectEnvVars = (providers: Record<string, { enabled: boolean; apiKey: string }>, serverToken?: string) => {
+  const simulateCollectEnvVars = (
+    providers: Record<string, { enabled: boolean; apiKey: string }>,
+    serverToken?: string,
+  ) => {
     const env: Record<string, string> = {};
 
     if (serverToken) {
-      env.LOBSTER_APIKEY_SERVER = serverToken;
+      env.ZHIYUAN_APIKEY_SERVER = serverToken;
     }
 
     for (const [name, config] of Object.entries(providers)) {
       if (!config.enabled) continue;
       const envName = name.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-      env[`LOBSTER_APIKEY_${envName}`] = config.apiKey;
+      env[`ZHIYUAN_APIKEY_${envName}`] = config.apiKey;
     }
 
     return env;
@@ -69,8 +68,8 @@ describe('env var stability on model switch', () => {
     const envAfter = simulateCollectEnvVars(providers);
 
     expect(JSON.stringify(envBefore)).toBe(JSON.stringify(envAfter));
-    expect(envBefore.LOBSTER_APIKEY_MOONSHOT).toBe('sk-moon-123');
-    expect(envBefore.LOBSTER_APIKEY_ANTHROPIC).toBe('sk-ant-456');
+    expect(envBefore.ZHIYUAN_APIKEY_MOONSHOT).toBe('sk-moon-123');
+    expect(envBefore.ZHIYUAN_APIKEY_ANTHROPIC).toBe('sk-ant-456');
   });
 
   test('only editing apiKey value causes env var change', () => {
@@ -112,7 +111,10 @@ const mapApiTypeToOpenClawApi = (
 
 type ProviderDescriptor = {
   providerId: string;
-  resolveApi: (ctx: { apiType: 'anthropic' | 'openai' | undefined; baseURL: string }) => OpenClawProviderApi;
+  resolveApi: (ctx: {
+    apiType: 'anthropic' | 'openai' | undefined;
+    baseURL: string;
+  }) => OpenClawProviderApi;
   normalizeBaseUrl: (rawBaseUrl: string) => string;
   resolveSessionModelId?: (modelId: string) => string;
   modelDefaults?: Partial<{
@@ -213,7 +215,7 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
 };
 
 const DEFAULT_DESCRIPTOR: ProviderDescriptor = {
-  providerId: OpenClawProviderId.Lobster,
+  providerId: OpenClawProviderId.Zhiyuan,
   resolveApi: ({ apiType }) => mapApiTypeToOpenClawApi(apiType),
   normalizeBaseUrl: stripChatCompletionsSuffix,
 };
@@ -233,7 +235,7 @@ const resolveDescriptor = (
   }
   return {
     ...DEFAULT_DESCRIPTOR,
-    providerId: providerName || OpenClawProviderId.Lobster,
+    providerId: providerName || OpenClawProviderId.Zhiyuan,
   };
 };
 
@@ -292,14 +294,14 @@ describe('resolveDescriptor', () => {
     expect(d.resolveApi({ apiType: 'openai', baseURL: '' })).toBe(OpenClawApi.OpenAICompletions);
   });
 
-  test('unknown provider falls back to lobster providerId', () => {
+  test('unknown provider falls back to zhiyuan providerId', () => {
     const d = resolveDescriptor('some-unknown', false);
     expect(d.providerId).toBe('some-unknown');
   });
 
-  test('empty provider name falls back to lobster', () => {
+  test('empty provider name falls back to zhiyuan', () => {
     const d = resolveDescriptor('', false);
-    expect(d.providerId).toBe(OpenClawProviderId.Lobster);
+    expect(d.providerId).toBe(OpenClawProviderId.Zhiyuan);
   });
 
   test('codingPlan flag is ignored for providers without codingPlan entry', () => {
@@ -342,10 +344,10 @@ describe('provider registry coverage', () => {
     }
   });
 
-  test('no provider resolves to lobster fallback', () => {
+  test('no provider resolves to zhiyuan fallback', () => {
     for (const name of allRegistryProviders) {
       const d = resolveDescriptor(name, false);
-      expect(d.providerId).not.toBe(OpenClawProviderId.Lobster);
+      expect(d.providerId).not.toBe(OpenClawProviderId.Zhiyuan);
     }
   });
 
@@ -361,7 +363,13 @@ describe('provider registry coverage', () => {
 
 import { buildProviderSelection } from './openclawConfigSync';
 
-const REQUIRED_SELECTION_KEYS = ['providerId', 'legacyModelId', 'sessionModelId', 'primaryModel', 'providerConfig'] as const;
+const REQUIRED_SELECTION_KEYS = [
+  'providerId',
+  'legacyModelId',
+  'sessionModelId',
+  'primaryModel',
+  'providerConfig',
+] as const;
 const REQUIRED_PROVIDER_CONFIG_KEYS = ['baseUrl', 'api', 'auth', 'models'] as const;
 const REQUIRED_MODEL_KEYS = ['id', 'name', 'api', 'input'] as const;
 
@@ -374,7 +382,11 @@ describe('buildProviderSelection contract', () => {
   };
 
   test('output has all required top-level keys', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+    });
     for (const key of REQUIRED_SELECTION_KEYS) {
       expect(result).toHaveProperty(key);
     }
@@ -386,7 +398,11 @@ describe('buildProviderSelection contract', () => {
   });
 
   test('providerConfig has all required keys', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.OpenAI, apiType: 'openai' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.OpenAI,
+      apiType: 'openai',
+    });
     for (const key of REQUIRED_PROVIDER_CONFIG_KEYS) {
       expect(result.providerConfig).toHaveProperty(key);
     }
@@ -401,7 +417,11 @@ describe('buildProviderSelection contract', () => {
   });
 
   test('model.id matches sessionModelId', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+    });
     expect(result.providerConfig.models[0].id).toBe(result.sessionModelId);
   });
 
@@ -411,18 +431,27 @@ describe('buildProviderSelection contract', () => {
   });
 
   test('model.input includes image for vision-supported models', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic', supportsImage: true });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+      supportsImage: true,
+    });
     expect(result.providerConfig.models[0].input).toContain('image');
   });
 
   test('apiKey uses env var placeholder for providers with resolveApiKey', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
-    expect(result.providerConfig.apiKey).toMatch(/^\$\{LOBSTER_APIKEY_/);
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+    });
+    expect(result.providerConfig.apiKey).toMatch(/^\$\{ZHIYUAN_APIKEY_/);
   });
 
   test('apiKey uses env var placeholder for unknown providers', () => {
     const result = buildProviderSelection({ ...baseOptions, providerName: 'unknown-provider' });
-    expect(result.providerConfig.apiKey).toMatch(/^\$\{LOBSTER_APIKEY_/);
+    expect(result.providerConfig.apiKey).toMatch(/^\$\{ZHIYUAN_APIKEY_/);
   });
 
   // ─── All registered providers ──────────────────────────────────────────

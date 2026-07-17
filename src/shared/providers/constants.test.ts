@@ -1,10 +1,6 @@
-import { describe,expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
-import {
-  ApiFormat,
-  ProviderName,
-  ProviderRegistry,
-} from './constants';
+import { ApiFormat, ProviderName, ProviderRegistry } from './constants';
 
 describe('ProviderName constants', () => {
   test('contains expected provider keys', () => {
@@ -12,7 +8,7 @@ describe('ProviderName constants', () => {
     expect(ProviderName.DeepSeek).toBe('deepseek');
     expect(ProviderName.LlamaCpp).toBe('llamacpp');
     expect(ProviderName.Custom).toBe('custom');
-    expect(ProviderName.LobsteraiServer).toBe('lobsterai-server');
+    expect(ProviderName.ZhiyuanServer).toBe('zhiyuan-server');
   });
 });
 
@@ -21,7 +17,7 @@ describe('ProviderRegistry', () => {
     const ids = ProviderRegistry.providerIds;
     expect(ids.length).toBe(16);
     expect(ids).not.toContain(ProviderName.Custom);
-    expect(ids).not.toContain(ProviderName.LobsteraiServer);
+    expect(ids).not.toContain(ProviderName.ZhiyuanServer);
   });
 
   test('get returns definition for known provider', () => {
@@ -38,14 +34,24 @@ describe('ProviderRegistry', () => {
   });
 
   test('resolveModelSupportsImage repairs known provider model metadata', () => {
-    expect(ProviderRegistry.resolveModelSupportsImage(ProviderName.Qwen, 'qwen3.6-plus', false)).toBe(true);
-    expect(ProviderRegistry.resolveModelSupportsImage(ProviderName.Qwen, 'qwen3-coder-plus', true)).toBe(false);
+    expect(
+      ProviderRegistry.resolveModelSupportsImage(ProviderName.Qwen, 'qwen3.6-plus', false),
+    ).toBe(true);
+    expect(
+      ProviderRegistry.resolveModelSupportsImage(ProviderName.Qwen, 'qwen3-coder-plus', true),
+    ).toBe(false);
   });
 
   test('resolveModelSupportsImage upgrades custom providers for globally known vision models', () => {
-    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'qwen3.6-plus', false)).toBe(true);
-    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'unknown-model', false)).toBe(false);
-    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'unknown-model', true)).toBe(true);
+    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'qwen3.6-plus', false)).toBe(
+      true,
+    );
+    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'unknown-model', false)).toBe(
+      false,
+    );
+    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'unknown-model', true)).toBe(
+      true,
+    );
   });
 
   test('supportsCodingPlan is true for moonshot, qwen, zhipu, volcengine, qianfan, xiaomi', () => {
@@ -119,20 +125,42 @@ describe('ProviderRegistry', () => {
 
   describe('getCodingPlanUrl', () => {
     test('returns anthropic endpoint for coding-plan-supported providers', () => {
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Moonshot, 'anthropic')).toBe('https://api.kimi.com/coding');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Qwen, 'anthropic')).toBe('https://coding.dashscope.aliyuncs.com/apps/anthropic');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Zhipu, 'anthropic')).toBe('https://open.bigmodel.cn/api/anthropic');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Volcengine, 'anthropic')).toBe('https://ark.cn-beijing.volces.com/api/coding');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Xiaomi, 'anthropic')).toBe('https://token-plan-cn.xiaomimimo.com/anthropic');
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Moonshot, 'anthropic')).toBe(
+        'https://api.kimi.com/coding',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Qwen, 'anthropic')).toBe(
+        'https://coding.dashscope.aliyuncs.com/apps/anthropic',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Zhipu, 'anthropic')).toBe(
+        'https://open.bigmodel.cn/api/anthropic',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Volcengine, 'anthropic')).toBe(
+        'https://ark.cn-beijing.volces.com/api/coding',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Xiaomi, 'anthropic')).toBe(
+        'https://token-plan-cn.xiaomimimo.com/anthropic',
+      );
     });
 
     test('returns openai endpoint for coding-plan-supported providers', () => {
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Moonshot, 'openai')).toBe('https://api.kimi.com/coding/v1');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Qwen, 'openai')).toBe('https://coding.dashscope.aliyuncs.com/v1');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Zhipu, 'openai')).toBe('https://open.bigmodel.cn/api/coding/paas/v4');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Volcengine, 'openai')).toBe('https://ark.cn-beijing.volces.com/api/coding/v3');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Qianfan, 'openai')).toBe('https://qianfan.baidubce.com/v2/coding/chat/completions');
-      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Xiaomi, 'openai')).toBe('https://token-plan-cn.xiaomimimo.com/v1');
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Moonshot, 'openai')).toBe(
+        'https://api.kimi.com/coding/v1',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Qwen, 'openai')).toBe(
+        'https://coding.dashscope.aliyuncs.com/v1',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Zhipu, 'openai')).toBe(
+        'https://open.bigmodel.cn/api/coding/paas/v4',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Volcengine, 'openai')).toBe(
+        'https://ark.cn-beijing.volces.com/api/coding/v3',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Qianfan, 'openai')).toBe(
+        'https://qianfan.baidubce.com/v2/coding/chat/completions',
+      );
+      expect(ProviderRegistry.getCodingPlanUrl(ProviderName.Xiaomi, 'openai')).toBe(
+        'https://token-plan-cn.xiaomimimo.com/v1',
+      );
     });
 
     test('returns undefined for providers that do not support codingPlan', () => {
@@ -144,26 +172,52 @@ describe('ProviderRegistry', () => {
 
   describe('getSwitchableBaseUrl', () => {
     test('returns anthropic url for providers with switchableBaseUrls', () => {
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.DeepSeek, 'anthropic')).toBe('https://api.deepseek.com/anthropic');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Moonshot, 'anthropic')).toBe('https://api.moonshot.cn/anthropic');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Zhipu, 'anthropic')).toBe('https://open.bigmodel.cn/api/anthropic');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Minimax, 'anthropic')).toBe('https://api.minimaxi.com/anthropic');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Qwen, 'anthropic')).toBe('https://dashscope.aliyuncs.com/apps/anthropic');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Ollama, 'anthropic')).toBe('http://localhost:11434');
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.DeepSeek, 'anthropic')).toBe(
+        'https://api.deepseek.com/anthropic',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Moonshot, 'anthropic')).toBe(
+        'https://api.moonshot.cn/anthropic',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Zhipu, 'anthropic')).toBe(
+        'https://open.bigmodel.cn/api/anthropic',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Minimax, 'anthropic')).toBe(
+        'https://api.minimaxi.com/anthropic',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Qwen, 'anthropic')).toBe(
+        'https://dashscope.aliyuncs.com/apps/anthropic',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Ollama, 'anthropic')).toBe(
+        'http://localhost:11434',
+      );
     });
 
     test('returns openai url for providers with switchableBaseUrls', () => {
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.DeepSeek, 'openai')).toBe('https://api.deepseek.com');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Moonshot, 'openai')).toBe('https://api.moonshot.cn/v1');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Zhipu, 'openai')).toBe('https://open.bigmodel.cn/api/paas/v4');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Minimax, 'openai')).toBe('https://api.minimaxi.com/v1');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Qwen, 'openai')).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1');
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Ollama, 'openai')).toBe('http://localhost:11434/v1');
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.DeepSeek, 'openai')).toBe(
+        'https://api.deepseek.com',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Moonshot, 'openai')).toBe(
+        'https://api.moonshot.cn/v1',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Zhipu, 'openai')).toBe(
+        'https://open.bigmodel.cn/api/paas/v4',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Minimax, 'openai')).toBe(
+        'https://api.minimaxi.com/v1',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Qwen, 'openai')).toBe(
+        'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      );
+      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Ollama, 'openai')).toBe(
+        'http://localhost:11434/v1',
+      );
     });
 
     test('returns undefined for providers without switchableBaseUrls', () => {
       expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.OpenAI, 'openai')).toBeUndefined();
-      expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Anthropic, 'anthropic')).toBeUndefined();
+      expect(
+        ProviderRegistry.getSwitchableBaseUrl(ProviderName.Anthropic, 'anthropic'),
+      ).toBeUndefined();
       expect(ProviderRegistry.getSwitchableBaseUrl(ProviderName.Gemini, 'openai')).toBeUndefined();
       expect(ProviderRegistry.getSwitchableBaseUrl('unknown', 'anthropic')).toBeUndefined();
     });

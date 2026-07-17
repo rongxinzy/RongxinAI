@@ -1,8 +1,4 @@
-import {
-  AgentAvatarSvg,
-  DefaultAgentAvatar,
-  parseAgentAvatarIcon,
-} from '@shared/agent/avatar';
+import { AgentAvatarSvg, DefaultAgentAvatar, parseAgentAvatarIcon } from '@shared/agent/avatar';
 import React from 'react';
 
 import artboardIconUrl from '../../assets/agent-avatars/artboard.svg';
@@ -23,7 +19,7 @@ import headphonesIconUrl from '../../assets/agent-avatars/headphones.svg';
 import heartIconUrl from '../../assets/agent-avatars/heart.svg';
 import inspirationIconUrl from '../../assets/agent-avatars/inspiration.svg';
 import lightningIconUrl from '../../assets/agent-avatars/lightning.svg';
-import lobsterIconUrl from '../../assets/agent-avatars/lobster.svg';
+import zhiyuanIconUrl from '../../assets/agent-avatars/zhiyuan.svg';
 import meditationIconUrl from '../../assets/agent-avatars/meditation.svg';
 import musicIconUrl from '../../assets/agent-avatars/music.svg';
 import petIconUrl from '../../assets/agent-avatars/pet.svg';
@@ -37,7 +33,7 @@ import translationAltIconUrl from '../../assets/agent-avatars/translation-alt.sv
 import travelIconUrl from '../../assets/agent-avatars/travel.svg';
 
 export const AGENT_AVATAR_SVG_OPTIONS: Array<{ svg: AgentAvatarSvg; labelKey: string }> = [
-  { svg: AgentAvatarSvg.Lobster, labelKey: 'agentAvatarSvgLobster' },
+  { svg: AgentAvatarSvg.Zhiyuan, labelKey: 'agentAvatarSvgZhiyuan' },
 
   { svg: AgentAvatarSvg.Code, labelKey: 'agentAvatarSvgCode' },
   { svg: AgentAvatarSvg.Repair, labelKey: 'agentAvatarSvgRepair' },
@@ -74,7 +70,7 @@ export const AGENT_AVATAR_SVG_OPTIONS: Array<{ svg: AgentAvatarSvg; labelKey: st
 ];
 
 const AGENT_AVATAR_SVG_URLS: Record<AgentAvatarSvg, string> = {
-  [AgentAvatarSvg.Lobster]: lobsterIconUrl,
+  [AgentAvatarSvg.Zhiyuan]: zhiyuanIconUrl,
   [AgentAvatarSvg.Code]: codeIconUrl,
   [AgentAvatarSvg.Repair]: repairIconUrl,
   [AgentAvatarSvg.Briefcase]: briefcaseIconUrl,
@@ -146,14 +142,18 @@ const AgentAvatarIcon: React.FC<AgentAvatarIconProps> = ({
     };
 
     return (
-      <span className={`inline-flex shrink-0 items-center justify-center rounded-full text-foreground ${className}`}>
+      <span
+        className={`inline-flex shrink-0 items-center justify-center rounded-full text-foreground ${className}`}
+      >
         <span aria-hidden="true" className={`inline-block ${iconClassName}`} style={maskStyle} />
       </span>
     );
   }
 
   return (
-    <span className={`inline-flex shrink-0 items-center justify-center leading-none ${className} ${legacyClassName}`}>
+    <span
+      className={`inline-flex shrink-0 items-center justify-center leading-none ${className} ${legacyClassName}`}
+    >
       {normalized || fallbackText}
     </span>
   );

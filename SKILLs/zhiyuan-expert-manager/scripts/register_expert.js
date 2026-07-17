@@ -18,7 +18,7 @@ const path = require('path');
 
 const { validateExpert } = require('./validate_expert');
 
-const DEFAULT_DB_FILENAME = 'lobsterai.sqlite';
+const DEFAULT_DB_FILENAME = 'zhiyuan.sqlite';
 
 const AGENT_SOURCE_EXPERT_PACKAGE = 'expert-package';
 const AGENT_SOURCE_EXPERT_PACKAGE_MEMBER = 'expert-package-member';
@@ -61,7 +61,10 @@ function parseMdFrontmatter(mdPath) {
     const trimmed = line.trim();
     if (trimmed.includes(':') && !trimmed.startsWith('-') && !trimmed.startsWith('#')) {
       const [key, ...rest] = trimmed.split(':');
-      const value = rest.join(':').trim().replace(/^["']|["']$/g, '');
+      const value = rest
+        .join(':')
+        .trim()
+        .replace(/^["']|["']$/g, '');
       if (value) frontmatter[key.trim()] = value;
     }
   }
@@ -71,18 +74,19 @@ function parseMdFrontmatter(mdPath) {
 }
 
 function normalizeAgentId(name) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    || `expert-${Date.now()}`;
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || `expert-${Date.now()}`
+  );
 }
 
 function generateUuid() {
   // Simple UUID v4 without external deps
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
@@ -92,7 +96,9 @@ function loadBetterSqlite3() {
     // When running inside RongxinAI source tree, prefer project's better-sqlite3
     return require('better-sqlite3');
   } catch (e) {
-    throw new Error('better-sqlite3 is not available. Make sure to run this script from the RongxinAI project directory.');
+    throw new Error(
+      'better-sqlite3 is not available. Make sure to run this script from the RongxinAI project directory.',
+    );
   }
 }
 
@@ -127,7 +133,9 @@ function agentIdExists(db, id) {
 }
 
 function agentNameExists(db, name) {
-  const row = db.prepare('SELECT 1 FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0').get(name.trim());
+  const row = db
+    .prepare('SELECT 1 FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0')
+    .get(name.trim());
   return !!row;
 }
 
@@ -137,12 +145,12 @@ function makeUniqueAgentId(db, baseId) {
 }
 
 function getDefaultIcon() {
-  // Matches encodeAgentAvatarIcon({ svg: AgentAvatarSvg.Lobster })
-  return 'agent-avatar-svg:lobster';
+  // Matches encodeAgentAvatarIcon({ svg: AgentAvatarSvg.Zhiyuan })
+  return 'agent-avatar-svg:zhiyuan';
 }
 
 function pickIconByCategory(categoryId) {
-  // Heuristic mapping from category to SVG avatar; falls back to lobster.
+  // Heuristic mapping from category to SVG avatar; falls back to zhiyuan.
   const mapping = {
     '01-ProductDesign': 'artboard',
     '02-Engineering': 'code',
@@ -157,7 +165,7 @@ function pickIconByCategory(categoryId) {
     '11-SecurityCompliance': 'scales',
     '12-IndustryConsultant': 'books',
   };
-  const svg = mapping[categoryId] || 'lobster';
+  const svg = mapping[categoryId] || 'zhiyuan';
   return `agent-avatar-svg:${svg}`;
 }
 
@@ -375,13 +383,22 @@ function registerTeamExpert(db, pluginJson, expertDir, options) {
 
   // Register members first
   for (const memberId of memberAgentNames) {
-    const mdPath = resolvePackagePath(expertDir, path.join('agents', `${memberId}.md`), 'member agent');
+    const mdPath = resolvePackagePath(
+      expertDir,
+      path.join('agents', `${memberId}.md`),
+      'member agent',
+    );
     if (!fs.existsSync(mdPath)) {
       throw new Error(`Member agent markdown not found: ${mdPath}`);
     }
     const { frontmatter, body } = parseMdFrontmatter(mdPath);
     const memberDisplay = (pluginJson.members || []).find(m => m.id === memberId);
-    const name = memberDisplay?.displayName?.zh || memberDisplay?.displayName?.en || frontmatter.displayName?.zh || frontmatter.displayName?.en || memberId;
+    const name =
+      memberDisplay?.displayName?.zh ||
+      memberDisplay?.displayName?.en ||
+      frontmatter.displayName?.zh ||
+      frontmatter.displayName?.en ||
+      memberId;
 
     const agentId = makeUniqueAgentId(db, normalizeAgentId(memberId));
     const now = Date.now();
@@ -397,7 +414,11 @@ function registerTeamExpert(db, pluginJson, expertDir, options) {
       name,
       '',
       body,
-      memberDisplay?.profession?.zh || memberDisplay?.profession?.en || frontmatter.profession?.zh || frontmatter.profession?.en || '',
+      memberDisplay?.profession?.zh ||
+        memberDisplay?.profession?.en ||
+        frontmatter.profession?.zh ||
+        frontmatter.profession?.en ||
+        '',
       options.model || '',
       options.workingDirectory || '',
       pickIconByCategory(pluginJson.categoryId),
@@ -411,7 +432,11 @@ function registerTeamExpert(db, pluginJson, expertDir, options) {
   }
 
   // Register lead
-  const leadMdPath = resolvePackagePath(expertDir, path.join('agents', `${leadAgentName}.md`), 'lead agent');
+  const leadMdPath = resolvePackagePath(
+    expertDir,
+    path.join('agents', `${leadAgentName}.md`),
+    'lead agent',
+  );
   if (!fs.existsSync(leadMdPath)) {
     throw new Error(`Lead agent markdown not found: ${leadMdPath}`);
   }
@@ -426,10 +451,12 @@ function registerTeamExpert(db, pluginJson, expertDir, options) {
   const now = Date.now();
 
   // Append member roster to lead system prompt for subagent orchestration
-  const memberRoster = memberIds.map(({ memberId, agentId }) => {
-    const member = (pluginJson.members || []).find(m => m.id === memberId);
-    return `- ${memberId} (Agent DB ID: ${agentId}): ${member?.profession?.zh || member?.profession?.en || memberId}`;
-  }).join('\n');
+  const memberRoster = memberIds
+    .map(({ memberId, agentId }) => {
+      const member = (pluginJson.members || []).find(m => m.id === memberId);
+      return `- ${memberId} (Agent DB ID: ${agentId}): ${member?.profession?.zh || member?.profession?.en || memberId}`;
+    })
+    .join('\n');
 
   const augmentedSystemPrompt = `${leadBody}\n\n## 已注册成员映射\n\n${memberRoster}\n\n调度成员时，在 subagent 工具的 name 参数中使用成员 ID（如 ${memberAgentNames[0] || 'member-id'}），系统会自动路由到对应 Agent。`;
 
@@ -500,14 +527,28 @@ function parseExpertPackage(expertDir, options = {}) {
 
     // Members first
     for (const memberId of memberAgentNames) {
-      const mdPath = resolvePackagePath(expertDir, path.join('agents', `${memberId}.md`), 'member agent');
+      const mdPath = resolvePackagePath(
+        expertDir,
+        path.join('agents', `${memberId}.md`),
+        'member agent',
+      );
       if (!fs.existsSync(mdPath)) {
         throw new Error(`Member agent markdown not found: ${mdPath}`);
       }
       const { frontmatter, body } = parseMdFrontmatter(mdPath);
       const memberDisplay = (pluginJson.members || []).find(m => m.id === memberId);
-      const name = memberDisplay?.displayName?.zh || memberDisplay?.displayName?.en || frontmatter.displayName?.zh || frontmatter.displayName?.en || memberId;
-      const identity = memberDisplay?.profession?.zh || memberDisplay?.profession?.en || frontmatter.profession?.zh || frontmatter.profession?.en || '';
+      const name =
+        memberDisplay?.displayName?.zh ||
+        memberDisplay?.displayName?.en ||
+        frontmatter.displayName?.zh ||
+        frontmatter.displayName?.en ||
+        memberId;
+      const identity =
+        memberDisplay?.profession?.zh ||
+        memberDisplay?.profession?.en ||
+        frontmatter.profession?.zh ||
+        frontmatter.profession?.en ||
+        '';
 
       memberRequests.push({
         id: normalizeAgentId(memberId),
@@ -525,16 +566,22 @@ function parseExpertPackage(expertDir, options = {}) {
     }
 
     // Lead with augmented prompt
-    const leadMdPath = resolvePackagePath(expertPath, path.join('agents', `${leadAgentName}.md`), 'lead agent');
+    const leadMdPath = resolvePackagePath(
+      expertPath,
+      path.join('agents', `${leadAgentName}.md`),
+      'lead agent',
+    );
     if (!fs.existsSync(leadMdPath)) {
       throw new Error(`Lead agent markdown not found: ${leadMdPath}`);
     }
     const { body: leadBody } = parseMdFrontmatter(leadMdPath);
 
-    const memberRoster = memberRequests.map((req) => {
-      const member = (pluginJson.members || []).find(m => normalizeAgentId(m.id) === req.id);
-      return `- ${req.id}（${member?.profession?.zh || member?.profession?.en || req.id}）`;
-    }).join('\n');
+    const memberRoster = memberRequests
+      .map(req => {
+        const member = (pluginJson.members || []).find(m => normalizeAgentId(m.id) === req.id);
+        return `- ${req.id}（${member?.profession?.zh || member?.profession?.en || req.id}）`;
+      })
+      .join('\n');
 
     const augmentedSystemPrompt = `${leadBody}\n\n## 已注册成员映射\n\n${memberRoster}\n\n调度成员时，在 subagent 工具的 name 参数中使用成员 ID（如 ${memberAgentNames[0] || 'member-id'}），系统会自动路由到对应 Agent。`;
 
@@ -632,7 +679,9 @@ function registerExpert(expertDir, options = {}) {
       console.log(`   • ${id}`);
     }
     if (piSyncedFiles && piSyncedFiles.length > 0) {
-      console.log(`   📋 Synced ${piSyncedFiles.length} agent(s) to pi agents directory for subagent discovery`);
+      console.log(
+        `   📋 Synced ${piSyncedFiles.length} agent(s) to pi agents directory for subagent discovery`,
+      );
     }
     console.log('   Start a Cowork session with the lead agent to use it.');
     return { pluginJson, agentIds };
@@ -642,7 +691,9 @@ function registerExpert(expertDir, options = {}) {
 }
 
 function printUsage() {
-  console.log('Usage: node register_expert.js <path/to/expert-dir> [--db-path <sqlite.db>] [--session-id <id>]');
+  console.log(
+    'Usage: node register_expert.js <path/to/expert-dir> [--db-path <sqlite.db>] [--session-id <id>]',
+  );
 }
 
 function main() {

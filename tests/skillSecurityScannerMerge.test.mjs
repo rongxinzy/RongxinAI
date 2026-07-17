@@ -21,7 +21,9 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { mergeReports } = require('../dist-electron/main/libs/skillSecurity/skillSecurityScanner.js');
+const {
+  mergeReports,
+} = require('../dist-electron/main/libs/skillSecurity/skillSecurityScanner.js');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -141,7 +143,9 @@ test('mergeReports preserves empty findings when both reports are clean', () => 
 test('mergeReports truncates aggregated findings to 100 entries', () => {
   // Build 60 unique findings per report → 120 total → should be capped at 100
   const makeFindings = (prefix, count) =>
-    Array.from({ length: count }, (_, i) => makeInfoFinding(`${prefix}-rule-${i}`, `${prefix}-${i}.sh`));
+    Array.from({ length: count }, (_, i) =>
+      makeInfoFinding(`${prefix}-rule-${i}`, `${prefix}-${i}.sh`),
+    );
 
   const a = makeReport({ findings: makeFindings('a', 60) });
   const b = makeReport({ findings: makeFindings('b', 60) });
@@ -175,11 +179,7 @@ test('mergeReports takes the maximum individual report score when findings contr
 
 test('mergeReports computes score from merged findings when they exceed individual scores', () => {
   // 3 danger findings → 3 × 20 = 60 points; individual report scores are 0
-  const findings = [
-    makeDangerFinding('d1'),
-    makeDangerFinding('d2'),
-    makeDangerFinding('d3'),
-  ];
+  const findings = [makeDangerFinding('d1'), makeDangerFinding('d2'), makeDangerFinding('d3')];
   const a = makeReport({ riskScore: 0, findings });
   const b = makeReport({ riskScore: 0 });
   const result = mergeReports([a, b]);
@@ -262,8 +262,8 @@ test('mergeReports sums scanDurationMs across three reports', () => {
 // ── dimensionSummary ─────────────────────────────────────────────────────────
 
 test('mergeReports dimensionSummary reflects merged findings dimensions', () => {
-  const f1 = makeWarningFinding('w1', 'a.sh');   // dimension: network
-  const f2 = makeDangerFinding('d1', 'b.sh');    // dimension: dangerous_command
+  const f1 = makeWarningFinding('w1', 'a.sh'); // dimension: network
+  const f2 = makeDangerFinding('d1', 'b.sh'); // dimension: dangerous_command
   const a = makeReport({ findings: [f1] });
   const b = makeReport({ findings: [f2] });
   const result = mergeReports([a, b]);
@@ -279,8 +279,8 @@ test('mergeReports dimensionSummary is empty when there are no findings', () => 
 });
 
 test('mergeReports dimensionSummary tracks maxSeverity correctly', () => {
-  const warning = makeWarningFinding('w1', 'a.sh');  // network / warning
-  const info = makeInfoFinding('i1', 'b.sh');        // network / info
+  const warning = makeWarningFinding('w1', 'a.sh'); // network / warning
+  const info = makeInfoFinding('i1', 'b.sh'); // network / info
   const a = makeReport({ findings: [warning, info] });
   const result = mergeReports([a, makeReport()]);
   assert.equal(result.dimensionSummary.network.count, 2);

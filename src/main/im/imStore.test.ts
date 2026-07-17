@@ -1,18 +1,21 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { IMStore } from './imStore';
 
 class FakeDb {
   private store: Map<string, string> = new Map();
-  private mappings: Map<string, {
-    im_conversation_id: string;
-    platform: string;
-    cowork_session_id: string;
-    agent_id: string;
-    openclaw_session_key: string | null;
-    created_at: number;
-    last_active_at: number;
-  }> = new Map();
+  private mappings: Map<
+    string,
+    {
+      im_conversation_id: string;
+      platform: string;
+      cowork_session_id: string;
+      agent_id: string;
+      openclaw_session_key: string | null;
+      created_at: number;
+      last_active_at: number;
+    }
+  > = new Map();
   private deletedPlatforms: string[] = [];
   writeCount = 0;
 
@@ -184,8 +187,9 @@ test('IMStore persists OpenClaw session keys in IM session mappings', () => {
     agentId: 'main',
     openClawSessionKey: 'agent:main:openclaw-weixin:bot-1:direct:user-1',
   });
-  expect(store.getSessionMappingByCoworkSessionId('cowork-1')?.openClawSessionKey)
-    .toBe('agent:main:openclaw-weixin:bot-1:direct:user-1');
+  expect(store.getSessionMappingByCoworkSessionId('cowork-1')?.openClawSessionKey).toBe(
+    'agent:main:openclaw-weixin:bot-1:direct:user-1',
+  );
 
   store.updateSessionOpenClawSessionKey(
     'bot-1:direct:user-1',
@@ -193,8 +197,9 @@ test('IMStore persists OpenClaw session keys in IM session mappings', () => {
     'agent:main:openclaw-weixin:bot-1:direct:user-2',
   );
 
-  expect(store.getSessionMapping('bot-1:direct:user-1', 'weixin')?.openClawSessionKey)
-    .toBe('agent:main:openclaw-weixin:bot-1:direct:user-2');
+  expect(store.getSessionMapping('bot-1:direct:user-1', 'weixin')?.openClawSessionKey).toBe(
+    'agent:main:openclaw-weixin:bot-1:direct:user-2',
+  );
 
   store.updateSessionMappingTarget(
     'bot-1:direct:user-1',
@@ -210,4 +215,3 @@ test('IMStore persists OpenClaw session keys in IM session mappings', () => {
     openClawSessionKey: 'agent:agent-2:openclaw-weixin:bot-1:direct:user-1',
   });
 });
-

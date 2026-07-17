@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import DOMPurify from 'dompurify';
-import React, { useCallback,useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { Artifact } from '@/types/artifact';
 

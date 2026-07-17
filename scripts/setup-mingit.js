@@ -5,8 +5,8 @@
  * Features:
  * - Cross-platform execution (macOS/Linux can prepare assets for Windows packaging)
  * - Optional strict mode: --required (fail build if not prepared)
- * - Offline archive support via LOBSTERAI_PORTABLE_GIT_ARCHIVE
- * - Mirror URL override via LOBSTERAI_PORTABLE_GIT_URL
+ * - Offline archive support via ZHIYUAN_PORTABLE_GIT_ARCHIVE
+ * - Mirror URL override via ZHIYUAN_PORTABLE_GIT_URL
  * - Unified extraction via 7zip-bin (path7za)
  */
 
@@ -20,16 +20,12 @@ const { pipeline } = require('stream/promises');
 
 const GIT_VERSION = '2.47.1';
 const PORTABLE_GIT_FILE = `PortableGit-${GIT_VERSION}-64-bit.7z.exe`;
-const DEFAULT_PORTABLE_GIT_URL =
-  `https://github.com/git-for-windows/git/releases/download/v${GIT_VERSION}.windows.1/${PORTABLE_GIT_FILE}`;
+const DEFAULT_PORTABLE_GIT_URL = `https://github.com/git-for-windows/git/releases/download/v${GIT_VERSION}.windows.1/${PORTABLE_GIT_FILE}`;
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'mingit');
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', PORTABLE_GIT_FILE);
-const RUNTIME_DIRS = [
-  path.join('dev', 'shm'),
-  path.join('dev', 'mqueue'),
-];
+const RUNTIME_DIRS = [path.join('dev', 'shm'), path.join('dev', 'mqueue')];
 
 const DIRS_TO_PRUNE = [
   'doc',
@@ -90,8 +86,8 @@ function resolve7zaPath() {
     ({ path7za } = require('7zip-bin'));
   } catch (error) {
     throw new Error(
-      'Missing dependency "7zip-bin". Run npm install and retry. '
-      + `Original error: ${error instanceof Error ? error.message : String(error)}`
+      'Missing dependency "7zip-bin". Run npm install and retry. ' +
+        `Original error: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -154,7 +150,9 @@ function pruneUnneededFiles() {
       fs.rmSync(fullPath, { recursive: true, force: true });
       prunedCount++;
     } catch (error) {
-      console.warn(`[setup-mingit] Warning: Could not remove ${relPath}: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(
+        `[setup-mingit] Warning: Could not remove ${relPath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
   console.log(`[setup-mingit] Pruned ${prunedCount} entries.`);
@@ -202,14 +200,14 @@ function ensurePortableGitRuntimeDirs(required) {
 }
 
 async function resolveArchive(required) {
-  const envArchive = resolveInputPath(process.env.LOBSTERAI_PORTABLE_GIT_ARCHIVE);
+  const envArchive = resolveInputPath(process.env.ZHIYUAN_PORTABLE_GIT_ARCHIVE);
   if (envArchive) {
     if (!isNonEmptyFile(envArchive)) {
-      throw new Error(
-        `LOBSTERAI_PORTABLE_GIT_ARCHIVE points to an invalid file: ${envArchive}`
-      );
+      throw new Error(`ZHIYUAN_PORTABLE_GIT_ARCHIVE points to an invalid file: ${envArchive}`);
     }
-    console.log(`[setup-mingit] Using local archive from LOBSTERAI_PORTABLE_GIT_ARCHIVE: ${envArchive}`);
+    console.log(
+      `[setup-mingit] Using local archive from ZHIYUAN_PORTABLE_GIT_ARCHIVE: ${envArchive}`,
+    );
     return { archivePath: envArchive, source: 'env-archive' };
   }
 
@@ -218,9 +216,10 @@ async function resolveArchive(required) {
     return { archivePath: DEFAULT_ARCHIVE_PATH, source: 'cache' };
   }
 
-  const urlFromEnv = typeof process.env.LOBSTERAI_PORTABLE_GIT_URL === 'string'
-    ? process.env.LOBSTERAI_PORTABLE_GIT_URL.trim()
-    : '';
+  const urlFromEnv =
+    typeof process.env.ZHIYUAN_PORTABLE_GIT_URL === 'string'
+      ? process.env.ZHIYUAN_PORTABLE_GIT_URL.trim()
+      : '';
   const downloadUrl = urlFromEnv || DEFAULT_PORTABLE_GIT_URL;
 
   try {
@@ -232,16 +231,16 @@ async function resolveArchive(required) {
   } catch (error) {
     if (required) {
       throw new Error(
-        'Unable to obtain PortableGit archive. '
-        + 'Set LOBSTERAI_PORTABLE_GIT_ARCHIVE to a local offline package or '
-        + 'set LOBSTERAI_PORTABLE_GIT_URL to a reachable mirror. '
-        + `Original error: ${error instanceof Error ? error.message : String(error)}`
+        'Unable to obtain PortableGit archive. ' +
+          'Set ZHIYUAN_PORTABLE_GIT_ARCHIVE to a local offline package or ' +
+          'set ZHIYUAN_PORTABLE_GIT_URL to a reachable mirror. ' +
+          `Original error: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
     console.warn(
-      '[setup-mingit] PortableGit archive is not available; skip because --required is not set. '
-      + `Reason: ${error instanceof Error ? error.message : String(error)}`
+      '[setup-mingit] PortableGit archive is not available; skip because --required is not set. ' +
+        `Reason: ${error instanceof Error ? error.message : String(error)}`,
     );
     return null;
   }
@@ -249,10 +248,13 @@ async function resolveArchive(required) {
 
 async function ensurePortableGit(options = {}) {
   const required = Boolean(options.required);
-  const shouldRun = process.platform === 'win32' || required || process.env.LOBSTERAI_SETUP_MINGIT_FORCE === '1';
+  const shouldRun =
+    process.platform === 'win32' || required || process.env.ZHIYUAN_SETUP_MINGIT_FORCE === '1';
 
   if (!shouldRun) {
-    console.log('[setup-mingit] Skip on non-Windows host (pass --required to force cross-platform preparation).');
+    console.log(
+      '[setup-mingit] Skip on non-Windows host (pass --required to force cross-platform preparation).',
+    );
     return { ok: true, skipped: true, bashPath: null };
   }
 
@@ -272,8 +274,8 @@ async function ensurePortableGit(options = {}) {
   const resolvedBash = findPortableGitBash();
   if (!resolvedBash) {
     throw new Error(
-      'PortableGit extraction finished but bash.exe is missing. '
-      + `Checked: ${path.join(OUTPUT_DIR, 'bin', 'bash.exe')} and ${path.join(OUTPUT_DIR, 'usr', 'bin', 'bash.exe')}`
+      'PortableGit extraction finished but bash.exe is missing. ' +
+        `Checked: ${path.join(OUTPUT_DIR, 'bin', 'bash.exe')} and ${path.join(OUTPUT_DIR, 'usr', 'bin', 'bash.exe')}`,
     );
   }
 
@@ -293,7 +295,7 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
+  main().catch(error => {
     console.error('[setup-mingit] ERROR:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   });

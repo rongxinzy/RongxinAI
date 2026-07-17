@@ -235,7 +235,7 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(config.agents.defaults.cwd).toBe(path.resolve(tmpDir));
   });
 
-  test('merges all server models into existing lobsterai provider and updates image input', async () => {
+  test('merges all server models into existing zhiyuan provider and updates image input', async () => {
     mockRuntimeState.proxyPort = 56646;
     mockRuntimeState.serverModels = [
       { modelId: 'qwen3.5-plus', supportsImage: true },
@@ -244,13 +244,13 @@ describe('OpenClawConfigSync runtime config output', () => {
     ];
     mockRuntimeState.rawApiConfig = {
       config: {
-        baseURL: 'https://api.lobsterai.local/proxy/v1',
+        baseURL: 'https://api.zhiyuan.local/proxy/v1',
         apiKey: 'access-token',
         model: 'qwen3.5-plus',
         apiType: 'openai',
       },
       providerMetadata: {
-        providerName: 'lobsterai-server',
+        providerName: 'zhiyuan-server',
         codingPlanEnabled: false,
         supportsImage: false,
         modelName: 'Qwen3.5 Plus',
@@ -298,39 +298,47 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(result.ok).toBe(true);
 
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    const provider = config.models.providers['lobsterai-server'];
+    const provider = config.models.providers['zhiyuan-server'];
     expect(provider.baseUrl).toBe('http://127.0.0.1:56646/v1');
-    expect(provider.models).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        id: 'qwen3.5-plus',
-        input: ['text', 'image'],
-      }),
-      expect.objectContaining({
-        id: 'qwen3.6-plus',
-        input: ['text', 'image'],
-      }),
-      expect.objectContaining({
-        id: 'deepseek-v3.2',
-        input: ['text'],
-      }),
-    ]));
+    expect(provider.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'qwen3.5-plus',
+          input: ['text', 'image'],
+        }),
+        expect.objectContaining({
+          id: 'qwen3.6-plus',
+          input: ['text', 'image'],
+        }),
+        expect.objectContaining({
+          id: 'deepseek-v3.2',
+          input: ['text'],
+        }),
+      ]),
+    );
     expect(provider.models).toHaveLength(3);
   });
 
   test('clears stale plugins.load.paths when current third-party extensions dir is unavailable', async () => {
     fs.writeFileSync(
       configPath,
-      JSON.stringify({
-        plugins: {
-          load: {
-            paths: ['/Users/whz/Desktop/rongx/LobsterAI/vendor/openclaw-runtime/linux-x64/third-party-extensions'],
-            watch: true,
-          },
-          entries: {
-            'mcp-bridge': { enabled: true },
+      JSON.stringify(
+        {
+          plugins: {
+            load: {
+              paths: [
+                '/Users/whz/Desktop/rongx/ZhiYuanAgent/vendor/openclaw-runtime/linux-x64/third-party-extensions',
+              ],
+              watch: true,
+            },
+            entries: {
+              'mcp-bridge': { enabled: true },
+            },
           },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     );
 
     const { OpenClawConfigSync } = await import('./openclawConfigSync');
@@ -379,7 +387,8 @@ describe('OpenClawConfigSync runtime config output', () => {
   });
 
   test('maps OpenAI OAuth mode to the OpenAI Codex provider', async () => {
-    const { AuthType, OpenClawApi, OpenClawProviderId, ProviderName } = await import('../../shared/providers');
+    const { AuthType, OpenClawApi, OpenClawProviderId, ProviderName } =
+      await import('../../shared/providers');
     const { buildProviderSelection } = await import('./openclawConfigSync');
 
     const selection = buildProviderSelection({
@@ -477,20 +486,22 @@ describe('OpenClawConfigSync runtime config output', () => {
         callbackUrl: 'http://127.0.0.1:12345/mcp',
         askUserCallbackUrl: 'http://127.0.0.1:12345/ask',
         secret: 'test-secret',
-        tools: [{
-          server: 'github',
-          name: 'create_issue',
-          description: 'Create an issue',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              attachments: {
-                type: 'array',
-                description: 'Optional issue attachments',
+        tools: [
+          {
+            server: 'github',
+            name: 'create_issue',
+            description: 'Create an issue',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                attachments: {
+                  type: 'array',
+                  description: 'Optional issue attachments',
+                },
               },
             },
           },
-        }],
+        ],
       }),
     });
 
@@ -525,26 +536,28 @@ describe('OpenClawConfigSync runtime config output', () => {
         skipMissedJobs: false,
       }),
       isEnterprise: () => false,
-      getTelegramInstances: () => [{
-        enabled: true,
-        botToken: 'tg-token',
-        instanceId: 'tg-inst-001',
-        instanceName: 'Test Telegram',
-        dmPolicy: 'open',
-        allowFrom: ['*'],
-        groupPolicy: 'allowlist',
-        groupAllowFrom: [],
-        groups: { '*': { requireMention: true } },
-        historyLimit: 50,
-        replyToMode: 'off',
-        linkPreview: true,
-        streaming: 'off',
-        mediaMaxMb: 5,
-        proxy: '',
-        webhookUrl: '',
-        webhookSecret: '',
-        debug: false,
-      }],
+      getTelegramInstances: () => [
+        {
+          enabled: true,
+          botToken: 'tg-token',
+          instanceId: 'tg-inst-001',
+          instanceName: 'Test Telegram',
+          dmPolicy: 'open',
+          allowFrom: ['*'],
+          groupPolicy: 'allowlist',
+          groupAllowFrom: [],
+          groups: { '*': { requireMention: true } },
+          historyLimit: 50,
+          replyToMode: 'off',
+          linkPreview: true,
+          streaming: 'off',
+          mediaMaxMb: 5,
+          proxy: '',
+          webhookUrl: '',
+          webhookSecret: '',
+          debug: false,
+        },
+      ],
       getDiscordOpenClawConfig: () => null,
       getDingTalkInstances: () => [],
       getFeishuInstances: () => [],
@@ -593,22 +606,24 @@ describe('OpenClawConfigSync runtime config output', () => {
       isEnterprise: () => false,
       getTelegramOpenClawConfig: () => null,
       getDiscordOpenClawConfig: () => null,
-      getDingTalkInstances: () => [{
-        enabled: true,
-        clientId: 'ding-client-id',
-        clientSecret: 'ding-secret',
-        dmPolicy: 'open',
-        allowFrom: ['*'],
-        groupPolicy: 'open',
-        sessionTimeout: 0,
-        separateSessionByConversation: false,
-        groupSessionScope: 'group',
-        sharedMemoryAcrossConversations: false,
-        gatewayBaseUrl: '',
-        debug: false,
-        instanceId: 'b8a32c47-c852-4ad2-bbfa-631797fc56ea',
-        instanceName: 'DingTalk Bot 1',
-      }],
+      getDingTalkInstances: () => [
+        {
+          enabled: true,
+          clientId: 'ding-client-id',
+          clientSecret: 'ding-secret',
+          dmPolicy: 'open',
+          allowFrom: ['*'],
+          groupPolicy: 'open',
+          sessionTimeout: 0,
+          separateSessionByConversation: false,
+          groupSessionScope: 'group',
+          sharedMemoryAcrossConversations: false,
+          gatewayBaseUrl: '',
+          debug: false,
+          instanceId: 'b8a32c47-c852-4ad2-bbfa-631797fc56ea',
+          instanceName: 'DingTalk Bot 1',
+        },
+      ],
       getFeishuInstances: () => [],
       getQQInstances: () => [],
       getWecomConfig: () => null,
@@ -617,14 +632,16 @@ describe('OpenClawConfigSync runtime config output', () => {
       getNeteaseBeeChanConfig: () => null,
       getWeixinConfig: () => null,
       getSkillsList: () => [],
-      getAgents: () => [{
-        id: 'worker-agent',
-        enabled: true,
-        name: 'Worker Agent',
-        prompt: '',
-        model: 'openai/gpt-test',
-        source: 'user',
-      }],
+      getAgents: () => [
+        {
+          id: 'worker-agent',
+          enabled: true,
+          name: 'Worker Agent',
+          prompt: '',
+          model: 'openai/gpt-test',
+          source: 'user',
+        },
+      ],
     };
 
     let currentBindings: Record<string, string> = {};
@@ -653,15 +670,22 @@ describe('OpenClawConfigSync runtime config output', () => {
   test('prefers external lark for feishu without stale feishu entry and keeps bundled qqbot entry', async () => {
     const { OpenClawConfigSync } = await import('./openclawConfigSync');
 
-    fs.writeFileSync(configPath, JSON.stringify({
-      plugins: {
-        entries: {
-          feishu: { enabled: false },
-          'openclaw-qqbot': { enabled: false },
-          qqbot: { enabled: false },
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          plugins: {
+            entries: {
+              feishu: { enabled: false },
+              'openclaw-qqbot': { enabled: false },
+              qqbot: { enabled: false },
+            },
+          },
         },
-      },
-    }, null, 2));
+        null,
+        2,
+      ),
+    );
 
     const sync = new OpenClawConfigSync({
       engineManager: {
@@ -686,34 +710,38 @@ describe('OpenClawConfigSync runtime config output', () => {
       getTelegramOpenClawConfig: () => null,
       getDiscordOpenClawConfig: () => null,
       getDingTalkInstances: () => [],
-      getFeishuInstances: () => [{
-        enabled: true,
-        appId: 'cli_feishu_app',
-        appSecret: 'secret',
-        instanceId: 'feishu-instance-1',
-        instanceName: 'Feishu Bot 1',
-        domain: 'feishu',
-        dmPolicy: 'open',
-        allowFrom: ['*'],
-        groupPolicy: 'allowlist',
-        groupAllowFrom: [],
-        groups: { '*': { requireMention: true } },
-        historyLimit: 50,
-        streaming: true,
-        replyMode: 'auto',
-        blockStreaming: false,
-        mediaMaxMb: 30,
-      }],
-      getQQInstances: () => [{
-        enabled: true,
-        appId: 'qq-app-id',
-        clientSecret: 'qq-secret',
-        instanceId: 'qq-instance-1',
-        instanceName: 'QQ Bot 1',
-        allowFrom: ['*'],
-        dmPolicy: 'open',
-        markdownSupport: true,
-      }],
+      getFeishuInstances: () => [
+        {
+          enabled: true,
+          appId: 'cli_feishu_app',
+          appSecret: 'secret',
+          instanceId: 'feishu-instance-1',
+          instanceName: 'Feishu Bot 1',
+          domain: 'feishu',
+          dmPolicy: 'open',
+          allowFrom: ['*'],
+          groupPolicy: 'allowlist',
+          groupAllowFrom: [],
+          groups: { '*': { requireMention: true } },
+          historyLimit: 50,
+          streaming: true,
+          replyMode: 'auto',
+          blockStreaming: false,
+          mediaMaxMb: 30,
+        },
+      ],
+      getQQInstances: () => [
+        {
+          enabled: true,
+          appId: 'qq-app-id',
+          clientSecret: 'qq-secret',
+          instanceId: 'qq-instance-1',
+          instanceName: 'QQ Bot 1',
+          allowFrom: ['*'],
+          dmPolicy: 'open',
+          markdownSupport: true,
+        },
+      ],
       getWecomConfig: () => null,
       getWecomInstances: () => [],
       getPopoInstances: () => [],
@@ -737,14 +765,21 @@ describe('OpenClawConfigSync runtime config output', () => {
   test('writes plugin entries using manifest ids and removes removed NIM channel entries', async () => {
     const { OpenClawConfigSync } = await import('./openclawConfigSync');
 
-    fs.writeFileSync(configPath, JSON.stringify({
-      plugins: {
-        entries: {
-          'openclaw-nim-channel': { enabled: true },
-          'nimsuite-openclaw-nim-channel': { enabled: true },
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          plugins: {
+            entries: {
+              'openclaw-nim-channel': { enabled: true },
+              'nimsuite-openclaw-nim-channel': { enabled: true },
+            },
+          },
         },
-      },
-    }, null, 2));
+        null,
+        2,
+      ),
+    );
 
     const sync = new OpenClawConfigSync({
       engineManager: {

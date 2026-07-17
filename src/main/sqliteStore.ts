@@ -6,7 +6,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { AgentId, DefaultAgentAvatarIcon, DefaultAgentProfile, LegacyAgentName, normalizeAgentAvatarIcon } from '../shared/agent';
+import {
+  AgentId,
+  DefaultAgentAvatarIcon,
+  DefaultAgentProfile,
+  LegacyAgentName,
+  normalizeAgentAvatarIcon,
+} from '../shared/agent';
 import { DB_FILENAME } from './appConstants';
 import {
   openSqliteDatabaseWithRecovery,
@@ -54,7 +60,9 @@ export class SqliteStore {
         }
         const restoreResult = backupManager.restoreLatestBackup(dbPath);
         if (!restoreResult.restored) {
-          console.warn('[SqliteBackup] No valid snapshot was restored; continuing with database reinitialization');
+          console.warn(
+            '[SqliteBackup] No valid snapshot was restored; continuing with database reinitialization',
+          );
         }
         db = openSqliteDatabaseWithRecovery(basePath, dbPath);
       }
@@ -234,7 +242,7 @@ export class SqliteStore {
     try {
       // Check if execution_mode column exists
       const columns = this.db.pragma('table_info(cowork_sessions)') as Array<{ name: string }>;
-      const colNames = columns.map((c) => c.name);
+      const colNames = columns.map(c => c.name);
 
       if (!colNames.includes('execution_mode')) {
         this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN execution_mode TEXT;');
@@ -257,7 +265,9 @@ export class SqliteStore {
       }
 
       if (!colNames.includes('model_override')) {
-        this.db.exec("ALTER TABLE cowork_sessions ADD COLUMN model_override TEXT NOT NULL DEFAULT '';");
+        this.db.exec(
+          "ALTER TABLE cowork_sessions ADD COLUMN model_override TEXT NOT NULL DEFAULT '';",
+        );
         this.didRunMigration = true;
       }
 
@@ -287,12 +297,18 @@ export class SqliteStore {
     }
 
     try {
-      const pinnedResult = this.db.prepare('UPDATE cowork_sessions SET pinned = 0 WHERE pinned IS NULL;').run();
+      const pinnedResult = this.db
+        .prepare('UPDATE cowork_sessions SET pinned = 0 WHERE pinned IS NULL;')
+        .run();
       const pinOrderResult = this.db
-        .prepare('UPDATE cowork_sessions SET pin_order = updated_at WHERE pinned = 1 AND pin_order IS NULL;')
+        .prepare(
+          'UPDATE cowork_sessions SET pin_order = updated_at WHERE pinned = 1 AND pin_order IS NULL;',
+        )
         .run();
       const unpinnedResult = this.db
-        .prepare('UPDATE cowork_sessions SET pin_order = NULL WHERE pinned = 0 AND pin_order IS NOT NULL;')
+        .prepare(
+          'UPDATE cowork_sessions SET pin_order = NULL WHERE pinned = 0 AND pin_order IS NOT NULL;',
+        )
         .run();
       if (pinnedResult.changes > 0 || pinOrderResult.changes > 0 || unpinnedResult.changes > 0) {
         this.didRunMigration = true;
@@ -312,9 +328,7 @@ export class SqliteStore {
         this.didRunMigration = true;
       }
       if (!sessionColNames.includes('mode')) {
-        this.db.exec(
-          "ALTER TABLE cowork_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'work';",
-        );
+        this.db.exec("ALTER TABLE cowork_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'work';");
         this.didRunMigration = true;
       }
       if (!sessionColNames.includes('workspace_id')) {
@@ -322,9 +336,11 @@ export class SqliteStore {
         this.didRunMigration = true;
       }
 
-      const fallbackWorkspacePath = path.join(os.homedir(), 'rongxinai', 'project');
+      const fallbackWorkspacePath = path.join(os.homedir(), 'zhiyuan', 'project');
       const legacySessions = this.db
-        .prepare('SELECT id, cwd FROM cowork_sessions WHERE workspace_id IS NULL OR TRIM(workspace_id) = \'\'')
+        .prepare(
+          "SELECT id, cwd FROM cowork_sessions WHERE workspace_id IS NULL OR TRIM(workspace_id) = ''",
+        )
         .all() as Array<{ id: string; cwd: string }>;
       const insertWorkspace = this.db.prepare(
         `INSERT INTO workspaces (id, name, path, created_at, updated_at)
@@ -337,9 +353,17 @@ export class SqliteStore {
       const now = Date.now();
       const migrateWorkspaces = this.db.transaction(() => {
         for (const session of legacySessions) {
-          const workspacePath = normalizeWorkspacePath(session.cwd?.trim() || fallbackWorkspacePath);
+          const workspacePath = normalizeWorkspacePath(
+            session.cwd?.trim() || fallbackWorkspacePath,
+          );
           const workspaceId = workspaceIdForPath(workspacePath);
-          insertWorkspace.run(workspaceId, workspaceNameForPath(workspacePath), workspacePath, now, now);
+          insertWorkspace.run(
+            workspaceId,
+            workspaceNameForPath(workspacePath),
+            workspacePath,
+            now,
+            now,
+          );
           updateSessionWorkspace.run(workspaceId, session.id);
         }
       });
@@ -350,7 +374,9 @@ export class SqliteStore {
     }
 
     // Create the index only after legacy databases have received workspace_id.
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);');
+    this.db.exec(
+      'CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);',
+    );
 
     // Migration: Add working_directory column to agents
     try {
@@ -369,7 +395,7 @@ export class SqliteStore {
         this.didRunMigration = true;
       }
       if (!agentColNames.includes('triage_override')) {
-        this.db.exec("ALTER TABLE agents ADD COLUMN triage_override TEXT;");
+        this.db.exec('ALTER TABLE agents ADD COLUMN triage_override TEXT;');
         this.didRunMigration = true;
       }
     } catch {
@@ -377,14 +403,20 @@ export class SqliteStore {
     }
 
     try {
-      const pinnedAgentResult = this.db.prepare('UPDATE agents SET pinned = 0 WHERE pinned IS NULL;').run();
+      const pinnedAgentResult = this.db
+        .prepare('UPDATE agents SET pinned = 0 WHERE pinned IS NULL;')
+        .run();
       const pinOrderAgentResult = this.db
         .prepare('UPDATE agents SET pin_order = updated_at WHERE pinned = 1 AND pin_order IS NULL;')
         .run();
       const unpinnedAgentResult = this.db
         .prepare('UPDATE agents SET pin_order = NULL WHERE pinned = 0 AND pin_order IS NOT NULL;')
         .run();
-      if (pinnedAgentResult.changes > 0 || pinOrderAgentResult.changes > 0 || unpinnedAgentResult.changes > 0) {
+      if (
+        pinnedAgentResult.changes > 0 ||
+        pinOrderAgentResult.changes > 0 ||
+        unpinnedAgentResult.changes > 0
+      ) {
         this.didRunMigration = true;
       }
     } catch {
@@ -417,10 +449,18 @@ export class SqliteStore {
           VALUES (?, ?, '', ?, '', '', ?, '[]', 1, 1, 'custom', '', ?, ?)
         `,
           )
-          .run(AgentId.Main, DefaultAgentProfile.Name, existingSystemPrompt, DefaultAgentAvatarIcon, now, now);
+          .run(
+            AgentId.Main,
+            DefaultAgentProfile.Name,
+            existingSystemPrompt,
+            DefaultAgentAvatarIcon,
+            now,
+            now,
+          );
       } else {
         const normalizedName = mainAgent.name.trim();
-        const shouldUpgradeName = !normalizedName || normalizedName.toLowerCase() === LegacyAgentName.Main;
+        const shouldUpgradeName =
+          !normalizedName || normalizedName.toLowerCase() === LegacyAgentName.Main;
         if (shouldUpgradeName) {
           this.db
             .prepare('UPDATE agents SET name = ?, updated_at = ? WHERE id = ?')
@@ -434,16 +474,19 @@ export class SqliteStore {
 
     // Migration: Replace legacy text/emoji/designed agent icons with the latest SVG avatar format.
     try {
-      const rows = this.db
-        .prepare('SELECT id, icon FROM agents')
-        .all() as Array<{ id: string; icon: string }>;
+      const rows = this.db.prepare('SELECT id, icon FROM agents').all() as Array<{
+        id: string;
+        icon: string;
+      }>;
       const updates = rows
-        .map((row) => ({ id: row.id, icon: normalizeAgentAvatarIcon(row.icon) }))
+        .map(row => ({ id: row.id, icon: normalizeAgentAvatarIcon(row.icon) }))
         .filter((row, index) => row.icon !== rows[index].icon);
 
       if (updates.length > 0) {
         const now = Date.now();
-        const updateIcon = this.db.prepare('UPDATE agents SET icon = ?, updated_at = ? WHERE id = ?');
+        const updateIcon = this.db.prepare(
+          'UPDATE agents SET icon = ?, updated_at = ? WHERE id = ?',
+        );
         const migrateIcons = this.db.transaction((agents: Array<{ id: string; icon: string }>) => {
           for (const agent of agents) {
             updateIcon.run(agent.icon, now, agent.id);

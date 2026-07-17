@@ -3,49 +3,13 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
 const { IMStore } = require('../dist-electron/main/im/imStore.js');
 
-class FakeDb {
-  constructor() {
-    this.imConfig = new Map();
-  }
-
-  run(sql, params = []) {
-    if (sql.includes('INSERT INTO im_config')) {
-      this.imConfig.set(String(params[0]), String(params[1]));
-      return;
-    }
-
-    if (sql.includes('INSERT OR REPLACE INTO im_config')) {
-      this.imConfig.set(String(params[0]), String(params[1]));
-      return;
-    }
-
-    if (sql.includes('DELETE FROM im_config WHERE key = ?')) {
-      this.imConfig.delete(String(params[0]));
-      return;
-    }
-
-    if (sql.includes('DELETE FROM im_config')) {
-      this.imConfig.clear();
-    }
-  }
-
-  exec(sql, params = []) {
-    if (sql.includes('SELECT value FROM im_config WHERE key = ?')) {
-      const value = this.imConfig.get(String(params[0]));
-      return value === undefined ? [] : [{ values: [[value]] }];
-    }
-    return [];
-  }
-}
-
-test('IMStore persists conversation reply routes by platform and conversation ID', () => {
-  const db = new FakeDb();
-  let saveCount = 0;
-  const store = new IMStore(db, () => {
-    saveCount += 1;
-  });
+test('IMStore persists conversation reply routes by platform and conversation ID', t => {
+  const db = new Database(':memory:');
+  t.after(() => db.close());
+  const store = new IMStore(db);
 
   assert.equal(store.getConversationReplyRoute('dingtalk', '__default__:conv-1'), null);
 
@@ -61,5 +25,4 @@ test('IMStore persists conversation reply routes by platform and conversation ID
     accountId: '__default__',
   });
   assert.equal(store.getConversationReplyRoute('telegram', '__default__:conv-1'), null);
-  assert.ok(saveCount >= 2);
 });

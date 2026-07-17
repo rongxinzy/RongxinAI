@@ -47,9 +47,10 @@ const listExtensionManifests = (
   }
 
   try {
-    return fs.readdirSync(extensionsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => readExtensionManifest(extensionsDir, entry.name, source))
+    return fs
+      .readdirSync(extensionsDir, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => readExtensionManifest(extensionsDir, entry.name, source))
       .filter((entry): entry is OpenClawExtensionManifest => entry !== null);
   } catch {
     return [];
@@ -83,8 +84,20 @@ const findBundledExtensionsDir = (): string | null => {
   const candidates = app.isPackaged
     ? [path.join(process.resourcesPath, 'cfmind', THIRD_PARTY_EXTENSIONS_DIR)]
     : [
-        path.join(app.getAppPath(), 'vendor', 'openclaw-runtime', 'current', THIRD_PARTY_EXTENSIONS_DIR),
-        path.join(process.cwd(), 'vendor', 'openclaw-runtime', 'current', THIRD_PARTY_EXTENSIONS_DIR),
+        path.join(
+          app.getAppPath(),
+          'vendor',
+          'openclaw-runtime',
+          'current',
+          THIRD_PARTY_EXTENSIONS_DIR,
+        ),
+        path.join(
+          process.cwd(),
+          'vendor',
+          'openclaw-runtime',
+          'current',
+          THIRD_PARTY_EXTENSIONS_DIR,
+        ),
       ];
 
   for (const candidate of candidates) {
@@ -122,11 +135,10 @@ export const syncLocalOpenClawExtensionsIntoRuntime = (
     if (!entry.isDirectory()) {
       continue;
     }
-    fs.cpSync(
-      path.join(sourceDir, entry.name),
-      path.join(targetExtensionsDir, entry.name),
-      { recursive: true, force: true },
-    );
+    fs.cpSync(path.join(sourceDir, entry.name), path.join(targetExtensionsDir, entry.name), {
+      recursive: true,
+      force: true,
+    });
     copied.push(entry.name);
   }
 
@@ -140,18 +152,18 @@ export const listLocalOpenClawExtensionIds = (): string[] => {
   }
 
   try {
-    return fs.readdirSync(sourceDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .filter((entry) => fs.existsSync(path.join(sourceDir, entry.name, 'openclaw.plugin.json')))
-      .map((entry) => entry.name);
+    return fs
+      .readdirSync(sourceDir, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .filter(entry => fs.existsSync(path.join(sourceDir, entry.name, 'openclaw.plugin.json')))
+      .map(entry => entry.name);
   } catch {
     return [];
   }
 };
 
-export const listLocalOpenClawExtensionManifests = (): OpenClawExtensionManifest[] => (
-  listExtensionManifests(findLocalExtensionsSourceDir(), 'local')
-);
+export const listLocalOpenClawExtensionManifests = (): OpenClawExtensionManifest[] =>
+  listExtensionManifests(findLocalExtensionsSourceDir(), 'local');
 
 export const listBundledOpenClawExtensionIds = (): string[] => {
   const extensionsDir = findBundledExtensionsDir();
@@ -160,18 +172,18 @@ export const listBundledOpenClawExtensionIds = (): string[] => {
   }
 
   try {
-    return fs.readdirSync(extensionsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .filter((entry) => fs.existsSync(path.join(extensionsDir, entry.name, 'openclaw.plugin.json')))
-      .map((entry) => entry.name);
+    return fs
+      .readdirSync(extensionsDir, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .filter(entry => fs.existsSync(path.join(extensionsDir, entry.name, 'openclaw.plugin.json')))
+      .map(entry => entry.name);
   } catch {
     return [];
   }
 };
 
-export const listBundledOpenClawExtensionManifests = (): OpenClawExtensionManifest[] => (
-  listExtensionManifests(findBundledExtensionsDir(), 'bundled')
-);
+export const listBundledOpenClawExtensionManifests = (): OpenClawExtensionManifest[] =>
+  listExtensionManifests(findBundledExtensionsDir(), 'bundled');
 
 export const listAvailableOpenClawExtensionManifests = (): OpenClawExtensionManifest[] => [
   ...listBundledOpenClawExtensionManifests(),
@@ -184,8 +196,9 @@ export const resolveOpenClawExtensionPluginId = (extensionId: string): string | 
     return null;
   }
 
-  const manifest = listAvailableOpenClawExtensionManifests()
-    .find((entry) => entry.directoryId === normalized || entry.pluginId === normalized);
+  const manifest = listAvailableOpenClawExtensionManifests().find(
+    entry => entry.directoryId === normalized || entry.pluginId === normalized,
+  );
   return manifest?.pluginId ?? null;
 };
 
@@ -218,7 +231,7 @@ export const findThirdPartyExtensionsDir = (): string | null => {
  * gateway's bundled-channel metadata loader.  Two locations are cleaned:
  *
  * 1. `dist/extensions/{id}` — legacy overlay installs placed plugins here.
- * 2. `extensions/{id}` — prior versions of LobsterAI installed plugins here.
+ * 2. `extensions/{id}` — prior versions of ZhiYuanAgent installed plugins here.
  *    Because gateway-bundle.mjs runs from the package root (not dist/),
  *    `RUNNING_FROM_BUILT_ARTIFACT` is false and `resolveBundledPluginScanDir`
  *    falls back to `extensions/`.  Third-party plugins there fail the

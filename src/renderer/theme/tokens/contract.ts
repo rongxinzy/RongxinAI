@@ -1,75 +1,75 @@
 /**
  * Token Contract — defines all semantic variables a theme must provide.
  *
- * Naming: --lobster-{category}-{name}
+ * Naming: --zy-{category}-{name}
  * Convention: shadcn/ui background/foreground pairing + Radix 12-step gray scale
  *
  * Every theme (ThemeDefinition.tokens) must supply a value for each key.
  */
 export const TOKEN_CONTRACT = {
   // ── Brand ──
-  'primary':            '--lobster-primary',
-  'primary-foreground': '--lobster-primary-foreground',
-  'primary-hover':      '--lobster-primary-hover',
-  'primary-muted':      '--lobster-primary-muted',
+  primary: '--zy-primary',
+  'primary-foreground': '--zy-primary-foreground',
+  'primary-hover': '--zy-primary-hover',
+  'primary-muted': '--zy-primary-muted',
 
   // ── Accent ──
-  'accent':             '--lobster-accent',
-  'accent-foreground':  '--lobster-accent-foreground',
+  accent: '--zy-accent',
+  'accent-foreground': '--zy-accent-foreground',
 
   // ── Surface / Background ──
-  'background':         '--lobster-background',
-  'foreground':         '--lobster-foreground',
-  'surface':            '--lobster-surface',
-  'surface-foreground': '--lobster-surface-foreground',
-  'surface-raised':     '--lobster-surface-raised',
-  'surface-overlay':    '--lobster-surface-overlay',
+  background: '--zy-background',
+  foreground: '--zy-foreground',
+  surface: '--zy-surface',
+  'surface-foreground': '--zy-surface-foreground',
+  'surface-raised': '--zy-surface-raised',
+  'surface-overlay': '--zy-surface-overlay',
 
   // ── Chat bubbles ──
-  'chat-user':              '--lobster-chat-user',
-  'chat-user-foreground':   '--lobster-chat-user-foreground',
-  'chat-bot':               '--lobster-chat-bot',
-  'chat-bot-foreground':    '--lobster-chat-bot-foreground',
+  'chat-user': '--zy-chat-user',
+  'chat-user-foreground': '--zy-chat-user-foreground',
+  'chat-bot': '--zy-chat-bot',
+  'chat-bot-foreground': '--zy-chat-bot-foreground',
 
   // ── Text hierarchy ──
-  'text-primary':       '--lobster-text-primary',
-  'text-muted-foreground':     '--lobster-text-secondary',
-  'text-muted':         '--lobster-text-muted',
+  'text-primary': '--zy-text-primary',
+  'text-muted-foreground': '--zy-text-secondary',
+  'text-muted': '--zy-text-muted',
 
   // ── Borders ──
-  'border':             '--lobster-border',
-  'border-subtle':      '--lobster-border-subtle',
-  'input-border':       '--lobster-input-border',
+  border: '--zy-border',
+  'border-subtle': '--zy-border-subtle',
+  'input-border': '--zy-input-border',
 
   // ── Scrollbar ──
-  'scroll-thumb':       '--lobster-scroll-thumb',
-  'scroll-thumb-hover': '--lobster-scroll-thumb-hover',
+  'scroll-thumb': '--zy-scroll-thumb',
+  'scroll-thumb-hover': '--zy-scroll-thumb-hover',
 
   // ── Decorative gradients ──
-  'gradient-1':         '--lobster-gradient-1',
-  'gradient-2':         '--lobster-gradient-2',
+  'gradient-1': '--zy-gradient-1',
+  'gradient-2': '--zy-gradient-2',
 
   // ── Status ──
-  'destructive':            '--lobster-destructive',
-  'destructive-foreground': '--lobster-destructive-foreground',
-  'success':                '--lobster-success',
-  'warning':                '--lobster-warning',
+  destructive: '--zy-destructive',
+  'destructive-foreground': '--zy-destructive-foreground',
+  success: '--zy-success',
+  warning: '--zy-warning',
 
   // ── Gray scale 11 steps (gray-1=lightest → gray-11=darkest, all themes) ──
-  'gray-1':  '--lobster-gray-1',
-  'gray-2':  '--lobster-gray-2',
-  'gray-3':  '--lobster-gray-3',
-  'gray-4':  '--lobster-gray-4',
-  'gray-5':  '--lobster-gray-5',
-  'gray-6':  '--lobster-gray-6',
-  'gray-7':  '--lobster-gray-7',
-  'gray-8':  '--lobster-gray-8',
-  'gray-9':  '--lobster-gray-9',
-  'gray-10': '--lobster-gray-10',
-  'gray-11': '--lobster-gray-11',
+  'gray-1': '--zy-gray-1',
+  'gray-2': '--zy-gray-2',
+  'gray-3': '--zy-gray-3',
+  'gray-4': '--zy-gray-4',
+  'gray-5': '--zy-gray-5',
+  'gray-6': '--zy-gray-6',
+  'gray-7': '--zy-gray-7',
+  'gray-8': '--zy-gray-8',
+  'gray-9': '--zy-gray-9',
+  'gray-10': '--zy-gray-10',
+  'gray-11': '--zy-gray-11',
 
   // ── Radius ──
-  'radius':  '--lobster-radius',
+  radius: '--zy-radius',
 } as const;
 
 export type TokenName = keyof typeof TOKEN_CONTRACT;

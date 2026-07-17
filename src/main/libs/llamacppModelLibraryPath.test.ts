@@ -12,7 +12,7 @@ afterEach(() => {
 test('uses LocalAppData for the default Windows model library', () => {
   vi.spyOn(app, 'getPath').mockImplementation(name => {
     if (name === 'appData') return 'C:\\Users\\tester\\AppData\\Roaming';
-    return 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI';
+    return 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent';
   });
   vi.stubEnv('LOCALAPPDATA', 'C:\\Users\\tester\\AppData\\Local');
   Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
@@ -20,6 +20,6 @@ test('uses LocalAppData for the default Windows model library', () => {
   const manager = new LlamaCppManager(() => ({}));
 
   expect(manager.getModelsDir()).toBe(
-    path.join('C:\\Users\\tester\\AppData\\Local', 'RongxinAI', 'models'),
+    path.join('C:\\Users\\tester\\AppData\\Local', 'ZhiYuanAgent', 'models'),
   );
 });

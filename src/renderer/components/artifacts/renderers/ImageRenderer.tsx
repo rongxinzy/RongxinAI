@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import React, { useCallback,useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import type { Artifact } from '@/types/artifact';
 

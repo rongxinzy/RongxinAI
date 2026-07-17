@@ -8,9 +8,7 @@ import type { Artifact } from '@/types/artifact';
 const MAX_HIGHLIGHT_SIZE = 50_000;
 
 function useIsDark() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark')
-  );
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.classList.contains('dark'));
@@ -98,18 +96,18 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
 
   if (!artifact.content) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">
-        No content
-      </div>
+      <div className="flex items-center justify-center h-full text-muted text-sm">No content</div>
     );
   }
 
   if (artifact.content.length > MAX_HIGHLIGHT_SIZE) {
     return (
       <div className="h-full overflow-auto">
-        <pre className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre ${
-          isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
-        }`}>
+        <pre
+          className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre ${
+            isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
+          }`}
+        >
           {artifact.content}
         </pre>
       </div>

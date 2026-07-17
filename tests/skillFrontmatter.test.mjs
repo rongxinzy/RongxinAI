@@ -24,7 +24,8 @@ test('parseFrontmatter: simple key-value pairs', () => {
 });
 
 test('parseFrontmatter: block scalar with pipe (|)', () => {
-  const raw = '---\nname: demo\ndescription: |\n  A multi-line description.\n  Second line.\n---\n# Content\n';
+  const raw =
+    '---\nname: demo\ndescription: |\n  A multi-line description.\n  Second line.\n---\n# Content\n';
   const { frontmatter, content } = parseFrontmatter(raw);
   assert.equal(frontmatter.name, 'demo');
   assert.equal(frontmatter.description, 'A multi-line description.\nSecond line.\n');
@@ -46,7 +47,8 @@ test('parseFrontmatter: quoted strings', () => {
 });
 
 test('parseFrontmatter: nested objects', () => {
-  const raw = '---\nname: demo\nmetadata:\n  short-description: A short desc\n  version: 2\n---\n# Content\n';
+  const raw =
+    '---\nname: demo\nmetadata:\n  short-description: A short desc\n  version: 2\n---\n# Content\n';
   const { frontmatter } = parseFrontmatter(raw);
   assert.equal(frontmatter.name, 'demo');
   assert.deepEqual(frontmatter.metadata, { 'short-description': 'A short desc', version: 2 });
@@ -208,6 +210,9 @@ test('integration: skill with block scalar description', () => {
 
   const { frontmatter, content } = parseFrontmatter(raw);
   assert.equal(frontmatter.name, 'demo');
-  assert.equal(String(frontmatter.description || '').trim(), 'A multi-line description.\nSecond line.');
+  assert.equal(
+    String(frontmatter.description || '').trim(),
+    'A multi-line description.\nSecond line.',
+  );
   assert.ok(content.includes('# Demo Skill'));
 });

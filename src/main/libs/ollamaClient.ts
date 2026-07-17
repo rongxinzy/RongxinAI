@@ -22,12 +22,17 @@ export class OllamaClient {
   }
 
   async listModels(): Promise<OllamaModel[]> {
-    const payload = await this.requestJson<{ models?: OllamaModel[] }>('/api/tags', { method: 'GET' });
+    const payload = await this.requestJson<{ models?: OllamaModel[] }>('/api/tags', {
+      method: 'GET',
+    });
     return payload.models ?? [];
   }
 
   async runningModels(timeoutMs = 30_000): Promise<OllamaRunningModel[]> {
-    const payload = await this.requestJson<{ models?: OllamaRunningModel[] }>('/api/ps', { method: 'GET', timeoutMs });
+    const payload = await this.requestJson<{ models?: OllamaRunningModel[] }>('/api/ps', {
+      method: 'GET',
+      timeoutMs,
+    });
     return payload.models ?? [];
   }
 
@@ -51,11 +56,15 @@ export class OllamaClient {
     onProgress?: StreamCallback<Record<string, unknown>>,
     options: RequestOptions = {},
   ): Promise<void> {
-    await this.requestNdjson('/api/create', {
-      method: 'POST',
-      body: JSON.stringify({ name, modelfile, stream: Boolean(onProgress) }),
-      signal: options.signal,
-    }, onProgress);
+    await this.requestNdjson(
+      '/api/create',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, modelfile, stream: Boolean(onProgress) }),
+        signal: options.signal,
+      },
+      onProgress,
+    );
   }
 
   async pullModel(
@@ -63,11 +72,15 @@ export class OllamaClient {
     onProgress?: StreamCallback<Record<string, unknown>>,
     options: RequestOptions = {},
   ): Promise<void> {
-    await this.requestNdjson('/api/pull', {
-      method: 'POST',
-      body: JSON.stringify({ name, stream: Boolean(onProgress) }),
-      signal: options.signal,
-    }, onProgress);
+    await this.requestNdjson(
+      '/api/pull',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, stream: Boolean(onProgress) }),
+        signal: options.signal,
+      },
+      onProgress,
+    );
   }
 
   async preloadModel(input: OllamaModelLaunchInput): Promise<OllamaModelLaunchResult> {
@@ -118,14 +131,18 @@ export class OllamaClient {
     }
 
     let sawDone = false;
-    await this.requestNdjson<OllamaChatChunk>('/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({ ...payload, stream: true }),
-      signal: options.signal,
-    }, (chunk) => {
-      sawDone = Boolean(chunk.done || sawDone);
-      onChunk(chunk);
-    });
+    await this.requestNdjson<OllamaChatChunk>(
+      '/api/chat',
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, stream: true }),
+        signal: options.signal,
+      },
+      chunk => {
+        sawDone = Boolean(chunk.done || sawDone);
+        onChunk(chunk);
+      },
+    );
     if (!sawDone) {
       throw new Error('Ollama chat stream ended without a done chunk');
     }
@@ -137,7 +154,7 @@ export class OllamaClient {
   ): Promise<T> {
     const response = await this.fetch(path, options);
     if (response.status === 204) return undefined as T;
-    return await response.json() as T;
+    return (await response.json()) as T;
   }
 
   private async requestNdjson<T>(
@@ -177,7 +194,10 @@ export class OllamaClient {
     onChunk?.(parsed as T);
   }
 
-  private async fetch(path: string, options: RequestInit & { timeoutMs?: number }): Promise<Response> {
+  private async fetch(
+    path: string,
+    options: RequestInit & { timeoutMs?: number },
+  ): Promise<Response> {
     const controller = new AbortController();
     const externalSignal = options.signal;
     const abortFromExternal = () => controller.abort(externalSignal?.reason);
@@ -210,8 +230,6 @@ export class OllamaClient {
 
 function isOllamaStreamError(value: unknown): value is { error: string } {
   return Boolean(
-    value
-    && typeof value === 'object'
-    && typeof (value as { error?: unknown }).error === 'string',
+    value && typeof value === 'object' && typeof (value as { error?: unknown }).error === 'string',
   );
 }

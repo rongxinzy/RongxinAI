@@ -83,18 +83,21 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     scheduledTaskService.loadTasks();
   }, []);
 
-  const switchToTab = useCallback((tab: TabType) => {
-    if (isFormDirtyRef.current && activeTab === 'create') {
-      pendingTabSwitchRef.current = tab;
-      setShowLeaveConfirm(true);
-      return;
-    }
-    setActiveTab(tab);
-    if (tab === 'tasks') {
-      dispatch(selectTask(null));
-      dispatch(setViewMode('list'));
-    }
-  }, [activeTab, dispatch]);
+  const switchToTab = useCallback(
+    (tab: TabType) => {
+      if (isFormDirtyRef.current && activeTab === 'create') {
+        pendingTabSwitchRef.current = tab;
+        setShowLeaveConfirm(true);
+        return;
+      }
+      setActiveTab(tab);
+      if (tab === 'tasks') {
+        dispatch(selectTask(null));
+        dispatch(setViewMode('list'));
+      }
+    },
+    [activeTab, dispatch],
+  );
 
   const handleTabChange = (value: string) => {
     const tab = value as TabType;
@@ -124,23 +127,27 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     }
   }, [selectedTaskId, dispatch]);
 
-  const handleCreateSaved = useCallback((newTaskId?: string) => {
-    isFormDirtyRef.current = false;
-    setCreatingTask(false);
-    setTemplatePrefill(undefined);
-    setCreateFormKey(k => k + 1);
-    setActiveTab('tasks');
-    if (newTaskId) {
-      dispatch(selectTask(newTaskId));
-      dispatch(setViewMode('detail'));
-    } else {
-      dispatch(selectTask(null));
-      dispatch(setViewMode('list'));
-    }
-  }, [dispatch]);
+  const handleCreateSaved = useCallback(
+    (newTaskId?: string) => {
+      isFormDirtyRef.current = false;
+      setCreatingTask(false);
+      setTemplatePrefill(undefined);
+      setCreateFormKey(k => k + 1);
+      setActiveTab('tasks');
+      if (newTaskId) {
+        dispatch(selectTask(newTaskId));
+        dispatch(setViewMode('detail'));
+      } else {
+        dispatch(selectTask(null));
+        dispatch(setViewMode('list'));
+      }
+    },
+    [dispatch],
+  );
 
   // Show back arrow when viewing task detail or editing within tasks tab
-  const showBack = activeTab === 'tasks' && (viewMode === 'detail' || viewMode === 'edit') && selectedTaskId;
+  const showBack =
+    activeTab === 'tasks' && (viewMode === 'detail' || viewMode === 'edit') && selectedTaskId;
 
   return (
     <div className="flex flex-col h-full">
@@ -149,20 +156,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         <div className="flex items-center gap-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onToggleSidebar}
-              >
+              <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
                 <PanelLeft />
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onNewChat}
-              >
+              <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
                 <Pencil />
               </Button>
               {updateBadge}
@@ -187,20 +184,27 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="flex-1 min-h-0 flex flex-col"
+      >
         <div className="max-w-2xl mx-auto w-full px-4 mt-3">
-        <TabsList className="shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)]">
-          <TabsTrigger value="create" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
-            <Plus />
-            {i18nService.t('scheduledTasksNewTask')}
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
-            {i18nService.t('scheduledTasksTabTasks')}
-          </TabsTrigger>
-          <TabsTrigger value="history" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
-            {i18nService.t('scheduledTasksTabHistory')}
-          </TabsTrigger>
-        </TabsList>
+          <TabsList className="shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)]">
+            <TabsTrigger value="create" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+              <Plus />
+              {i18nService.t('scheduledTasksNewTask')}
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+              {i18nService.t('scheduledTasksTabTasks')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="history"
+              className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+            >
+              {i18nService.t('scheduledTasksTabHistory')}
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         <div className="max-w-2xl mx-auto w-full px-4">
@@ -209,49 +213,49 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
         <TabsContent value="create" className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-2xl mx-auto w-full px-4">
-          {creatingTask ? (
-            <TaskForm
-              key={createFormKey}
-              mode="create"
-              prefill={templatePrefill}
-              onCancel={() => {
-                setCreatingTask(false);
-                setTemplatePrefill(undefined);
-                isFormDirtyRef.current = false;
-              }}
-              onSaved={handleCreateSaved}
-              onDirtyChange={handleFormDirtyChange}
-            />
-          ) : (
-            <TaskTemplateGallery
-              onSelectTemplate={(values) => {
-                setTemplatePrefill(values);
-                setCreatingTask(true);
-              }}
-              onCustom={() => {
-                setTemplatePrefill(undefined);
-                setCreatingTask(true);
-              }}
-            />
-          )}
+            {creatingTask ? (
+              <TaskForm
+                key={createFormKey}
+                mode="create"
+                prefill={templatePrefill}
+                onCancel={() => {
+                  setCreatingTask(false);
+                  setTemplatePrefill(undefined);
+                  isFormDirtyRef.current = false;
+                }}
+                onSaved={handleCreateSaved}
+                onDirtyChange={handleFormDirtyChange}
+              />
+            ) : (
+              <TaskTemplateGallery
+                onSelectTemplate={values => {
+                  setTemplatePrefill(values);
+                  setCreatingTask(true);
+                }}
+                onCustom={() => {
+                  setTemplatePrefill(undefined);
+                  setCreatingTask(true);
+                }}
+              />
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="tasks" className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-2xl mx-auto w-full px-4">
-          {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
-          {viewMode === 'edit' && selectedTask && (
-            <TaskForm
-              mode="edit"
-              task={selectedTask}
-              onCancel={handleEditCancel}
-              onSaved={() => dispatch(setViewMode('detail'))}
-              onDirtyChange={handleFormDirtyChange}
-            />
-          )}
-          {viewMode === 'detail' && selectedTask && (
-            <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
-          )}
+            {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
+            {viewMode === 'edit' && selectedTask && (
+              <TaskForm
+                mode="edit"
+                task={selectedTask}
+                onCancel={handleEditCancel}
+                onSaved={() => dispatch(setViewMode('detail'))}
+                onDirtyChange={handleFormDirtyChange}
+              />
+            )}
+            {viewMode === 'detail' && selectedTask && (
+              <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
+            )}
           </div>
         </TabsContent>
 
@@ -277,12 +281,8 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {i18nService.t('taskFormUnsavedChanges')}
-            </DialogTitle>
-            <DialogDescription>
-              {i18nService.t('taskFormLeaveConfirm')}
-            </DialogDescription>
+            <DialogTitle>{i18nService.t('taskFormUnsavedChanges')}</DialogTitle>
+            <DialogDescription>{i18nService.t('taskFormLeaveConfirm')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button

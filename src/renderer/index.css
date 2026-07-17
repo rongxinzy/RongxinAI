@@ -10,27 +10,27 @@
 /* ── Tailwind v4 theme configuration ── */
 @theme {
   /* Semantic theme colors (driven by CSS variables) */
-  --color-background: var(--lobster-background);
-  --color-foreground: var(--lobster-foreground);
-  --color-primary: var(--lobster-primary);
-  --color-primary-foreground: var(--lobster-primary-foreground);
-  --color-primary-hover: var(--lobster-primary-hover);
-  --color-primary-muted: var(--lobster-primary-muted);
-  --color-primary-dark: var(--lobster-primary-hover);
-  --color-accent: var(--lobster-accent);
-  --color-accent-foreground: var(--lobster-accent-foreground);
-  --color-surface: var(--lobster-surface);
-  --color-surface-foreground: var(--lobster-surface-foreground);
-  --color-surface-raised: var(--lobster-surface-raised);
-  --color-surface-overlay: var(--lobster-surface-overlay);
-  --color-surface-inset: var(--lobster-surface-raised);
-  --color-border: var(--lobster-border);
-  --color-border-subtle: var(--lobster-border-subtle);
-  --color-border-input: var(--lobster-input-border);
-  --color-destructive: var(--lobster-destructive);
-  --color-destructive-foreground: var(--lobster-destructive-foreground);
-  --color-success: var(--lobster-success);
-  --color-warning: var(--lobster-warning);
+  --color-background: var(--zy-background);
+  --color-foreground: var(--zy-foreground);
+  --color-primary: var(--zy-primary);
+  --color-primary-foreground: var(--zy-primary-foreground);
+  --color-primary-hover: var(--zy-primary-hover);
+  --color-primary-muted: var(--zy-primary-muted);
+  --color-primary-dark: var(--zy-primary-hover);
+  --color-accent: var(--zy-accent);
+  --color-accent-foreground: var(--zy-accent-foreground);
+  --color-surface: var(--zy-surface);
+  --color-surface-foreground: var(--zy-surface-foreground);
+  --color-surface-raised: var(--zy-surface-raised);
+  --color-surface-overlay: var(--zy-surface-overlay);
+  --color-surface-inset: var(--zy-surface-raised);
+  --color-border: var(--zy-border);
+  --color-border-subtle: var(--zy-border-subtle);
+  --color-border-input: var(--zy-input-border);
+  --color-destructive: var(--zy-destructive);
+  --color-destructive-foreground: var(--zy-destructive-foreground);
+  --color-success: var(--zy-success);
+  --color-warning: var(--zy-warning);
 
   /* shadcn/ui compatible tokens */
   --color-ring: var(--ring);
@@ -53,31 +53,31 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Legacy claude.* aliases */
-  --color-claude-bg: var(--lobster-background);
-  --color-claude-surface: var(--lobster-surface);
-  --color-claude-surfaceHover: var(--lobster-surface-raised);
-  --color-claude-surfaceMuted: var(--lobster-surface-raised);
-  --color-claude-surfaceInset: var(--lobster-surface-raised);
-  --color-claude-border: var(--lobster-border);
-  --color-claude-borderLight: var(--lobster-border-subtle);
-  --color-claude-text: var(--lobster-text-primary);
-  --color-claude-textSecondary: var(--lobster-text-secondary);
-  --color-claude-darkBg: var(--lobster-background);
-  --color-claude-darkSurface: var(--lobster-surface);
-  --color-claude-darkSurfaceHover: var(--lobster-surface-raised);
-  --color-claude-darkSurfaceMuted: var(--lobster-surface-raised);
-  --color-claude-darkSurfaceInset: var(--lobster-surface-raised);
-  --color-claude-darkBorder: var(--lobster-border);
-  --color-claude-darkBorderLight: var(--lobster-border-subtle);
-  --color-claude-darkText: var(--lobster-text-primary);
-  --color-claude-darkTextSecondary: var(--lobster-text-secondary);
-  --color-claude-accent: var(--lobster-primary);
-  --color-claude-accentHover: var(--lobster-primary-hover);
-  --color-claude-accentLight: var(--lobster-primary);
-  --color-claude-accentMuted: var(--lobster-primary-muted);
+  --color-claude-bg: var(--zy-background);
+  --color-claude-surface: var(--zy-surface);
+  --color-claude-surfaceHover: var(--zy-surface-raised);
+  --color-claude-surfaceMuted: var(--zy-surface-raised);
+  --color-claude-surfaceInset: var(--zy-surface-raised);
+  --color-claude-border: var(--zy-border);
+  --color-claude-borderLight: var(--zy-border-subtle);
+  --color-claude-text: var(--zy-text-primary);
+  --color-claude-textSecondary: var(--zy-text-secondary);
+  --color-claude-darkBg: var(--zy-background);
+  --color-claude-darkSurface: var(--zy-surface);
+  --color-claude-darkSurfaceHover: var(--zy-surface-raised);
+  --color-claude-darkSurfaceMuted: var(--zy-surface-raised);
+  --color-claude-darkSurfaceInset: var(--zy-surface-raised);
+  --color-claude-darkBorder: var(--zy-border);
+  --color-claude-darkBorderLight: var(--zy-border-subtle);
+  --color-claude-darkText: var(--zy-text-primary);
+  --color-claude-darkTextSecondary: var(--zy-text-secondary);
+  --color-claude-accent: var(--zy-primary);
+  --color-claude-accentHover: var(--zy-primary-hover);
+  --color-claude-accentLight: var(--zy-primary);
+  --color-claude-accentMuted: var(--zy-primary-muted);
 
   /* Border radius */
-  --radius-theme: var(--lobster-radius);
+  --radius-theme: var(--zy-radius);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
@@ -89,7 +89,7 @@
   --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-popover: 0 4px 20px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
-  --shadow-glow-accent: 0 0 20px var(--lobster-primary-muted);
+  --shadow-glow-accent: 0 0 20px var(--zy-primary-muted);
 
   /* Animations */
   --animate-fade-in: fade-in 0.2s ease-out;
@@ -104,75 +104,121 @@
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
   @keyframes fade-in-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   @keyframes fade-in-down {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
   @keyframes shimmer {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(100%); }
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
   }
   @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-3px); }
-    40% { transform: translateX(3px); }
-    60% { transform: translateX(-2px); }
-    80% { transform: translateX(2px); }
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-3px);
+    }
+    40% {
+      transform: translateX(3px);
+    }
+    60% {
+      transform: translateX(-2px);
+    }
+    80% {
+      transform: translateX(2px);
+    }
   }
   @keyframes message-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
 /* ── Typography plugin customization ── */
 @utility prose {
-  color: var(--lobster-text-primary);
+  color: var(--zy-text-primary);
 
   & a {
-    color: var(--lobster-primary);
+    color: var(--zy-primary);
   }
   & a:hover {
-    color: var(--lobster-primary-hover);
+    color: var(--zy-primary-hover);
   }
   & code {
-    color: var(--lobster-text-primary);
-    background-color: var(--lobster-surface-raised);
+    color: var(--zy-text-primary);
+    background-color: var(--zy-surface-raised);
     padding: 0.2em 0.4em;
     border-radius: 0.25rem;
     font-weight: 400;
   }
   & code::before,
   & code::after {
-    content: "";
+    content: '';
   }
   & pre {
-    background-color: var(--lobster-surface-raised);
-    color: var(--lobster-text-primary);
+    background-color: var(--zy-surface-raised);
+    color: var(--zy-text-primary);
     padding: 1em;
     border-radius: 0.75rem;
     overflow-x: auto;
   }
   & blockquote {
-    border-left-color: var(--lobster-primary);
-    color: var(--lobster-text-secondary);
+    border-left-color: var(--zy-primary);
+    color: var(--zy-text-secondary);
   }
-  & h1, & h2, & h3, & h4 {
-    color: var(--lobster-text-primary);
+  & h1,
+  & h2,
+  & h3,
+  & h4 {
+    color: var(--zy-text-primary);
   }
   & strong {
-    color: var(--lobster-text-primary);
+    color: var(--zy-text-primary);
   }
   & table {
     margin-top: 0;
@@ -183,12 +229,12 @@
 /* ── Base layer ── */
 @layer base {
   * {
-    border-color: var(--lobster-border);
+    border-color: var(--zy-border);
     outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
   }
   body {
-    background-color: var(--lobster-background);
-    color: var(--lobster-foreground);
+    background-color: var(--zy-background);
+    color: var(--zy-foreground);
   }
 }
 
@@ -205,7 +251,7 @@
 }
 
 .dark .katex {
-  color: var(--lobster-text-primary);
+  color: var(--zy-text-primary);
 }
 
 /* Inline code styling (only applies to bare <code>, not inside pre blocks) */
@@ -217,14 +263,15 @@
 table {
   border-collapse: collapse;
 }
-th, td {
-  border-color: var(--lobster-border);
+th,
+td {
+  border-color: var(--zy-border);
 }
 th {
-  background-color: var(--lobster-surface);
+  background-color: var(--zy-surface);
 }
 td {
-  background-color: var(--lobster-surface);
+  background-color: var(--zy-surface);
 }
 
 /* CodeMirror editor: keep isolated */
@@ -240,29 +287,29 @@ td {
 
 /* ── ai-elements CodeBlock: white background ── */
 [data-language] {
-  background-color: var(--lobster-surface) !important;
+  background-color: var(--zy-surface) !important;
 }
-[data-language] [class*="bg-muted"] {
-  background-color: var(--lobster-surface) !important;
+[data-language] [class*='bg-muted'] {
+  background-color: var(--zy-surface) !important;
 }
 
 /* ── Streamdown 2.5 raw code-block (fallback) ── */
-div[class~="bg-sidebar"][class~="my-4"] {
+div[class~='bg-sidebar'][class~='my-4'] {
   overflow: hidden !important;
   border-radius: 0.5rem !important;
-  border: 1px solid var(--lobster-border) !important;
-  background-color: var(--lobster-surface) !important;
+  border: 1px solid var(--zy-border) !important;
+  background-color: var(--zy-surface) !important;
   padding: 0 !important;
   gap: 0 !important;
   display: block !important;
   margin: 0.75rem 0 !important;
 }
 /* Header row */
-div[class~="bg-sidebar"][class~="my-4"] > div:first-child {
+div[class~='bg-sidebar'][class~='my-4'] > div:first-child {
   display: flex !important;
   align-items: center !important;
-  border-bottom: 1px solid var(--lobster-border) !important;
-  background-color: var(--lobster-surface) !important;
+  border-bottom: 1px solid var(--zy-border) !important;
+  background-color: var(--zy-surface) !important;
   padding-left: 1rem !important;
   padding-right: 1rem !important;
   height: auto !important;
@@ -270,13 +317,13 @@ div[class~="bg-sidebar"][class~="my-4"] > div:first-child {
   padding-bottom: 0.5rem !important;
 }
 /* Code body */
-div[class~="bg-sidebar"][class~="my-4"] > div:last-child {
+div[class~='bg-sidebar'][class~='my-4'] > div:last-child {
   border: none !important;
   border-radius: 0 !important;
   padding: 1rem !important;
   background: transparent !important;
 }
-div[class~="bg-sidebar"][class~="my-4"] > div:last-child pre {
+div[class~='bg-sidebar'][class~='my-4'] > div:last-child pre {
   background: transparent !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -286,14 +333,14 @@ div[class~="bg-sidebar"][class~="my-4"] > div:last-child pre {
 
 /* Line numbers in code blocks: very subdued color */
 [data-language] code span::before {
-  color: var(--lobster-text-muted) !important;
+  color: var(--zy-text-muted) !important;
   opacity: 0.35;
 }
 
 /* Style for blockquotes */
 blockquote {
-  border-left-color: var(--lobster-primary);
-  color: var(--lobster-text-secondary);
+  border-left-color: var(--zy-primary);
+  color: var(--zy-text-secondary);
   border-left-width: 3px;
   padding-left: 1em;
   font-style: italic;
@@ -306,7 +353,10 @@ blockquote {
 }
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter',
+    system-ui, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.6;
   font-weight: 400;
 
@@ -318,9 +368,12 @@ blockquote {
 
 /* Theme colors are driven by CSS variables from themes.css.
  * color-scheme is set by the [data-theme] selectors. */
-body, #root, .App, main {
-  background-color: var(--lobster-background);
-  color: var(--lobster-foreground);
+body,
+#root,
+.App,
+main {
+  background-color: var(--zy-background);
+  color: var(--zy-foreground);
 }
 
 body {
@@ -344,12 +397,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--lobster-scroll-thumb);
+  background-color: var(--zy-scroll-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--lobster-scroll-thumb-hover);
+  background-color: var(--zy-scroll-thumb-hover);
 }
 
 .scrollbar-hidden {
@@ -363,8 +416,8 @@ body {
 
 /* Style for select options to match theme */
 option {
-  background-color: var(--lobster-surface);
-  color: var(--lobster-foreground);
+  background-color: var(--zy-surface);
+  color: var(--zy-foreground);
 }
 
 /* Ensure select elements have proper styling in Firefox */
@@ -399,7 +452,7 @@ select::-ms-expand {
 /* Focus ring */
 .focus-ring {
   @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
-  --tw-ring-offset-color: var(--lobster-background);
+  --tw-ring-offset-color: var(--zy-background);
 }
 
 /* Button styles */
@@ -408,13 +461,13 @@ select::-ms-expand {
 }
 
 .btn-secondary {
-  background-color: var(--lobster-surface);
-  color: var(--lobster-text-primary);
-  border: 1px solid var(--lobster-border);
+  background-color: var(--zy-surface);
+  color: var(--zy-text-primary);
+  border: 1px solid var(--zy-border);
   @apply font-medium py-2 px-4 rounded-lg transition-colors;
 }
 .btn-secondary:hover {
-  background-color: var(--lobster-surface-raised);
+  background-color: var(--zy-surface-raised);
 }
 
 /* Sidebar width transition */
@@ -425,7 +478,7 @@ select::-ms-expand {
 
 /* Subtle separator line */
 .separator {
-  border-color: var(--lobster-border-subtle);
+  border-color: var(--zy-border-subtle);
   border-top-width: 1px;
 }
 
@@ -441,14 +494,14 @@ select::-ms-expand {
 }
 
 /* Command palette InputGroup — suppress blue focus ring from InputGroup base class */
-[data-slot="command-input-group"]:has([data-slot="input-group-control"]:focus-visible) {
+[data-slot='command-input-group']:has([data-slot='input-group-control']:focus-visible) {
   --tw-ring-shadow: 0 0 #0000;
   box-shadow: 0 0 #0000;
-  border-color: var(--lobster-input-border);
+  border-color: var(--zy-input-border);
 }
 
 /* ModelSelector — hide dialog overlay so list appears as a dropdown */
-[data-slot="dialog-portal"]:has([data-slot="model-selector-content"]) [data-slot="dialog-overlay"] {
+[data-slot='dialog-portal']:has([data-slot='model-selector-content']) [data-slot='dialog-overlay'] {
   display: none;
 }
 
@@ -459,7 +512,7 @@ select::-ms-expand {
 
 /* Skeleton loading */
 .skeleton {
-  background-color: var(--lobster-surface-raised);
+  background-color: var(--zy-surface-raised);
   @apply rounded;
   position: relative;
   overflow: hidden;
@@ -469,7 +522,7 @@ select::-ms-expand {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
   animation: shimmer 1.5s infinite;
 }
 
@@ -479,7 +532,7 @@ select::-ms-expand {
   height: 2px;
   overflow: hidden;
   border-radius: 1px;
-  background: var(--lobster-primary-muted);
+  background: var(--zy-primary-muted);
 }
 .streaming-bar::before {
   content: '';
@@ -489,17 +542,21 @@ select::-ms-expand {
   height: 100%;
   width: 40%;
   border-radius: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--lobster-primary) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--zy-primary) 50%, transparent 100%);
   opacity: 0.7;
   animation: streaming-slide 1.5s ease-in-out infinite;
 }
 /* Streaming bar glow uses primary color */
 .streaming-bar::before {
-  box-shadow: 0 0 6px var(--lobster-primary-muted);
+  box-shadow: 0 0 6px var(--zy-primary-muted);
 }
 @keyframes streaming-slide {
-  0% { left: -40%; }
-  100% { left: 100%; }
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 /* Respect reduced-motion preference */
@@ -513,157 +570,159 @@ select::-ms-expand {
   }
 }
 
-/* Switch: shadcn uses hsl(var(--primary)) → hsl(#3B82F6) = invalid CSS with lobster hex values.
+/* Switch: shadcn uses hsl(var(--primary)) → hsl(#3B82F6) = invalid CSS with zhiyuan hex values.
    Define track colors and transition directly, bypassing the broken hsl() wrapper.
    !important required — base-ui may strip transition classes at runtime. */
-[data-slot="switch"] {
-  transition: background-color 200ms ease, box-shadow 200ms ease !important;
+[data-slot='switch'] {
+  transition:
+    background-color 200ms ease,
+    box-shadow 200ms ease !important;
 }
-[data-slot="switch"][data-unchecked] {
-  background-color: var(--lobster-surface-raised);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+[data-slot='switch'][data-unchecked] {
+  background-color: var(--zy-surface-raised);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
 }
-[data-slot="switch"][data-checked] {
-  background-color: var(--lobster-primary);
+[data-slot='switch'][data-checked] {
+  background-color: var(--zy-primary);
 }
-[data-slot="switch-thumb"] {
+[data-slot='switch-thumb'] {
   transition: transform 200ms ease !important;
 }
-[data-slot="switch-thumb"][data-unchecked] {
+[data-slot='switch-thumb'][data-unchecked] {
   transform: translateX(0);
 }
-[data-slot="switch-thumb"][data-checked] {
+[data-slot='switch-thumb'][data-checked] {
   transform: translateX(calc(100% - 2px));
 }
 
-/* Slider: lobster theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
-[data-slot="slider-track"] {
-  background-color: var(--lobster-surface-raised);
+/* Slider: zhiyuan theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
+[data-slot='slider-track'] {
+  background-color: var(--zy-surface-raised);
 }
-[data-slot="slider-indicator"] {
-  background-color: var(--lobster-primary);
+[data-slot='slider-indicator'] {
+  background-color: var(--zy-primary);
 }
-[data-slot="slider-thumb"] {
-  background-color: var(--lobster-surface);
-  border-color: var(--lobster-primary);
+[data-slot='slider-thumb'] {
+  background-color: var(--zy-surface);
+  border-color: var(--zy-primary);
 }
-[data-slot="slider-thumb"]:focus-visible {
-  box-shadow: 0 0 0 2px var(--lobster-primary-muted);
+[data-slot='slider-thumb']:focus-visible {
+  box-shadow: 0 0 0 2px var(--zy-primary-muted);
 }
 
 /* Download progress uses Slider for consistent geometry, without an interactive thumb. */
-[data-slot="slider"][data-download-progress] [data-slot="slider-indicator"] {
-  background-color: var(--lobster-success);
+[data-slot='slider'][data-download-progress] [data-slot='slider-indicator'] {
+  background-color: var(--zy-success);
 }
-[data-slot="slider"][data-download-progress] [data-slot="slider-thumb"] {
+[data-slot='slider'][data-download-progress] [data-slot='slider-thumb'] {
   display: none;
 }
 
 /* Local inference tabs need a stronger active state than the neutral tab rail. */
-[data-local-inference-tabs] [data-slot="tabs-list"] {
-  background-color: var(--lobster-surface-raised);
+[data-local-inference-tabs] [data-slot='tabs-list'] {
+  background-color: var(--zy-surface-raised);
 }
-[data-local-inference-tabs] [data-slot="tabs-trigger"][data-active] {
-  background-color: var(--lobster-primary);
-  color: var(--lobster-primary-foreground);
+[data-local-inference-tabs] [data-slot='tabs-trigger'][data-active] {
+  background-color: var(--zy-primary);
+  color: var(--zy-primary-foreground);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
 }
 
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
-   via the Tailwind plugin which uses var(--lobster-*) directly. */
-[data-slot="dialog-content"] {
+   via the Tailwind plugin which uses var(--zy-*) directly. */
+[data-slot='dialog-content'] {
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 }
-[data-slot="dialog-footer"] {
-  background-color: var(--lobster-surface);
-  border-top-color: var(--lobster-border);
+[data-slot='dialog-footer'] {
+  background-color: var(--zy-surface);
+  border-top-color: var(--zy-border);
 }
-[data-slot="button"].bg-primary {
-  background-color: var(--lobster-primary);
-  color: var(--lobster-primary-foreground);
+[data-slot='button'].bg-primary {
+  background-color: var(--zy-primary);
+  color: var(--zy-primary-foreground);
 }
-[data-slot="button"].bg-primary:hover {
-  background-color: var(--lobster-primary-hover);
+[data-slot='button'].bg-primary:hover {
+  background-color: var(--zy-primary-hover);
 }
-[data-slot="button"].border-border {
-  border-color: var(--lobster-border);
+[data-slot='button'].border-border {
+  border-color: var(--zy-border);
 }
-[data-slot="button"].bg-background {
-  background-color: var(--lobster-surface);
+[data-slot='button'].bg-background {
+  background-color: var(--zy-surface);
 }
-[data-slot="button"].bg-secondary {
-  background-color: var(--lobster-surface-raised);
-  color: var(--lobster-foreground);
+[data-slot='button'].bg-secondary {
+  background-color: var(--zy-surface-raised);
+  color: var(--zy-foreground);
 }
-[data-slot="button"].text-destructive {
-  color: var(--lobster-destructive);
+[data-slot='button'].text-destructive {
+  color: var(--zy-destructive);
 }
-[data-slot="button"][data-local-inference-unload-button="true"] {
-  background-color: var(--lobster-destructive);
-  border-color: var(--lobster-destructive);
-  color: var(--lobster-destructive-foreground);
+[data-slot='button'][data-local-inference-unload-button='true'] {
+  background-color: var(--zy-destructive);
+  border-color: var(--zy-destructive);
+  color: var(--zy-destructive-foreground);
 }
-[data-slot="button"][data-local-inference-unload-button="true"]:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--lobster-destructive) 88%, black);
-  border-color: color-mix(in srgb, var(--lobster-destructive) 88%, black);
-  color: var(--lobster-destructive-foreground);
+[data-slot='button'][data-local-inference-unload-button='true']:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
+  border-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
+  color: var(--zy-destructive-foreground);
 }
-[data-slot="toggle"][aria-pressed="true"] {
-  background-color: var(--lobster-surface-raised);
-  color: var(--lobster-foreground);
+[data-slot='toggle'][aria-pressed='true'] {
+  background-color: var(--zy-surface-raised);
+  color: var(--zy-foreground);
 }
 
 /* Base UI select popup dimensions use runtime CSS variables. */
-[data-slot="select-content"] {
+[data-slot='select-content'] {
   width: var(--anchor-width) !important;
   max-height: var(--available-height) !important;
   transform-origin: var(--transform-origin) !important;
 }
 
 /* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
-[data-mode="work-chat"][data-slot="switch"] {
+[data-mode='work-chat'][data-slot='switch'] {
   width: 100% !important;
   height: 28px !important;
 }
 /* Work/Chat toggle — track color token (darker than sidebar bg-surface-raised #F0F1F4) */
 :root {
-  --work-chat-track-bg: #E5E7EB;
+  --work-chat-track-bg: #e5e7eb;
 }
 .dark {
-  --work-chat-track-bg: #2D3039;
+  --work-chat-track-bg: #2d3039;
 }
 
 /* Track: bordered to distinguish from sidebar bg, relative for absolute thumb */
-[data-mode="work-chat"][data-slot="switch"][data-unchecked],
-[data-mode="work-chat"][data-slot="switch"][data-checked] {
+[data-mode='work-chat'][data-slot='switch'][data-unchecked],
+[data-mode='work-chat'][data-slot='switch'][data-checked] {
   background-color: var(--work-chat-track-bg) !important;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.10) !important;
-  border-color: var(--lobster-border) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border-color: var(--zy-border) !important;
   position: relative !important;
 }
 /* Track: allow thumb overflow */
-[data-mode="work-chat"][data-slot="switch"] {
+[data-mode='work-chat'][data-slot='switch'] {
   overflow: visible !important;
 }
 /* Thumb: glass, centered at 25%/75%, crosses track center */
-[data-mode="work-chat"] [data-slot="switch-thumb"] {
+[data-mode='work-chat'] [data-slot='switch-thumb'] {
   width: calc(50% + 12px) !important;
   height: calc(100% + 8px) !important;
   border-radius: 9999px !important;
   box-shadow:
-    0 4px 14px rgba(0,0,0,0.16),
-    0 1px 3px rgba(0,0,0,0.06) !important;
+    0 4px 14px rgba(0, 0, 0, 0.16),
+    0 1px 3px rgba(0, 0, 0, 0.06) !important;
   position: absolute !important;
   transition: left 200ms ease !important;
 }
-[data-mode="work-chat"] [data-slot="switch-thumb"][data-unchecked] {
+[data-mode='work-chat'] [data-slot='switch-thumb'][data-unchecked] {
   left: -6px;
   top: -4px;
   transform: none;
   translate: none !important;
 }
-[data-mode="work-chat"] [data-slot="switch-thumb"][data-checked] {
+[data-mode='work-chat'] [data-slot='switch-thumb'][data-checked] {
   left: calc(50% - 6px);
   top: -4px;
   transform: none;
@@ -671,22 +730,22 @@ select::-ms-expand {
 }
 
 /* ButtonGroup: joined buttons — Tailwind v4 *:data-slot: variant chain. */
-[data-slot="button-group"] > [data-slot] {
+[data-slot='button-group'] > [data-slot] {
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
 }
-[data-slot="button-group"] > [data-slot]:not(:has(~ [data-slot])) {
-  border-top-right-radius: var(--lobster-radius) !important;
-  border-bottom-right-radius: var(--lobster-radius) !important;
+[data-slot='button-group'] > [data-slot]:not(:has(~ [data-slot])) {
+  border-top-right-radius: var(--zy-radius) !important;
+  border-bottom-right-radius: var(--zy-radius) !important;
 }
-[data-slot="button-group"] > [data-slot] ~ [data-slot] {
+[data-slot='button-group'] > [data-slot] ~ [data-slot] {
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
   border-left-width: 0 !important;
 }
 
 /* Select: match dropdown width to trigger. */
-[data-slot="select-content"] {
+[data-slot='select-content'] {
   width: var(--anchor-width) !important;
   max-height: var(--available-height) !important;
   transform-origin: var(--transform-origin) !important;

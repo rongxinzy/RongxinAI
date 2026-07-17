@@ -65,7 +65,11 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
       const result = await window.electron.dialog.selectDirectory();
       if (result.success && result.path) {
         if (isWindowsDriveRoot(result.path)) {
-          window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('folderDriveRootNotAllowed') }));
+          window.dispatchEvent(
+            new CustomEvent('app:showToast', {
+              detail: i18nService.t('folderDriveRootNotAllowed'),
+            }),
+          );
           return;
         }
         onSelectFolder(result.path);
@@ -75,14 +79,19 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
     }
   }, [onSelectFolder]);
 
-  const handleSelectRecentFolder = useCallback((path: string) => {
-    if (isWindowsDriveRoot(path)) {
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('folderDriveRootNotAllowed') }));
-      return;
-    }
-    onSelectFolder(path);
-    setOpen(false);
-  }, [onSelectFolder]);
+  const handleSelectRecentFolder = useCallback(
+    (path: string) => {
+      if (isWindowsDriveRoot(path)) {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('folderDriveRootNotAllowed') }),
+        );
+        return;
+      }
+      onSelectFolder(path);
+      setOpen(false);
+    },
+    [onSelectFolder],
+  );
 
   const truncatePath = (path: string, maxLength = 40): string => {
     if (!path) return i18nService.t('noFolderSelected');
@@ -116,10 +125,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
               </div>
             ) : (
               recentFolders.map((folder, index) => (
-                <DropdownMenuItem
-                  key={index}
-                  onClick={() => handleSelectRecentFolder(folder)}
-                >
+                <DropdownMenuItem key={index} onClick={() => handleSelectRecentFolder(folder)}>
                   <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{truncatePath(folder)}</span>
                 </DropdownMenuItem>

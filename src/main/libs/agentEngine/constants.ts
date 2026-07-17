@@ -4,4 +4,4 @@ export const AgentLifecyclePhase = {
   Error: 'error',
   Fallback: 'fallback',
 } as const;
-export type AgentLifecyclePhase = typeof AgentLifecyclePhase[keyof typeof AgentLifecyclePhase];
+export type AgentLifecyclePhase = (typeof AgentLifecyclePhase)[keyof typeof AgentLifecyclePhase];

@@ -13,7 +13,7 @@ export const LlamaCppModelLoadFailureReason = {
 } as const;
 
 export type LlamaCppModelLoadFailureReason =
-  typeof LlamaCppModelLoadFailureReason[keyof typeof LlamaCppModelLoadFailureReason];
+  (typeof LlamaCppModelLoadFailureReason)[keyof typeof LlamaCppModelLoadFailureReason];
 
 export class LlamaCppModelLoadError extends Error {
   readonly reason: LlamaCppModelLoadFailureReason;
@@ -114,9 +114,7 @@ const serviceUnavailablePatterns = [
 ];
 
 // Keep classifier output stable so orchestration can map technical errors to concise user messages.
-export function classifyLlamaCppModelLoadError(
-  error: unknown,
-): LlamaCppModelLoadFailureReason {
+export function classifyLlamaCppModelLoadError(error: unknown): LlamaCppModelLoadFailureReason {
   if (error instanceof LlamaCppModelLoadError) {
     return error.reason;
   }
@@ -158,9 +156,7 @@ export function classifyLlamaCppModelLoadError(
   return LlamaCppModelLoadFailureReason.Unknown;
 }
 
-export function isRetryableLlamaCppModelLoadError(
-  reason: LlamaCppModelLoadFailureReason,
-): boolean {
+export function isRetryableLlamaCppModelLoadError(reason: LlamaCppModelLoadFailureReason): boolean {
   return (
     reason === LlamaCppModelLoadFailureReason.VramInsufficient ||
     reason === LlamaCppModelLoadFailureReason.SystemMemoryInsufficient ||
@@ -170,9 +166,7 @@ export function isRetryableLlamaCppModelLoadError(
   );
 }
 
-export function getLlamaCppModelLoadFailureI18nKey(
-  reason: LlamaCppModelLoadFailureReason,
-): string {
+export function getLlamaCppModelLoadFailureI18nKey(reason: LlamaCppModelLoadFailureReason): string {
   switch (reason) {
     case LlamaCppModelLoadFailureReason.ModelsLimitReached:
       return 'llamacppLoadModelLimitReached';

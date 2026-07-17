@@ -29,7 +29,7 @@ export function getInstallableMarketplaceModels(
   models: MarketplaceModel[],
   installedModelPathMap: Map<string, string>,
 ): MarketplaceModel[] {
-  return models.filter((model) => {
+  return models.filter(model => {
     const installedModelName = model.installedPath
       ? installedModelPathMap.get(model.installedPath)
       : undefined;

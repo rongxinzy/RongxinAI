@@ -25,11 +25,15 @@ export function initCronJobServiceManager(d: CronJobServiceDeps): void {
 export function getCronJobService(): CronJobService {
   if (!cronJobService) {
     if (!deps) {
-      throw new Error('CronJobServiceManager not initialized. Call initCronJobServiceManager() first.');
+      throw new Error(
+        'CronJobServiceManager not initialized. Call initCronJobServiceManager() first.',
+      );
     }
     const adapter = deps.getOpenClawRuntimeAdapter();
     if (!adapter) {
-      throw new Error('OpenClaw runtime adapter not initialized. CronJobService requires OpenClaw.');
+      throw new Error(
+        'OpenClaw runtime adapter not initialized. CronJobService requires OpenClaw.',
+      );
     }
     cronJobService = new CronJobService({
       getGatewayClient: () => adapter.getGatewayClient(),

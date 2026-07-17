@@ -100,11 +100,17 @@ const AllRunsHistory: React.FC = () => {
               key={s}
               variant="outline"
               size="sm"
-              className={filter.status === s ? 'bg-secondary text-foreground' : 'bg-card text-muted-foreground'}
-              onClick={() => handleFilterChange({
-                ...filter,
-                status: filter.status === s ? undefined : s,
-              })}
+              className={
+                filter.status === s
+                  ? 'bg-secondary text-foreground'
+                  : 'bg-card text-muted-foreground'
+              }
+              onClick={() =>
+                handleFilterChange({
+                  ...filter,
+                  status: filter.status === s ? undefined : s,
+                })
+              }
             >
               {i18nService.t(statusLabelKeys[s])}
             </Button>
@@ -157,9 +163,15 @@ const AllRunsHistory: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksHistoryColTitle')}</TableHead>
-              <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksHistoryColTime')}</TableHead>
-              <TableHead className="text-muted-foreground w-24">{i18nService.t('scheduledTasksHistoryColStatus')}</TableHead>
+              <TableHead className="text-muted-foreground">
+                {i18nService.t('scheduledTasksHistoryColTitle')}
+              </TableHead>
+              <TableHead className="text-muted-foreground">
+                {i18nService.t('scheduledTasksHistoryColTime')}
+              </TableHead>
+              <TableHead className="text-muted-foreground w-24">
+                {i18nService.t('scheduledTasksHistoryColStatus')}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -174,12 +186,8 @@ const AllRunsHistory: React.FC = () => {
                 >
                   <TableCell className="max-w-[180px] min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-foreground truncate">
-                        {run.taskName}
-                      </span>
-                      {run.status === 'running' && (
-                        <Spinner className="size-3 text-blue-500" />
-                      )}
+                      <span className="text-sm text-foreground truncate">{run.taskName}</span>
+                      {run.status === 'running' && <Spinner className="size-3 text-blue-500" />}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -193,12 +201,18 @@ const AllRunsHistory: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={
-                      run.status === 'success' ? 'text-(--lobster-success)' :
-                      run.status === 'error' ? 'text-destructive' :
-                      run.status === 'running' ? 'text-primary' :
-                      'text-muted-foreground'
-                    }>
+                    <Badge
+                      variant="outline"
+                      className={
+                        run.status === 'success'
+                          ? 'text-(--zy-success)'
+                          : run.status === 'error'
+                            ? 'text-destructive'
+                            : run.status === 'running'
+                              ? 'text-primary'
+                              : 'text-muted-foreground'
+                      }
+                    >
                       {i18nService.t(statusLabelKeys[run.status] || '')}
                     </Badge>
                   </TableCell>
@@ -210,12 +224,7 @@ const AllRunsHistory: React.FC = () => {
       )}
 
       {allRunsHasMore && (
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleLoadMore}
-          className="w-full py-3"
-        >
+        <Button type="button" variant="ghost" onClick={handleLoadMore} className="w-full py-3">
           {i18nService.t('scheduledTasksLoadMore')}
         </Button>
       )}

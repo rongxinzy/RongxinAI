@@ -18,7 +18,8 @@ test('model order reorders a dragged model at the drop target', () => {
 });
 
 test('model order ignores drops that do not reference visible cards', () => {
-  expect(
-    reorderLocalModelOrder(['qwen-0.5b', 'qwen-3'], 'missing-model', 'qwen-3'),
-  ).toEqual(['qwen-0.5b', 'qwen-3']);
+  expect(reorderLocalModelOrder(['qwen-0.5b', 'qwen-3'], 'missing-model', 'qwen-3')).toEqual([
+    'qwen-0.5b',
+    'qwen-3',
+  ]);
 });

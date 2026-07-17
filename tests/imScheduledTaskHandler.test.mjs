@@ -28,7 +28,10 @@ test('normalizes model-detected IM reminder requests into direct cron.add inputs
   assert.equal(parsed.payloadText, '⏰ 提醒：喝饮料');
   assert.equal(parsed.delayLabel, '2分钟后');
   // scheduleAt may be in any timezone representation; compare as absolute timestamps
-  assert.equal(new Date(parsed.scheduleAt).getTime(), new Date('2026-03-15T16:30:00+08:00').getTime());
+  assert.equal(
+    new Date(parsed.scheduleAt).getTime(),
+    new Date('2026-03-15T16:30:00+08:00').getTime(),
+  );
   assert.match(parsed.confirmationText, /2分钟后.*会提醒你喝饮料/u);
 });
 
@@ -38,34 +41,48 @@ test('only uses heuristic as a cheap reminder candidate prefilter', () => {
 });
 
 test('rejects detector payloads without a future timezone-aware timestamp', () => {
-  assert.equal(normalizeDetectedScheduledTaskRequest({
-    shouldCreateTask: true,
-    scheduleAt: '2026-03-15T16:30:00',
-    reminderBody: '喝水',
-  }, '提醒我喝水', new Date('2026-03-15T16:28:00+08:00')), null);
+  assert.equal(
+    normalizeDetectedScheduledTaskRequest(
+      {
+        shouldCreateTask: true,
+        scheduleAt: '2026-03-15T16:30:00',
+        reminderBody: '喝水',
+      },
+      '提醒我喝水',
+      new Date('2026-03-15T16:28:00+08:00'),
+    ),
+    null,
+  );
 });
 
 test('identifies reminder system turns for async IM delivery', () => {
-  assert.equal(isReminderSystemTurn([
-    { type: 'assistant', content: '普通回复' },
-  ]), false);
+  assert.equal(isReminderSystemTurn([{ type: 'assistant', content: '普通回复' }]), false);
 
-  assert.equal(isReminderSystemTurn([
-    { type: 'system', content: '⏰ 提醒：喝饮料' },
-    { type: 'assistant', content: '该喝饮料啦！' },
-  ]), true);
+  assert.equal(
+    isReminderSystemTurn([
+      { type: 'system', content: '⏰ 提醒：喝饮料' },
+      { type: 'assistant', content: '该喝饮料啦！' },
+    ]),
+    true,
+  );
 });
 
 test('keeps recognizing legacy reminder system messages during transition', () => {
-  assert.equal(isReminderSystemTurn([
-    { type: 'system', content: 'System: [Sunday, March 15th, 2026 — 4:30 PM] ⏰ 提醒：喝饮料' },
-    { type: 'assistant', content: '该喝饮料啦！' },
-  ]), true);
+  assert.equal(
+    isReminderSystemTurn([
+      { type: 'system', content: 'System: [Sunday, March 15th, 2026 — 4:30 PM] ⏰ 提醒：喝饮料' },
+      { type: 'assistant', content: '该喝饮料啦！' },
+    ]),
+    true,
+  );
 });
 
 test('recognizes plain reminder text turns during runtime hotfix rollout', () => {
-  assert.equal(isReminderSystemTurn([
-    { type: 'user', content: '⏰ 提醒：该去钉钉打卡啦！别忘了打卡哦～' },
-    { type: 'assistant', content: '⏰ 时间到啦，该去打卡了。' },
-  ]), true);
+  assert.equal(
+    isReminderSystemTurn([
+      { type: 'user', content: '⏰ 提醒：该去钉钉打卡啦！别忘了打卡哦～' },
+      { type: 'assistant', content: '⏰ 时间到啦，该去打卡了。' },
+    ]),
+    true,
+  );
 });

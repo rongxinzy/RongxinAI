@@ -1,5 +1,5 @@
 import type { ThemeDefinition } from '../theme';
-import { allThemes,ThemeManager } from '../theme';
+import { allThemes, ThemeManager } from '../theme';
 import { configService } from './config';
 
 type ThemeType = 'light' | 'dark' | 'system';
@@ -16,7 +16,7 @@ class ThemeService {
       this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     }
     this.manager = new ThemeManager(allThemes, {
-      storageKey: 'lobster-theme-id',
+      storageKey: 'zhiyuan-theme-id',
       defaultTheme: 'classic-light',
       followSystem: false,
     });
@@ -36,7 +36,7 @@ class ThemeService {
 
       // 监听系统主题变化
       if (this.mediaQuery) {
-        this.mediaQueryListener = (e) => {
+        this.mediaQueryListener = e => {
           if (this.currentTheme === 'system') {
             this.applyByAppearance(e.matches ? 'dark' : 'light');
           }
@@ -110,7 +110,7 @@ class ThemeService {
   // 根据 appearance 选择第一个匹配的主题，或恢复已保存的主题
   private applyByAppearance(appearance: 'light' | 'dark'): void {
     // Check if there's a saved theme ID with the right appearance
-    const savedId = localStorage.getItem('lobster-theme-id');
+    const savedId = localStorage.getItem('zhiyuan-theme-id');
     if (savedId) {
       const saved = allThemes.find(t => t.meta.id === savedId);
       if (saved && saved.meta.appearance === appearance) {

@@ -20,6 +20,7 @@ Use the web-search skill when you need:
 - **Troubleshooting** - Search for specific error messages or solutions
 
 **Examples of when to use:**
+
 - User: "What are the new features in React 19?"
 - User: "Search for the latest Next.js App Router documentation"
 - User: "What's the current status of the Rust async project?"
@@ -39,6 +40,7 @@ Use the web-search skill when you need:
 ```
 
 **Architecture:**
+
 1. **CLI Script** - Simple bash interface for Claude
 2. **Bridge Server** - Express HTTP API (auto-started by Electron)
 3. **Playwright Manager** - Browser connection and session management
@@ -252,6 +254,7 @@ bash SKILLs/web-search/scripts/search.sh "Playwright page.evaluate examples" 5
 **Error:** `✗ Bridge Server is not running`
 
 **Solution:**
+
 - The server should auto-start with Electron
 - If manual start needed: `bash SKILLs/web-search/scripts/start-server.sh`
 - Check logs: `cat SKILLs/web-search/.server.log`
@@ -263,6 +266,7 @@ bash SKILLs/web-search/scripts/search.sh "Playwright page.evaluate examples" 5
 **Cause:** Chrome not installed or not found
 
 **Solution:**
+
 - macOS: Install from https://www.google.com/chrome/
 - Linux: `sudo apt install chromium-browser`
 - Windows: Install from https://www.google.com/chrome/
@@ -272,6 +276,7 @@ bash SKILLs/web-search/scripts/search.sh "Playwright page.evaluate examples" 5
 **Error:** `CDP port not ready` or `Connection timeout`
 
 **Solution:**
+
 ```bash
 # Stop server
 bash SKILLs/web-search/scripts/stop-server.sh
@@ -288,11 +293,13 @@ bash SKILLs/web-search/scripts/start-server.sh
 **Error:** `Found 0 results`
 
 **Possible causes:**
+
 - Query too specific or unusual
 - Bing changed page structure (rare)
 - Network issues
 
 **Solution:**
+
 - Try broader query
 - Check internet connection
 - Verify page loads manually at bing.com
@@ -302,6 +309,7 @@ bash SKILLs/web-search/scripts/start-server.sh
 **Error:** `Search failed: timeout`
 
 **Solution:**
+
 - Check internet connection
 - Reduce max results
 - Try again (might be temporary network issue)
@@ -321,6 +329,7 @@ Each search result contains:
 ```
 
 **Fields:**
+
 - **Title** - Page/article title
 - **URL** - Direct link (may include Bing tracking)
 - **Snippet** - Preview text from the page
@@ -328,6 +337,7 @@ Each search result contains:
 ### Parsing Results
 
 The search output is Markdown. Extract:
+
 1. Total results count
 2. Search duration
 3. Individual result titles and URLs
@@ -411,13 +421,13 @@ which google-chrome || which chromium || which chromium-browser
 
 ### Common Issues
 
-| Issue | Symptom | Solution |
-|-------|---------|----------|
-| Server down | `Connection refused` | Start server or restart Electron |
-| Browser missing | `Chrome not found` | Install Chrome/Chromium |
-| Port conflict | `Address already in use` | Stop conflicting process on port 8923 |
-| Stale connection | `Connection not found` | Remove `.connection` cache file |
-| Network issue | `Search timeout` | Check internet connection |
+| Issue            | Symptom                  | Solution                              |
+| ---------------- | ------------------------ | ------------------------------------- |
+| Server down      | `Connection refused`     | Start server or restart Electron      |
+| Browser missing  | `Chrome not found`       | Install Chrome/Chromium               |
+| Port conflict    | `Address already in use` | Stop conflicting process on port 8923 |
+| Stale connection | `Connection not found`   | Remove `.connection` cache file       |
+| Network issue    | `Search timeout`         | Check internet connection             |
 
 ### Reset Everything
 
@@ -449,6 +459,7 @@ bash scripts/search.sh "test" 1
 **User:** "What are the new features in Next.js 15?"
 
 **Claude's approach:**
+
 ```bash
 # Search for Next.js 15 features
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 15 new features" 5
@@ -461,6 +472,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 15 new features" 5
 **User:** "I'm getting 'Cannot find module' error in TypeScript"
 
 **Claude's approach:**
+
 ```bash
 # Search for the specific error
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript Cannot find module error solution" 5
@@ -473,6 +485,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript Cannot find module 
 **User:** "What happened in AI this month?"
 
 **Claude's approach:**
+
 ```bash
 # Search for recent AI news
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
@@ -485,6 +498,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
 **User:** "How do I use React Server Components?"
 
 **Claude's approach:**
+
 ```bash
 # Search for RSC documentation and tutorials
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide tutorial" 5
@@ -497,6 +511,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide 
 **User:** "Should I use Vite or webpack in 2026?"
 
 **Claude's approach:**
+
 ```bash
 # Search for recent comparisons
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Vite vs webpack 2026 comparison" 5
@@ -550,6 +565,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Vite vs webpack 2026 compariso
 ## Support
 
 For issues:
+
 1. Check `.server.log` for errors
 2. Run basic test: `node SKILLs/web-search/scripts/test-basic.js`
 3. Verify Chrome installation

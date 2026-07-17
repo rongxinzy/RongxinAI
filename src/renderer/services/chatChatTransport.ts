@@ -13,7 +13,7 @@ import type { DirectChatRequestOptions } from './localThinkingRequest';
 function extractText(message: UIMessage): string {
   return message.parts
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
+    .map(p => p.text)
     .join('');
 }
 
@@ -44,7 +44,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
     abortSignal: AbortSignal | undefined;
   } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
     const directChatOptions = this.options;
-    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    const lastUser = [...messages].reverse().find(m => m.role === 'user');
     const prompt = lastUser ? extractText(lastUser) : '';
     if (!prompt.trim()) throw new Error('No prompt to send.');
 
@@ -81,45 +81,52 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
           controller.close();
         };
 
-        void apiService.chat(
-          prompt,
-          (content, reasoning) => {
-            if (abortSignal?.aborted) {
-              close('aborted');
-              return;
-            }
-            // apiService sends accumulated full content — diff to get deltas
-            if (reasoning) {
-              const delta = reasoning.startsWith(lastReasoning) ? reasoning.slice(lastReasoning.length) : reasoning;
-              lastReasoning = reasoning;
-              if (delta) {
-                if (!reasoningId) {
-                  reasoningId = generateId();
-                  enqueue({ type: 'reasoning-start', id: reasoningId });
-                }
-                enqueue({ type: 'reasoning-delta', id: reasoningId, delta });
+        void apiService
+          .chat(
+            prompt,
+            (content, reasoning) => {
+              if (abortSignal?.aborted) {
+                close('aborted');
+                return;
               }
-            }
-            if (content) {
-              const delta = content.startsWith(lastContent) ? content.slice(lastContent.length) : content;
-              lastContent = content;
-              if (delta) {
-                if (!textId) {
-                  textId = generateId();
-                  enqueue({ type: 'text-start', id: textId });
+              // apiService sends accumulated full content — diff to get deltas
+              if (reasoning) {
+                const delta = reasoning.startsWith(lastReasoning)
+                  ? reasoning.slice(lastReasoning.length)
+                  : reasoning;
+                lastReasoning = reasoning;
+                if (delta) {
+                  if (!reasoningId) {
+                    reasoningId = generateId();
+                    enqueue({ type: 'reasoning-start', id: reasoningId });
+                  }
+                  enqueue({ type: 'reasoning-delta', id: reasoningId, delta });
                 }
-                enqueue({ type: 'text-delta', id: textId, delta });
               }
-            }
-          },
-          history,
-          directChatOptions,
-        ).then(() => {
-          close();
-        }).catch((error: Error) => {
-          enqueue({ type: 'error', errorText: error.message || 'Chat API error' });
-          close('error');
-        });
+              if (content) {
+                const delta = content.startsWith(lastContent)
+                  ? content.slice(lastContent.length)
+                  : content;
+                lastContent = content;
+                if (delta) {
+                  if (!textId) {
+                    textId = generateId();
+                    enqueue({ type: 'text-start', id: textId });
+                  }
+                  enqueue({ type: 'text-delta', id: textId, delta });
+                }
+              }
+            },
+            history,
+            directChatOptions,
+          )
+          .then(() => {
+            close();
+          })
+          .catch((error: Error) => {
+            enqueue({ type: 'error', errorText: error.message || 'Chat API error' });
+            close('error');
+          });
 
         abortSignal?.addEventListener('abort', () => {
           close('aborted');

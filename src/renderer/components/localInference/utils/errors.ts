@@ -13,10 +13,7 @@ function stripTechnicalErrorPrefixes(message: string): string {
 
   while (next && next !== previous) {
     previous = next;
-    next = next
-      .replace(REMOTE_METHOD_ERROR_PREFIX, '')
-      .replace(ERROR_NAME_PREFIX, '')
-      .trim();
+    next = next.replace(REMOTE_METHOD_ERROR_PREFIX, '').replace(ERROR_NAME_PREFIX, '').trim();
   }
 
   return next;

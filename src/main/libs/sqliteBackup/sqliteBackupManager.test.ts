@@ -20,7 +20,7 @@ import {
 const tempDirs: string[] = [];
 
 const makeTempDir = (): string => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-sqlite-backup-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-sqlite-backup-'));
   tempDirs.push(dir);
   return dir;
 };
@@ -65,12 +65,12 @@ test('retainLatestSnapshots keeps only the newest successful snapshot', () => {
     },
   ]);
 
-  expect(retained.map((item) => item.fileName)).toEqual(['newest.sqlite']);
-  expect(removed.map((item) => item.fileName)).toEqual(['previous.sqlite', 'oldest.sqlite']);
+  expect(retained.map(item => item.fileName)).toEqual(['newest.sqlite']);
+  expect(removed.map(item => item.fileName)).toEqual(['previous.sqlite', 'oldest.sqlite']);
 });
 
 test('buildBackupPaths creates manifest snapshots and quarantine locations under userData', () => {
-  const userDataPath = '/tmp/lobsterai-user-data';
+  const userDataPath = '/tmp/zhiyuan-user-data';
   const paths = buildSqliteBackupPaths(userDataPath);
   expect(paths.backupDir).toContain(path.join('backups', 'sqlite'));
   expect(paths.snapshotsDir).toContain(path.join('backups', 'sqlite', 'snapshots'));
@@ -123,8 +123,12 @@ test('createBackup rewrites the same backup file instead of creating a second sn
   expect(manager.readManifest().snapshots[0]?.fileName).toBe(SQLITE_BACKUP_FILE_NAME);
   expect(manager.readManifest().snapshots[0]?.createdAt).toBe(secondRecord.createdAt);
 
-  const reopened = new Database(path.join(paths.snapshotsDir, SQLITE_BACKUP_FILE_NAME), { readonly: true });
-  expect(reopened.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({ value: 'second' });
+  const reopened = new Database(path.join(paths.snapshotsDir, SQLITE_BACKUP_FILE_NAME), {
+    readonly: true,
+  });
+  expect(reopened.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({
+    value: 'second',
+  });
   reopened.close();
 });
 

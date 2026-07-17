@@ -1,9 +1,9 @@
 {
-  "name": "rongxinai",
+  "name": "zhiyuan-agent",
   "private": true,
   "author": {
-    "name": "RongxinAI",
-    "email": "dev@rongxinai.com"
+    "name": "ZhiYuanAgent",
+    "email": "dev@zhiyuanagent.com"
   },
   "license": "MIT",
   "version": "2026.7.16",

@@ -1,12 +1,12 @@
-# RongxinAI 定时任务系统设计文档
+# 知远智能体定时任务系统设计文档
 
 ## 总述
 
-RongxinAI 的定时任务系统是一套横跨 **Renderer(UI) -> Main Process(IPC/业务逻辑) -> OpenClaw Gateway(调度引擎)** 三层的端到端自动化执行框架。它允许用户通过 UI 界面、IM 聊天或 Cowork 会话创建定时任务，由 OpenClaw 的 Cron 引擎进行调度触发，并将执行结果通过 IM 通道或 Webhook 投递给用户。
+知远智能体的定时任务系统是一套横跨 **Renderer(UI) -> Main Process(IPC/业务逻辑) -> OpenClaw Gateway(调度引擎)** 三层的端到端自动化执行框架。它允许用户通过 UI 界面、IM 聊天或 Cowork 会话创建定时任务，由 OpenClaw 的 Cron 引擎进行调度触发，并将执行结果通过 IM 通道或 Webhook 投递给用户。
 
 **核心设计理念**：
 
-1. **OpenClaw 驱动** -- 所有定时任务的调度、执行、投递均由 OpenClaw Gateway 原生完成，RongxinAI 作为上层应用只负责任务的 CRUD 和 UI 展示，不接管消息投递逻辑
+1. **OpenClaw 驱动** -- 所有定时任务的调度、执行、投递均由 OpenClaw Gateway 原生完成，知远智能体作为上层应用只负责任务的 CRUD 和 UI 展示，不接管消息投递逻辑
 2. **策略模式(Policy Pattern)** -- 不同来源的任务(UI/IM/Cowork/Legacy)各自拥有独立的策略类，控制默认参数、绑定关系、只读字段等行为
 3. **来源推断(Origin Inference)** -- 通过 `sessionKey` 的格式反向推断任务来源和执行绑定，实现与旧数据的无缝兼容
 4. **流式轮询** -- 通过 15 秒间隔的轮询机制将 OpenClaw 的任务状态变化实时推送到 UI
@@ -65,17 +65,17 @@ graph TB
 
 ```typescript
 type Schedule =
-  | { kind: 'at'; at: string }              // 一次性：ISO 8601 时间戳
-  | { kind: 'every'; everyMs: number; anchorMs?: number }  // 固定间隔（毫秒）
-  | { kind: 'cron'; expr: string; tz?: string; staggerMs?: number }  // Cron 表达式
+  | { kind: 'at'; at: string } // 一次性：ISO 8601 时间戳
+  | { kind: 'every'; everyMs: number; anchorMs?: number } // 固定间隔（毫秒）
+  | { kind: 'cron'; expr: string; tz?: string; staggerMs?: number }; // Cron 表达式
 ```
 
 #### 1.2 Payload -- 执行内容
 
 ```typescript
 type ScheduledTaskPayload =
-  | { kind: 'agentTurn'; message: string; timeoutSeconds?: number }   // Agent 对话轮次
-  | { kind: 'systemEvent'; text: string }                              // 系统事件注入
+  | { kind: 'agentTurn'; message: string; timeoutSeconds?: number } // Agent 对话轮次
+  | { kind: 'systemEvent'; text: string }; // 系统事件注入
 ```
 
 - `agentTurn`：在隔离会话中执行完整的 Agent 对话轮次，支持超时控制
@@ -86,10 +86,10 @@ type ScheduledTaskPayload =
 ```typescript
 interface ScheduledTaskDelivery {
   mode: 'none' | 'announce' | 'webhook';
-  channel?: string;      // IM 通道名：'feishu', 'dingtalk-connector', 'telegram' 等
-  to?: string;           // 目标标识：会话 ID 或 Webhook URL
-  accountId?: string;    // 多账号场景下的账号标识
-  bestEffort?: boolean;  // 投递失败是否影响任务状态
+  channel?: string; // IM 通道名：'feishu', 'dingtalk-connector', 'telegram' 等
+  to?: string; // 目标标识：会话 ID 或 Webhook URL
+  accountId?: string; // 多账号场景下的账号标识
+  bestEffort?: boolean; // 投递失败是否影响任务状态
 }
 ```
 
@@ -185,14 +185,14 @@ interface TaskPolicy {
 
 每个方法的职责：
 
-| 方法 | 职责 |
-|------|------|
-| `getCreateDefaults` | 返回该来源任务的默认参数 |
-| `normalizeDraft` | 保存前的归一化校验（自动填充、绑定一致性） |
-| `onDeliveryChanged` | 用户修改投递配置时联动更新绑定关系 |
-| `toWireBinding` | 将领域模型的 `ExecutionBinding` 映射为 OpenClaw 的 `sessionTarget`/`sessionKey` |
-| `describeRunBehavior` | 生成人类可读的运行行为描述 |
-| `getReadonlyFields` | 返回 UI 中不可编辑的字段列表 |
+| 方法                  | 职责                                                                            |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `getCreateDefaults`   | 返回该来源任务的默认参数                                                        |
+| `normalizeDraft`      | 保存前的归一化校验（自动填充、绑定一致性）                                      |
+| `onDeliveryChanged`   | 用户修改投递配置时联动更新绑定关系                                              |
+| `toWireBinding`       | 将领域模型的 `ExecutionBinding` 映射为 OpenClaw 的 `sessionTarget`/`sessionKey` |
+| `describeRunBehavior` | 生成人类可读的运行行为描述                                                      |
+| `getReadonlyFields`   | 返回 UI 中不可编辑的字段列表                                                    |
 
 #### 2.2 四种策略实现
 
@@ -247,12 +247,12 @@ classDiagram
 
 **各策略默认参数对比：**
 
-| 策略 | sessionTarget | wakeMode | delivery.mode | delivery.channel | 只读字段 |
-|------|--------------|----------|---------------|-----------------|---------|
-| ManualTaskPolicy | `isolated` | `now` | `announce` | `last` | 无 |
-| IMTaskPolicy | `main` | `now` | `announce` | 来源平台 | `origin` |
-| CoworkTaskPolicy | `main` | `now` | `announce` | `last` | `origin` |
-| LegacyTaskPolicy | `main` | `next-heartbeat` | -- | -- | `origin` |
+| 策略             | sessionTarget | wakeMode         | delivery.mode | delivery.channel | 只读字段 |
+| ---------------- | ------------- | ---------------- | ------------- | ---------------- | -------- |
+| ManualTaskPolicy | `isolated`    | `now`            | `announce`    | `last`           | 无       |
+| IMTaskPolicy     | `main`        | `now`            | `announce`    | 来源平台         | `origin` |
+| CoworkTaskPolicy | `main`        | `now`            | `announce`    | `last`           | `origin` |
+| LegacyTaskPolicy | `main`        | `next-heartbeat` | --            | --               | `origin` |
 
 **策略切换 delivery 时的绑定联动：**
 
@@ -284,20 +284,20 @@ const taskPolicyRegistry = new TaskPolicyRegistry([
 
 ```typescript
 type TaskOrigin =
-  | { kind: 'legacy' }                                         // 旧版任务
-  | { kind: 'im'; platform: string; conversationId: string }   // IM 创建
-  | { kind: 'cowork'; sessionId: string }                      // Cowork 会话创建
-  | { kind: 'manual' }                                         // UI 手动创建
+  | { kind: 'legacy' } // 旧版任务
+  | { kind: 'im'; platform: string; conversationId: string } // IM 创建
+  | { kind: 'cowork'; sessionId: string } // Cowork 会话创建
+  | { kind: 'manual' }; // UI 手动创建
 ```
 
 #### 3.2 ExecutionBinding -- 任务如何执行
 
 ```typescript
 type ExecutionBinding =
-  | { kind: 'new_session' }                                      // 每次触发创建新会话
-  | { kind: 'ui_session'; sessionId: string }                    // 在指定 UI 会话中执行
-  | { kind: 'im_session'; platform: string; conversationId: string; sessionId?: string }  // IM 会话绑定
-  | { kind: 'session_key'; sessionKey: string }                  // 使用显式 sessionKey
+  | { kind: 'new_session' } // 每次触发创建新会话
+  | { kind: 'ui_session'; sessionId: string } // 在指定 UI 会话中执行
+  | { kind: 'im_session'; platform: string; conversationId: string; sessionId?: string } // IM 会话绑定
+  | { kind: 'session_key'; sessionKey: string }; // 使用显式 sessionKey
 ```
 
 #### 3.3 inferOriginAndBinding -- 反向推断
@@ -308,7 +308,7 @@ type ExecutionBinding =
 flowchart TD
     A["输入: task.sessionKey"] --> B{sessionKey 存在?}
     B -->|No| G["origin: manual<br/>binding: new_session"]
-    B -->|Yes| C{是 managed key?<br/>agent:main:lobsterai:*}
+    B -->|Yes| C{是 managed key?<br/>agent:main:zhiyuan:*}
     C -->|Yes| D{delivery 指向 IM 通道?}
     D -->|Yes| E["origin: im<br/>binding: im_session"]
     D -->|No| F["origin: cowork<br/>binding: ui_session"]
@@ -319,11 +319,11 @@ flowchart TD
 
 **SessionKey 格式说明：**
 
-| 格式 | 示例 | 含义 |
-|------|------|------|
-| `agent:main:lobsterai:{sessionId}` | `agent:main:lobsterai:abc123` | 托管会话（UI/Cowork 创建） |
-| `agent:{agentId}:{platform}:{subtype}:{conversationId}` | `agent:main:feishu:direct:ou_xxx` | IM 通道会话 |
-| `cron:{jobId}` | `cron:job-456` | 隔离的 Cron 会话 |
+| 格式                                                    | 示例                              | 含义                       |
+| ------------------------------------------------------- | --------------------------------- | -------------------------- |
+| `agent:main:zhiyuan:{sessionId}`                        | `agent:main:zhiyuan:abc123`       | 托管会话（UI/Cowork 创建） |
+| `agent:{agentId}:{platform}:{subtype}:{conversationId}` | `agent:main:feishu:direct:ou_xxx` | IM 通道会话                |
+| `cron:{jobId}`                                          | `cron:job-456`                    | 隔离的 Cron 会话           |
 
 ---
 
@@ -340,11 +340,11 @@ flowchart LR
 
 三个核心方法：
 
-| 方法 | 输入 | 输出 | 用途 |
-|------|------|------|------|
-| `fromWire()` | `WireTask` + 可选 `meta` | `PolicyTaskModel` | 从 IPC 数据还原领域模型 |
-| `toWireInput()` | `PolicyTaskModel` + `TaskPolicy` | `PolicyTaskInput` | 保存时转为 IPC 格式 |
-| `createDraft()` | `TaskOrigin` + `defaults` | `PolicyTaskModel` | 创建空白草稿 |
+| 方法            | 输入                             | 输出              | 用途                    |
+| --------------- | -------------------------------- | ----------------- | ----------------------- |
+| `fromWire()`    | `WireTask` + 可选 `meta`         | `PolicyTaskModel` | 从 IPC 数据还原领域模型 |
+| `toWireInput()` | `PolicyTaskModel` + `TaskPolicy` | `PolicyTaskInput` | 保存时转为 IPC 格式     |
+| `createDraft()` | `TaskOrigin` + `defaults`        | `PolicyTaskModel` | 创建空白草稿            |
 
 ---
 
@@ -354,11 +354,11 @@ flowchart LR
 
 **支持的格式：**
 
-| 格式 | 示例 | 解析函数 |
-|------|------|---------|
-| 结构化提示 | `A scheduled reminder has been triggered. The reminder content is: ...` | `parseScheduledReminderPrompt()` |
-| Legacy 系统消息 | `System: [2026-03-21 09:00] ⏰ 查看邮箱` | `parseLegacyScheduledReminderSystemMessage()` |
-| 简单 emoji 格式 | `⏰ 提醒：查看邮箱` | `parseSimpleScheduledReminderText()` |
+| 格式            | 示例                                                                    | 解析函数                                      |
+| --------------- | ----------------------------------------------------------------------- | --------------------------------------------- |
+| 结构化提示      | `A scheduled reminder has been triggered. The reminder content is: ...` | `parseScheduledReminderPrompt()`              |
+| Legacy 系统消息 | `System: [2026-03-21 09:00] ⏰ 查看邮箱`                                | `parseLegacyScheduledReminderSystemMessage()` |
+| 简单 emoji 格式 | `⏰ 提醒：查看邮箱`                                                     | `parseSimpleScheduledReminderText()`          |
 
 统一入口 `getScheduledReminderDisplayText()` 按优先级依次尝试三种解析器，返回纯文本提醒内容。
 
@@ -385,21 +385,21 @@ graph TD
 ```typescript
 class ScheduledTaskService {
   // CRUD 操作
-  async loadTasks()                          // IPC: scheduledTask:list
-  async createTask(input)                    // IPC: scheduledTask:create
-  async updateTaskById(id, partial)          // IPC: scheduledTask:update
-  async deleteTask(id)                       // IPC: scheduledTask:delete
-  async toggleTask(id, enabled)              // IPC: scheduledTask:toggle
+  async loadTasks(); // IPC: scheduledTask:list
+  async createTask(input); // IPC: scheduledTask:create
+  async updateTaskById(id, partial); // IPC: scheduledTask:update
+  async deleteTask(id); // IPC: scheduledTask:delete
+  async toggleTask(id, enabled); // IPC: scheduledTask:toggle
 
   // 执行操作
-  async runManually(id)                      // IPC: scheduledTask:runManually
-  async stopTask(id)                         // IPC: scheduledTask:stop
+  async runManually(id); // IPC: scheduledTask:runManually
+  async stopTask(id); // IPC: scheduledTask:stop
 
   // 查询操作
-  async loadRuns(taskId, limit?, offset?)    // IPC: scheduledTask:listRuns
-  async loadAllRuns(limit?, offset?)         // IPC: scheduledTask:listAllRuns
-  async listChannels()                       // IPC: scheduledTask:listChannels
-  async listChannelConversations(channel)    // IPC: scheduledTask:listChannelConversations
+  async loadRuns(taskId, limit?, offset?); // IPC: scheduledTask:listRuns
+  async loadAllRuns(limit?, offset?); // IPC: scheduledTask:listAllRuns
+  async listChannels(); // IPC: scheduledTask:listChannels
+  async listChannelConversations(channel); // IPC: scheduledTask:listChannelConversations
 }
 ```
 
@@ -418,6 +418,7 @@ interface ScheduledTaskState {
 ```
 
 状态更新来源：
+
 - **用户操作** -> Service 调用 -> IPC 返回 -> dispatch action
 - **轮询推送** -> IPC 事件监听 -> dispatch action（`updateTaskState`, `addOrUpdateRun`）
 
@@ -429,25 +430,25 @@ interface ScheduledTaskState {
 
 共 14 个 `scheduledTask:*` invoke 通道 + 3 个广播事件：
 
-| 通道 | 方向 | 功能 |
-|------|------|------|
-| `scheduledTask:list` | Request-Reply | 获取全部任务 |
-| `scheduledTask:get` | Request-Reply | 获取单个任务 |
-| `scheduledTask:create` | Request-Reply | 创建任务（含 IM delivery 归一化） |
-| `scheduledTask:update` | Request-Reply | 更新任务（含 IM delivery 归一化） |
-| `scheduledTask:delete` | Request-Reply | 删除任务 |
-| `scheduledTask:toggle` | Request-Reply | 启用/禁用任务 |
-| `scheduledTask:runManually` | Request-Reply | 手动触发执行 |
-| `scheduledTask:stop` | Request-Reply | 停止执行（No-op） |
-| `scheduledTask:listRuns` | Request-Reply | 获取任务运行历史 |
-| `scheduledTask:countRuns` | Request-Reply | 获取运行次数 |
-| `scheduledTask:listAllRuns` | Request-Reply | 获取全局运行历史 |
-| `scheduledTask:resolveSession` | Request-Reply | 获取瞬态会话内容 |
-| `scheduledTask:listChannels` | Request-Reply | 列出可用 IM 通道 |
-| `scheduledTask:listChannelConversations` | Request-Reply | 列出通道下的会话 |
-| `scheduledTask:statusUpdate` | Broadcast | 任务状态变更推送 |
-| `scheduledTask:runUpdate` | Broadcast | 运行记录更新推送 |
-| `scheduledTask:refresh` | Broadcast | 全量刷新信号 |
+| 通道                                     | 方向          | 功能                              |
+| ---------------------------------------- | ------------- | --------------------------------- |
+| `scheduledTask:list`                     | Request-Reply | 获取全部任务                      |
+| `scheduledTask:get`                      | Request-Reply | 获取单个任务                      |
+| `scheduledTask:create`                   | Request-Reply | 创建任务（含 IM delivery 归一化） |
+| `scheduledTask:update`                   | Request-Reply | 更新任务（含 IM delivery 归一化） |
+| `scheduledTask:delete`                   | Request-Reply | 删除任务                          |
+| `scheduledTask:toggle`                   | Request-Reply | 启用/禁用任务                     |
+| `scheduledTask:runManually`              | Request-Reply | 手动触发执行                      |
+| `scheduledTask:stop`                     | Request-Reply | 停止执行（No-op）                 |
+| `scheduledTask:listRuns`                 | Request-Reply | 获取任务运行历史                  |
+| `scheduledTask:countRuns`                | Request-Reply | 获取运行次数                      |
+| `scheduledTask:listAllRuns`              | Request-Reply | 获取全局运行历史                  |
+| `scheduledTask:resolveSession`           | Request-Reply | 获取瞬态会话内容                  |
+| `scheduledTask:listChannels`             | Request-Reply | 列出可用 IM 通道                  |
+| `scheduledTask:listChannelConversations` | Request-Reply | 列出通道下的会话                  |
+| `scheduledTask:statusUpdate`             | Broadcast     | 任务状态变更推送                  |
+| `scheduledTask:runUpdate`                | Broadcast     | 运行记录更新推送                  |
+| `scheduledTask:refresh`                  | Broadcast     | 全量刷新信号                      |
 
 #### 7.2 Create/Update 的 IM Delivery 归一化
 
@@ -469,7 +470,7 @@ flowchart TD
 
 **为什么要剥离前缀？**
 
-RongxinAI 的 `imStore` 中存储的 `conversationId` 带有 IM 子类型前缀（如 `direct:ou_xxx` 表示飞书私聊，`group:oc_xxx` 表示飞书群聊）。但 OpenClaw 的飞书插件中 `normalizeFeishuTarget()` 不识别 `direct:` 前缀，会将 `direct:ou_xxx` 原样传递给飞书 API，导致 400 错误。因此在传递给 OpenClaw 之前需要剥离此前缀。
+知远智能体的 `imStore` 中存储的 `conversationId` 带有 IM 子类型前缀（如 `direct:ou_xxx` 表示飞书私聊，`group:oc_xxx` 表示飞书群聊）。但 OpenClaw 的飞书插件中 `normalizeFeishuTarget()` 不识别 `direct:` 前缀，会将 `direct:ou_xxx` 原样传递给飞书 API，导致 400 错误。因此在传递给 OpenClaw 之前需要剥离此前缀。
 
 ---
 
@@ -477,7 +478,7 @@ RongxinAI 的 `imStore` 中存储的 `conversationId` 带有 IM 子类型前缀�
 
 #### 8.1 职责
 
-`CronJobService` 是 RongxinAI 与 OpenClaw Gateway 之间的 **适配器层**，封装了所有 Cron RPC 调用。
+`CronJobService` 是 知远智能体与 OpenClaw Gateway 之间的 **适配器层**，封装了所有 Cron RPC 调用。
 
 ```mermaid
 classDiagram
@@ -513,16 +514,16 @@ classDiagram
 
 #### 8.2 Gateway RPC 方法映射
 
-| CronJobService 方法 | Gateway RPC | 说明 |
-|---------------------|------------|------|
-| `addJob()` | `cron.add` | 创建 Cron Job |
-| `updateJob()` | `cron.update` | 更新 Cron Job（patch 模式） |
-| `removeJob()` | `cron.remove` | 删除 Cron Job |
-| `toggleJob()` | `cron.update` | 更新 enabled 字段 |
-| `runJob()` | `cron.run` | 立即触发执行 |
-| `listJobs()` | `cron.list` | 列出所有 Job（含 disabled） |
-| `listRuns()` | `cron.runs` | 查询 Job 的运行历史 |
-| `listAllRuns()` | `cron.runs` | 查询全局运行历史 |
+| CronJobService 方法 | Gateway RPC   | 说明                        |
+| ------------------- | ------------- | --------------------------- |
+| `addJob()`          | `cron.add`    | 创建 Cron Job               |
+| `updateJob()`       | `cron.update` | 更新 Cron Job（patch 模式） |
+| `removeJob()`       | `cron.remove` | 删除 Cron Job               |
+| `toggleJob()`       | `cron.update` | 更新 enabled 字段           |
+| `runJob()`          | `cron.run`    | 立即触发执行                |
+| `listJobs()`        | `cron.list`   | 列出所有 Job（含 disabled） |
+| `listRuns()`        | `cron.runs`   | 查询 Job 的运行历史         |
+| `listAllRuns()`     | `cron.runs`   | 查询全局运行历史            |
 
 #### 8.3 轮询机制
 
@@ -552,15 +553,15 @@ sequenceDiagram
 
 #### 8.4 类型映射
 
-CronJobService 在 RongxinAI 前端类型和 OpenClaw Gateway 类型之间进行双向转换：
+CronJobService 在 知远智能体前端类型和 OpenClaw Gateway 类型之间进行双向转换：
 
-| 前端类型 | Gateway 类型 | 转换函数 |
-|---------|-------------|---------|
-| `Schedule` | `GatewaySchedule` | `mapGatewaySchedule()` / `toGatewaySchedule()` |
-| `ScheduledTaskPayload` | `GatewayPayload` | `toGatewayPayload()` |
-| `ScheduledTaskDelivery` | `GatewayDelivery` | `toGatewayDelivery()` |
-| `TaskState` | `GatewayJobState` | `mapGatewayTaskState()` |
-| `ScheduledTask` | `GatewayJob` | `mapGatewayJob()` |
+| 前端类型                | Gateway 类型      | 转换函数                                       |
+| ----------------------- | ----------------- | ---------------------------------------------- |
+| `Schedule`              | `GatewaySchedule` | `mapGatewaySchedule()` / `toGatewaySchedule()` |
+| `ScheduledTaskPayload`  | `GatewayPayload`  | `toGatewayPayload()`                           |
+| `ScheduledTaskDelivery` | `GatewayDelivery` | `toGatewayDelivery()`                          |
+| `TaskState`             | `GatewayJobState` | `mapGatewayTaskState()`                        |
+| `ScheduledTask`         | `GatewayJob`      | `mapGatewayJob()`                              |
 
 ---
 
@@ -614,29 +615,29 @@ sequenceDiagram
 
 #### 10.1 SessionKey 格式
 
-OpenClaw 使用 `sessionKey` 来标识和管理会话。RongxinAI 当前保留 legacy `lobsterai` 段用于兼容旧会话，格式如下：
+OpenClaw 使用 `sessionKey` 来标识和管理会话。知远智能体会话 key 统一使用 `zhiyuan` 段，格式如下：
 
-| 类型 | 格式 | 示例 | 用途 |
-|------|------|------|------|
-| 托管会话 | `agent:{agentId}:lobsterai:{sessionId}` | `agent:main:lobsterai:abc123` | UI/Cowork 创建的会话 |
-| 通道会话 | `agent:{agentId}:{platform}:{subtype}:{conversationId}` | `agent:main:feishu:direct:ou_xxx` | IM 平台的会话 |
-| Cron 会话 | `cron:{jobId}` | `cron:job-456` | 隔离 Cron 任务的独立会话 |
+| 类型      | 格式                                                    | 示例                              | 用途                     |
+| --------- | ------------------------------------------------------- | --------------------------------- | ------------------------ |
+| 托管会话  | `agent:{agentId}:zhiyuan:{sessionId}`                   | `agent:main:zhiyuan:abc123`       | UI/Cowork 创建的会话     |
+| 通道会话  | `agent:{agentId}:{platform}:{subtype}:{conversationId}` | `agent:main:feishu:direct:ou_xxx` | IM 平台的会话            |
+| Cron 会话 | `cron:{jobId}`                                          | `cron:job-456`                    | 隔离 Cron 任务的独立会话 |
 
 #### 10.2 平台映射
 
 ```typescript
 const CHANNEL_PLATFORM_MAP: Record<string, IMPlatform> = {
   'dingtalk-connector': 'dingtalk',
-  'feishu': 'feishu',
-  'telegram': 'telegram',
-  'discord': 'discord',
+  feishu: 'feishu',
+  telegram: 'telegram',
+  discord: 'discord',
 };
 
 const PLATFORM_TO_CHANNEL_MAP: Record<IMPlatform, string> = {
-  'dingtalk': 'dingtalk-connector',
-  'feishu': 'feishu',
-  'telegram': 'telegram',
-  'discord': 'discord',
+  dingtalk: 'dingtalk-connector',
+  feishu: 'feishu',
+  telegram: 'telegram',
+  discord: 'discord',
 };
 ```
 
@@ -665,15 +666,15 @@ interface CronJob {
   name: string;
   description?: string;
   enabled: boolean;
-  schedule: CronSchedule;           // at | every | cron
+  schedule: CronSchedule; // at | every | cron
   sessionTarget: 'main' | 'isolated';
   wakeMode: 'now' | 'next-heartbeat';
-  payload: CronPayload;            // systemEvent | agentTurn
-  delivery?: CronDelivery;         // announce | webhook | none
+  payload: CronPayload; // systemEvent | agentTurn
+  delivery?: CronDelivery; // announce | webhook | none
   failureAlert?: CronFailureAlert;
   agentId?: string | null;
   sessionKey?: string | null;
-  deleteAfterRun?: boolean;        // 一次性任务自动删除
+  deleteAfterRun?: boolean; // 一次性任务自动删除
   state: CronJobState;
   createdAtMs: number;
   updatedAtMs: number;
@@ -720,28 +721,30 @@ flowchart TD
 #### 11.4 重试与错误处理
 
 **瞬态错误（自动重试）：**
+
 - 速率限制 (429)
 - 网络错误 (timeout, ECONNRESET)
 - 服务器错误 (5xx)
 
 **永久错误（立即禁用）：**
+
 - 认证失败（API Key 无效）
 - 配置/验证错误
 
 **重试策略：**
 
-| 任务类型 | 重试次数 | 退避策略 | 失败后行为 |
-|---------|---------|---------|-----------|
-| 一次性 (`at`) | 最多 3 次 | 30s -> 1m -> 5m | 禁用或删除 |
-| 循环 (`cron`/`every`) | 不限次 | 30s -> 1m -> 5m -> 15m -> 60m | 保持启用，退避延长 |
+| 任务类型              | 重试次数  | 退避策略                      | 失败后行为         |
+| --------------------- | --------- | ----------------------------- | ------------------ |
+| 一次性 (`at`)         | 最多 3 次 | 30s -> 1m -> 5m               | 禁用或删除         |
+| 循环 (`cron`/`every`) | 不限次    | 30s -> 1m -> 5m -> 15m -> 60m | 保持启用，退避延长 |
 
 #### 11.5 存储与清理
 
-| 存储项 | 路径 | 清理策略 |
-|-------|------|---------|
-| Job 定义 | `~/.openclaw/cron/jobs.json` | 手动删除 |
+| 存储项   | 路径                                  | 清理策略                                            |
+| -------- | ------------------------------------- | --------------------------------------------------- |
+| Job 定义 | `~/.openclaw/cron/jobs.json`          | 手动删除                                            |
 | 运行历史 | `~/.openclaw/cron/runs/{jobId}.jsonl` | `runLog.maxBytes` (2MB) + `runLog.keepLines` (2000) |
-| 隔离会话 | OpenClaw sessions | `sessionRetention` (默认 24h) |
+| 隔离会话 | OpenClaw sessions                     | `sessionRetention` (默认 24h)                       |
 
 ---
 
@@ -837,18 +840,18 @@ sequenceDiagram
 
 ## 总结
 
-RongxinAI 的定时任务系统通过三层架构实现了完整的自动化执行能力：
+知远智能体的定时任务系统通过三层架构实现了完整的自动化执行能力：
 
 1. **前端层（Renderer）**：提供直观的 UI 界面用于任务的 CRUD 管理，通过 Redux + 轮询实现实时状态更新
 2. **业务层（Main Process）**：通过 IPC handler + CronJobService 封装业务逻辑，负责 IM delivery 的归一化处理和类型映射
-3. **引擎层（OpenClaw Gateway）**：承担所有调度、执行、投递的核心工作，确保 RongxinAI 不需要自行实现消息投递逻辑
+3. **引擎层（OpenClaw Gateway）**：承担所有调度、执行、投递的核心工作，确保 知远智能体不需要自行实现消息投递逻辑
 
 **关键设计决策：**
 
-| 决策 | 理由 |
-|------|------|
-| 策略模式区分任务来源 | 不同来源的默认参数、绑定关系、只读字段各不相同，策略模式避免了大量 if-else |
-| 来源推断而非存储 | 通过 sessionKey 格式反推来源，无需修改 OpenClaw 的数据模型即可兼容旧数据 |
-| 前缀剥离而非修改 OpenClaw | RongxinAI 的 `imStore` 需要带前缀的 ID 做内部路由，但 OpenClaw 的 Feishu 插件不识别该前缀，因此在传递给 OpenClaw 前剥离 |
-| 15 秒轮询而非 WebSocket | OpenClaw Gateway 不暴露实时事件流，轮询是最简单可靠的状态同步方式 |
-| `isolated` + `announce` 作为 IM 投递标准模式 | 隔离会话避免污染主聊天记录，announce 模式让 OpenClaw 原生处理消息投递，保持 OpenClaw 驱动的设计理念 |
+| 决策                                         | 理由                                                                                                                    |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 策略模式区分任务来源                         | 不同来源的默认参数、绑定关系、只读字段各不相同，策略模式避免了大量 if-else                                              |
+| 来源推断而非存储                             | 通过 sessionKey 格式反推来源，无需修改 OpenClaw 的数据模型即可兼容旧数据                                                |
+| 前缀剥离而非修改 OpenClaw                    | 知远智能体的 `imStore` 需要带前缀的 ID 做内部路由，但 OpenClaw 的 Feishu 插件不识别该前缀，因此在传递给 OpenClaw 前剥离 |
+| 15 秒轮询而非 WebSocket                      | OpenClaw Gateway 不暴露实时事件流，轮询是最简单可靠的状态同步方式                                                       |
+| `isolated` + `announce` 作为 IM 投递标准模式 | 隔离会话避免污染主聊天记录，announce 模式让 OpenClaw 原生处理消息投递，保持 OpenClaw 驱动的设计理念                     |

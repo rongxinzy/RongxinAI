@@ -46,6 +46,7 @@ $env:ARK_API_KEY="你的API密钥"
 RongxinAI 会自动读取系统环境变量，确保在启动 RongxinAI 前已设置 `ARK_API_KEY`。
 
 **如何获取 API Key：**
+
 1. 访问火山方舟控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/apikey
 2. 创建新的 API Key
 3. 复制密钥并设置为环境变量
@@ -69,6 +70,7 @@ Seedance 视频生成是一个异步过程：
 ### 免费额度
 
 所有 Seedance 模型在 **default 模式（在线推理）**下提供：
+
 - **200万 token** 免费额度
 - flex 模式（离线推理）无免费额度
 
@@ -76,10 +78,10 @@ Seedance 视频生成是一个异步过程：
 
 ### 限流限制
 
-| 模型系列 | RPM（每分钟请求数） | 并发数 | TPD（离线模式每日token） |
-|---------|-------------------|--------|----------------------|
-| Pro 系列 | 600 | 10 | 5000亿 |
-| Lite 系列 | 300 | 5 | 2500亿 |
+| 模型系列  | RPM（每分钟请求数） | 并发数 | TPD（离线模式每日token） |
+| --------- | ------------------- | ------ | ------------------------ |
+| Pro 系列  | 600                 | 10     | 5000亿                   |
+| Lite 系列 | 300                 | 5      | 2500亿                   |
 
 - **RPM 限流**：账号下同模型每分钟允许创建的任务数量上限
 - **并发数限制**：同一时刻在处理中的任务数量上限
@@ -88,6 +90,7 @@ Seedance 视频生成是一个异步过程：
 ### 视频保存时间
 
 ⚠️ **重要提醒**：
+
 - 任务数据（包括视频URL）仅保留 **24 小时**
 - 超时后会被自动清除
 - **务必及时下载保存生成的视频**
@@ -108,6 +111,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 **示例提示词：**
+
 - "写实风格，晴朗的蓝天之下，一大片白色的雏菊花田，镜头逐渐拉近，最终定格在一朵雏菊花的特写上，花瓣上有几颗晶莹的露珠"
 - "一辆地铁轰隆隆驶过，书页飞扬，镜头开始环绕着女孩360度旋转"
 - "海边日落，海浪轻拍沙滩，宁静祥和的氛围"
@@ -133,11 +137,13 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 **支持的图片来源：**
+
 - ✅ 本地文件：`/path/to/image.jpg`
 - ✅ 网络URL：`https://example.com/image.jpg`
 - ✅ file://协议：`file:///path/to/image.jpg`
 
 **支持的图片格式：**
+
 - jpg, jpeg, png, gif, webp, bmp, tiff, heic
 
 ### 3. 图片生成视频（I2V）- 首尾帧引导
@@ -186,23 +192,23 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 
 ### 必需参数
 
-| 参数 | 说明 | 示例 |
-|-----|------|------|
+| 参数       | 说明                   | 示例         |
+| ---------- | ---------------------- | ------------ |
 | `--prompt` | 视频描述提示词（必需） | "小猫在玩耍" |
 
 ### 可选参数
 
-| 参数 | 说明 | 默认值 | 可选值 |
-|-----|------|-------|--------|
-| `--image` | 参考图片路径或URL（可多次使用） | 无 | 本地文件路径或URL |
-| `--model` | 模型ID | `doubao-seedance-1-5-pro-251215` | 见模型列表 |
-| `--duration` | 视频时长（秒） | 5 | 2-12（不同模型范围不同） |
-| `--ratio` | 宽高比 | `adaptive` | `adaptive`, `16:9`, `9:16`, `1:1` |
-| `--audio` | 生成音频（仅1.5 pro支持） | 否 | 标志参数 |
-| `--no-watermark` | 不添加水印 | 否 | 标志参数 |
-| `--output` | 输出文件路径 | `generated_video.mp4` | 文件路径 |
-| `--poll-interval` | 状态查询间隔（秒） | 5 | 1-10 |
-| `--timeout` | 最大等待时间（秒） | 300 | 60-600 |
+| 参数              | 说明                            | 默认值                           | 可选值                            |
+| ----------------- | ------------------------------- | -------------------------------- | --------------------------------- |
+| `--image`         | 参考图片路径或URL（可多次使用） | 无                               | 本地文件路径或URL                 |
+| `--model`         | 模型ID                          | `doubao-seedance-1-5-pro-251215` | 见模型列表                        |
+| `--duration`      | 视频时长（秒）                  | 5                                | 2-12（不同模型范围不同）          |
+| `--ratio`         | 宽高比                          | `adaptive`                       | `adaptive`, `16:9`, `9:16`, `1:1` |
+| `--audio`         | 生成音频（仅1.5 pro支持）       | 否                               | 标志参数                          |
+| `--no-watermark`  | 不添加水印                      | 否                               | 标志参数                          |
+| `--output`        | 输出文件路径                    | `generated_video.mp4`            | 文件路径                          |
+| `--poll-interval` | 状态查询间隔（秒）              | 5                                | 1-10                              |
+| `--timeout`       | 最大等待时间（秒）              | 300                              | 60-600                            |
 
 ## 模型选择
 
@@ -259,6 +265,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 或在 RongxinAI 对话中说："用 Seedance 2.0 生成视频..."
 
 **推荐使用场景：**
+
 - 追求最高质量 + 音画同步 → 1.5 pro
 - 标准高质量视频 → 1.0 pro
 - 快速生成预览 → 1.0 pro fast
@@ -301,6 +308,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 **注意：**
+
 - Seedance 1.5 pro 支持 4-12 秒
 - Seedance 1.0 系列支持 2-12 秒
 - 时长越长，生成时间越久
@@ -332,38 +340,44 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 
 生成过程中可能出现的任务状态：
 
-| 状态 | 说明 | 操作 |
-|------|------|------|
-| `queued` | 任务排队中 | 继续等待 |
-| `running` | 正在生成视频 | 继续等待 |
-| `succeeded` | 生成成功 | 下载视频 |
-| `failed` | 生成失败 | 查看错误信息 |
+| 状态        | 说明         | 操作         |
+| ----------- | ------------ | ------------ |
+| `queued`    | 任务排队中   | 继续等待     |
+| `running`   | 正在生成视频 | 继续等待     |
+| `succeeded` | 生成成功     | 下载视频     |
+| `failed`    | 生成失败     | 查看错误信息 |
 
 ## 错误处理
 
 ### 常见错误及解决方案
 
 **错误：未设置环境变量 ARK_API_KEY**
+
 - 原因：未配置 API Key
 - 解决：按照"如何配置 API Key"部分的说明进行配置
 
 **错误：任务创建失败 (HTTP 401)**
+
 - 原因：API Key 无效或已过期
 - 解决：检查 API Key 是否正确，或在控制台重新生成
 
 **错误：任务创建失败 (HTTP 400)**
+
 - 原因：参数错误（如 duration 超出范围）
 - 解决：检查参数是否符合模型要求
 
 **错误：任务超时**
+
 - 原因：生成时间过长或 API 繁忙
 - 解决：增加 `--timeout` 值，或稍后重试
 
 **错误：任务失败**
+
 - 原因：内容违规、提示词不清晰、图片格式错误等
 - 解决：检查提示词内容，确保图片URL可访问
 
 **错误：限流 (HTTP 429)**
+
 - 原因：超过 RPM 或并发限制
 - 解决：等待1分钟后重试，或升级配额
 
@@ -394,6 +408,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 **示例：**
+
 ```
 写实风格，海边日落，一只海鸥在空中盘旋，镜头从远处缓缓推进到海鸥特写，宁静祥和的氛围
 ```
@@ -410,6 +425,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ## 常见使用场景
 
 ### 短视频创作
+
 ```bash
 bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
   --prompt "产品展示：智能手表从不同角度旋转展示" \
@@ -418,6 +434,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 ### 动画短片
+
 ```bash
 bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
   --prompt "卡通风格，小兔子在森林里蹦蹦跳跳" \
@@ -427,6 +444,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 ### 社交媒体内容
+
 ```bash
 bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
   --prompt "美食特写：热气腾腾的拉面，筷子夹起面条" \
@@ -435,6 +453,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ```
 
 ### 教学演示
+
 ```bash
 bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
   --prompt "科普动画：地球自转，太阳光照射地球表面" \
@@ -451,6 +470,7 @@ bash "$SKILLS_ROOT/seedance/scripts/generate-video.sh" \
 ## 技术支持
 
 如遇到问题，可以：
+
 1. 查看脚本输出的错误信息
 2. 检查 API Key 配置是否正确
 3. 访问火山方舟控制台查看任务详情

@@ -24,9 +24,12 @@ function summarizeGatewayAsarEntries(entries) {
   return {
     hasOpenClawEntry: entrySet.has(`/${OPENCLAW_ENTRY}`),
     hasControlUiIndex: entrySet.has(`/${DIST_CONTROL_UI_INDEX.replace(/\\/g, '/')}`),
-    hasGatewayEntry: entrySet.has(`/${DIST_ENTRY_JS.replace(/\\/g, '/')}`)
-      || entrySet.has(`/${DIST_ENTRY_MJS.replace(/\\/g, '/')}`),
-    hasBundledExtensions: normalizedEntries.some((entry) => entry === '/dist/extensions' || entry.startsWith('/dist/extensions/')),
+    hasGatewayEntry:
+      entrySet.has(`/${DIST_ENTRY_JS.replace(/\\/g, '/')}`) ||
+      entrySet.has(`/${DIST_ENTRY_MJS.replace(/\\/g, '/')}`),
+    hasBundledExtensions: normalizedEntries.some(
+      entry => entry === '/dist/extensions' || entry.startsWith('/dist/extensions/'),
+    ),
   };
 }
 

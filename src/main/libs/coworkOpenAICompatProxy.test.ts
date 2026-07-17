@@ -1,5 +1,5 @@
 import type http from 'http';
-import { describe,expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { __openAICompatProxyTestUtils, isAllowedProxyHost } from './coworkOpenAICompatProxy';
 
@@ -58,18 +58,18 @@ function parseSSEEvents(raw: string) {
 
 function collectInputJsonDeltas(events: Array<{ event: string; data: unknown }>) {
   return events
-    .filter((event) => event.event === 'content_block_delta')
-    .map((event) => event.data as Record<string, unknown>)
-    .filter((data) => (data?.delta as Record<string, unknown>)?.type === 'input_json_delta')
-    .map((data) => String((data.delta as Record<string, unknown>)?.partial_json ?? ''));
+    .filter(event => event.event === 'content_block_delta')
+    .map(event => event.data as Record<string, unknown>)
+    .filter(data => (data?.delta as Record<string, unknown>)?.type === 'input_json_delta')
+    .map(data => String((data.delta as Record<string, unknown>)?.partial_json ?? ''));
 }
 
 function collectToolUseStarts(events: Array<{ event: string; data: unknown }>) {
   return events
-    .filter((event) => event.event === 'content_block_start')
-    .map((event) => event.data as Record<string, unknown>)
-    .filter((data) => (data?.content_block as Record<string, unknown>)?.type === 'tool_use')
-    .map((data) => ({
+    .filter(event => event.event === 'content_block_start')
+    .map(event => event.data as Record<string, unknown>)
+    .filter(data => (data?.content_block as Record<string, unknown>)?.type === 'tool_use')
+    .map(data => ({
       id: String((data.content_block as Record<string, unknown>)?.id ?? ''),
       name: String((data.content_block as Record<string, unknown>)?.name ?? ''),
     }));
@@ -81,13 +81,7 @@ function runResponsesSequence(sequence: Array<{ event: string; payload: unknown 
   const context = testUtils.createResponsesStreamContext();
 
   for (const step of sequence) {
-    testUtils.processResponsesStreamEvent(
-      response,
-      state,
-      context,
-      step.event,
-      step.payload,
-    );
+    testUtils.processResponsesStreamEvent(response, state, context, step.event, step.payload);
   }
 
   const events = parseSSEEvents(response.getOutput());
@@ -103,7 +97,8 @@ function runResponsesSequence(sequence: Array<{ event: string; payload: unknown 
 test('A: added -> delta* -> done emits exactly one final arguments payload', () => {
   const responseId = 'resp_a';
   const model = 'gpt-5.2';
-  const finalArguments = '{"questions":[{"header":"安全确认","question":"继续?","options":[{"label":"允许","description":"ok"},{"label":"拒绝","description":"no"}]}],"answers":{}}';
+  const finalArguments =
+    '{"questions":[{"header":"安全确认","question":"继续?","options":[{"label":"允许","description":"ok"},{"label":"拒绝","description":"no"}]}],"answers":{}}';
 
   const result = runResponsesSequence([
     {
@@ -287,7 +282,7 @@ test('C: delta before added keeps correct name/id and does not lose arguments', 
 
   expect(result.inputJsonDeltas.length).toBe(1);
   expect(result.inputJsonDeltas[0]).toBe(finalArguments);
-  expect(result.toolUseStarts.some((item) => item.name === 'Skill')).toBeTruthy();
+  expect(result.toolUseStarts.some(item => item.name === 'Skill')).toBeTruthy();
 });
 
 test('D: output_item.done + function_call_arguments.done emits arguments only once', () => {
@@ -529,8 +524,8 @@ test('F: two interleaved function calls keep arguments isolated', () => {
   ]);
 
   expect(result.inputJsonDeltas.length).toBe(2);
-  expect(result.inputJsonDeltas.filter((item) => item === args1).length).toBe(1);
-  expect(result.inputJsonDeltas.filter((item) => item === args2).length).toBe(1);
+  expect(result.inputJsonDeltas.filter(item => item === args1).length).toBe(1);
+  expect(result.inputJsonDeltas.filter(item => item === args2).length).toBe(1);
 });
 
 test('G: convertChatCompletionsRequestToResponsesRequest auto-injects missing function_call_output', () => {
@@ -557,10 +552,10 @@ test('G: convertChatCompletionsRequestToResponsesRequest auto-injects missing fu
   });
 
   const input = Array.isArray(request.input) ? request.input : [];
-  const autoInjected = input.find((item: Record<string, unknown>) => (
-    item?.type === 'function_call_output'
-    && item?.call_id === 'call_missing_output'
-  ));
+  const autoInjected = input.find(
+    (item: Record<string, unknown>) =>
+      item?.type === 'function_call_output' && item?.call_id === 'call_missing_output',
+  );
 
   expect(autoInjected).toBeTruthy();
   expect(typeof autoInjected.output).toBe('string');

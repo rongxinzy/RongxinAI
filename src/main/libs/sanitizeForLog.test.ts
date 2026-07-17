@@ -45,21 +45,22 @@ describe('SENSITIVE_LOG_KEY_PATTERN', () => {
   // Known false positives: keys containing "token"/"session" substrings that
   // are not actually sensitive (e.g. "max_tokens"). Documenting so we can
   // tighten the regex later without breaking expectations.
-  const knownFalsePositives = [
-    'max_tokens',
-  ];
+  const knownFalsePositives = ['max_tokens'];
 
-  test.each(shouldMatch)('matches sensitive key: %s', (key) => {
+  test.each(shouldMatch)('matches sensitive key: %s', key => {
     expect(SENSITIVE_LOG_KEY_PATTERN.test(key)).toBe(true);
   });
 
-  test.each(shouldNotMatch)('does not match safe key: %s', (key) => {
+  test.each(shouldNotMatch)('does not match safe key: %s', key => {
     expect(SENSITIVE_LOG_KEY_PATTERN.test(key)).toBe(false);
   });
 
-  test.each(knownFalsePositives)('known false positive (matches but not truly sensitive): %s', (key) => {
-    expect(SENSITIVE_LOG_KEY_PATTERN.test(key)).toBe(true);
-  });
+  test.each(knownFalsePositives)(
+    'known false positive (matches but not truly sensitive): %s',
+    key => {
+      expect(SENSITIVE_LOG_KEY_PATTERN.test(key)).toBe(true);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

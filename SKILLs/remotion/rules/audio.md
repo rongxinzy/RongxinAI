@@ -21,11 +21,11 @@ npx remotion add @remotion/media
 Use `<Audio>` from `@remotion/media` to add audio to your composition.
 
 ```tsx
-import { Audio } from "@remotion/media";
-import { staticFile } from "remotion";
+import { Audio } from '@remotion/media';
+import { staticFile } from 'remotion';
 
 export const MyComposition = () => {
-  return <Audio src={staticFile("audio.mp3")} />;
+  return <Audio src={staticFile('audio.mp3')} />;
 };
 ```
 
@@ -47,7 +47,7 @@ const { fps } = useVideoConfig();
 
 return (
   <Audio
-    src={staticFile("audio.mp3")}
+    src={staticFile('audio.mp3')}
     trimBefore={2 * fps} // Skip the first 2 seconds
     trimAfter={10 * fps} // End at the 10 second mark
   />
@@ -61,14 +61,14 @@ The audio still starts playing at the beginning of the composition - only the sp
 Wrap the audio in a `<Sequence>` to delay when it starts:
 
 ```tsx
-import { Sequence, staticFile } from "remotion";
-import { Audio } from "@remotion/media";
+import { Sequence, staticFile } from 'remotion';
+import { Audio } from '@remotion/media';
 
 const { fps } = useVideoConfig();
 
 return (
   <Sequence from={1 * fps}>
-    <Audio src={staticFile("audio.mp3")} />
+    <Audio src={staticFile('audio.mp3')} />
   </Sequence>
 );
 ```
@@ -80,22 +80,20 @@ The audio will start playing after 1 second.
 Set a static volume (0 to 1):
 
 ```tsx
-<Audio src={staticFile("audio.mp3")} volume={0.5} />
+<Audio src={staticFile('audio.mp3')} volume={0.5} />
 ```
 
 Or use a callback for dynamic volume based on the current frame:
 
 ```tsx
-import { interpolate } from "remotion";
+import { interpolate } from 'remotion';
 
 const { fps } = useVideoConfig();
 
 return (
   <Audio
-    src={staticFile("audio.mp3")}
-    volume={(f) =>
-      interpolate(f, [0, 1 * fps], [0, 1], { extrapolateRight: "clamp" })
-    }
+    src={staticFile('audio.mp3')}
+    volume={f => interpolate(f, [0, 1 * fps], [0, 1], { extrapolateRight: 'clamp' })}
   />
 );
 ```
@@ -112,7 +110,7 @@ const { fps } = useVideoConfig();
 
 return (
   <Audio
-    src={staticFile("audio.mp3")}
+    src={staticFile('audio.mp3')}
     muted={frame >= 2 * fps && frame <= 4 * fps} // Mute between 2s and 4s
   />
 );
@@ -134,7 +132,7 @@ Reverse playback is not supported.
 Use `loop` to loop the audio indefinitely:
 
 ```tsx
-<Audio src={staticFile("audio.mp3")} loop />
+<Audio src={staticFile('audio.mp3')} loop />
 ```
 
 Use `loopVolumeCurveBehavior` to control how the frame count behaves when looping:
@@ -144,10 +142,10 @@ Use `loopVolumeCurveBehavior` to control how the frame count behaves when loopin
 
 ```tsx
 <Audio
-  src={staticFile("audio.mp3")}
+  src={staticFile('audio.mp3')}
   loop
   loopVolumeCurveBehavior="extend"
-  volume={(f) => interpolate(f, [0, 300], [1, 0])} // Fade out over multiple loops
+  volume={f => interpolate(f, [0, 300], [1, 0])} // Fade out over multiple loops
 />
 ```
 

@@ -37,11 +37,7 @@ const sanitizeToolSegment = (value: string): string => {
   return sanitized || 'tool';
 };
 
-const buildRegisteredToolName = (
-  server: string,
-  tool: string,
-  usedNames: Set<string>,
-): string => {
+const buildRegisteredToolName = (server: string, tool: string, usedNames: Set<string>): string => {
   const base = `mcp_${sanitizeToolSegment(server)}_${sanitizeToolSegment(tool)}`;
   let next = base;
   let index = 2;
@@ -86,7 +82,9 @@ const parsePluginConfig = (value: unknown): McpBridgePluginConfig => {
     callbackUrl: typeof raw.callbackUrl === 'string' ? raw.callbackUrl.trim() : '',
     secret: typeof raw.secret === 'string' ? raw.secret.trim() : '',
     requestTimeoutMs:
-      typeof raw.requestTimeoutMs === 'number' && Number.isFinite(raw.requestTimeoutMs) && raw.requestTimeoutMs > 0
+      typeof raw.requestTimeoutMs === 'number' &&
+      Number.isFinite(raw.requestTimeoutMs) &&
+      raw.requestTimeoutMs > 0
         ? Math.max(1_000, Math.floor(raw.requestTimeoutMs))
         : DEFAULT_TIMEOUT_MS,
     tools,
@@ -130,9 +128,7 @@ const ensureToolResultPayload = (
   }
 
   const text =
-    typeof payload === 'string'
-      ? payload
-      : JSON.stringify(payload ?? { ok: true }, null, 2);
+    typeof payload === 'string' ? payload : JSON.stringify(payload ?? { ok: true }, null, 2);
 
   return {
     content: [{ type: 'text', text }],
@@ -141,9 +137,7 @@ const ensureToolResultPayload = (
 };
 
 const buildToolDescription = (tool: McpBridgeToolConfig): string => {
-  const parts = [
-    `Proxy to MCP tool "${tool.name}" on server "${tool.server}".`,
-  ];
+  const parts = [`Proxy to MCP tool "${tool.name}" on server "${tool.server}".`];
   if (tool.description) {
     parts.push(tool.description);
   }
@@ -188,7 +182,8 @@ const invokeBridge = async (
     }
 
     if (!response.ok) {
-      const message = extractErrorMessage(payload) || response.statusText || 'Unknown MCP bridge error';
+      const message =
+        extractErrorMessage(payload) || response.statusText || 'Unknown MCP bridge error';
       throw new Error(`MCP bridge HTTP ${response.status}: ${message}`);
     }
 
@@ -215,7 +210,9 @@ const plugin = {
   register(api: OpenClawPluginApi) {
     const config = parsePluginConfig(api.pluginConfig);
     if (!config.callbackUrl || !config.secret || config.tools.length === 0) {
-      api.logger.info('[mcp-bridge] skipped registration because callbackUrl/secret/tools are incomplete.');
+      api.logger.info(
+        '[mcp-bridge] skipped registration because callbackUrl/secret/tools are incomplete.',
+      );
       return;
     }
 

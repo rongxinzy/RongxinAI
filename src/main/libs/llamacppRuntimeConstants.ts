@@ -9,4 +9,4 @@ export const LlamaCppRuntimeTargetId = {
 } as const;
 
 export type LlamaCppRuntimeTargetId =
-  typeof LlamaCppRuntimeTargetId[keyof typeof LlamaCppRuntimeTargetId];
+  (typeof LlamaCppRuntimeTargetId)[keyof typeof LlamaCppRuntimeTargetId];

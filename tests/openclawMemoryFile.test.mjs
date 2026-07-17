@@ -36,7 +36,7 @@ const {
 // ---- helpers ----------------------------------------------------------------
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-memoryfile-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-memoryfile-test-'));
 }
 
 function cleanupDir(dir) {
@@ -87,7 +87,7 @@ test('parseMemoryMd: skips bullets inside fenced code blocks', () => {
   const md = `- real entry\n\`\`\`\n- fake bullet inside code\n\`\`\`\n- another real entry\n`;
   const entries = parseMemoryMd(md);
   assert.equal(entries.length, 2);
-  assert.ok(entries.every((e) => !e.text.includes('fake')));
+  assert.ok(entries.every(e => !e.text.includes('fake')));
 });
 
 test('parseMemoryMd: empty string returns empty array', () => {
@@ -126,8 +126,8 @@ test('serializeMemoryMd: output is parseable round-trip', () => {
   const md = serializeMemoryMd(original);
   const parsed = parseMemoryMd(md);
   assert.equal(parsed.length, 2);
-  assert.ok(parsed.some((e) => e.text === 'I live in Shanghai'));
-  assert.ok(parsed.some((e) => e.text === 'I prefer dark mode'));
+  assert.ok(parsed.some(e => e.text === 'I live in Shanghai'));
+  assert.ok(parsed.some(e => e.text === 'I prefer dark mode'));
 });
 
 // ==================== resolveMemoryFilePath ====================
@@ -169,7 +169,7 @@ test('addMemoryEntry: skips duplicate (same fingerprint)', () => {
   try {
     const filePath = memFilePath(dir);
     addMemoryEntry(filePath, 'I prefer Python');
-    addMemoryEntry(filePath, 'I prefer Python');  // duplicate
+    addMemoryEntry(filePath, 'I prefer Python'); // duplicate
 
     const entries = parseMemoryMd(fs.readFileSync(filePath, 'utf-8'));
     assert.equal(entries.length, 1);
@@ -183,7 +183,7 @@ test('addMemoryEntry: deduplication is case-insensitive', () => {
   try {
     const filePath = memFilePath(dir);
     addMemoryEntry(filePath, 'I love coffee');
-    addMemoryEntry(filePath, 'i love coffee');  // same fingerprint
+    addMemoryEntry(filePath, 'i love coffee'); // same fingerprint
 
     const entries = parseMemoryMd(fs.readFileSync(filePath, 'utf-8'));
     assert.equal(entries.length, 1);
@@ -303,8 +303,8 @@ test('deleteMemoryEntry: preserves other entries when deleting one', () => {
 
     const entries = parseMemoryMd(fs.readFileSync(filePath, 'utf-8'));
     assert.equal(entries.length, 2);
-    assert.ok(entries.some((e) => e.text === 'keep entry A'));
-    assert.ok(entries.some((e) => e.text === 'keep entry B'));
+    assert.ok(entries.some(e => e.text === 'keep entry A'));
+    assert.ok(entries.some(e => e.text === 'keep entry B'));
   } finally {
     cleanupDir(dir);
   }
@@ -383,7 +383,9 @@ test('migrateSqliteToMemoryMd: migrates texts to MEMORY.md and marks done', () =
     let done = false;
     const source = {
       isMigrationDone: () => false,
-      markMigrationDone: () => { done = true; },
+      markMigrationDone: () => {
+        done = true;
+      },
       getActiveMemoryTexts: () => ['I live in Beijing', 'I prefer dark mode'],
     };
 
@@ -393,7 +395,7 @@ test('migrateSqliteToMemoryMd: migrates texts to MEMORY.md and marks done', () =
 
     const entries = parseMemoryMd(fs.readFileSync(filePath, 'utf-8'));
     assert.equal(entries.length, 2);
-    assert.ok(entries.some((e) => e.text === 'I live in Beijing'));
+    assert.ok(entries.some(e => e.text === 'I live in Beijing'));
   } finally {
     cleanupDir(dir);
   }
@@ -409,7 +411,9 @@ test('migrateSqliteToMemoryMd: skips duplicates that already exist in MEMORY.md'
     let done = false;
     const source = {
       isMigrationDone: () => false,
-      markMigrationDone: () => { done = true; },
+      markMigrationDone: () => {
+        done = true;
+      },
       getActiveMemoryTexts: () => ['I live in Beijing', 'I prefer Python'],
     };
 
@@ -431,7 +435,9 @@ test('migrateSqliteToMemoryMd: empty source marks done without writing file', ()
     let done = false;
     const source = {
       isMigrationDone: () => false,
-      markMigrationDone: () => { done = true; },
+      markMigrationDone: () => {
+        done = true;
+      },
       getActiveMemoryTexts: () => [],
     };
 

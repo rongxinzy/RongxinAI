@@ -6,9 +6,7 @@ import {
 import type { ProviderConfig } from '../../shared/providers';
 import { ApiFormat, ProviderName, ProviderRegistry } from '../../shared/providers';
 
-export type {
-  LlamaCppOpenClawEligibility,
-} from '../../shared/llamacpp';
+export type { LlamaCppOpenClawEligibility } from '../../shared/llamacpp';
 export {
   assessLlamaCppOpenClawEligibility,
   LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW,
@@ -96,17 +94,15 @@ export function upsertLlamaCppProviderInAppConfig(
   const currentProvider = current.providers?.[ProviderName.LlamaCpp];
   const nextProvider = buildManagedLlamaCppProviderConfig(currentProvider, models);
   const availableModelIds = new Set(
-    (nextProvider.models ?? [])
-      .map(model => model.id.trim())
-      .filter(Boolean),
+    (nextProvider.models ?? []).map(model => model.id.trim()).filter(Boolean),
   );
   const clearedDefaultModel =
-    current.model?.defaultModelProvider === ProviderName.LlamaCpp
-    && (!current.model.defaultModel?.trim()
-      || !availableModelIds.has(current.model.defaultModel.trim()));
+    current.model?.defaultModelProvider === ProviderName.LlamaCpp &&
+    (!current.model.defaultModel?.trim() ||
+      !availableModelIds.has(current.model.defaultModel.trim()));
   const changed =
-    serializeLlamaCppProviderConfig(currentProvider) !== serializeLlamaCppProviderConfig(nextProvider)
-    || clearedDefaultModel;
+    serializeLlamaCppProviderConfig(currentProvider) !==
+      serializeLlamaCppProviderConfig(nextProvider) || clearedDefaultModel;
 
   if (!changed) {
     return {

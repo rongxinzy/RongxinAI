@@ -38,7 +38,9 @@ export function readBundledLlamaCppBackendManifest(): LlamaCppBackendManifest | 
   };
 }
 
-function injectBundledArchiveUrls(entry: LlamaCppBackendManifestEntry): LlamaCppBackendManifestEntry {
+function injectBundledArchiveUrls(
+  entry: LlamaCppBackendManifestEntry,
+): LlamaCppBackendManifestEntry {
   return {
     ...entry,
     archive: entry.archive ? injectBundledArchiveUrl(entry.archive) : entry.archive,
@@ -46,9 +48,9 @@ function injectBundledArchiveUrls(entry: LlamaCppBackendManifestEntry): LlamaCpp
   };
 }
 
-function injectBundledArchiveUrl<T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] }>(
-  archive: T,
-): T {
+function injectBundledArchiveUrl<
+  T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] },
+>(archive: T): T {
   return {
     ...archive,
     url: resolveBundledArchiveUrl(archive.assetName) ?? archive.url,

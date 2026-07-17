@@ -1,10 +1,7 @@
 ﻿import { describe, expect, test } from 'vitest';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
-import {
-  type LlamaCppModelLaunchInput,
-  LlamaCppRuntimeBackend,
-} from '../../shared/llamacpp';
+import { type LlamaCppModelLaunchInput, LlamaCppRuntimeBackend } from '../../shared/llamacpp';
 import {
   estimateRequiredLlamaCppModelVramMiB,
   LlamaCppModelGpuPlacementDefaults,
@@ -168,12 +165,12 @@ describe('llamacppModelGpuPlacement', () => {
   });
 
   test('estimates required vram from model size and context buffer', () => {
-    expect(estimateRequiredLlamaCppModelVramMiB({
-      modelSizeBytes: gib(10),
-      ctxSize: 4096,
-    })).toBe(
-      Math.ceil(10 * 1024 * LlamaCppModelGpuPlacementDefaults.ModelSizeMultiplier) + 4 * 256,
-    );
+    expect(
+      estimateRequiredLlamaCppModelVramMiB({
+        modelSizeBytes: gib(10),
+        ctxSize: 4096,
+      }),
+    ).toBe(Math.ceil(10 * 1024 * LlamaCppModelGpuPlacementDefaults.ModelSizeMultiplier) + 4 * 256);
   });
 });
 
@@ -199,7 +196,9 @@ function gpuCapabilities(input: {
   };
 }
 
-function availableSnapshot(gpus: Array<{ index: number; memoryFreeMiB: number }>): NvidiaSmiSnapshot {
+function availableSnapshot(
+  gpus: Array<{ index: number; memoryFreeMiB: number }>,
+): NvidiaSmiSnapshot {
   return {
     source: 'nvidia-smi',
     available: true,

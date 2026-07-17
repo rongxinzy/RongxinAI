@@ -39,7 +39,7 @@ async function startApp() {
   });
 }
 
-startApp().catch((err) => {
+startApp().catch(err => {
   console.error('Error starting app:', err);
   process.exit(1);
-}); 
+});

@@ -4,7 +4,13 @@
 import { describe, test } from 'vitest';
 
 import { runChannelProbeContract } from './channel-probe.contract';
-import { buildProbeResult, makeAuthCheckFail, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  buildProbeResult,
+  makeAuthCheckFail,
+  makeAuthCheckPass,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 describe('Channel probe contract: dingtalk', () => {
   test('missing_credentials path conforms to contract', () => {
@@ -15,7 +21,11 @@ describe('Channel probe contract: dingtalk', () => {
     runChannelProbeContract({
       platform: 'dingtalk',
       result: buildProbeResult('dingtalk', {
-        checks: [makeAuthCheckPass('dingxxx'), makeGatewayRunningCheck(), makeInboundActivityCheck('pass')],
+        checks: [
+          makeAuthCheckPass('dingxxx'),
+          makeGatewayRunningCheck(),
+          makeInboundActivityCheck('pass'),
+        ],
       }),
     });
   });

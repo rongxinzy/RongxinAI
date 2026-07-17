@@ -89,7 +89,9 @@ describe('ensureLlamaCppServiceRunning', () => {
       start: vi.fn(async () => startStatus),
     };
 
-    await expect(ensureLlamaCppServiceRunning(manager, loadModelOptions(logger))).resolves.toMatchObject({
+    await expect(
+      ensureLlamaCppServiceRunning(manager, loadModelOptions(logger)),
+    ).resolves.toMatchObject({
       success: false,
       code: LlamaCppServiceStartupFailureCode.PortInUse,
       serviceStatus: detectedStatus,
@@ -118,7 +120,9 @@ describe('ensureLlamaCppServiceRunning', () => {
       getStatus: vi.fn(() => currentStatus),
     };
 
-    await expect(ensureLlamaCppServiceRunning(manager, loadModelOptions(logger))).resolves.toMatchObject({
+    await expect(
+      ensureLlamaCppServiceRunning(manager, loadModelOptions(logger)),
+    ).resolves.toMatchObject({
       success: false,
       code: LlamaCppServiceStartupFailureCode.ProcessExited,
       startStatus: expect.objectContaining({
@@ -132,48 +136,58 @@ describe('ensureLlamaCppServiceRunning', () => {
 
 describe('classifyLlamaCppServiceStartupFailure', () => {
   test('prioritizes backend failures before generic process exits', () => {
-    expect(classifyLlamaCppServiceStartupFailure({
-      startStatus: status(
-        'error',
-        'llama.cpp exited unexpectedly during startup: CUDA error: no CUDA-capable device',
-      ),
-      detectedStatus: status('installed'),
-    })).toMatchObject({
+    expect(
+      classifyLlamaCppServiceStartupFailure({
+        startStatus: status(
+          'error',
+          'llama.cpp exited unexpectedly during startup: CUDA error: no CUDA-capable device',
+        ),
+        detectedStatus: status('installed'),
+      }),
+    ).toMatchObject({
       code: LlamaCppServiceStartupFailureCode.BackendUnavailable,
     });
   });
 
   test('classifies startup timeouts', () => {
-    expect(classifyLlamaCppServiceStartupFailure({
-      startStatus: status('error', 'llama.cpp did not become ready before timeout'),
-    })).toMatchObject({
+    expect(
+      classifyLlamaCppServiceStartupFailure({
+        startStatus: status('error', 'llama.cpp did not become ready before timeout'),
+      }),
+    ).toMatchObject({
       code: LlamaCppServiceStartupFailureCode.StartupTimeout,
     });
   });
 
   test('classifies damaged or missing runtime as runtime damage', () => {
-    expect(classifyLlamaCppServiceStartupFailure({
-      initialStatus: status('not-installed'),
-      startStatus: status('not-installed', 'llama-server executable missing'),
-    })).toMatchObject({
+    expect(
+      classifyLlamaCppServiceStartupFailure({
+        initialStatus: status('not-installed'),
+        startStatus: status('not-installed', 'llama-server executable missing'),
+      }),
+    ).toMatchObject({
       code: LlamaCppServiceStartupFailureCode.RuntimeDamaged,
     });
   });
 
   test('classifies stopped service as process exited', () => {
-    expect(classifyLlamaCppServiceStartupFailure({
-      startStatus: status('stopped'),
-      detectedStatus: status('installed'),
-    })).toMatchObject({
+    expect(
+      classifyLlamaCppServiceStartupFailure({
+        startStatus: status('stopped'),
+        detectedStatus: status('installed'),
+      }),
+    ).toMatchObject({
       code: LlamaCppServiceStartupFailureCode.ProcessExited,
     });
   });
 
   test('falls back to unknown when no known pattern matches', () => {
-    expect(classifyLlamaCppServiceStartupFailure({
-      startStatus: status('error', 'unexpected service failure'),
-      detectedStatus: status('installed'),
-    })).toMatchObject({
+    expect(
+      classifyLlamaCppServiceStartupFailure({
+        startStatus: status('error', 'unexpected service failure'),
+        detectedStatus: status('installed'),
+      }),
+    ).toMatchObject({
       code: LlamaCppServiceStartupFailureCode.Unknown,
     });
   });

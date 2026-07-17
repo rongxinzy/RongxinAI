@@ -12,12 +12,16 @@ export const isDefaultAgentId = (agentId?: string | null): boolean => {
   return agentId?.trim() === AgentId.Main;
 };
 
-export const isDefaultAgentProfileName = (agent: Pick<AgentDisplaySource, 'id' | 'name'>): boolean => {
+export const isDefaultAgentProfileName = (
+  agent: Pick<AgentDisplaySource, 'id' | 'name'>,
+): boolean => {
   if (!isDefaultAgentId(agent.id)) return false;
   const normalizedName = agent.name?.trim() ?? '';
-  return !normalizedName
-    || normalizedName.toLowerCase() === LegacyAgentName.Main
-    || normalizedName === DefaultAgentProfile.Name;
+  return (
+    !normalizedName ||
+    normalizedName.toLowerCase() === LegacyAgentName.Main ||
+    normalizedName === DefaultAgentProfile.Name
+  );
 };
 
 export const getAgentDisplayName = (agent: Pick<AgentDisplaySource, 'id' | 'name'>): string => {
@@ -36,7 +40,7 @@ export const getAgentDisplayNameById = (
   const normalizedAgentId = agentId.trim();
   if (!normalizedAgentId) return null;
 
-  const agent = agents.find((item) => item.id === normalizedAgentId);
+  const agent = agents.find(item => item.id === normalizedAgentId);
   if (agent) return getAgentDisplayName(agent);
 
   if (isDefaultAgentId(normalizedAgentId)) {
@@ -46,6 +50,8 @@ export const getAgentDisplayNameById = (
   return normalizedAgentId;
 };
 
-export const shouldUseDefaultAgentIcon = (agent: Pick<AgentDisplaySource, 'id' | 'icon'>): boolean => {
+export const shouldUseDefaultAgentIcon = (
+  agent: Pick<AgentDisplaySource, 'id' | 'icon'>,
+): boolean => {
   return isDefaultAgentId(agent.id) && !agent.icon?.trim();
 };

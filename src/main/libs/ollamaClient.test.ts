@@ -8,9 +8,14 @@ describe('OllamaClient', () => {
   });
 
   test('lists local models from /api/tags', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
-      models: [{ name: 'qwen3:8b', size: 123 }],
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          models: [{ name: 'qwen3:8b', size: 123 }],
+        }),
+      ),
+    );
 
     const client = new OllamaClient('http://127.0.0.1:11434/');
 
@@ -22,18 +27,26 @@ describe('OllamaClient', () => {
   });
 
   test('streams chat chunks from /api/chat NDJSON', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ndjsonResponse([
-      JSON.stringify({ message: { role: 'assistant', content: 'hi' } }),
-      JSON.stringify({ done: true, eval_count: 1 }),
-    ])));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        ndjsonResponse([
+          JSON.stringify({ message: { role: 'assistant', content: 'hi' } }),
+          JSON.stringify({ done: true, eval_count: 1 }),
+        ]),
+      ),
+    );
     const chunks: unknown[] = [];
     const client = new OllamaClient();
 
-    await client.chat({
-      model: 'qwen3:8b',
-      messages: [{ role: 'user', content: 'hello' }],
-      stream: true,
-    }, (chunk) => chunks.push(chunk));
+    await client.chat(
+      {
+        model: 'qwen3:8b',
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: true,
+      },
+      chunk => chunks.push(chunk),
+    );
 
     expect(chunks).toEqual([
       { message: { role: 'assistant', content: 'hi' } },
@@ -42,9 +55,10 @@ describe('OllamaClient', () => {
   });
 
   test('throws when Ollama stream returns an error chunk', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ndjsonResponse([
-      JSON.stringify({ error: 'model not found' }),
-    ])));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ndjsonResponse([JSON.stringify({ error: 'model not found' })])),
+    );
     const client = new OllamaClient();
 
     await expect(client.pullModel('missing')).rejects.toThrow('model not found');

@@ -22,10 +22,13 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { getRulesForFile, ALL_SECURITY_RULES } = require('../dist-electron/main/libs/skillSecurity/skillSecurityRules.js');
+const {
+  getRulesForFile,
+  ALL_SECURITY_RULES,
+} = require('../dist-electron/main/libs/skillSecurity/skillSecurityRules.js');
 
 function getRuleIds(relativePath) {
-  return getRulesForFile(relativePath).map((r) => r.id);
+  return getRulesForFile(relativePath).map(r => r.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,12 +69,15 @@ test('every rule has a non-empty patterns array of RegExp objects', () => {
 test('every rule severity is one of: info, warning, danger, critical', () => {
   const valid = new Set(['info', 'warning', 'danger', 'critical']);
   for (const rule of ALL_SECURITY_RULES) {
-    assert.ok(valid.has(rule.severity), `Unexpected severity "${rule.severity}" on rule ${rule.id}`);
+    assert.ok(
+      valid.has(rule.severity),
+      `Unexpected severity "${rule.severity}" on rule ${rule.id}`,
+    );
   }
 });
 
 test('all rule ids are unique', () => {
-  const ids = ALL_SECURITY_RULES.map((r) => r.id);
+  const ids = ALL_SECURITY_RULES.map(r => r.id);
   const unique = new Set(ids);
   assert.equal(unique.size, ids.length);
 });
@@ -217,7 +223,7 @@ test('getRulesForFile: .svg includes web_content.svg_script', () => {
 });
 
 test('getRulesForFile: .svg does not include dangerous_cmd rules', () => {
-  const hasDangerous = getRuleIds('logo.svg').some((id) => id.startsWith('dangerous_cmd.'));
+  const hasDangerous = getRuleIds('logo.svg').some(id => id.startsWith('dangerous_cmd.'));
   assert.equal(hasDangerous, false);
 });
 

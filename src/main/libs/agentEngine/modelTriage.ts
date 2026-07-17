@@ -33,25 +33,29 @@ export function classifyByRules(
   const len = trimmed.length;
   const hasCode = /```[\s\S]*?```/.test(prompt);
   const hasInlineCode = /`[^`]+`/.test(prompt);
-  const isGreeting =
-    /^(你好|hi\b|hello\b|hey\b|早上好|晚上好|下午好|再见|bye\b|谢谢|thank)/i.test(trimmed);
+  const isGreeting = /^(你好|hi\b|hello\b|hey\b|早上好|晚上好|下午好|再见|bye\b|谢谢|thank)/i.test(
+    trimmed,
+  );
   const isSimpleFact =
     /^(什么是|who is|when did|where is|how many|what is|几点|天气|日期|今天.*几)/i.test(trimmed);
   const isComplex =
-    /(为什么|怎么实现|如何设计|分析|架构|重构|review|解释.*原理|compare|区别|源码|底层|原理|设计模式)/.test(prompt) ||
-    /(write|implement|refactor|explain|analyze|design|optimize|debug|fix.*bug)/i.test(prompt);
+    /(为什么|怎么实现|如何设计|分析|架构|重构|review|解释.*原理|compare|区别|源码|底层|原理|设计模式)/.test(
+      prompt,
+    ) || /(write|implement|refactor|explain|analyze|design|optimize|debug|fix.*bug)/i.test(prompt);
   const hasFilePath =
     /(?:^|\s)([\w./-]*\/[\w./-]+\.[\w]{1,6})(?:\s|$)/.test(prompt) ||
     /(?:^|\s)([A-Za-z]:\\[\w\\./-]+\.\w{1,6})(?:\s|$)/.test(prompt);
-  const isTranslation =
-    /(翻译|translate|译成|翻成|用.*怎么说)/i.test(prompt) && len < 200;
-  const isSummaryRequest =
-    /(总结|概括|摘要|summarize|summarize|tl;dr)/i.test(prompt) && len > 500;
+  const isTranslation = /(翻译|translate|译成|翻成|用.*怎么说)/i.test(prompt) && len < 200;
+  const isSummaryRequest = /(总结|概括|摘要|summarize|summarize|tl;dr)/i.test(prompt) && len > 500;
 
   // light tier: short greetings, simple facts, translations
   if (len < 60 && (isGreeting || isSimpleFact) && !hasCode) {
     if (config.rules.lightModelRef) {
-      return { tier: 'light', modelRef: config.rules.lightModelRef, reason: `light: ${isGreeting ? 'greeting' : 'simple-fact'}` };
+      return {
+        tier: 'light',
+        modelRef: config.rules.lightModelRef,
+        reason: `light: ${isGreeting ? 'greeting' : 'simple-fact'}`,
+      };
     }
     return { tier: 'light', modelRef: null, reason: 'light-rule-match-no-model' };
   }
@@ -61,19 +65,20 @@ export function classifyByRules(
   }
 
   // heavy tier: code generation, architecture analysis, complex reasoning, summarization
-  if (
-    (hasCode && len > 200) ||
-    (isComplex && len > 80) ||
-    hasFilePath ||
-    isSummaryRequest
-  ) {
+  if ((hasCode && len > 200) || (isComplex && len > 80) || hasFilePath || isSummaryRequest) {
     if (config.rules.heavyModelRef) {
-      return { tier: 'heavy', modelRef: config.rules.heavyModelRef, reason: `heavy: ${[
-        hasCode ? 'code' : '',
-        isComplex ? 'complex' : '',
-        hasFilePath ? 'file' : '',
-        isSummaryRequest ? 'summary' : '',
-      ].filter(Boolean).join('+')}` };
+      return {
+        tier: 'heavy',
+        modelRef: config.rules.heavyModelRef,
+        reason: `heavy: ${[
+          hasCode ? 'code' : '',
+          isComplex ? 'complex' : '',
+          hasFilePath ? 'file' : '',
+          isSummaryRequest ? 'summary' : '',
+        ]
+          .filter(Boolean)
+          .join('+')}`,
+      };
     }
     return { tier: 'heavy', modelRef: null, reason: 'heavy-rule-match-no-model' };
   }
@@ -148,15 +153,15 @@ export async function classifyMessage(
   if (ruleResult.reason.startsWith('light:') || ruleResult.reason.startsWith('heavy:')) {
     return ruleResult;
   }
-  if (ruleResult.reason === 'deep-conversation' || ruleResult.reason === 'heavy-rule-match-no-model') {
+  if (
+    ruleResult.reason === 'deep-conversation' ||
+    ruleResult.reason === 'heavy-rule-match-no-model'
+  ) {
     return ruleResult;
   }
 
   // Ambiguous cases — try local model if configured
-  if (
-    config.rules.useLocalModelTriage &&
-    config.rules.triageModelName
-  ) {
+  if (config.rules.useLocalModelTriage && config.rules.triageModelName) {
     const llmResult = await classifyByLocalModel(prompt, config.rules.triageModelName, config);
     if (llmResult) {
       return llmResult;
@@ -227,7 +232,7 @@ export async function classifyByLocalModel(
       return null;
     }
 
-    const body = await response.json() as {
+    const body = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
     const rawText = body?.choices?.[0]?.message?.content?.trim().toLowerCase() || '';
@@ -252,10 +257,7 @@ function parseClassificationResponse(text: string): 'light' | 'standard' | 'heav
   return null;
 }
 
-function tierToResult(
-  tier: 'light' | 'standard' | 'heavy',
-  config: TriageConfig,
-): TriageResult {
+function tierToResult(tier: 'light' | 'standard' | 'heavy', config: TriageConfig): TriageResult {
   if (tier === 'light' && config.rules.lightModelRef) {
     return { tier: 'light', modelRef: config.rules.lightModelRef, reason: 'llm: light' };
   }

@@ -67,17 +67,40 @@ const DIRS_TO_DELETE = new Set([
 // pruned unless explicitly added here.
 
 const BUNDLED_EXTENSIONS_TO_KEEP = new Set([
-  // --- Providers (LobsterAI may route to these) ---
-  'anthropic', 'deepseek', 'google', 'kimi-coding', 'minimax', 'moonshot',
-  'ollama', 'openai', 'openrouter', 'qianfan', 'qwen', 'stepfun', 'volcengine',
+  // --- Providers (ZhiYuanAgent may route to these) ---
+  'anthropic',
+  'deepseek',
+  'google',
+  'kimi-coding',
+  'minimax',
+  'moonshot',
+  'ollama',
+  'openai',
+  'openrouter',
+  'qianfan',
+  'qwen',
+  'stepfun',
+  'volcengine',
   // --- Channels (managed via entries or third-party replacements) ---
-  'telegram', 'discord', 'feishu', 'qqbot',
+  'telegram',
+  'discord',
+  'feishu',
+  'qqbot',
   // --- Core features ---
-  'browser', 'memory-core', 'lobster', 'llm-task', 'zai',
+  'browser',
+  'memory-core',
+  'llm-task',
+  'zai',
   // --- Media / voice (bundled defaults, may be used by agents) ---
-  'image-generation-core', 'media-understanding-core', 'speech-core', 'talk-voice',
+  'image-generation-core',
+  'media-understanding-core',
+  'speech-core',
+  'talk-voice',
   // --- Internal ---
-  'acpx', 'thread-ownership', 'memory-lancedb', 'memory-wiki',
+  'acpx',
+  'thread-ownership',
+  'memory-lancedb',
+  'memory-wiki',
 ]);
 
 function shouldKeepBundledExtension(extensionId) {
@@ -90,8 +113,8 @@ function shouldKeepBundledExtension(extensionId) {
 // Callers already have try-catch protection.
 
 const PACKAGES_TO_STUB = [
-  'koffi',                  // Windows FFI for terminal PTY — not needed in gateway mode
-  '@tloncorp/tlon-skill',   // Tlon channel pruned from dist/extensions; native binary not needed
+  'koffi', // Windows FFI for terminal PTY — not needed in gateway mode
+  '@tloncorp/tlon-skill', // Tlon channel pruned from dist/extensions; native binary not needed
   '@lancedb',
   '@jimp',
   '@napi-rs',
@@ -142,7 +165,9 @@ function stubPackage(pkgDir, pkgName, stats) {
   try {
     const origPkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
     version = origPkg.version || version;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Remove all contents
   fs.rmSync(pkgDir, { recursive: true, force: true });
@@ -151,18 +176,26 @@ function stubPackage(pkgDir, pkgName, stats) {
   // Write dual CJS + ESM stub files
   fs.writeFileSync(path.join(pkgDir, 'index.js'), GENERIC_STUB_INDEX_CJS, 'utf8');
   fs.writeFileSync(path.join(pkgDir, 'index.mjs'), GENERIC_STUB_INDEX_ESM, 'utf8');
-  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({
-    name: pkgName,
-    version,
-    main: 'index.js',
-    exports: {
-      '.': {
-        import: './index.mjs',
-        require: './index.js',
-        default: './index.js',
+  fs.writeFileSync(
+    path.join(pkgDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: pkgName,
+        version,
+        main: 'index.js',
+        exports: {
+          '.': {
+            import: './index.mjs',
+            require: './index.js',
+            default: './index.js',
+          },
+        },
       },
-    },
-  }, null, 2) + '\n', 'utf8');
+      null,
+      2,
+    ) + '\n',
+    'utf8',
+  );
 
   stats.stubbed.push(pkgName);
 }
@@ -170,7 +203,7 @@ function stubPackage(pkgDir, pkgName, stats) {
 // ─── File cleanup ───
 
 function shouldDeleteFile(filename) {
-  return PATTERNS_TO_DELETE.some((pattern) => pattern.test(filename));
+  return PATTERNS_TO_DELETE.some(pattern => pattern.test(filename));
 }
 
 function cleanDir(dirPath, stats) {
@@ -197,14 +230,18 @@ function cleanDir(dirPath, stats) {
         if (remaining.length === 0) {
           fs.rmdirSync(fullPath);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (entry.isFile() && shouldDeleteFile(entry.name)) {
       try {
         const size = fs.statSync(fullPath).size;
         fs.unlinkSync(fullPath);
         stats.filesRemoved++;
         stats.bytesFreed += size;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
@@ -219,18 +256,24 @@ function getDirSize(dirPath) {
       if (entry.isDirectory()) {
         total += getDirSize(fullPath);
       } else {
-        try { total += fs.statSync(fullPath).size; } catch { /* ignore */ }
+        try {
+          total += fs.statSync(fullPath).size;
+        } catch {
+          /* ignore */
+        }
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return total;
 }
 
 // ─── Main ───
 
 function main() {
-  const runtimeRoot = process.argv[2]
-    || path.join(__dirname, '..', 'vendor', 'openclaw-runtime', 'current');
+  const runtimeRoot =
+    process.argv[2] || path.join(__dirname, '..', 'vendor', 'openclaw-runtime', 'current');
 
   if (!fs.existsSync(runtimeRoot)) {
     console.error(`[prune-openclaw-runtime] Runtime root not found: ${runtimeRoot}`);
@@ -245,7 +288,13 @@ function main() {
 
   console.log(`[prune-openclaw-runtime] Cleaning ${runtimeRoot} ...`);
 
-  const stats = { filesRemoved: 0, dirsRemoved: 0, bytesFreed: 0, stubbed: [], extensionsPruned: [] };
+  const stats = {
+    filesRemoved: 0,
+    dirsRemoved: 0,
+    bytesFreed: 0,
+    stubbed: [],
+    extensionsPruned: [],
+  };
 
   // Step 1: Remove unused bundled extensions from dist/extensions/
   const distExtDir = path.join(runtimeRoot, 'dist', 'extensions');
@@ -275,7 +324,7 @@ function main() {
     stats.bytesFreed += size;
     stats.dirsRemoved++;
     console.log(
-      `[prune-openclaw-runtime] Removed bundled feishu because openclaw-lark is present (${(size / 1024 / 1024).toFixed(1)} MB)`
+      `[prune-openclaw-runtime] Removed bundled feishu because openclaw-lark is present (${(size / 1024 / 1024).toFixed(1)} MB)`,
     );
   }
 
@@ -287,7 +336,7 @@ function main() {
     stats.bytesFreed += size;
     stats.dirsRemoved++;
     console.log(
-      `[prune-openclaw-runtime] Removed stale external openclaw-qqbot (${(size / 1024 / 1024).toFixed(1)} MB)`
+      `[prune-openclaw-runtime] Removed stale external openclaw-qqbot (${(size / 1024 / 1024).toFixed(1)} MB)`,
     );
   }
 
@@ -314,7 +363,7 @@ function main() {
       stats.bytesFreed += size;
       stats.dirsRemoved++;
       console.log(
-        `[prune-openclaw-runtime] Removed orphaned platform binary ${scope}/${entry.name} (${(size / 1024 / 1024).toFixed(1)} MB)`
+        `[prune-openclaw-runtime] Removed orphaned platform binary ${scope}/${entry.name} (${(size / 1024 / 1024).toFixed(1)} MB)`,
       );
     }
   }
@@ -332,7 +381,9 @@ function main() {
           stats.filesRemoved++;
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   // Step 2c: Remove openclaw SDK duplicates from third-party-extensions.
@@ -351,12 +402,14 @@ function main() {
           stats.bytesFreed += size;
           stats.dirsRemoved++;
           console.log(
-            `[prune-openclaw-runtime] Removed duplicate openclaw SDK from ${plugin.name} (${(size / 1024 / 1024).toFixed(1)} MB)`
+            `[prune-openclaw-runtime] Removed duplicate openclaw SDK from ${plugin.name} (${(size / 1024 / 1024).toFixed(1)} MB)`,
           );
         }
       }
     } catch (err) {
-      console.warn(`[prune-openclaw-runtime] Failed to prune openclaw from third-party-extensions: ${err.message}`);
+      console.warn(
+        `[prune-openclaw-runtime] Failed to prune openclaw from third-party-extensions: ${err.message}`,
+      );
     }
   }
 
@@ -374,20 +427,22 @@ function main() {
           cleanDir(extNodeModules, stats);
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   const mbFreed = (stats.bytesFreed / 1024 / 1024).toFixed(1);
   if (stats.extensionsPruned.length > 0) {
     console.log(
-      `[prune-openclaw-runtime] Pruned ${stats.extensionsPruned.length} unused bundled extensions`
+      `[prune-openclaw-runtime] Pruned ${stats.extensionsPruned.length} unused bundled extensions`,
     );
   }
   console.log(
-    `[prune-openclaw-runtime] Stubbed: ${stats.stubbed.length > 0 ? stats.stubbed.join(', ') : 'none'}`
+    `[prune-openclaw-runtime] Stubbed: ${stats.stubbed.length > 0 ? stats.stubbed.join(', ') : 'none'}`,
   );
   console.log(
-    `[prune-openclaw-runtime] Removed ${stats.filesRemoved} files, ${stats.dirsRemoved} dirs, freed ${mbFreed} MB`
+    `[prune-openclaw-runtime] Removed ${stats.filesRemoved} files, ${stats.dirsRemoved} dirs, freed ${mbFreed} MB`,
   );
 }
 

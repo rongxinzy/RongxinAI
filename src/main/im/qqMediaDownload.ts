@@ -63,11 +63,16 @@ function getExtensionFromMime(mimeType: string): string {
  */
 export function mapQQMediaType(type: string): IMMediaType {
   switch (type) {
-    case 'image': return 'image';
-    case 'video': return 'video';
-    case 'audio': return 'audio';
-    case 'voice': return 'voice';
-    default: return 'document';
+    case 'image':
+      return 'image';
+    case 'video':
+      return 'video';
+    case 'audio':
+      return 'audio';
+    case 'voice':
+      return 'voice';
+    default:
+      return 'document';
   }
 }
 
@@ -98,11 +103,15 @@ function inferMimeType(type: string, fileName?: string): string {
   }
   // Fallback based on type
   switch (type) {
-    case 'image': return 'image/jpeg';
-    case 'video': return 'video/mp4';
+    case 'image':
+      return 'image/jpeg';
+    case 'video':
+      return 'video/mp4';
     case 'audio':
-    case 'voice': return 'audio/mpeg';
-    default: return 'application/octet-stream';
+    case 'voice':
+      return 'audio/mpeg';
+    default:
+      return 'application/octet-stream';
   }
 }
 
@@ -116,15 +125,18 @@ function inferMimeType(type: string, fileName?: string): string {
 export async function downloadQQAttachment(
   url: string,
   type: string,
-  fileName?: string
+  fileName?: string,
 ): Promise<{ localPath: string; fileSize: number; mimeType: string } | null> {
   try {
     const mimeType = inferMimeType(type, fileName);
-    console.log(`[QQ Media] 下载附件:`, JSON.stringify({
-      type,
-      mimeType,
-      fileName,
-    }));
+    console.log(
+      `[QQ Media] 下载附件:`,
+      JSON.stringify({
+        type,
+        mimeType,
+        fileName,
+      }),
+    );
 
     const response = await fetchWithSystemProxy(url);
     if (!response.ok) {
@@ -135,7 +147,9 @@ export async function downloadQQAttachment(
     const buffer = Buffer.from(await response.arrayBuffer());
 
     if (buffer.length > MAX_FILE_SIZE) {
-      console.warn(`[QQ Media] 文件过大: ${(buffer.length / 1024 / 1024).toFixed(1)}MB (限制: 25MB)`);
+      console.warn(
+        `[QQ Media] 文件过大: ${(buffer.length / 1024 / 1024).toFixed(1)}MB (限制: 25MB)`,
+      );
       return null;
     }
 

@@ -2,9 +2,11 @@ import { expect, test } from 'vitest';
 
 test('marketplace page size is fixed across viewport sizes', async () => {
   const module = await import('./LocalInferenceView');
-  const getMarketplacePageSize = (module as {
-    __test__getMarketplacePageSize?: () => number;
-  }).__test__getMarketplacePageSize;
+  const getMarketplacePageSize = (
+    module as {
+      __test__getMarketplacePageSize?: () => number;
+    }
+  ).__test__getMarketplacePageSize;
 
   expect(typeof getMarketplacePageSize).toBe('function');
   if (!getMarketplacePageSize) return;
@@ -14,12 +16,14 @@ test('marketplace page size is fixed across viewport sizes', async () => {
 
 test('marketplace search params load directly up to the app and openapi caps', async () => {
   const module = await import('./LocalInferenceView');
-  const buildMarketplaceSearchParams = (module as {
-    __test__buildMarketplaceSearchParams?: (input: {
-      query: string;
-      pageNumber?: number;
-    }) => { query?: string; limit?: number; pageNumber?: number } | null;
-  }).__test__buildMarketplaceSearchParams;
+  const buildMarketplaceSearchParams = (
+    module as {
+      __test__buildMarketplaceSearchParams?: (input: {
+        query: string;
+        pageNumber?: number;
+      }) => { query?: string; limit?: number; pageNumber?: number } | null;
+    }
+  ).__test__buildMarketplaceSearchParams;
 
   expect(typeof buildMarketplaceSearchParams).toBe('function');
   if (!buildMarketplaceSearchParams) return;
@@ -29,10 +33,12 @@ test('marketplace search params load directly up to the app and openapi caps', a
     limit: 3000,
   });
 
-  expect(buildMarketplaceSearchParams({
-    query: ' qwen ',
-    pageNumber: 4,
-  })).toEqual({
+  expect(
+    buildMarketplaceSearchParams({
+      query: ' qwen ',
+      pageNumber: 4,
+    }),
+  ).toEqual({
     query: 'qwen',
     limit: 3000,
     pageNumber: 4,
@@ -44,12 +50,14 @@ test('marketplace search params load directly up to the app and openapi caps', a
 
 test('marketplace only keeps installable models in the visible list', async () => {
   const module = await import('./LocalInferenceView');
-  const getInstallableMarketplaceModels = (module as unknown as {
-    __test__getInstallableMarketplaceModels?: (
-      models: Array<{ id: string; repoId: string; installed: boolean; installedPath?: string }>,
-      installedModelPathMap: Map<string, string>,
-    ) => Array<{ id: string }>;
-  }).__test__getInstallableMarketplaceModels;
+  const getInstallableMarketplaceModels = (
+    module as unknown as {
+      __test__getInstallableMarketplaceModels?: (
+        models: Array<{ id: string; repoId: string; installed: boolean; installedPath?: string }>,
+        installedModelPathMap: Map<string, string>,
+      ) => Array<{ id: string }>;
+    }
+  ).__test__getInstallableMarketplaceModels;
 
   expect(typeof getInstallableMarketplaceModels).toBe('function');
   if (!getInstallableMarketplaceModels) return;
@@ -68,14 +76,16 @@ test('marketplace only keeps installable models in the visible list', async () =
 
 test('model card busy state locks the loading or unloading model card', async () => {
   const module = await import('./LocalInferenceView');
-  const getModelCardBusyState = (module as {
-    __test__getModelCardBusyState?: (input: {
-      modelName: string;
-      loadingModelName: string | null;
-      unloadingModelName: string | null;
-      globalLoading: boolean;
-    }) => { cardBusy: boolean; buttonsDisabled: boolean };
-  }).__test__getModelCardBusyState;
+  const getModelCardBusyState = (
+    module as {
+      __test__getModelCardBusyState?: (input: {
+        modelName: string;
+        loadingModelName: string | null;
+        unloadingModelName: string | null;
+        globalLoading: boolean;
+      }) => { cardBusy: boolean; buttonsDisabled: boolean };
+    }
+  ).__test__getModelCardBusyState;
 
   expect(typeof getModelCardBusyState).toBe('function');
   if (!getModelCardBusyState) return;
@@ -143,12 +153,14 @@ test('model card busy state locks the loading or unloading model card', async ()
 
 test('model action guard blocks operations for the unloading model only', async () => {
   const module = await import('./LocalInferenceView');
-  const shouldBlockModelAction = (module as {
-    __test__shouldBlockModelAction?: (input: {
-      modelName: string;
-      unloadingModelName: string | null;
-    }) => boolean;
-  }).__test__shouldBlockModelAction;
+  const shouldBlockModelAction = (
+    module as {
+      __test__shouldBlockModelAction?: (input: {
+        modelName: string;
+        unloadingModelName: string | null;
+      }) => boolean;
+    }
+  ).__test__shouldBlockModelAction;
 
   expect(typeof shouldBlockModelAction).toBe('function');
   if (!shouldBlockModelAction) return;
@@ -177,13 +189,15 @@ test('model action guard blocks operations for the unloading model only', async 
 
 test('unload busy state keeps a minimum visible duration', async () => {
   const module = await import('./LocalInferenceView');
-  const getRemainingBusyMs = (module as {
-    __test__getRemainingBusyMs?: (input: {
-      startedAtMs: number;
-      nowMs: number;
-      minimumBusyMs: number;
-    }) => number;
-  }).__test__getRemainingBusyMs;
+  const getRemainingBusyMs = (
+    module as {
+      __test__getRemainingBusyMs?: (input: {
+        startedAtMs: number;
+        nowMs: number;
+        minimumBusyMs: number;
+      }) => number;
+    }
+  ).__test__getRemainingBusyMs;
 
   expect(typeof getRemainingBusyMs).toBe('function');
   if (!getRemainingBusyMs) return;
@@ -207,9 +221,13 @@ test('unload busy state keeps a minimum visible duration', async () => {
 
 test('local inference service action only auto-starts the shared llama.cpp service', async () => {
   const module = await import('./LocalInferenceView');
-  const resolveLlamaCppServiceAction = (module as {
-    __test__resolveLlamaCppServiceAction?: (snapshot: { status: string } | null | undefined) => string;
-  }).__test__resolveLlamaCppServiceAction;
+  const resolveLlamaCppServiceAction = (
+    module as {
+      __test__resolveLlamaCppServiceAction?: (
+        snapshot: { status: string } | null | undefined,
+      ) => string;
+    }
+  ).__test__resolveLlamaCppServiceAction;
 
   expect(typeof resolveLlamaCppServiceAction).toBe('function');
   if (!resolveLlamaCppServiceAction) return;
@@ -224,15 +242,21 @@ test('local inference service action only auto-starts the shared llama.cpp servi
 
 test('local inference transient notices auto-dismiss within five seconds', async () => {
   const module = await import('./LocalInferenceView');
-  const isInstallTerminalPhase = (module as {
-    __test__isInstallTerminalPhase?: (phase: string) => boolean;
-  }).__test__isInstallTerminalPhase;
-  const getLocalInferenceToastAutoDismissMs = (module as {
-    __test__getLocalInferenceToastAutoDismissMs?: () => number;
-  }).__test__getLocalInferenceToastAutoDismissMs;
-  const getLocalInferenceProgressDismissMs = (module as {
-    __test__getLocalInferenceProgressDismissMs?: () => number;
-  }).__test__getLocalInferenceProgressDismissMs;
+  const isInstallTerminalPhase = (
+    module as {
+      __test__isInstallTerminalPhase?: (phase: string) => boolean;
+    }
+  ).__test__isInstallTerminalPhase;
+  const getLocalInferenceToastAutoDismissMs = (
+    module as {
+      __test__getLocalInferenceToastAutoDismissMs?: () => number;
+    }
+  ).__test__getLocalInferenceToastAutoDismissMs;
+  const getLocalInferenceProgressDismissMs = (
+    module as {
+      __test__getLocalInferenceProgressDismissMs?: () => number;
+    }
+  ).__test__getLocalInferenceProgressDismissMs;
 
   expect(typeof isInstallTerminalPhase).toBe('function');
   expect(typeof getLocalInferenceToastAutoDismissMs).toBe('function');
@@ -256,13 +280,15 @@ test('local inference transient notices auto-dismiss within five seconds', async
 
 test('install progress summary uses a readable separator', async () => {
   const module = await import('./LocalInferenceView');
-  const formatInstallProgressSummary = (module as {
-    __test__formatInstallProgressSummary?: (progress: Record<string, unknown>) => {
-      primary: string;
-      phase?: string;
-      error?: string;
-    };
-  }).__test__formatInstallProgressSummary;
+  const formatInstallProgressSummary = (
+    module as {
+      __test__formatInstallProgressSummary?: (progress: Record<string, unknown>) => {
+        primary: string;
+        phase?: string;
+        error?: string;
+      };
+    }
+  ).__test__formatInstallProgressSummary;
 
   expect(typeof formatInstallProgressSummary).toBe('function');
   if (!formatInstallProgressSummary) return;

@@ -74,15 +74,33 @@ const SANDBOX_HOST = '10.0.2.2';
 const GEMINI_FALLBACK_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 function isGeminiProvider(provider?: string, baseURL?: string): boolean {
-  return provider === 'gemini'
-    || Boolean(baseURL?.includes('generativelanguage.googleapis.com'));
+  return provider === 'gemini' || Boolean(baseURL?.includes('generativelanguage.googleapis.com'));
 }
 
 const GEMINI_UNSUPPORTED_SCHEMA_KEYS = new Set([
-  'patternProperties', 'additionalProperties', '$schema', '$id', '$ref', '$defs',
-  'definitions', 'examples', 'minLength', 'maxLength', 'minimum', 'maximum',
-  'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'pattern', 'format',
-  'default', 'minItems', 'maxItems', 'uniqueItems', 'minProperties', 'maxProperties',
+  'patternProperties',
+  'additionalProperties',
+  '$schema',
+  '$id',
+  '$ref',
+  '$defs',
+  'definitions',
+  'examples',
+  'minLength',
+  'maxLength',
+  'minimum',
+  'maximum',
+  'exclusiveMinimum',
+  'exclusiveMaximum',
+  'multipleOf',
+  'pattern',
+  'format',
+  'default',
+  'minItems',
+  'maxItems',
+  'uniqueItems',
+  'minProperties',
+  'maxProperties',
 ]);
 
 function sanitizeSchemaForGemini(schema: unknown): unknown {
@@ -136,12 +154,7 @@ let lastProxyError: string | null = null;
 
 // ── DNS Rebinding protection: Host header validation ──
 
-const ALLOWED_PROXY_HOSTS = new Set([
-  '127.0.0.1',
-  'localhost',
-  '[::1]',
-  '::1',
-]);
+const ALLOWED_PROXY_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
 
 /**
  * Validate that the request Host header refers to a loopback address.
@@ -161,15 +174,11 @@ export function isAllowedProxyHost(req: http.IncomingMessage): boolean {
   if (hostHeader.startsWith('[')) {
     // IPv6 bracket notation: [::1]:12345
     const bracketEnd = hostHeader.indexOf(']');
-    hostName = bracketEnd >= 0
-      ? hostHeader.slice(0, bracketEnd + 1)
-      : hostHeader;
+    hostName = bracketEnd >= 0 ? hostHeader.slice(0, bracketEnd + 1) : hostHeader;
   } else {
     // IPv4 or hostname: 127.0.0.1:12345 or localhost:12345
     const colonIndex = hostHeader.lastIndexOf(':');
-    hostName = colonIndex >= 0
-      ? hostHeader.slice(0, colonIndex)
-      : hostHeader;
+    hostName = colonIndex >= 0 ? hostHeader.slice(0, colonIndex) : hostHeader;
   }
 
   return ALLOWED_PROXY_HOSTS.has(hostName);
@@ -344,7 +353,7 @@ function cacheToolCallExtraContentFromOpenAIResponse(body: unknown): void {
 function hydrateOpenAIRequestToolCalls(
   body: Record<string, unknown>,
   provider?: string,
-  baseURL?: string
+  baseURL?: string,
 ): void {
   const isGemini =
     provider === 'gemini' || Boolean(baseURL?.includes('generativelanguage.googleapis.com'));
@@ -452,7 +461,13 @@ function estimateTokenCountFromUnknown(value: unknown): number {
     let total = 0;
     for (const [key, nested] of Object.entries(obj)) {
       // Prefer semantically meaningful text fields; avoid double-counting structural keys.
-      if (key === 'text' || key === 'content' || key === 'system' || key === 'name' || key === 'description') {
+      if (
+        key === 'text' ||
+        key === 'content' ||
+        key === 'system' ||
+        key === 'name' ||
+        key === 'description'
+      ) {
         total += estimateTokenCountFromUnknown(nested);
       }
     }
@@ -525,9 +540,7 @@ function extractTextFromChatContent(content: unknown): string {
 
 function convertUserChatContentToResponsesInput(content: unknown): Array<Record<string, unknown>> {
   if (typeof content === 'string') {
-    return content
-      ? [{ type: 'input_text', text: content }]
-      : [];
+    return content ? [{ type: 'input_text', text: content }] : [];
   }
 
   const parts: Array<Record<string, unknown>> = [];
@@ -637,7 +650,7 @@ function normalizeResponsesToolChoiceFromChat(toolChoice: unknown): unknown {
 }
 
 function convertChatCompletionsRequestToResponsesRequest(
-  chatRequest: Record<string, unknown>
+  chatRequest: Record<string, unknown>,
 ): Record<string, unknown> {
   const request: Record<string, unknown> = {};
   const input: Array<Record<string, unknown>> = [];
@@ -664,9 +677,10 @@ function convertChatCompletionsRequestToResponsesRequest(
     request.tool_choice = normalizeResponsesToolChoiceFromChat(chatRequest.tool_choice);
   }
 
-  const maxOutputTokens = toNumber(chatRequest.max_output_tokens)
-    ?? toNumber(chatRequest.max_completion_tokens)
-    ?? toNumber(chatRequest.max_tokens);
+  const maxOutputTokens =
+    toNumber(chatRequest.max_output_tokens) ??
+    toNumber(chatRequest.max_completion_tokens) ??
+    toNumber(chatRequest.max_tokens);
   if (maxOutputTokens !== null) {
     request.max_output_tokens = maxOutputTokens;
   }
@@ -794,7 +808,7 @@ function normalizeToolName(value: unknown): string {
 
 function filterOpenAIToolsForProvider(
   openAIRequest: Record<string, unknown>,
-  provider?: string
+  provider?: string,
 ): void {
   if (provider !== 'openai') {
     return;
@@ -805,7 +819,7 @@ function filterOpenAIToolsForProvider(
     return;
   }
 
-  const filteredTools = tools.filter((tool) => {
+  const filteredTools = tools.filter(tool => {
     const toolObj = toOptionalObject(tool);
     if (!toolObj) return true;
     const functionObj = toOptionalObject(toolObj.function);
@@ -819,8 +833,9 @@ function filterOpenAIToolsForProvider(
     openAIRequest.tools = filteredTools;
     const toolChoiceObj = toOptionalObject(openAIRequest.tool_choice);
     if (toolChoiceObj) {
-      const forcedName = normalizeToolName(toolChoiceObj.name)
-        || normalizeToolName(toOptionalObject(toolChoiceObj.function)?.name);
+      const forcedName =
+        normalizeToolName(toolChoiceObj.name) ||
+        normalizeToolName(toOptionalObject(toolChoiceObj.function)?.name);
       if (forcedName === 'skill') {
         openAIRequest.tool_choice = 'auto';
       }
@@ -835,7 +850,7 @@ function filterOpenAIToolsForProvider(
  */
 function remapMessageRolesForMiniMax(
   openAIRequest: Record<string, unknown>,
-  provider?: string
+  provider?: string,
 ): void {
   if (provider !== 'minimax') {
     return;
@@ -890,7 +905,7 @@ function extractMaxTokensRange(errorMessage: string): { min: number; max: number
 
 function clampMaxTokensFromError(
   openAIRequest: Record<string, unknown>,
-  errorMessage: string
+  errorMessage: string,
 ): { changed: boolean; clampedTo?: number } {
   const currentMaxTokens = openAIRequest.max_tokens;
   if (typeof currentMaxTokens !== 'number' || !Number.isFinite(currentMaxTokens)) {
@@ -922,15 +937,17 @@ function shouldUseMaxCompletionTokensForModel(model: unknown): boolean {
   const resolvedModel = normalizedModel.includes('/')
     ? normalizedModel.slice(normalizedModel.lastIndexOf('/') + 1)
     : normalizedModel;
-  return resolvedModel.startsWith('gpt-5')
-    || resolvedModel.startsWith('o1')
-    || resolvedModel.startsWith('o3')
-    || resolvedModel.startsWith('o4');
+  return (
+    resolvedModel.startsWith('gpt-5') ||
+    resolvedModel.startsWith('o1') ||
+    resolvedModel.startsWith('o3') ||
+    resolvedModel.startsWith('o4')
+  );
 }
 
 function normalizeMaxTokensFieldForOpenAIProvider(
   openAIRequest: Record<string, unknown>,
-  provider?: string
+  provider?: string,
 ): void {
   if (provider !== 'openai') {
     return;
@@ -952,9 +969,7 @@ function normalizeMaxTokensFieldForOpenAIProvider(
  * more than one system message, returning error 2013 "invalid chat setting".
  * This is safe for all providers since the semantic meaning is preserved.
  */
-function mergeSystemMessagesForProvider(
-  openAIRequest: Record<string, unknown>
-): void {
+function mergeSystemMessagesForProvider(openAIRequest: Record<string, unknown>): void {
   const messages = toArray(openAIRequest.messages);
   if (messages.length === 0) {
     return;
@@ -991,9 +1006,11 @@ function mergeSystemMessagesForProvider(
 
 function isMaxTokensUnsupportedError(errorMessage: string): boolean {
   const normalized = errorMessage.toLowerCase();
-  return normalized.includes('max_tokens')
-    && normalized.includes('max_completion_tokens')
-    && normalized.includes('not supported');
+  return (
+    normalized.includes('max_tokens') &&
+    normalized.includes('max_completion_tokens') &&
+    normalized.includes('not supported')
+  );
 }
 
 /**
@@ -1002,8 +1019,10 @@ function isMaxTokensUnsupportedError(errorMessage: string): boolean {
  */
 function isToolsUnsupportedError(errorMessage: string): boolean {
   const normalized = errorMessage.toLowerCase();
-  return normalized.includes('does not support tools')
-    || normalized.includes('tool use is not supported');
+  return (
+    normalized.includes('does not support tools') ||
+    normalized.includes('tool use is not supported')
+  );
 }
 
 /**
@@ -1020,9 +1039,10 @@ function stripToolsFromRequest(openAIRequest: Record<string, unknown>): boolean 
   return true;
 }
 
-function convertMaxTokensToMaxCompletionTokens(
-  openAIRequest: Record<string, unknown>
-): { changed: boolean; convertedTo?: number } {
+function convertMaxTokensToMaxCompletionTokens(openAIRequest: Record<string, unknown>): {
+  changed: boolean;
+  convertedTo?: number;
+} {
   const maxTokens = openAIRequest.max_tokens;
   if (typeof maxTokens !== 'number' || !Number.isFinite(maxTokens)) {
     return { changed: false };
@@ -1035,7 +1055,7 @@ function convertMaxTokensToMaxCompletionTokens(
 function writeJSON(
   res: http.ServerResponse,
   statusCode: number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
 ): void {
   const payload = JSON.stringify(body);
   res.writeHead(statusCode, {
@@ -1133,7 +1153,7 @@ function readRequestBody(req: http.IncomingMessage): Promise<string> {
       resolve(body);
     });
 
-    req.on('error', (error) => {
+    req.on('error', error => {
       fail(error instanceof Error ? error : new Error(String(error)));
     });
   });
@@ -1199,7 +1219,9 @@ function extractResponsesReasoningText(itemObj: Record<string, unknown>): string
 
 function detectResponsesFinishReason(responseObj: Record<string, unknown>): string {
   const output = toArray(responseObj.output);
-  const hasFunctionCall = output.some((item) => toString(toOptionalObject(item)?.type) === 'function_call');
+  const hasFunctionCall = output.some(
+    item => toString(toOptionalObject(item)?.type) === 'function_call',
+  );
   if (hasFunctionCall) {
     return 'tool_calls';
   }
@@ -1207,8 +1229,8 @@ function detectResponsesFinishReason(responseObj: Record<string, unknown>): stri
   const status = toString(responseObj.status);
   const incompleteReason = toString(toOptionalObject(responseObj.incomplete_details)?.reason);
   if (
-    status === 'incomplete'
-    && (incompleteReason === 'max_output_tokens' || incompleteReason === 'max_tokens')
+    status === 'incomplete' &&
+    (incompleteReason === 'max_output_tokens' || incompleteReason === 'max_tokens')
   ) {
     return 'length';
   }
@@ -1237,7 +1259,11 @@ function convertResponsesToOpenAIResponse(body: unknown): Record<string, unknown
           continue;
         }
         const contentType = toString(contentObj.type);
-        if (contentType === 'output_text' || contentType === 'text' || contentType === 'input_text') {
+        if (
+          contentType === 'output_text' ||
+          contentType === 'text' ||
+          contentType === 'input_text'
+        ) {
           const text = toString(contentObj.text);
           if (text) {
             textParts.push({ type: 'text', text });
@@ -1346,7 +1372,7 @@ function closeCurrentBlockIfNeeded(res: http.ServerResponse, state: StreamState)
 function ensureMessageStart(
   res: http.ServerResponse,
   state: StreamState,
-  chunk: OpenAIStreamChunk
+  chunk: OpenAIStreamChunk,
 ): void {
   if (state.hasMessageStart) {
     return;
@@ -1414,7 +1440,7 @@ function ensureToolUseBlock(
   res: http.ServerResponse,
   state: StreamState,
   index: number,
-  toolCall: ToolCallState
+  toolCall: ToolCallState,
 ): void {
   const resolvedId = toolCall.id || `tool_call_${index}`;
   const resolvedName = toolCall.name || 'tool';
@@ -1449,7 +1475,7 @@ function emitMessageDelta(
   res: http.ServerResponse,
   state: StreamState,
   finishReason: string | null | undefined,
-  chunk: OpenAIStreamChunk
+  chunk: OpenAIStreamChunk,
 ): void {
   closeCurrentBlockIfNeeded(res, state);
 
@@ -1469,7 +1495,7 @@ function emitMessageDelta(
 function processOpenAIChunk(
   res: http.ServerResponse,
   state: StreamState,
-  chunk: OpenAIStreamChunk
+  chunk: OpenAIStreamChunk,
 ): void {
   ensureMessageStart(res, state, chunk);
 
@@ -1510,7 +1536,7 @@ function processOpenAIChunk(
       const toolIndex = item.index ?? 0;
       const existing = state.toolCalls[toolIndex] ?? {};
       const normalizedExtraContent = normalizeToolCallExtraContent(
-        item as unknown as Record<string, unknown>
+        item as unknown as Record<string, unknown>,
       );
       if (normalizedExtraContent !== undefined) {
         existing.extraContent = normalizedExtraContent;
@@ -1571,9 +1597,7 @@ function parseSSEPacket(packet: string): { event: string; payload: string } {
   };
 }
 
-function findSSEPacketBoundary(
-  buffer: string
-): { index: number; separatorLength: number } | null {
+function findSSEPacketBoundary(buffer: string): { index: number; separatorLength: number } | null {
   const match = /\r?\n\r?\n/.exec(buffer);
   if (!match || typeof match.index !== 'number') {
     return null;
@@ -1587,7 +1611,7 @@ function findSSEPacketBoundary(
 
 function extractResponsesFunctionCallMetadata(
   payloadObj: Record<string, unknown>,
-  itemObj: Record<string, unknown> | null
+  itemObj: Record<string, unknown> | null,
 ): {
   outputIndex: number | null;
   callId: string;
@@ -1612,13 +1636,11 @@ function extractResponsesFunctionCallMetadata(
 function registerResponsesFunctionCallState(
   context: ResponsesStreamContext,
   payloadObj: Record<string, unknown>,
-  itemObj: Record<string, unknown> | null
+  itemObj: Record<string, unknown> | null,
 ): ResponsesFunctionCallState {
   const metadata = extractResponsesFunctionCallMetadata(payloadObj, itemObj);
 
-  let callState = metadata.callId
-    ? context.functionCallByCallId.get(metadata.callId)
-    : undefined;
+  let callState = metadata.callId ? context.functionCallByCallId.get(metadata.callId) : undefined;
   if (!callState && metadata.itemId) {
     callState = context.functionCallByItemId.get(metadata.itemId);
   }
@@ -1627,9 +1649,8 @@ function registerResponsesFunctionCallState(
   }
 
   if (!callState) {
-    const outputIndex = metadata.outputIndex !== null
-      ? metadata.outputIndex
-      : context.nextToolIndex;
+    const outputIndex =
+      metadata.outputIndex !== null ? metadata.outputIndex : context.nextToolIndex;
     callState = {
       outputIndex,
       callId: '',
@@ -1673,7 +1694,7 @@ function registerResponsesFunctionCallState(
 
 function syncToolCallStateWithResponsesFunctionCall(
   state: StreamState,
-  callState: ResponsesFunctionCallState
+  callState: ResponsesFunctionCallState,
 ): ToolCallState {
   const toolCall = state.toolCalls[callState.outputIndex] ?? {};
   if (callState.callId) {
@@ -1705,7 +1726,7 @@ function emitResponsesFunctionCallChunk(
     argumentsText?: string;
     responseId?: string;
     model?: string;
-  }
+  },
 ): void {
   const toolCall = syncToolCallStateWithResponsesFunctionCall(state, callState);
 
@@ -1749,7 +1770,7 @@ function emitResponsesFunctionCallMetadataOnce(
   context: ResponsesStreamContext,
   callState: ResponsesFunctionCallState,
   responseId?: string,
-  model?: string
+  model?: string,
 ): void {
   if (callState.metadataEmitted) {
     return;
@@ -1774,16 +1795,14 @@ function emitResponsesFunctionCallArgumentsOnce(
   callState: ResponsesFunctionCallState,
   argumentsText: string,
   responseId?: string,
-  model?: string
+  model?: string,
 ): void {
   if (callState.emitted) {
     return;
   }
 
-  const resolvedArguments = argumentsText
-    || callState.finalArguments
-    || callState.argumentsBuffer
-    || '{}';
+  const resolvedArguments =
+    argumentsText || callState.finalArguments || callState.argumentsBuffer || '{}';
   if (!resolvedArguments) {
     return;
   }
@@ -1804,7 +1823,7 @@ function emitResponsesCompletedFunctionCalls(
   res: http.ServerResponse,
   state: StreamState,
   context: ResponsesStreamContext,
-  responseObj: Record<string, unknown>
+  responseObj: Record<string, unknown>,
 ): void {
   const responseId = toString(responseObj.id);
   const model = toString(responseObj.model);
@@ -1830,19 +1849,13 @@ function emitResponsesCompletedFunctionCalls(
     }
 
     const callState = registerResponsesFunctionCallState(context, payloadObj, itemObj);
-    emitResponsesFunctionCallMetadataOnce(
-      res,
-      state,
-      context,
-      callState,
-      responseId,
-      model
-    );
+    emitResponsesFunctionCallMetadataOnce(res, state, context, callState, responseId, model);
 
-    const finalizedArguments = normalizeFunctionArguments(itemObj.arguments)
-      || callState.finalArguments
-      || callState.argumentsBuffer
-      || '{}';
+    const finalizedArguments =
+      normalizeFunctionArguments(itemObj.arguments) ||
+      callState.finalArguments ||
+      callState.argumentsBuffer ||
+      '{}';
     emitResponsesFunctionCallArgumentsOnce(
       res,
       state,
@@ -1850,7 +1863,7 @@ function emitResponsesCompletedFunctionCalls(
       callState,
       finalizedArguments,
       responseId,
-      model
+      model,
     );
   }
 }
@@ -1859,7 +1872,7 @@ function emitResponsesFallbackContent(
   res: http.ServerResponse,
   state: StreamState,
   responseObj: Record<string, unknown>,
-  context: ResponsesStreamContext
+  context: ResponsesStreamContext,
 ): void {
   const syntheticOpenAIResponse = convertResponsesToOpenAIResponse(responseObj);
   const firstChoice = toOptionalObject(toArray(syntheticOpenAIResponse.choices)[0]);
@@ -1918,7 +1931,7 @@ function emitResponsesFallbackContent(
       context,
       callState,
       toString(syntheticOpenAIResponse.id),
-      toString(syntheticOpenAIResponse.model)
+      toString(syntheticOpenAIResponse.model),
     );
     emitResponsesFunctionCallArgumentsOnce(
       res,
@@ -1927,7 +1940,7 @@ function emitResponsesFallbackContent(
       callState,
       toString(functionObj.arguments) || '{}',
       toString(syntheticOpenAIResponse.id),
-      toString(syntheticOpenAIResponse.model)
+      toString(syntheticOpenAIResponse.model),
     );
   }
 }
@@ -1937,7 +1950,7 @@ function processResponsesStreamEvent(
   state: StreamState,
   context: ResponsesStreamContext,
   event: string,
-  payloadObj: Record<string, unknown>
+  payloadObj: Record<string, unknown>,
 ): void {
   const eventType = event || toString(payloadObj.type);
 
@@ -1968,8 +1981,8 @@ function processResponsesStreamEvent(
   }
 
   if (
-    eventType === 'response.reasoning_summary_text.delta'
-    || eventType === 'response.reasoning.delta'
+    eventType === 'response.reasoning_summary_text.delta' ||
+    eventType === 'response.reasoning.delta'
   ) {
     const thinkingDelta = toString(payloadObj.delta);
     if (thinkingDelta) {
@@ -1993,14 +2006,7 @@ function processResponsesStreamEvent(
       const callState = registerResponsesFunctionCallState(context, payloadObj, itemObj);
       const responseId = toString(payloadObj.response_id);
       const model = toString(payloadObj.model);
-      emitResponsesFunctionCallMetadataOnce(
-        res,
-        state,
-        context,
-        callState,
-        responseId,
-        model
-      );
+      emitResponsesFunctionCallMetadataOnce(res, state, context, callState, responseId, model);
 
       if (eventType === 'response.output_item.done' && !callState.emitted) {
         const inlineArguments = normalizeFunctionArguments(itemObj.arguments);
@@ -2012,7 +2018,7 @@ function processResponsesStreamEvent(
             callState,
             inlineArguments,
             responseId,
-            model
+            model,
           );
         }
       }
@@ -2032,9 +2038,8 @@ function processResponsesStreamEvent(
 
   if (eventType === 'response.function_call_arguments.done') {
     const callState = registerResponsesFunctionCallState(context, payloadObj, null);
-    const argumentsDone = normalizeFunctionArguments(payloadObj.arguments)
-      || callState.argumentsBuffer
-      || '{}';
+    const argumentsDone =
+      normalizeFunctionArguments(payloadObj.arguments) || callState.argumentsBuffer || '{}';
     callState.finalArguments = argumentsDone;
     emitResponsesFunctionCallArgumentsOnce(
       res,
@@ -2043,7 +2048,7 @@ function processResponsesStreamEvent(
       callState,
       argumentsDone,
       toString(payloadObj.response_id),
-      toString(payloadObj.model)
+      toString(payloadObj.model),
     );
     return;
   }
@@ -2062,7 +2067,8 @@ function processResponsesStreamEvent(
       choices: [{ finish_reason: detectResponsesFinishReason(responseObj) }],
       usage: {
         prompt_tokens: toNumber(usage?.input_tokens) ?? toNumber(usage?.prompt_tokens) ?? 0,
-        completion_tokens: toNumber(usage?.output_tokens) ?? toNumber(usage?.completion_tokens) ?? 0,
+        completion_tokens:
+          toNumber(usage?.output_tokens) ?? toNumber(usage?.completion_tokens) ?? 0,
       },
     });
   }
@@ -2070,7 +2076,7 @@ function processResponsesStreamEvent(
 
 async function handleResponsesStreamResponse(
   upstreamResponse: Response,
-  res: http.ServerResponse
+  res: http.ServerResponse,
 ): Promise<void> {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -2079,7 +2085,11 @@ async function handleResponsesStreamResponse(
   });
 
   if (!upstreamResponse.body) {
-    emitSSE(res, 'error', createAnthropicErrorBody('Upstream returned empty stream', 'stream_error'));
+    emitSSE(
+      res,
+      'error',
+      createAnthropicErrorBody('Upstream returned empty stream', 'stream_error'),
+    );
     res.end();
     return;
   }
@@ -2160,7 +2170,7 @@ async function handleResponsesStreamResponse(
 
 async function handleChatCompletionsStreamResponse(
   upstreamResponse: Response,
-  res: http.ServerResponse
+  res: http.ServerResponse,
 ): Promise<void> {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -2170,7 +2180,11 @@ async function handleChatCompletionsStreamResponse(
 
   if (!upstreamResponse.body) {
     console.warn('[CoworkProxy] Stream: upstream returned empty body');
-    emitSSE(res, 'error', createAnthropicErrorBody('Upstream returned empty stream', 'stream_error'));
+    emitSSE(
+      res,
+      'error',
+      createAnthropicErrorBody('Upstream returned empty stream', 'stream_error'),
+    );
     res.end();
     return;
   }
@@ -2202,7 +2216,9 @@ async function handleChatCompletionsStreamResponse(
   while (true) {
     const { value, done } = await reader.read();
     if (done) {
-      console.log(`[CoworkProxy] Stream: upstream done after ${chunkCount} chunks, sawDoneMarker=${sawDoneMarker}`);
+      console.log(
+        `[CoworkProxy] Stream: upstream done after ${chunkCount} chunks, sawDoneMarker=${sawDoneMarker}`,
+      );
       break;
     }
 
@@ -2262,10 +2278,7 @@ async function handleChatCompletionsStreamResponse(
   res.end();
 }
 
-async function handleRequest(
-  req: http.IncomingMessage,
-  res: http.ServerResponse
-): Promise<void> {
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // DNS Rebinding protection: reject requests with non-loopback Host header
   if (!isAllowedProxyHost(req)) {
     console.warn(`[CoworkProxy] Rejected request with disallowed Host header: ${req.headers.host}`);
@@ -2285,14 +2298,16 @@ async function handleRequest(
   // Token authentication: all endpoints except /healthz require a valid Bearer token
   if (proxyAuthToken) {
     const authHeader = req.headers.authorization || '';
-    const bearerToken = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7).trim()
-      : '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
     if (bearerToken !== proxyAuthToken) {
-      writeJSON(res, 401, createAnthropicErrorBody(
-        'Unauthorized: invalid or missing proxy token',
-        'authentication_error'
-      ));
+      writeJSON(
+        res,
+        401,
+        createAnthropicErrorBody(
+          'Unauthorized: invalid or missing proxy token',
+          'authentication_error',
+        ),
+      );
       return;
     }
   }
@@ -2318,7 +2333,11 @@ async function handleRequest(
     try {
       parsedRequestBody = JSON.parse(requestBodyRaw);
     } catch {
-      writeJSON(res, 400, createAnthropicErrorBody('Request body must be valid JSON', 'invalid_request_error'));
+      writeJSON(
+        res,
+        400,
+        createAnthropicErrorBody('Request body must be valid JSON', 'invalid_request_error'),
+      );
       return;
     }
 
@@ -2333,7 +2352,11 @@ async function handleRequest(
   // This route manages the Copilot token lifecycle independently of upstreamConfig
   // and injects the required IDE headers (Editor-Version etc.) before forwarding
   // to the real GitHub Copilot API.
-  if (method === 'POST' && (url.pathname === '/v1/copilot/chat/completions' || url.pathname === '/copilot/chat/completions')) {
+  if (
+    method === 'POST' &&
+    (url.pathname === '/v1/copilot/chat/completions' ||
+      url.pathname === '/copilot/chat/completions')
+  ) {
     let body = '';
     try {
       body = await readRequestBody(req);
@@ -2343,15 +2366,23 @@ async function handleRequest(
       return;
     }
 
-    const { getCurrentCopilotToken, refreshCopilotTokenNow } = await import('./copilotTokenManager.js');
+    const { getCurrentCopilotToken, refreshCopilotTokenNow } =
+      await import('./copilotTokenManager.js');
 
     let tokenState = getCurrentCopilotToken();
     if (!tokenState) {
       try {
         tokenState = await refreshCopilotTokenNow();
       } catch (err) {
-        console.warn('[CoworkProxy] Copilot passthrough: no token available and refresh failed:', err);
-        writeJSON(res, 503, createAnthropicErrorBody('Copilot token unavailable', 'service_unavailable'));
+        console.warn(
+          '[CoworkProxy] Copilot passthrough: no token available and refresh failed:',
+          err,
+        );
+        writeJSON(
+          res,
+          503,
+          createAnthropicErrorBody('Copilot token unavailable', 'service_unavailable'),
+        );
         return;
       }
     }
@@ -2363,7 +2394,7 @@ async function handleRequest(
 
     const buildCopilotHeaders = (token: string): Record<string, string> => ({
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Copilot-Integration-Id': 'vscode-chat',
       'Editor-Version': 'vscode/1.96.2',
       'Editor-Plugin-Version': 'copilot-chat/0.26.7',
@@ -2380,7 +2411,9 @@ async function handleRequest(
 
     // Auto-retry once on auth error by refreshing the short-lived token
     if (upstreamResponse.status === 401 || upstreamResponse.status === 403) {
-      console.log('[CoworkProxy] Copilot passthrough: auth error, refreshing token and retrying...');
+      console.log(
+        '[CoworkProxy] Copilot passthrough: auth error, refreshing token and retrying...',
+      );
       try {
         const refreshed = await refreshCopilotTokenNow();
         const newCopilotUrl = refreshed.baseUrl.replace(/\/+$/, '').endsWith('/chat/completions')
@@ -2420,9 +2453,12 @@ async function handleRequest(
   }
 
   // OpenClaw sends requests to /v1/chat/completions (OpenAI format) when using
-  // the lobster provider. Transparently proxy these requests to the upstream with
+  // the zhiyuan provider. Transparently proxy these requests to the upstream with
   // IDE headers injected (needed for GitHub Copilot).
-  if (method === 'POST' && (url.pathname === '/v1/chat/completions' || url.pathname === '/chat/completions')) {
+  if (
+    method === 'POST' &&
+    (url.pathname === '/v1/chat/completions' || url.pathname === '/chat/completions')
+  ) {
     if (!upstreamConfig) {
       writeJSON(res, 503, createAnthropicErrorBody('Proxy not configured', 'service_unavailable'));
       return;
@@ -2453,7 +2489,9 @@ async function handleRequest(
     const upstreamUrl = upstreamBase.endsWith('/chat/completions')
       ? upstreamBase
       : `${upstreamBase}/chat/completions`;
-    console.log(`[CoworkProxy] OpenAI passthrough → ${upstreamUrl} (provider: ${upstreamConfig.provider})`);
+    console.log(
+      `[CoworkProxy] OpenAI passthrough → ${upstreamUrl} (provider: ${upstreamConfig.provider})`,
+    );
     try {
       const { session } = await import('electron');
       let upstreamResponse = await session.defaultSession.fetch(upstreamUrl, {
@@ -2463,12 +2501,14 @@ async function handleRequest(
       });
       // Auto-retry once for token expiry using provider-based refresher
       if (
-        (upstreamResponse.status === 401 || upstreamResponse.status === 403)
-        && upstreamConfig.provider
+        (upstreamResponse.status === 401 || upstreamResponse.status === 403) &&
+        upstreamConfig.provider
       ) {
         const refresher = tokenRefreshers.get(upstreamConfig.provider);
         if (refresher) {
-          console.log(`[CoworkProxy] OpenAI passthrough: ${upstreamConfig.provider} auth error, refreshing token and retrying...`);
+          console.log(
+            `[CoworkProxy] OpenAI passthrough: ${upstreamConfig.provider} auth error, refreshing token and retrying...`,
+          );
           try {
             const newToken = await refresher();
             if (newToken) {
@@ -2479,10 +2519,15 @@ async function handleRequest(
                 headers: upstreamHeaders,
                 body,
               });
-              console.log(`[CoworkProxy] OpenAI passthrough: retry status=${upstreamResponse.status}`);
+              console.log(
+                `[CoworkProxy] OpenAI passthrough: retry status=${upstreamResponse.status}`,
+              );
             }
           } catch (refreshErr) {
-            console.warn(`[CoworkProxy] OpenAI passthrough: ${upstreamConfig.provider} token refresh failed:`, refreshErr);
+            console.warn(
+              `[CoworkProxy] OpenAI passthrough: ${upstreamConfig.provider} token refresh failed:`,
+              refreshErr,
+            );
           }
         }
       }
@@ -2496,7 +2541,10 @@ async function handleRequest(
         const pump = async () => {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) { res.end(); return; }
+            if (done) {
+              res.end();
+              return;
+            }
             res.write(Buffer.from(value));
           }
         };
@@ -2507,10 +2555,14 @@ async function handleRequest(
       }
     } catch (proxyError) {
       console.error('[CoworkProxy] OpenAI passthrough error:', proxyError);
-      writeJSON(res, 502, createAnthropicErrorBody(
-        proxyError instanceof Error ? proxyError.message : 'Upstream error',
-        'api_error',
-      ));
+      writeJSON(
+        res,
+        502,
+        createAnthropicErrorBody(
+          proxyError instanceof Error ? proxyError.message : 'Upstream error',
+          'api_error',
+        ),
+      );
     }
     return;
   }
@@ -2524,7 +2576,10 @@ async function handleRequest(
     writeJSON(
       res,
       503,
-      createAnthropicErrorBody('OpenAI compatibility proxy is not configured', 'service_unavailable')
+      createAnthropicErrorBody(
+        'OpenAI compatibility proxy is not configured',
+        'service_unavailable',
+      ),
     );
     return;
   }
@@ -2542,16 +2597,20 @@ async function handleRequest(
   try {
     parsedRequestBody = JSON.parse(requestBodyRaw);
   } catch {
-    writeJSON(res, 400, createAnthropicErrorBody('Request body must be valid JSON', 'invalid_request_error'));
+    writeJSON(
+      res,
+      400,
+      createAnthropicErrorBody('Request body must be valid JSON', 'invalid_request_error'),
+    );
     return;
   }
 
   const upstreamAPIType = resolveUpstreamAPIType(upstreamConfig.provider);
   const openAIRequest = anthropicToOpenAI(parsedRequestBody);
 
-  // Inject session_id and user_message for lobsterai-server logging only.
+  // Inject session_id and user_message for zhiyuan-server logging only.
   // Strict providers (e.g. Gemini) reject unknown payload fields.
-  if (upstreamConfig.provider === 'lobsterai-server') {
+  if (upstreamConfig.provider === 'zhiyuan-server') {
     if (currentCoworkSessionId) {
       openAIRequest.session_id = currentCoworkSessionId;
     }
@@ -2568,11 +2627,15 @@ async function handleRequest(
   // Force-remap model name to the user-configured upstream model.
   // The Claude Agent SDK may emit internal model names (e.g. claude-haiku-4-5-20251001)
   // for probe/warmup requests, which non-Anthropic providers don't recognize.
-  if (upstreamConfig.provider && upstreamConfig.provider !== 'anthropic' && upstreamConfig.provider !== 'openai') {
+  if (
+    upstreamConfig.provider &&
+    upstreamConfig.provider !== 'anthropic' &&
+    upstreamConfig.provider !== 'openai'
+  ) {
     const requestModel = typeof openAIRequest.model === 'string' ? openAIRequest.model : '';
     if (requestModel !== upstreamConfig.model) {
       console.info(
-        `[CoworkProxy] Remapping model: ${requestModel} -> ${upstreamConfig.model} (provider: ${upstreamConfig.provider})`
+        `[CoworkProxy] Remapping model: ${requestModel} -> ${upstreamConfig.model} (provider: ${upstreamConfig.provider})`,
       );
       openAIRequest.model = upstreamConfig.model;
     }
@@ -2591,12 +2654,15 @@ async function handleRequest(
   // This fix applies to both chat_completions and responses API types.
   mergeSystemMessagesForProvider(openAIRequest);
 
-  const upstreamRequest = upstreamAPIType === 'responses'
-    ? convertChatCompletionsRequestToResponsesRequest(openAIRequest)
-    : openAIRequest;
+  const upstreamRequest =
+    upstreamAPIType === 'responses'
+      ? convertChatCompletionsRequestToResponsesRequest(openAIRequest)
+      : openAIRequest;
   const stream = Boolean(upstreamRequest.stream);
 
-  console.log(`[CoworkProxy] Upstream: apiType=${upstreamAPIType}, model=${upstreamRequest.model}, stream=${stream}, provider=${upstreamConfig.provider}`);
+  console.log(
+    `[CoworkProxy] Upstream: apiType=${upstreamAPIType}, model=${upstreamRequest.model}, stream=${stream}, provider=${upstreamConfig.provider}`,
+  );
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -2621,7 +2687,7 @@ async function handleRequest(
 
   const sendUpstreamRequest = async (
     payload: Record<string, unknown>,
-    targetURL: string
+    targetURL: string,
   ): Promise<Response> => {
     currentTargetURL = targetURL;
     console.log(`[CoworkProxy] Sending upstream request to: ${targetURL}`);
@@ -2635,14 +2701,20 @@ async function handleRequest(
   let upstreamResponse: Response;
   const fetchStartTime = Date.now();
   try {
-    console.log(`[CoworkProxy] Awaiting upstream fetch (stream=${stream}, model=${upstreamRequest.model})...`);
+    console.log(
+      `[CoworkProxy] Awaiting upstream fetch (stream=${stream}, model=${upstreamRequest.model})...`,
+    );
     upstreamResponse = await sendUpstreamRequest(upstreamRequest, targetURLs[0]);
     const fetchDuration = Date.now() - fetchStartTime;
-    console.log(`[CoworkProxy] Upstream response: status=${upstreamResponse.status}, ok=${upstreamResponse.ok}, fetchTime=${fetchDuration}ms, stream=${stream}`);
+    console.log(
+      `[CoworkProxy] Upstream response: status=${upstreamResponse.status}, ok=${upstreamResponse.ok}, fetchTime=${fetchDuration}ms, stream=${stream}`,
+    );
   } catch (error) {
     const fetchDuration = Date.now() - fetchStartTime;
     const message = error instanceof Error ? error.message : 'Network error';
-    console.error(`[CoworkProxy] Upstream fetch error after ${fetchDuration}ms (stream=${stream}): ${message}`);
+    console.error(
+      `[CoworkProxy] Upstream fetch error after ${fetchDuration}ms (stream=${stream}): ${message}`,
+    );
     lastProxyError = message;
     writeJSON(res, 502, createAnthropicErrorBody(message));
     return;
@@ -2652,12 +2724,14 @@ async function handleRequest(
     // 401/403 likely means the token expired.  Look up the registered
     // refresher for this provider and retry once with a fresh token.
     if (
-      (upstreamResponse.status === 401 || upstreamResponse.status === 403)
-      && upstreamConfig?.provider
+      (upstreamResponse.status === 401 || upstreamResponse.status === 403) &&
+      upstreamConfig?.provider
     ) {
       const refresher = tokenRefreshers.get(upstreamConfig.provider);
       if (refresher) {
-        console.log(`[CoworkProxy] Got ${upstreamResponse.status} from ${upstreamConfig.provider}, attempting token refresh and retry...`);
+        console.log(
+          `[CoworkProxy] Got ${upstreamResponse.status} from ${upstreamConfig.provider}, attempting token refresh and retry...`,
+        );
         try {
           const newToken = await refresher();
           if (newToken) {
@@ -2671,10 +2745,15 @@ async function handleRequest(
             }
             upstreamResponse = await sendUpstreamRequest(upstreamRequest, currentTargetURL);
             const retryDuration = Date.now() - fetchStartTime;
-            console.log(`[CoworkProxy] Token refresh retry: status=${upstreamResponse.status}, ok=${upstreamResponse.ok}, fetchTime=${retryDuration}ms`);
+            console.log(
+              `[CoworkProxy] Token refresh retry: status=${upstreamResponse.status}, ok=${upstreamResponse.ok}, fetchTime=${retryDuration}ms`,
+            );
           }
         } catch (refreshError) {
-          console.warn(`[CoworkProxy] Token refresh for ${upstreamConfig.provider} failed:`, refreshError);
+          console.warn(
+            `[CoworkProxy] Token refresh for ${upstreamConfig.provider} failed:`,
+            refreshError,
+          );
         }
       }
     }
@@ -2698,7 +2777,9 @@ async function handleRequest(
 
     if (!upstreamResponse.ok) {
       const firstErrorText = await upstreamResponse.text();
-      console.error(`[CoworkProxy] Upstream error: status=${upstreamResponse.status}, body=${firstErrorText.slice(0, 500)}`);
+      console.error(
+        `[CoworkProxy] Upstream error: status=${upstreamResponse.status}, body=${firstErrorText.slice(0, 500)}`,
+      );
       let firstErrorMessage = extractErrorMessage(firstErrorText);
       if (firstErrorMessage === 'Upstream API request failed') {
         firstErrorMessage = `Upstream API request failed (${upstreamResponse.status}) ${currentTargetURL}`;
@@ -2716,9 +2797,7 @@ async function handleRequest(
                 const retryErrorText = await upstreamResponse.text();
                 firstErrorMessage = extractErrorMessage(retryErrorText);
               } else {
-                console.info(
-                  '[CoworkProxy] Retried request after stripping unsupported tools'
-                );
+                console.info('[CoworkProxy] Retried request after stripping unsupported tools');
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error';
@@ -2739,8 +2818,8 @@ async function handleRequest(
                 firstErrorMessage = extractErrorMessage(retryErrorText);
               } else {
                 console.info(
-                  '[cowork-openai-compat-proxy] Retried request with max_completion_tokens '
-                    + `converted from max_tokens=${convertResult.convertedTo}`
+                  '[cowork-openai-compat-proxy] Retried request with max_completion_tokens ' +
+                    `converted from max_tokens=${convertResult.convertedTo}`,
                 );
               }
             } catch (error) {
@@ -2764,7 +2843,7 @@ async function handleRequest(
                 firstErrorMessage = extractErrorMessage(retryErrorText);
               } else {
                 console.info(
-                  `[cowork-openai-compat-proxy] Retried request with clamped max_tokens=${clampResult.clampedTo}`
+                  `[cowork-openai-compat-proxy] Retried request with clamped max_tokens=${clampResult.clampedTo}`,
                 );
               }
             } catch (error) {
@@ -2842,7 +2921,7 @@ export async function startCoworkOpenAICompatProxy(): Promise<void> {
 
   await new Promise<void>((resolve, reject) => {
     const server = http.createServer((req, res) => {
-      void handleRequest(req, res).catch((error) => {
+      void handleRequest(req, res).catch(error => {
         const message = error instanceof Error ? error.message : 'Internal proxy error';
         lastProxyError = message;
         if (!res.headersSent) {
@@ -2853,7 +2932,7 @@ export async function startCoworkOpenAICompatProxy(): Promise<void> {
       });
     });
 
-    server.on('error', (error) => {
+    server.on('error', error => {
       lastProxyError = error.message;
       reject(error);
     });
@@ -2884,7 +2963,7 @@ export async function stopCoworkOpenAICompatProxy(): Promise<void> {
   proxyAuthToken = null;
 
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
+    server.close(error => {
       if (error) {
         reject(error);
         return;
@@ -2903,11 +2982,16 @@ export function configureCoworkOpenAICompatProxy(config: OpenAICompatUpstreamCon
   lastProxyError = null;
 }
 
-export function registerProxyTokenRefresher(provider: string, refresher: () => Promise<string | null>): void {
+export function registerProxyTokenRefresher(
+  provider: string,
+  refresher: () => Promise<string | null>,
+): void {
   tokenRefreshers.set(provider, refresher);
 }
 
-export function getCoworkOpenAICompatProxyBaseURL(target: OpenAICompatProxyTarget = 'local'): string | null {
+export function getCoworkOpenAICompatProxyBaseURL(
+  target: OpenAICompatProxyTarget = 'local',
+): string | null {
   if (!proxyServer || !proxyPort) {
     return null;
   }

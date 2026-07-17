@@ -15,7 +15,7 @@ import {
 const tempDirs: string[] = [];
 
 const makeTempDir = (): string => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-sqlite-recovery-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-sqlite-recovery-'));
   tempDirs.push(dir);
   return dir;
 };
@@ -60,7 +60,9 @@ test('restoreLatestBackup replaces broken database with newest valid snapshot', 
     expect(result.restored).toBe(true);
 
     const restoredDb = new Database(dbPath, { readonly: true });
-    expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({ value: 'first' });
+    expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({
+      value: 'first',
+    });
     restoredDb.close();
 
     const quarantineEntries = fs.readdirSync(manager.getPaths().quarantineDir);
@@ -88,7 +90,9 @@ test('openSqliteDatabaseWithRecovery restores the latest snapshot before startup
   fs.writeFileSync(dbPath, 'not-a-sqlite-db', 'utf8');
 
   const restoredDb = openSqliteDatabaseWithRecovery(userDataPath, dbPath);
-  expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({ value: 'restored' });
+  expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({
+    value: 'restored',
+  });
   restoredDb.close();
 });
 
@@ -113,6 +117,8 @@ test('restoreLatestBackup falls back to the previous backup file when publish wa
   expect(result.restored).toBe(true);
 
   const restoredDb = new Database(dbPath, { readonly: true });
-  expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({ value: 'first' });
+  expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({
+    value: 'first',
+  });
   restoredDb.close();
 });

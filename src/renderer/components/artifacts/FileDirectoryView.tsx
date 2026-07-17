@@ -41,9 +41,7 @@ const TYPE_LABEL_KEYS: Record<ArtifactType, string> = {
 
 function getShortPath(filePath: string): string {
   const parts = filePath.replace(/\\/g, '/').split('/');
-  return parts.length > 2
-    ? `.../${parts.slice(-2).join('/')}`
-    : parts.join('/');
+  return parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : parts.join('/');
 }
 
 interface FileDirectoryViewProps {
@@ -53,7 +51,12 @@ interface FileDirectoryViewProps {
   compact?: boolean;
 }
 
-const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({ artifacts, selectedId, onSelect, compact }) => {
+const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
+  artifacts,
+  selectedId,
+  onSelect,
+  compact,
+}) => {
   const [search, setSearch] = useState('');
 
   const sortedAndFiltered = useMemo(() => {
@@ -103,9 +106,8 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({ artifacts, select
           </div>
         ) : (
           sortedAndFiltered.map((artifact, idx) => {
-            const showGroupHeader = !compact && (
-              idx === 0 || artifact.type !== sortedAndFiltered[idx - 1].type
-            );
+            const showGroupHeader =
+              !compact && (idx === 0 || artifact.type !== sortedAndFiltered[idx - 1].type);
             return (
               <React.Fragment key={artifact.id}>
                 {showGroupHeader && (
@@ -118,11 +120,11 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({ artifacts, select
                   className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors
                     ${artifact.id === selectedId ? 'bg-primary/10 text-primary' : 'hover:bg-surface text-foreground'}`}
                 >
-                  {!compact && <span className="shrink-0 text-base">{TYPE_ICONS[artifact.type] || '📄'}</span>}
+                  {!compact && (
+                    <span className="shrink-0 text-base">{TYPE_ICONS[artifact.type] || '📄'}</span>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="truncate">
-                      {artifact.fileName || artifact.title}
-                    </div>
+                    <div className="truncate">{artifact.fileName || artifact.title}</div>
                     {!compact && artifact.filePath && (
                       <div className="text-[10px] text-muted truncate">
                         {getShortPath(artifact.filePath)}
@@ -133,9 +135,7 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({ artifacts, select
                     )}
                   </div>
                   {!compact && (
-                    <span className="shrink-0 text-xs text-muted uppercase">
-                      {artifact.type}
-                    </span>
+                    <span className="shrink-0 text-xs text-muted uppercase">{artifact.type}</span>
                   )}
                 </div>
               </React.Fragment>

@@ -67,7 +67,8 @@ export function normalizeInstallProgress(
 ): LlamaCppInstallProgress {
   return {
     modelId: typeof chunk.modelId === 'string' && chunk.modelId.trim() ? chunk.modelId : name,
-    modelName: typeof chunk.modelName === 'string' && chunk.modelName.trim() ? chunk.modelName : name,
+    modelName:
+      typeof chunk.modelName === 'string' && chunk.modelName.trim() ? chunk.modelName : name,
     phase:
       typeof chunk.phase === 'string'
         ? (chunk.phase as LlamaCppInstallProgress['phase'])
@@ -150,4 +151,3 @@ export function formatDate(value: string): string {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 }
-

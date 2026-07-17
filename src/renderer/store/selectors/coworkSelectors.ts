@@ -21,35 +21,29 @@ export const selectUnreadSessionIds = (state: RootState) => state.cowork.unreadS
 // These compute new values from the store and use createSelector to avoid
 // returning new object references when the inputs haven't changed.
 
-export const selectAgentEngine = createSelector(
-  selectCoworkConfig,
-  (config) => config.agentEngine,
-);
+export const selectAgentEngine = createSelector(selectCoworkConfig, config => config.agentEngine);
 
 export const selectIsOpenClawEngine = createSelector(
   selectAgentEngine,
-  (engine) => engine === 'openclaw',
+  engine => engine === 'openclaw',
 );
 
 export const selectCurrentMessages = createSelector(
   selectCurrentSession,
-  (session) => session?.messages ?? null,
+  session => session?.messages ?? null,
 );
 
 export const selectCurrentMessagesLength = createSelector(
   selectCurrentMessages,
-  (messages) => messages?.length ?? 0,
+  messages => messages?.length ?? 0,
 );
 
-export const selectLastMessageContent = createSelector(
-  selectCurrentMessages,
-  (messages) => {
-    if (!messages || messages.length === 0) return undefined;
-    return messages[messages.length - 1]?.content;
-  },
-);
+export const selectLastMessageContent = createSelector(selectCurrentMessages, messages => {
+  if (!messages || messages.length === 0) return undefined;
+  return messages[messages.length - 1]?.content;
+});
 
 export const selectFirstPendingPermission = createSelector(
   selectPendingPermissions,
-  (permissions) => permissions[0] ?? null,
+  permissions => permissions[0] ?? null,
 );

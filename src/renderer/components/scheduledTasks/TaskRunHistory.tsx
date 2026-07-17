@@ -58,7 +58,10 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
     (state: RootState) => state.scheduledTask.runsHasMore[taskId] ?? false,
   );
   const [viewingRun, setViewingRun] = useState<ScheduledTaskRun | null>(null);
-  const [viewingError, setViewingError] = useState<Pick<ScheduledTaskRun, 'startedAt' | 'error'> | null>(null);
+  const [viewingError, setViewingError] = useState<Pick<
+    ScheduledTaskRun,
+    'startedAt' | 'error'
+  > | null>(null);
   const [filter, setFilter] = useState<RunFilter>(EMPTY_FILTER);
 
   const hasActiveFilter = Boolean(filter.startDate || filter.endDate || filter.status);
@@ -172,11 +175,15 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
                   {run.status === 'running' ? (
                     <Spinner className="size-3.5" />
                   ) : (
-                    <span className={`text-sm font-bold ${
-                      run.status === 'success' ? 'text-green-500' :
-                      run.status === 'error' ? 'text-destructive' :
-                      'text-yellow-500'
-                    }`}>
+                    <span
+                      className={`text-sm font-bold ${
+                        run.status === 'success'
+                          ? 'text-green-500'
+                          : run.status === 'error'
+                            ? 'text-destructive'
+                            : 'text-yellow-500'
+                      }`}
+                    >
                       {run.status === 'success' ? '✓' : run.status === 'error' ? '✗' : '↷'}
                     </span>
                   )}
@@ -224,12 +231,7 @@ const TaskRunHistory: React.FC<TaskRunHistoryProps> = ({ taskId, runs, taskPromp
       )}
 
       {hasMore && (
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleLoadMore}
-          className="w-full py-2 mt-2"
-        >
+        <Button type="button" variant="ghost" onClick={handleLoadMore} className="w-full py-2 mt-2">
           {i18nService.t('scheduledTasksLoadMore')}
         </Button>
       )}

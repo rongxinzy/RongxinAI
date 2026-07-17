@@ -27,10 +27,12 @@ export type DangerLevel = 'safe' | 'caution' | 'destructive';
  * (rm, rmdir, unlink, del, erase, remove-item, find -delete, git clean).
  */
 export function isDeleteCommand(command: string): boolean {
-  return DELETE_COMMAND_RE.test(command)
-    || FIND_DELETE_COMMAND_RE.test(command)
-    || GIT_CLEAN_COMMAND_RE.test(command)
-    || OSASCRIPT_DELETE_RE.test(command);
+  return (
+    DELETE_COMMAND_RE.test(command) ||
+    FIND_DELETE_COMMAND_RE.test(command) ||
+    GIT_CLEAN_COMMAND_RE.test(command) ||
+    OSASCRIPT_DELETE_RE.test(command)
+  );
 }
 
 /**
@@ -38,11 +40,13 @@ export function isDeleteCommand(command: string): boolean {
  * explicit user confirmation before execution.
  */
 export function isDangerousCommand(command: string): boolean {
-  return isDeleteCommand(command)
-    || GIT_PUSH_RE.test(command)
-    || GIT_RESET_HARD_RE.test(command)
-    || KILL_COMMAND_RE.test(command)
-    || CHMOD_COMMAND_RE.test(command);
+  return (
+    isDeleteCommand(command) ||
+    GIT_PUSH_RE.test(command) ||
+    GIT_RESET_HARD_RE.test(command) ||
+    KILL_COMMAND_RE.test(command) ||
+    CHMOD_COMMAND_RE.test(command)
+  );
 }
 
 /**

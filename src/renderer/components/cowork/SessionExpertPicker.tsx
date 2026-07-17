@@ -32,13 +32,18 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
   const experts = useMemo(
-    () => agents.filter((agent) => (
-      agent.enabled && (agent.source === CoworkSessionExpertSource.Package || agent.source === CoworkSessionExpertSource.Member)
-    )),
+    () =>
+      agents.filter(
+        agent =>
+          agent.enabled &&
+          (agent.source === CoworkSessionExpertSource.Package ||
+            agent.source === CoworkSessionExpertSource.Member),
+      ),
     [agents],
   );
   const snapshotNames = useMemo(
-    () => new Map((currentSession?.experts ?? []).map((expert) => [expert.expertId, expert.expertName])),
+    () =>
+      new Map((currentSession?.experts ?? []).map(expert => [expert.expertId, expert.expertName])),
     [currentSession?.experts],
   );
   const selected = new Set(selectedExpertIds);
@@ -47,7 +52,7 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
 
   const toggleExpert = (expertId: string) => {
     const next = selected.has(expertId)
-      ? selectedExpertIds.filter((id) => id !== expertId)
+      ? selectedExpertIds.filter(id => id !== expertId)
       : [...selectedExpertIds, expertId];
     onChange(next);
   };
@@ -83,7 +88,7 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
             <CommandList>
               <CommandEmpty>{i18nService.t('noSessionExperts')}</CommandEmpty>
               <CommandGroup heading={i18nService.t('sessionExperts')}>
-                {experts.map((expert) => {
+                {experts.map(expert => {
                   const isSelected = selected.has(expert.id);
                   return (
                     <CommandItem
@@ -107,8 +112,8 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
           </Command>
         </PopoverContent>
       </Popover>
-      {selectedExpertIds.map((expertId) => {
-        const expert = experts.find((item) => item.id === expertId);
+      {selectedExpertIds.map(expertId => {
+        const expert = experts.find(item => item.id === expertId);
         const expertName = expert?.name ?? snapshotNames.get(expertId) ?? expertId;
         return (
           <Badge key={expertId} variant="secondary" title={expertName}>

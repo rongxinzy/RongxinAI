@@ -1,6 +1,9 @@
 import type { Artifact } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
-import type { ArtifactDetectionWorkerRequest, ArtifactDetectionWorkerResponse } from './artifactDetection.worker';
+import type {
+  ArtifactDetectionWorkerRequest,
+  ArtifactDetectionWorkerResponse,
+} from './artifactDetection.worker';
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 const BINARY_DOCUMENT_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx', '.pdf']);
@@ -34,12 +37,16 @@ export class ArtifactDetectionService {
   constructor(
     private onDetected: (artifacts: ArtifactDetectionResult[]) => void,
     private onFileLoaded: (artifact: Artifact) => void,
-    private readFile?: (absPath: string) => Promise<{ success: boolean; dataUrl?: string } | null | undefined>,
+    private readFile?: (
+      absPath: string,
+    ) => Promise<{ success: boolean; dataUrl?: string } | null | undefined>,
   ) {}
 
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
-    const worker = new Worker(new URL('./artifactDetection.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('./artifactDetection.worker.ts', import.meta.url), {
+      type: 'module',
+    });
     worker.onmessage = (event: MessageEvent<ArtifactDetectionWorkerResponse>) => {
       const data = event.data;
       const resolver = this.pending.get(data.seq);
@@ -51,7 +58,7 @@ export class ArtifactDetectionService {
         resolver(data.artifacts ?? []);
       }
     };
-    worker.onerror = (error) => {
+    worker.onerror = error => {
       console.error('[ArtifactDetectionService] worker runtime error:', error);
     };
     this.worker = worker;
@@ -78,7 +85,7 @@ export class ArtifactDetectionService {
     sessionId: string,
     cwd?: string | null,
   ): Promise<void> {
-    const unprocessed = messages.filter((m) => !this.processedMessageIds.has(m.id));
+    const unprocessed = messages.filter(m => !this.processedMessageIds.has(m.id));
     if (unprocessed.length === 0) return;
 
     for (const m of messages) {
@@ -98,16 +105,22 @@ export class ArtifactDetectionService {
   }
 
   private detect(messages: CoworkMessage[], sessionId: string): Promise<ArtifactDetectionResult[]> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const seq = ++this.seq;
       this.pending.set(seq, resolve);
-      this.ensureWorker().postMessage({ messages, sessionId, seq } satisfies ArtifactDetectionWorkerRequest);
+      this.ensureWorker().postMessage({
+        messages,
+        sessionId,
+        seq,
+      } satisfies ArtifactDetectionWorkerRequest);
     });
   }
 
   private async loadFiles(detected: ArtifactDetectionResult[], cwd?: string | null): Promise<void> {
     if (!this.readFile) return;
-    const toLoad = detected.filter((d) => d.needsFileLoad && d.artifact.filePath && !this.loadedFileIds.has(d.artifact.id));
+    const toLoad = detected.filter(
+      d => d.needsFileLoad && d.artifact.filePath && !this.loadedFileIds.has(d.artifact.id),
+    );
     if (toLoad.length === 0) return;
 
     for (const { artifact } of toLoad) {
@@ -115,7 +128,9 @@ export class ArtifactDetectionService {
       rawPath = this.toAbsolutePath(rawPath);
       const absPath = rawPath.startsWith('/')
         ? rawPath
-        : (/^[A-Za-z]:/.test(rawPath) ? rawPath : `${cwd ?? ''}/${rawPath}`);
+        : /^[A-Za-z]:/.test(rawPath)
+          ? rawPath
+          : `${cwd ?? ''}/${rawPath}`;
       try {
         const result = await this.readFile(absPath);
         if (result?.success && result.dataUrl) {
@@ -125,7 +140,7 @@ export class ArtifactDetectionService {
           if (isTextType) {
             try {
               const base64 = result.dataUrl.split(',')[1] || '';
-              const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+              const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
               content = new TextDecoder('utf-8').decode(bytes);
             } catch {
               content = result.dataUrl;

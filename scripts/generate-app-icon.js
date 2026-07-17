@@ -69,7 +69,7 @@ const dataOffset0 = headerSize + entrySize * count;
 let currentOffset = dataOffset0;
 const entries = pngBuffers.map(({ size, data }) => {
   const entry = {
-    width: size >= 256 ? 0 : size,   // 0 means 256 in ICO format
+    width: size >= 256 ? 0 : size, // 0 means 256 in ICO format
     height: size >= 256 ? 0 : size,
     dataSize: data.length,
     offset: currentOffset,
@@ -84,21 +84,21 @@ const totalSize = currentOffset;
 const ico = Buffer.alloc(totalSize);
 
 // ICONDIR
-ico.writeUInt16LE(0, 0);        // reserved
-ico.writeUInt16LE(1, 2);        // type = ICO
-ico.writeUInt16LE(count, 4);    // image count
+ico.writeUInt16LE(0, 0); // reserved
+ico.writeUInt16LE(1, 2); // type = ICO
+ico.writeUInt16LE(count, 4); // image count
 
 // ICONDIRENTRY for each image
 entries.forEach((e, i) => {
   const off = headerSize + i * entrySize;
-  ico.writeUInt8(e.width, off + 0);       // width
-  ico.writeUInt8(e.height, off + 1);      // height
-  ico.writeUInt8(0, off + 2);             // color palette
-  ico.writeUInt8(0, off + 3);             // reserved
-  ico.writeUInt16LE(1, off + 4);          // color planes
-  ico.writeUInt16LE(32, off + 6);         // bits per pixel
+  ico.writeUInt8(e.width, off + 0); // width
+  ico.writeUInt8(e.height, off + 1); // height
+  ico.writeUInt8(0, off + 2); // color palette
+  ico.writeUInt8(0, off + 3); // reserved
+  ico.writeUInt16LE(1, off + 4); // color planes
+  ico.writeUInt16LE(32, off + 6); // bits per pixel
   ico.writeUInt32LE(e.dataSize, off + 8); // image data size
-  ico.writeUInt32LE(e.offset, off + 12);  // image data offset
+  ico.writeUInt32LE(e.offset, off + 12); // image data offset
 });
 
 // Image data

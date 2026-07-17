@@ -4,10 +4,13 @@
  */
 declare module 'cron-parser' {
   export const CronExpressionParser: {
-    parse(expr: string, options?: {
-      currentDate?: Date;
-      tz?: string;
-    }): CronParserInterval;
+    parse(
+      expr: string,
+      options?: {
+        currentDate?: Date;
+        tz?: string;
+      },
+    ): CronParserInterval;
   };
 
   export interface CronParserInterval {

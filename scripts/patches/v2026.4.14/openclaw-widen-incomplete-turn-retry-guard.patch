@@ -14,7 +14,7 @@ index 9341af3610..711764781c 100644
 -  ) {
 -    return null;
 -  }
-+  // LobsterAI patch: remove provider gate so reasoning-only retry applies to
++  // ZhiYuanAgent patch: remove provider gate so reasoning-only retry applies to
 +  // all providers, not just GPT-5 family.  Non-frontier models (Volcengine,
 +  // Ollama, etc.) can return reasoning/thinking content without visible text,
 +  // triggering "payloads=0" errors.  Upstream widens this in v2026.4.23+.
@@ -33,7 +33,7 @@ index 9341af3610..711764781c 100644
 -  ) {
 -    return null;
 -  }
-+  // LobsterAI patch: remove provider gate — same rationale as reasoning-only
++  // ZhiYuanAgent patch: remove provider gate — same rationale as reasoning-only
 +  // retry above.  See resolveReasoningOnlyRetryInstruction patch comment.
  
    if (

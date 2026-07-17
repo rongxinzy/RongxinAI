@@ -43,7 +43,7 @@ const ActiveSkillBadge: React.FC = () => {
             type="button"
             variant="ghost"
             size="icon-xs"
-            onClick={(e) => handleRemoveSkill(e, skill.id)}
+            onClick={e => handleRemoveSkill(e, skill.id)}
             className="rounded hover:bg-primary-muted transition-colors"
             title={i18nService.t('clearSkill')}
           >

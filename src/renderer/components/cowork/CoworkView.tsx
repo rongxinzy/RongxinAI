@@ -1,7 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { PanelLeft, Pencil, ShieldCheck } from 'lucide-react';
-import React, { useEffect, useRef,useState } from 'react';
-import { useDispatch,useSelector } from 'react-redux';
+import React, { useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
@@ -18,12 +18,24 @@ import {
   selectCurrentSession,
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
-import { addMessage, addSession, clearCurrentSession, setCurrentSession, setStreaming, updateMessageContent, updateSessionStatus } from '../../store/slices/coworkSlice';
-import { clearSelection,selectAction, setActions } from '../../store/slices/quickActionSlice';
+import {
+  addMessage,
+  addSession,
+  clearCurrentSession,
+  setCurrentSession,
+  setStreaming,
+  updateMessageContent,
+  updateSessionStatus,
+} from '../../store/slices/coworkSlice';
+import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
-import type { CoworkImageAttachment, CoworkSession, OpenClawEngineStatus } from '../../types/cowork';
+import type {
+  CoworkImageAttachment,
+  CoworkSession,
+  OpenClawEngineStatus,
+} from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
-import { PromptPanel,QuickActionBar } from '../quick-actions';
+import { PromptPanel, QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
@@ -39,7 +51,14 @@ export interface CoworkViewProps {
   updateBadge?: React.ReactNode;
 }
 
-const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSkills, isSidebarCollapsed, onToggleSidebar, onNewChat, updateBadge }) => {
+const CoworkView: React.FC<CoworkViewProps> = ({
+  onRequestAppSettings,
+  onShowSkills,
+  isSidebarCollapsed,
+  onToggleSidebar,
+  onNewChat,
+  updateBadge,
+}) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
   const [isInitialized, setIsInitialized] = useState(false);
@@ -59,7 +78,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
 
   const [workMode, setWorkMode] = useState<'work' | 'chat'>(
-    () => configService.getConfig().workMode ?? 'work'
+    () => configService.getConfig().workMode ?? 'work',
   );
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
@@ -94,23 +113,28 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const selectedActionId = useSelector((state: RootState) => state.quickAction.selectedActionId);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const agents = useSelector((state: RootState) => state.agent.agents);
-  const currentAgent = agents.find((agent) => agent.id === currentAgentId);
+  const currentAgent = agents.find(agent => agent.id === currentAgentId);
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
-  const currentWorkspace = workspaces.find((workspace) => workspace.id === currentWorkspaceId);
+  const currentWorkspace = workspaces.find(workspace => workspace.id === currentWorkspaceId);
   const currentWorkspacePath = currentWorkspace?.path || config.workingDirectory || '';
 
-  const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
+  const currentAgentSelectedModel = useAgentSelectedModel(
+    currentAgentId,
+    currentAgent?.model ?? '',
+  );
 
-  const buildApiConfigNotice = (error?: string): { noticeI18nKey: string; noticeExtra?: string } => {
+  const buildApiConfigNotice = (
+    error?: string,
+  ): { noticeI18nKey: string; noticeExtra?: string } => {
     const key = 'coworkModelSettingsRequired';
     if (!error) {
       return { noticeI18nKey: key };
     }
     const normalizedError = error.trim();
     if (
-      normalizedError.startsWith('No enabled provider found for model:')
-      || normalizedError === 'No available model configured in enabled providers.'
+      normalizedError.startsWith('No enabled provider found for model:') ||
+      normalizedError === 'No available model configured in enabled providers.'
     ) {
       return { noticeI18nKey: key };
     }
@@ -179,7 +203,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     };
     init();
 
-    const unsubscribeOpenClawStatus = coworkService.onOpenClawEngineStatus((status) => {
+    const unsubscribeOpenClawStatus = coworkService.onOpenClawEngineStatus(status => {
       setOpenClawStatus(status);
     });
 
@@ -197,7 +221,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       unsubscribe();
       unsubscribeOpenClawStatus();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   useEffect(() => {
@@ -205,11 +229,21 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     void coworkService.loadSessions(undefined, currentWorkspaceId);
   }, [currentWorkspaceId, isInitialized]);
 
-  const handleStartSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds: string[] = []): Promise<boolean | void> => {
+  const handleStartSession = async (
+    prompt: string,
+    skillPrompt?: string,
+    imageAttachments?: CoworkImageAttachment[],
+    expertIds: string[] = [],
+  ): Promise<boolean | void> => {
     console.log('[CoworkView] handleStartSession: imageAttachments diagnosis', {
       hasImageAttachments: !!imageAttachments,
       count: imageAttachments?.length ?? 0,
-      details: imageAttachments?.map(a => ({ name: a.name, mimeType: a.mimeType, base64Length: a.base64Data?.length ?? 0 })) ?? [],
+      details:
+        imageAttachments?.map(a => ({
+          name: a.name,
+          mimeType: a.mimeType,
+          base64Length: a.base64Data?.length ?? 0,
+        })) ?? [],
     });
     // Prevent duplicate submissions
     if (isStartingRef.current) return;
@@ -247,7 +281,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       const tempSessionId = `temp-${Date.now()}`;
       const fallbackTitle = buildSessionTitleFromInput(
         prompt,
-        i18nService.t('coworkDefaultSessionTitle')
+        i18nService.t('coworkDefaultSessionTitle'),
       );
       const now = Date.now();
 
@@ -265,7 +299,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         updatedAt: now,
         cwd: currentWorkspacePath,
         systemPrompt: '',
-        modelOverride: currentAgentSelectedModel ? toOpenClawModelRef(currentAgentSelectedModel) : '',
+        modelOverride: currentAgentSelectedModel
+          ? toOpenClawModelRef(currentAgentSelectedModel)
+          : '',
         executionMode: config.executionMode || 'local',
         activeSkillIds: sessionSkillIds,
         workspaceId: currentWorkspaceId || '',
@@ -276,12 +312,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             type: 'user',
             content: prompt,
             timestamp: now,
-            metadata: (sessionSkillIds.length > 0 || (imageAttachments && imageAttachments.length > 0))
-              ? {
-                ...(sessionSkillIds.length > 0 ? { skillIds: sessionSkillIds } : {}),
-                ...(imageAttachments && imageAttachments.length > 0 ? { imageAttachments } : {}),
-              }
-              : undefined,
+            metadata:
+              sessionSkillIds.length > 0 || (imageAttachments && imageAttachments.length > 0)
+                ? {
+                    ...(sessionSkillIds.length > 0 ? { skillIds: sessionSkillIds } : {}),
+                    ...(imageAttachments && imageAttachments.length > 0
+                      ? { imageAttachments }
+                      : {}),
+                  }
+                : undefined,
           },
         ],
         messagesOffset: 0,
@@ -330,32 +369,90 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             switch (chunk.type) {
               case 'text-start':
                 if (!assistantMessageAdded) {
-                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: assistantMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
+                  dispatch(
+                    addMessage({
+                      sessionId: tempSessionId,
+                      message: {
+                        id: assistantMsgId,
+                        type: 'assistant',
+                        content: '',
+                        timestamp: Date.now(),
+                        metadata: { isStreaming: true, isFinal: false },
+                      },
+                    }),
+                  );
                   assistantMessageAdded = true;
                 }
                 break;
               case 'text-delta':
                 assistantContent += chunk.delta;
                 if (!assistantMessageAdded) {
-                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: assistantMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
+                  dispatch(
+                    addMessage({
+                      sessionId: tempSessionId,
+                      message: {
+                        id: assistantMsgId,
+                        type: 'assistant',
+                        content: chunk.delta,
+                        timestamp: Date.now(),
+                        metadata: { isStreaming: true, isFinal: false },
+                      },
+                    }),
+                  );
                   assistantMessageAdded = true;
                 } else {
-                  dispatch(updateMessageContent({ sessionId: tempSessionId, messageId: assistantMsgId, content: assistantContent, metadata: { isStreaming: true, isFinal: false } }));
+                  dispatch(
+                    updateMessageContent({
+                      sessionId: tempSessionId,
+                      messageId: assistantMsgId,
+                      content: assistantContent,
+                      metadata: { isStreaming: true, isFinal: false },
+                    }),
+                  );
                 }
                 break;
               case 'reasoning-start':
                 if (!thinkingMessageAdded) {
-                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: thinkingMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                  dispatch(
+                    addMessage({
+                      sessionId: tempSessionId,
+                      message: {
+                        id: thinkingMsgId,
+                        type: 'assistant',
+                        content: '',
+                        timestamp: Date.now(),
+                        metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                      },
+                    }),
+                  );
                   thinkingMessageAdded = true;
                 }
                 break;
               case 'reasoning-delta':
                 thinkingContent += chunk.delta;
                 if (!thinkingMessageAdded) {
-                  dispatch(addMessage({ sessionId: tempSessionId, message: { id: thinkingMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                  dispatch(
+                    addMessage({
+                      sessionId: tempSessionId,
+                      message: {
+                        id: thinkingMsgId,
+                        type: 'assistant',
+                        content: chunk.delta,
+                        timestamp: Date.now(),
+                        metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                      },
+                    }),
+                  );
                   thinkingMessageAdded = true;
                 } else {
-                  dispatch(updateMessageContent({ sessionId: tempSessionId, messageId: thinkingMsgId, content: thinkingContent, metadata: { isStreaming: true, isFinal: false, isThinking: true } }));
+                  dispatch(
+                    updateMessageContent({
+                      sessionId: tempSessionId,
+                      messageId: thinkingMsgId,
+                      content: thinkingContent,
+                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                    }),
+                  );
                 }
                 break;
               case 'error':
@@ -371,8 +468,28 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           // so that addSession does not overwrite currentSession with stale data.
           const finalMessages = [
             { id: `msg-${now}`, type: 'user' as const, content: prompt, timestamp: now },
-            ...(thinkingContent ? [{ id: thinkingMsgId, type: 'assistant' as const, content: thinkingContent, timestamp: Date.now(), metadata: { isStreaming: false, isFinal: true, isThinking: true } }] : []),
-            ...(assistantContent ? [{ id: assistantMsgId, type: 'assistant' as const, content: assistantContent, timestamp: Date.now(), metadata: { isStreaming: false, isFinal: true } }] : []),
+            ...(thinkingContent
+              ? [
+                  {
+                    id: thinkingMsgId,
+                    type: 'assistant' as const,
+                    content: thinkingContent,
+                    timestamp: Date.now(),
+                    metadata: { isStreaming: false, isFinal: true, isThinking: true },
+                  },
+                ]
+              : []),
+            ...(assistantContent
+              ? [
+                  {
+                    id: assistantMsgId,
+                    type: 'assistant' as const,
+                    content: assistantContent,
+                    timestamp: Date.now(),
+                    metadata: { isStreaming: false, isFinal: true },
+                  },
+                ]
+              : []),
           ];
           const savedSession: CoworkSession = {
             ...tempSession,
@@ -384,20 +501,24 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
           dispatch(addSession(savedSession));
           // Persist chat session to SQLite via IPC
-          coworkService.saveChatSession(savedSession).catch(err =>
-            console.error('[CoworkView] Failed to persist chat session:', err)
-          );
+          coworkService
+            .saveChatSession(savedSession)
+            .catch(err => console.error('[CoworkView] Failed to persist chat session:', err));
         } catch (error) {
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
-          dispatch(addMessage({
-            sessionId: tempSessionId,
-            message: {
-              id: `error-${Date.now()}`,
-              type: 'system',
-              content: i18nService.t('chatErrorMessage').replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-              timestamp: Date.now(),
-            },
-          }));
+          dispatch(
+            addMessage({
+              sessionId: tempSessionId,
+              message: {
+                id: `error-${Date.now()}`,
+                type: 'system',
+                content: i18nService
+                  .t('chatErrorMessage')
+                  .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
+                timestamp: Date.now(),
+              },
+            }),
+          );
         } finally {
           dispatch(setStreaming(false));
           isStartingRef.current = false;
@@ -411,15 +532,18 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       // auto-routing prompt to avoid injecting Claude SDK tool-calling instructions
       // that confuse non-Claude models (e.g. kimi-k2.5 falls back to text-based
       // tool calls, producing empty tool names and err=true failures).
-      const isExpertAgent = currentAgent?.source === CoworkSessionExpertSource.Package || currentAgent?.source === CoworkSessionExpertSource.Member;
+      const isExpertAgent =
+        currentAgent?.source === CoworkSessionExpertSource.Package ||
+        currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
       const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt = [skillPrompt, baseSystemPrompt]
-        .filter(p => p?.trim())
-        .join('\n\n') || undefined;
+      const combinedSystemPrompt =
+        [skillPrompt, baseSystemPrompt].filter(p => p?.trim()).join('\n\n') || undefined;
 
       // Start the actual session immediately with fallback title
-      const sessionModelOverride = currentAgentSelectedModel ? toOpenClawModelRef(currentAgentSelectedModel) : '';
+      const sessionModelOverride = currentAgentSelectedModel
+        ? toOpenClawModelRef(currentAgentSelectedModel)
+        : '';
       console.log('[CoworkView] creating session:', {
         modelId: currentAgentSelectedModel?.id,
         providerKey: currentAgentSelectedModel?.providerKey,
@@ -427,7 +551,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         agentName: currentAgent?.name,
         agentSource: currentAgent?.source,
         agentSystemPrompt: agentSystemPrompt ? `${agentSystemPrompt.slice(0, 80)}...` : '(empty)',
-        combinedSystemPrompt: combinedSystemPrompt ? `${combinedSystemPrompt.slice(0, 120)}...` : '(undefined)',
+        combinedSystemPrompt: combinedSystemPrompt
+          ? `${combinedSystemPrompt.slice(0, 120)}...`
+          : '(undefined)',
       });
       const { session: startedSession, error: startError } = await coworkService.startSession({
         prompt,
@@ -444,15 +570,19 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
 
       if (!startedSession && startError) {
         // Show the error as a system message in the temp session
-        dispatch(addMessage({
-          sessionId: tempSessionId,
-          message: {
-            id: `error-${Date.now()}`,
-            type: 'system',
-            content: i18nService.t('coworkErrorSessionStartFailed').replace('{error}', startError),
-            timestamp: Date.now(),
-          },
-        }));
+        dispatch(
+          addMessage({
+            sessionId: tempSessionId,
+            message: {
+              id: `error-${Date.now()}`,
+              type: 'system',
+              content: i18nService
+                .t('coworkErrorSessionStartFailed')
+                .replace('{error}', startError),
+              timestamp: Date.now(),
+            },
+          }),
+        );
         dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
         return;
       }
@@ -472,7 +602,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     }
   };
 
-  const handleContinueSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds: string[] = []) => {
+  const handleContinueSession = async (
+    prompt: string,
+    skillPrompt?: string,
+    imageAttachments?: CoworkImageAttachment[],
+    expertIds: string[] = [],
+  ) => {
     if (!currentSession) return;
     if (isContinuingRef.current) return;
 
@@ -486,15 +621,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       try {
         // Add user message to session first
         const userMsgId = `msg-${Date.now()}`;
-        dispatch(addMessage({
-          sessionId: currentSession.id,
-          message: {
-            id: userMsgId,
-            type: 'user',
-            content: prompt,
-            timestamp: Date.now(),
-          },
-        }));
+        dispatch(
+          addMessage({
+            sessionId: currentSession.id,
+            message: {
+              id: userMsgId,
+              type: 'user',
+              content: prompt,
+              timestamp: Date.now(),
+            },
+          }),
+        );
 
         dispatch(setStreaming(true));
         const transport = new ChatChatTransport({
@@ -505,9 +642,18 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           trigger: 'submit-message',
           chatId: currentSession.id,
           messageId: undefined,
-          messages: (currentSession.messages || []).filter(m => m.type === 'user' || m.type === 'assistant').map(m => ({
-            id: m.id, role: m.type as 'user' | 'assistant', parts: [{ type: 'text' as const, text: m.content }],
-          })).concat({ id: userMsgId, role: 'user' as const, parts: [{ type: 'text' as const, text: prompt }] }),
+          messages: (currentSession.messages || [])
+            .filter(m => m.type === 'user' || m.type === 'assistant')
+            .map(m => ({
+              id: m.id,
+              role: m.type as 'user' | 'assistant',
+              parts: [{ type: 'text' as const, text: m.content }],
+            }))
+            .concat({
+              id: userMsgId,
+              role: 'user' as const,
+              parts: [{ type: 'text' as const, text: prompt }],
+            }),
           abortSignal: undefined,
         });
         const reader = stream.getReader();
@@ -520,32 +666,90 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           switch (chunk.type) {
             case 'text-start':
               if (!assistantMessageAdded) {
-                dispatch(addMessage({ sessionId: currentSession.id, message: { id: assistantMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
+                dispatch(
+                  addMessage({
+                    sessionId: currentSession.id,
+                    message: {
+                      id: assistantMsgId,
+                      type: 'assistant',
+                      content: '',
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false },
+                    },
+                  }),
+                );
                 assistantMessageAdded = true;
               }
               break;
             case 'text-delta':
               assistantContent += chunk.delta;
               if (!assistantMessageAdded) {
-                dispatch(addMessage({ sessionId: currentSession.id, message: { id: assistantMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false } } }));
+                dispatch(
+                  addMessage({
+                    sessionId: currentSession.id,
+                    message: {
+                      id: assistantMsgId,
+                      type: 'assistant',
+                      content: chunk.delta,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false },
+                    },
+                  }),
+                );
                 assistantMessageAdded = true;
               } else {
-                dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: assistantMsgId, content: assistantContent, metadata: { isStreaming: true, isFinal: false } }));
+                dispatch(
+                  updateMessageContent({
+                    sessionId: currentSession.id,
+                    messageId: assistantMsgId,
+                    content: assistantContent,
+                    metadata: { isStreaming: true, isFinal: false },
+                  }),
+                );
               }
               break;
             case 'reasoning-start':
               if (!thinkingMessageAdded) {
-                dispatch(addMessage({ sessionId: currentSession.id, message: { id: thinkingMsgId, type: 'assistant', content: '', timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                dispatch(
+                  addMessage({
+                    sessionId: currentSession.id,
+                    message: {
+                      id: thinkingMsgId,
+                      type: 'assistant',
+                      content: '',
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                    },
+                  }),
+                );
                 thinkingMessageAdded = true;
               }
               break;
             case 'reasoning-delta':
               thinkingContent += chunk.delta;
               if (!thinkingMessageAdded) {
-                dispatch(addMessage({ sessionId: currentSession.id, message: { id: thinkingMsgId, type: 'assistant', content: chunk.delta, timestamp: Date.now(), metadata: { isStreaming: true, isFinal: false, isThinking: true } } }));
+                dispatch(
+                  addMessage({
+                    sessionId: currentSession.id,
+                    message: {
+                      id: thinkingMsgId,
+                      type: 'assistant',
+                      content: chunk.delta,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                    },
+                  }),
+                );
                 thinkingMessageAdded = true;
               } else {
-                dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: thinkingMsgId, content: thinkingContent, metadata: { isStreaming: true, isFinal: false, isThinking: true } }));
+                dispatch(
+                  updateMessageContent({
+                    sessionId: currentSession.id,
+                    messageId: thinkingMsgId,
+                    content: thinkingContent,
+                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                  }),
+                );
               }
               break;
             case 'error':
@@ -554,30 +758,48 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         }
         // Finalize message metadata to prevent streaming replay on reload
         if (assistantMessageAdded) {
-          dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: assistantMsgId, content: assistantContent, metadata: { isStreaming: false, isFinal: true } }));
+          dispatch(
+            updateMessageContent({
+              sessionId: currentSession.id,
+              messageId: assistantMsgId,
+              content: assistantContent,
+              metadata: { isStreaming: false, isFinal: true },
+            }),
+          );
         }
         if (thinkingMessageAdded) {
-          dispatch(updateMessageContent({ sessionId: currentSession.id, messageId: thinkingMsgId, content: thinkingContent, metadata: { isStreaming: false, isFinal: true, isThinking: true } }));
+          dispatch(
+            updateMessageContent({
+              sessionId: currentSession.id,
+              messageId: thinkingMsgId,
+              content: thinkingContent,
+              metadata: { isStreaming: false, isFinal: true, isThinking: true },
+            }),
+          );
         }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
         // Persist updated session (with new messages) to SQLite
         const updatedSession = store.getState().cowork.currentSession;
         if (updatedSession) {
-          coworkService.saveChatSession(updatedSession).catch(error =>
-            console.error('[CoworkView] Failed to persist chat continue:', error),
-          );
+          coworkService
+            .saveChatSession(updatedSession)
+            .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
         }
       } catch (error) {
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
-        dispatch(addMessage({
-          sessionId: currentSession.id,
-          message: {
-            id: `error-${Date.now()}`,
-            type: 'system',
-            content: i18nService.t('chatErrorMessage').replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-            timestamp: Date.now(),
-          },
-        }));
+        dispatch(
+          addMessage({
+            sessionId: currentSession.id,
+            message: {
+              id: `error-${Date.now()}`,
+              type: 'system',
+              content: i18nService
+                .t('chatErrorMessage')
+                .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
+              timestamp: Date.now(),
+            },
+          }),
+        );
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
       } finally {
         dispatch(setStreaming(false));
@@ -590,12 +812,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     isContinuingRef.current = true;
     try {
       const sessionSkillIds = [...activeSkillIds];
-      const isExpertAgent = currentAgent?.source === CoworkSessionExpertSource.Package || currentAgent?.source === CoworkSessionExpertSource.Member;
+      const isExpertAgent =
+        currentAgent?.source === CoworkSessionExpertSource.Package ||
+        currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
       const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt = [skillPrompt, baseSystemPrompt]
-        .filter(p => p?.trim())
-        .join('\n\n') || undefined;
+      const combinedSystemPrompt =
+        [skillPrompt, baseSystemPrompt].filter(p => p?.trim()).join('\n\n') || undefined;
 
       await coworkService.continueSession({
         sessionId: currentSession.id,
@@ -665,9 +888,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
       const shouldClear = !currentSession;
       dispatch(clearCurrentSession());
       dispatch(clearSelection());
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', {
-        detail: { clear: shouldClear },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('cowork:focus-input', {
+          detail: { clear: shouldClear },
+        }),
+      );
     };
     window.addEventListener('cowork:shortcut:new-session', handleNewSession);
     return () => {
@@ -702,9 +927,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           <WindowTitleBar inline />
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-muted-foreground">
-            {i18nService.t('loading')}
-          </div>
+          <div className="text-muted-foreground">{i18nService.t('loading')}</div>
         </div>
       </div>
     );
@@ -732,7 +955,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         <div className="flex items-center gap-1.5 mr-2 px-2.5 py-1">
           <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
           <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
-            {i18nService.t('lobsterGuardEnabled')}
+            {i18nService.t('zhiyuanGuardEnabled')}
           </span>
         </div>
         <WindowTitleBar inline />
@@ -741,27 +964,35 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   );
 
   // Engine status banner for error/non-running states (starting overlay is now global in App.tsx)
-  const engineStatusBanner = shouldShowEngineStatus && openClawStatus && openClawStatus.phase !== 'starting' && openClawStatus.phase !== 'compiling' && openClawStatus.phase !== 'error' ? (
-    <div className={`shrink-0 flex items-center justify-between px-4 py-2 text-xs ${isEngineError
-      ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
-      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
-    }`}>
-      <div className="flex items-center gap-2">
-        <span>{resolveEngineStatusText(openClawStatus)}</span>
-        {typeof openClawStatus.progressPercent === 'number' && (
-          <span className="opacity-70">({Math.round(openClawStatus.progressPercent)}%)</span>
-        )}
-      </div>
-      <Button
-        variant={isEngineError ? 'destructive' : 'default'}
-        size="xs"
-        onClick={handleRestartGateway}
-        disabled={isRestartingGateway}
+  const engineStatusBanner =
+    shouldShowEngineStatus &&
+    openClawStatus &&
+    openClawStatus.phase !== 'starting' &&
+    openClawStatus.phase !== 'compiling' &&
+    openClawStatus.phase !== 'error' ? (
+      <div
+        className={`shrink-0 flex items-center justify-between px-4 py-2 text-xs ${
+          isEngineError
+            ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
+            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
+        }`}
       >
-        {i18nService.t('coworkOpenClawRestartGateway')}
-      </Button>
-    </div>
-  ) : null;
+        <div className="flex items-center gap-2">
+          <span>{resolveEngineStatusText(openClawStatus)}</span>
+          {typeof openClawStatus.progressPercent === 'number' && (
+            <span className="opacity-70">({Math.round(openClawStatus.progressPercent)}%)</span>
+          )}
+        </div>
+        <Button
+          variant={isEngineError ? 'destructive' : 'default'}
+          size="xs"
+          onClick={handleRestartGateway}
+          disabled={isRestartingGateway}
+        >
+          {i18nService.t('coworkOpenClawRestartGateway')}
+        </Button>
+      </div>
+    ) : null;
 
   // When there's a current session, show the session detail view
   if (currentSession) {
@@ -826,7 +1057,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
                 onStop={handleStopSession}
                 isStreaming={isStreaming}
                 disabled={false}
-                placeholder={workMode === 'chat' ? i18nService.t('chatPlaceholder') : i18nService.t('coworkPlaceholder')}
+                placeholder={
+                  workMode === 'chat'
+                    ? i18nService.t('chatPlaceholder')
+                    : i18nService.t('coworkPlaceholder')
+                }
                 size="large"
                 workingDirectory={currentWorkspacePath}
                 onWorkingDirectoryChange={async (dir: string) => {
@@ -850,10 +1085,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             style={{ animationDelay: '300ms', animationFillMode: 'both' }}
           >
             {selectedAction ? (
-              <PromptPanel
-                action={selectedAction}
-                onPromptSelect={handleQuickActionPromptSelect}
-              />
+              <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
             ) : (
               <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
             )}

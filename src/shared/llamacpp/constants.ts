@@ -38,14 +38,14 @@ export const LlamaCppIpcChannel = {
   ModelLaunchLogWindowTargetChanged: 'llamacpp:model-launch-log-window:target-changed',
 } as const;
 
-export type LlamaCppIpcChannel = typeof LlamaCppIpcChannel[keyof typeof LlamaCppIpcChannel];
+export type LlamaCppIpcChannel = (typeof LlamaCppIpcChannel)[keyof typeof LlamaCppIpcChannel];
 
 export const LlamaCppModelLaunchLogWindowView = {
   ModelLaunchLog: 'llamacpp-model-launch-log',
 } as const;
 
 export type LlamaCppModelLaunchLogWindowView =
-  typeof LlamaCppModelLaunchLogWindowView[keyof typeof LlamaCppModelLaunchLogWindowView];
+  (typeof LlamaCppModelLaunchLogWindowView)[keyof typeof LlamaCppModelLaunchLogWindowView];
 
 export const LlamaCppModelLaunchLogWindowQuery = {
   View: 'view',
@@ -54,7 +54,7 @@ export const LlamaCppModelLaunchLogWindowQuery = {
 } as const;
 
 export type LlamaCppModelLaunchLogWindowQuery =
-  typeof LlamaCppModelLaunchLogWindowQuery[keyof typeof LlamaCppModelLaunchLogWindowQuery];
+  (typeof LlamaCppModelLaunchLogWindowQuery)[keyof typeof LlamaCppModelLaunchLogWindowQuery];
 
 export const LlamaCppRuntimeBackend = {
   Auto: 'auto',
@@ -63,7 +63,7 @@ export const LlamaCppRuntimeBackend = {
 } as const;
 
 export type LlamaCppRuntimeBackend =
-  typeof LlamaCppRuntimeBackend[keyof typeof LlamaCppRuntimeBackend];
+  (typeof LlamaCppRuntimeBackend)[keyof typeof LlamaCppRuntimeBackend];
 
 export const LlamaCppRuntimeCudaMajor = {
   Cuda12: '12',
@@ -71,7 +71,7 @@ export const LlamaCppRuntimeCudaMajor = {
 } as const;
 
 export type LlamaCppRuntimeCudaMajor =
-  typeof LlamaCppRuntimeCudaMajor[keyof typeof LlamaCppRuntimeCudaMajor];
+  (typeof LlamaCppRuntimeCudaMajor)[keyof typeof LlamaCppRuntimeCudaMajor];
 
 export const LlamaCppServiceConfigFieldKey = {
   ModelsMax: 'modelsMax',
@@ -92,7 +92,7 @@ export const LlamaCppServiceConfigFieldKey = {
 } as const;
 
 export type LlamaCppServiceConfigFieldKey =
-  typeof LlamaCppServiceConfigFieldKey[keyof typeof LlamaCppServiceConfigFieldKey];
+  (typeof LlamaCppServiceConfigFieldKey)[keyof typeof LlamaCppServiceConfigFieldKey];
 
 export const LlamaCppModelLaunchLogLevel = {
   Debug: 'debug',
@@ -102,7 +102,7 @@ export const LlamaCppModelLaunchLogLevel = {
 } as const;
 
 export type LlamaCppModelLaunchLogLevel =
-  typeof LlamaCppModelLaunchLogLevel[keyof typeof LlamaCppModelLaunchLogLevel];
+  (typeof LlamaCppModelLaunchLogLevel)[keyof typeof LlamaCppModelLaunchLogLevel];
 
 export const LlamaCppModelLaunchLogPhase = {
   Requested: 'requested',
@@ -120,14 +120,14 @@ export const LlamaCppModelLaunchLogPhase = {
 } as const;
 
 export type LlamaCppModelLaunchLogPhase =
-  typeof LlamaCppModelLaunchLogPhase[keyof typeof LlamaCppModelLaunchLogPhase];
+  (typeof LlamaCppModelLaunchLogPhase)[keyof typeof LlamaCppModelLaunchLogPhase];
 
 export const LlamaCppModelLaunchLogSource = {
   LaunchFlow: 'launch-flow',
 } as const;
 
 export type LlamaCppModelLaunchLogSource =
-  typeof LlamaCppModelLaunchLogSource[keyof typeof LlamaCppModelLaunchLogSource];
+  (typeof LlamaCppModelLaunchLogSource)[keyof typeof LlamaCppModelLaunchLogSource];
 
 export const LlamaCppModelLaunchLogSessionStatus = {
   Starting: 'starting',
@@ -136,5 +136,4 @@ export const LlamaCppModelLaunchLogSessionStatus = {
 } as const;
 
 export type LlamaCppModelLaunchLogSessionStatus =
-  typeof LlamaCppModelLaunchLogSessionStatus[keyof typeof LlamaCppModelLaunchLogSessionStatus];
-
+  (typeof LlamaCppModelLaunchLogSessionStatus)[keyof typeof LlamaCppModelLaunchLogSessionStatus];

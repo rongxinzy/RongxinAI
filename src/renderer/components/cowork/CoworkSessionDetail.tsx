@@ -1,12 +1,19 @@
-import { Conversation, ConversationContent, ConversationScrollButton } from '@shared/components/ai-elements/conversation';
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from '@shared/components/ai-elements/conversation';
 import { Button } from '@shared/components/ui/button';
 import { Download, Folder, Image as ImageIcon, PanelLeft, Pencil } from 'lucide-react';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo,useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
-import { getArtifactTypeFromExtension, normalizeFilePathForDedup } from '../../services/artifactParser';
+import {
+  getArtifactTypeFromExtension,
+  normalizeFilePathForDedup,
+} from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
@@ -30,20 +37,41 @@ import {
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import type { Artifact } from '../../types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
-import type { CoworkImageAttachment,CoworkMessage, CoworkMessageMetadata } from '../../types/cowork';
+import type {
+  CoworkImageAttachment,
+  CoworkMessage,
+  CoworkMessageMetadata,
+} from '../../types/cowork';
 import { getCompactFolderName } from '../../utils/path';
 import { ArtifactPanel } from '../artifacts';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon, StreamingBar } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
-import { type CoworkOpenShareOptionsEventDetail,CoworkUiEvent } from './constants';
+import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import type { CaptureRect } from './helpers/exportUtils';
-import { composeExportCanvas, domRectToCaptureRect, formatExportTimestamp, loadImageFromBase64, MAX_EXPORT_CANVAS_HEIGHT, MAX_EXPORT_SEGMENTS,sanitizeExportFileName, waitForNextFrame } from './helpers/exportUtils';
-import { buildConversationTurns, buildDisplayItems, hasRenderableAssistantContent } from './helpers/messageGrouping';
+import {
+  composeExportCanvas,
+  domRectToCaptureRect,
+  formatExportTimestamp,
+  loadImageFromBase64,
+  MAX_EXPORT_CANVAS_HEIGHT,
+  MAX_EXPORT_SEGMENTS,
+  sanitizeExportFileName,
+  waitForNextFrame,
+} from './helpers/exportUtils';
+import {
+  buildConversationTurns,
+  buildDisplayItems,
+  hasRenderableAssistantContent,
+} from './helpers/messageGrouping';
 // toolUtils helpers used in sub-components
-import { normalizeLocalPath, parseRootRelativePath,toAbsolutePathFromCwd } from './helpers/pathUtils';
+import {
+  normalizeLocalPath,
+  parseRootRelativePath,
+  toAbsolutePathFromCwd,
+} from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { TodoQueue } from './TodoQueue';
 
@@ -52,7 +80,12 @@ const EMPTY_ARTIFACTS: Artifact[] = [];
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
-  onContinue: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], expertIds?: string[]) => boolean | void | Promise<boolean | void>;
+  onContinue: (
+    prompt: string,
+    skillPrompt?: string,
+    imageAttachments?: CoworkImageAttachment[],
+    expertIds?: string[],
+  ) => boolean | void | Promise<boolean | void>;
   onStop: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
@@ -94,7 +127,10 @@ class ArtifactPanelErrorBoundary extends React.Component<
           <Button
             variant="secondary"
             size="xs"
-            onClick={() => { this.setState({ hasError: false, error: null }); this.props.onClose(); }}
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              this.props.onClose();
+            }}
           >
             Close
           </Button>
@@ -134,7 +170,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   useEffect(() => {
     if (sessionId) {
-      window.electron.cowork.getGatewaySessionId(sessionId).then((res) => {
+      window.electron.cowork.getGatewaySessionId(sessionId).then(res => {
         if (res.success) setGatewaySessionId(res.gatewaySessionId);
       });
     } else {
@@ -154,12 +190,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const railLinesRef = useRef<HTMLDivElement>(null);
   const [hoveredRailIndex, setHoveredRailIndex] = useState<number | null>(null);
   const [isRailHovered, setIsRailHovered] = useState(false);
-  const [railTooltip, setRailTooltip] = useState<{ label: string; top: number; right: number; isUser: boolean } | null>(null);
+  const [railTooltip, setRailTooltip] = useState<{
+    label: string;
+    top: number;
+    right: number;
+    isUser: boolean;
+  } | null>(null);
 
   // Export states
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
-
 
   // ─── Artifact detection ─────────────────────────────────────────────
   const isPanelOpen = useSelector(selectIsPanelOpen);
@@ -172,7 +212,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const previousArtifactPanelOpenRef = useRef(isPanelOpen);
   const contentRowRef = useRef<HTMLDivElement>(null);
   const sessionArtifacts = useSelector((state: RootState) =>
-    sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS
+    sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS,
   );
 
   const artifactDetectionServiceRef = useRef<ArtifactDetectionService | null>(null);
@@ -186,17 +226,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
 
     const service = new ArtifactDetectionService(
-      (detected) => {
+      detected => {
         for (const { artifact } of detected) {
           if (!artifact.filePath) {
             dispatch(addArtifact({ sessionId, artifact }));
           }
         }
       },
-      (artifact) => {
+      artifact => {
         dispatch(addArtifact({ sessionId, artifact }));
       },
-      (absPath) => window.electron.dialog.readFileAsDataUrl(absPath),
+      absPath => window.electron.dialog.readFileAsDataUrl(absPath),
     );
     artifactDetectionServiceRef.current = service;
 
@@ -250,7 +290,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const updateArtifactPanelMaxWidth = useCallback(() => {
     const contentWidth = contentRowRef.current?.clientWidth ?? 0;
     if (contentWidth <= 0) return;
-    const availablePanelWidth = contentWidth - COWORK_DETAIL_MIN_WIDTH - ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH;
+    const availablePanelWidth =
+      contentWidth - COWORK_DETAIL_MIN_WIDTH - ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH;
     const nextMaxWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, availablePanelWidth));
     const proportionalMinWidth = Math.floor(contentWidth * ARTIFACT_PANEL_MIN_WIDTH_RATIO);
     const nextMinWidth = Math.min(nextMaxWidth, Math.max(MIN_PANEL_WIDTH, proportionalMinWidth));
@@ -283,10 +324,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const service = artifactDetectionServiceRef.current;
     if (!service) return;
 
-    service.processMessages(currentSession.messages, sessionId, currentSession.cwd).catch((err) => {
+    service.processMessages(currentSession.messages, sessionId, currentSession.cwd).catch(err => {
       console.error('[ArtifactDetection] failed:', err);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- uses messagesLength as stable proxy for currentSession.messages
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- uses messagesLength as stable proxy for currentSession.messages
   }, [sessionId, messagesLength, isStreaming]);
 
   // Intercept clicks on artifact-compatible file links → open in panel
@@ -321,12 +362,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       e.stopPropagation();
 
       const normalizedClick = normalizeFilePathForDedup(filePath);
-      const existing = sessionArtifacts.find(a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick);
+      const existing = sessionArtifacts.find(
+        a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick,
+      );
       if (existing) {
         dispatch(selectArtifact(existing.id));
       } else {
         const type = getArtifactTypeFromExtension(ext)!;
-        const fileName = filePath.slice(Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1);
+        const fileName = filePath.slice(
+          Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1,
+        );
         const newArtifact: Artifact = {
           id: `artifact-click-${Date.now()}`,
           messageId: '',
@@ -400,7 +445,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const lines: string[] = [];
     lines.push(`# ${currentSession.title}`);
     lines.push('');
-    lines.push(`> ${i18nService.t('coworkExportCreatedAt')}: ${new Date(currentSession.createdAt).toLocaleString()}`);
+    lines.push(
+      `> ${i18nService.t('coworkExportCreatedAt')}: ${new Date(currentSession.createdAt).toLocaleString()}`,
+    );
     lines.push('');
     lines.push('---');
     lines.push('');
@@ -428,7 +475,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         lines.push('#### Tool Result');
         lines.push('');
         lines.push('```');
-        lines.push(msg.content.slice(0, 2000) + (msg.content.length > 2000 ? '\n... (truncated)' : ''));
+        lines.push(
+          msg.content.slice(0, 2000) + (msg.content.length > 2000 ? '\n... (truncated)' : ''),
+        );
         lines.push('```');
         lines.push('');
       }
@@ -438,46 +487,57 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   const sessionToJSON = useCallback((): string => {
     if (!currentSession) return '{}';
-    return JSON.stringify({
-      title: currentSession.title,
-      createdAt: new Date(currentSession.createdAt).toISOString(),
-      updatedAt: new Date(currentSession.updatedAt).toISOString(),
-      status: currentSession.status,
-      messages: currentSession.messages.map(msg => ({
-        type: msg.type,
-        content: msg.content,
-        timestamp: new Date(msg.timestamp).toISOString(),
-        ...(msg.metadata?.toolName ? { toolName: msg.metadata.toolName } : {}),
-        ...(msg.metadata?.toolInput ? { toolInput: msg.metadata.toolInput } : {}),
-      })),
-    }, null, 2);
+    return JSON.stringify(
+      {
+        title: currentSession.title,
+        createdAt: new Date(currentSession.createdAt).toISOString(),
+        updatedAt: new Date(currentSession.updatedAt).toISOString(),
+        status: currentSession.status,
+        messages: currentSession.messages.map(msg => ({
+          type: msg.type,
+          content: msg.content,
+          timestamp: new Date(msg.timestamp).toISOString(),
+          ...(msg.metadata?.toolName ? { toolName: msg.metadata.toolName } : {}),
+          ...(msg.metadata?.toolInput ? { toolInput: msg.metadata.toolInput } : {}),
+        })),
+      },
+      null,
+      2,
+    );
   }, [currentSession]);
 
-  const handleExportText = useCallback(async (format: 'md' | 'json') => {
-    if (!currentSession) return;
-    const content = format === 'md' ? sessionToMarkdown() : sessionToJSON();
-    const timestamp = new Date().toISOString().slice(0, 10);
-    const fileName = sanitizeExportFileName(`${currentSession.title}-${timestamp}.${format}`);
-    try {
-      const result = await window.electron.cowork.exportSessionText({
-        content,
-        defaultFileName: fileName,
-        fileExtension: format,
-      });
-      if (result.success && !result.canceled) {
-        window.dispatchEvent(new CustomEvent('app:showToast', {
-          detail: i18nService.t('coworkExportTextSuccess'),
-        }));
-      } else if (!result.success) {
-        throw new Error(result.error || 'Export failed');
+  const handleExportText = useCallback(
+    async (format: 'md' | 'json') => {
+      if (!currentSession) return;
+      const content = format === 'md' ? sessionToMarkdown() : sessionToJSON();
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const fileName = sanitizeExportFileName(`${currentSession.title}-${timestamp}.${format}`);
+      try {
+        const result = await window.electron.cowork.exportSessionText({
+          content,
+          defaultFileName: fileName,
+          fileExtension: format,
+        });
+        if (result.success && !result.canceled) {
+          window.dispatchEvent(
+            new CustomEvent('app:showToast', {
+              detail: i18nService.t('coworkExportTextSuccess'),
+            }),
+          );
+        } else if (!result.success) {
+          throw new Error(result.error || 'Export failed');
+        }
+      } catch (error) {
+        console.error('Failed to export session text:', error);
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: i18nService.t('coworkExportTextFailed'),
+          }),
+        );
       }
-    } catch (error) {
-      console.error('Failed to export session text:', error);
-      window.dispatchEvent(new CustomEvent('app:showToast', {
-        detail: i18nService.t('coworkExportTextFailed'),
-      }));
-    }
-  }, [currentSession, sessionToMarkdown, sessionToJSON]);
+    },
+    [currentSession, sessionToMarkdown, sessionToJSON],
+  );
 
   const handleShareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -498,7 +558,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               throw new Error('Invalid capture area');
             }
 
-            const scrollContentHeight = Math.max(scrollContainer.scrollHeight, scrollContainer.clientHeight);
+            const scrollContentHeight = Math.max(
+              scrollContainer.scrollHeight,
+              scrollContainer.clientHeight,
+            );
             if (scrollContentHeight <= 0) {
               throw new Error('Invalid content height');
             }
@@ -508,8 +571,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               return Math.max(0, Math.min(scrollContentHeight, y));
             };
 
-            const userAnchors = scrollContainer.querySelectorAll<HTMLElement>('[data-export-role="user-message"]');
-            const assistantAnchors = scrollContainer.querySelectorAll<HTMLElement>('[data-export-role="assistant-block"]');
+            const userAnchors = scrollContainer.querySelectorAll<HTMLElement>(
+              '[data-export-role="user-message"]',
+            );
+            const assistantAnchors = scrollContainer.querySelectorAll<HTMLElement>(
+              '[data-export-role="assistant-block"]',
+            );
 
             let contentStart = 0;
             let contentEnd = scrollContentHeight;
@@ -530,7 +597,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
             const maxStart = Math.max(0, scrollContentHeight - 1);
             contentStart = Math.max(0, Math.min(maxStart, Math.round(contentStart)));
-            contentEnd = Math.max(contentStart + 1, Math.min(scrollContentHeight, Math.round(contentEnd)));
+            contentEnd = Math.max(
+              contentStart + 1,
+              Math.min(scrollContentHeight, Math.round(contentEnd)),
+            );
 
             const outputHeight = contentEnd - contentStart;
 
@@ -559,11 +629,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               return loadImageFromBase64(chunk.pngBase64);
             };
 
-            scrollContainer.scrollTop = Math.min(contentStart, Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight));
+            scrollContainer.scrollTop = Math.min(
+              contentStart,
+              Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight),
+            );
             await waitForNextFrame();
             await waitForNextFrame();
 
-            const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+            const maxScrollTop = Math.max(
+              0,
+              scrollContainer.scrollHeight - scrollContainer.clientHeight,
+            );
             let contentOffset = contentStart;
             while (contentOffset < contentEnd) {
               const targetScrollTop = Math.min(contentOffset, maxScrollTop);
@@ -573,16 +649,22 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
               const chunkImage = await captureAndLoad(scrollRect);
               const sourceYOffset = Math.max(0, contentOffset - targetScrollTop);
-              const drawableHeight = Math.min(scrollRect.height - sourceYOffset, contentEnd - contentOffset);
+              const drawableHeight = Math.min(
+                scrollRect.height - sourceYOffset,
+                contentEnd - contentOffset,
+              );
               if (drawableHeight <= 0) {
                 throw new Error('Failed to stitch export image');
               }
               const scaleY = chunkImage.naturalHeight / scrollRect.height;
               const sourceYInImage = Math.max(0, Math.round(sourceYOffset * scaleY));
-              const sourceHeightInImage = Math.max(1, Math.min(
-                chunkImage.naturalHeight - sourceYInImage,
-                Math.round(drawableHeight * scaleY),
-              ));
+              const sourceHeightInImage = Math.max(
+                1,
+                Math.min(
+                  chunkImage.naturalHeight - sourceYInImage,
+                  Math.round(drawableHeight * scaleY),
+                ),
+              );
 
               context.drawImage(
                 chunkImage,
@@ -618,9 +700,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               defaultFileName: sanitizeExportFileName(`${currentSession.title}-${timestamp}.png`),
             });
             if (saveResult.success && !saveResult.canceled) {
-              window.dispatchEvent(new CustomEvent('app:showToast', {
-                detail: i18nService.t('coworkExportImageSuccess'),
-              }));
+              window.dispatchEvent(
+                new CustomEvent('app:showToast', {
+                  detail: i18nService.t('coworkExportImageSuccess'),
+                }),
+              );
               return;
             }
             if (!saveResult.success) {
@@ -631,9 +715,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           }
         } catch (error) {
           console.error('Failed to export session image:', error);
-          window.dispatchEvent(new CustomEvent('app:showToast', {
-            detail: i18nService.t('coworkExportImageFailed'),
-          }));
+          window.dispatchEvent(
+            new CustomEvent('app:showToast', {
+              detail: i18nService.t('coworkExportImageFailed'),
+            }),
+          );
         } finally {
           setIsExportingImage(false);
         }
@@ -666,7 +752,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     isNavigatingRef.current = true;
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
-    navigatingTimerRef.current = setTimeout(() => { isNavigatingRef.current = false; }, NAV_SCROLL_LOCK_DURATION);
+    navigatingTimerRef.current = setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, NAV_SCROLL_LOCK_DURATION);
 
     // Try to scroll to the exact data-rail-index element if it's in the DOM
     const container = scrollContainerRef.current;
@@ -691,69 +779,76 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // selectors (selectLastMessageContent / selectCurrentMessagesLength)
   // so there is no need to derive them from currentSession here.
 
-  const resolveLocalFilePath = useCallback((href: string, text: string) => {
-    const hrefValue = typeof href === 'string' ? href.trim() : '';
-    const textValue = typeof text === 'string' ? text.trim() : '';
-    if (!hrefValue && !textValue) return null;
+  const resolveLocalFilePath = useCallback(
+    (href: string, text: string) => {
+      const hrefValue = typeof href === 'string' ? href.trim() : '';
+      const textValue = typeof text === 'string' ? text.trim() : '';
+      if (!hrefValue && !textValue) return null;
 
-    const hrefRootRelative = hrefValue ? parseRootRelativePath(hrefValue) : null;
-    if (hrefRootRelative) {
-      return hrefRootRelative;
-    }
-
-    const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
-    if (hrefPath) {
-      if (hrefPath.isRelative && currentSession?.cwd) {
-        return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
+      const hrefRootRelative = hrefValue ? parseRootRelativePath(hrefValue) : null;
+      if (hrefRootRelative) {
+        return hrefRootRelative;
       }
-      if (hrefPath.isAbsolute) {
-        return hrefPath.path;
-      }
-    }
 
-    const textRootRelative = textValue ? parseRootRelativePath(textValue) : null;
-    if (textRootRelative) {
-      return textRootRelative;
-    }
-
-    const textPath = textValue ? normalizeLocalPath(textValue) : null;
-    if (textPath) {
-      if (textPath.isRelative && currentSession?.cwd) {
-        return toAbsolutePathFromCwd(textPath.path, currentSession.cwd);
+      const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
+      if (hrefPath) {
+        if (hrefPath.isRelative && currentSession?.cwd) {
+          return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
+        }
+        if (hrefPath.isAbsolute) {
+          return hrefPath.path;
+        }
       }
-      if (textPath.isAbsolute) {
-        return textPath.path;
-      }
-    }
 
-    return null;
-  }, [currentSession?.cwd]);
+      const textRootRelative = textValue ? parseRootRelativePath(textValue) : null;
+      if (textRootRelative) {
+        return textRootRelative;
+      }
+
+      const textPath = textValue ? normalizeLocalPath(textValue) : null;
+      if (textPath) {
+        if (textPath.isRelative && currentSession?.cwd) {
+          return toAbsolutePathFromCwd(textPath.path, currentSession.cwd);
+        }
+        if (textPath.isAbsolute) {
+          return textPath.path;
+        }
+      }
+
+      return null;
+    },
+    [currentSession?.cwd],
+  );
 
   const mapDisplayText = useCallback((value: string): string => {
     return value;
   }, []);
 
-  const handleReEdit = useCallback((message: CoworkMessage) => {
-    const ref = promptInputRef.current;
-    if (!ref) return;
-    // Set text content
-    if (message.content?.trim()) {
-      ref.setValue(message.content);
-    }
-    // Restore image attachments (always call to clear previous attachments)
-    const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ?? []) as CoworkImageAttachment[];
-    ref.setImageAttachments(imageAttachments);
-    // Restore active skills
-    const skillIds = (message.metadata as CoworkMessageMetadata)?.skillIds;
-    if (skillIds && skillIds.length > 0) {
-      dispatch(setActiveSkillIds(skillIds));
-    }
-    // Focus the input
-    ref.focus();
-  }, [dispatch]);
+  const handleReEdit = useCallback(
+    (message: CoworkMessage) => {
+      const ref = promptInputRef.current;
+      if (!ref) return;
+      // Set text content
+      if (message.content?.trim()) {
+        ref.setValue(message.content);
+      }
+      // Restore image attachments (always call to clear previous attachments)
+      const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ??
+        []) as CoworkImageAttachment[];
+      ref.setImageAttachments(imageAttachments);
+      // Restore active skills
+      const skillIds = (message.metadata as CoworkMessageMetadata)?.skillIds;
+      if (skillIds && skillIds.length > 0) {
+        dispatch(setActiveSkillIds(skillIds));
+      }
+      // Focus the input
+      ref.focus();
+    },
+    [dispatch],
+  );
 
   const messages = currentSession?.messages;
-  const displayItems = useMemo(() => messages ? buildDisplayItems(messages) : [], [messages]);
+  const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
 
   useSessionHistoryPagination({
@@ -766,9 +861,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // Cache turn-level DOM elements (data-turn-index, always in DOM even for lazy turns)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) { turnElsCacheRef.current = []; return; }
+    if (!container) {
+      turnElsCacheRef.current = [];
+      return;
+    }
     turnElsCacheRef.current = Array.from(
-      container.querySelectorAll<HTMLElement>('[data-turn-index]')
+      container.querySelectorAll<HTMLElement>('[data-turn-index]'),
     );
   }, [turns]);
 
@@ -807,13 +905,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   // StickToBottom (Conversation) handles auto-scroll during streaming
 
-
   if (!currentSession) {
     return null;
   }
 
   const artifactPanelFrameWidth = isArtifactPanelVisible
-    ? Math.max(artifactPanelMinWidth, Math.min(panelWidth, artifactPanelMaxWidth)) + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH
+    ? Math.max(artifactPanelMinWidth, Math.min(panelWidth, artifactPanelMaxWidth)) +
+      ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH
     : 0;
 
   const renderConversationTurns = () => {
@@ -863,18 +961,30 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         }
       }
       const turnArtifacts = sessionArtifacts.filter(
-        a => turnMessageIds.has(a.messageId) && PREVIEWABLE_ARTIFACT_TYPES.has(a.type)
+        a => turnMessageIds.has(a.messageId) && PREVIEWABLE_ARTIFACT_TYPES.has(a.type),
       );
 
       return (
         <div key={turn.id} data-turn-index={index}>
           {turn.userMessage && (
-            <div data-export-role="user-message" className={isLastTurn ? 'animate-message-in' : undefined} {...(userRailIdx >= 0 ? { 'data-rail-index': userRailIdx } : undefined)}>
-              <UserBubble message={turn.userMessage} skills={skills} onReEdit={remoteManaged ? undefined : handleReEdit} />
+            <div
+              data-export-role="user-message"
+              className={isLastTurn ? 'animate-message-in' : undefined}
+              {...(userRailIdx >= 0 ? { 'data-rail-index': userRailIdx } : undefined)}
+            >
+              <UserBubble
+                message={turn.userMessage}
+                skills={skills}
+                onReEdit={remoteManaged ? undefined : handleReEdit}
+              />
             </div>
           )}
           {showAssistantBlock && (
-            <div data-export-role="assistant-block" className={isLastTurn ? 'animate-message-in' : undefined} {...(asstRailIdx >= 0 ? { 'data-rail-index': asstRailIdx } : undefined)}>
+            <div
+              data-export-role="assistant-block"
+              className={isLastTurn ? 'animate-message-in' : undefined}
+              {...(asstRailIdx >= 0 ? { 'data-rail-index': asstRailIdx } : undefined)}
+            >
               <TurnBlock
                 turn={turn}
                 artifacts={turnArtifacts}
@@ -913,7 +1023,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             {process.env.NODE_ENV === 'development' && gatewaySessionId && (
               <span
                 className="non-draggable text-[10px] text-muted-foreground ml-1.5 font-mono select-text cursor-text"
-                onPointerDown={(e) => e.stopPropagation()}
+                onPointerDown={e => e.stopPropagation()}
               >
                 {gatewaySessionId.slice(0, 8)}
               </span>
@@ -959,7 +1069,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         >
           <div
             className="w-full max-w-xs mx-4 dark:bg-claude-darkSurface bg-claude-surface rounded-2xl shadow-modal overflow-hidden modal-content"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b dark:border-claude-darkBorder border-claude-border">
               <h3 className="text-base font-semibold dark:text-claude-darkText text-claude-text">
@@ -970,35 +1080,50 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
-                onClick={(e) => { setShowExportOptions(false); handleShareClick(e); }}
+                onClick={e => {
+                  setShowExportOptions(false);
+                  handleShareClick(e);
+                }}
                 disabled={isExportingImage}
               >
                 <ImageIcon className="h-5 w-5" />
                 <div>
                   <div className="font-medium">{i18nService.t('coworkExportImage')}</div>
-                  <div className="text-xs text-muted-foreground">{i18nService.t('coworkExportImageDesc')}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {i18nService.t('coworkExportImageDesc')}
+                  </div>
                 </div>
               </Button>
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
-                onClick={() => { setShowExportOptions(false); handleExportText('md'); }}
+                onClick={() => {
+                  setShowExportOptions(false);
+                  handleExportText('md');
+                }}
               >
                 <Download className="h-5 w-5" />
                 <div>
                   <div className="font-medium">Markdown</div>
-                  <div className="text-xs text-muted-foreground">{i18nService.t('coworkExportMarkdownDesc')}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {i18nService.t('coworkExportMarkdownDesc')}
+                  </div>
                 </div>
               </Button>
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
-                onClick={() => { setShowExportOptions(false); handleExportText('json'); }}
+                onClick={() => {
+                  setShowExportOptions(false);
+                  handleExportText('json');
+                }}
               >
                 <Download className="h-5 w-5" />
                 <div>
                   <div className="font-medium">JSON</div>
-                  <div className="text-xs text-muted-foreground">{i18nService.t('coworkExportJSONDesc')}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {i18nService.t('coworkExportJSONDesc')}
+                  </div>
                 </div>
               </Button>
             </div>
@@ -1008,287 +1133,339 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
       {/* Content row: chat + artifact panel */}
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
-      <div ref={detailRootRef} className="flex-1 flex flex-col bg-background h-full" style={{ minWidth: COWORK_DETAIL_MIN_WIDTH }}>
-      <div className="relative flex-1 min-h-0">
-        <Conversation className="h-full">
-          <ConversationContent
-            className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
-            scrollClassName="cowork-conversation-scroll"
-          >
-            <div ref={scrollContainerRef}>
-              {renderConversationTurns()}
-              <div className="h-20" />
-            </div>
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
+        <div
+          ref={detailRootRef}
+          className="flex-1 flex flex-col bg-background h-full"
+          style={{ minWidth: COWORK_DETAIL_MIN_WIDTH }}
+        >
+          <div className="relative flex-1 min-h-0">
+            <Conversation className="h-full">
+              <ConversationContent
+                className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
+                scrollClassName="cowork-conversation-scroll"
+              >
+                <div ref={scrollContainerRef}>
+                  {renderConversationTurns()}
+                  <div className="h-20" />
+                </div>
+              </ConversationContent>
+              <ConversationScrollButton />
+            </Conversation>
 
-        {/* Turn Navigation Rail — to the left of scrollbar */}
-        {turns.length > 1 && (
-          <div
-            className="absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
-            style={{ maxHeight: 'calc(100% - 40px)' }}
-            onMouseEnter={() => setIsRailHovered(true)}
-            onMouseLeave={() => {
-              setIsRailHovered(false);
-              setHoveredRailIndex(null);
-              setRailTooltip(null);
-            }}
-          >
-            {/* Up Arrow */}
-            <button
-              type="button"
-              onClick={() => {
-                const resolvedRail = currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex;
-                if (resolvedRail <= 0) return;
-                navigateToRailItem(resolvedRail - 1);
-              }}
-              onMouseEnter={() => { setHoveredRailIndex(null); }}
-              className={`shrink-0 flex items-center justify-center w-5 h-5 mb-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
-                ${!isRailHovered
-                  ? 'opacity-0 pointer-events-none'
-                  : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
-                    ? 'opacity-30 cursor-default'
-                    : 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-              </svg>
-            </button>
-
-            {/* Message Lines */}
-            <div
-              ref={railLinesRef}
-              className="overflow-y-auto min-h-0 flex-1"
-              style={{ scrollbarWidth: 'none' }}
-            >
-            {(() => {
-              // Build flat list of messages with their content length and turn index
-              const MIN_W = 6;  // px
-              const MAX_W = 16; // px
-              // Strip common markdown syntax for tooltip display
-              const stripMd = (s: string) => s
-                .replace(/^#+\s+/gm, '')
-                .replace(/```[\s\S]*?```/g, ' ')
-                .replace(/`[^`]*`/g, ' ')
-                .replace(/[*_~>]/g, '')
-                .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-                .replace(/\s+/g, ' ')
-                .trim();
-              // Get first meaningful text snippet from content
-              const getLabel = (content: string, fallback: string) => {
-                const stripped = stripMd(content);
-                return stripped.slice(0, 50) || fallback;
-              };
-              type RailItem = { key: string; turnIndex: number; label: string; contentLen: number; isUser: boolean };
-              const items: RailItem[] = [];
-              for (let i = 0; i < turns.length; i++) {
-                const turn = turns[i];
-                if (turn.userMessage) {
-                  const content = turn.userMessage.content ?? '';
-                  items.push({
-                    key: `${turn.id}-user`,
-                    turnIndex: i,
-                    label: getLabel(content, `Turn ${i + 1}`),
-                    contentLen: content.length,
-                    isUser: true,
-                  });
-                }
-                // Aggregate all assistant content into one line per turn
-                let asstContent = '';
-                for (const item of turn.assistantItems) {
-                  if (item.type === 'assistant' && item.message?.content) {
-                    asstContent += item.message.content;
-                  }
-                }
-                if (asstContent) {
-                  items.push({
-                    key: `${turn.id}-asst`,
-                    turnIndex: i,
-                    label: getLabel(asstContent, '知远智能体'),
-                    contentLen: asstContent.length,
-                    isUser: false,
-                  });
-                }
-              }
-              const maxLen = items.reduce((acc, m) => Math.max(acc, m.contentLen), 1);
-              // Sync rail item count and turn-to-rail mapping
-              railItemCountRef.current = items.length;
-              const rangeMap: { first: number; last: number }[] = [];
-              for (let ri = 0; ri < items.length; ri++) {
-                const ti = items[ri].turnIndex;
-                if (!rangeMap[ti]) {
-                  rangeMap[ti] = { first: ri, last: ri };
-                } else {
-                  rangeMap[ti].last = ri;
-                }
-              }
-              turnToRailRangeRef.current = rangeMap;
-
-              // Clamp rail index to valid range
-              const resolvedRailIndex = currentRailIndex < 0 || currentRailIndex >= items.length
-                ? items.length - 1
-                : currentRailIndex;
-
-              return items.map((msg, idx) => {
-                const isActive = idx === resolvedRailIndex;
-                const isHovered = idx === hoveredRailIndex;
-                const ratio = msg.contentLen / maxLen;
-                const lineW = Math.round(MIN_W + ratio * (MAX_W - MIN_W));
-                return (
-                  <button
-                    key={msg.key}
-                    type="button"
-                    onClick={() => {
-                      navigateToRailItem(idx);
-                    }}
-                    onMouseEnter={(e) => {
-                      setHoveredRailIndex(idx);
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const top = Math.max(8, Math.min(rect.top + rect.height / 2, window.innerHeight - 8));
-                      setRailTooltip({
-                        label: msg.label,
-                        top,
-                        right: window.innerWidth - rect.left + 8,
-                        isUser: msg.isUser,
-                      });
-                    }}
-                    onMouseLeave={() => setRailTooltip(null)}
-                    className="flex items-center justify-end cursor-pointer w-5 py-[5px]"
+            {/* Turn Navigation Rail — to the left of scrollbar */}
+            {turns.length > 1 && (
+              <div
+                className="absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
+                style={{ maxHeight: 'calc(100% - 40px)' }}
+                onMouseEnter={() => setIsRailHovered(true)}
+                onMouseLeave={() => {
+                  setIsRailHovered(false);
+                  setHoveredRailIndex(null);
+                  setRailTooltip(null);
+                }}
+              >
+                {/* Up Arrow */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const resolvedRail =
+                      currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex;
+                    if (resolvedRail <= 0) return;
+                    navigateToRailItem(resolvedRail - 1);
+                  }}
+                  onMouseEnter={() => {
+                    setHoveredRailIndex(null);
+                  }}
+                  className={`shrink-0 flex items-center justify-center w-5 h-5 mb-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
+                ${
+                  !isRailHovered
+                    ? 'opacity-0 pointer-events-none'
+                    : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
+                      ? 'opacity-30 cursor-default'
+                      : 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60'
+                }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className="w-3.5 h-3.5"
                   >
-                    <div
-                      className={`h-[2px] rounded-full transition-all ${
-                        isActive || isHovered
-                          ? 'bg-neutral-800 dark:bg-neutral-200'
-                          : 'bg-neutral-300 dark:bg-neutral-600'
-                      }`}
-                      style={{ width: isActive || isHovered ? MAX_W : lineW }}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 15.75l7.5-7.5 7.5 7.5"
                     />
-                  </button>
-                );
-              });
-            })()}
-            </div>
+                  </svg>
+                </button>
 
-            {/* Down Arrow */}
-            <button
-              type="button"
-              onClick={() => {
-                const maxRail = railItemCountRef.current - 1;
-                const resolvedRail = currentRailIndex < 0 ? maxRail : currentRailIndex;
-                if (resolvedRail >= maxRail) return;
-                navigateToRailItem(resolvedRail + 1);
-              }}
-              onMouseEnter={() => { setHoveredRailIndex(null); }}
-              className={`shrink-0 flex items-center justify-center w-5 h-5 mt-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
-                ${!isRailHovered
-                  ? 'opacity-0 pointer-events-none'
-                  : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >= railItemCountRef.current - 1
-                    ? 'opacity-30 cursor-default'
-                    : 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-              </svg>
-            </button>
-          </div>
-        )}
+                {/* Message Lines */}
+                <div
+                  ref={railLinesRef}
+                  className="overflow-y-auto min-h-0 flex-1"
+                  style={{ scrollbarWidth: 'none' }}
+                >
+                  {(() => {
+                    // Build flat list of messages with their content length and turn index
+                    const MIN_W = 6; // px
+                    const MAX_W = 16; // px
+                    // Strip common markdown syntax for tooltip display
+                    const stripMd = (s: string) =>
+                      s
+                        .replace(/^#+\s+/gm, '')
+                        .replace(/```[\s\S]*?```/g, ' ')
+                        .replace(/`[^`]*`/g, ' ')
+                        .replace(/[*_~>]/g, '')
+                        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    // Get first meaningful text snippet from content
+                    const getLabel = (content: string, fallback: string) => {
+                      const stripped = stripMd(content);
+                      return stripped.slice(0, 50) || fallback;
+                    };
+                    type RailItem = {
+                      key: string;
+                      turnIndex: number;
+                      label: string;
+                      contentLen: number;
+                      isUser: boolean;
+                    };
+                    const items: RailItem[] = [];
+                    for (let i = 0; i < turns.length; i++) {
+                      const turn = turns[i];
+                      if (turn.userMessage) {
+                        const content = turn.userMessage.content ?? '';
+                        items.push({
+                          key: `${turn.id}-user`,
+                          turnIndex: i,
+                          label: getLabel(content, `Turn ${i + 1}`),
+                          contentLen: content.length,
+                          isUser: true,
+                        });
+                      }
+                      // Aggregate all assistant content into one line per turn
+                      let asstContent = '';
+                      for (const item of turn.assistantItems) {
+                        if (item.type === 'assistant' && item.message?.content) {
+                          asstContent += item.message.content;
+                        }
+                      }
+                      if (asstContent) {
+                        items.push({
+                          key: `${turn.id}-asst`,
+                          turnIndex: i,
+                          label: getLabel(asstContent, '知远智能体'),
+                          contentLen: asstContent.length,
+                          isUser: false,
+                        });
+                      }
+                    }
+                    const maxLen = items.reduce((acc, m) => Math.max(acc, m.contentLen), 1);
+                    // Sync rail item count and turn-to-rail mapping
+                    railItemCountRef.current = items.length;
+                    const rangeMap: { first: number; last: number }[] = [];
+                    for (let ri = 0; ri < items.length; ri++) {
+                      const ti = items[ri].turnIndex;
+                      if (!rangeMap[ti]) {
+                        rangeMap[ti] = { first: ri, last: ri };
+                      } else {
+                        rangeMap[ti].last = ri;
+                      }
+                    }
+                    turnToRailRangeRef.current = rangeMap;
 
-        {railTooltip && createPortal(
-          <div
-            className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
-              max-w-[240px] shadow-[0_2px_12px_rgba(0,0,0,0.12)]
-              border dark:shadow-[0_2px_12px_rgba(0,0,0,0.4)]
-              ${railTooltip.isUser
-                ? 'rounded-[12px_12px_4px_12px] bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
-                : 'rounded-xl bg-neutral-50 border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
-              }`}
-            style={{
-              top: railTooltip.top,
-              right: railTooltip.right,
-              transform: 'translateY(-50%)',
-            }}
-          >
-            {!railTooltip.isUser && (
-              <div className="text-[12px] font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
-                知远智能体：
+                    // Clamp rail index to valid range
+                    const resolvedRailIndex =
+                      currentRailIndex < 0 || currentRailIndex >= items.length
+                        ? items.length - 1
+                        : currentRailIndex;
+
+                    return items.map((msg, idx) => {
+                      const isActive = idx === resolvedRailIndex;
+                      const isHovered = idx === hoveredRailIndex;
+                      const ratio = msg.contentLen / maxLen;
+                      const lineW = Math.round(MIN_W + ratio * (MAX_W - MIN_W));
+                      return (
+                        <button
+                          key={msg.key}
+                          type="button"
+                          onClick={() => {
+                            navigateToRailItem(idx);
+                          }}
+                          onMouseEnter={e => {
+                            setHoveredRailIndex(idx);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const top = Math.max(
+                              8,
+                              Math.min(rect.top + rect.height / 2, window.innerHeight - 8),
+                            );
+                            setRailTooltip({
+                              label: msg.label,
+                              top,
+                              right: window.innerWidth - rect.left + 8,
+                              isUser: msg.isUser,
+                            });
+                          }}
+                          onMouseLeave={() => setRailTooltip(null)}
+                          className="flex items-center justify-end cursor-pointer w-5 py-[5px]"
+                        >
+                          <div
+                            className={`h-[2px] rounded-full transition-all ${
+                              isActive || isHovered
+                                ? 'bg-neutral-800 dark:bg-neutral-200'
+                                : 'bg-neutral-300 dark:bg-neutral-600'
+                            }`}
+                            style={{ width: isActive || isHovered ? MAX_W : lineW }}
+                          />
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Down Arrow */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const maxRail = railItemCountRef.current - 1;
+                    const resolvedRail = currentRailIndex < 0 ? maxRail : currentRailIndex;
+                    if (resolvedRail >= maxRail) return;
+                    navigateToRailItem(resolvedRail + 1);
+                  }}
+                  onMouseEnter={() => {
+                    setHoveredRailIndex(null);
+                  }}
+                  className={`shrink-0 flex items-center justify-center w-5 h-5 mt-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
+                ${
+                  !isRailHovered
+                    ? 'opacity-0 pointer-events-none'
+                    : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
+                        railItemCountRef.current - 1
+                      ? 'opacity-30 cursor-default'
+                      : 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60'
+                }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className="w-3.5 h-3.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </button>
               </div>
             )}
-            <div
-              className="text-neutral-600 dark:text-neutral-300"
-              style={{
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                wordBreak: 'break-all',
-              }}
-            >
-              {railTooltip.label}
+
+            {railTooltip &&
+              createPortal(
+                <div
+                  className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
+              max-w-[240px] shadow-[0_2px_12px_rgba(0,0,0,0.12)]
+              border dark:shadow-[0_2px_12px_rgba(0,0,0,0.4)]
+              ${
+                railTooltip.isUser
+                  ? 'rounded-[12px_12px_4px_12px] bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
+                  : 'rounded-xl bg-neutral-50 border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
+              }`}
+                  style={{
+                    top: railTooltip.top,
+                    right: railTooltip.right,
+                    transform: 'translateY(-50%)',
+                  }}
+                >
+                  {!railTooltip.isUser && (
+                    <div className="text-[12px] font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
+                      知远智能体：
+                    </div>
+                  )}
+                  <div
+                    className="text-neutral-600 dark:text-neutral-300"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {railTooltip.label}
+                  </div>
+                </div>,
+                document.body,
+              )}
+          </div>
+
+          {/* Streaming Activity Bar */}
+          {isStreaming && <StreamingBar messages={currentSession.messages} />}
+
+          {/* Input Area */}
+          <div className="px-4 pb-4 shrink-0">
+            <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
+              <TodoQueue messages={currentSession.messages} />
+              <CoworkPromptInput
+                ref={promptInputRef}
+                onSubmit={onContinue}
+                onStop={onStop}
+                isStreaming={isStreaming}
+                placeholder={i18nService.t(
+                  remoteManaged
+                    ? 'coworkRemoteManagedPlaceholder'
+                    : workMode === 'chat'
+                      ? 'chatPlaceholder'
+                      : 'coworkContinuePlaceholder',
+                )}
+                disabled={remoteManaged}
+                size="large"
+                remoteManaged={remoteManaged}
+                onManageSkills={remoteManaged ? undefined : onManageSkills}
+                showModelSelector={true}
+                isDirectChat={isDirectChat}
+                showLocalThinkingToggle={workMode === 'chat'}
+                localThinkingEnabled={localThinkingEnabled}
+                onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
+                sessionId={currentSession?.id}
+              />
+              <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
+                {i18nService.t('aiGeneratedDisclaimer')}
+              </p>
             </div>
-          </div>,
-          document.body
+          </div>
+        </div>
+        {shouldRenderArtifactPanel && (
+          <div
+            className={`h-full shrink-0 overflow-hidden ${
+              isArtifactPanelTransitioning
+                ? 'transition-[width,opacity] duration-200 ease-out motion-reduce:transition-none'
+                : ''
+            } ${isArtifactPanelVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            style={{
+              width: artifactPanelFrameWidth,
+              maxWidth: artifactPanelMaxWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
+            }}
+            aria-hidden={!isPanelOpen}
+          >
+            <div className="flex h-full" style={{ width: artifactPanelFrameWidth }}>
+              <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
+                <ArtifactPanel
+                  artifacts={sessionArtifacts}
+                  minPanelWidth={artifactPanelMinWidth}
+                  maxPanelWidth={artifactPanelMaxWidth}
+                />
+              </ArtifactPanelErrorBoundary>
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Streaming Activity Bar */}
-      {isStreaming && <StreamingBar messages={currentSession.messages} />}
-
-      {/* Input Area */}
-      <div className="px-4 pb-4 shrink-0">
-        <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
-          <TodoQueue messages={currentSession.messages} />
-          <CoworkPromptInput
-            ref={promptInputRef}
-            onSubmit={onContinue}
-            onStop={onStop}
-            isStreaming={isStreaming}
-            placeholder={i18nService.t(remoteManaged ? 'coworkRemoteManagedPlaceholder' : workMode === 'chat' ? 'chatPlaceholder' : 'coworkContinuePlaceholder')}
-            disabled={remoteManaged}
-            size="large"
-            remoteManaged={remoteManaged}
-            onManageSkills={remoteManaged ? undefined : onManageSkills}
-            showModelSelector={true}
-            isDirectChat={isDirectChat}
-            showLocalThinkingToggle={workMode === 'chat'}
-            localThinkingEnabled={localThinkingEnabled}
-            onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
-            sessionId={currentSession?.id}
-          />
-          <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
-            {i18nService.t('aiGeneratedDisclaimer')}
-          </p>
-        </div>
-      </div>
-    </div>
-    {shouldRenderArtifactPanel && (
-      <div
-        className={`h-full shrink-0 overflow-hidden ${
-          isArtifactPanelTransitioning
-            ? 'transition-[width,opacity] duration-200 ease-out motion-reduce:transition-none'
-            : ''
-        } ${isArtifactPanelVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-        style={{
-          width: artifactPanelFrameWidth,
-          maxWidth: artifactPanelMaxWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
-        }}
-        aria-hidden={!isPanelOpen}
-      >
-        <div
-          className="flex h-full"
-          style={{ width: artifactPanelFrameWidth }}
-        >
-          <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-            <ArtifactPanel
-              artifacts={sessionArtifacts}
-              minPanelWidth={artifactPanelMinWidth}
-              maxPanelWidth={artifactPanelMaxWidth}
-            />
-          </ArtifactPanelErrorBoundary>
-        </div>
-      </div>
-    )}
-    </div>
     </div>
   );
 };

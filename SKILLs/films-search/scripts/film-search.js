@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 // [1] Configuration
 // =============================================
 
-const CACHE_DIR = path.join(os.tmpdir(), 'lobsterai-film-cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'zhiyuan-film-cache');
 
 const DEFAULT_CONFIG = {
   preferredPan: ['quark', 'aliyun', 'baidu', 'uc'],
@@ -37,7 +37,10 @@ function loadConfig() {
 
   const envPan = process.env.FILM_SEARCH_PREFERRED_PAN;
   if (envPan) {
-    cfg.preferredPan = envPan.split(',').map(s => s.trim()).filter(Boolean);
+    cfg.preferredPan = envPan
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
   }
 
   const envLimit = parseInt(process.env.FILM_SEARCH_DEFAULT_LIMIT, 10);
@@ -122,9 +125,8 @@ function deduplicateResults(results) {
   for (const r of results) {
     // Use URL as primary dedup key, but for search page URLs
     // (not direct pan links), include title+pan to avoid over-dedup
-    const isPanUrl = r.url && Object.values(PAN_URL_PATTERNS).some(
-      p => new RegExp(p.source).test(r.url)
-    );
+    const isPanUrl =
+      r.url && Object.values(PAN_URL_PATTERNS).some(p => new RegExp(p.source).test(r.url));
     const key = isPanUrl ? r.url : `${r.title}|${r.pan}|${r.url}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -163,7 +165,11 @@ function getCache(key) {
     const stat = fs.statSync(file);
     if (Date.now() - stat.mtimeMs > config.cacheTTL) {
       // Expired, clean up
-      try { fs.unlinkSync(file); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        /* ignore */
+      }
       return null;
     }
     return JSON.parse(fs.readFileSync(file, 'utf-8'));
@@ -176,11 +182,7 @@ function setCache(key, data) {
   if (!config.cacheEnabled) return;
   try {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(
-      path.join(CACHE_DIR, key + '.json'),
-      JSON.stringify(data),
-      'utf-8'
-    );
+    fs.writeFileSync(path.join(CACHE_DIR, key + '.json'), JSON.stringify(data), 'utf-8');
   } catch {
     // Cache write failure is non-critical
   }
@@ -229,13 +231,12 @@ function buildSearchQueries(keyword, panTypes) {
  * Resolve the web-search script path.
  */
 function getWebSearchScriptPath() {
-  const skillsRoot = process.env.SKILLS_ROOT
-    || process.env.LOBSTERAI_SKILLS_ROOT
-    || path.resolve(__dirname, '..', '..');
+  const skillsRoot =
+    process.env.SKILLS_ROOT ||
+    process.env.ZHIYUAN_SKILLS_ROOT ||
+    path.resolve(__dirname, '..', '..');
 
-  const candidates = [
-    path.join(skillsRoot, 'web-search', 'scripts', 'search.sh'),
-  ];
+  const candidates = [path.join(skillsRoot, 'web-search', 'scripts', 'search.sh')];
 
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
@@ -256,7 +257,10 @@ async function callWebSearch(query, maxResults) {
   }
 
   // Write query to temp file in explicit UTF-8 to avoid encoding issues
-  const tmpFile = path.join(os.tmpdir(), `film-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
+  const tmpFile = path.join(
+    os.tmpdir(),
+    `film-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
+  );
   fs.writeFileSync(tmpFile, query, 'utf-8');
 
   const isWindows = process.platform === 'win32';
@@ -288,24 +292,28 @@ async function callWebSearch(query, maxResults) {
         throw new Error('Windows 上未找到 bash（需要 Git Bash 或 WSL）');
       }
 
-      const result = await execFileAsync(
-        bashPath,
-        [scriptPath, queryArg, String(maxResults)],
-        { timeout: config.timeout * 2, maxBuffer: 10 * 1024 * 1024, env: childEnv }
-      );
+      const result = await execFileAsync(bashPath, [scriptPath, queryArg, String(maxResults)], {
+        timeout: config.timeout * 2,
+        maxBuffer: 10 * 1024 * 1024,
+        env: childEnv,
+      });
       stdout = result.stdout;
     } else {
-      const result = await execFileAsync(
-        'bash',
-        [scriptPath, queryArg, String(maxResults)],
-        { timeout: config.timeout * 2, maxBuffer: 10 * 1024 * 1024, env: childEnv }
-      );
+      const result = await execFileAsync('bash', [scriptPath, queryArg, String(maxResults)], {
+        timeout: config.timeout * 2,
+        maxBuffer: 10 * 1024 * 1024,
+        env: childEnv,
+      });
       stdout = result.stdout;
     }
 
     return stdout || '';
   } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 }
 
@@ -425,7 +433,12 @@ async function searchViaWebSearch(keyword, panTypes, limit) {
  */
 function buildSmartQueries(keyword, panTypes) {
   const panNames = { quark: '夸克网盘', baidu: '百度网盘', aliyun: '阿里云盘', uc: 'UC网盘' };
-  const panDomains = { quark: 'pan.quark.cn', baidu: 'pan.baidu.com', aliyun: 'www.alipan.com', uc: 'drive.uc.cn' };
+  const panDomains = {
+    quark: 'pan.quark.cn',
+    baidu: 'pan.baidu.com',
+    aliyun: 'www.alipan.com',
+    uc: 'drive.uc.cn',
+  };
   const queries = [];
 
   // 1. Chinese name queries first — reliably find resource aggregator pages
@@ -476,10 +489,23 @@ function extractPageUrls(markdown) {
  * Domain blacklist: pages from these domains won't have downloadable pan links.
  */
 const DOMAIN_BLACKLIST = [
-  'douban.com', 'bilibili.com', 'iqiyi.com', 'youku.com', 'v.qq.com',
-  'mgtv.com', 'zhihu.com', 'weibo.com', 'baike.baidu.com', 'wikipedia.org',
-  'imdb.com', 'bing.com', 'google.com', 'so.com', 'sogou.com',
-  'movie.douban.com', 'baidu.com/s?',
+  'douban.com',
+  'bilibili.com',
+  'iqiyi.com',
+  'youku.com',
+  'v.qq.com',
+  'mgtv.com',
+  'zhihu.com',
+  'weibo.com',
+  'baike.baidu.com',
+  'wikipedia.org',
+  'imdb.com',
+  'bing.com',
+  'google.com',
+  'so.com',
+  'sogou.com',
+  'movie.douban.com',
+  'baidu.com/s?',
 ];
 
 /**
@@ -611,12 +637,7 @@ async function searchViaDeepExtract(keyword, panTypes, limit) {
  * Main search orchestrator: runs selected engines, merges, filters, sorts.
  */
 async function searchAll(keyword, options = {}) {
-  const {
-    pan = 'all',
-    quality = 'all',
-    limit = config.defaultLimit,
-    engine = 'deep',
-  } = options;
+  const { pan = 'all', quality = 'all', limit = config.defaultLimit, engine = 'deep' } = options;
 
   // Determine target pan types
   const panTypes = pan === 'all' ? [...config.preferredPan] : [pan];

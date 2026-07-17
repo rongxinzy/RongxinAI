@@ -43,19 +43,14 @@ const quickActionSlice = createSlice({
       state.isLoading = action.payload;
     },
     /** 清空选择 */
-    clearSelection: (state) => {
+    clearSelection: state => {
       state.selectedActionId = null;
       state.selectedPromptId = null;
     },
   },
 });
 
-export const {
-  setActions,
-  selectAction,
-  selectPrompt,
-  setLoading,
-  clearSelection,
-} = quickActionSlice.actions;
+export const { setActions, selectAction, selectPrompt, setLoading, clearSelection } =
+  quickActionSlice.actions;
 
 export default quickActionSlice.reducer;

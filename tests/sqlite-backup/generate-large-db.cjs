@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 const DEFAULTS = {
-  db: path.resolve(process.cwd(), 'lobsterai.sqlite'),
+  db: path.resolve(process.cwd(), 'zhiyuan.sqlite'),
   sessions: 20,
   messagesPerSession: 5000,
   payloadKb: 8,
@@ -34,8 +34,8 @@ Options:
   --help                        Show this help
 
 Examples:
-  node tests/sqlite-backup/generate-large-db.cjs --db ~/tmp/lobsterai.sqlite
-  node tests/sqlite-backup/generate-large-db.cjs --db ./tmp/lobsterai.sqlite --sessions 50 --messages-per-session 10000 --payload-kb 16
+  node tests/sqlite-backup/generate-large-db.cjs --db ~/tmp/zhiyuan.sqlite
+  node tests/sqlite-backup/generate-large-db.cjs --db ./tmp/zhiyuan.sqlite --sessions 50 --messages-per-session 10000 --payload-kb 16
 `);
 }
 
@@ -127,7 +127,8 @@ function sqlString(value) {
 }
 
 function createPayloadBytes(targetBytes) {
-  const line = 'The quick brown lobster benchmarks SQLite backup throughput with wide message payloads.\n';
+  const line =
+    'The quick brown fox benchmarks SQLite backup throughput with wide message payloads.\n';
   return line.repeat(Math.max(1, Math.ceil(targetBytes / Buffer.byteLength(line))));
 }
 
@@ -210,20 +211,19 @@ function main() {
   const startTime = Date.now();
   const tempSqlPath = path.join(
     os.tmpdir(),
-    `lobsterai-sqlite-backup-seed-${process.pid}-${Date.now()}.sql`,
+    `zhiyuan-sqlite-backup-seed-${process.pid}-${Date.now()}.sql`,
   );
 
   let insertedMessages = 0;
-  const sqlLines = [
-    'BEGIN IMMEDIATE;',
-  ];
+  const sqlLines = ['BEGIN IMMEDIATE;'];
 
   try {
     for (let sessionIndex = 0; sessionIndex < options.sessions; sessionIndex += 1) {
       const sessionId = crypto.randomUUID();
       const sessionStart = Date.now() - (options.sessions - sessionIndex) * 60_000;
 
-      sqlLines.push(`
+      sqlLines.push(
+        `
 INSERT INTO cowork_sessions (
   id, title, claude_session_id, status, pinned, cwd, system_prompt, model_override,
   execution_mode, created_at, updated_at, active_skill_ids, agent_id
@@ -241,17 +241,21 @@ INSERT INTO cowork_sessions (
   ${sessionStart},
   NULL,
   'main'
-);`.trim());
+);`.trim(),
+      );
 
       for (let messageIndex = 0; messageIndex < options.messagesPerSession; messageIndex += 1) {
         const ratioIndex = (messageIndex + 1) / options.messagesPerSession;
-        const type = ratioIndex <= options.assistantRatio && messageIndex % 2 === 1 ? 'assistant' : 'user';
+        const type =
+          ratioIndex <= options.assistantRatio && messageIndex % 2 === 1 ? 'assistant' : 'user';
         const createdAt = sessionStart + messageIndex * 1000;
-        const metadata = type === 'assistant'
-          ? JSON.stringify({ isFinal: true, synthetic: true })
-          : JSON.stringify({ synthetic: true });
+        const metadata =
+          type === 'assistant'
+            ? JSON.stringify({ isFinal: true, synthetic: true })
+            : JSON.stringify({ synthetic: true });
 
-        sqlLines.push(`
+        sqlLines.push(
+          `
 INSERT INTO cowork_messages (
   id, session_id, type, content, metadata, created_at, sequence
 ) VALUES (
@@ -262,7 +266,8 @@ INSERT INTO cowork_messages (
   ${sqlString(metadata)},
   ${createdAt},
   ${messageIndex + 1}
-);`.trim());
+);`.trim(),
+        );
 
         insertedMessages += 1;
         if (insertedMessages % options.reportEvery === 0 || insertedMessages === totalMessages) {
@@ -291,7 +296,9 @@ INSERT INTO cowork_messages (
       throw importResult.error;
     }
     if (importResult.status !== 0) {
-      throw new Error(importResult.stderr || `sqlite3 import exited with status ${importResult.status}`);
+      throw new Error(
+        importResult.stderr || `sqlite3 import exited with status ${importResult.status}`,
+      );
     }
 
     const durationMs = Date.now() - startTime;
@@ -301,7 +308,9 @@ INSERT INTO cowork_messages (
     console.log(`[sqlite-backup] Done in ${durationMs} ms`);
     console.log(`[sqlite-backup] main db size: ${(dbSize / 1024 / 1024).toFixed(2)} MiB`);
     console.log(`[sqlite-backup] wal size: ${(walSize / 1024 / 1024).toFixed(2)} MiB`);
-    console.log('[sqlite-backup] Tip: close the app or run a checkpoint before measuring backup of the main db file only.');
+    console.log(
+      '[sqlite-backup] Tip: close the app or run a checkpoint before measuring backup of the main db file only.',
+    );
   } finally {
     fs.rmSync(tempSqlPath, { force: true });
   }

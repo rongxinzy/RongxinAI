@@ -40,7 +40,7 @@ type UpdateApiResponse = {
   };
 };
 
-const APP_UPDATE_TEST_CURRENT_VERSION_ENV = 'LOBSTERAI_UPDATE_CURRENT_VERSION';
+const APP_UPDATE_TEST_CURRENT_VERSION_ENV = 'ZHIYUAN_UPDATE_CURRENT_VERSION';
 const APP_UPDATE_READY_FILE_KEY_PREFIX = 'app_update_ready_file';
 
 type StoredReadyFile = {
@@ -85,7 +85,10 @@ export class AppUpdateCoordinator {
     this.autoOpenReadyModal = false;
   }
 
-  async checkNow(_options?: { manual?: boolean; userId?: string | null }): Promise<AppUpdateCheckResult> {
+  async checkNow(_options?: {
+    manual?: boolean;
+    userId?: string | null;
+  }): Promise<AppUpdateCheckResult> {
     console.log('[AppUpdate] update system is disabled');
     const state = this.resetToIdle();
     return { success: true, state, updateFound: false };
@@ -194,7 +197,9 @@ export class AppUpdateCoordinator {
       }
       const cancelled = error instanceof Error && error.message === 'Download cancelled';
       if (cancelled) {
-        console.log(`[AppUpdate] download cancelled for active flow, flowId=${flowId}, source=${source}`);
+        console.log(
+          `[AppUpdate] download cancelled for active flow, flowId=${flowId}, source=${source}`,
+        );
         this.clearStoredReadyFile(source);
         return this.setState({
           status: AppUpdateStatus.Available,
@@ -346,16 +351,16 @@ export class AppUpdateCoordinator {
   }
 
   private isCachedInstallerForSource(filename: string, source: AppUpdateSource | null): boolean {
-    if (!filename.startsWith('rongxinai-update-')) {
+    if (!filename.startsWith('zhiyuan-update-')) {
       return false;
     }
     if (source == null) {
       return true;
     }
-    if (filename.startsWith(`rongxinai-update-${source}-`)) {
+    if (filename.startsWith(`zhiyuan-update-${source}-`)) {
       return true;
     }
-    return /^rongxinai-update-\d+/.test(filename);
+    return /^zhiyuan-update-\d+/.test(filename);
   }
 
   private async pruneCachedInstallerFiles(
@@ -411,9 +416,7 @@ export class AppUpdateCoordinator {
         : null;
 
     if (inMemoryReadyFile) {
-      console.log(
-        `[AppUpdate] checking in-memory ready file: ${inMemoryReadyFile.filePath}`,
-      );
+      console.log(`[AppUpdate] checking in-memory ready file: ${inMemoryReadyFile.filePath}`);
       const isValid = await this.isReadyFileValid(
         inMemoryReadyFile.filePath,
         inMemoryReadyFile.fileHash,
@@ -433,13 +436,8 @@ export class AppUpdateCoordinator {
       return null;
     }
 
-    console.log(
-      `[AppUpdate] checking persisted ready file: ${storedReadyFile.filePath}`,
-    );
-    const isValid = await this.isReadyFileValid(
-      storedReadyFile.filePath,
-      storedReadyFile.fileHash,
-    );
+    console.log(`[AppUpdate] checking persisted ready file: ${storedReadyFile.filePath}`);
+    const isValid = await this.isReadyFileValid(storedReadyFile.filePath, storedReadyFile.fileHash);
     if (isValid) {
       console.log('[AppUpdate] persisted ready file is valid');
       return storedReadyFile;
@@ -470,9 +468,7 @@ export class AppUpdateCoordinator {
       }
       return actualHash === expectedHash;
     } catch {
-      console.warn(
-        `[AppUpdate] ready file validation failed: stat/hash threw, path=${filePath}`,
-      );
+      console.warn(`[AppUpdate] ready file validation failed: stat/hash threw, path=${filePath}`);
       return false;
     }
   }

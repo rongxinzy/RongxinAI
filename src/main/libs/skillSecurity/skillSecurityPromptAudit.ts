@@ -62,20 +62,13 @@ const PROMPT_INJECTION_RULES: PromptAuditRule[] = [
   {
     id: 'prompt_injection.unicode_obfuscation',
     severity: 'warning',
-    patterns: [
-      /[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/,
-      /[\u0300-\u036F]{3,}/,
-    ],
+    patterns: [/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/, /[\u0300-\u036F]{3,}/],
     description: 'securityFindingUnicodeObfuscation',
   },
   {
     id: 'prompt_injection.role_hijack',
     severity: 'danger',
-    patterns: [
-      /\[SYSTEM\]|\[ADMIN\]|\[ROOT\]/,
-      /\bhuman\s*:\s*/i,
-      /\bassistant\s*:\s*/i,
-    ],
+    patterns: [/\[SYSTEM\]|\[ADMIN\]|\[ROOT\]/, /\bhuman\s*:\s*/i, /\bassistant\s*:\s*/i],
     description: 'securityFindingRoleHijack',
   },
 ];

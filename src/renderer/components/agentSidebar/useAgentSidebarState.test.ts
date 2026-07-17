@@ -50,7 +50,7 @@ test('sortAgentSidebarTasks keeps unpinned tasks ordered by last update time', (
     makeSession('middle', 200, 300),
   ]);
 
-  expect(sorted.map((session) => session.id)).toEqual([
+  expect(sorted.map(session => session.id)).toEqual([
     'older-created-newer-update',
     'middle',
     'newer-created-older-update',
@@ -65,7 +65,7 @@ test('sortAgentSidebarTasks keeps pinned tasks in first-pinned-first order', () 
     makeSession('first-pinned', 200, 100, CoworkSessionStatusValue.Completed, true, 1),
   ]);
 
-  expect(sorted.map((session) => session.id)).toEqual([
+  expect(sorted.map(session => session.id)).toEqual([
     'first-pinned',
     'second-pinned',
     'newer-unpinned',
@@ -81,7 +81,7 @@ test('sortAgentSidebarAgents keeps pinned agents in first-pinned-first order', (
     makeAgent('another-regular'),
   ]);
 
-  expect(sorted.map((agent) => agent.id)).toEqual([
+  expect(sorted.map(agent => agent.id)).toEqual([
     'first-pinned',
     'second-pinned',
     'regular',

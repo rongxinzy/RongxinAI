@@ -56,11 +56,21 @@ function calculateHeatScore(article, allArticles, keyword) {
     // Use pre-computed match type if available (from tokenized matching)
     if (article._matchType) {
       switch (article._matchType) {
-        case 'exact_title':  score += 30; break; // Full keyword in title
-        case 'token_title':  score += 20; break; // Token match in title
-        case 'web_search':   score += 15; break; // Web search result (keyword-relevant)
-        case 'exact_summary': score += 10; break; // Full keyword in summary
-        case 'token_summary': score += 5;  break; // Token match in summary
+        case 'exact_title':
+          score += 30;
+          break; // Full keyword in title
+        case 'token_title':
+          score += 20;
+          break; // Token match in title
+        case 'web_search':
+          score += 15;
+          break; // Web search result (keyword-relevant)
+        case 'exact_summary':
+          score += 10;
+          break; // Full keyword in summary
+        case 'token_summary':
+          score += 5;
+          break; // Token match in summary
       }
     } else {
       // Fallback: simple substring matching (e.g., for HN articles)
@@ -97,9 +107,7 @@ function calculateHeatScore(article, allArticles, keyword) {
   if (article.title) {
     const titleNormalized = normalizeTitle(article.title);
     const duplicateCount = allArticles.filter(a => {
-      return a.title &&
-             normalizeTitle(a.title) === titleNormalized &&
-             a.source !== article.source;
+      return a.title && normalizeTitle(a.title) === titleNormalized && a.source !== article.source;
     }).length;
     score += duplicateCount * 20; // +20 per duplicate source
   }
@@ -120,9 +128,7 @@ function findDuplicateSources(article, allArticles) {
   const duplicates = [];
 
   for (const a of allArticles) {
-    if (a.title &&
-        normalizeTitle(a.title) === titleNormalized &&
-        a.source !== article.source) {
+    if (a.title && normalizeTitle(a.title) === titleNormalized && a.source !== article.source) {
       duplicates.push(a.source);
     }
   }
@@ -133,5 +139,5 @@ function findDuplicateSources(article, allArticles) {
 module.exports = {
   calculateHeatScore,
   findDuplicateSources,
-  normalizeTitle
+  normalizeTitle,
 };

@@ -1,5 +1,5 @@
 import type { Agent, CoworkStore, CreateAgentRequest, UpdateAgentRequest } from './coworkStore';
-import { PRESET_AGENTS, type PresetAgent,presetToCreateRequest } from './presetAgents';
+import { PRESET_AGENTS, type PresetAgent, presetToCreateRequest } from './presetAgents';
 
 /**
  * AgentManager handles CRUD operations for agents and preset agent installation.
@@ -51,7 +51,7 @@ export class AgentManager {
   getPresetAgents(): PresetAgent[] {
     const existingAgents = this.store.listAgents();
     const existingPresetIds = new Set(
-      existingAgents.filter(a => a.source === 'preset').map(a => a.presetId)
+      existingAgents.filter(a => a.source === 'preset').map(a => a.presetId),
     );
     // Only return presets that haven't been added yet
     return PRESET_AGENTS.filter(p => !existingPresetIds.has(p.id));

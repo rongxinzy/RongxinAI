@@ -85,7 +85,7 @@ const SelectionReason = {
 };
 
 const LLAMACPP_BACKEND_RESOURCES_DIR = 'llamacpp-backends';
-const RONGXINAI_APP_DATA_DIR = 'RongxinAI';
+const ZHIYUAN_APP_DATA_DIR = 'ZhiYuanAgent';
 const LLAMACPP_RUNTIME_DIR = 'llamacpp-runtime';
 const INSTALL_LOG_FILE = 'install-llamacpp.log';
 const MANIFEST_FILE = 'manifest.json';
@@ -96,7 +96,7 @@ const PREFERRED_CUDA_MAJOR = '12';
 const NETWORK_FAILURE_HINT = 'Please check network, proxy, or firewall settings.';
 
 const DownloadConfig = {
-  UserAgent: 'RongxinAI/llamacpp-nsis-helper',
+  UserAgent: 'ZhiYuanAgent/llamacpp-nsis-helper',
   ResumeOnIncompleteMaxRetry: 3,
   MaxRetries: 3,
   TotalRetryEvents: 6,
@@ -117,7 +117,7 @@ const PowerShellCommand = {
   Command: '-Command',
 };
 
-const LOCAL_SIGNING_CERT_SUBJECT = 'CN=RongxinAI Local llama.cpp Runtime Signing';
+const LOCAL_SIGNING_CERT_SUBJECT = 'CN=ZhiYuanAgent Local Inference Runtime Signing';
 const WINDOWS_SIGNABLE_FILE_EXTENSIONS = new Set(['.dll', '.exe']);
 
 function parseCliArgs(argv) {
@@ -137,13 +137,13 @@ function parseCliArgs(argv) {
       continue;
     }
     if (
-      arg === CliFlag.Manifest
-      || arg === CliFlag.ResourcesDir
-      || arg === CliFlag.AppDataDir
-      || arg === CliFlag.LogPath
-      || arg === CliFlag.Platform
-      || arg === CliFlag.Arch
-      || arg === CliFlag.HasNvidiaGpu
+      arg === CliFlag.Manifest ||
+      arg === CliFlag.ResourcesDir ||
+      arg === CliFlag.AppDataDir ||
+      arg === CliFlag.LogPath ||
+      arg === CliFlag.Platform ||
+      arg === CliFlag.Arch ||
+      arg === CliFlag.HasNvidiaGpu
     ) {
       const value = argv[index + 1];
       if (!value || value.startsWith('--')) {
@@ -165,20 +165,22 @@ function parseCliArgs(argv) {
 }
 
 function printUsage() {
-  console.log([
-    'Usage: node scripts/install-llamacpp-backend-nsis.cjs [options]',
-    '',
-    'Options:',
-    '  --manifest <path>            Manifest path. Defaults to resources/llamacpp-backends/manifest.json.',
-    '  --resources-dir <path>       Directory containing manifest.json and optional backend archives.',
-    '  --app-data-dir <path>        AppData root. Defaults to %APPDATA%/RongxinAI.',
-    '  --log-path <path>            Log file path. Defaults to %APPDATA%/RongxinAI/install-llamacpp.log.',
-    '  --platform <platform>        Runtime platform override for tests, for example win32.',
-    '  --arch <arch>                Runtime arch override for tests, for example x64 or arm64.',
-    '  --has-nvidia-gpu <true|false>  GPU override for tests.',
-    '  --local-signing-confirmed   Allow the helper to locally sign unsigned Windows runtime files.',
-    '  --dry-run                   Plan only. If omitted, the helper installs the selected backend.',
-  ].join('\n'));
+  console.log(
+    [
+      'Usage: node scripts/install-llamacpp-backend-nsis.cjs [options]',
+      '',
+      'Options:',
+      '  --manifest <path>            Manifest path. Defaults to resources/llamacpp-backends/manifest.json.',
+      '  --resources-dir <path>       Directory containing manifest.json and optional backend archives.',
+      '  --app-data-dir <path>        AppData root. Defaults to %APPDATA%/ZhiYuanAgent.',
+      '  --log-path <path>            Log file path. Defaults to %APPDATA%/ZhiYuanAgent/install-llamacpp.log.',
+      '  --platform <platform>        Runtime platform override for tests, for example win32.',
+      '  --arch <arch>                Runtime arch override for tests, for example x64 or arm64.',
+      '  --has-nvidia-gpu <true|false>  GPU override for tests.',
+      '  --local-signing-confirmed   Allow the helper to locally sign unsigned Windows runtime files.',
+      '  --dry-run                   Plan only. If omitted, the helper installs the selected backend.',
+    ].join('\n'),
+  );
 }
 
 function parseBoolean(value) {
@@ -200,7 +202,7 @@ function resolveDefaultResourcesDir(scriptDir = __dirname, cwd = process.cwd()) 
 
 function resolveAppDataDir(env = process.env) {
   const appDataRoot = env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  return path.join(appDataRoot, RONGXINAI_APP_DATA_DIR);
+  return path.join(appDataRoot, ZHIYUAN_APP_DATA_DIR);
 }
 
 function resolveLogPath(appDataDir) {
@@ -217,20 +219,24 @@ function readManifest(manifestPath) {
 }
 
 function buildInstallPlan(input = {}) {
-  const resourcesDir = path.resolve(input.resourcesDir || resolveDefaultResourcesDir(input.scriptDir, input.cwd));
+  const resourcesDir = path.resolve(
+    input.resourcesDir || resolveDefaultResourcesDir(input.scriptDir, input.cwd),
+  );
   const manifestPath = path.resolve(input.manifestPath || path.join(resourcesDir, MANIFEST_FILE));
   const manifest = input.manifest || readManifest(manifestPath);
   const platform = normalizePlatform(input.platform || process.platform);
   const arch = input.arch || process.arch;
-  const hasNvidiaGpu = typeof input.hasNvidiaGpu === 'boolean'
-    ? input.hasNvidiaGpu
-    : detectNvidiaGpu({ platform, arch });
+  const hasNvidiaGpu =
+    typeof input.hasNvidiaGpu === 'boolean'
+      ? input.hasNvidiaGpu
+      : detectNvidiaGpu({ platform, arch });
   const selection = selectRecommendedBackend(manifest, { platform, arch, hasNvidiaGpu });
 
   if (!selection.entry) {
-    const exitCode = selection.reason === SelectionReason.UnsupportedRuntime
-      ? ExitCode.UnsupportedRuntime
-      : ExitCode.NoCompatibleBackend;
+    const exitCode =
+      selection.reason === SelectionReason.UnsupportedRuntime
+        ? ExitCode.UnsupportedRuntime
+        : ExitCode.NoCompatibleBackend;
     return {
       success: false,
       exitCode,
@@ -280,7 +286,10 @@ function buildInstallPlan(input = {}) {
 function selectRecommendedBackend(manifest, runtime) {
   const platform = normalizePlatform(runtime.platform);
   const arch = runtime.arch;
-  if (platform !== RuntimePlatform.Windows || ![RuntimeArch.X64, RuntimeArch.Arm64].includes(arch)) {
+  if (
+    platform !== RuntimePlatform.Windows ||
+    ![RuntimeArch.X64, RuntimeArch.Arm64].includes(arch)
+  ) {
     return {
       entry: null,
       reason: SelectionReason.UnsupportedRuntime,
@@ -288,8 +297,8 @@ function selectRecommendedBackend(manifest, runtime) {
     };
   }
 
-  const compatible = manifest.backends.filter(entry =>
-    normalizePlatform(entry.platform) === RuntimePlatform.Windows && entry.arch === arch
+  const compatible = manifest.backends.filter(
+    entry => normalizePlatform(entry.platform) === RuntimePlatform.Windows && entry.arch === arch,
   );
   if (compatible.length === 0) {
     return {
@@ -301,7 +310,10 @@ function selectRecommendedBackend(manifest, runtime) {
 
   if (arch === RuntimeArch.Arm64) {
     return {
-      entry: findPreferredBackend(compatible, { backend: BackendId.WinArm64, accelerator: BackendAccelerator.Cpu }),
+      entry: findPreferredBackend(compatible, {
+        backend: BackendId.WinArm64,
+        accelerator: BackendAccelerator.Cpu,
+      }),
       reason: SelectionReason.WindowsArm64Cpu,
     };
   }
@@ -317,24 +329,31 @@ function selectRecommendedBackend(manifest, runtime) {
   }
 
   return {
-    entry: findPreferredBackend(compatible, { backend: BackendId.WinX64, accelerator: BackendAccelerator.Cpu }),
+    entry: findPreferredBackend(compatible, {
+      backend: BackendId.WinX64,
+      accelerator: BackendAccelerator.Cpu,
+    }),
     reason: SelectionReason.WindowsX64Cpu,
   };
 }
 
 function findPreferredBackend(entries, preference) {
-  return entries.find(entry => entry.backend === preference.backend)
-    || entries.find(entry => entry.accelerator === preference.accelerator)
-    || entries[0]
-    || null;
+  return (
+    entries.find(entry => entry.backend === preference.backend) ||
+    entries.find(entry => entry.accelerator === preference.accelerator) ||
+    entries[0] ||
+    null
+  );
 }
 
 function findPreferredCudaBackend(entries) {
   const cudaEntries = entries.filter(entry => entry.accelerator === BackendAccelerator.Cuda);
-  return cudaEntries.find(entry => String(entry.cudaMajor || '') === PREFERRED_CUDA_MAJOR)
-    || cudaEntries.find(entry => entry.backend.includes(`cuda-${PREFERRED_CUDA_MAJOR}`))
-    || cudaEntries[0]
-    || null;
+  return (
+    cudaEntries.find(entry => String(entry.cudaMajor || '') === PREFERRED_CUDA_MAJOR) ||
+    cudaEntries.find(entry => entry.backend.includes(`cuda-${PREFERRED_CUDA_MAJOR}`)) ||
+    cudaEntries[0] ||
+    null
+  );
 }
 
 function resolveArchivePlan(entry, manifest, resourcesDir) {
@@ -368,7 +387,8 @@ function resolveReleaseAssetUrl(manifest, assetName) {
 }
 
 function detectNvidiaGpu(runtime) {
-  if (runtime.platform !== RuntimePlatform.Windows || runtime.arch !== RuntimeArch.X64) return false;
+  if (runtime.platform !== RuntimePlatform.Windows || runtime.arch !== RuntimeArch.X64)
+    return false;
   const result = spawnSync('nvidia-smi', ['-L'], {
     encoding: 'utf8',
     timeout: 5000,
@@ -408,7 +428,10 @@ function writePlanLog(plan, logPath, mode = 'dry-run') {
   appendLog(logPath, `current link: ${plan.currentPath}`);
   appendLog(logPath, `archive source: ${plan.archive?.source || 'none'}`);
   if (mode === 'dry-run') {
-    appendLog(logPath, 'dry-run complete; no download, extraction, or junction changes were executed');
+    appendLog(
+      logPath,
+      'dry-run complete; no download, extraction, or junction changes were executed',
+    );
   }
 }
 
@@ -480,10 +503,15 @@ async function installBackendFromPlan(plan, options = {}) {
         throw new Error(`Backend archive does not contain ${executableName}.`);
       }
 
-      copyDirectoryContents(path.dirname(extractedExecutable), getManagedBackendBinDir(stagedBackendDir));
+      copyDirectoryContents(
+        path.dirname(extractedExecutable),
+        getManagedBackendBinDir(stagedBackendDir),
+      );
       const stagedExecutable = getManagedBackendExecutablePath(stagedBackendDir, plan.platform);
       if (!fs.existsSync(stagedExecutable)) {
-        throw new Error(`Staged backend is missing ${path.join(RuntimePathName.Build, RuntimePathName.Bin, executableName)}.`);
+        throw new Error(
+          `Staged backend is missing ${path.join(RuntimePathName.Build, RuntimePathName.Bin, executableName)}.`,
+        );
       }
 
       writeRuntimeBuildInfo(stagedBackendDir, {
@@ -540,7 +568,10 @@ async function installBackendFromPlan(plan, options = {}) {
 
 async function prepareArchiveForInstall(plan, logPath) {
   if (!plan.archive?.assetName) {
-    throw createInstallError(ExitCode.ArchiveInstallFailed, 'Selected backend does not declare an archive.');
+    throw createInstallError(
+      ExitCode.ArchiveInstallFailed,
+      'Selected backend does not declare an archive.',
+    );
   }
   if (plan.archive.source === ArchiveSource.Local && plan.archive.path) {
     return {
@@ -596,9 +627,13 @@ async function downloadRemoteArchive(plan, logPath) {
   let retryAbortError = null;
   downloader.on('retry', (_attempt, _retryOptions, error) => {
     retryEvents += 1;
-    appendLog(logPath, `download retry scheduled: ${Math.min(retryEvents, DownloadConfig.TotalRetryEvents)}/${DownloadConfig.TotalRetryEvents}`);
+    appendLog(
+      logPath,
+      `download retry scheduled: ${Math.min(retryEvents, DownloadConfig.TotalRetryEvents)}/${DownloadConfig.TotalRetryEvents}`,
+    );
     if (retryEvents >= DownloadConfig.TotalRetryEvents && !retryAbortError) {
-      const message = error instanceof Error ? error.message : String(error || 'retry limit exceeded');
+      const message =
+        error instanceof Error ? error.message : String(error || 'retry limit exceeded');
       retryAbortError = createInstallError(
         ExitCode.DownloadFailed,
         `Download failed after automatic retries. ${NETWORK_FAILURE_HINT} ${message}`,
@@ -673,7 +708,9 @@ function getManagedBackendExecutablePath(backendDir, platform) {
 }
 
 function resolveLlamaServerExecutableName(platform) {
-  return normalizePlatform(platform) === RuntimePlatform.Windows ? LLAMA_SERVER_EXE : LLAMA_SERVER_POSIX;
+  return normalizePlatform(platform) === RuntimePlatform.Windows
+    ? LLAMA_SERVER_EXE
+    : LLAMA_SERVER_POSIX;
 }
 
 function findExecutablePath(rootDir, executableName) {
@@ -729,7 +766,10 @@ function ensureWindowsRuntimeLocalSigning(input) {
   try {
     const signableFiles = findWindowsRuntimeSignableFiles(input.binDir);
     if (signableFiles.length === 0) {
-      appendLog(input.logPath, 'local signing skipped because no Windows executable files were staged');
+      appendLog(
+        input.logPath,
+        'local signing skipped because no Windows executable files were staged',
+      );
       return { success: true, checkedCount: 0, signedCount: 0 };
     }
 
@@ -750,7 +790,10 @@ function ensureWindowsRuntimeLocalSigning(input) {
       return { success: true, checkedCount: signableFiles.length, signedCount: 0 };
     }
 
-    appendLog(input.logPath, `local signing confirmation required for ${unsignedFiles.length} unsigned Windows runtime files`);
+    appendLog(
+      input.logPath,
+      `local signing confirmation required for ${unsignedFiles.length} unsigned Windows runtime files`,
+    );
     if (!input.confirmed) {
       return failedInstallResult(
         ExitCode.LocalSigningConfirmationRequired,
@@ -832,9 +875,14 @@ function ensureWindowsLocalCodeSigningCertificate(logPath) {
     '}',
     'Write-Output $cert.Thumbprint',
   ].join('; ');
-  const thumbprint = readLastNonEmptyLine(runPowerShellScript(script, [LOCAL_SIGNING_CERT_SUBJECT], { timeoutMs: 60000 }));
+  const thumbprint = readLastNonEmptyLine(
+    runPowerShellScript(script, [LOCAL_SIGNING_CERT_SUBJECT], { timeoutMs: 60000 }),
+  );
   if (!thumbprint) {
-    throw createInstallError(ExitCode.LocalSigningFailed, 'Local code signing certificate was not created.');
+    throw createInstallError(
+      ExitCode.LocalSigningFailed,
+      'Local code signing certificate was not created.',
+    );
   }
   appendLog(logPath, `local signing certificate ready: ${thumbprint}`);
   return thumbprint;
@@ -851,23 +899,29 @@ function signWindowsRuntimeFile(filePath, thumbprint) {
     '$updated = Get-AuthenticodeSignature -FilePath $filePath',
     'Write-Output $updated.Status',
   ].join('; ');
-  return readLastNonEmptyLine(runPowerShellScript(script, [thumbprint, filePath], { timeoutMs: 60000 }));
+  return readLastNonEmptyLine(
+    runPowerShellScript(script, [thumbprint, filePath], { timeoutMs: 60000 }),
+  );
 }
 
 function runPowerShellScript(script, args = [], options = {}) {
-  const result = spawnSync(PowerShellCommand.Executable, [
-    PowerShellCommand.NoProfile,
-    PowerShellCommand.NonInteractive,
-    PowerShellCommand.ExecutionPolicy,
-    PowerShellCommand.Bypass,
-    PowerShellCommand.Command,
-    script,
-    ...args,
-  ], {
-    encoding: 'utf8',
-    timeout: options.timeoutMs || 60000,
-    windowsHide: true,
-  });
+  const result = spawnSync(
+    PowerShellCommand.Executable,
+    [
+      PowerShellCommand.NoProfile,
+      PowerShellCommand.NonInteractive,
+      PowerShellCommand.ExecutionPolicy,
+      PowerShellCommand.Bypass,
+      PowerShellCommand.Command,
+      script,
+      ...args,
+    ],
+    {
+      encoding: 'utf8',
+      timeout: options.timeoutMs || 60000,
+      windowsHide: true,
+    },
+  );
   const stdout = String(result.stdout || '').trim();
   const stderr = String(result.stderr || '').trim();
   if (result.error) {

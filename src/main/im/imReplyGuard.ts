@@ -1,7 +1,8 @@
 import type { CoworkMessage } from '../coworkStore';
 
 export const DEFAULT_IM_EMPTY_REPLY = '处理完成，但没有生成回复。';
-export const UNSCHEDULED_REMINDER_FAILURE_REPLY = '这次没有真正创建定时任务，所以不会自动提醒。请重试。';
+export const UNSCHEDULED_REMINDER_FAILURE_REPLY =
+  '这次没有真正创建定时任务，所以不会自动提醒。请重试。';
 export const FAILED_REMINDER_FAILURE_REPLY = '定时任务创建失败，所以不会自动提醒。请重试。';
 
 const REFERENCE_UNSCHEDULED_REMINDER_NOTE =
@@ -49,11 +50,7 @@ const isCronAddToolUseMessage = (message: CoworkMessage): boolean => {
 };
 
 const extractToolResultError = (message: CoworkMessage): string | null => {
-  const candidates = [
-    message.metadata?.error,
-    message.metadata?.toolResult,
-    message.content,
-  ];
+  const candidates = [message.metadata?.error, message.metadata?.toolResult, message.content];
   for (const candidate of candidates) {
     if (typeof candidate !== 'string') continue;
     const normalized = normalizeReplyText(candidate);
@@ -80,8 +77,8 @@ export function hasUnbackedReminderCommitment(text: string): boolean {
   if (normalized.includes(REFERENCE_UNSCHEDULED_REMINDER_NOTE.toLowerCase())) return false;
   if (normalized.includes(UNSCHEDULED_REMINDER_FAILURE_REPLY.toLowerCase())) return false;
   if (normalized.includes(FAILED_REMINDER_FAILURE_REPLY.toLowerCase())) return false;
-  if (REMINDER_NEGATION_PATTERNS.some((pattern) => pattern.test(text))) return false;
-  return REMINDER_COMMITMENT_PATTERNS.some((pattern) => pattern.test(text));
+  if (REMINDER_NEGATION_PATTERNS.some(pattern => pattern.test(text))) return false;
+  return REMINDER_COMMITMENT_PATTERNS.some(pattern => pattern.test(text));
 }
 
 export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
@@ -102,7 +99,8 @@ export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
 
     if (isCronAddToolUseMessage(message)) {
       attemptedCronAdds += 1;
-      const toolUseId = typeof message.metadata?.toolUseId === 'string' ? message.metadata.toolUseId : '';
+      const toolUseId =
+        typeof message.metadata?.toolUseId === 'string' ? message.metadata.toolUseId : '';
       if (toolUseId) {
         cronAddToolUseIds.add(toolUseId);
       }
@@ -111,7 +109,8 @@ export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
 
     if (message.type !== 'tool_result') continue;
 
-    const toolUseId = typeof message.metadata?.toolUseId === 'string' ? message.metadata.toolUseId : '';
+    const toolUseId =
+      typeof message.metadata?.toolUseId === 'string' ? message.metadata.toolUseId : '';
     if (!toolUseId || !cronAddToolUseIds.has(toolUseId)) continue;
 
     if (message.metadata?.isError) {

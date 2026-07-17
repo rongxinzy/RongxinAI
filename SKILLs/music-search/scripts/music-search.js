@@ -17,7 +17,7 @@ const deepExtract = require('./shared/deep-extract');
 // [1] Configuration
 // =============================================
 
-const CACHE_DIR = path.join(os.tmpdir(), 'lobsterai-music-cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'zhiyuan-music-cache');
 
 const DEFAULT_CONFIG = {
   preferredPan: ['quark', 'aliyun', 'baidu', 'uc'],
@@ -37,7 +37,10 @@ function loadConfig() {
 
   const envPan = process.env.MUSIC_SEARCH_PREFERRED_PAN;
   if (envPan) {
-    cfg.preferredPan = envPan.split(',').map(s => s.trim()).filter(Boolean);
+    cfg.preferredPan = envPan
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
   }
 
   const envLimit = parseInt(process.env.MUSIC_SEARCH_DEFAULT_LIMIT, 10);
@@ -126,9 +129,8 @@ function deduplicateResults(results) {
   const seen = new Set();
   const unique = [];
   for (const r of results) {
-    const isPanUrl = r.url && Object.values(PAN_URL_PATTERNS).some(
-      p => new RegExp(p.source).test(r.url)
-    );
+    const isPanUrl =
+      r.url && Object.values(PAN_URL_PATTERNS).some(p => new RegExp(p.source).test(r.url));
     const key = isPanUrl ? r.url : `${r.title}|${r.pan}|${r.url}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -166,7 +168,11 @@ function getCache(key) {
     const file = path.join(CACHE_DIR, key + '.json');
     const stat = fs.statSync(file);
     if (Date.now() - stat.mtimeMs > config.cacheTTL) {
-      try { fs.unlinkSync(file); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        /* ignore */
+      }
       return null;
     }
     return JSON.parse(fs.readFileSync(file, 'utf-8'));
@@ -179,11 +185,7 @@ function setCache(key, data) {
   if (!config.cacheEnabled) return;
   try {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(
-      path.join(CACHE_DIR, key + '.json'),
-      JSON.stringify(data),
-      'utf-8'
-    );
+    fs.writeFileSync(path.join(CACHE_DIR, key + '.json'), JSON.stringify(data), 'utf-8');
   } catch {
     // Cache write failure is non-critical
   }
@@ -229,13 +231,12 @@ function buildSearchQueries(keyword, panTypes) {
  * Resolve the web-search script path.
  */
 function getWebSearchScriptPath() {
-  const skillsRoot = process.env.SKILLS_ROOT
-    || process.env.LOBSTERAI_SKILLS_ROOT
-    || path.resolve(__dirname, '..', '..');
+  const skillsRoot =
+    process.env.SKILLS_ROOT ||
+    process.env.ZHIYUAN_SKILLS_ROOT ||
+    path.resolve(__dirname, '..', '..');
 
-  const candidates = [
-    path.join(skillsRoot, 'web-search', 'scripts', 'search.sh'),
-  ];
+  const candidates = [path.join(skillsRoot, 'web-search', 'scripts', 'search.sh')];
 
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
@@ -253,7 +254,10 @@ async function callWebSearch(query, maxResults) {
     throw new Error('web-search skill 未找到，请确保 web-search 已启用');
   }
 
-  const tmpFile = path.join(os.tmpdir(), `music-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
+  const tmpFile = path.join(
+    os.tmpdir(),
+    `music-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
+  );
   fs.writeFileSync(tmpFile, query, 'utf-8');
 
   const isWindows = process.platform === 'win32';
@@ -285,24 +289,28 @@ async function callWebSearch(query, maxResults) {
         throw new Error('Windows 上未找到 bash（需要 Git Bash 或 WSL）');
       }
 
-      const result = await execFileAsync(
-        bashPath,
-        [scriptPath, queryArg, String(maxResults)],
-        { timeout: config.timeout * 2, maxBuffer: 10 * 1024 * 1024, env: childEnv }
-      );
+      const result = await execFileAsync(bashPath, [scriptPath, queryArg, String(maxResults)], {
+        timeout: config.timeout * 2,
+        maxBuffer: 10 * 1024 * 1024,
+        env: childEnv,
+      });
       stdout = result.stdout;
     } else {
-      const result = await execFileAsync(
-        'bash',
-        [scriptPath, queryArg, String(maxResults)],
-        { timeout: config.timeout * 2, maxBuffer: 10 * 1024 * 1024, env: childEnv }
-      );
+      const result = await execFileAsync('bash', [scriptPath, queryArg, String(maxResults)], {
+        timeout: config.timeout * 2,
+        maxBuffer: 10 * 1024 * 1024,
+        env: childEnv,
+      });
       stdout = result.stdout;
     }
 
     return stdout || '';
   } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 }
 
@@ -449,13 +457,29 @@ function extractPageUrls(markdown) {
  * Domain blacklist: pages from these domains won't have downloadable pan links.
  */
 const DOMAIN_BLACKLIST = [
-  'bilibili.com', 'iqiyi.com', 'youku.com', 'v.qq.com',
-  'mgtv.com', 'zhihu.com', 'weibo.com', 'baike.baidu.com', 'wikipedia.org',
-  'imdb.com', 'bing.com', 'google.com', 'so.com', 'sogou.com',
+  'bilibili.com',
+  'iqiyi.com',
+  'youku.com',
+  'v.qq.com',
+  'mgtv.com',
+  'zhihu.com',
+  'weibo.com',
+  'baike.baidu.com',
+  'wikipedia.org',
+  'imdb.com',
+  'bing.com',
+  'google.com',
+  'so.com',
+  'sogou.com',
   'baidu.com/s?',
   // Music streaming platforms (no downloadable pan links)
-  'music.163.com', 'y.qq.com', 'kugou.com', 'kuwo.com',
-  'music.apple.com', 'spotify.com', 'tidal.com',
+  'music.163.com',
+  'y.qq.com',
+  'kugou.com',
+  'kuwo.com',
+  'music.apple.com',
+  'spotify.com',
+  'tidal.com',
 ];
 
 /**
@@ -582,12 +606,7 @@ async function searchViaDeepExtract(keyword, panTypes, limit) {
  * Main search orchestrator.
  */
 async function searchAll(keyword, options = {}) {
-  const {
-    pan = 'all',
-    format = 'all',
-    limit = config.defaultLimit,
-    engine = 'deep',
-  } = options;
+  const { pan = 'all', format = 'all', limit = config.defaultLimit, engine = 'deep' } = options;
 
   const panTypes = pan === 'all' ? [...config.preferredPan] : [pan];
 
@@ -654,7 +673,9 @@ async function searchAll(keyword, options = {}) {
 async function cmdSearch(args) {
   const keyword = args.positional[0];
   if (!keyword) {
-    outputError('请提供搜索关键词。用法: search <关键词> [--pan quark] [--format flac] [--limit 5]');
+    outputError(
+      '请提供搜索关键词。用法: search <关键词> [--pan quark] [--format flac] [--limit 5]',
+    );
     process.exit(1);
   }
 

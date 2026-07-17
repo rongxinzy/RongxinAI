@@ -83,18 +83,18 @@ Tailwind v4 升级（MR #513）合并后，在 UI 层暴露出 5 个回归问题
 
 **根因**：这是 v4 迁移中最隐蔽的问题——**CSS 变量层叠优先级冲突**。
 
-v3 时代 `text-muted-foreground` 指向 `--lobster-text-secondary`（深灰）。v4 迁移后存在两处同名变量定义：
+v3 时代 `text-muted-foreground` 指向 `--zy-text-secondary`（深灰）。v4 迁移后存在两处同名变量定义：
 
 ```css
 /* shadcn-token-bridge.css（v3 遗留，无层） */
 :root, [data-theme] {
-  --color-muted-foreground: var(--lobster-text-muted);  /* 浅灰 */
+  --color-muted-foreground: var(--zy-text-muted);  /* 浅灰 */
 }
 
 /* index.css @theme（v4 新增，@layer theme） */
 @layer theme {
   :root, :host {
-    --color-muted-foreground: var(--muted-foreground);  /* → --lobster-text-secondary 深灰 */
+    --color-muted-foreground: var(--muted-foreground);  /* → --zy-text-secondary 深灰 */
   }
 }
 ```
@@ -104,9 +104,9 @@ v3 时代 `text-muted-foreground` 指向 `--lobster-text-secondary`（深灰）�
 **修复**：将 bridge 文件中的变量值改为与 v3 一致：
 
 ```diff
-  --color-background: var(--lobster-background);
-- --color-muted-foreground: var(--lobster-text-muted);
-+ --color-muted-foreground: var(--lobster-text-secondary);
+  --color-background: var(--zy-background);
+- --color-muted-foreground: var(--zy-text-muted);
++ --color-muted-foreground: var(--zy-text-secondary);
 ```
 
 > 注意：bridge 文件中的 `--color-muted-foreground` 是 v3 时代为兼容 shadcn 组件保留的覆盖定义。由于无层样式始终覆盖 `@layer theme`，后续如需调整 muted-foreground 颜色，应直接修改 bridge 文件而非 @theme。
@@ -167,7 +167,7 @@ v3 时代 `text-muted-foreground` 指向 `--lobster-text-secondary`（深灰）�
 - ✅ `npm run lint` 无错误
 - ✅ `vite build` 构建成功，编译 CSS 中确认：
   - `translate: none !important` 已生成
-  - `--color-muted-foreground: var(--lobster-text-secondary)` 为最终生效值
+  - `--color-muted-foreground: var(--zy-text-secondary)` 为最终生效值
 
 ## 五、经验总结（v4 迁移排错指南）
 

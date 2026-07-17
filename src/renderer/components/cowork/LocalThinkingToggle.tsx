@@ -40,7 +40,7 @@ export function LocalThinkingToggle({
   return (
     <Tooltip>
       <TooltipTrigger
-        render={(
+        render={
           <Toggle
             aria-label={i18nService.t('chatThinkingToggle')}
             pressed={enabled ?? false}
@@ -51,7 +51,7 @@ export function LocalThinkingToggle({
             <Brain data-icon="inline-start" />
             <span>{i18nService.t('chatThinkingToggle')}</span>
           </Toggle>
-        )}
+        }
       />
       <TooltipContent>{i18nService.t('chatThinkingToggleHint')}</TooltipContent>
     </Tooltip>

@@ -3,15 +3,14 @@ export const CoworkModelProtocol = {
   GeminiNative: 'gemini_native',
 } as const;
 
-export type CoworkModelProtocol = typeof CoworkModelProtocol[keyof typeof CoworkModelProtocol];
+export type CoworkModelProtocol = (typeof CoworkModelProtocol)[keyof typeof CoworkModelProtocol];
 
 const API_ERROR_SNIPPET_MAX_CHARS = 240;
 
-const toRecord = (value: unknown): Record<string, unknown> | null => (
+const toRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
-);
+    ? (value as Record<string, unknown>)
+    : null;
 
 const collectTextFromUnknown = (value: unknown): string[] => {
   if (typeof value === 'string') {
@@ -20,7 +19,7 @@ const collectTextFromUnknown = (value: unknown): string[] => {
   }
 
   if (Array.isArray(value)) {
-    return value.flatMap((item) => collectTextFromUnknown(item));
+    return value.flatMap(item => collectTextFromUnknown(item));
   }
 
   const record = toRecord(value);
@@ -120,7 +119,7 @@ export function extractTextFromAnthropicResponse(payload: unknown): string {
   const content = record.content;
   if (Array.isArray(content)) {
     return content
-      .map((item) => {
+      .map(item => {
         const block = toRecord(item);
         return typeof block?.text === 'string' ? block.text : '';
       })

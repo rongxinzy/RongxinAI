@@ -12,13 +12,16 @@ const MAX_RECENT_STDERR_LINES = 20;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
     promise.then(
-      (value) => {
+      value => {
         clearTimeout(timer);
         resolve(value);
       },
-      (error) => {
+      error => {
         clearTimeout(timer);
         reject(error);
       },
@@ -79,7 +82,9 @@ export interface McpConnectionProbeResult {
   toolCount?: number;
 }
 
-export async function probeMcpConnection(data: McpServerFormData): Promise<McpConnectionProbeResult> {
+export async function probeMcpConnection(
+  data: McpServerFormData,
+): Promise<McpConnectionProbeResult> {
   const record = buildProbeRecord(data);
   let transport: StdioClientTransport | SSEClientTransport | StreamableHTTPClientTransport;
   const recentStderr: string[] = [];
@@ -90,7 +95,9 @@ export async function probeMcpConnection(data: McpServerFormData): Promise<McpCo
       const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
       const spawnEnv: Record<string, string> = {
         ...Object.fromEntries(
-          Object.entries(enhancedEnv).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+          Object.entries(enhancedEnv).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string',
+          ),
         ),
         ...(resolved.env || {}),
       };
@@ -111,9 +118,10 @@ export async function probeMcpConnection(data: McpServerFormData): Promise<McpCo
 
       const parsedUrl = new URL(rawUrl);
       const requestInit = buildRemoteRequestInit(record);
-      transport = record.transportType === 'sse'
-        ? new SSEClientTransport(parsedUrl, requestInit ? { requestInit } : undefined)
-        : new StreamableHTTPClientTransport(parsedUrl, requestInit ? { requestInit } : undefined);
+      transport =
+        record.transportType === 'sse'
+          ? new SSEClientTransport(parsedUrl, requestInit ? { requestInit } : undefined)
+          : new StreamableHTTPClientTransport(parsedUrl, requestInit ? { requestInit } : undefined);
     }
   } catch (error) {
     return {
@@ -123,13 +131,21 @@ export async function probeMcpConnection(data: McpServerFormData): Promise<McpCo
   }
 
   const client = new Client(
-    { name: 'rongxinai-mcp-connection-test', version: '1.0.0' },
+    { name: 'zhiyuan-mcp-connection-test', version: '1.0.0' },
     { capabilities: {} },
   );
 
   try {
-    await withTimeout(client.connect(transport), MCP_CONNECTION_TEST_TIMEOUT_MS, 'MCP stdio initialize');
-    const toolResult = await withTimeout(client.listTools(), MCP_CONNECTION_TEST_TIMEOUT_MS, 'MCP listTools');
+    await withTimeout(
+      client.connect(transport),
+      MCP_CONNECTION_TEST_TIMEOUT_MS,
+      'MCP stdio initialize',
+    );
+    const toolResult = await withTimeout(
+      client.listTools(),
+      MCP_CONNECTION_TEST_TIMEOUT_MS,
+      'MCP listTools',
+    );
     return {
       success: true,
       toolCount: Array.isArray(toolResult.tools) ? toolResult.tools.length : 0,

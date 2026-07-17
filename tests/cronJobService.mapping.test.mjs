@@ -7,7 +7,7 @@ const {
   mapGatewayJob,
   mapGatewayRun,
   mapGatewayTaskState,
-} = require('../dist-electron/main/libs/cronJobService.js');
+} = require('../dist-electron/scheduledTask/cronJobService.js');
 
 test('mapGatewayTaskState marks running jobs as running and preserves counters', () => {
   const state = mapGatewayTaskState({

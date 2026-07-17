@@ -45,7 +45,11 @@ function buildBrowserHtml(artifact: Artifact): string | null {
 }
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 interface ArtifactPanelProps {
@@ -73,44 +77,53 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
-  const constrainedMaxPanelWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, maxPanelWidth));
+  const constrainedMaxPanelWidth = Math.max(
+    MIN_PANEL_WIDTH,
+    Math.min(MAX_PANEL_WIDTH, maxPanelWidth),
+  );
   const constrainedMinPanelWidth = Math.min(
     constrainedMaxPanelWidth,
     Math.max(MIN_PANEL_WIDTH, minPanelWidth),
   );
-  const constrainedPanelWidth = Math.max(constrainedMinPanelWidth, Math.min(constrainedMaxPanelWidth, panelWidth));
+  const constrainedPanelWidth = Math.max(
+    constrainedMinPanelWidth,
+    Math.min(constrainedMaxPanelWidth, panelWidth),
+  );
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    startX.current = e.clientX;
-    startWidth.current = constrainedPanelWidth;
-    document.body.classList.add('select-none');
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      startX.current = e.clientX;
+      startWidth.current = constrainedPanelWidth;
+      document.body.classList.add('select-none');
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isResizing.current) return;
-      const nextWidth = startWidth.current + startX.current - moveEvent.clientX;
-      if (nextWidth < constrainedMinPanelWidth) {
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!isResizing.current) return;
+        const nextWidth = startWidth.current + startX.current - moveEvent.clientX;
+        if (nextWidth < constrainedMinPanelWidth) {
+          isResizing.current = false;
+          document.body.classList.remove('select-none');
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          dispatch(closePanel());
+          return;
+        }
+        dispatch(setPanelWidth(Math.min(constrainedMaxPanelWidth, nextWidth)));
+      };
+
+      const handleMouseUp = () => {
         isResizing.current = false;
         document.body.classList.remove('select-none');
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
-        dispatch(closePanel());
-        return;
-      }
-      dispatch(setPanelWidth(Math.min(constrainedMaxPanelWidth, nextWidth)));
-    };
+      };
 
-    const handleMouseUp = () => {
-      isResizing.current = false;
-      document.body.classList.remove('select-none');
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [constrainedMaxPanelWidth, constrainedMinPanelWidth, constrainedPanelWidth, dispatch]);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [constrainedMaxPanelWidth, constrainedMinPanelWidth, constrainedPanelWidth, dispatch],
+  );
 
   useEffect(() => {
     return () => {
@@ -122,8 +135,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     if (!showFileList) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        fileListRef.current && !fileListRef.current.contains(e.target as Node) &&
-        toggleBtnRef.current && !toggleBtnRef.current.contains(e.target as Node)
+        fileListRef.current &&
+        !fileListRef.current.contains(e.target as Node) &&
+        toggleBtnRef.current &&
+        !toggleBtnRef.current.contains(e.target as Node)
       ) {
         setShowFileList(false);
       }
@@ -133,10 +148,13 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   }, [showFileList]);
 
   const handleClose = useCallback(() => dispatch(closePanel()), [dispatch]);
-  const handleSelectArtifact = useCallback((id: string) => {
-    dispatch(selectArtifact(id));
-    setShowFileList(false);
-  }, [dispatch]);
+  const handleSelectArtifact = useCallback(
+    (id: string) => {
+      dispatch(selectArtifact(id));
+      setShowFileList(false);
+    },
+    [dispatch],
+  );
 
   const handleCopy = useCallback(async () => {
     if (selectedArtifact) {
@@ -191,7 +209,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     try {
       const result = await window.electron.dialog.readFileAsDataUrl(selectedArtifact.filePath);
       if (result?.success && result.dataUrl) {
-        const isTextType = selectedArtifact.type !== 'image' && selectedArtifact.type !== 'document';
+        const isTextType =
+          selectedArtifact.type !== 'image' && selectedArtifact.type !== 'document';
         let content = result.dataUrl;
         if (isTextType) {
           try {
@@ -202,10 +221,12 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             content = result.dataUrl;
           }
         }
-        dispatch(addArtifact({
-          sessionId: selectedArtifact.sessionId,
-          artifact: { ...selectedArtifact, content },
-        }));
+        dispatch(
+          addArtifact({
+            sessionId: selectedArtifact.sessionId,
+            artifact: { ...selectedArtifact, content },
+          }),
+        );
       }
     } catch {
       // File unreadable or missing
@@ -230,7 +251,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             className="absolute top-10 right-2 z-20 w-[240px] max-h-[60%] bg-background border border-border rounded-lg shadow-lg flex flex-col overflow-hidden"
           >
             <div className="h-9 flex items-center px-3 border-b border-border shrink-0">
-              <span className="text-xs font-medium text-muted-foreground">{t('artifactFileList')}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('artifactFileList')}
+              </span>
             </div>
             <FileDirectoryView
               artifacts={previewableArtifacts}
@@ -245,7 +268,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Header: file list toggle + filename + type + actions */}
             <div className="h-10 flex items-center gap-2 px-3 border-b border-border shrink-0">
-              <span className="text-sm font-medium truncate">{selectedArtifact.fileName || selectedArtifact.title}</span>
+              <span className="text-sm font-medium truncate">
+                {selectedArtifact.fileName || selectedArtifact.title}
+              </span>
               <span className="flex-1" />
               {selectedArtifact.filePath && (
                 <Button
@@ -357,7 +382,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           /* No artifact selected: show full-width file list */
           <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div className="h-10 flex items-center px-3 border-b border-border shrink-0">
-              <span className="text-xs font-medium text-muted-foreground">{t('artifactFiles')}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('artifactFiles')}
+              </span>
               <span className="flex-1" />
               <Button
                 variant="ghost"
@@ -381,13 +408,31 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 };
 
 const FolderIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M2 4.5A1.5 1.5 0 013.5 3h2.879a1.5 1.5 0 011.06.44l.622.62a1.5 1.5 0 001.06.44H12.5A1.5 1.5 0 0114 6v5.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" />
   </svg>
 );
 
 const BrowserIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="8" cy="8" r="6" />
     <ellipse cx="8" cy="8" rx="2.5" ry="6" />
     <path d="M2 8h12" />
@@ -395,7 +440,16 @@ const BrowserIcon = () => (
 );
 
 const OpenExternalIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M12 9v3.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 012 12.5v-7A1.5 1.5 0 013.5 4H7" />
     <path d="M10 2h4v4" />
     <path d="M7 9l7-7" />
@@ -403,20 +457,46 @@ const OpenExternalIcon = () => (
 );
 
 const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+  >
     <path d="M4 4l8 8M12 4l-8 8" />
   </svg>
 );
 
 const FileListIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M4.5 2.881c0-.644.522-1.167 1.167-1.167h2.552c.323 0 .635.117.878.33l.58.507c.243.213.555.33.877.33h3.351c.736 0 1.333.597 1.333 1.333v5.945c0 .49-.398.889-.889.889" />
     <path d="M1.143 6.476c0-.736.597-1.333 1.333-1.333h2.314c.323 0 .635.117.878.33l.58.507c.242.213.554.33.877.33h3.351c.736 0 1.333.597 1.333 1.334v4.833c0 .736-.597 1.333-1.333 1.333H2.476c-.736 0-1.333-.597-1.333-1.333V6.476z" />
   </svg>
 );
 
 const RefreshIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M13.5 8a5.5 5.5 0 01-9.55 3.75" />
     <path d="M2.5 8a5.5 5.5 0 019.55-3.75" />
     <path d="M12.05 1.25v3h-3" />

@@ -48,7 +48,9 @@ describe('llamacpp runtime download script', () => {
     expect(resolveRuntimeDownloadSource('win-x64-cuda-12', { rootDir, env: {} })).toBe(
       'https://rongxinai.krli.org/llamacpp/b9244/llama-b9244-bin-win-cuda-12.4-x64.zip',
     );
-    expect(resolveRuntimeCompanionDownloadSources('win-x64-cuda-12', { rootDir, env: {} })).toEqual([]);
+    expect(resolveRuntimeCompanionDownloadSources('win-x64-cuda-12', { rootDir, env: {} })).toEqual(
+      [],
+    );
   });
 
   test('supports zip and tar.gz runtime archives', () => {
@@ -59,15 +61,15 @@ describe('llamacpp runtime download script', () => {
   test('maps the official asset names per target', () => {
     const rootDir = process.cwd();
 
-    expect(resolveRuntimeReleaseTag(rootDir, { LLAMACPP_RUNTIME_RELEASE_TAG: 'b9243' })).toBe('b9243');
+    expect(resolveRuntimeReleaseTag(rootDir, { LLAMACPP_RUNTIME_RELEASE_TAG: 'b9243' })).toBe(
+      'b9243',
+    );
     expect(
       resolveRuntimeDownloadSource('linux-arm64', {
         rootDir,
         env: { LLAMACPP_RUNTIME_RELEASE_TAG: 'b9243' },
       }),
-    ).toBe(
-      'https://rongxinai.krli.org/llamacpp/b9243/llama-b9243-bin-ubuntu-arm64.tar.gz',
-    );
+    ).toBe('https://rongxinai.krli.org/llamacpp/b9243/llama-b9243-bin-ubuntu-arm64.tar.gz');
   });
 
   test('allows explicit mirrors to substitute both target and asset placeholders', () => {
@@ -84,7 +86,8 @@ describe('llamacpp runtime download script', () => {
 
   test('formats GitHub 404 failures with actionable guidance', () => {
     const rootDir = process.cwd();
-    const url = 'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip';
+    const url =
+      'https://github.com/ggml-org/llama.cpp/releases/download/b9244/llama-b9244-bin-win-cpu-x64.zip';
 
     const message = formatDownloadFailureMessage(404, 'Not Found', url, 'win-x64', rootDir);
 

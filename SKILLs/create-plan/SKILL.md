@@ -30,9 +30,9 @@ Throughout the entire workflow, operate in read-only mode. Do not write or updat
    - Start with **1 short paragraph** describing the intent and approach.
    - Clearly call out what is **in scope** and what is **not in scope** in short.
    - Then provide a **small checklist** of action items (default 6–10 items).
-      - Each checklist item should be a concrete action and, when helpful, mention files/commands.
-      - **Make items atomic and ordered**: discovery → changes → tests → rollout.
-      - **Verb-first**: “Add…”, “Refactor…”, “Verify…”, “Ship…”.
+     - Each checklist item should be a concrete action and, when helpful, mention files/commands.
+     - **Make items atomic and ordered**: discovery → changes → tests → rollout.
+     - **Verb-first**: “Add…”, “Refactor…”, “Verify…”, “Ship…”.
    - Include at least one item for **tests/validation** and one for **edge cases/risk** when applicable.
    - If there are unknowns, include a tiny **Open questions** section (max 3).
 
@@ -46,10 +46,12 @@ Throughout the entire workflow, operate in read-only mode. Do not write or updat
 <1–3 sentences: what we’re doing, why, and the high-level approach.>
 
 ## Scope
+
 - In:
 - Out:
 
 ## Action items
+
 [ ] <Step 1>
 [ ] <Step 2>
 [ ] <Step 3>
@@ -58,18 +60,22 @@ Throughout the entire workflow, operate in read-only mode. Do not write or updat
 [ ] <Step 6>
 
 ## Open questions
+
 - <Question 1>
 - <Question 2>
 - <Question 3>
 ```
 
 ## Checklist item guidance
+
 Good checklist items:
+
 - Point to likely files/modules: src/..., app/..., services/...
 - Name concrete validation: “Run npm test”, “Add unit tests for X”
 - Include safe rollout when relevant: feature flag, migration plan, rollback note
 
 Avoid:
+
 - Vague steps (“handle backend”, “do auth”)
 - Too many micro-steps
 - Writing code snippets (keep the plan implementation-agnostic)

@@ -1,10 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-  getCustomProviderDefaultName,
-  getProviderDisplayName,
-  isCustomProvider,
-} from './config';
+import { getCustomProviderDefaultName, getProviderDisplayName, isCustomProvider } from './config';
 
 test('isCustomProvider: custom_0 is custom', () => {
   expect(isCustomProvider('custom_0')).toBe(true);
@@ -69,4 +65,3 @@ test('getProviderDisplayName: custom provider with displayName uses it', () => {
 test('getProviderDisplayName: custom provider with undefined displayName uses default', () => {
   expect(getProviderDisplayName('custom_2', { displayName: undefined })).toBe('Custom2');
 });
-

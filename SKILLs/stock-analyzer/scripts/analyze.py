@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterAI Stock Deep Analyzer
+ZhiYuanAgent Stock Deep Analyzer
 Comprehensive multi-dimensional stock analysis using Yahoo Finance data.
 Produces value, technical, growth, and financial health scores.
 
@@ -309,7 +309,7 @@ def render_report(ticker_symbol: str, period: str):
 # ---------------------------------------------------------------------------
 
 def main():
-    ap = argparse.ArgumentParser(description="LobsterAI Stock Deep Analyzer")
+    ap = argparse.ArgumentParser(description="ZhiYuanAgent Stock Deep Analyzer")
     ap.add_argument("ticker", help="股票代码 (如 601288.SS, AAPL)")
     ap.add_argument("--period", default="6mo", help="分析周期 (1mo/3mo/6mo/1y/2y)")
     ap.add_argument("--output", default="text", choices=["text", "json"])

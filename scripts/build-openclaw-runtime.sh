@@ -78,7 +78,7 @@ node -e 'const [a,b,c]=process.versions.node.split(".").map(Number);const ok=a>2
 # ---------------------------------------------------------------------------
 # Build cache: skip if the runtime was already built for the pinned version.
 # On Windows (Git Bash / MSYS2), paths like $ELECTRON_ROOT are Unix-style
-# (e.g. /d/github/LobsterAI) which Node.js cannot resolve via require().
+# (e.g. /d/github/ZhiYuanAgent) which Node.js cannot resolve via require().
 # Use "node -" with process.argv so MSYS2 auto-converts the paths.
 # ---------------------------------------------------------------------------
 DESIRED_VERSION=""
@@ -134,7 +134,7 @@ pnpm install --frozen-lockfile
 pnpm build
 pnpm ui:build
 # Skip release:check — it validates the openclaw npm package for publishing and
-# is not relevant for LobsterAI embedded runtime builds.  On Windows it also
+# is not relevant for ZhiYuanAgent embedded runtime builds.  On Windows it also
 # fails due to spawnSync/execFileSync not finding npm without shell:true, and
 # npm pack producing truncated tarballs.
 echo "[openclaw-runtime] Skipping release:check (not needed for embedded builds)"
@@ -208,7 +208,7 @@ rm -rf node_modules package-lock.json
 # Avoid npm peer resolution conflicts caused by dev-only lint toolchain.
 npm pkg delete devDependencies >/dev/null 2>&1 || true
 
-# RongxinAI: remove channel plugins that pull unreachable git dependencies
+# ZhiYuanAgent: remove channel plugins that pull unreachable git dependencies
 node -e "
 	const fs=require('fs'),path=require('path');
 	const f='package.json';
@@ -218,10 +218,10 @@ node -e "
 	if(p[key])['@openclaw/whatsapp','@whiskeysockets/baileys'].forEach(d=>{
 	if(p[key][d]){delete p[key][d];removed.push(key+':'+d);}});
 	});
-	if(removed.length)console.log('[RongxinAI] Removed: '+removed.join(', '));
-	else console.log('[RongxinAI] WARNING: @whiskeysockets/baileys not found in package.json');
+	if(removed.length)console.log('[ZhiYuanAgent] Removed: '+removed.join(', '));
+	else console.log('[ZhiYuanAgent] WARNING: @whiskeysockets/baileys not found in package.json');
 	fs.writeFileSync(f,JSON.stringify(p,null,2)+'\n');
-	" || echo "[RongxinAI] ERROR: failed to strip deps"
+	" || echo "[ZhiYuanAgent] ERROR: failed to strip deps"
 
 echo "[openclaw-runtime] npm target platform=$NPM_TARGET_PLATFORM arch=$NPM_TARGET_ARCH"
 NPM_CONFIG_LEGACY_PEER_DEPS=true \

@@ -96,7 +96,7 @@ function collectScannableFiles(rootDir: string): ScannableFile[] {
 
     for (const entry of entries) {
       if (files.length >= MAX_FILES) break;
-      if (!entry.name || entry.name.startsWith('.') && SKIP_DIRS.has(entry.name)) continue;
+      if (!entry.name || (entry.name.startsWith('.') && SKIP_DIRS.has(entry.name))) continue;
       if (SKIP_DIRS.has(entry.name)) continue;
 
       const fullPath = path.join(current, entry.name);
@@ -227,7 +227,7 @@ async function loadJsxray(): Promise<any> {
 
 async function scanFileWithJsxray(
   file: ScannableFile,
-  content: string
+  content: string,
 ): Promise<SecurityFinding[]> {
   const findings: SecurityFinding[] = [];
   const mod = await loadJsxray();
@@ -242,9 +242,8 @@ async function scanFileWithJsxray(
         const mapping = JSXRAY_WARNING_MAP[warning.kind];
         if (!mapping) continue;
 
-        const line = warning.location?.[0]?.start?.line
-          ?? warning.location?.start?.line
-          ?? undefined;
+        const line =
+          warning.location?.[0]?.start?.line ?? warning.location?.start?.line ?? undefined;
 
         findings.push({
           dimension: mapping.dimension,
@@ -264,7 +263,10 @@ async function scanFileWithJsxray(
       severity: 'info',
       ruleId: 'jsxray.parse_error',
       file: file.relativePath,
-      matchedPattern: `Parse error: ${err instanceof Error ? err.message : 'unknown'}`.substring(0, 200),
+      matchedPattern: `Parse error: ${err instanceof Error ? err.message : 'unknown'}`.substring(
+        0,
+        200,
+      ),
       description: 'securityFindingParseError',
     });
   }
@@ -275,9 +277,11 @@ async function scanFileWithJsxray(
 // ── Build dimension summary ──────────────────────────────────────────────────
 
 function buildDimensionSummary(
-  findings: SecurityFinding[]
+  findings: SecurityFinding[],
 ): Partial<Record<SecurityDimension, { count: number; maxSeverity: FindingSeverity }>> {
-  const summary: Partial<Record<SecurityDimension, { count: number; maxSeverity: FindingSeverity }>> = {};
+  const summary: Partial<
+    Record<SecurityDimension, { count: number; maxSeverity: FindingSeverity }>
+  > = {};
   const severityOrder: FindingSeverity[] = ['info', 'warning', 'danger', 'critical'];
 
   for (const f of findings) {
@@ -400,9 +404,7 @@ export async function scanSkillSecurity(skillDir: string): Promise<SkillSecurity
  * Scan multiple skill directories and merge results.
  * Used when a download source contains multiple skills.
  */
-export async function scanMultipleSkillDirs(
-  skillDirs: string[]
-): Promise<SkillSecurityReport[]> {
+export async function scanMultipleSkillDirs(skillDirs: string[]): Promise<SkillSecurityReport[]> {
   const reports: SkillSecurityReport[] = [];
   for (const dir of skillDirs) {
     reports.push(await scanSkillSecurity(dir));

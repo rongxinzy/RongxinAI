@@ -8,10 +8,7 @@ import { cpRecursiveSync } from '../fsCompat';
 const PYTHON_RUNTIME_DIR_NAME = 'python-win';
 const PYTHON_RUNTIME_STATE_FILE = 'runtime.json';
 
-const REQUIRED_FILES = [
-  'python.exe',
-  'python3.exe',
-];
+const REQUIRED_FILES = ['python.exe', 'python3.exe'];
 const PIP_EXECUTABLE_CANDIDATES = [
   path.join('Scripts', 'pip.exe'),
   path.join('Scripts', 'pip3.exe'),
@@ -24,22 +21,19 @@ const PIP_MODULE_MAIN_REL_PATH = path.join('Lib', 'site-packages', 'pip', '__mai
 const PIP_MODULE_INIT_REL_PATH = path.join('Lib', 'site-packages', 'pip', '__init__.py');
 
 function hasPipExecutable(rootDir: string): boolean {
-  return PIP_EXECUTABLE_CANDIDATES.some((relPath) => fs.existsSync(path.join(rootDir, relPath)));
+  return PIP_EXECUTABLE_CANDIDATES.some(relPath => fs.existsSync(path.join(rootDir, relPath)));
 }
 
 function hasPipSupport(rootDir: string): boolean {
   const hasCommand = hasPipExecutable(rootDir);
   const hasModuleShim =
-    fs.existsSync(path.join(rootDir, PIP_MODULE_MAIN_REL_PATH))
-    || fs.existsSync(path.join(rootDir, PIP_MODULE_INIT_REL_PATH));
+    fs.existsSync(path.join(rootDir, PIP_MODULE_MAIN_REL_PATH)) ||
+    fs.existsSync(path.join(rootDir, PIP_MODULE_INIT_REL_PATH));
   return hasCommand && hasModuleShim;
 }
 
 function findPythonExecutable(rootDir: string): string | null {
-  const candidates = [
-    path.join(rootDir, 'python.exe'),
-    path.join(rootDir, 'python3.exe'),
-  ];
+  const candidates = [path.join(rootDir, 'python.exe'), path.join(rootDir, 'python3.exe')];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       return candidate;
@@ -50,7 +44,7 @@ function findPythonExecutable(rootDir: string): string | null {
 
 function readEmbedPthFiles(rootDir: string): string[] {
   try {
-    return fs.readdirSync(rootDir).filter((name) => name.endsWith('._pth'));
+    return fs.readdirSync(rootDir).filter(name => name.endsWith('._pth'));
   } catch {
     return [];
   }
@@ -76,7 +70,10 @@ function ensureEmbedSitePackages(rootDir: string): void {
       hasImportSite = true;
       continue;
     }
-    if (trimmed.toLowerCase() === 'lib\\site-packages' || trimmed.toLowerCase() === 'lib/site-packages') {
+    if (
+      trimmed.toLowerCase() === 'lib\\site-packages' ||
+      trimmed.toLowerCase() === 'lib/site-packages'
+    ) {
       updated.push('Lib\\site-packages');
       hasSitePackages = true;
       continue;
@@ -119,7 +116,7 @@ function appendWindowsPath(current: string | undefined, entries: string[]): stri
 
 function runtimeHealth(
   rootDir: string,
-  options: { requireEmbedSiteConfig?: boolean; requirePip?: boolean } = {}
+  options: { requireEmbedSiteConfig?: boolean; requirePip?: boolean } = {},
 ): { ok: boolean; missing: string[] } {
   const requireEmbedSiteConfig = options.requireEmbedSiteConfig !== false;
   const requirePip = options.requirePip === true;
@@ -138,8 +135,8 @@ function runtimeHealth(
       missing.push('Scripts/pip.exe (or Scripts/pip3.exe/pip.cmd)');
     }
     if (
-      !fs.existsSync(path.join(rootDir, PIP_MODULE_MAIN_REL_PATH))
-      && !fs.existsSync(path.join(rootDir, PIP_MODULE_INIT_REL_PATH))
+      !fs.existsSync(path.join(rootDir, PIP_MODULE_MAIN_REL_PATH)) &&
+      !fs.existsSync(path.join(rootDir, PIP_MODULE_INIT_REL_PATH))
     ) {
       missing.push(PIP_MODULE_MAIN_REL_PATH.replace(/\\/g, '/'));
     }
@@ -151,9 +148,10 @@ function runtimeHealth(
       const pthPath = path.join(rootDir, pthFiles[0]);
       try {
         const raw = fs.readFileSync(pthPath, 'utf8');
-        const lines = raw.split(/\r?\n/).map((line) => line.trim().toLowerCase());
+        const lines = raw.split(/\r?\n/).map(line => line.trim().toLowerCase());
         const hasImportSite = lines.includes('import site');
-        const hasSitePackages = lines.includes('lib\\site-packages') || lines.includes('lib/site-packages');
+        const hasSitePackages =
+          lines.includes('lib\\site-packages') || lines.includes('lib/site-packages');
         if (!hasImportSite || !hasSitePackages) {
           missing.push(`${pthFiles[0]} config (require "Lib\\site-packages" and "import site")`);
         }
@@ -223,7 +221,9 @@ export function getUserPythonRoot(): string {
   return path.join(app.getPath('userData'), 'runtimes', PYTHON_RUNTIME_DIR_NAME);
 }
 
-export function appendPythonRuntimeToEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {
+export function appendPythonRuntimeToEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
   if (process.platform !== 'win32') {
     return env;
   }
@@ -239,7 +239,7 @@ export function appendPythonRuntimeToEnv(env: Record<string, string | undefined>
 
   if (pathEntries.length > 0) {
     env.PATH = appendWindowsPath(env.PATH, pathEntries);
-    env.LOBSTERAI_PYTHON_ROOT = pathEntries[0];
+    env.ZHIYUAN_PYTHON_ROOT = pathEntries[0];
   }
 
   return env;
@@ -263,7 +263,9 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
     if (userHealth.ok) {
       ensureRuntimeStateFile(userRoot, 'existing-user-runtime');
       if (!hasPipSupport(userRoot)) {
-        console.warn('[python-runtime] User runtime is ready without full pip support; pip commands may fail.');
+        console.warn(
+          '[python-runtime] User runtime is ready without full pip support; pip commands may fail.',
+        );
       }
       console.log('[python-runtime] User runtime already healthy');
       return { success: true };
@@ -300,7 +302,9 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
 
     ensureRuntimeStateFile(userRoot, bundledRoot);
     if (!hasPipSupport(userRoot)) {
-      console.warn('[python-runtime] Synced runtime does not include full pip support; pip commands may fail.');
+      console.warn(
+        '[python-runtime] Synced runtime does not include full pip support; pip commands may fail.',
+      );
     }
     console.log('[python-runtime] Runtime sync complete');
     return { success: true };
@@ -314,7 +318,7 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
 function runPythonCommand(
   pythonExe: string,
   args: string[],
-  rootDir: string
+  rootDir: string,
 ): { ok: boolean; detail?: string } {
   const env = {
     ...process.env,

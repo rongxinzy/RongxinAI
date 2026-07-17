@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-  LlamaCppRuntimeBackend,
-  LlamaCppRuntimeCudaMajor,
-} from '../../shared/llamacpp';
+import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { ProviderName } from '../../shared/providers/constants';
 import {
   getLlamaCppLoadedModelLimitViolation,
@@ -18,29 +15,31 @@ import {
 } from './llamacpp';
 
 test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malformed structured numbers', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    host: ' 0.0.0.0 ',
-    port: 'not-a-port',
-    modelsDir: ' /tmp/models ',
-    modelsMax: '2',
-    modelsAutoload: 'true' as unknown as boolean,
-    ctxSize: '8192',
-    parallel: '2x',
-    gpuLayers: 'all',
-    threads: '8',
-    batchSize: '256',
-    ubatchSize: '64',
-    runtimeBackend: LlamaCppRuntimeBackend.Cuda,
-    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
-    device: ' 0,1 ',
-    mainGpu: '-1',
-    splitMode: 'layer',
-    tensorSplit: ' 3,2 ',
-    flashAttn: 'maybe' as 'auto',
-    reasoning: 'on',
-    chatTemplate: 'chatml',
-    reasoningFormat: 'invalid' as 'auto',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      host: ' 0.0.0.0 ',
+      port: 'not-a-port',
+      modelsDir: ' /tmp/models ',
+      modelsMax: '2',
+      modelsAutoload: 'true' as unknown as boolean,
+      ctxSize: '8192',
+      parallel: '2x',
+      gpuLayers: 'all',
+      threads: '8',
+      batchSize: '256',
+      ubatchSize: '64',
+      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+      device: ' 0,1 ',
+      mainGpu: '-1',
+      splitMode: 'layer',
+      tensorSplit: ' 3,2 ',
+      flashAttn: 'maybe' as 'auto',
+      reasoning: 'on',
+      chatTemplate: 'chatml',
+      reasoningFormat: 'invalid' as 'auto',
+    }),
+  ).toEqual({
     host: '127.0.0.1',
     listenHost: '0.0.0.0',
     modelsDir: '/tmp/models',
@@ -84,45 +83,53 @@ test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while k
 });
 
 test('sanitizeLlamaCppServiceConfig disables autoload unless modelsMax is one', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    modelsMax: '1',
-    modelsAutoload: true,
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      modelsMax: '1',
+      modelsAutoload: true,
+    }),
+  ).toEqual({
     modelsMax: '1',
     modelsAutoload: true,
   });
 
-  expect(sanitizeLlamaCppServiceConfig({
-    modelsMax: '2',
-    modelsAutoload: true,
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      modelsMax: '2',
+      modelsAutoload: true,
+    }),
+  ).toEqual({
     modelsMax: '2',
     modelsAutoload: false,
   });
 
-  expect(sanitizeLlamaCppServiceConfig({
-    modelsAutoload: true,
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      modelsAutoload: true,
+    }),
+  ).toEqual({
     modelsAutoload: false,
   });
 });
 
 test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to explicit defaults', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    modelsMax: 'abc',
-    timeout: '1.5',
-    threadsHttp: 'auto',
-    cacheReuse: 'one',
-    cacheRam: '8g',
-    ctxSize: '4k',
-    parallel: 'two',
-    batchSize: 'NaN',
-    ubatchSize: '--',
-    gpuLayers: 'gpu',
-    threads: 'fast',
-    threadsBatch: 'many',
-    mainGpu: 'main',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      modelsMax: 'abc',
+      timeout: '1.5',
+      threadsHttp: 'auto',
+      cacheReuse: 'one',
+      cacheRam: '8g',
+      ctxSize: '4k',
+      parallel: 'two',
+      batchSize: 'NaN',
+      ubatchSize: '--',
+      gpuLayers: 'gpu',
+      threads: 'fast',
+      threadsBatch: 'many',
+      mainGpu: 'main',
+    }),
+  ).toEqual({
     modelsMax: '3',
     timeout: '120',
     threadsHttp: '4',
@@ -140,21 +147,23 @@ test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to
 });
 
 test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit defaults', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    modelsMax: '9999999',
-    timeout: '9999999',
-    threadsHttp: '9999999',
-    ctxSize: '9999999',
-    parallel: '9999999',
-    batchSize: '9999999',
-    ubatchSize: '9999999',
-    gpuLayers: '9999999',
-    threads: '9999999',
-    threadsBatch: '9999999',
-    mainGpu: '9999999',
-    cacheReuse: '9999999',
-    cacheRam: '9999999',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      modelsMax: '9999999',
+      timeout: '9999999',
+      threadsHttp: '9999999',
+      ctxSize: '9999999',
+      parallel: '9999999',
+      batchSize: '9999999',
+      ubatchSize: '9999999',
+      gpuLayers: '9999999',
+      threads: '9999999',
+      threadsBatch: '9999999',
+      mainGpu: '9999999',
+      cacheReuse: '9999999',
+      cacheRam: '9999999',
+    }),
+  ).toEqual({
     modelsMax: '3',
     timeout: '120',
     threadsHttp: '4',
@@ -172,61 +181,77 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
 });
 
 test('sanitizeLlamaCppServiceConfig drops invalid tensor split values', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    tensorSplit: '9999',
-  })).toEqual({});
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      tensorSplit: '9999',
+    }),
+  ).toEqual({});
 
-  expect(sanitizeLlamaCppServiceConfig({
-    splitMode: 'tensor',
-    tensorSplit: '按张量拆分',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      splitMode: 'tensor',
+      tensorSplit: '按张量拆分',
+    }),
+  ).toEqual({
     splitMode: 'tensor',
   });
 
-  expect(sanitizeLlamaCppServiceConfig({
-    splitMode: 'tensor',
-    tensorSplit: '3,2',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      splitMode: 'tensor',
+      tensorSplit: '3,2',
+    }),
+  ).toEqual({
     splitMode: 'tensor',
     tensorSplit: '3,2',
   });
 });
 
 test('sanitizeLlamaCppServiceConfig drops invalid structured device values', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    device: '显卡0',
-  })).toEqual({});
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      device: '显卡0',
+    }),
+  ).toEqual({});
 });
 
 test('sanitizeLlamaCppServiceConfig drops tensor split when split mode is not tensor', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    splitMode: 'layer',
-    tensorSplit: '3,2',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      splitMode: 'layer',
+      tensorSplit: '3,2',
+    }),
+  ).toEqual({
     splitMode: 'layer',
   });
 });
 
 test('sanitizeLlamaCppServiceConfig drops tensor split when it exceeds available device count', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    splitMode: 'tensor',
-    tensorSplit: '3,2,1',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      splitMode: 'tensor',
+      tensorSplit: '3,2,1',
+    }),
+  ).toEqual({
     splitMode: 'tensor',
     tensorSplit: '3,2,1',
   });
 });
 test('sanitizeLlamaCppServiceConfig drops invalid runtime backend fields', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,
-    runtimeCudaMajor: '11' as unknown as LlamaCppRuntimeCudaMajor,
-  })).toEqual({});
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      runtimeBackend: 'metal' as unknown as LlamaCppRuntimeBackend,
+      runtimeCudaMajor: '11' as unknown as LlamaCppRuntimeCudaMajor,
+    }),
+  ).toEqual({});
 });
 
 test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as the default loaded model limit', () => {
-  expect(sanitizeLlamaCppServiceConfig({
-    modelsMax: '',
-  })).toEqual({
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      modelsMax: '',
+    }),
+  ).toEqual({
     modelsMax: '3',
   });
 });
@@ -252,28 +277,26 @@ test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not 
 });
 
 test('getLlamaCppLoadedModelLimitViolation blocks loading a third model when modelsMax is two', () => {
-  expect(getLlamaCppLoadedModelLimitViolation({
-    modelsMax: '2',
-    runningModels: [
-      { name: 'Qwen3-0.6B-GGUF' },
-      { name: 'Qwen3-1.7B-GGUF' },
-    ],
-    targetModelName: 'Qwen3-4B-GGUF',
-  })).toEqual({
+  expect(
+    getLlamaCppLoadedModelLimitViolation({
+      modelsMax: '2',
+      runningModels: [{ name: 'Qwen3-0.6B-GGUF' }, { name: 'Qwen3-1.7B-GGUF' }],
+      targetModelName: 'Qwen3-4B-GGUF',
+    }),
+  ).toEqual({
     limit: 2,
     next: 3,
   });
 });
 
 test('getLlamaCppLoadedModelLimitViolation allows reloading an already running model', () => {
-  expect(getLlamaCppLoadedModelLimitViolation({
-    modelsMax: '2',
-    runningModels: [
-      { name: 'Qwen3-0.6B-GGUF' },
-      { name: 'Qwen3-1.7B-GGUF' },
-    ],
-    targetModelName: 'Qwen3-1.7B-GGUF',
-  })).toBeNull();
+  expect(
+    getLlamaCppLoadedModelLimitViolation({
+      modelsMax: '2',
+      runningModels: [{ name: 'Qwen3-0.6B-GGUF' }, { name: 'Qwen3-1.7B-GGUF' }],
+      targetModelName: 'Qwen3-1.7B-GGUF',
+    }),
+  ).toBeNull();
 });
 
 test('shouldSyncOpenClawAfterRunningModelRefresh syncs when running llama.cpp model bindings change', () => {
@@ -282,54 +305,62 @@ test('shouldSyncOpenClawAfterRunningModelRefresh syncs when running llama.cpp mo
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-running')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-not-running')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-deleted')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(true);
+  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(
+    true,
+  );
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(true);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(false);
   expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-stopped')).toBe(true);
 });
 
 test('shouldSyncOpenClawForRunningModelRefresh requires the llama.cpp provider to be enabled', () => {
-  expect(shouldSyncOpenClawForRunningModelRefresh({
-    reason: 'llamacpp-model-loaded',
-    runningModelsChanged: true,
-    appConfigChanged: false,
-    appConfig: {
-      providers: {
-        [ProviderName.LlamaCpp]: {
-          enabled: false,
-          userEnabled: false,
-          models: [],
+  expect(
+    shouldSyncOpenClawForRunningModelRefresh({
+      reason: 'llamacpp-model-loaded',
+      runningModelsChanged: true,
+      appConfigChanged: false,
+      appConfig: {
+        providers: {
+          [ProviderName.LlamaCpp]: {
+            enabled: false,
+            userEnabled: false,
+            models: [],
+          },
         },
       },
-    },
-  })).toBe(false);
+    }),
+  ).toBe(false);
 
-  expect(shouldSyncOpenClawForRunningModelRefresh({
-    reason: 'llamacpp-model-loaded',
-    runningModelsChanged: true,
-    appConfigChanged: false,
-    appConfig: {
-      providers: {
-        [ProviderName.LlamaCpp]: {
-          enabled: true,
-          userEnabled: true,
-          models: [],
+  expect(
+    shouldSyncOpenClawForRunningModelRefresh({
+      reason: 'llamacpp-model-loaded',
+      runningModelsChanged: true,
+      appConfigChanged: false,
+      appConfig: {
+        providers: {
+          [ProviderName.LlamaCpp]: {
+            enabled: true,
+            userEnabled: true,
+            models: [],
+          },
         },
       },
-    },
-  })).toBe(true);
+    }),
+  ).toBe(true);
 });
 
 test('computes total free VRAM from nvidia-smi snapshots', () => {
-  expect(getTotalFreeVramMiB({
-    source: 'nvidia-smi',
-    available: true,
-    checkedAt: '2026-05-20T00:00:00.000Z',
-    gpus: [
-      { index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1024 },
-      { index: 1, name: 'GPU 1', memoryTotalMiB: 8192, memoryFreeMiB: 2048 },
-    ],
-  })).toBe(3072);
+  expect(
+    getTotalFreeVramMiB({
+      source: 'nvidia-smi',
+      available: true,
+      checkedAt: '2026-05-20T00:00:00.000Z',
+      gpus: [
+        { index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1024 },
+        { index: 1, name: 'GPU 1', memoryTotalMiB: 8192, memoryFreeMiB: 2048 },
+      ],
+    }),
+  ).toBe(3072);
 });
 
 test('uses a bounded VRAM recovery threshold for unload confirmation', () => {
@@ -345,42 +376,44 @@ test('detects when VRAM has recovered enough after unload', () => {
     gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1024 }],
   };
 
-  expect(hasRecoveredVram({
-    beforeSnapshot,
-    currentSnapshot: {
-      ...beforeSnapshot,
-      checkedAt: '2026-05-20T00:00:01.000Z',
-      gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1180 }],
-    },
-    sizeVramBytes: 512 * 1024 * 1024,
-  })).toBe(true);
+  expect(
+    hasRecoveredVram({
+      beforeSnapshot,
+      currentSnapshot: {
+        ...beforeSnapshot,
+        checkedAt: '2026-05-20T00:00:01.000Z',
+        gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1180 }],
+      },
+      sizeVramBytes: 512 * 1024 * 1024,
+    }),
+  ).toBe(true);
 
-  expect(hasRecoveredVram({
-    beforeSnapshot,
-    currentSnapshot: {
-      ...beforeSnapshot,
-      checkedAt: '2026-05-20T00:00:01.000Z',
-      gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1050 }],
-    },
-    sizeVramBytes: 512 * 1024 * 1024,
-  })).toBe(false);
+  expect(
+    hasRecoveredVram({
+      beforeSnapshot,
+      currentSnapshot: {
+        ...beforeSnapshot,
+        checkedAt: '2026-05-20T00:00:01.000Z',
+        gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 8192, memoryFreeMiB: 1050 }],
+      },
+      sizeVramBytes: 512 * 1024 * 1024,
+    }),
+  ).toBe(false);
 });
 
 test('confirms model unload after consecutive missing polls', async () => {
-  const polls = [
-    [{ name: 'model-a' }],
-    [],
-    [],
-  ];
+  const polls = [[{ name: 'model-a' }], [], []];
   let index = 0;
 
-  await expect(waitForLlamaCppModelUnloadConfirmation({
-    modelName: 'model-a',
-    listRunningModels: async () => polls[Math.min(index++, polls.length - 1)],
-    timeoutMs: 50,
-    intervalMs: 0,
-    stableMissingPolls: 2,
-  })).resolves.toEqual({
+  await expect(
+    waitForLlamaCppModelUnloadConfirmation({
+      modelName: 'model-a',
+      listRunningModels: async () => polls[Math.min(index++, polls.length - 1)],
+      timeoutMs: 50,
+      intervalMs: 0,
+      stableMissingPolls: 2,
+    }),
+  ).resolves.toEqual({
     confirmed: true,
     runningModels: [],
   });
@@ -389,13 +422,15 @@ test('confirms model unload after consecutive missing polls', async () => {
 test('returns the last running-model snapshot when unload confirmation times out', async () => {
   const runningModels = [{ name: 'model-a' }];
 
-  await expect(waitForLlamaCppModelUnloadConfirmation({
-    modelName: 'model-a',
-    listRunningModels: async () => runningModels,
-    timeoutMs: 0,
-    intervalMs: 0,
-    stableMissingPolls: 2,
-  })).resolves.toEqual({
+  await expect(
+    waitForLlamaCppModelUnloadConfirmation({
+      modelName: 'model-a',
+      listRunningModels: async () => runningModels,
+      timeoutMs: 0,
+      intervalMs: 0,
+      stableMissingPolls: 2,
+    }),
+  ).resolves.toEqual({
     confirmed: false,
     runningModels,
   });

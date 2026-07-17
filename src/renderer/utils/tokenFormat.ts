@@ -3,9 +3,10 @@ export function formatMessageTime(timestamp: number): string {
   const now = new Date();
   const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  const isToday = date.getFullYear() === now.getFullYear()
-    && date.getMonth() === now.getMonth()
-    && date.getDate() === now.getDate();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
   if (isToday) return time;
 
   const isThisYear = date.getFullYear() === now.getFullYear();

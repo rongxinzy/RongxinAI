@@ -20,7 +20,7 @@ const skillSlice = createSlice({
       state.skills = action.payload;
       // Remove any active skill IDs that no longer exist
       state.activeSkillIds = state.activeSkillIds.filter(id =>
-        action.payload.some(skill => skill.id === id)
+        action.payload.some(skill => skill.id === id),
       );
     },
     addSkill: (state, action: PayloadAction<Skill>) => {
@@ -53,7 +53,7 @@ const skillSlice = createSlice({
     setActiveSkillIds: (state, action: PayloadAction<string[]>) => {
       state.activeSkillIds = action.payload;
     },
-    clearActiveSkills: (state) => {
+    clearActiveSkills: state => {
       state.activeSkillIds = [];
     },
   },

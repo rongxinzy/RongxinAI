@@ -1,7 +1,11 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
-BindingKind, DeliveryChannel, DeliveryMode,   OriginKind, SessionTarget,
+  BindingKind,
+  DeliveryChannel,
+  DeliveryMode,
+  OriginKind,
+  SessionTarget,
 } from '../constants';
 import { makeModel } from '../fixtures';
 import { CoworkTaskPolicy } from './coworkPolicy';
@@ -15,13 +19,19 @@ test('CoworkPolicy.getCreateDefaults: with cowork origin -> sessionTarget main +
 
 test('CoworkPolicy.getCreateDefaults: with non-cowork origin -> throws Error', () => {
   const policy = new CoworkTaskPolicy();
-  expect(() => policy.getCreateDefaults({ kind: OriginKind.Manual } as any)).toThrow(/Invalid origin/);
+  expect(() => policy.getCreateDefaults({ kind: OriginKind.Manual } as any)).toThrow(
+    /Invalid origin/,
+  );
 });
 
 test('CoworkPolicy.getCreateDefaults: with im origin -> throws Error', () => {
   const policy = new CoworkTaskPolicy();
-  expect(
-    () => policy.getCreateDefaults({ kind: OriginKind.IM, platform: 'telegram', conversationId: 'c1' } as any)
+  expect(() =>
+    policy.getCreateDefaults({
+      kind: OriginKind.IM,
+      platform: 'telegram',
+      conversationId: 'c1',
+    } as any),
   ).toThrow(/Invalid origin/);
 });
 
@@ -54,7 +64,10 @@ test('CoworkPolicy.onDeliveryChanged: any delivery change -> binding unchanged',
     binding: { kind: BindingKind.UISession, sessionId: 'sess-1' },
     delivery: { mode: DeliveryMode.None },
   });
-  const result = policy.onDeliveryChanged(draft, { mode: DeliveryMode.Announce, channel: 'telegram' });
+  const result = policy.onDeliveryChanged(draft, {
+    mode: DeliveryMode.Announce,
+    channel: 'telegram',
+  });
   expect(result.binding).toEqual(draft.binding);
   expect(result.delivery).toEqual({ mode: DeliveryMode.Announce, channel: 'telegram' });
 });
@@ -74,7 +87,7 @@ test('CoworkPolicy.toWireBinding: ui_session binding -> managed sessionKey', () 
   const policy = new CoworkTaskPolicy();
   const result = policy.toWireBinding({ kind: BindingKind.UISession, sessionId: 'sess-x' });
   expect(result.sessionTarget).toBe(SessionTarget.Main);
-  expect(result.sessionKey).toBe('agent:main:lobsterai:sess-x');
+  expect(result.sessionKey).toBe('agent:main:zhiyuan:sess-x');
 });
 
 test('CoworkPolicy.toWireBinding: session_key binding -> isolated + original sessionKey', () => {

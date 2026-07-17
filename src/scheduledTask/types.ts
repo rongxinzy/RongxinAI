@@ -1,4 +1,4 @@
-import type { DeliveryMode, SessionTarget, TaskStatus,WakeMode } from './constants';
+import type { DeliveryMode, SessionTarget, TaskStatus, WakeMode } from './constants';
 
 export interface ScheduleAt {
   kind: 'at';

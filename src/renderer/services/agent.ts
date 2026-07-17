@@ -11,7 +11,7 @@ import {
 } from '../store/slices/agentSlice';
 import { clearCurrentSession } from '../store/slices/coworkSlice';
 import { clearAgentSelectedModel } from '../store/slices/modelSlice';
-import { clearActiveSkills,setActiveSkillIds } from '../store/slices/skillSlice';
+import { clearActiveSkills, setActiveSkillIds } from '../store/slices/skillSlice';
 import type { Agent, PresetAgent } from '../types/agent';
 
 class AgentService {
@@ -20,7 +20,7 @@ class AgentService {
     try {
       const agents = await window.electron?.agents?.list();
       if (agents) {
-        const mappedAgents = agents.map((a) => ({
+        const mappedAgents = agents.map(a => ({
           id: a.id,
           name: a.name,
           description: a.description,
@@ -58,22 +58,24 @@ class AgentService {
     try {
       const agent = await window.electron?.agents?.create(request);
       if (agent) {
-        store.dispatch(addAgent({
-          id: agent.id,
-          name: agent.name,
-          description: agent.description,
-          icon: agent.icon,
-          model: agent.model ?? '',
-          workingDirectory: agent.workingDirectory ?? '',
-          enabled: agent.enabled,
-          pinned: agent.pinned ?? false,
-          pinOrder: agent.pinOrder ?? null,
-          isDefault: agent.isDefault,
-          source: agent.source,
-          presetId: agent.presetId ?? '',
-          systemPrompt: agent.systemPrompt ?? '',
-          skillIds: agent.skillIds ?? [],
-        }));
+        store.dispatch(
+          addAgent({
+            id: agent.id,
+            name: agent.name,
+            description: agent.description,
+            icon: agent.icon,
+            model: agent.model ?? '',
+            workingDirectory: agent.workingDirectory ?? '',
+            enabled: agent.enabled,
+            pinned: agent.pinned ?? false,
+            pinOrder: agent.pinOrder ?? null,
+            isDefault: agent.isDefault,
+            source: agent.source,
+            presetId: agent.presetId ?? '',
+            systemPrompt: agent.systemPrompt ?? '',
+            skillIds: agent.skillIds ?? [],
+          }),
+        );
         return agent;
       }
       return null;
@@ -83,36 +85,41 @@ class AgentService {
     }
   }
 
-  async updateAgent(id: string, updates: {
-    name?: string;
-    description?: string;
-    systemPrompt?: string;
-    identity?: string;
-    model?: string;
-    workingDirectory?: string;
-    icon?: string;
-    skillIds?: string[];
-    enabled?: boolean;
-    pinned?: boolean;
-    triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
-  }): Promise<Agent | null> {
+  async updateAgent(
+    id: string,
+    updates: {
+      name?: string;
+      description?: string;
+      systemPrompt?: string;
+      identity?: string;
+      model?: string;
+      workingDirectory?: string;
+      icon?: string;
+      skillIds?: string[];
+      enabled?: boolean;
+      pinned?: boolean;
+      triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
+    },
+  ): Promise<Agent | null> {
     try {
       const agent = await window.electron?.agents?.update(id, updates);
       if (agent) {
-        store.dispatch(updateAgentAction({
-          id: agent.id,
-          updates: {
-            name: agent.name,
-            description: agent.description,
-            icon: agent.icon,
-            model: agent.model ?? '',
-            workingDirectory: agent.workingDirectory ?? '',
-            enabled: agent.enabled,
-            pinned: agent.pinned ?? false,
-            pinOrder: agent.pinOrder ?? null,
-            skillIds: agent.skillIds ?? [],
-          },
-        }));
+        store.dispatch(
+          updateAgentAction({
+            id: agent.id,
+            updates: {
+              name: agent.name,
+              description: agent.description,
+              icon: agent.icon,
+              model: agent.model ?? '',
+              workingDirectory: agent.workingDirectory ?? '',
+              enabled: agent.enabled,
+              pinned: agent.pinned ?? false,
+              pinOrder: agent.pinOrder ?? null,
+              skillIds: agent.skillIds ?? [],
+            },
+          }),
+        );
         // If the edited agent is the currently active one, sync skillIds
         // to the runtime skill slice so new conversations pick up changes
         // immediately (switchAgent handles this on explicit switch, but
@@ -174,22 +181,24 @@ class AgentService {
     try {
       const agent = await window.electron?.agents?.addPreset(presetId);
       if (agent) {
-        store.dispatch(addAgent({
-          id: agent.id,
-          name: agent.name,
-          description: agent.description,
-          icon: agent.icon,
-          model: agent.model ?? '',
-          workingDirectory: agent.workingDirectory ?? '',
-          enabled: agent.enabled,
-          pinned: agent.pinned ?? false,
-          pinOrder: agent.pinOrder ?? null,
-          isDefault: agent.isDefault,
-          source: agent.source,
-          presetId: agent.presetId ?? '',
-          systemPrompt: agent.systemPrompt ?? '',
-          skillIds: agent.skillIds ?? [],
-        }));
+        store.dispatch(
+          addAgent({
+            id: agent.id,
+            name: agent.name,
+            description: agent.description,
+            icon: agent.icon,
+            model: agent.model ?? '',
+            workingDirectory: agent.workingDirectory ?? '',
+            enabled: agent.enabled,
+            pinned: agent.pinned ?? false,
+            pinOrder: agent.pinOrder ?? null,
+            isDefault: agent.isDefault,
+            source: agent.source,
+            presetId: agent.presetId ?? '',
+            systemPrompt: agent.systemPrompt ?? '',
+            skillIds: agent.skillIds ?? [],
+          }),
+        );
         return agent;
       }
       return null;
@@ -199,7 +208,15 @@ class AgentService {
     }
   }
 
-  async importExpertPackage(expertDir: string): Promise<{ success: boolean; agentIds?: string[]; expertType?: string; name?: string; error?: string }> {
+  async importExpertPackage(
+    expertDir: string,
+  ): Promise<{
+    success: boolean;
+    agentIds?: string[];
+    expertType?: string;
+    name?: string;
+    error?: string;
+  }> {
     try {
       const result = await window.electron?.agents?.importExpertPackage(expertDir);
       if (result?.success) {
@@ -208,14 +225,17 @@ class AgentService {
       return result ?? { success: false, error: 'Import not supported' };
     } catch (error) {
       console.error('Failed to import expert package:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to import expert package' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to import expert package',
+      };
     }
   }
 
   switchAgent(agentId: string): void {
     store.dispatch(setCurrentAgentId(agentId));
     store.dispatch(clearCurrentSession());
-    const agent = store.getState().agent.agents.find((a) => a.id === agentId);
+    const agent = store.getState().agent.agents.find(a => a.id === agentId);
     if (agent?.skillIds?.length) {
       store.dispatch(setActiveSkillIds(agent.skillIds));
     } else {

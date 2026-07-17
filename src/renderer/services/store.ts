@@ -35,4 +35,4 @@ class LocalStoreService implements LocalStore {
   }
 }
 
-export const localStore = new LocalStoreService(); 
+export const localStore = new LocalStoreService();

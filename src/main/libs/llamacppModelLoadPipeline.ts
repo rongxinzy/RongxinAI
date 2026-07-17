@@ -67,7 +67,8 @@ export async function loadLlamaCppModelThroughPipeline(
 
   const placedInput = applyGpuPlacement(input);
   const startedAtMs = input.now?.() ?? Date.now();
-  const startupBudgetMs = input.startupBudgetMs ?? LlamaCppModelLoadPipelineDefaults.StartupBudgetMs;
+  const startupBudgetMs =
+    input.startupBudgetMs ?? LlamaCppModelLoadPipelineDefaults.StartupBudgetMs;
   const deadlineMs = startedAtMs + startupBudgetMs;
 
   const retryResult = await loadLlamaCppModelWithRetry<LlamaCppModelLaunchResult>({
@@ -80,7 +81,7 @@ export async function loadLlamaCppModelThroughPipeline(
     listRunningModels: input.listRunningModels,
     unloadModel: input.unloadModel,
     onLog: input.onLog,
-    attemptLoad: async (attemptInput) => {
+    attemptLoad: async attemptInput => {
       const loadResult = await input.loadModel(attemptInput);
       const settleResult = await settleLlamaCppModelStartup({
         modelName,
@@ -113,9 +114,7 @@ export async function loadLlamaCppModelThroughPipeline(
   };
 }
 
-function applyGpuPlacement(
-  input: LlamaCppModelLoadPipelineInput,
-): LlamaCppModelLaunchInput {
+function applyGpuPlacement(input: LlamaCppModelLoadPipelineInput): LlamaCppModelLaunchInput {
   const placementResult = planLlamaCppModelGpuPlacement({
     launchInput: input.launchInput,
     runtimeBackend: input.runtimeBackend,
@@ -135,10 +134,7 @@ function applyGpuPlacement(
 }
 
 function mapSettleStatusToFailureReason(
-  status: Exclude<
-    LlamaCppModelStartupSettleStatus,
-    typeof LlamaCppModelStartupSettleStatus.Loaded
-  >,
+  status: Exclude<LlamaCppModelStartupSettleStatus, typeof LlamaCppModelStartupSettleStatus.Loaded>,
 ): LlamaCppModelLoadFailureReasonType {
   switch (status) {
     case LlamaCppModelStartupSettleStatus.ServiceUnavailable:

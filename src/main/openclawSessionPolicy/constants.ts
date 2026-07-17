@@ -6,7 +6,7 @@ export const OpenClawSessionKeepAlive = {
 } as const;
 
 export type OpenClawSessionKeepAlive =
-  typeof OpenClawSessionKeepAlive[keyof typeof OpenClawSessionKeepAlive];
+  (typeof OpenClawSessionKeepAlive)[keyof typeof OpenClawSessionKeepAlive];
 
 export const OPENCLAW_SESSION_POLICY_STORE_KEY = 'openclaw_session_policy';
 
@@ -30,4 +30,4 @@ export const OpenClawSessionPolicyIpc = {
 } as const;
 
 export type OpenClawSessionPolicyIpc =
-  typeof OpenClawSessionPolicyIpc[keyof typeof OpenClawSessionPolicyIpc];
+  (typeof OpenClawSessionPolicyIpc)[keyof typeof OpenClawSessionPolicyIpc];

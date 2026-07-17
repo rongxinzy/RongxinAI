@@ -9,11 +9,17 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { t } from './i18n';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
-import { parseModelScopeSkillUrl, resolveModelScopeSkillInstallSource } from './libs/modelscopeSkillMarketplace';
+import {
+  parseModelScopeSkillUrl,
+  resolveModelScopeSkillInstallSource,
+} from './libs/modelscopeSkillMarketplace';
 import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
-import { mergeReports,scanMultipleSkillDirs } from './libs/skillSecurity/skillSecurityScanner';
-import type { SecurityReportAction,SkillSecurityReport } from './libs/skillSecurity/skillSecurityTypes';
+import { mergeReports, scanMultipleSkillDirs } from './libs/skillSecurity/skillSecurityScanner';
+import type {
+  SecurityReportAction,
+  SkillSecurityReport,
+} from './libs/skillSecurity/skillSecurityTypes';
 import { SqliteStore } from './sqliteStore';
 
 /**
@@ -56,7 +62,9 @@ function hasCommand(command: string, env: NodeJS.ProcessEnv): boolean {
     timeout: 5000,
   });
   if (result.status !== 0) {
-    console.log(`[skills] hasCommand('${command}'): not found (status=${result.status}, error=${result.error?.message || 'none'})`);
+    console.log(
+      `[skills] hasCommand('${command}'): not found (status=${result.status}, error=${result.error?.message || 'none'})`,
+    );
   }
   return result.status === 0;
 }
@@ -105,12 +113,14 @@ function resolveWindowsRegistryPath(): string | null {
   try {
     const machinePath = execSync(
       'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path',
-      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }
+      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
     );
-    const userPath = execSync(
-      'reg query "HKCU\\Environment" /v Path',
-      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }
-    );
+    const userPath = execSync('reg query "HKCU\\Environment" /v Path', {
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    });
 
     const extract = (output: string): string => {
       const match = output.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.+)/i);
@@ -131,14 +141,17 @@ function isWindowsDeletePermissionError(error: unknown): boolean {
   return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
 }
 
-function tryWindowsDeleteFallbackAsync(targetDir: string): Promise<{ success: boolean; detail?: string }> {
-  if (process.platform !== 'win32') return Promise.resolve({ success: false, detail: 'not-windows' });
+function tryWindowsDeleteFallbackAsync(
+  targetDir: string,
+): Promise<{ success: boolean; detail?: string }> {
+  if (process.platform !== 'win32')
+    return Promise.resolve({ success: false, detail: 'not-windows' });
 
   return new Promise<void>(resolve => setTimeout(resolve, 50)).then(() => {
     const escapedPath = targetDir.replace(/"/g, '""');
     const command = `icacls "${escapedPath}" /reset /t /c >nul 2>&1 & attrib -r -s -h "${escapedPath}" /s /d >nul 2>&1 & rmdir /s /q "${escapedPath}"`;
 
-    return new Promise<{ success: boolean; detail?: string }>((resolve) => {
+    return new Promise<{ success: boolean; detail?: string }>(resolve => {
       let settled = false;
       const settle = (result: { success: boolean; detail?: string }) => {
         if (settled) return;
@@ -153,8 +166,12 @@ function tryWindowsDeleteFallbackAsync(targetDir: string): Promise<{ success: bo
 
       let stderr = '';
       let stdout = '';
-      child.stderr?.on('data', (data: Buffer) => { stderr += data.toString('utf-8'); });
-      child.stdout?.on('data', (data: Buffer) => { stdout += data.toString('utf-8'); });
+      child.stderr?.on('data', (data: Buffer) => {
+        stderr += data.toString('utf-8');
+      });
+      child.stdout?.on('data', (data: Buffer) => {
+        stdout += data.toString('utf-8');
+      });
 
       const timer = setTimeout(() => {
         child.kill();
@@ -171,7 +188,7 @@ function tryWindowsDeleteFallbackAsync(targetDir: string): Promise<{ success: bo
         }
       });
 
-      child.on('error', (err) => {
+      child.on('error', err => {
         clearTimeout(timer);
         settle({ success: false, detail: err.message });
       });
@@ -179,15 +196,22 @@ function tryWindowsDeleteFallbackAsync(targetDir: string): Promise<{ success: bo
   });
 }
 
-function normalizeWindowsSkillDirectoryAttrs(targetDir: string): { success: boolean; detail?: string } {
+function normalizeWindowsSkillDirectoryAttrs(targetDir: string): {
+  success: boolean;
+  detail?: string;
+} {
   if (process.platform !== 'win32') return { success: true };
 
   const escapedPath = targetDir.replace(/"/g, '""');
-  const result = spawnSync('cmd.exe', ['/d', '/s', '/c', `attrib -r -s -h "${escapedPath}" /s /d`], {
-    stdio: 'pipe',
-    windowsHide: true,
-    timeout: 10000,
-  });
+  const result = spawnSync(
+    'cmd.exe',
+    ['/d', '/s', '/c', `attrib -r -s -h "${escapedPath}" /s /d`],
+    {
+      stdio: 'pipe',
+      windowsHide: true,
+      timeout: 10000,
+    },
+  );
 
   if (result.status === 0) {
     return { success: true };
@@ -227,7 +251,13 @@ function buildSkillEnv(): Record<string, string | undefined> {
       const registryPath = resolveWindowsRegistryPath();
       if (registryPath) {
         const currentPath = env.PATH || '';
-        const seen = new Set(currentPath.toLowerCase().split(';').map(s => s.trim().replace(/[\\/]+$/, '')).filter(Boolean));
+        const seen = new Set(
+          currentPath
+            .toLowerCase()
+            .split(';')
+            .map(s => s.trim().replace(/[\\/]+$/, ''))
+            .filter(Boolean),
+        );
         const extra: string[] = [];
         for (const entry of registryPath.split(';')) {
           const trimmed = entry.trim();
@@ -252,8 +282,15 @@ function buildSkillEnv(): Record<string, string | undefined> {
         `${env.LOCALAPPDATA || ''}\\Programs\\nodejs`,
       ].filter(Boolean);
 
-      const pathSet = new Set((env.PATH || '').toLowerCase().split(';').map(s => s.trim().replace(/[\\/]+$/, '')));
-      const missingPaths = commonWinPaths.filter(p => !pathSet.has(p.toLowerCase().replace(/[\\/]+$/, '')));
+      const pathSet = new Set(
+        (env.PATH || '')
+          .toLowerCase()
+          .split(';')
+          .map(s => s.trim().replace(/[\\/]+$/, '')),
+      );
+      const missingPaths = commonWinPaths.filter(
+        p => !pathSet.has(p.toLowerCase().replace(/[\\/]+$/, '')),
+      );
       if (missingPaths.length > 0) {
         env.PATH = env.PATH ? `${env.PATH};${missingPaths.join(';')}` : missingPaths.join(';');
       }
@@ -280,7 +317,7 @@ function buildSkillEnv(): Record<string, string | undefined> {
 
   // Expose Electron executable so skill scripts can run JS with ELECTRON_RUN_AS_NODE
   // even when system Node.js is not installed.
-  env.LOBSTERAI_ELECTRON_PATH = getElectronNodeRuntimePath();
+  env.ZHIYUAN_ELECTRON_PATH = getElectronNodeRuntimePath();
   appendPythonRuntimeToEnv(env);
 
   // Re-normalize after appendPythonRuntimeToEnv may have added a PATH key
@@ -340,7 +377,9 @@ const WATCH_DEBOUNCE_MS = 250;
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
-const parseFrontmatter = (raw: string): { frontmatter: Record<string, unknown>; content: string } => {
+const parseFrontmatter = (
+  raw: string,
+): { frontmatter: Record<string, unknown>; content: string } => {
   const normalized = raw.replace(/^\uFEFF/, '');
   const match = normalized.match(FRONTMATTER_RE);
   if (!match) {
@@ -481,9 +520,9 @@ const resolveWindowsGitExecutable = (): string | null => {
   const bundledRoots = app.isPackaged
     ? [path.join(process.resourcesPath, 'mingit')]
     : [
-      path.join(__dirname, '..', '..', 'resources', 'mingit'),
-      path.join(process.cwd(), 'resources', 'mingit'),
-    ];
+        path.join(__dirname, '..', '..', 'resources', 'mingit'),
+        path.join(process.cwd(), 'resources', 'mingit'),
+      ];
 
   for (const root of bundledRoots) {
     const bundledCandidates = [
@@ -533,52 +572,58 @@ const resolveGitCommand = (): { command: string; env?: NodeJS.ProcessEnv } => {
 const runCommand = (
   command: string,
   args: string[],
-  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
-): Promise<void> => new Promise((resolve, reject) => {
-  const child = spawn(command, args, {
-    cwd: options?.cwd,
-    env: options?.env,
-    windowsHide: true,
-    stdio: ['ignore', 'ignore', 'pipe'],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv },
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options?.cwd,
+      env: options?.env,
+      windowsHide: true,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', chunk => {
+      stderr += chunk.toString();
+    });
+    child.on('error', error => reject(error));
+    child.on('close', code => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(stderr.trim() || `Command failed with exit code ${code}`));
+    });
   });
-  let stderr = '';
-  child.stderr.on('data', chunk => {
-    stderr += chunk.toString();
-  });
-  child.on('error', error => reject(error));
-  child.on('close', code => {
-    if (code === 0) {
-      resolve();
-      return;
-    }
-    reject(new Error(stderr.trim() || `Command failed with exit code ${code}`));
-  });
-});
 
 const runCommandCapture = (
   command: string,
   args: string[],
-  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
-): Promise<{ stdout: string; stderr: string }> => new Promise((resolve, reject) => {
-  const child = spawn(command, args, {
-    cwd: options?.cwd,
-    env: options?.env,
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv },
+): Promise<{ stdout: string; stderr: string }> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options?.cwd,
+      env: options?.env,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk.toString();
+    });
+    child.on('error', error => reject(error));
+    child.on('close', code => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+      reject(new Error(stderr.trim() || `Command failed with exit code ${code}`));
+    });
   });
-  let stdout = '';
-  let stderr = '';
-  child.stdout.on('data', chunk => { stdout += chunk.toString(); });
-  child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-  child.on('error', error => reject(error));
-  child.on('close', code => {
-    if (code === 0) {
-      resolve({ stdout, stderr });
-      return;
-    }
-    reject(new Error(stderr.trim() || `Command failed with exit code ${code}`));
-  });
-});
 
 type SkillScriptRunResult = {
   success: boolean;
@@ -597,71 +642,72 @@ const runScriptWithTimeout = (options: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   timeoutMs: number;
-}): Promise<SkillScriptRunResult> => new Promise((resolve) => {
-  const startedAt = Date.now();
-  const child = spawn(options.command, options.args, {
-    cwd: options.cwd,
-    env: options.env,
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+}): Promise<SkillScriptRunResult> =>
+  new Promise(resolve => {
+    const startedAt = Date.now();
+    const child = spawn(options.command, options.args, {
+      cwd: options.cwd,
+      env: options.env,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
-  let settled = false;
-  let timedOut = false;
-  let stdout = '';
-  let stderr = '';
-  let forceKillTimer: NodeJS.Timeout | null = null;
+    let settled = false;
+    let timedOut = false;
+    let stdout = '';
+    let stderr = '';
+    let forceKillTimer: NodeJS.Timeout | null = null;
 
-  const settle = (result: SkillScriptRunResult) => {
-    if (settled) return;
-    settled = true;
-    resolve(result);
-  };
+    const settle = (result: SkillScriptRunResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
 
-  const timeoutTimer = setTimeout(() => {
-    timedOut = true;
-    child.kill('SIGTERM');
-    forceKillTimer = setTimeout(() => {
-      child.kill('SIGKILL');
-    }, 2000);
-  }, options.timeoutMs);
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      forceKillTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+      }, 2000);
+    }, options.timeoutMs);
 
-  child.stdout.on('data', (chunk) => {
-    stdout += chunk.toString();
-  });
-  child.stderr.on('data', (chunk) => {
-    stderr += chunk.toString();
-  });
+    child.stdout.on('data', chunk => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk.toString();
+    });
 
-  child.on('error', (error: NodeJS.ErrnoException) => {
-    clearTimeout(timeoutTimer);
-    if (forceKillTimer) clearTimeout(forceKillTimer);
-    settle({
-      success: false,
-      exitCode: null,
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-      durationMs: Date.now() - startedAt,
-      timedOut,
-      error: error.message,
-      spawnErrorCode: error.code,
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      clearTimeout(timeoutTimer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      settle({
+        success: false,
+        exitCode: null,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        durationMs: Date.now() - startedAt,
+        timedOut,
+        error: error.message,
+        spawnErrorCode: error.code,
+      });
+    });
+
+    child.on('close', exitCode => {
+      clearTimeout(timeoutTimer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      settle({
+        success: !timedOut && exitCode === 0,
+        exitCode,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        durationMs: Date.now() - startedAt,
+        timedOut,
+        error: timedOut ? `Command timed out after ${options.timeoutMs}ms` : undefined,
+      });
     });
   });
-
-  child.on('close', (exitCode) => {
-    clearTimeout(timeoutTimer);
-    if (forceKillTimer) clearTimeout(forceKillTimer);
-    settle({
-      success: !timedOut && exitCode === 0,
-      exitCode,
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-      durationMs: Date.now() - startedAt,
-      timedOut,
-      error: timedOut ? `Command timed out after ${options.timeoutMs}ms` : undefined,
-    });
-  });
-});
 
 const cleanupPathSafely = (targetPath: string | null): void => {
   if (!targetPath) return;
@@ -687,7 +733,7 @@ const listSkillDirs = (root: string): string[] => {
   const entries = fs.readdirSync(root);
   return entries
     .map(entry => path.join(root, entry))
-    .filter((entryPath) => {
+    .filter(entryPath => {
       try {
         const stat = fs.lstatSync(entryPath);
         if (!stat.isDirectory() && !stat.isSymbolicLink()) {
@@ -828,7 +874,7 @@ const parseGithubRepoSource = (repoUrl: string): GithubRepoSource | null => {
 const downloadGithubArchive = async (
   source: GithubRepoSource,
   tempRoot: string,
-  ref?: string
+  ref?: string,
 ): Promise<string> => {
   const encodedRef = ref ? encodeURIComponent(ref) : '';
   const archiveUrlCandidates: Array<{ url: string; headers: Record<string, string> }> = [];
@@ -837,16 +883,16 @@ const downloadGithubArchive = async (
     archiveUrlCandidates.push(
       {
         url: `https://github.com/${source.owner}/${source.repo}/archive/refs/heads/${encodedRef}.zip`,
-        headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+        headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
       },
       {
         url: `https://github.com/${source.owner}/${source.repo}/archive/refs/tags/${encodedRef}.zip`,
-        headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+        headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
       },
       {
         url: `https://github.com/${source.owner}/${source.repo}/archive/${encodedRef}.zip`,
-        headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
-      }
+        headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
+      },
     );
   }
 
@@ -854,7 +900,7 @@ const downloadGithubArchive = async (
     url: `https://api.github.com/repos/${source.owner}/${source.repo}/zipball${encodedRef ? `/${encodedRef}` : ''}`,
     headers: {
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'RongxinAI Skill Downloader',
+      'User-Agent': 'ZhiYuanAgent Skill Downloader',
       'X-GitHub-Api-Version': '2022-11-28',
     },
   });
@@ -892,7 +938,8 @@ const downloadGithubArchive = async (
   fs.mkdirSync(extractRoot, { recursive: true });
   await extractZip(zipPath, { dir: extractRoot });
 
-  const extractedDirs = fs.readdirSync(extractRoot)
+  const extractedDirs = fs
+    .readdirSync(extractRoot)
     .map(entry => path.join(extractRoot, entry))
     .filter(entryPath => {
       try {
@@ -916,7 +963,12 @@ const downloadGithubArchive = async (
 const isNpmPackageSpec = (source: string): boolean => {
   // Must not be a local path, URL, or GitHub shorthand (owner/repo)
   if (source.startsWith('.') || source.startsWith('/') || source.startsWith('~')) return false;
-  try { new URL(source); return false; } catch { /* not a URL, good */ }
+  try {
+    new URL(source);
+    return false;
+  } catch {
+    /* not a URL, good */
+  }
 
   // Scoped package: @scope/name or @scope/name@version
   if (/^@[\w-]+\/[\w.-]+(@[\w.^~>=<*-]+)?$/.test(source)) return true;
@@ -931,7 +983,16 @@ const isNpmPackageSpec = (source: string): boolean => {
  */
 const resolveNpmCliJs = (): string | null => {
   const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npm-cli.js')]
+    ? [
+        path.join(
+          process.resourcesPath,
+          'app.asar.unpacked',
+          'node_modules',
+          'npm',
+          'bin',
+          'npm-cli.js',
+        ),
+      ]
     : [
         path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
         path.join(process.cwd(), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
@@ -958,20 +1019,26 @@ const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<strin
     npmArgs = ['pack', spec, '--ignore-scripts', '--json'];
   }
 
-  const packResult = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const child = spawn(npmCommand, npmArgs, {
-      cwd: tempRoot,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' },
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (data) => { stdout += data; });
-    child.stderr.on('data', (data) => { stderr += data; });
-    child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
-    child.on('error', (err) => resolve({ code: 1, stdout: '', stderr: err.message }));
-  });
+  const packResult = await new Promise<{ code: number; stdout: string; stderr: string }>(
+    resolve => {
+      const child = spawn(npmCommand, npmArgs, {
+        cwd: tempRoot,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' },
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', data => {
+        stdout += data;
+      });
+      child.stderr.on('data', data => {
+        stderr += data;
+      });
+      child.on('close', code => resolve({ code: code ?? 1, stdout, stderr }));
+      child.on('error', err => resolve({ code: 1, stdout: '', stderr: err.message }));
+    },
+  );
 
   if (packResult.code !== 0) {
     const detail = packResult.stderr.trim() || packResult.stdout.trim();
@@ -991,7 +1058,9 @@ const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<strin
           break;
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   if (tgzFiles.length === 0) {
@@ -1004,15 +1073,17 @@ const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<strin
   fs.mkdirSync(extractDir, { recursive: true });
 
   // Use tar to extract (Node.js built-in zlib + tar via npm's own bundled tar)
-  const tarExtract = await new Promise<{ code: number; stderr: string }>((resolve) => {
+  const tarExtract = await new Promise<{ code: number; stderr: string }>(resolve => {
     // Use system tar (available on all platforms including Windows 10+)
     const child = spawn('tar', ['xzf', tgzPath, '-C', extractDir], {
       windowsHide: true,
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     let stderr = '';
-    child.stderr.on('data', (data) => { stderr += data; });
-    child.on('close', (code) => resolve({ code: code ?? 1, stderr }));
+    child.stderr.on('data', data => {
+      stderr += data;
+    });
+    child.on('close', code => resolve({ code: code ?? 1, stderr }));
     child.on('error', () => resolve({ code: 1, stderr: 'tar not found' }));
   });
 
@@ -1027,7 +1098,8 @@ const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<strin
   }
 
   // Fallback: return first directory in extract dir
-  const dirs = fs.readdirSync(extractDir)
+  const dirs = fs
+    .readdirSync(extractDir)
     .map(name => path.join(extractDir, name))
     .filter(p => fs.statSync(p).isDirectory());
   return dirs[0] || extractDir;
@@ -1036,8 +1108,10 @@ const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<strin
 const isRemoteZipUrl = (source: string): boolean => {
   try {
     const url = new URL(source);
-    return (url.protocol === 'http:' || url.protocol === 'https:')
-      && url.pathname.toLowerCase().endsWith('.zip');
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.pathname.toLowerCase().endsWith('.zip')
+    );
   } catch {
     return false;
   }
@@ -1046,7 +1120,7 @@ const isRemoteZipUrl = (source: string): boolean => {
 const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string> => {
   const response = await session.defaultSession.fetch(zipUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+    headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
   });
 
   if (!response.ok) {
@@ -1060,7 +1134,8 @@ const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string>
   fs.mkdirSync(extractRoot, { recursive: true });
   await extractZip(zipPath, { dir: extractRoot });
 
-  const extractedDirs = fs.readdirSync(extractRoot)
+  const extractedDirs = fs
+    .readdirSync(extractRoot)
     .map(entry => path.join(extractRoot, entry))
     .filter(entryPath => {
       try {
@@ -1173,7 +1248,10 @@ const isWebSearchSkillBroken = (skillRoot: string): boolean => {
     if (!serverEntryContent.includes("TextDecoder('gb18030'")) {
       return true;
     }
-    if (serverEntryContent.includes('scoreDecodedJsonText') && serverEntryContent.includes('Request body decoded using gb18030 (score')) {
+    if (
+      serverEntryContent.includes('scoreDecodedJsonText') &&
+      serverEntryContent.includes('Request body decoded using gb18030 (score')
+    ) {
       return true;
     }
   } catch {
@@ -1187,15 +1265,18 @@ export class SkillManager {
   private watchers: fs.FSWatcher[] = [];
   private notifyTimer: NodeJS.Timeout | null = null;
   private changeListeners: Array<() => void> = [];
-  private pendingInstalls = new Map<string, {
-    tempDir: string;
-    cleanupPath: string | null;
-    root: string;
-    skillDirs: string[];
-    timer: NodeJS.Timeout;
-    isUpgrade?: boolean;
-    existingSkillDir?: string;
-  }>();
+  private pendingInstalls = new Map<
+    string,
+    {
+      tempDir: string;
+      cleanupPath: string | null;
+      root: string;
+      skillDirs: string[];
+      timer: NodeJS.Timeout;
+      isUpgrade?: boolean;
+      existingSkillDir?: string;
+    }
+  >();
   private upgradingSkillIds = new Set<string>();
   private deletingSkillIds = new Set<string>();
 
@@ -1236,13 +1317,18 @@ export class SkillManager {
         const originalDir = path.join(root, originalName);
 
         try {
-          if (fs.existsSync(originalDir) && fs.existsSync(path.join(originalDir, SKILL_FILE_NAME))) {
+          if (
+            fs.existsSync(originalDir) &&
+            fs.existsSync(path.join(originalDir, SKILL_FILE_NAME))
+          ) {
             // Upgrade completed successfully, clean up backup
             console.log(`[SkillManager] cleaning up completed upgrade backup: ${entry}`);
             fs.rmSync(backupDir, { recursive: true, force: true });
           } else {
             // Upgrade was interrupted, roll back
-            console.log(`[SkillManager] rolling back interrupted upgrade: ${entry} 鈫?${originalName}`);
+            console.log(
+              `[SkillManager] rolling back interrupted upgrade: ${entry} 鈫?${originalName}`,
+            );
             if (fs.existsSync(originalDir)) {
               fs.rmSync(originalDir, { recursive: true, force: true });
             }
@@ -1268,7 +1354,9 @@ export class SkillManager {
     const bundledRoot = this.getBundledSkillsRoot();
     console.log('[skills] syncBundledSkillsToUserData: bundledRoot =', bundledRoot);
     if (!bundledRoot || bundledRoot === userRoot || !fs.existsSync(bundledRoot)) {
-      console.log('[skills] syncBundledSkillsToUserData: bundledRoot skipped (missing or same as userRoot)');
+      console.log(
+        '[skills] syncBundledSkillsToUserData: bundledRoot skipped (missing or same as userRoot)',
+      );
       return;
     }
 
@@ -1292,8 +1380,12 @@ export class SkillManager {
       }
 
       const bundledSkillDirs = listSkillDirs(bundledRoot);
-      console.log('[skills] syncBundledSkillsToUserData: found', bundledSkillDirs.length, 'bundled skills');
-      bundledSkillDirs.forEach((dir) => {
+      console.log(
+        '[skills] syncBundledSkillsToUserData: found',
+        bundledSkillDirs.length,
+        'bundled skills',
+      );
+      bundledSkillDirs.forEach(dir => {
         const id = path.basename(dir);
         if (bundledIds && !bundledIds.has(id)) {
           console.log(`[skills] syncBundledSkillsToUserData: skipping non-bundled "${id}"`);
@@ -1308,7 +1400,10 @@ export class SkillManager {
         if (targetExists) {
           // Version-based update: if bundled has a version and it's newer, force update
           const bundledVer = this.getSkillVersion(dir);
-          if (bundledVer && compareVersions(bundledVer, this.getSkillVersion(targetDir) || '0.0.0') > 0) {
+          if (
+            bundledVer &&
+            compareVersions(bundledVer, this.getSkillVersion(targetDir) || '0.0.0') > 0
+          ) {
             shouldRepair = true;
             needsCleanCopy = true;
           }
@@ -1324,7 +1419,9 @@ export class SkillManager {
 
         if (targetExists && !shouldRepair) return;
         try {
-          console.log(`[skills] syncBundledSkillsToUserData: copying "${id}" from ${dir} to ${targetDir}`);
+          console.log(
+            `[skills] syncBundledSkillsToUserData: copying "${id}" from ${dir} to ${targetDir}`,
+          );
 
           // Preserve .env file before clean copy
           let envBackup: Buffer | null = null;
@@ -1450,7 +1547,12 @@ export class SkillManager {
       if (!fs.existsSync(root)) return;
       const skillDirs = listSkillDirs(root);
       skillDirs.forEach(dir => {
-        const skill = this.parseSkillDir(dir, state, defaults, builtInSkillIds.has(path.basename(dir)));
+        const skill = this.parseSkillDir(
+          dir,
+          state,
+          defaults,
+          builtInSkillIds.has(path.basename(dir)),
+        );
         if (!skill) return;
         skillMap.set(skill.id, skill);
       });
@@ -1473,7 +1575,10 @@ export class SkillManager {
     if (enabled.length === 0) return null;
 
     const skillEntries = enabled
-      .map(s => `  <skill><id>${s.id}</id><name>${s.name}</name><description>${s.description}</description><location>${s.skillPath}</location></skill>`)
+      .map(
+        s =>
+          `  <skill><id>${s.id}</id><name>${s.name}</name><description>${s.description}</description><location>${s.skillPath}</location></skill>`,
+      )
       .join('\n');
 
     return [
@@ -1522,7 +1627,6 @@ export class SkillManager {
   }
 
   private async _performDelete(id: string, root: string): Promise<SkillRecord[]> {
-
     let targetDir: string | null = resolveWithin(root, id);
     if (!fs.existsSync(targetDir)) {
       const bundledRoot = this.getBundledSkillsRoot();
@@ -1534,7 +1638,12 @@ export class SkillManager {
       }
     }
 
-    console.log('[skills] deleteSkill: id=%s, targetDir=%s, platform=%s', id, targetDir, process.platform);
+    console.log(
+      '[skills] deleteSkill: id=%s, targetDir=%s, platform=%s',
+      id,
+      targetDir,
+      process.platform,
+    );
 
     // Release directory handles held by fs.watch() before deleting;
     // on Windows, open handles prevent rmSync from removing the directory.
@@ -1562,7 +1671,11 @@ export class SkillManager {
           }
           const fallback = await tryWindowsDeleteFallbackAsync(targetDir);
           if (!fallback.success) {
-            console.warn('[skills] deleteSkill: Windows fallback failed for "%s": %s', id, fallback.detail || 'unknown');
+            console.warn(
+              '[skills] deleteSkill: Windows fallback failed for "%s": %s',
+              id,
+              fallback.detail || 'unknown',
+            );
             // Last resort: remove SKILL.md so listSkillDirs won't discover this
             // directory, then rename it to a tombstone cleaned up on next startup.
             try {
@@ -1572,7 +1685,10 @@ export class SkillManager {
               }
               const tombstone = targetDir + '.deleted.' + Date.now();
               fs.renameSync(targetDir, tombstone);
-              console.warn('[skills] deleteSkill: directory renamed to tombstone "%s" as last resort', path.basename(tombstone));
+              console.warn(
+                '[skills] deleteSkill: directory renamed to tombstone "%s" as last resort',
+                path.basename(tombstone),
+              );
               removedByFallback = true;
             } catch (renameError) {
               console.error('[skills] deleteSkill: last-resort rename also failed:', renameError);
@@ -1583,7 +1699,10 @@ export class SkillManager {
           }
         }
         if (removedByFallback) {
-          console.warn('[skills] deleteSkill: directory removed via Windows fallback in %dms', Date.now() - startMs);
+          console.warn(
+            '[skills] deleteSkill: directory removed via Windows fallback in %dms',
+            Date.now() - startMs,
+          );
         } else {
           console.log('[skills] deleteSkill: directory removed in %dms', Date.now() - startMs);
         }
@@ -1613,7 +1732,9 @@ export class SkillManager {
     const resolvedSource = await resolveModelScopeSkillInstallSource(source, {
       token: this.getModelScopeApiToken(),
       fetchImpl: (input, init) =>
-        session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<typeof fetch>,
+        session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
+          typeof fetch
+        >,
     });
     return resolvedSource;
   }
@@ -1645,7 +1766,7 @@ export class SkillManager {
         if (stat.isFile()) {
           if (isZipFile(localSource)) {
             console.log('[SkillManager] downloadSkill: detected local zip file');
-            const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
+            const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-zip-'));
             await extractZip(localSource, { dir: tempRoot });
             localSource = tempRoot;
             cleanupPath = tempRoot;
@@ -1653,19 +1774,22 @@ export class SkillManager {
             console.log('[SkillManager] downloadSkill: detected local SKILL.md file');
             localSource = path.dirname(localSource);
           } else {
-            return { success: false, error: 'Skill source must be a directory, zip file, or SKILL.md file' };
+            return {
+              success: false,
+              error: 'Skill source must be a directory, zip file, or SKILL.md file',
+            };
           }
         } else {
           console.log('[SkillManager] downloadSkill: detected local directory');
         }
       } else if (isRemoteZipUrl(resolvedSource)) {
         console.log('[SkillManager] downloadSkill: detected remote zip URL');
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-zip-'));
         cleanupPath = tempRoot;
         localSource = await downloadZipUrl(resolvedSource, tempRoot);
       } else if (isNpmPackageSpec(resolvedSource)) {
         console.log(`[SkillManager] downloadSkill: detected npm package spec "${resolvedSource}"`);
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-npm-'));
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-npm-'));
         cleanupPath = tempRoot;
         localSource = await downloadNpmPackage(resolvedSource, tempRoot);
         console.log(`[SkillManager] downloadSkill: npm package extracted to ${localSource}`);
@@ -1674,9 +1798,11 @@ export class SkillManager {
         if (!normalized) {
           return { success: false, error: t('skillErrInvalidSource') };
         }
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-'));
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-'));
         cleanupPath = tempRoot;
-        const repoName = normalizeFolderName(normalized.repoNameHint || deriveRepoName(normalized.repoUrl));
+        const repoName = normalizeFolderName(
+          normalized.repoNameHint || deriveRepoName(normalized.repoUrl),
+        );
         const clonePath = path.join(tempRoot, repoName);
         const githubSource = parseGithubRepoSource(normalized.repoUrl);
         let downloadedSourceRoot = clonePath;
@@ -1685,13 +1811,23 @@ export class SkillManager {
         // Fall back to git clone only for non-GitHub sources or if download fails.
         let downloaded = false;
         if (githubSource) {
-          console.log(`[SkillManager] downloadSkill: trying GitHub HTTP zip download for ${githubSource.owner}/${githubSource.repo}`);
+          console.log(
+            `[SkillManager] downloadSkill: trying GitHub HTTP zip download for ${githubSource.owner}/${githubSource.repo}`,
+          );
           try {
-            downloadedSourceRoot = await downloadGithubArchive(githubSource, tempRoot, normalized.ref);
+            downloadedSourceRoot = await downloadGithubArchive(
+              githubSource,
+              tempRoot,
+              normalized.ref,
+            );
             downloaded = true;
-            console.log(`[SkillManager] downloadSkill: GitHub HTTP download succeeded 鈫?${downloadedSourceRoot}`);
+            console.log(
+              `[SkillManager] downloadSkill: GitHub HTTP download succeeded 鈫?${downloadedSourceRoot}`,
+            );
           } catch (err) {
-            console.log(`[SkillManager] downloadSkill: GitHub HTTP download failed: ${err instanceof Error ? err.message : err}, falling back to git clone`);
+            console.log(
+              `[SkillManager] downloadSkill: GitHub HTTP download failed: ${err instanceof Error ? err.message : err}, falling back to git clone`,
+            );
           }
         }
 
@@ -1709,8 +1845,8 @@ export class SkillManager {
             const errno = (error as NodeJS.ErrnoException | null)?.code;
             if (errno === 'ENOENT' && process.platform === 'win32') {
               throw new Error(
-                'Failed to download skill. Git is not installed.'
-                + ' Please install Git for Windows, or use a GitHub URL (HTTP download).'
+                'Failed to download skill. Git is not installed.' +
+                  ' Please install Git for Windows, or use a GitHub URL (HTTP download).',
               );
             }
             throw error;
@@ -1720,14 +1856,20 @@ export class SkillManager {
         if (normalized.sourceSubpath) {
           const scopedSource = resolveWithin(downloadedSourceRoot, normalized.sourceSubpath);
           if (!fs.existsSync(scopedSource)) {
-            return { success: false, error: `Path "${normalized.sourceSubpath}" not found in repository` };
+            return {
+              success: false,
+              error: `Path "${normalized.sourceSubpath}" not found in repository`,
+            };
           }
           const scopedStat = fs.statSync(scopedSource);
           if (scopedStat.isFile()) {
             if (path.basename(scopedSource) === SKILL_FILE_NAME) {
               localSource = path.dirname(scopedSource);
             } else {
-              return { success: false, error: 'GitHub path must point to a directory or SKILL.md file' };
+              return {
+                success: false,
+                error: 'GitHub path must point to a directory or SKILL.md file',
+              };
             }
           } else {
             localSource = scopedSource;
@@ -1735,7 +1877,6 @@ export class SkillManager {
         } else {
           localSource = downloadedSourceRoot;
         }
-
       }
 
       const skillDirs = collectSkillDirsFromSource(localSource);
@@ -1748,13 +1889,19 @@ export class SkillManager {
       // Security scan before installation
       let auditReport: SkillSecurityReport | null = null;
       try {
-        console.log(`[SkillManager] Starting security scan for ${skillDirs.length} skill dir(s)...`);
+        console.log(
+          `[SkillManager] Starting security scan for ${skillDirs.length} skill dir(s)...`,
+        );
         const reports = await scanMultipleSkillDirs(skillDirs);
         auditReport = mergeReports(reports);
         if (auditReport) {
-          console.log(`[SkillManager] Security scan complete: riskLevel=${auditReport.riskLevel}, score=${auditReport.riskScore}, findings=${auditReport.findings.length}, duration=${auditReport.scanDurationMs}ms`);
+          console.log(
+            `[SkillManager] Security scan complete: riskLevel=${auditReport.riskLevel}, score=${auditReport.riskScore}, findings=${auditReport.findings.length}, duration=${auditReport.scanDurationMs}ms`,
+          );
           for (const f of auditReport.findings) {
-            console.log(`[SkillManager]   [${f.severity}] ${f.dimension} | ${f.ruleId} 鈫?${f.file}${f.line ? ':' + f.line : ''}`);
+            console.log(
+              `[SkillManager]   [${f.severity}] ${f.dimension} | ${f.ruleId} 鈫?${f.file}${f.line ? ':' + f.line : ''}`,
+            );
           }
         }
       } catch (err) {
@@ -1764,15 +1911,20 @@ export class SkillManager {
       // If risk detected, cache for user confirmation instead of auto-installing
       if (auditReport && auditReport.riskLevel !== 'safe') {
         const pendingId = crypto.randomUUID();
-        console.log(`[SkillManager] Risk detected (${auditReport.riskLevel}), pending user confirmation: ${pendingId}`);
-        const timer = setTimeout(() => {
-          const pending = this.pendingInstalls.get(pendingId);
-          if (pending) {
-            cleanupPathSafely(pending.cleanupPath);
-            this.pendingInstalls.delete(pendingId);
-            console.log(`[SkillManager] Pending install ${pendingId} expired (TTL)`);
-          }
-        }, 5 * 60 * 1000);
+        console.log(
+          `[SkillManager] Risk detected (${auditReport.riskLevel}), pending user confirmation: ${pendingId}`,
+        );
+        const timer = setTimeout(
+          () => {
+            const pending = this.pendingInstalls.get(pendingId);
+            if (pending) {
+              cleanupPathSafely(pending.cleanupPath);
+              this.pendingInstalls.delete(pendingId);
+              console.log(`[SkillManager] Pending install ${pendingId} expired (TTL)`);
+            }
+          },
+          5 * 60 * 1000,
+        );
 
         this.pendingInstalls.set(pendingId, {
           tempDir: localSource,
@@ -1802,9 +1954,18 @@ export class SkillManager {
         cpRecursiveSync(skillDir, targetDir);
         const normalizeResult = normalizeWindowsSkillDirectoryAttrs(targetDir);
         if (normalizeResult.success) {
-          console.log('[skills] install normalization applied for "%s" at %s', folderName, targetDir);
+          console.log(
+            '[skills] install normalization applied for "%s" at %s',
+            folderName,
+            targetDir,
+          );
         } else {
-          console.warn('[skills] install normalization failed for "%s" at %s: %s', folderName, targetDir, normalizeResult.detail || 'unknown');
+          console.warn(
+            '[skills] install normalization failed for "%s" at %s: %s',
+            folderName,
+            targetDir,
+            normalizeResult.detail || 'unknown',
+          );
         }
       }
 
@@ -1816,11 +1977,17 @@ export class SkillManager {
       return { success: true, skills: this.listSkills() };
     } catch (error) {
       cleanupPathSafely(cleanupPath);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to download skill' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to download skill',
+      };
     }
   }
 
-  async upgradeSkill(skillId: string, downloadUrl: string): Promise<{
+  async upgradeSkill(
+    skillId: string,
+    downloadUrl: string,
+  ): Promise<{
     success: boolean;
     skills?: SkillRecord[];
     error?: string;
@@ -1852,24 +2019,31 @@ export class SkillManager {
     }
   }
 
-  private async performUpgradeDownload(skillId: string, downloadUrl: string, existingSkillDir: string): Promise<{
+  private async performUpgradeDownload(
+    skillId: string,
+    downloadUrl: string,
+    existingSkillDir: string,
+  ): Promise<{
     success: boolean;
     skills?: SkillRecord[];
     error?: string;
     auditReport?: SkillSecurityReport;
     pendingInstallId?: string;
-  }> {    let cleanupPath: string | null = null;
+  }> {
+    let cleanupPath: string | null = null;
     try {
       const resolvedDownloadUrl = await this.resolveMarketplaceSkillSource(downloadUrl);
       if (!resolvedDownloadUrl) {
         return { success: false, error: t('skillErrModelScopeInstallUnavailable') };
       }
 
-      console.log(`[SkillManager] starting upgrade for skill "${skillId}" via "${resolvedDownloadUrl}"`);
+      console.log(
+        `[SkillManager] starting upgrade for skill "${skillId}" via "${resolvedDownloadUrl}"`,
+      );
       const root = this.ensureSkillsRoot();
 
       // Download new version (reuse downloadSkill's download logic)
-      const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-upgrade-'));
+      const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-upgrade-'));
       cleanupPath = tempRoot;
 
       let localSource: string;
@@ -1881,7 +2055,9 @@ export class SkillManager {
           cleanupPathSafely(cleanupPath);
           return { success: false, error: 'Invalid download URL' };
         }
-        const repoName = normalizeFolderName(normalized.repoNameHint || deriveRepoName(normalized.repoUrl));
+        const repoName = normalizeFolderName(
+          normalized.repoNameHint || deriveRepoName(normalized.repoUrl),
+        );
         const clonePath = path.join(tempRoot, repoName);
         const githubSource = parseGithubRepoSource(normalized.repoUrl);
         let downloadedSourceRoot = clonePath;
@@ -1889,7 +2065,11 @@ export class SkillManager {
 
         if (githubSource) {
           try {
-            downloadedSourceRoot = await downloadGithubArchive(githubSource, tempRoot, normalized.ref);
+            downloadedSourceRoot = await downloadGithubArchive(
+              githubSource,
+              tempRoot,
+              normalized.ref,
+            );
             downloaded = true;
           } catch {
             // Fall through to git clone
@@ -1902,14 +2082,17 @@ export class SkillManager {
           // marketplace URL. The installed repo's .git/config already points at
           // the correct remote that git can fetch from directly.
 
-
           let cloneUrl = normalized.repoUrl;
           if (fs.existsSync(path.join(existingSkillDir, '.git'))) {
             try {
-              const { stdout } = await runCommandCapture(gitRuntime.command, ['remote', 'get-url', 'origin'], {
-                cwd: existingSkillDir,
-                env: gitRuntime.env,
-              });
+              const { stdout } = await runCommandCapture(
+                gitRuntime.command,
+                ['remote', 'get-url', 'origin'],
+                {
+                  cwd: existingSkillDir,
+                  env: gitRuntime.env,
+                },
+              );
               const remoteUrl = stdout.trim();
               if (remoteUrl) {
                 cloneUrl = remoteUrl;
@@ -1929,8 +2112,13 @@ export class SkillManager {
             // If clone fails with a redirect error, fall back to fetching inside the
             // existing repo 鈥?its on-disk remote URL may survive a redirect that a
             // fresh clone cannot handle.
-            if (/unable to update url base from redirection/i.test(cloneMsg) || /redirect/i.test(cloneMsg)) {
-              console.log(`[SkillManager] clone redirect fallback, fetching in existing repo for "${skillId}"`);
+            if (
+              /unable to update url base from redirection/i.test(cloneMsg) ||
+              /redirect/i.test(cloneMsg)
+            ) {
+              console.log(
+                `[SkillManager] clone redirect fallback, fetching in existing repo for "${skillId}"`,
+              );
               const fetchArgs = ['fetch', '--depth', '1', 'origin'];
               if (normalized.ref) fetchArgs.push(normalized.ref);
               await runCommand(gitRuntime.command, fetchArgs, {
@@ -1956,9 +2144,10 @@ export class SkillManager {
             cleanupPathSafely(cleanupPath);
             return { success: false, error: `Path "${normalized.sourceSubpath}" not found` };
           }
-          localSource = fs.statSync(scopedSource).isFile() && path.basename(scopedSource) === SKILL_FILE_NAME
-            ? path.dirname(scopedSource)
-            : scopedSource;
+          localSource =
+            fs.statSync(scopedSource).isFile() && path.basename(scopedSource) === SKILL_FILE_NAME
+              ? path.dirname(scopedSource)
+              : scopedSource;
         } else {
           localSource = downloadedSourceRoot;
         }
@@ -1971,7 +2160,8 @@ export class SkillManager {
       }
 
       // Find the matching skill dir for this ID
-      const matchingSkillDir = skillDirs.find(d => normalizeFolderName(path.basename(d)) === skillId) || skillDirs[0];
+      const matchingSkillDir =
+        skillDirs.find(d => normalizeFolderName(path.basename(d)) === skillId) || skillDirs[0];
 
       // Security scan
       let auditReport: SkillSecurityReport | null = null;
@@ -1985,14 +2175,19 @@ export class SkillManager {
       // If risk detected, cache for user confirmation
       if (auditReport && auditReport.riskLevel !== 'safe') {
         const pendingId = crypto.randomUUID();
-        console.log(`[SkillManager] Upgrade risk detected (${auditReport.riskLevel}), pending confirmation: ${pendingId}`);
-        const timer = setTimeout(() => {
-          const pending = this.pendingInstalls.get(pendingId);
-          if (pending) {
-            cleanupPathSafely(pending.cleanupPath);
-            this.pendingInstalls.delete(pendingId);
-          }
-        }, 5 * 60 * 1000);
+        console.log(
+          `[SkillManager] Upgrade risk detected (${auditReport.riskLevel}), pending confirmation: ${pendingId}`,
+        );
+        const timer = setTimeout(
+          () => {
+            const pending = this.pendingInstalls.get(pendingId);
+            if (pending) {
+              cleanupPathSafely(pending.cleanupPath);
+              this.pendingInstalls.delete(pendingId);
+            }
+          },
+          5 * 60 * 1000,
+        );
 
         this.pendingInstalls.set(pendingId, {
           tempDir: localSource,
@@ -2020,7 +2215,10 @@ export class SkillManager {
       return { success: true, skills: this.listSkills() };
     } catch (error) {
       cleanupPathSafely(cleanupPath);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to upgrade skill' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to upgrade skill',
+      };
     }
   }
 
@@ -2069,7 +2267,7 @@ export class SkillManager {
 
   confirmPendingInstall(
     pendingId: string,
-    action: SecurityReportAction
+    action: SecurityReportAction,
   ): { success: boolean; skills?: SkillRecord[]; error?: string } {
     console.log(`[SkillManager] confirmPendingInstall: id=${pendingId}, action=${action}`);
     const pending = this.pendingInstalls.get(pendingId);
@@ -2108,9 +2306,18 @@ export class SkillManager {
         cpRecursiveSync(skillDir, targetDir);
         const normalizeResult = normalizeWindowsSkillDirectoryAttrs(targetDir);
         if (normalizeResult.success) {
-          console.log('[skills] install normalization applied for "%s" at %s', folderName, targetDir);
+          console.log(
+            '[skills] install normalization applied for "%s" at %s',
+            folderName,
+            targetDir,
+          );
         } else {
-          console.warn('[skills] install normalization failed for "%s" at %s: %s', folderName, targetDir, normalizeResult.detail || 'unknown');
+          console.warn(
+            '[skills] install normalization failed for "%s" at %s: %s',
+            folderName,
+            targetDir,
+            normalizeResult.detail || 'unknown',
+          );
         }
         installedIds.push(path.basename(targetDir));
       }
@@ -2149,10 +2356,14 @@ export class SkillManager {
               try {
                 fs.rmSync(path.join(root, entry), { recursive: true, force: true });
                 console.log('[skills] startWatching: cleaned up tombstone "%s"', entry);
-              } catch { /* will retry next time */ }
+              } catch {
+                /* will retry next time */
+              }
             }
           }
-        } catch { /* ignore scan errors */ }
+        } catch {
+          /* ignore scan errors */
+        }
       }
     }
 
@@ -2165,19 +2376,30 @@ export class SkillManager {
       // Gateway restarts.  Legitimate skill changes always go through explicit
       // code paths (installSkill, deleteSkill, etc.) that call
       // notifySkillsChanged directly.
-      if (!filename) { if (process.platform !== 'win32') this.scheduleNotify(); return; }
+      if (!filename) {
+        if (process.platform !== 'win32') this.scheduleNotify();
+        return;
+      }
       // Ignore hidden files/dirs and known non-skill files
       if (filename.startsWith('.')) return;
       // Accept directory changes (new skill added/removed) and config file
-      if (filename === SKILLS_CONFIG_FILE) { this.scheduleNotify(); return; }
+      if (filename === SKILLS_CONFIG_FILE) {
+        this.scheduleNotify();
+        return;
+      }
       // For other filenames, check if it looks like a skill directory entry
       // (no extension = likely a directory name)
-      if (!path.extname(filename)) { this.scheduleNotify(); }
+      if (!path.extname(filename)) {
+        this.scheduleNotify();
+      }
     };
 
     // Skill-directory-level watch: only react to skill definition file changes.
     const skillDirWatchHandler = (_event: string, filename: string | null) => {
-      if (!filename) { if (process.platform !== 'win32') this.scheduleNotify(); return; }
+      if (!filename) {
+        if (process.platform !== 'win32') this.scheduleNotify();
+        return;
+      }
       if (filename === SKILL_FILE_NAME || filename === SKILLS_CONFIG_FILE) {
         this.scheduleNotify();
       }
@@ -2255,15 +2477,20 @@ export class SkillManager {
     dir: string,
     state: SkillStateMap,
     defaults: Record<string, SkillDefaultConfig>,
-    isBuiltIn: boolean
+    isBuiltIn: boolean,
   ): SkillRecord | null {
     const skillFile = path.join(dir, SKILL_FILE_NAME);
     if (!fs.existsSync(skillFile)) return null;
     try {
       const raw = fs.readFileSync(skillFile, 'utf8');
       const { frontmatter, content } = parseFrontmatter(raw);
-      const name = (String(frontmatter.name || '') || path.basename(dir)).trim() || path.basename(dir);
-      const description = (String(frontmatter.description || '') || extractDescription(content) || name).trim();
+      const name =
+        (String(frontmatter.name || '') || path.basename(dir)).trim() || path.basename(dir);
+      const description = (
+        String(frontmatter.description || '') ||
+        extractDescription(content) ||
+        name
+      ).trim();
       const isOfficial = isTruthy(frontmatter.official) || isTruthy(frontmatter.isOfficial);
       const meta = frontmatter.metadata as Record<string, unknown> | undefined;
       const v = frontmatter.version ?? meta?.version;
@@ -2273,7 +2500,18 @@ export class SkillManager {
       const prompt = content.trim();
       const defaultEnabled = defaults[id]?.enabled ?? true;
       const enabled = state[id]?.enabled ?? defaultEnabled;
-      return { id, name, description, enabled, isOfficial, isBuiltIn, updatedAt, prompt, skillPath: skillFile, version };
+      return {
+        id,
+        name,
+        description,
+        enabled,
+        isOfficial,
+        isBuiltIn,
+        updatedAt,
+        prompt,
+        skillPath: skillFile,
+        version,
+      };
     } catch (error) {
       console.warn('[skills] Failed to parse skill:', dir, error);
       return null;
@@ -2377,7 +2615,11 @@ export class SkillManager {
     return path.resolve(projectRoot, SKILLS_DIR_NAME);
   }
 
-  getSkillConfig(skillId: string): { success: boolean; config?: Record<string, string>; error?: string } {
+  getSkillConfig(skillId: string): {
+    success: boolean;
+    config?: Record<string, string>;
+    error?: string;
+  } {
     try {
       const skillDir = this.resolveSkillDir(skillId);
       const envPath = path.join(skillDir, '.env');
@@ -2405,11 +2647,17 @@ export class SkillManager {
       }
       return { success: true, config };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to read skill config' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to read skill config',
+      };
     }
   }
 
-  setSkillConfig(skillId: string, config: Record<string, string>): { success: boolean; error?: string } {
+  setSkillConfig(
+    skillId: string,
+    config: Record<string, string>,
+  ): { success: boolean; error?: string } {
     try {
       const skillDir = this.resolveSkillDir(skillId);
       const envPath = path.join(skillDir, '.env');
@@ -2418,7 +2666,12 @@ export class SkillManager {
         .map(([key, value]) => {
           // Wrap value in double quotes if it contains characters that dotenv
           // would misinterpret (e.g. # treated as inline comment, or spaces)
-          if (value.includes('#') || value.includes(' ') || value.includes('"') || value.includes("'")) {
+          if (
+            value.includes('#') ||
+            value.includes(' ') ||
+            value.includes('"') ||
+            value.includes("'")
+          ) {
             // Escape any existing double quotes inside the value
             const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
             return `${key}="${escaped}"`;
@@ -2428,7 +2681,10 @@ export class SkillManager {
       fs.writeFileSync(envPath, lines.join('\n') + '\n', 'utf8');
       return { success: true };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to write skill config' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to write skill config',
+      };
     }
   }
 
@@ -2507,7 +2763,8 @@ export class SkillManager {
     // Check if npm is available
     const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     if (!hasCommand(npmCommand, env) && !hasCommand('npm', env)) {
-      const errorMsg = 'npm is not available and skill cannot be repaired from bundled resources. Please install Node.js from https://nodejs.org/';
+      const errorMsg =
+        'npm is not available and skill cannot be repaired from bundled resources. Please install Node.js from https://nodejs.org/';
       console.error(`[skills] ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
@@ -2563,7 +2820,7 @@ export class SkillManager {
 
   async testEmailConnectivity(
     skillId: string,
-    config: Record<string, string>
+    config: Record<string, string>,
   ): Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }> {
     try {
       const skillDir = this.resolveSkillDir(skillId);
@@ -2591,7 +2848,7 @@ export class SkillManager {
       const envOverrides = Object.fromEntries(
         Object.entries(config ?? {})
           .filter(([key]) => key.trim())
-          .map(([key, value]) => [key, String(value ?? '')])
+          .map(([key, value]) => [key, String(value ?? '')]),
       );
 
       console.log('[email-connectivity] Running IMAP test (list-mailboxes)...');
@@ -2600,18 +2857,25 @@ export class SkillManager {
         imapScript,
         ['list-mailboxes'],
         envOverrides,
-        20000
+        20000,
       );
-      console.log('[email-connectivity] IMAP result:', JSON.stringify({
-        success: imapResult.success,
-        exitCode: imapResult.exitCode,
-        timedOut: imapResult.timedOut,
-        durationMs: imapResult.durationMs,
-        stdout: imapResult.stdout?.slice(0, 500),
-        stderr: imapResult.stderr?.slice(0, 500),
-        error: imapResult.error,
-        spawnErrorCode: imapResult.spawnErrorCode,
-      }, null, 2));
+      console.log(
+        '[email-connectivity] IMAP result:',
+        JSON.stringify(
+          {
+            success: imapResult.success,
+            exitCode: imapResult.exitCode,
+            timedOut: imapResult.timedOut,
+            durationMs: imapResult.durationMs,
+            stdout: imapResult.stdout?.slice(0, 500),
+            stderr: imapResult.stderr?.slice(0, 500),
+            error: imapResult.error,
+            spawnErrorCode: imapResult.spawnErrorCode,
+          },
+          null,
+          2,
+        ),
+      );
 
       console.log('[email-connectivity] Running SMTP test (verify)...');
       const smtpResult = await this.runSkillScriptWithEnv(
@@ -2619,26 +2883,40 @@ export class SkillManager {
         smtpScript,
         ['verify'],
         envOverrides,
-        20000
+        20000,
       );
-      console.log('[email-connectivity] SMTP result:', JSON.stringify({
-        success: smtpResult.success,
-        exitCode: smtpResult.exitCode,
-        timedOut: smtpResult.timedOut,
-        durationMs: smtpResult.durationMs,
-        stdout: smtpResult.stdout?.slice(0, 500),
-        stderr: smtpResult.stderr?.slice(0, 500),
-        error: smtpResult.error,
-        spawnErrorCode: smtpResult.spawnErrorCode,
-      }, null, 2));
+      console.log(
+        '[email-connectivity] SMTP result:',
+        JSON.stringify(
+          {
+            success: smtpResult.success,
+            exitCode: smtpResult.exitCode,
+            timedOut: smtpResult.timedOut,
+            durationMs: smtpResult.durationMs,
+            stdout: smtpResult.stdout?.slice(0, 500),
+            stderr: smtpResult.stderr?.slice(0, 500),
+            error: smtpResult.error,
+            spawnErrorCode: smtpResult.spawnErrorCode,
+          },
+          null,
+          2,
+        ),
+      );
 
       const checks: EmailConnectivityCheck[] = [
         this.buildEmailConnectivityCheck('imap_connection', imapResult),
         this.buildEmailConnectivityCheck('smtp_connection', smtpResult),
       ];
-      const verdict: EmailConnectivityVerdict = checks.every(check => check.level === 'pass') ? 'pass' : 'fail';
+      const verdict: EmailConnectivityVerdict = checks.every(check => check.level === 'pass')
+        ? 'pass'
+        : 'fail';
 
-      console.log('[email-connectivity] Final verdict:', verdict, 'checks:', JSON.stringify(checks, null, 2));
+      console.log(
+        '[email-connectivity] Final verdict:',
+        verdict,
+        'checks:',
+        JSON.stringify(checks, null, 2),
+      );
 
       return {
         success: true,
@@ -2666,7 +2944,9 @@ export class SkillManager {
     return path.dirname(skill.skillPath);
   }
 
-  private getScriptRuntimeCandidates(env: NodeJS.ProcessEnv): Array<{ command: string; extraEnv?: NodeJS.ProcessEnv }> {
+  private getScriptRuntimeCandidates(
+    env: NodeJS.ProcessEnv,
+  ): Array<{ command: string; extraEnv?: NodeJS.ProcessEnv }> {
     const candidates: Array<{ command: string; extraEnv?: NodeJS.ProcessEnv }> = [];
     if (hasCommand('node', env)) {
       candidates.push({ command: 'node' });
@@ -2683,7 +2963,7 @@ export class SkillManager {
     scriptPath: string,
     scriptArgs: string[],
     envOverrides: Record<string, string>,
-    timeoutMs: number
+    timeoutMs: number,
   ): Promise<SkillScriptRunResult> {
     let lastResult: SkillScriptRunResult | null = null;
 
@@ -2711,15 +2991,17 @@ export class SkillManager {
       return result;
     }
 
-    return lastResult ?? {
-      success: false,
-      exitCode: null,
-      stdout: '',
-      stderr: '',
-      durationMs: 0,
-      timedOut: false,
-      error: 'Failed to run skill script',
-    };
+    return (
+      lastResult ?? {
+        success: false,
+        exitCode: null,
+        stdout: '',
+        stderr: '',
+        durationMs: 0,
+        timedOut: false,
+        error: 'Failed to run skill script',
+      }
+    );
   }
 
   private parseScriptMessage(stdout: string): string | null {
@@ -2728,7 +3010,12 @@ export class SkillManager {
     }
     try {
       const parsed = JSON.parse(stdout);
-      if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string' && parsed.message.trim()) {
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        typeof parsed.message === 'string' &&
+        parsed.message.trim()
+      ) {
         return parsed.message.trim();
       }
       return null;
@@ -2738,16 +3025,18 @@ export class SkillManager {
   }
 
   private getLastOutputLine(text: string): string {
-    return text
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean)
-      .slice(-1)[0] || '';
+    return (
+      text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .slice(-1)[0] || ''
+    );
   }
 
   private buildEmailConnectivityCheck(
     code: EmailConnectivityCheckCode,
-    result: SkillScriptRunResult
+    result: SkillScriptRunResult,
   ): EmailConnectivityCheck {
     const label = code === 'imap_connection' ? 'IMAP' : 'SMTP';
 
@@ -2763,9 +3052,7 @@ export class SkillManager {
 
     const message = result.timedOut
       ? `${label} connectivity check timed out`
-      : result.error
-        || this.getLastOutputLine(result.stderr)
-        || `${label} connection failed`;
+      : result.error || this.getLastOutputLine(result.stderr) || `${label} connection failed`;
 
     return {
       code,
@@ -2786,7 +3073,11 @@ export class SkillManager {
         repoUrl: `https://github.com/${source}.git`,
       };
     }
-    if (source.startsWith('http://') || source.startsWith('https://') || source.startsWith('git@')) {
+    if (
+      source.startsWith('http://') ||
+      source.startsWith('https://') ||
+      source.startsWith('git@')
+    ) {
       return {
         repoUrl: source,
       };

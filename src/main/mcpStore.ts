@@ -95,7 +95,8 @@ export class McpStore {
     if (data.args !== undefined) config.args = data.args;
     if (data.env !== undefined && Object.keys(data.env).length > 0) config.env = data.env;
     if (data.url !== undefined) config.url = data.url;
-    if (data.headers !== undefined && Object.keys(data.headers).length > 0) config.headers = data.headers;
+    if (data.headers !== undefined && Object.keys(data.headers).length > 0)
+      config.headers = data.headers;
     if (data.isBuiltIn) config.isBuiltIn = true;
     if (data.githubUrl) config.githubUrl = data.githubUrl;
     if (data.registryId) config.registryId = data.registryId;
@@ -108,7 +109,7 @@ export class McpStore {
         'SELECT id, name, description, enabled, transport_type, config_json, created_at, updated_at FROM mcp_servers ORDER BY created_at ASC',
       )
       .all() as McpServerRow[];
-    return rows.map((row) => this.deserializeRow(row));
+    return rows.map(row => this.deserializeRow(row));
   }
 
   getServer(id: string): McpServerRecord | null {
@@ -191,6 +192,6 @@ export class McpStore {
         'SELECT id, name, description, enabled, transport_type, config_json, created_at, updated_at FROM mcp_servers WHERE enabled = 1 ORDER BY created_at ASC',
       )
       .all() as McpServerRow[];
-    return rows.map((row) => this.deserializeRow(row));
+    return rows.map(row => this.deserializeRow(row));
   }
 }

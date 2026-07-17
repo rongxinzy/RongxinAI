@@ -37,7 +37,7 @@ const {
 test('parseMemoryMd accepts single-character entries', () => {
   const content = '# Memories\n\n- A\n- Hello world\n- B\n';
   const entries = parseMemoryMd(content);
-  const texts = entries.map((e) => e.text);
+  const texts = entries.map(e => e.text);
   assert.ok(texts.includes('A'), 'Single char "A" should be parsed');
   assert.ok(texts.includes('B'), 'Single char "B" should be parsed');
   assert.ok(texts.includes('Hello world'), '"Hello world" should be parsed');

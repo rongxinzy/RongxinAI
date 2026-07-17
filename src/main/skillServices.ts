@@ -68,7 +68,7 @@ function buildSkillServiceEnv(): Record<string, string | undefined> {
 
   // Expose Electron executable so skill scripts can run JS with ELECTRON_RUN_AS_NODE
   // even when system Node.js is not installed.
-  env.LOBSTERAI_ELECTRON_PATH = electronNodeRuntimePath;
+  env.ZHIYUAN_ELECTRON_PATH = electronNodeRuntimePath;
   appendPythonRuntimeToEnv(env);
 
   return env;
@@ -90,10 +90,12 @@ export class SkillServiceManager {
     try {
       const startScript = fs.readFileSync(startServerScript, 'utf-8');
       const searchScriptContent = fs.readFileSync(searchScript, 'utf-8');
-      return startScript.includes('WEB_SEARCH_FORCE_REPAIR')
-        && startScript.includes('detect_healthy_bridge_server')
-        && searchScriptContent.includes('ACTIVE_SERVER_URL')
-        && searchScriptContent.includes('try_switch_to_local_server');
+      return (
+        startScript.includes('WEB_SEARCH_FORCE_REPAIR') &&
+        startScript.includes('detect_healthy_bridge_server') &&
+        searchScriptContent.includes('ACTIVE_SERVER_URL') &&
+        searchScriptContent.includes('try_switch_to_local_server')
+      );
     } catch {
       return false;
     }
@@ -102,8 +104,10 @@ export class SkillServiceManager {
   private hasLegacyWebSearchEncodingHeuristic(serverEntry: string): boolean {
     try {
       const content = fs.readFileSync(serverEntry, 'utf-8');
-      return content.includes('scoreDecodedJsonText')
-        && content.includes('Request body decoded using gb18030 (score');
+      return (
+        content.includes('scoreDecodedJsonText') &&
+        content.includes('Request body decoded using gb18030 (score')
+      );
     } catch {
       return true;
     }
@@ -174,9 +178,11 @@ export class SkillServiceManager {
       path.join(skillPath, 'dist', 'server', 'index.js'),
       path.join(skillPath, 'node_modules', 'iconv-lite', 'encodings', 'index.js'),
     ];
-    return requiredPaths.every(requiredPath => fs.existsSync(requiredPath))
-      && this.hasWebSearchRuntimeScriptSupport(skillPath)
-      && !this.isWebSearchDistOutdated(skillPath);
+    return (
+      requiredPaths.every(requiredPath => fs.existsSync(requiredPath)) &&
+      this.hasWebSearchRuntimeScriptSupport(skillPath) &&
+      !this.isWebSearchDistOutdated(skillPath)
+    );
   }
 
   private hasCommand(command: string, env: NodeJS.ProcessEnv): boolean {
@@ -197,7 +203,9 @@ export class SkillServiceManager {
       path.join(app.getAppPath(), 'SKILLs', 'web-search'),
     ];
 
-    const bundledPath = candidates.find(candidate => candidate !== skillPath && fs.existsSync(candidate));
+    const bundledPath = candidates.find(
+      candidate => candidate !== skillPath && fs.existsSync(candidate),
+    );
     if (!bundledPath) {
       return;
     }
@@ -208,13 +216,18 @@ export class SkillServiceManager {
       });
       console.log('[SkillServices] Repaired web-search runtime from bundled resources');
     } catch (error) {
-      console.warn('[SkillServices] Failed to repair web-search runtime from bundled resources:', error);
+      console.warn(
+        '[SkillServices] Failed to repair web-search runtime from bundled resources:',
+        error,
+      );
     }
   }
 
-  private resolveNodeRuntime(
-    env: NodeJS.ProcessEnv
-  ): { command: string; args: string[]; extraEnv?: NodeJS.ProcessEnv } {
+  private resolveNodeRuntime(env: NodeJS.ProcessEnv): {
+    command: string;
+    args: string[];
+    extraEnv?: NodeJS.ProcessEnv;
+  } {
     if (this.hasCommand('node', env)) {
       return { command: 'node', args: [] };
     }
@@ -238,10 +251,11 @@ export class SkillServiceManager {
 
     const nodeModules = path.join(skillPath, 'node_modules');
     const distDir = path.join(skillPath, 'dist');
-    const env = this.skillEnv as NodeJS.ProcessEnv ?? process.env;
+    const env = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
     const npmAvailable = this.hasCommand('npm', env);
 
-    const shouldInstallDeps = !fs.existsSync(nodeModules) || !this.isWebSearchRuntimeHealthy(skillPath);
+    const shouldInstallDeps =
+      !fs.existsSync(nodeModules) || !this.isWebSearchRuntimeHealthy(skillPath);
     if (shouldInstallDeps) {
       if (!npmAvailable) {
         throw new Error('Web-search runtime is incomplete and npm is not available to repair it');
@@ -253,7 +267,9 @@ export class SkillServiceManager {
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
     if (shouldCompileDist) {
       if (!npmAvailable) {
-        throw new Error('Web-search dist files are missing/outdated and npm is not available to rebuild them');
+        throw new Error(
+          'Web-search dist files are missing/outdated and npm is not available to rebuild them',
+        );
       }
       console.log('[SkillServices] Compiling web-search TypeScript...');
       execSync('npm run build', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
@@ -340,13 +356,13 @@ export class SkillServiceManager {
     const logFile = path.join(skillPath, '.server.log');
     const serverEntry = path.join(skillPath, 'dist', 'server', 'index.js');
     this.ensureWebSearchRuntimeReady(skillPath);
-    const baseEnv = this.skillEnv as NodeJS.ProcessEnv ?? process.env;
+    const baseEnv = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
     const runtime = this.resolveNodeRuntime(baseEnv);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();
     const env = {
       ...baseEnv,
       ...(runtime.extraEnv ?? {}),
-      LOBSTERAI_ELECTRON_PATH: electronNodeRuntimePath,
+      ZHIYUAN_ELECTRON_PATH: electronNodeRuntimePath,
     };
 
     // Node/Electron validates stdio streams synchronously. Use fd to avoid
@@ -369,7 +385,9 @@ export class SkillServiceManager {
     child.unref();
 
     const runtimeLabel = runtime.command === 'node' ? 'node' : 'electron-node';
-    console.log(`[SkillServices] Web Search Bridge Server starting (PID: ${child.pid}, runtime: ${runtimeLabel})`);
+    console.log(
+      `[SkillServices] Web Search Bridge Server starting (PID: ${child.pid}, runtime: ${runtimeLabel})`,
+    );
     console.log(`[SkillServices] Logs: ${logFile}`);
   }
 
@@ -473,7 +491,7 @@ export class SkillServiceManager {
    */
   getStatus(): { webSearch: boolean } {
     return {
-      webSearch: this.isWebSearchServiceRunning()
+      webSearch: this.isWebSearchServiceRunning(),
     };
   }
 
@@ -484,7 +502,7 @@ export class SkillServiceManager {
     try {
       const response = await fetch('http://127.0.0.1:8923/api/health', {
         method: 'GET',
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(3000),
       });
       return response.ok;
     } catch {
