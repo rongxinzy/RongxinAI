@@ -233,6 +233,8 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 
 项目使用两套 UI 组件库。**所有 UI 代码必须优先使用这些组件，禁止自造轮子。**
 
+**设计标准见 `DESIGN.md`**（色彩、字体、字号、字重、行高、圆角、阴影、间距、边框、透明度、动效的项目级约束）。所有 UI 工作必须同时遵守 DESIGN.md；主题只保留浅色 / 深色 / 跟随系统。
+
 ### shadcn/ui（基础组件）
 
 位于 `src/shared/components/ui/`，基于 [shadcn/ui](https://ui.shadcn.com/)（base-nova 风格，lucide 图标库）。
