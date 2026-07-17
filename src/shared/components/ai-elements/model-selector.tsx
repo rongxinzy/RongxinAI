@@ -142,7 +142,6 @@ export type ModelSelectorLogoProps = Omit<ComponentProps<'img'>, 'src' | 'alt'> 
     | 'scaleway'
     | 'amazon-bedrock'
     | 'cerebras'
-    // oxlint-disable-next-line typescript-eslint(ban-types) -- intentional pattern for autocomplete-friendly string union
     | (string & {});
 };
 
