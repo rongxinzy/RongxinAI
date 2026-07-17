@@ -32,6 +32,7 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
+import { getSkillsRoot } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
 import type {
   CoworkContinueOptions,
@@ -264,15 +265,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const workspaceRoot = options.workspaceRoot || process.cwd();
       const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
 
-      // System prompt — merge user config + skills manifest.
-      // pi's ResourceLoader discovers SYSTEM.md at two levels:
-      //   1. <cwd>/.pi/SYSTEM.md  (project-level, checked first)
-      //   2. ~/.pi/agent/SYSTEM.md (global fallback)
-      // Write to the session's workspace so different projects/agents
-      // get isolated system prompts without cross-contamination.
+      // System prompt — user config only. Skills are discovered and appended
+      // by the resource loader (additionalSkillPaths), which renders them via
+      // pi's formatSkillsForPrompt — no manual injection here to avoid
+      // duplicating the skills section.
       const basePrompt = options.systemPrompt?.trim() || '';
-      const skillsPrompt = this.buildSkillsPrompt(options.skillIds);
-      const mergedPrompt = [basePrompt, skillsPrompt].filter(Boolean).join('\n\n');
       const history = options.conversationHistory;
       const historyBlock = history && history.length > 0
         ? [
@@ -281,12 +278,17 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             '=== END PREVIOUS CONVERSATION ===',
           ].join('\n')
         : '';
-      const effectiveSystemPrompt = [mergedPrompt, historyBlock].filter(Boolean).join('\n\n');
+      const effectiveSystemPrompt = [basePrompt, historyBlock].filter(Boolean).join('\n\n');
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
       // default resource loader supplies the Pi Coding Assistant identity,
       // so override that loader per session to keep expert contexts isolated.
-      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, effectiveSystemPrompt);
+      const resourceLoader = await this.createPiResourceLoader(
+        pi,
+        workspaceRoot,
+        effectiveSystemPrompt,
+        options.skillIds,
+      );
       sessionOptions.resourceLoader = resourceLoader;
 
       // Resolve model early — needed by both MCP proxy and subagent tool
@@ -525,15 +527,47 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     pi: PiModules,
     cwd: string,
     systemPrompt: string,
+    skillIds?: string[],
   ): Promise<PiResourceLoader> {
     const resourceLoader = new pi.DefaultResourceLoader({
       cwd,
       agentDir: pi.getAgentDir(),
+      // RongxinAI skills come exclusively from the app-managed SKILLs dirs —
+      // never from the developer's global ~/.agents/skills (which would leak
+      // dev-only tooling skills like ai-sdk/shadcn into user sessions).
+      noSkills: true,
+      additionalSkillPaths: this.resolveRongxinAiSkillDirs(),
+      skillsOverride: skillIds === undefined
+        ? undefined
+        : (base: { skills: Array<{ name?: string; id?: string }>; diagnostics: unknown[] }) => ({
+          ...base,
+          skills: base.skills.filter((skill) => (
+            skillIds.includes(skill.id || '') || skillIds.includes(skill.name || '')
+          )),
+        }),
       systemPromptOverride: () => systemPrompt || '',
       appendSystemPromptOverride: (): string[] => [],
     });
     await resourceLoader.reload();
     return resourceLoader;
+  }
+
+  /**
+   * Skill directories exposed to Pi sessions, in priority order.
+   * Development: project-root SKILLs/ (via getSkillsRoot) plus userData/SKILLs
+   * (may exist from a previous packaged run). Production: userData/SKILLs only
+   * (getSkillsRoot already resolves there).
+   */
+  private resolveRongxinAiSkillDirs(): string[] {
+    const dirs: string[] = [];
+    const push = (dir: string): void => {
+      if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
+    };
+    push(getSkillsRoot());
+    if (!app.isPackaged) {
+      push(path.join(app.getPath('userData'), 'SKILLs'));
+    }
+    return dirs;
   }
 
   /**
@@ -932,34 +966,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   }
 
   // ── Skills & MCP integration ──
-
-  /**
-   * Build a skills manifest prompt using Pi's native skill discovery.
-   * Pi SDK scans the RongxinAI SKILLs directory for SKILL.md files,
-   * parses YAML frontmatter, and formats them as XML with proper escaping.
-   *
-   * This replaces the hand-rolled XML builder — Pi's formatSkillsForPrompt
-   * follows the Agent Skills standard (agentskills.io).
-   */
-  private buildSkillsPrompt(skillIds?: string[]): string {
-    try {
-      const skillsDir = path.join(app.getPath('userData'), 'SKILLs');
-      // Use Pi's native skill loader (sync, discovers SKILL.md files recursively)
-      const { loadSkillsFromDir } = require('@earendil-works/pi-coding-agent/dist/core/skills.js');
-      const result = loadSkillsFromDir({ dir: skillsDir, source: 'rongxinai' });
-      const selectedSkills = skillIds === undefined
-        ? result.skills
-        : result.skills.filter((skill: { name?: string; id?: string }) => (
-          skillIds.includes(skill.id || '') || skillIds.includes(skill.name || '')
-        ));
-      if (selectedSkills.length === 0) return '';
-      // Use Pi's native formatter (XML escaping, disableModelInvocation support)
-      const { formatSkillsForPrompt } = require('@earendil-works/pi-coding-agent/dist/core/skills.js');
-      return formatSkillsForPrompt(selectedSkills);
-    } catch {
-      return '';
-    }
-  }
 
   /**
    * Build a single MCP proxy tool (pi-mcp-adapter pattern) instead of
