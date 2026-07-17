@@ -25,7 +25,8 @@ default:
       export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
       mkdir -p "$NPM_CONFIG_CACHE"
       printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
-    - npm install --prefer-offline --no-audit --ignore-scripts
+    - npm install -g bun --prefer-offline --no-audit
+    - bun install --ignore-scripts
 
 stages:
   - lint
@@ -60,7 +61,7 @@ lint:
       if [ -n "$FILES" ]; then
         echo "Linting changed files:"
         echo "$FILES"
-        echo "$FILES" | xargs npx eslint --report-unused-disable-directives --max-warnings 0
+        echo "$FILES" | xargs npx oxlint --report-unused-disable-directives --deny-warnings
       else
         echo "No TypeScript files changed, skipping lint"
       fi
@@ -269,9 +270,10 @@ build-linux:
     - rm -rf dist dist-electron release
     # 确保 Electron 打包所需的系统库存在（镜像可能已预装，缺少则安装）
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 2>/dev/null || true
-    # 安装依赖：使用 npm install（非 ci）以利用 node_modules 缓存
-    # --prefer-offline 优先本地 npm cache，--ignore-scripts 跳过 postinstall
-    - npm install --prefer-offline --no-audit --ignore-scripts
+    # 安装依赖：使用 bun（lockfile 为 bun.lock）以利用 node_modules 缓存
+    # --ignore-scripts 跳过 postinstall（Electron 二进制由下方步骤手动下载）
+    - npm install -g bun --prefer-offline --no-audit
+    - bun install --ignore-scripts
     - npm install -g pnpm --registry https://registry.npmmirror.com
     - pnpm config set registry https://registry.npmmirror.com
     # 手动下载 Electron 二进制（避免 GitHub 不可达）

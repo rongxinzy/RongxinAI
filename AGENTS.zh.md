@@ -14,8 +14,11 @@ npm run electron:dev:openclaw
 # 构建生产包（TypeScript + Vite）
 npm run build
 
-# 使用 ESLint 进行代码检查
+# 使用 oxlint 进行代码检查（配置：.oxlintrc.json）
 npm run lint
+
+# 使用 oxfmt 格式化（配置：.oxfmtrc.json）
+npm run format
 
 # 运行单元测试（Vitest）
 npm test
@@ -32,7 +35,7 @@ npm run dist:linux      # Linux (.AppImage)
 npm run openclaw:runtime:host   # 当前平台
 ```
 
-**要求**：Node.js >=24 <25。Windows 构建需要 PortableGit（详见 README.md）。
+**要求**：Node.js >=24 <25，Bun >=1.3（包管理器；使用 `bun install` 代替 `npm install`，锁文件为 `bun.lock`）。Windows 构建需要 PortableGit（详见 README.md）。
 
 **OpenClaw 环境变量**：`OPENCLAW_SRC`（默认 `../openclaw`）、`OPENCLAW_FORCE_BUILD=1`（强制重建）、`OPENCLAW_SKIP_ENSURE=1`（跳过版本检出）。
 
@@ -46,7 +49,7 @@ RongxinAI 是一款面向本地优先 AI Agent 工作流的 Electron + React 桌
 
 采用严格的进程隔离与 IPC 通信。
 
-面向用户的产品文档应使用 RongxinAI 名称。运行时存储、协议处理器、会话键和历史迁移路径中可能仍存在一些遗留标识符；除非任务明确包含兼容性迁移，否则不要重命名这些代码。
+面向用户的产品文档和 UI 文案必须使用「知远智能体」名称。LobsterAI、RongxinAI、LEO、李知远均为已停用品牌名，不得在品牌面重新引入。OpenClaw、pi、llama.cpp 属于内部实现细节：不得在品牌或用户可见文案中暴露，Agent 运行时与本地推理一律表述为全栈自研。运行时存储、协议处理器、会话键和历史迁移路径中可能仍存在一些遗留标识符；除非任务明确包含兼容性迁移，否则不要重命名这些代码。
 
 ### 认证流程
 

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LEO — AI Agent Workspace by RongxinAI</title>
-  <meta name="description" content="LEO is an all-in-one local AI Agent workspace powered by OpenClaw and llama.cpp. Cowork sessions, local inference, skills, MCP, scheduled tasks, and IM channels — all local-first." />
+  <title>ZhiYuan Agent — Local AI Agent Workspace</title>
+  <meta name="description" content="ZhiYuan Agent is an all-in-one local AI Agent workspace with a fully self-developed stack. Cowork sessions, local inference, skills, MCP, scheduled tasks, and IM channels — all local-first." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2334D399' /%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' font-weight='700' fill='%23000'%3EL%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -217,7 +217,7 @@
     <div class="container">
       <a href="#" class="nav-logo">
         <span class="nav-logo-icon">L</span>
-        <span>LEO</span>
+        <span>ZhiYuan Agent</span>
       </a>
       <div class="nav-links">
         <a href="#features">Features</a>
@@ -252,7 +252,7 @@
             <span>v2026.6 — Open Source</span>
           </div>
           <h1>Your Local <span>AI Agent</span> Workspace</h1>
-          <p>LEO combines OpenClaw agent runtime, llama.cpp local inference, built-in skills, MCP integrations, scheduled tasks, and IM channels — all running locally on your machine with full privacy control.</p>
+          <p>ZhiYuan Agent combines a self-developed agent runtime, self-developed local inference, built-in skills, MCP integrations, scheduled tasks, and IM channels — all running locally on your machine with full privacy control.</p>
           <div class="btn-group" style="justify-content:flex-start">
             <a href="#cta" class="btn btn-primary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -297,7 +297,7 @@
               <p>Analyze this quarterly report and summarize key findings. Generate a PowerPoint deck with the results.</p>
             </div>
             <div class="hero-message hero-message-agent">
-              <div class="hero-message-role">LEO</div>
+              <div class="hero-message-role">ZhiYuan Agent</div>
               <p>Reading the report... I'll extract financial highlights, compare YoY growth, and build the slides.</p>
             </div>
             <div class="hero-tool-bar">
@@ -316,7 +316,7 @@
       <div class="section-header fade-in">
         <div class="section-label section-label-green">Capabilities</div>
         <h2 class="section-title">Everything an <span class="highlight-green">AI Agent</span> Needs</h2>
-        <p class="section-desc">LEO is not just a chat UI. It's an execution environment where Agents work on your machine, access tools, run code, and stay reachable through your everyday channels.</p>
+        <p class="section-desc">ZhiYuan Agent is not just a chat UI. It's an execution environment where Agents work on your machine, access tools, run code, and stay reachable through your everyday channels.</p>
       </div>
       <div class="features-grid">
         <div class="feature-card fade-in">
@@ -326,7 +326,7 @@
           <h3>Cowork Agent Workflows</h3>
           <p>Multi-step tasks with file tools, shell commands, browser automation, document processing, and approval-gated actions. Real-time streaming of messages, tool calls, and permission requests.</p>
           <div class="feature-tags">
-            <span class="feature-tag">OpenClaw Runtime</span>
+            <span class="feature-tag">Agent Runtime</span>
             <span class="feature-tag">Stream Events</span>
             <span class="feature-tag">Permission Control</span>
           </div>
@@ -335,8 +335,8 @@
           <div class="feature-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           </div>
-          <h3>llama.cpp Local Inference</h3>
-          <p>Manage local GGUF models with a full lifecycle: install, list, load, configure launch parameters (context length, GPU offload, threads), and run llama-server locally. Model marketplace backed by ModelScope with 40K+ models.</p>
+          <h3>Local Inference</h3>
+          <p>Manage local GGUF models with a full lifecycle: install, list, load, configure launch parameters (context length, GPU offload, threads), and run the inference service locally. Model marketplace backed by ModelScope with 40K+ models.</p>
           <div class="feature-tags">
             <span class="feature-tag">GGUF Models</span>
             <span class="feature-tag">GPU Offload</span>
@@ -407,87 +407,84 @@
         <p class="section-desc">Electron with context isolation, IPC-only communication, and sandboxed renderer. Your data stays in local SQLite — sessions, config, memory, and task metadata never leave your machine.</p>
       </div>
       <div class="arch-diagram fade-in">
-        <!-- Inlined architecture SVG (simplified portable version) -->
-        <svg width="100%" height="auto" viewBox="0 0 1120 820" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:1120px;margin:0 auto">
+        <!-- Inlined architecture SVG (monochrome, TikZ-style) -->
+        <svg width="100%" height="auto" viewBox="0 0 1120 880" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:1120px;margin:0 auto;background:#fff">
           <defs>
-            <linearGradient id="a-bg" x1="0" y1="0" x2="1120" y2="820" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#071013"/>
-              <stop offset="1" stop-color="#0B1020"/>
-            </linearGradient>
-            <linearGradient id="a-green" x1="0" y1="0" x2="1" y2="1">
-              <stop stop-color="#34D399"/>
-              <stop offset="1" stop-color="#0EA5E9"/>
-            </linearGradient>
-            <linearGradient id="a-blue" x1="0" y1="0" x2="1" y2="1">
-              <stop stop-color="#38BDF8"/>
-              <stop offset="1" stop-color="#6366F1"/>
-            </linearGradient>
-            <filter id="a-glow">
-              <feGaussianBlur stdDeviation="6" result="a-blur"/>
-              <feColorMatrix in="a-blur" type="matrix" values="0 0 0 0 0.12 0 0 0 0 0.85 0 0 0 0 0.62 0 0 0 0.22 0"/>
-              <feBlend in="SourceGraphic"/>
-            </filter>
+            <pattern id="a-hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.7"/>
+            </pattern>
+            <marker id="a-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+            </marker>
+            <style>
+              .at { fill: #000; font-family: 'Latin Modern Roman', 'CMU Serif', 'STIX Two Text', 'Times New Roman', serif; }
+              .abox { fill: #fff; stroke: #000; stroke-width: 1.6; }
+              .agrp { fill: none; stroke: #000; stroke-width: 1.4; stroke-dasharray: 7 5; }
+              .aln  { stroke: #000; stroke-width: 1.6; }
+            </style>
           </defs>
-          <rect width="1120" height="820" rx="28" fill="url(#a-bg)"/>
-          <text x="560" y="42" text-anchor="middle" fill="#E5E7EB" font-size="26" font-weight="700" font-family="Inter,sans-serif">RongxinAI Local AI Agent Workspace</text>
-          <text x="560" y="70" text-anchor="middle" fill="#9CA3AF" font-size="17" font-family="Inter,sans-serif">OpenClaw runs Agent workflows, llama.cpp serves local GGUF models, Electron owns the desktop security boundary</text>
+          <rect width="1120" height="880" fill="#fff"/>
+          <text x="560" y="50" text-anchor="middle" class="at" font-size="26" font-weight="700">ZhiYuan Agent — Local AI Agent Workspace</text>
+          <text x="560" y="80" text-anchor="middle" class="at" font-size="15" font-style="italic">Fully self-developed stack &#183; agent runtime and local inference built in-house &#183; Electron owns the desktop security boundary</text>
 
-          <rect x="50" y="105" width="1020" height="285" rx="22" fill="#071A18" stroke="url(#a-green)" stroke-width="3" filter="url(#a-glow)"/>
-          <text x="560" y="135" text-anchor="middle" fill="#D1FAE5" font-size="22" font-weight="700" font-family="Inter,sans-serif">Electron Main Process</text>
+          <rect x="60" y="110" width="1000" height="300" class="agrp"/>
+          <text x="82" y="142" class="at" font-size="18" font-weight="700">Electron Main Process</text>
 
-          <rect x="85" y="165" width="360" height="110" rx="16" fill="#0B1F1E" stroke="#34D399" stroke-width="3"/>
-          <text x="115" y="205" fill="#D1FAE5" font-size="22" font-weight="700" font-family="Inter,sans-serif">OpenClaw Runtime</text>
-          <text x="115" y="235" fill="#A7F3D0" font-size="17" font-family="Inter,sans-serif">Cowork sessions, tools, approvals</text>
-          <rect x="306" y="188" width="78" height="30" rx="8" fill="#052E1D" stroke="#22C55E"/>
-          <text x="345" y="209" text-anchor="middle" fill="#86EFAC" font-size="14" font-weight="700" font-family="Inter,sans-serif">Primary</text>
+          <rect x="95" y="165" width="350" height="95" fill="url(#a-hatch)" stroke="#000" stroke-width="1.6"/>
+          <text x="115" y="201" class="at" font-size="17" font-weight="700">Agent Runtime</text>
+          <text x="115" y="227" class="at" font-size="13">Cowork sessions, tools, approvals</text>
+          <rect x="352" y="178" width="78" height="24" fill="#fff" stroke="#000" stroke-width="1.2"/>
+          <text x="391" y="195" text-anchor="middle" class="at" font-size="13" font-weight="700">primary</text>
 
-          <rect x="470" y="165" width="260" height="110" rx="16" fill="#111827" stroke="#38BDF8" stroke-width="3"/>
-          <text x="500" y="205" fill="#BAE6FD" font-size="22" font-weight="700" font-family="Inter,sans-serif">llama.cpp Service</text>
-          <text x="500" y="235" fill="#BFDBFE" font-size="17" font-family="Inter,sans-serif">GGUF models, launch options, marketplace</text>
+          <rect x="470" y="165" width="270" height="95" class="abox"/>
+          <text x="490" y="201" class="at" font-size="17" font-weight="700">Local Inference</text>
+          <text x="490" y="227" class="at" font-size="13">GGUF models, launch options,</text>
+          <text x="490" y="247" class="at" font-size="13">marketplace</text>
 
-          <rect x="755" y="165" width="280" height="110" rx="16" fill="#111827" stroke="#A78BFA" stroke-width="3"/>
-          <text x="785" y="205" fill="#DDD6FE" font-size="22" font-weight="700" font-family="Inter,sans-serif">Skill / MCP Manager</text>
-          <text x="785" y="235" fill="#BFDBFE" font-size="17" font-family="Inter,sans-serif">Built-in skills, skill marketplace, external tools</text>
+          <rect x="765" y="165" width="270" height="95" class="abox"/>
+          <text x="785" y="201" class="at" font-size="17" font-weight="700">Skill / MCP Manager</text>
+          <text x="785" y="227" class="at" font-size="13">Built-in skills, marketplace,</text>
+          <text x="785" y="247" class="at" font-size="13">external tools</text>
 
-          <rect x="85" y="300" width="300" height="70" rx="14" fill="#10231F" stroke="#22C55E" stroke-width="2.5"/>
-          <text x="115" y="329" fill="#D1FAE5" font-size="22" font-weight="700" font-family="Inter,sans-serif">SQLite Storage</text>
-          <text x="115" y="354" fill="#A7F3D0" font-size="17" font-family="Inter,sans-serif">Sessions, config, memory, tasks</text>
+          <rect x="95" y="290" width="350" height="95" class="abox"/>
+          <text x="115" y="326" class="at" font-size="17" font-weight="700">SQLite Storage</text>
+          <text x="115" y="352" class="at" font-size="13">Sessions, config, memory, tasks</text>
 
-          <rect x="410" y="300" width="300" height="70" rx="14" fill="#1B172A" stroke="#F59E0B" stroke-width="2.5"/>
-          <text x="440" y="329" fill="#DDD6FE" font-size="22" font-weight="700" font-family="Inter,sans-serif">Scheduled Tasks</text>
-          <text x="440" y="354" fill="#BFDBFE" font-size="17" font-family="Inter,sans-serif">Cron, background triggers, delivery</text>
+          <rect x="470" y="290" width="270" height="95" class="abox"/>
+          <text x="490" y="326" class="at" font-size="17" font-weight="700">Scheduled Tasks</text>
+          <text x="490" y="352" class="at" font-size="13">Cron, background triggers, delivery</text>
 
-          <rect x="735" y="300" width="300" height="70" rx="14" fill="#171A22" stroke="#60A5FA" stroke-width="2.5"/>
-          <text x="765" y="329" fill="#BAE6FD" font-size="22" font-weight="700" font-family="Inter,sans-serif">IM / Email Gateway</text>
-          <text x="765" y="354" fill="#BFDBFE" font-size="17" font-family="Inter,sans-serif">WeChat, WeCom, DingTalk, Feishu, QQ, Email</text>
+          <rect x="765" y="290" width="270" height="95" class="abox"/>
+          <text x="785" y="326" class="at" font-size="17" font-weight="700">IM / Email Gateway</text>
+          <text x="785" y="352" class="at" font-size="13">WeChat, WeCom, DingTalk,</text>
+          <text x="785" y="372" class="at" font-size="13">Feishu/Lark, QQ, Email</text>
 
-          <path d="M560 390V470" stroke="#6B7280" stroke-width="4"/>
-          <rect x="405" y="470" width="310" height="86" rx="16" fill="#15191F" stroke="#6B7280" stroke-width="3"/>
-          <text x="560" y="506" text-anchor="middle" fill="#E5E7EB" font-size="26" font-weight="700" font-family="Inter,sans-serif">Preload Script</text>
-          <text x="560" y="535" text-anchor="middle" fill="#9CA3AF" font-size="16" font-family="Inter,sans-serif">contextBridge / IPC secure bridge</text>
-          <path d="M560 556V635" stroke="#6B7280" stroke-width="4"/>
+          <line x1="560" y1="410" x2="560" y2="462" class="aln" marker-start="url(#a-arr)" marker-end="url(#a-arr)"/>
+          <text x="578" y="442" class="at" font-size="12" font-style="italic">IPC invoke</text>
+          <rect x="420" y="465" width="280" height="70" class="abox"/>
+          <text x="560" y="497" text-anchor="middle" class="at" font-size="16" font-weight="700">Preload Script</text>
+          <text x="560" y="521" text-anchor="middle" class="at" font-size="12" font-style="italic">contextBridge &#183; IPC secure bridge</text>
+          <line x1="560" y1="535" x2="560" y2="587" class="aln" marker-start="url(#a-arr)" marker-end="url(#a-arr)"/>
+          <text x="578" y="568" class="at" font-size="12" font-style="italic">stream events</text>
 
-          <rect x="50" y="635" width="1020" height="145" rx="22" fill="#07111F" stroke="url(#a-blue)" stroke-width="3" filter="url(#a-glow)"/>
-          <text x="560" y="666" text-anchor="middle" fill="#BAE6FD" font-size="22" font-weight="700" font-family="Inter,sans-serif">Renderer Process (React)</text>
+          <rect x="60" y="590" width="1000" height="200" class="agrp"/>
+          <text x="82" y="622" class="at" font-size="18" font-weight="700">Renderer Process (React)</text>
 
-          <rect x="85" y="695" width="220" height="60" rx="14" fill="#0D1726" stroke="#60A5FA" stroke-width="2.5"/>
-          <text x="115" y="732" fill="#BAE6FD" font-size="22" font-weight="700" font-family="Inter,sans-serif">Redux State</text>
-
-          <rect x="330" y="695" width="245" height="60" rx="14" fill="#0A1E24" stroke="#22D3EE" stroke-width="2.5"/>
-          <text x="360" y="732" fill="#BAE6FD" font-size="22" font-weight="700" font-family="Inter,sans-serif">Cowork / Inference UI</text>
-
-          <rect x="600" y="695" width="210" height="60" rx="14" fill="#1A1430" stroke="#A855F7" stroke-width="2.5"/>
-          <text x="630" y="732" fill="#DDD6FE" font-size="22" font-weight="700" font-family="Inter,sans-serif">Artifacts Preview</text>
-
-          <rect x="835" y="695" width="200" height="60" rx="14" fill="#111827" stroke="#34D399" stroke-width="2.5"/>
-          <text x="865" y="732" fill="#D1FAE5" font-size="22" font-weight="700" font-family="Inter,sans-serif">Settings / Market</text>
+          <rect x="95" y="655" width="215" height="85" class="abox"/>
+          <text x="202" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Redux State</text>
+          <rect x="335" y="655" width="250" height="85" class="abox"/>
+          <text x="460" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Cowork / Inference UI</text>
+          <rect x="610" y="655" width="220" height="85" class="abox"/>
+          <text x="720" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Artifacts Preview</text>
+          <rect x="855" y="655" width="180" height="85" class="abox"/>
+          <text x="945" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Settings / Market</text>
         </svg>
       </div>
       <div class="arch-layers fade-in">
         <div class="arch-layer">
           <div class="arch-layer-icon">🛡️</div>
           <h4>Main Process</h4>
-          <p>OpenClaw runtime, llama.cpp service, SQLite storage, gateway integrations</p>
+          <p>Agent runtime, local inference service, SQLite storage, gateway integrations</p>
         </div>
         <div class="arch-layer">
           <div class="arch-layer-icon">🔗</div>
@@ -509,7 +506,7 @@
       <div class="section-header fade-in">
         <div class="section-label section-label-purple">Ecosystem</div>
         <h2 class="section-title">30+ <span class="highlight-purple">Built-in Skills</span></h2>
-        <p class="section-desc">From document generation to stock analysis, browser automation to video creation — extend LEO's capabilities without writing a single line of code.</p>
+        <p class="section-desc">From document generation to stock analysis, browser automation to video creation — extend ZhiYuan Agent's capabilities without writing a single line of code.</p>
       </div>
       <div class="skills-grid fade-in">
         <div class="skill-item"><span class="skill-icon">🔍</span><span>Web Search</span><small>search & research</small></div>
@@ -546,7 +543,7 @@
       <div class="section-header fade-in">
         <div class="section-label section-label-green">Stack</div>
         <h2 class="section-title">Built with Modern <span class="highlight-green">Technology</span></h2>
-        <p class="section-desc">A full-stack Electron application with React frontend, OpenClaw agent runtime, and llama.cpp local inference.</p>
+        <p class="section-desc">A full-stack Electron application with React frontend, self-developed agent runtime, and self-developed local inference.</p>
       </div>
       <div class="tech-grid fade-in">
         <div class="tech-item">
@@ -576,12 +573,12 @@
         </div>
         <div class="tech-item">
           <div class="tech-icon">🦙</div>
-          <div class="tech-name">llama.cpp</div>
+          <div class="tech-name">Local Inference</div>
           <div class="tech-layer">Local Inference</div>
         </div>
         <div class="tech-item">
           <div class="tech-icon">🐙</div>
-          <div class="tech-name">OpenClaw</div>
+          <div class="tech-name">Agent Runtime</div>
           <div class="tech-layer">Agent Runtime</div>
         </div>
         <div class="tech-item">
@@ -647,7 +644,7 @@
       <div class="cta-box fade-in">
         <div class="section-label section-label-green" style="margin:0 auto 16px">Open Source</div>
         <h2>Ready to run <span style="background:linear-gradient(135deg,#34D399,#0EA5E9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">your own AI Agent</span>?</h2>
-        <p>LEO is free and open source under the MIT License. Clone the repo, install dependencies, and start building.</p>
+        <p>ZhiYuan Agent is free and open source under the MIT License. Clone the repo, install dependencies, and start building.</p>
         <div class="cta-buttons">
           <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" class="cta-button cta-button-primary">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
@@ -675,9 +672,9 @@
         <div class="footer-brand">
           <a href="#" class="nav-logo">
             <span class="nav-logo-icon">L</span>
-            <span>LEO</span>
+            <span>ZhiYuan Agent</span>
           </a>
-          <p>An all-in-one local AI Agent workspace powered by OpenClaw and llama.cpp. Built by 北京容芯致远 (RongxinAI).</p>
+          <p>An all-in-one local AI Agent workspace with a fully self-developed stack. Built by 北京容芯致远.</p>
         </div>
         <div class="footer-col">
           <h4>Product</h4>
@@ -700,7 +697,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <span>&copy; 2026 RongxinAI. MIT License.</span>
+        <span>&copy; 2026 北京容芯致远. MIT License.</span>
         <div class="footer-socials">
           <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" title="GitHub">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>

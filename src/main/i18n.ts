@@ -55,12 +55,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorContentFiltered: '内容未通过安全审核，请修改后重试。',
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
-    coworkLlamaCppModelNotRunning: '该 llama.cpp 模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
-    coworkLlamaCppContextWindowUnknown: '该 llama.cpp 模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
-    coworkLlamaCppContextWindowTooSmall: '该 llama.cpp 模型当前运行上下文过小（当前 {current}，OpenClaw 至少需要 {required}）。请调大 ctx-size 后重新加载模型。',
-    coworkLlamaCppTrainingContextTooSmall: '该 llama.cpp 模型的训练上下文上限只有 {trained}，低于 OpenClaw 所需的至少 {required}，无法用于当前 agent / 定时任务能力。请改用更大上下文模型。',
-    coworkLlamaCppContextLimitReached: '该 llama.cpp 会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
-    llamacppUnloadVramRecoveryPending: '模型已从 llama.cpp 运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
+    coworkLlamaCppModelNotRunning: '该本地推理模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
+    coworkLlamaCppContextWindowUnknown: '该本地推理模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
+    coworkLlamaCppContextWindowTooSmall: '该本地推理模型当前运行上下文过小（当前 {current}，Agent 引擎至少需要 {required}）。请调大 ctx-size 后重新加载模型。',
+    coworkLlamaCppTrainingContextTooSmall: '该本地推理模型的训练上下文上限只有 {trained}，低于Agent 引擎所需的至少 {required}，无法用于当前 agent / 定时任务能力。请改用更大上下文模型。',
+    coworkLlamaCppContextLimitReached: '该本地推理会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
+    llamacppUnloadVramRecoveryPending: '模型已从本地推理运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
     llamacppUnloadConfirmationPending: '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
     llamacppLaunchContextExceedsTrainingLimit: '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
     llamacppLaunchContextClampedToTrainingLimit: '请求上下文 {requested} 已超过模型训练上限 {trained}，已按 {effective} 启动。',
@@ -76,15 +76,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppLoadModelStartupTimeout: '模型加载时间过长，请稍后重试或降低模型配置。',
     llamacppLoadModelUnknown: '模型加载失败，请稍后重试。',
     llamacppModelLoadInProgress: '已有模型正在加载，请等待完成后再试。',
-    llamacppServiceStartupPortInUse: 'llama.cpp 服务端口已被占用，请检查端口设置或关闭占用端口的程序后重试。',
-    llamacppServiceStartupProcessExited: 'llama.cpp 服务启动后异常退出，请稍后重试。',
-    llamacppServiceStartupTimeout: 'llama.cpp 服务启动超时，请稍后重试。',
-    llamacppServiceStartupBackendUnavailable: '当前 llama.cpp 运行时后端不可用，请检查显卡驱动或运行时配置。',
-    llamacppServiceStartupRuntimeDamaged: 'llama.cpp runtime 不可用或可能已损坏，请重新安装应用后重试。',
-    llamacppServiceStartupUnknown: 'llama.cpp 服务启动失败，请稍后重试。',
+    llamacppServiceStartupPortInUse: '本地推理服务端口已被占用，请检查端口设置或关闭占用端口的程序后重试。',
+    llamacppServiceStartupProcessExited: '本地推理服务启动后异常退出，请稍后重试。',
+    llamacppServiceStartupTimeout: '本地推理服务启动超时，请稍后重试。',
+    llamacppServiceStartupBackendUnavailable: '当前本地推理运行时后端不可用，请检查显卡驱动或运行时配置。',
+    llamacppServiceStartupRuntimeDamaged: '本地推理 runtime 不可用或可能已损坏，请重新安装应用后重试。',
+    llamacppServiceStartupUnknown: '本地推理服务启动失败，请稍后重试。',
     llamacppModelLaunchLogWindowTitle: '模型启动日志',
-    localInferenceImportRuntimeDialogTitle: '选择 llama.cpp backend',
-    localInferenceImportRuntimeDialogMessage: '请选择 llama.cpp backend 主包压缩包（zip 或 tar.gz）；如果已经解压，请进入目录后选择其中任意文件。RongxinAI 会校验平台和 backend 类型后导入。',
+    localInferenceImportRuntimeDialogTitle: '选择本地推理 backend',
+    localInferenceImportRuntimeDialogMessage: '请选择本地推理 backend 主包压缩包（zip 或 tar.gz）；如果已经解压，请进入目录后选择其中任意文件。知远智能体 会校验平台和 backend 类型后导入。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
 
@@ -147,7 +147,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imUnknownPlatform: '未知平台。',
 
     // QQ
-    imQqOpenClawHint: 'QQ 通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
+    imQqOpenClawHint: 'QQ 通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imQqMentionHint: '频道中需 @机器人 触发对话，也支持私信和群聊。',
     imQqAuthPassed: 'QQ 鉴权通过（AccessToken 已获取）。',
     imQqAccessTokenFailed: '获取 AccessToken 失败',
@@ -164,7 +164,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imTelegramCheckToken: '请检查 Bot Token 是否正确。',
     imTelegramCheckTokenNetwork: '请检查 Bot Token 是否正确，且网络通畅。',
     imTelegramOpenClawHint:
-      'Telegram 通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
+      'Telegram 通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
 
     // Discord
     imDiscordMissingBotToken: '缺少必要配置项: botToken',
@@ -173,7 +173,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDiscordAuthFailed: 'Discord Bot 鉴权失败: {error}',
     imDiscordCheckTokenNetwork: '请检查 Bot Token 是否正确，且网络通畅。',
     imDiscordOpenClawHint:
-      'Discord 通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
+      'Discord 通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imDiscordGroupMention: 'Discord 群聊中仅响应 @机器人的消息。',
 
     // Feishu
@@ -182,7 +182,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imFeishuAuthFailed: '飞书鉴权失败: {error}',
     imFeishuCheckAppIdSecret: '请检查 App ID 和 App Secret 是否正确。',
     imFeishuOpenClawHint:
-      '飞书通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
+      '飞书通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imFeishuGroupMention: '飞书群聊中仅响应 @机器人的消息。',
     imFeishuGroupMentionSuggestion: '请在群聊中使用 @机器人 + 内容触发对话。',
     imFeishuEventSubscription: '飞书需要开启消息事件订阅（im.message.receive_v1）才能收消息。',
@@ -196,7 +196,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDingtalkCheckClientIdSecret:
       '请检查 Client ID 和 Client Secret 是否正确，且机器人权限已开通。',
     imDingtalkOpenClawHint:
-      '钉钉通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
+      '钉钉通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imDingtalkBotMembership: '钉钉机器人需被加入目标会话并具备发言权限。',
     imDingtalkBotMembershipSuggestion: '请确认机器人在目标会话中，且企业权限配置允许收发消息。',
 
@@ -204,22 +204,22 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imWecomFillBotIdSecret: '请补全 Bot ID 和 Secret 后重新测试连通性。',
     imWecomConfigReady: '企业微信配置已就绪（Bot ID: {botId}）。',
     imWecomOpenClawHint:
-      '企业微信通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
-    imWecomConfigReadyOpenClaw: '企业微信配置已就绪（Bot ID: {botId}），通过 OpenClaw 运行。',
+      '企业微信通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
+    imWecomConfigReadyOpenClaw: '企业微信配置已就绪（Bot ID: {botId}），通过Agent 引擎运行。',
 
     // Weixin
     imWeixinNotEnabled: '微信渠道当前未启用。',
     imWeixinEnableSuggestion: '请启用微信渠道后重新测试连通性。',
     imWeixinConfigReady: '微信配置已就绪。',
     imWeixinOpenClawHint:
-      '微信通过 OpenClaw 运行时运行，Bot 将在 OpenClaw Gateway 启动后自动连接。',
-    imWeixinConfigReadyOpenClaw: '微信配置已就绪，通过 OpenClaw 运行。',
+      '微信通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
+    imWeixinConfigReadyOpenClaw: '微信配置已就绪，通过Agent 引擎运行。',
     imWeixinAccountMissing: '尚未绑定微信账号，需要扫码登录。',
     imWeixinAccountMissingSuggestion: '请在微信设置中点击"扫码连接微信"完成账号绑定。',
-    imWeixinGatewayNotRunning: 'OpenClaw Gateway 未启动，微信频道无法连接。',
-    imWeixinGatewayNotRunningSuggestion: '请先启动 AI 引擎（OpenClaw），微信 Bot 才会连接微信服务器。',
+    imWeixinGatewayNotRunning: 'Agent 引擎 Gateway 未启动，微信频道无法连接。',
+    imWeixinGatewayNotRunningSuggestion: '请先启动 AI 引擎（Agent 引擎），微信 Bot 才会连接微信服务器。',
     imWeixinChannelProbeFailed: '无法确认微信频道状态。',
-    imWeixinChannelProbeFailedSuggestion: '请稍后重试。如果问题持续，尝试重启 OpenClaw Gateway 或重新扫码绑定。',
+    imWeixinChannelProbeFailedSuggestion: '请稍后重试。如果问题持续，尝试重启Agent 引擎 Gateway 或重新扫码绑定。',
     imWeixinChannelActive: '微信频道连接状态正常。',
     imWeixinGatewayProbeError: '微信频道探活失败：{error}',
     imChannelActive: '{channel} 频道连接状态正常。',
@@ -281,7 +281,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailMissingPassword: '实例「{name}」使用 IMAP 模式但未填写密码',
     emailMissingApiKey: '实例「{name}」使用 WebSocket 模式但未填写 API Key',
     emailInvalidApiKey: '实例「{name}」的 API Key 格式不正确（应以 ck_ 开头）',
-    emailGatewayRestarting: '正在重启 OpenClaw Gateway...',
+    emailGatewayRestarting: '正在重启Agent 引擎 Gateway...',
     emailDeleteConfirm: '确定要删除邮箱账号「{name}」吗？',
     emailEnterValidEmailFirst: '请先填写有效的邮箱地址',
     emailVerifyInBrowserAndPaste: '请在浏览器中完成验证，然后将 API Key 粘贴回来',
@@ -342,12 +342,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Content did not pass the safety review. Please modify and try again.',
     coworkErrorServerError: 'Server error occurred. Please try again later.',
     coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
-    coworkLlamaCppModelNotRunning: 'This llama.cpp model is not running. Load it from Local Inference first or choose another model.',
-    coworkLlamaCppContextWindowUnknown: 'The running llama.cpp model did not report an effective context window. Reload it from Local Inference before sending again.',
-    coworkLlamaCppContextWindowTooSmall: 'This llama.cpp model is currently running with too small a context window ({current}); OpenClaw requires at least {required}. Increase ctx-size and reload the model.',
-    coworkLlamaCppTrainingContextTooSmall: 'This llama.cpp model was trained for only {trained} context tokens, below OpenClaw\'s minimum requirement of {required}. Choose a larger-context model for agent and scheduled-task use.',
-    coworkLlamaCppContextLimitReached: 'This llama.cpp session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
-    llamacppUnloadVramRecoveryPending: 'The model has been removed from the llama.cpp running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
+    coworkLlamaCppModelNotRunning: 'This local inference model is not running. Load it from Local Inference first or choose another model.',
+    coworkLlamaCppContextWindowUnknown: 'The running local inference model did not report an effective context window. Reload it from Local Inference before sending again.',
+    coworkLlamaCppContextWindowTooSmall: 'This local inference model is currently running with too small a context window ({current}); Agent engine requires at least {required}. Increase ctx-size and reload the model.',
+    coworkLlamaCppTrainingContextTooSmall: 'This local inference model was trained for only {trained} context tokens, below Agent engine\'s minimum requirement of {required}. Choose a larger-context model for agent and scheduled-task use.',
+    coworkLlamaCppContextLimitReached: 'This local inference session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
+    llamacppUnloadVramRecoveryPending: 'The model has been removed from the local inference running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
     llamacppUnloadConfirmationPending: 'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
     llamacppLaunchContextExceedsTrainingLimit: 'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
     llamacppLaunchContextClampedToTrainingLimit: 'The requested context {requested} exceeds the model training limit {trained}. Started with {effective} instead.',
@@ -363,15 +363,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppLoadModelStartupTimeout: 'Model loading took too long. Try again later or lower the model configuration.',
     llamacppLoadModelUnknown: 'Model loading failed. Please try again later.',
     llamacppModelLoadInProgress: 'A model is already loading. Wait for it to finish and try again.',
-    llamacppServiceStartupPortInUse: 'The llama.cpp service port is already in use. Check the port setting or close the conflicting process and try again.',
-    llamacppServiceStartupProcessExited: 'The llama.cpp service exited during startup. Please try again later.',
-    llamacppServiceStartupTimeout: 'The llama.cpp service startup timed out. Please try again later.',
-    llamacppServiceStartupBackendUnavailable: 'The selected llama.cpp runtime backend is unavailable. Check the GPU driver or runtime configuration.',
-    llamacppServiceStartupRuntimeDamaged: 'The llama.cpp runtime is unavailable or may be damaged. Reinstall the application and try again.',
-    llamacppServiceStartupUnknown: 'The llama.cpp service failed to start. Please try again later.',
+    llamacppServiceStartupPortInUse: 'The local inference service port is already in use. Check the port setting or close the conflicting process and try again.',
+    llamacppServiceStartupProcessExited: 'The local inference service exited during startup. Please try again later.',
+    llamacppServiceStartupTimeout: 'The local inference service startup timed out. Please try again later.',
+    llamacppServiceStartupBackendUnavailable: 'The selected local inference runtime backend is unavailable. Check the GPU driver or runtime configuration.',
+    llamacppServiceStartupRuntimeDamaged: 'The local inference runtime is unavailable or may be damaged. Reinstall the application and try again.',
+    llamacppServiceStartupUnknown: 'The local inference service failed to start. Please try again later.',
     llamacppModelLaunchLogWindowTitle: 'Model startup logs',
-    localInferenceImportRuntimeDialogTitle: 'Select llama.cpp Backend',
-    localInferenceImportRuntimeDialogMessage: 'Select a llama.cpp backend archive (zip or tar.gz). If it is already extracted, open that directory and choose any file inside it. RongxinAI will validate the platform and backend type before importing it.',
+    localInferenceImportRuntimeDialogTitle: 'Select local inference Backend',
+    localInferenceImportRuntimeDialogMessage: 'Select a local inference backend archive (zip or tar.gz). If it is already extracted, open that directory and choose any file inside it. ZhiYuan Agent will validate the platform and backend type before importing it.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',
@@ -445,7 +445,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // QQ
     imQqOpenClawHint:
-      'QQ runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
+      'QQ runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imQqMentionHint:
       '@mention the bot in channels to start a conversation. Direct messages and group chats are also supported.',
     imQqAuthPassed: 'QQ authentication passed (AccessToken obtained).',
@@ -465,7 +465,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imTelegramCheckTokenNetwork:
       'Please check that the Bot Token is correct and the network is reachable.',
     imTelegramOpenClawHint:
-      'Telegram runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
+      'Telegram runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
 
     // Discord
     imDiscordMissingBotToken: 'Missing required configuration: botToken',
@@ -475,7 +475,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDiscordCheckTokenNetwork:
       'Please check that the Bot Token is correct and the network is reachable.',
     imDiscordOpenClawHint:
-      'Discord runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
+      'Discord runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imDiscordGroupMention: 'Discord only responds to @mentioned messages in group chats.',
 
     // Feishu
@@ -485,7 +485,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imFeishuAuthFailed: 'Feishu authentication failed: {error}',
     imFeishuCheckAppIdSecret: 'Please check that the App ID and App Secret are correct.',
     imFeishuOpenClawHint:
-      'Feishu runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
+      'Feishu runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imFeishuGroupMention: 'Feishu only responds to @mentioned messages in group chats.',
     imFeishuGroupMentionSuggestion:
       'Please @mention the bot in group chats to start a conversation.',
@@ -503,7 +503,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDingtalkCheckClientIdSecret:
       'Please check that the Client ID and Client Secret are correct and that bot permissions are enabled.',
     imDingtalkOpenClawHint:
-      'DingTalk runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
+      'DingTalk runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imDingtalkBotMembership:
       'The DingTalk bot must be added to the target conversation with messaging permissions.',
     imDingtalkBotMembershipSuggestion:
@@ -513,23 +513,23 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imWecomFillBotIdSecret: 'Please provide the Bot ID and Secret and test connectivity again.',
     imWecomConfigReady: 'WeCom configuration is ready (Bot ID: {botId}).',
     imWecomOpenClawHint:
-      'WeCom runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
+      'WeCom runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imWecomConfigReadyOpenClaw:
-      'WeCom configuration is ready (Bot ID: {botId}), running via OpenClaw.',
+      'WeCom configuration is ready (Bot ID: {botId}), running via Agent engine.',
 
     // Weixin
     imWeixinNotEnabled: 'WeChat channel is not currently enabled.',
     imWeixinEnableSuggestion: 'Please enable the WeChat channel and test connectivity again.',
     imWeixinConfigReady: 'WeChat configuration is ready.',
     imWeixinOpenClawHint:
-      'WeChat runs via OpenClaw runtime. The bot will connect automatically when OpenClaw Gateway starts.',
-    imWeixinConfigReadyOpenClaw: 'WeChat configuration is ready, running via OpenClaw.',
+      'WeChat runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
+    imWeixinConfigReadyOpenClaw: 'WeChat configuration is ready, running via Agent engine.',
     imWeixinAccountMissing: 'WeChat account is not bound. QR code scan is required.',
     imWeixinAccountMissingSuggestion: 'Please use "Scan to Connect WeChat" in WeChat settings to bind your account.',
-    imWeixinGatewayNotRunning: 'OpenClaw Gateway is not running. WeChat channel cannot connect.',
-    imWeixinGatewayNotRunningSuggestion: 'Please start the AI engine (OpenClaw) first for the WeChat bot to connect.',
+    imWeixinGatewayNotRunning: 'Agent engine Gateway is not running. WeChat channel cannot connect.',
+    imWeixinGatewayNotRunningSuggestion: 'Please start the AI engine (Agent engine) first for the WeChat bot to connect.',
     imWeixinChannelProbeFailed: 'Unable to verify WeChat channel status.',
-    imWeixinChannelProbeFailedSuggestion: 'Please try again later. If the issue persists, restart OpenClaw Gateway or re-scan the QR code.',
+    imWeixinChannelProbeFailedSuggestion: 'Please try again later. If the issue persists, restart Agent engine Gateway or re-scan the QR code.',
     imWeixinChannelActive: 'WeChat channel connection is active.',
     imWeixinGatewayProbeError: 'WeChat channel health check failed: {error}',
     imChannelActive: '{channel} channel connection is active.',
@@ -591,7 +591,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailMissingPassword: 'Instance "{name}" uses IMAP mode but password is missing',
     emailMissingApiKey: 'Instance "{name}" uses WebSocket mode but API Key is missing',
     emailInvalidApiKey: 'Instance "{name}" has invalid API Key format (should start with ck_)',
-    emailGatewayRestarting: 'Restarting OpenClaw Gateway...',
+    emailGatewayRestarting: 'Restarting Agent engine Gateway...',
     emailDeleteConfirm: 'Delete email account "{name}"?',
     emailEnterValidEmailFirst: 'Please enter a valid email address first',
     emailVerifyInBrowserAndPaste:

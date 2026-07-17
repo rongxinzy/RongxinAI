@@ -14,8 +14,11 @@ npm run electron:dev:openclaw
 # Build production bundle (TypeScript + Vite)
 npm run build
 
-# Lint with ESLint
+# Lint with oxlint (config: .oxlintrc.json)
 npm run lint
+
+# Format with oxfmt (config: .oxfmtrc.json)
+npm run format
 
 # Run unit tests (Vitest)
 npm test
@@ -32,7 +35,7 @@ npm run dist:linux      # Linux (.AppImage)
 npm run openclaw:runtime:host   # current platform
 ```
 
-**Requirements**: Node.js >=24 <25. Windows builds require PortableGit (see README.md for setup).
+**Requirements**: Node.js >=24 <25, Bun >=1.3 (package manager; `bun install` instead of `npm install`, lockfile is `bun.lock`). Windows builds require PortableGit (see README.md for setup).
 
 **OpenClaw env vars**: `OPENCLAW_SRC` (default `../openclaw`), `OPENCLAW_FORCE_BUILD=1` (force rebuild), `OPENCLAW_SKIP_ENSURE=1` (skip version checkout).
 
@@ -46,7 +49,7 @@ RongxinAI is an Electron + React desktop application for local-first AI Agent wo
 
 Uses strict process isolation with IPC communication.
 
-Public-facing product documentation should use the RongxinAI name. Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
+Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. LobsterAI, RongxinAI, LEO, and 李知远 are retired brand names — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
 
 ### Authentication Flow
 

@@ -443,7 +443,7 @@ test('MarketplaceService retries OpenAPI rate limits with the next token', async
 
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(result.models.some(model => model.repoId === 'owner/retried-GGUF')).toBe(true);
-  expect(fetchMock.mock.calls.map(([, init]) => (init?.headers as Record<string, string>).Authorization)).toEqual([
+  expect(fetchMock.mock.calls.map(([, init]) => (init?.headers as Record<string, string> | undefined)?.Authorization)).toEqual([
     'Bearer first-token',
     'Bearer second-token',
   ]);
