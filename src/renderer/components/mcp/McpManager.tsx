@@ -503,14 +503,14 @@ const McpManager: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
                         <Plug className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <span className="text-sm font-medium text-foreground truncate">
                         {server.name}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         type="button"
                         variant="ghost"
@@ -588,14 +588,14 @@ const McpManager: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
                         <Plug className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <span className="text-sm font-medium text-foreground truncate">
                         {entry.name}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {installedRegistryIds.has(entry.id) ? (
                         <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
                           {i18nService.t('mcpInstalled')}
@@ -657,14 +657,14 @@ const McpManager: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
                         <Plug className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <span className="text-sm font-medium text-foreground truncate">
                         {server.name}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         type="button"
                         variant="ghost"

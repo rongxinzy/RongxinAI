@@ -807,7 +807,7 @@ const IMSettings: React.FC = () => {
   return (
     <div className="flex h-full gap-4">
       {/* Platform List - Left Side */}
-      <div className="w-48 flex-shrink-0 border-r border-border pr-3 space-y-2 overflow-y-auto">
+      <div className="w-48 shrink-0 border-r border-border pr-3 space-y-2 overflow-y-auto">
         {platforms.map((platform) => {
                 const logo = PlatformRegistry.logo(platform);
            const isEnabled = isPlatformEnabled(platform);
@@ -853,7 +853,7 @@ const IMSettings: React.FC = () => {
                               : 'hover:bg-surface-raised'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
+                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
                           <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
                             {inst.instanceName}
                           </span>
@@ -905,7 +905,7 @@ const IMSettings: React.FC = () => {
                               : 'hover:bg-surface-raised'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
+                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
                           <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
                             {inst.instanceName}
                           </span>
@@ -957,7 +957,7 @@ const IMSettings: React.FC = () => {
                               : 'hover:bg-surface-raised'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
+                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
                           <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
                             {inst.instanceName}
                           </span>
@@ -1009,7 +1009,7 @@ const IMSettings: React.FC = () => {
                               : 'hover:bg-surface-raised'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
+                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
                           <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
                             {inst.instanceName}
                           </span>
@@ -1061,7 +1061,7 @@ const IMSettings: React.FC = () => {
                               : 'hover:bg-surface-raised'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
+                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
                           <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
                             {inst.instanceName}
                           </span>
@@ -1113,7 +1113,7 @@ const IMSettings: React.FC = () => {
                               : 'hover:bg-surface-raised'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 flex-shrink-0`} />
+                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
                           <span className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
                             {inst.instanceName}
                           </span>
@@ -1177,7 +1177,7 @@ const IMSettings: React.FC = () => {
       </div>
 
       {/* Platform Settings - Right Side */}
-      <div className="flex-1 min-w-0 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
+      <div className="flex-1 min-w-0 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable">
         {/* Header with status (only for single-instance platforms without per-instance headers) */}
         {activePlatform === 'weixin' && (
         <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
@@ -1591,7 +1591,7 @@ const IMSettings: React.FC = () => {
                   </Button>
                   {weixinQrError && (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                      <XCircle className="h-4 w-4 flex-shrink-0" />
+                      <XCircle className="h-4 w-4 shrink-0" />
                       {weixinQrError}
                     </div>
                   )}
@@ -1639,7 +1639,7 @@ const IMSettings: React.FC = () => {
               )}
               {weixinQrStatus === 'success' && (
                 <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-                  <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 shrink-0" />
                   {i18nService.t('imWeixinQrSuccess')}
                 </div>
               )}

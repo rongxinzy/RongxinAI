@@ -200,14 +200,14 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
       }}
       className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-150 ${
         isActive
-          ? 'bg-black/[0.06] dark:bg-white/[0.08]'
-          : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
+          ? 'bg-black/6 dark:bg-white/8'
+          : 'hover:bg-black/4 dark:hover:bg-white/5'
       }`}
     >
       {/* Content area */}
       <div className="flex items-start">
         {isBatchMode && (
-          <div className="flex items-center mr-2 mt-0.5 flex-shrink-0">
+          <div className="flex items-center mr-2 mt-0.5 shrink-0">
             <input
               type="checkbox"
               checked={isSelected}
@@ -225,7 +225,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             {/* Status indicator */}
             {showStatusIndicator && (
               <span
-                className={`block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 ${
+                className={`block w-2 h-2 rounded-full bg-blue-500 shrink-0 ${
                   showRunningIndicator ? 'shadow-[0_0_6px_rgba(59,130,246,0.5)] animate-pulse' : ''
                 }`}
                 title={showRunningIndicator ? i18nService.t(statusLabels[session.status]) : undefined}

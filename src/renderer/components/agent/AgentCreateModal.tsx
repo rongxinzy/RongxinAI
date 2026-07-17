@@ -500,7 +500,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                               onClick={() => !boundToOther && handleToggleIMBinding(bindingKey)}
                             >
                               <div className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
                                 <span className="text-sm text-foreground">
                                   {inst.instanceName}
                                 </span>
@@ -609,7 +609,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           isOpen={isOpen}
           onClose={handleClose}
           overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-          className="w-[calc(100vw-56px)] !max-w-[854px] h-[88vh] max-h-[720px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface ring-0 p-0 gap-0 flex flex-col overflow-hidden"
+          className="w-[calc(100vw-56px)] max-w-[854px]! h-[88vh] max-h-[720px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface ring-0 p-0 gap-0 flex flex-col overflow-hidden"
         >
           {content}
         </Modal>
@@ -653,7 +653,7 @@ const AgentTemplatePickerModal: React.FC<{
     <Modal
       isOpen
       onClose={onClose}
-      overlayClassName="fixed inset-0 z-[60] flex items-center justify-center bg-black/10 dark:bg-black/50"
+      overlayClassName="fixed inset-0 z-60 flex items-center justify-center bg-black/10 dark:bg-black/50"
       className="w-[calc(100vw-56px)] max-w-[760px] max-h-[82vh] rounded-xl border border-border/80 bg-surface shadow-[0_12px_40px_rgba(0,0,0,0.16)] overflow-hidden flex flex-col"
     >
       <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">

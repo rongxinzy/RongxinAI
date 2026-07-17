@@ -381,7 +381,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                     {i18nService.t('coworkToolInput')}
                   </label>
                   <div className="px-3 py-2 rounded-lg bg-surface max-h-40 overflow-y-auto">
-                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                    <pre className="text-xs text-foreground whitespace-pre-wrap wrap-break-word font-mono">
                       {requestedCommand}
                     </pre>
                   </div>
@@ -413,7 +413,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                           {i18nService.t('coworkToolInput')}
                         </label>
                         <div className="px-3 py-2 rounded-lg bg-background max-h-40 overflow-y-auto">
-                          <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                          <pre className="text-xs text-foreground whitespace-pre-wrap wrap-break-word font-mono">
                             {requestedCommand}
                           </pre>
                         </div>
@@ -462,7 +462,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                   {i18nService.t('coworkToolInput')}
                 </label>
                 <div className="px-3 py-2 rounded-lg bg-background">
-                  <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+                  <pre className="text-xs text-foreground whitespace-pre-wrap wrap-break-word font-mono">
                     {formatToolInput(permission.toolInput)}
                   </pre>
                 </div>
@@ -474,7 +474,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         {/* Warning for dangerous operations - 固定在滚动区域外，始终可见 */}
         {(!isQuestionTool || isConfirmMode) && dangerLevel === 'destructive' && (
           <div className="flex items-start gap-2 p-3 mx-6 my-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <TriangleAlert className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <TriangleAlert className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-red-700 dark:text-red-400">
                 {i18nService.t('coworkDestructiveOperation')}
@@ -487,7 +487,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         )}
         {(!isQuestionTool || isConfirmMode) && dangerLevel === 'caution' && (
           <div className="flex items-start gap-2 p-3 mx-6 my-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-            <TriangleAlert className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+            <TriangleAlert className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
                 {i18nService.t('coworkCautionOperation')}

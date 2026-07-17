@@ -74,7 +74,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
 
   return (
     <div className="space-y-0.5">
-      <div className="group sticky top-0 z-20 -ml-[6px] h-7 w-[calc(100%+12px)] bg-surface-raised">
+      <div className="group sticky top-0 z-20 ml-[-6px] h-7 w-[calc(100%+12px)] bg-surface-raised">
         <Button
           variant="ghost"
           className="flex h-full w-full items-center justify-start gap-2 rounded-md py-0 pl-3 pr-12 text-left text-[14px] font-normal text-foreground"
@@ -104,15 +104,15 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
           <div className={`min-h-0 min-w-0 max-w-full ${isTaskGroupVisible ? '' : 'pointer-events-none overflow-hidden'}`} role="group" aria-hidden={!workspace.isExpanded}>
             <div className="min-w-0 max-w-full space-y-0.5">
               {workspace.hasLoadError && workspace.tasks.length === 0 && (
-                <Button variant="ghost" onClick={() => onRetryLoadTasks(workspace.id)} className="-ml-[6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
+                <Button variant="ghost" onClick={() => onRetryLoadTasks(workspace.id)} className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
               )}
               {workspace.isLoadingTasks && workspace.tasks.length === 0 && (
-                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
+                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
               )}
               {!workspace.isLoadingTasks && !workspace.hasLoadError && workspace.tasks.length === 0 && (
-                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('myAgentSidebarNoTasks')}</div>
+                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('myAgentSidebarNoTasks')}</div>
               )}
               {workspace.tasks.map((task) => (
                 <AgentTaskRow

@@ -62,7 +62,7 @@ const ImageCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
 
   return (
     <div
-      className="group relative h-16 w-16 flex-shrink-0 rounded-lg border dark:border-claude-darkBorder border-claude-border overflow-hidden bg-claude-surface dark:bg-claude-darkSurface"
+      className="group relative h-16 w-16 shrink-0 rounded-lg border dark:border-claude-darkBorder border-claude-border overflow-hidden bg-claude-surface dark:bg-claude-darkSurface"
       title={attachment.path}
     >
       {/* Thumbnail or fallback */}
@@ -113,11 +113,11 @@ const FileCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
 
   return (
     <div
-      className="group relative flex h-16 w-40 flex-shrink-0 items-center gap-2 rounded-lg border dark:border-claude-darkBorder border-claude-border bg-claude-surface dark:bg-claude-darkSurface px-2"
+      className="group relative flex h-16 w-40 shrink-0 items-center gap-2 rounded-lg border dark:border-claude-darkBorder border-claude-border bg-claude-surface dark:bg-claude-darkSurface px-2"
       title={attachment.path}
     >
       {/* File type icon */}
-      <FileTypeIcon fileName={attachment.name} className="h-8 w-8 flex-shrink-0" />
+      <FileTypeIcon fileName={attachment.name} className="h-8 w-8 shrink-0" />
 
       {/* File name + type label */}
       <div className="flex min-w-0 flex-1 flex-col justify-center">

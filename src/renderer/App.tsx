@@ -649,7 +649,7 @@ const handleConfirmUpdate = useCallback(async () => {
         {windowsStandaloneTitleBar}
         <div className="flex-1 flex items-center justify-center bg-background">
           <div className="flex flex-col items-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-accent animate-pulse">
+            <div className="w-16 h-16 rounded-full bg-linear-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-accent animate-pulse">
               <MessageCircle className="h-8 w-8 text-white" />
             </div>
             <div className="w-24 h-1 rounded-full bg-primary/20 overflow-hidden">
@@ -723,7 +723,7 @@ const handleConfirmUpdate = useCallback(async () => {
           hideLogin={true}
         />
         <div className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}>
-          <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden [contain:layout_style_paint]">
+          <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
             <EngineStartupOverlay />
             {hasMountedLocalInference && (
               <div className={mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'}>

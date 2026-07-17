@@ -65,12 +65,12 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
 
   return (
     <div
-      className={`group relative -ml-[6px] flex h-[30px] w-[calc(100%+12px)] cursor-pointer items-center gap-2 rounded-md ${
+      className={`group relative ml-[-6px] flex h-[30px] w-[calc(100%+12px)] cursor-pointer items-center gap-2 rounded-md ${
         isBatchMode ? 'pl-4' : 'pl-[38px]'
       } pr-2.5 text-[14px] font-normal transition-colors ${
         task.isSelected
-          ? 'bg-black/[0.06] text-foreground dark:bg-white/[0.07]'
-          : 'text-foreground/80 hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.04]'
+          ? 'bg-black/6 text-foreground dark:bg-white/[0.07]'
+          : 'text-foreground/80 hover:bg-black/3 hover:text-foreground dark:hover:bg-white/4'
       }`}
       onClick={handleRowClick}
       onMouseMove={() => setSuppressPinHover(false)}

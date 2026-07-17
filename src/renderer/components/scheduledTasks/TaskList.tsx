@@ -35,7 +35,7 @@ import {
 // ── Status to text color mapping ──
 
 const statusTextClass: Record<string, string> = {
-  success: 'text-[var(--lobster-success)]',
+  success: 'text-(--lobster-success)',
   error: 'text-destructive',
   running: 'text-primary',
   skipped: 'text-muted-foreground',

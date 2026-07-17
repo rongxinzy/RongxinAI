@@ -49,7 +49,7 @@ const McpView: React.FC<McpViewProps> = ({ isSidebarCollapsed, onToggleSidebar, 
         <WindowTitleBar inline />
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-gutter:stable]">
+      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <McpManager />
         </div>

@@ -1044,7 +1044,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 navigateToRailItem(resolvedRail - 1);
               }}
               onMouseEnter={() => { setHoveredRailIndex(null); }}
-              className={`shrink-0 flex items-center justify-center w-5 h-5 mb-2 -mr-[5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
+              className={`shrink-0 flex items-center justify-center w-5 h-5 mb-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
                 ${!isRailHovered
                   ? 'opacity-0 pointer-events-none'
                   : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
@@ -1180,7 +1180,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 navigateToRailItem(resolvedRail + 1);
               }}
               onMouseEnter={() => { setHoveredRailIndex(null); }}
-              className={`shrink-0 flex items-center justify-center w-5 h-5 mt-2 -mr-[5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
+              className={`shrink-0 flex items-center justify-center w-5 h-5 mt-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
                 ${!isRailHovered
                   ? 'opacity-0 pointer-events-none'
                   : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >= railItemCountRef.current - 1
@@ -1196,7 +1196,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
         {railTooltip && createPortal(
           <div
-            className={`fixed z-[100] px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
+            className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
               max-w-[240px] shadow-[0_2px_12px_rgba(0,0,0,0.12)]
               border dark:shadow-[0_2px_12px_rgba(0,0,0,0.4)]
               ${railTooltip.isUser

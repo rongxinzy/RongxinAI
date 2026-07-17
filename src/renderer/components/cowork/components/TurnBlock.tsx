@@ -64,9 +64,9 @@ export const TurnBlock: React.FC<{
       <div className="rounded-lg border border-border bg-background px-3 py-2">
         <div className="flex items-center gap-2">
           {isError ? (
-            <TriangleAlert className="size-4 text-muted-foreground flex-shrink-0" />
+            <TriangleAlert className="size-4 text-muted-foreground shrink-0" />
           ) : (
-            <Info className="size-4 text-muted-foreground flex-shrink-0" />
+            <Info className="size-4 text-muted-foreground shrink-0" />
           )}
           <div className="text-xs whitespace-pre-wrap text-muted-foreground">{content}</div>
         </div>
@@ -89,7 +89,7 @@ export const TurnBlock: React.FC<{
       <div className="py-1">
         <div className="flex items-start gap-2">
           <span
-            className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`}
+            className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`}
           />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-muted-foreground">
@@ -108,7 +108,7 @@ export const TurnBlock: React.FC<{
             {(hasToolResultText || showNoDetailError) && (
               <div className="mt-2 px-3 py-2 rounded-lg bg-surface-raised max-h-64 overflow-y-auto">
                 <pre
-                  className={`text-xs whitespace-pre-wrap break-words font-mono ${isToolError ? 'text-red-500' : hasToolResultText ? 'text-foreground' : 'text-muted-foreground italic'}`}
+                  className={`text-xs whitespace-pre-wrap wrap-break-word font-mono ${isToolError ? 'text-red-500' : hasToolResultText ? 'text-foreground' : 'text-muted-foreground italic'}`}
                 >
                   {displayText}
                 </pre>

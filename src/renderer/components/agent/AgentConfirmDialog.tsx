@@ -32,7 +32,7 @@ const AgentConfirmDialog: React.FC<AgentConfirmDialogProps> = ({
   return (
     <Modal
       onClose={onCancel}
-      overlayClassName="fixed inset-0 z-[9999] flex items-center justify-center modal-backdrop px-4"
+      overlayClassName="fixed inset-0 z-9999 flex items-center justify-center modal-backdrop px-4"
       className="modal-content w-full max-w-sm rounded-2xl border border-border bg-surface shadow-modal overflow-hidden"
     >
       <div className="flex items-start gap-3 px-5 py-4">

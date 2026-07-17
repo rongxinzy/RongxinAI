@@ -1154,7 +1154,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {i18nService.t('scheduledTasksFormPayloadTextAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
             </label>
           </div>
-          <div className="rounded-lg border border-border bg-[var(--lobster-surface)]">
+          <div className="rounded-lg border border-border bg-(--lobster-surface)">
             <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}
@@ -1180,7 +1180,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
       {/* Submit error */}
       {submitError && (
         <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
-          <span className="text-xs text-red-600 dark:text-red-400 break-words min-w-0">
+          <span className="text-xs text-red-600 dark:text-red-400 wrap-break-word min-w-0">
             {i18nService.t('scheduledTasksFormSubmitError')}
             {submitError}
           </span>

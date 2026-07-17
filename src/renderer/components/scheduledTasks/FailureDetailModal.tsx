@@ -53,7 +53,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
             <div className="text-xs font-medium text-muted-foreground mb-1">
               {i18nService.t('scheduledTasksInputCommand')}
             </div>
-            <div className="text-sm text-foreground bg-secondary rounded-lg p-3 whitespace-pre-wrap break-words border border-border">
+            <div className="text-sm text-foreground bg-secondary rounded-lg p-3 whitespace-pre-wrap wrap-break-word border border-border">
               {inputCommand || '-'}
             </div>
           </div>
@@ -62,7 +62,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
             <div className="text-xs font-medium text-destructive mb-1">
               {i18nService.t('scheduledTasksFailureReason')}
             </div>
-            <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3 whitespace-pre-wrap break-words border border-destructive/20">
+            <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3 whitespace-pre-wrap wrap-break-word border border-destructive/20">
               {error || '-'}
             </div>
           </div>

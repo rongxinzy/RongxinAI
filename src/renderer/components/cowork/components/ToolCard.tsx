@@ -29,7 +29,7 @@ const TodoWriteInputView: React.FC<{ items: ParsedTodoItem[] }> = ({ items }) =>
   <div className="flex flex-col gap-2">
     {items.map((item, index) => (
       <div key={`todo-item-${index}`} className="flex items-start gap-2">
-        <span className={`mt-0.5 size-4 rounded-[4px] border flex-shrink-0 inline-flex items-center justify-center ${
+        <span className={`mt-0.5 size-4 rounded-[4px] border shrink-0 inline-flex items-center justify-center ${
           item.status === 'completed' ? 'bg-green-500/10 border-green-500 text-green-500'
           : item.status === 'in_progress' ? 'bg-transparent border-blue-500'
           : 'bg-transparent border-border'
@@ -37,7 +37,7 @@ const TodoWriteInputView: React.FC<{ items: ParsedTodoItem[] }> = ({ items }) =>
           {item.status === 'completed' && <Check className="size-3" />}
         </span>
         <div className="min-w-0 flex-1">
-          <div className={`text-xs whitespace-pre-wrap break-words leading-5 ${item.status === 'completed' ? 'text-muted' : 'text-foreground'}`}>
+          <div className={`text-xs whitespace-pre-wrap wrap-break-word leading-5 ${item.status === 'completed' ? 'text-muted' : 'text-foreground'}`}>
             {item.primaryText}
           </div>
         </div>

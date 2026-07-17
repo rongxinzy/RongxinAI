@@ -666,14 +666,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
                     <Puzzle className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <span className="text-sm font-medium text-foreground truncate">
                     {resolveSkillName(skill.id, skill.name)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   {!readOnly && !skill.isBuiltIn && (
                     <Button
                       type="button"
@@ -768,14 +768,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
+                    <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
                       <Puzzle className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <span className="text-sm font-medium text-foreground truncate">
                       {resolveSkillName(skill.id, skill.name)}
                     </span>
                   </div>
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     {(() => {
                       const status = getSkillInstallStatus(skill);
                       if (status === 'installed') {
@@ -889,7 +889,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
         <Modal onClose={() => setSelectedMarketplaceSkill(null)} overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60" className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center shrink-0">
                   <Puzzle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
@@ -903,7 +903,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => setSelectedMarketplaceSkill(null)}
-                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors flex-shrink-0"
+                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -916,7 +916,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
             <div className="space-y-2 mb-5">
               {selectedMarketplaceSkill.version && (
                 <div className="flex items-center text-xs">
-                  <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailVersion')}</span>
+                  <span className="w-16 shrink-0 text-muted-foreground">{i18nService.t('skillDetailVersion')}</span>
                   <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
                     v{selectedMarketplaceSkill.version}
                   </span>
@@ -924,7 +924,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               )}
               {selectedMarketplaceSkill.source?.from && (
                 <div className="flex items-center text-xs">
-                  <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
+                  <span className="w-16 shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
                   <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
                     {selectedMarketplaceSkill.source.from}
                   </span>
@@ -937,7 +937,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               )}
               {selectedMarketplaceSkill.source?.url && (
                 <div className="flex items-start text-xs">
-                  <span className="w-16 flex-shrink-0 text-muted-foreground pt-0.5">URL</span>
+                  <span className="w-16 shrink-0 text-muted-foreground pt-0.5">URL</span>
                   <Button
                     type="button"
                     variant="link"
@@ -979,7 +979,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
         <Modal onClose={() => setSelectedSkill(null)} overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60" className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center shrink-0">
                   <Puzzle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
@@ -993,7 +993,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => setSelectedSkill(null)}
-                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors flex-shrink-0"
+                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -1010,7 +1010,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                   <>
                     {selectedSkill.isOfficial && (
                       <div className="flex items-center text-xs">
-                        <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
+                        <span className="w-16 shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
                         <span className="px-1.5 py-0.5 rounded bg-primary-muted text-primary font-medium">
                           {i18nService.t('official')}
                         </span>
@@ -1023,7 +1023,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                     )}
                     {!selectedSkill.isOfficial && mp?.source?.from && (
                       <div className="flex items-center text-xs">
-                        <span className="w-16 flex-shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
+                        <span className="w-16 shrink-0 text-muted-foreground">{i18nService.t('skillDetailSource')}</span>
                         <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
                           {mp.source.from}
                         </span>
@@ -1036,7 +1036,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                     )}
                     {mp?.source?.url && (
                       <div className="flex items-start text-xs">
-                        <span className="w-16 flex-shrink-0 text-muted-foreground pt-0.5">URL</span>
+                        <span className="w-16 shrink-0 text-muted-foreground pt-0.5">URL</span>
                         <Button
                           type="button"
                           variant="link"

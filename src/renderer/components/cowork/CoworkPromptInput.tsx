@@ -901,11 +901,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       )}
       {imageVisionHint && (
         <div className="mb-2 flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-          <TriangleAlert className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>
             {i18nService.t('imageVisionHint')}
           </span>
-          <Button variant="ghost" size="icon-xs" className="ml-auto flex-shrink-0" onClick={() => setImageVisionHint(false)}>
+          <Button variant="ghost" size="icon-xs" className="ml-auto shrink-0" onClick={() => setImageVisionHint(false)}>
             <X className="h-3 w-3" />
           </Button>
         </div>
@@ -913,7 +913,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       <PromptInput
         multiple
         className={cn(
-          'shadow-elevated rounded-2xl transition-shadow focus-within:shadow-[0_4px_16px_rgba(59,130,246,0.25)] [&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:has-[:focus-visible]:border-input [&_[data-slot=input-group]]:has-[:focus-visible]:ring-0',
+          'shadow-elevated rounded-2xl transition-shadow focus-within:shadow-[0_4px_16px_rgba(59,130,246,0.25)] **:data-[slot=input-group]:rounded-2xl **:data-[slot=input-group]:has-focus-visible:border-input **:data-[slot=input-group]:has-focus-visible:ring-0',
           isDraggingFiles && 'ring-2 ring-primary'
         )}
         onDragEnter={handleDragEnter}
@@ -954,9 +954,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 <>
                   <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
                     <PromptInputButton
-                      className={`gap-1.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                      className={`gap-1.5 hover:bg-black/3 dark:hover:bg-white/4 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
                     >
-                      <Folder className="h-4 w-4 flex-shrink-0" />
+                      <Folder className="h-4 w-4 shrink-0" />
                       <span className="max-w-[150px] truncate text-xs">
                         {truncatePath(workingDirectory)}
                       </span>
@@ -968,7 +968,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                             e.stopPropagation();
                             handleFolderSelect('');
                           }}
-                          className="flex-shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                          className="shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                         >
                           <X className="h-3 w-3" />
                         </span>
@@ -990,7 +990,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 onEnabledChange={onLocalThinkingEnabledChange}
               />
               {!remoteManaged && (
-                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile} className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                <PromptInputButton onClick={handleAddFile} disabled={disabled || isStreaming || isAddingFile} className="hover:bg-black/3 dark:hover:bg-white/4">
                   <Paperclip className="h-4 w-4" />
                 </PromptInputButton>
               )}

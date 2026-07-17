@@ -210,7 +210,7 @@ export function ModelLaunchLogWindow() {
           <Card className="min-h-0 flex-1 gap-0 overflow-hidden border-slate-800 bg-slate-950 p-0 shadow-sm">
             <CardContent className="min-h-0 flex-1 p-0">
               <ScrollArea className="h-full min-h-0 bg-slate-950">
-                <pre className="min-h-full whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-slate-100 selection:bg-slate-700 selection:text-white">{body}</pre>
+                <pre className="min-h-full whitespace-pre-wrap wrap-break-word p-4 font-mono text-xs leading-5 text-slate-100 selection:bg-slate-700 selection:text-white">{body}</pre>
                 <div ref={endRef} aria-hidden="true" />
               </ScrollArea>
             </CardContent>
@@ -285,7 +285,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
     return (
       <Badge
         variant="outline"
-        className="border-[color-mix(in_srgb,var(--lobster-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-success)_12%,transparent)] text-[var(--lobster-success)]"
+        className="border-[color-mix(in_srgb,var(--lobster-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-success)_12%,transparent)] text-(--lobster-success)"
       >
         {i18nService.t('localInferenceModelLaunchSucceeded')}
       </Badge>
@@ -295,7 +295,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
     return (
       <Badge
         variant="outline"
-        className="border-[color-mix(in_srgb,var(--lobster-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-destructive)_12%,transparent)] text-[var(--lobster-destructive)]"
+        className="border-[color-mix(in_srgb,var(--lobster-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-destructive)_12%,transparent)] text-(--lobster-destructive)"
       >
         {i18nService.t('localInferenceModelLaunchFailed')}
       </Badge>
@@ -304,7 +304,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
   return (
     <Badge
       variant="outline"
-      className="border-[color-mix(in_srgb,var(--lobster-primary)_28%,transparent)] bg-[var(--lobster-primary-muted)] text-[var(--lobster-primary)]"
+      className="border-[color-mix(in_srgb,var(--lobster-primary)_28%,transparent)] bg-(--lobster-primary-muted) text-(--lobster-primary)"
     >
       {i18nService.t('localInferenceModelLaunchStarting')}
     </Badge>

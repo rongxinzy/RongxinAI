@@ -82,7 +82,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
           <ul className="mt-2 space-y-1.5 max-h-40 overflow-y-auto pl-2">
             {currentLog.content.map((item, index) => (
               <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                <span className="mt-2 h-1 w-1 flex-shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
                 <span>{item}</span>
               </li>
             ))}
@@ -124,7 +124,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
 
         {updateState.errorMessage && (
-          <p className="mt-4 text-sm text-muted-foreground break-words">
+          <p className="mt-4 text-sm text-muted-foreground wrap-break-word">
             {updateState.errorMessage}
           </p>
         )}

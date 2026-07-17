@@ -22,7 +22,7 @@ const SkillsButton: React.FC<SkillsButtonProps> = ({
         type="button"
         variant="ghost"
         size="icon"
-        className={`rounded-xl bg-surface text-muted-foreground hover:text-primary dark:hover:text-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${className}`}
+        className={`rounded-xl bg-surface text-muted-foreground hover:text-primary dark:hover:text-primary hover:bg-black/3 dark:hover:bg-white/4 ${className}`}
         title="Skills"
       >
         <Puzzle className="h-5 w-5" />

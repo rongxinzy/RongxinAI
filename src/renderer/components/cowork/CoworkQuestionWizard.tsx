@@ -343,7 +343,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                   >
                     <div className="flex items-start gap-3">
                       {currentQuestion.multiSelect ? (
-                        <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 transition-colors ${
+                        <div className={`mt-0.5 shrink-0 w-4 h-4 rounded border-2 transition-colors ${
                           isSelected
                             ? 'bg-primary border-primary'
                             : 'border-border'
@@ -355,7 +355,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({
                           )}
                         </div>
                       ) : (
-                        <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
+                        <div className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
                           isSelected
                             ? 'border-primary'
                             : 'border-border'

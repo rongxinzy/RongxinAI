@@ -460,7 +460,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               onClick={() => canToggle && handleToggleIMBinding(bindingKey)}
             >
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
                 <span className="text-sm text-foreground">
                   {inst.instanceName}
                 </span>
@@ -557,7 +557,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       <Modal
         onClose={handleClose}
         overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-        className="w-[calc(100vw-56px)] !max-w-[854px] h-[88vh] max-h-[720px] flex flex-col overflow-hidden rounded-xl bg-background shadow-2xl p-0 gap-0 ring-0"
+        className="w-[calc(100vw-56px)] max-w-[854px]! h-[88vh] max-h-[720px] flex flex-col overflow-hidden rounded-xl bg-background shadow-2xl p-0 gap-0 ring-0"
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border bg-surface/40 px-4 py-3">
           <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -605,7 +605,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
             >
               {tab.label}
               {activeTab === tab.key && (
-                <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-foreground rounded-full" />
+                <div className="absolute -bottom-px left-0 right-0 h-0.5 bg-foreground rounded-full" />
               )}
             </Button>
           ))}

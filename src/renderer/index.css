@@ -3,9 +3,194 @@
 @import './theme/css/base.css';
 @import './theme/css/shadcn-token-bridge.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/typography';
+
+/* ── Tailwind v4 theme configuration ── */
+@theme {
+  /* Semantic theme colors (driven by CSS variables) */
+  --color-background: var(--lobster-background);
+  --color-foreground: var(--lobster-foreground);
+  --color-primary: var(--lobster-primary);
+  --color-primary-foreground: var(--lobster-primary-foreground);
+  --color-primary-hover: var(--lobster-primary-hover);
+  --color-primary-muted: var(--lobster-primary-muted);
+  --color-primary-dark: var(--lobster-primary-hover);
+  --color-accent: var(--lobster-accent);
+  --color-accent-foreground: var(--lobster-accent-foreground);
+  --color-surface: var(--lobster-surface);
+  --color-surface-foreground: var(--lobster-surface-foreground);
+  --color-surface-raised: var(--lobster-surface-raised);
+  --color-surface-overlay: var(--lobster-surface-overlay);
+  --color-surface-inset: var(--lobster-surface-raised);
+  --color-border: var(--lobster-border);
+  --color-border-subtle: var(--lobster-border-subtle);
+  --color-border-input: var(--lobster-input-border);
+  --color-destructive: var(--lobster-destructive);
+  --color-destructive-foreground: var(--lobster-destructive-foreground);
+  --color-success: var(--lobster-success);
+  --color-warning: var(--lobster-warning);
+
+  /* shadcn/ui compatible tokens */
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-input: var(--input);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Legacy claude.* aliases */
+  --color-claude-bg: var(--lobster-background);
+  --color-claude-surface: var(--lobster-surface);
+  --color-claude-surfaceHover: var(--lobster-surface-raised);
+  --color-claude-surfaceMuted: var(--lobster-surface-raised);
+  --color-claude-surfaceInset: var(--lobster-surface-raised);
+  --color-claude-border: var(--lobster-border);
+  --color-claude-borderLight: var(--lobster-border-subtle);
+  --color-claude-text: var(--lobster-text-primary);
+  --color-claude-textSecondary: var(--lobster-text-secondary);
+  --color-claude-darkBg: var(--lobster-background);
+  --color-claude-darkSurface: var(--lobster-surface);
+  --color-claude-darkSurfaceHover: var(--lobster-surface-raised);
+  --color-claude-darkSurfaceMuted: var(--lobster-surface-raised);
+  --color-claude-darkSurfaceInset: var(--lobster-surface-raised);
+  --color-claude-darkBorder: var(--lobster-border);
+  --color-claude-darkBorderLight: var(--lobster-border-subtle);
+  --color-claude-darkText: var(--lobster-text-primary);
+  --color-claude-darkTextSecondary: var(--lobster-text-secondary);
+  --color-claude-accent: var(--lobster-primary);
+  --color-claude-accentHover: var(--lobster-primary-hover);
+  --color-claude-accentLight: var(--lobster-primary);
+  --color-claude-accentMuted: var(--lobster-primary-muted);
+
+  /* Border radius */
+  --radius-theme: var(--lobster-radius);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* Box shadows */
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-popover: 0 4px 20px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
+  --shadow-glow-accent: 0 0 20px var(--lobster-primary-muted);
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-in-up: fade-in-up 0.25s ease-out;
+  --animate-fade-in-down: fade-in-down 0.2s ease-out;
+  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-shimmer: shimmer 1.5s infinite;
+  --animate-shake: shake 0.4s ease-in-out;
+  --animate-message-in: message-in 0.25s ease-out both;
+
+  /* Transition timing */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in-down {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-3px); }
+    40% { transform: translateX(3px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(2px); }
+  }
+  @keyframes message-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ── Typography plugin customization ── */
+@utility prose {
+  color: var(--lobster-text-primary);
+
+  & a {
+    color: var(--lobster-primary);
+  }
+  & a:hover {
+    color: var(--lobster-primary-hover);
+  }
+  & code {
+    color: var(--lobster-text-primary);
+    background-color: var(--lobster-surface-raised);
+    padding: 0.2em 0.4em;
+    border-radius: 0.25rem;
+    font-weight: 400;
+  }
+  & code::before,
+  & code::after {
+    content: "";
+  }
+  & pre {
+    background-color: var(--lobster-surface-raised);
+    color: var(--lobster-text-primary);
+    padding: 1em;
+    border-radius: 0.75rem;
+    overflow-x: auto;
+  }
+  & blockquote {
+    border-left-color: var(--lobster-primary);
+    color: var(--lobster-text-secondary);
+  }
+  & h1, & h2, & h3, & h4 {
+    color: var(--lobster-text-primary);
+  }
+  & strong {
+    color: var(--lobster-text-primary);
+  }
+  & table {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+/* ── Base layer ── */
+@layer base {
+  * {
+    border-color: var(--lobster-border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--lobster-background);
+    color: var(--lobster-foreground);
+  }
+}
 
 /* KaTeX styles */
 .katex-display {
@@ -483,8 +668,7 @@ select::-ms-expand {
   transform: none;
 }
 
-/* ButtonGroup: joined buttons — Tailwind v3.4-compatible CSS.
-   Uses explicit selectors instead of Tailwind v4 *:data-slot: variant chain. */
+/* ButtonGroup: joined buttons — Tailwind v4 *:data-slot: variant chain. */
 [data-slot="button-group"] > [data-slot] {
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
@@ -499,9 +683,7 @@ select::-ms-expand {
   border-left-width: 0 !important;
 }
 
-/* Select: match dropdown width to trigger. Tailwind v3.4 doesn't process
-   var() inside arbitrary values (min-w-[var(--anchor-width)] → not compiled),
-   so use a plain CSS rule targeting the base-ui popup via data-slot. */
+/* Select: match dropdown width to trigger. */
 [data-slot="select-content"] {
   width: var(--anchor-width) !important;
   max-height: var(--available-height) !important;

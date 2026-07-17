@@ -56,7 +56,7 @@ export const UserBubble: React.FC<{
     >
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <Message from="user" className="ml-auto items-end">
-          <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
+          <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
             {displayContent}
           </MessageContent>
         </Message>

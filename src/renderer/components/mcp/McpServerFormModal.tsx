@@ -396,7 +396,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                           variant="ghost"
                           size="icon"
                           onClick={() => handleRemoveEnvRow(index)}
-                          className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 shrink-0"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                             <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -404,7 +404,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                         </Button>
                       )}
                       {row.required && (
-                        <span className="text-red-400 text-xs flex-shrink-0 w-4 text-center">*</span>
+                        <span className="text-red-400 text-xs shrink-0 w-4 text-center">*</span>
                       )}
                     </div>
                     {envErrors[index] && row.required && (
@@ -466,7 +466,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                       variant="ghost"
                       size="icon"
                       onClick={() => handleRemoveHeaderRow(index)}
-                      className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
+                      className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 shrink-0"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                         <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />

@@ -48,9 +48,9 @@ const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
-  'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]';
+  'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4';
 const activeSidebarNavItemClassName =
-  `${sidebarNavItemClassName} bg-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
+  `${sidebarNavItemClassName} bg-black/6 hover:bg-black/6 dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
 const sidebarCreateIconClassName = 'h-4 w-4 shrink-0 text-muted-foreground/40 dark:text-muted-foreground/45';
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -352,7 +352,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-sm">{i18nService.t('chatMode')}</span>
             </span>
           </div>
-          <div className="!mt-2">
+          <div className="mt-2!">
             <Button
               type="button"
               variant="ghost"
@@ -489,7 +489,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-0.5 [&_[role=treeitem]]:!pl-3">
+                <div className="space-y-0.5 **:[[role=treeitem]]:pl-3!">
                   {chatTaskNodes.map((task) => (
                     <AgentTaskRow
                   key={task.id}
@@ -524,17 +524,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
         <div
-          className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
+          className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
             agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
           }`}
         />
         <div
-          className={`pointer-events-none absolute inset-x-0 top-[68px] z-10 h-10 bg-gradient-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
+          className={`pointer-events-none absolute inset-x-0 top-[68px] z-10 h-10 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
             agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
           }`}
         />
         <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
             agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
           }`}
         />
@@ -598,7 +598,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             variant="ghost"
             onClick={() => onShowSettings()}
-            className={`inline-flex h-7 items-center !justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${hideLogin ? 'w-full' : 'shrink-0'}`}
+            className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
             aria-label={i18nService.t('settings')}
           >
             <Cog className="h-4 w-4 shrink-0" />

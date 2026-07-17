@@ -120,7 +120,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
                   key={index}
                   onClick={() => handleSelectRecentFolder(folder)}
                 >
-                  <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{truncatePath(folder)}</span>
                 </DropdownMenuItem>
               ))
