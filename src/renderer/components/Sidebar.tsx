@@ -51,7 +51,7 @@ const sidebarNavItemClassName =
   'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4';
 const activeSidebarNavItemClassName =
   `${sidebarNavItemClassName} bg-black/6 hover:bg-black/6 dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
-const sidebarCreateIconClassName = 'h-4 w-4 shrink-0 text-muted-foreground/40 dark:text-muted-foreground/45';
+const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 
 const Sidebar: React.FC<SidebarProps> = ({
   onShowSettings,
@@ -336,7 +336,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className={cn(
               'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
               workMode === 'work'
-                ? 'font-semibold text-foreground scale-125'
+                ? 'font-semibold text-foreground'
                 : 'font-normal text-muted-foreground opacity-50'
             )} style={{ left: '25%', transform: 'translate(-50%, -50%)' }}>
               <Briefcase className="size-3.5" />
@@ -345,7 +345,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className={cn(
               'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
               workMode === 'chat'
-                ? 'font-semibold text-foreground scale-125'
+                ? 'font-semibold text-foreground'
                 : 'font-normal text-muted-foreground opacity-50'
             )} style={{ left: '75%', transform: 'translate(-50%, -50%)' }}>
               <MessageCircle className="size-3.5" />
@@ -422,7 +422,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Button>
             </>
           )}
-          {workMode !== 'chat' && (
+          {workMode === 'chat' && (
             <>
               <Button
                 type="button"

@@ -661,11 +661,13 @@ select::-ms-expand {
   left: -6px;
   top: -4px;
   transform: none;
+  translate: none !important;
 }
 [data-mode="work-chat"] [data-slot="switch-thumb"][data-checked] {
   left: calc(50% - 6px);
   top: -4px;
   transform: none;
+  translate: none !important;
 }
 
 /* ButtonGroup: joined buttons — Tailwind v4 *:data-slot: variant chain. */

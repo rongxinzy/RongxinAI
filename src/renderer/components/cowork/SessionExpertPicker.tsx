@@ -55,18 +55,20 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger>
-          <PromptInputButton
-            type="button"
-            disabled={disabled}
-            tooltip={i18nService.t('addSessionExpert')}
-          >
-            <UsersRound data-icon="inline-start" />
-            {selectedExpertIds.length > 0 && (
-              <span className="text-xs">{selectedExpertIds.length}</span>
-            )}
-          </PromptInputButton>
-        </PopoverTrigger>
+        <PopoverTrigger
+          render={
+            <PromptInputButton
+              type="button"
+              disabled={disabled}
+              tooltip={i18nService.t('addSessionExpert')}
+            >
+              <UsersRound data-icon="inline-start" />
+              {selectedExpertIds.length > 0 && (
+                <span className="text-xs">{selectedExpertIds.length}</span>
+              )}
+            </PromptInputButton>
+          }
+        />
         <PopoverContent
           side="top"
           align="start"
