@@ -1,89 +1,87 @@
-﻿<svg width="1120" height="820" viewBox="0 0 1120 820" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1120" height="880" viewBox="0 0 1120 880" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1120" y2="820" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#071013"/>
-      <stop offset="1" stop-color="#0B1020"/>
-    </linearGradient>
-    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#34D399"/>
-      <stop offset="1" stop-color="#0EA5E9"/>
-    </linearGradient>
-    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#38BDF8"/>
-      <stop offset="1" stop-color="#6366F1"/>
-    </linearGradient>
-    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#A78BFA"/>
-      <stop offset="1" stop-color="#F472B6"/>
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.12 0 0 0 0 0.85 0 0 0 0 0.62 0 0 0 0.22 0"/>
-      <feBlend in="SourceGraphic"/>
-    </filter>
+    <pattern id="hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.7"/>
+    </pattern>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
     <style>
-      .title{font:700 26px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#E5E7EB}
-      .label{font:700 22px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#D1FAE5}
-      .labelBlue{font:700 22px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#BAE6FD}
-      .labelPurple{font:700 22px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#DDD6FE}
-      .body{font:500 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#A7F3D0}
-      .bodyBlue{font:500 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#BFDBFE}
-      .bodyMuted{font:500 16px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#9CA3AF}
-      .pill{font:700 14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;fill:#86EFAC}
+      text { fill: #000; font-family: 'Latin Modern Roman', 'CMU Serif', 'STIX Two Text', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', 'Times New Roman', serif; }
+      .t0 { font-size: 26px; font-weight: 700; }
+      .t1 { font-size: 15px; font-style: italic; }
+      .t2 { font-size: 18px; font-weight: 700; }
+      .t3 { font-size: 17px; font-weight: 700; }
+      .t4 { font-size: 13px; }
+      .t5 { font-size: 16px; font-weight: 700; }
+      .t6 { font-size: 12px; font-style: italic; }
+      .t7 { font-size: 15px; font-weight: 700; }
+      .box { fill: #fff; stroke: #000; stroke-width: 1.6; }
+      .grp { fill: none; stroke: #000; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .ln  { stroke: #000; stroke-width: 1.6; }
     </style>
   </defs>
 
-  <rect width="1120" height="820" rx="28" fill="url(#bg)"/>
-  <text x="560" y="42" text-anchor="middle" class="title">RongxinAI 鏈湴 AI Agent 宸ヤ綔鍙?/text>
-  <text x="560" y="70" text-anchor="middle" class="bodyMuted">OpenClaw 璐熻矗 Agent 鎵ц锛宭lama.cpp 璐熻矗鏈湴 GGUF 妯″瀷锛孍lectron 璐熻矗妗岄潰绔畨鍏ㄨ竟鐣?/text>
+  <rect width="1120" height="880" fill="#fff"/>
 
-  <rect x="50" y="105" width="1020" height="285" rx="22" fill="#071A18" stroke="url(#green)" stroke-width="3" filter="url(#glow)"/>
-  <text x="560" y="135" text-anchor="middle" class="label">Electron Main Process</text>
+  <text x="560" y="50" text-anchor="middle" class="t0">RongxinAI 本地 AI Agent 工作台</text>
+  <text x="560" y="80" text-anchor="middle" class="t1">OpenClaw 执行 Agent 工作流 &#183; llama.cpp 提供本地 GGUF 模型推理 &#183; Electron 掌管桌面安全边界</text>
 
-  <rect x="85" y="165" width="360" height="110" rx="16" fill="#0B1F1E" stroke="#34D399" stroke-width="3"/>
-  <text x="115" y="205" class="label">OpenClaw Runtime</text>
-  <text x="115" y="235" class="body">Cowork 浼氳瘽銆佸伐鍏疯皟鐢ㄣ€佹潈闄愯姹?/text>
-  <rect x="306" y="188" width="78" height="30" rx="8" fill="#052E1D" stroke="#22C55E"/>
-  <text x="345" y="209" text-anchor="middle" class="pill">涓诲紩鎿?/text>
+  <!-- Electron 主进程 -->
+  <rect x="60" y="110" width="1000" height="300" class="grp"/>
+  <text x="82" y="142" class="t2">Electron 主进程</text>
 
-  <rect x="470" y="165" width="260" height="110" rx="16" fill="#111827" stroke="#38BDF8" stroke-width="3"/>
-  <text x="500" y="205" class="labelBlue">llama.cpp 鏈嶅姟</text>
-  <text x="500" y="235" class="bodyBlue">GGUF 妯″瀷銆佸惎鍔ㄥ弬鏁般€佹ā鍨嬪競鍦?/text>
+  <rect x="95" y="165" width="350" height="95" fill="url(#hatch)" stroke="#000" stroke-width="1.6"/>
+  <text x="115" y="201" class="t3">OpenClaw 运行时</text>
+  <text x="115" y="227" class="t4">Cowork 会话、工具调用、权限请求</text>
+  <rect x="352" y="178" width="78" height="24" fill="#fff" stroke="#000" stroke-width="1.2"/>
+  <text x="391" y="195" text-anchor="middle" class="t4" font-weight="700">主引擎</text>
 
-  <rect x="755" y="165" width="280" height="110" rx="16" fill="#111827" stroke="#A78BFA" stroke-width="3"/>
-  <text x="785" y="205" class="labelPurple">Skill / MCP 绠＄悊</text>
-  <text x="785" y="235" class="bodyBlue">??????????????</text>
+  <rect x="470" y="165" width="270" height="95" class="box"/>
+  <text x="490" y="201" class="t3">llama.cpp 服务</text>
+  <text x="490" y="227" class="t4">GGUF 模型、启动参数、</text>
+  <text x="490" y="247" class="t4">模型市场</text>
 
-  <rect x="85" y="300" width="300" height="70" rx="14" fill="#10231F" stroke="#22C55E" stroke-width="2.5"/>
-  <text x="115" y="329" class="label">SQLite 鏈湴瀛樺偍</text>
-  <text x="115" y="354" class="body">浼氳瘽銆侀厤缃€佽蹇嗐€佷换鍔?/text>
+  <rect x="765" y="165" width="270" height="95" class="box"/>
+  <text x="785" y="201" class="t3">技能 / MCP 管理</text>
+  <text x="785" y="227" class="t4">内置技能、技能市场、</text>
+  <text x="785" y="247" class="t4">外部工具</text>
 
-  <rect x="410" y="300" width="300" height="70" rx="14" fill="#1B172A" stroke="#F59E0B" stroke-width="2.5"/>
-  <text x="440" y="329" class="labelPurple">瀹氭椂浠诲姟璋冨害</text>
-  <text x="440" y="354" class="bodyBlue">Cron銆佸悗鍙拌Е鍙戙€佺粨鏋滄姇閫?/text>
+  <rect x="95" y="290" width="350" height="95" class="box"/>
+  <text x="115" y="326" class="t3">SQLite 本地存储</text>
+  <text x="115" y="352" class="t4">会话、配置、记忆、任务</text>
 
-  <rect x="735" y="300" width="300" height="70" rx="14" fill="#171A22" stroke="#60A5FA" stroke-width="2.5"/>
-  <text x="765" y="329" class="labelBlue">IM / 閭欢缃戝叧</text>
-  <text x="765" y="354" class="bodyBlue">寰俊銆佷紒寰€侀拤閽夈€侀涔︺€丵Q銆侀偖绠?/text>
+  <rect x="470" y="290" width="270" height="95" class="box"/>
+  <text x="490" y="326" class="t3">定时任务调度</text>
+  <text x="490" y="352" class="t4">Cron、后台触发、结果投递</text>
 
-  <path d="M560 390V470" stroke="#6B7280" stroke-width="4"/>
-  <rect x="405" y="470" width="310" height="86" rx="16" fill="#15191F" stroke="#6B7280" stroke-width="3"/>
-  <text x="560" y="506" text-anchor="middle" class="title">Preload Script</text>
-  <text x="560" y="535" text-anchor="middle" class="bodyMuted">contextBridge / IPC 瀹夊叏妗ユ帴</text>
-  <path d="M560 556V635" stroke="#6B7280" stroke-width="4"/>
+  <rect x="765" y="290" width="270" height="95" class="box"/>
+  <text x="785" y="326" class="t3">IM / 邮件网关</text>
+  <text x="785" y="352" class="t4">微信、企微、钉钉、</text>
+  <text x="785" y="372" class="t4">飞书、QQ、邮箱</text>
 
-  <rect x="50" y="635" width="1020" height="145" rx="22" fill="#07111F" stroke="url(#blue)" stroke-width="3" filter="url(#glow)"/>
-  <text x="560" y="666" text-anchor="middle" class="labelBlue">Renderer Process (React)</text>
+  <!-- IPC 桥接 -->
+  <line x1="560" y1="410" x2="560" y2="462" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="578" y="442" class="t6">IPC 调用</text>
+  <rect x="420" y="465" width="280" height="70" class="box"/>
+  <text x="560" y="497" text-anchor="middle" class="t5">Preload 脚本</text>
+  <text x="560" y="521" text-anchor="middle" class="t6">contextBridge &#183; IPC 安全桥接</text>
+  <line x1="560" y1="535" x2="560" y2="587" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="578" y="568" class="t6">流式事件</text>
 
-  <rect x="85" y="695" width="220" height="60" rx="14" fill="#0D1726" stroke="#60A5FA" stroke-width="2.5"/>
-  <text x="115" y="732" class="labelBlue">Redux 鐘舵€?/text>
+  <!-- 渲染进程 -->
+  <rect x="60" y="590" width="1000" height="200" class="grp"/>
+  <text x="82" y="622" class="t2">渲染进程（React）</text>
 
-  <rect x="330" y="695" width="245" height="60" rx="14" fill="#0A1E24" stroke="#22D3EE" stroke-width="2.5"/>
-  <text x="360" y="732" class="labelBlue">Cowork / 鎺ㄧ悊鐣岄潰</text>
+  <rect x="95" y="655" width="215" height="85" class="box"/>
+  <text x="202" y="705" text-anchor="middle" class="t7">Redux 状态</text>
 
-  <rect x="600" y="695" width="210" height="60" rx="14" fill="#1A1430" stroke="#A855F7" stroke-width="2.5"/>
-  <text x="630" y="732" class="labelPurple">Artifacts 棰勮</text>
+  <rect x="335" y="655" width="250" height="85" class="box"/>
+  <text x="460" y="705" text-anchor="middle" class="t7">Cowork / 推理界面</text>
 
-  <rect x="835" y="695" width="200" height="60" rx="14" fill="#111827" stroke="#34D399" stroke-width="2.5"/>
-  <text x="865" y="732" class="label">璁剧疆 / 甯傚満</text>
+  <rect x="610" y="655" width="220" height="85" class="box"/>
+  <text x="720" y="705" text-anchor="middle" class="t7">Artifacts 预览</text>
+
+  <rect x="855" y="655" width="180" height="85" class="box"/>
+  <text x="945" y="705" text-anchor="middle" class="t7">设置 / 市场</text>
 </svg>
