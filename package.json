@@ -73,7 +73,7 @@
     "preview": "vite preview",
     "compile:electron": "tsc --project electron-tsconfig.json",
     "precompile:electron": "electron-builder install-app-deps",
-    "build:skill:web-search": "npm install --prefix SKILLs/web-search && npx tsc -p SKILLs/web-search/tsconfig.json && node -e \"const fs=require('fs');['.connection','.server.log','.server.pid'].forEach(f=>{try{fs.unlinkSync('SKILLs/web-search/'+f)}catch(e){}});\"",
+    "build:skill:web-search": "npm install --prefix SKILLs/web-search && node SKILLs/web-search/node_modules/typescript/bin/tsc -p SKILLs/web-search/tsconfig.json && node -e \"const fs=require('fs');['.connection','.server.log','.server.pid'].forEach(f=>{try{fs.unlinkSync('SKILLs/web-search/'+f)}catch(e){}});\"",
     "build:skill:tech-news": "node scripts/build-skill-tech-news.js",
     "build:skill:email": "cd SKILLs/imap-smtp-email && npm install --production",
     "build:skills": "npm run build:skill:web-search && npm run build:skill:tech-news && npm run build:skill:email",
