@@ -24,21 +24,21 @@
 
   <rect width="1120" height="880" fill="#fff"/>
 
-  <text x="560" y="50" text-anchor="middle" class="t0">RongxinAI 本地 AI Agent 工作台</text>
-  <text x="560" y="80" text-anchor="middle" class="t1">OpenClaw 执行 Agent 工作流 &#183; llama.cpp 提供本地 GGUF 模型推理 &#183; Electron 掌管桌面安全边界</text>
+  <text x="560" y="50" text-anchor="middle" class="t0">知远智能体 — 本地 AI Agent 工作台</text>
+  <text x="560" y="80" text-anchor="middle" class="t1">全栈自研 &#183; 自研 Agent 运行时与本地推理引擎 &#183; Electron 掌管桌面安全边界</text>
 
   <!-- Electron 主进程 -->
   <rect x="60" y="110" width="1000" height="300" class="grp"/>
   <text x="82" y="142" class="t2">Electron 主进程</text>
 
   <rect x="95" y="165" width="350" height="95" fill="url(#hatch)" stroke="#000" stroke-width="1.6"/>
-  <text x="115" y="201" class="t3">OpenClaw 运行时</text>
+  <text x="115" y="201" class="t3">Agent 运行时</text>
   <text x="115" y="227" class="t4">Cowork 会话、工具调用、权限请求</text>
   <rect x="352" y="178" width="78" height="24" fill="#fff" stroke="#000" stroke-width="1.2"/>
   <text x="391" y="195" text-anchor="middle" class="t4" font-weight="700">主引擎</text>
 
   <rect x="470" y="165" width="270" height="95" class="box"/>
-  <text x="490" y="201" class="t3">llama.cpp 服务</text>
+  <text x="490" y="201" class="t3">本地推理服务</text>
   <text x="490" y="227" class="t4">GGUF 模型、启动参数、</text>
   <text x="490" y="247" class="t4">模型市场</text>
 

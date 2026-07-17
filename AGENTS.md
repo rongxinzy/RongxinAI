@@ -49,7 +49,7 @@ RongxinAI is an Electron + React desktop application for local-first AI Agent wo
 
 Uses strict process isolation with IPC communication.
 
-Public-facing product documentation should use the RongxinAI name. Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
+Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. LobsterAI, RongxinAI, LEO, and 李知远 are retired brand names — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
 
 ### Authentication Flow
 

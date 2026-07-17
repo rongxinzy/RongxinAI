@@ -1,11 +1,11 @@
-# LEO
+# 知远智能体 (ZhiYuan Agent)
 
 <p align="center">
-  <img src="public/logo.png" alt="LEO" width="120">
+  <img src="public/logo.png" alt="知远智能体" width="120">
 </p>
 
 <p align="center">
-  <strong>An all-in-one local AI Agent workspace powered by OpenClaw and llama.cpp</strong>
+  <strong>An all-in-one local AI Agent workspace with a fully self-developed stack</strong>
 </p>
 
 <p align="center">
@@ -26,15 +26,15 @@
 
 ---
 
-LEO is the official English product name of 李知远智能体, an AI Agent workspace by 北京容芯致远 for development, research, automation, and personal productivity. It combines the OpenClaw runtime, llama.cpp local inference, built-in skills, MCP integrations, scheduled tasks, and IM or email reachability in one application.
+ZhiYuan Agent (知远智能体) is a local-first desktop AI Agent workspace by 北京容芯致远, built for development, research, automation, and personal productivity. Its agent runtime and local inference engine are developed in-house, and it integrates built-in skills, MCP integrations, scheduled tasks, and IM or email reachability in one application.
 
-LEO is not just a chat UI. It is an execution environment where an Agent can work on your machine, request approval for sensitive tools, manage local GGUF models, run recurring tasks, and stay reachable from desktop and mobile channels.
+ZhiYuan Agent is not just a chat UI. It is an execution environment where an Agent can work on your machine, request approval for sensitive tools, manage local GGUF models, run recurring tasks, and stay reachable from desktop and mobile channels.
 
 ## Key Features
 
 - **Cowork agent workflows**: Run multi-step tasks with file tools, shell commands, browser automation, document processing, and approval-gated actions.
-- **llama.cpp local inference**: Manage local GGUF models, configure `llama-server`, and connect local models to Agent workflows.
-- **Model marketplace**: Search GGUF models from ModelScope and install them into the app-managed llama.cpp directory.
+- **Local inference**: Manage local GGUF models, tune the inference service, and connect local models to Agent workflows.
+- **Model marketplace**: Search GGUF models from ModelScope and install them into the app-managed model directory.
 - **Skills and MCP**: Use built-in skills and connect external tools or internal services through MCP.
 - **Scheduled tasks**: Create recurring jobs for briefings, follow-ups, inbox cleanup, reports, and other background work.
 - **IM and email channels**: Reach the Agent through WeChat, WeCom, DingTalk, Feishu/Lark, QQ, and email.
@@ -43,10 +43,10 @@ LEO is not just a chat UI. It is an execution environment where an Agent can wor
 ## How It Works
 
 <p align="center">
-  <img src="public/readme/rongxinai_architecture_en.svg" alt="LEO architecture" width="760">
+  <img src="public/readme/rongxinai_architecture_en.svg" alt="ZhiYuan Agent architecture" width="760">
 </p>
 
-LEO uses Electron with strict process isolation. The Renderer hosts the React UI, Preload exposes controlled IPC through `contextBridge`, and the Main Process manages OpenClaw sessions, llama.cpp lifecycle, local storage, skills, MCP integrations, and messaging gateways.
+ZhiYuan Agent uses Electron with strict process isolation. The Renderer hosts the React UI, Preload exposes controlled IPC through `contextBridge`, and the Main Process manages agent sessions, the local inference lifecycle, local storage, skills, MCP integrations, and messaging gateways.
 
 ## Quick Start
 
@@ -64,25 +64,15 @@ bun install
 bun run electron:dev
 ```
 
-The current repository name remains `RongxinAI` for compatibility.
-
 The Vite dev server runs at `http://localhost:5175` by default.
 
-### Develop With OpenClaw And llama.cpp
+### Full-Stack Development (Agent Runtime + Local Inference)
 
 ```bash
 bun run electron:dev:openclaw
 ```
 
-This command ensures the pinned OpenClaw runtime, prepares the llama.cpp runtime for the current host, and starts the Electron development app.
-
-Useful OpenClaw build variables:
-
-| Variable | Description |
-| --- | --- |
-| `OPENCLAW_SRC` | Path to the local OpenClaw source directory |
-| `OPENCLAW_FORCE_BUILD=1` | Force an OpenClaw runtime rebuild |
-| `OPENCLAW_SKIP_ENSURE=1` | Skip automatic OpenClaw version checkout |
+This command prepares the built-in agent runtime and the local inference runtime for the current host, then starts the Electron development app.
 
 ## Build And Package
 
@@ -102,13 +92,13 @@ bun run dist:win
 bun run dist:linux
 ```
 
-The packaged desktop app includes the required OpenClaw runtime. The local inference stack uses llama.cpp and manages its runtime separately through the app scripts.
+The packaged desktop app ships with the agent runtime included. The local inference stack is managed separately through the app scripts.
 
 ## Core Modules
 
 ### Cowork
 
-Cowork is the primary session system. A task is sent from the Renderer to the Main Process through IPC, then dispatched to OpenClaw. Messages, permission requests, tool state, and completion events stream back to the UI in real time.
+Cowork is the primary session system. A task is sent from the Renderer to the Main Process through IPC, then dispatched to the built-in agent runtime. Messages, permission requests, tool state, and completion events stream back to the UI in real time.
 
 Key stream events:
 
@@ -120,16 +110,11 @@ Key stream events:
 | `complete` | The session has finished |
 | `error` | The session failed |
 
-### llama.cpp Local Inference
+### Local Inference
 
-The local inference workspace manages the app-owned `llama-server` process, local GGUF models, the ModelScope-backed marketplace, and per-model launch parameters such as context length, GPU offload layers, threads, batch size, main GPU, memory mapping, and keep-alive.
+The local inference workspace manages the app-owned inference service, local GGUF models, the ModelScope-backed marketplace, and per-model launch parameters such as context length, GPU offload layers, threads, batch size, main GPU, memory mapping, and keep-alive.
 
-Current default local model path (legacy directory name retained for compatibility):
-
-- macOS: `~/Library/Application Support/RongxinAI/models/llamacpp`
-- Windows: `%APPDATA%\\RongxinAI\\models\\llamacpp`
-
-If `modelsDir` is configured in the service settings, the custom path takes precedence.
+If `modelsDir` is configured in the service settings, the custom path takes precedence over the default model directory.
 
 ### Skills And MCP
 
@@ -149,7 +134,7 @@ Common built-in skills:
 
 ### Scheduled Tasks
 
-Scheduled tasks can be created from natural language or through the GUI. When a task runs, LEO starts a Cowork session, keeps the result in the desktop app, and can optionally deliver notifications through configured IM or email channels.
+Scheduled tasks can be created from natural language or through the GUI. When a task runs, ZhiYuan Agent starts a Cowork session, keeps the result in the desktop app, and can optionally deliver notifications through configured IM or email channels.
 
 ## Tech Stack
 
@@ -161,8 +146,8 @@ Scheduled tasks can be created from natural language or through the GUI. When a 
 | Styling | Tailwind CSS 4 |
 | Tooling | Bun (package manager), oxlint, oxfmt |
 | State | Redux Toolkit |
-| Agent runtime | OpenClaw |
-| Local models | llama.cpp |
+| Agent runtime | Self-developed |
+| Local inference | Self-developed (GGUF models) |
 | Storage | better-sqlite3 |
 | Rendering | react-markdown / Mermaid / KaTeX |
 

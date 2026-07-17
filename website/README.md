@@ -1,6 +1,6 @@
-# LEO Official Website
+# 知远智能体 Official Website
 
-This directory contains the official product website for **LEO** (RongxinAI), a local-first AI Agent workspace.
+This directory contains the official product website for **知远智能体 (ZhiYuan Agent)**, a local-first AI Agent workspace with a fully self-developed stack.
 
 ## Tech
 

@@ -24,21 +24,21 @@
 
   <rect width="1120" height="880" fill="#fff"/>
 
-  <text x="560" y="50" text-anchor="middle" class="t0">RongxinAI — Local AI Agent Workspace</text>
-  <text x="560" y="80" text-anchor="middle" class="t1">OpenClaw runs agent workflows &#183; llama.cpp serves local GGUF models &#183; Electron owns the desktop security boundary</text>
+  <text x="560" y="50" text-anchor="middle" class="t0">ZhiYuan Agent — Local AI Agent Workspace</text>
+  <text x="560" y="80" text-anchor="middle" class="t1">Fully self-developed stack &#183; agent runtime and local inference built in-house &#183; Electron owns the desktop security boundary</text>
 
   <!-- Electron Main Process -->
   <rect x="60" y="110" width="1000" height="300" class="grp"/>
   <text x="82" y="142" class="t2">Electron Main Process</text>
 
   <rect x="95" y="165" width="350" height="95" fill="url(#hatch)" stroke="#000" stroke-width="1.6"/>
-  <text x="115" y="201" class="t3">OpenClaw Runtime</text>
+  <text x="115" y="201" class="t3">Agent Runtime</text>
   <text x="115" y="227" class="t4">Cowork sessions, tools, approvals</text>
   <rect x="352" y="178" width="78" height="24" fill="#fff" stroke="#000" stroke-width="1.2"/>
   <text x="391" y="195" text-anchor="middle" class="t4" font-weight="700">primary</text>
 
   <rect x="470" y="165" width="270" height="95" class="box"/>
-  <text x="490" y="201" class="t3">llama.cpp Service</text>
+  <text x="490" y="201" class="t3">Local Inference</text>
   <text x="490" y="227" class="t4">GGUF models, launch options,</text>
   <text x="490" y="247" class="t4">marketplace</text>
 
