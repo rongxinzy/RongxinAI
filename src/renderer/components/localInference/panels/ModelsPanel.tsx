@@ -315,16 +315,8 @@ function ModelCard({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-<<<<<<< HEAD
-        'relative min-h-34 cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
-        'w-full max-w-88',
-        'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
-        isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
-=======
         'relative min-h-40 w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
         'hover:border-border hover:bg-muted/20 hover:shadow-md',
-        isRunning && 'border-primary/40 bg-primary/10',
->>>>>>> 15eac65b (feat(bdtl): 修改本地推理的前端呈现方式)
         (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
         dragging && 'opacity-50',
       )}
@@ -332,7 +324,6 @@ function ModelCard({
       <div
         className={cn(
           'absolute inset-x-0 top-0 h-0.5 bg-transparent',
-          isRunning && 'bg-primary/70',
         )}
       />
       {isRunning ? (
@@ -342,13 +333,8 @@ function ModelCard({
         />
       ) : null}
       {loadingModel || unloading ? (
-<<<<<<< HEAD
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
-          <Button
-=======
         <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
           <Button21st
->>>>>>> 15eac65b (feat(bdtl): 修改本地推理的前端呈现方式)
             type="button"
             isDisabled
             size="default"
@@ -362,7 +348,9 @@ function ModelCard({
               data-icon="inline-start"
               className="[animation-duration:2s]"
             />
-            {i18nService.t(unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading')}
+            <span>
+              {i18nService.t(unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading')}
+            </span>
           </Button21st>
           {loadingModel ? (
             <Button21st
@@ -637,6 +625,3 @@ function formatModelCardDate(value: string): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
-
-
-
