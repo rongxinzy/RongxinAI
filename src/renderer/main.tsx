@@ -6,6 +6,7 @@ import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 
 import { LlamaCppModelLaunchLogWindowQuery, LlamaCppModelLaunchLogWindowView } from '../shared/llamacpp';
+import { RendererPrototypeQuery, RendererPrototypeView } from './prototypes/constants';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -15,10 +16,27 @@ if (!rootElement) {
 const routeParams = new URLSearchParams(window.location.search);
 const isModelLaunchLogWindow = routeParams.get(LlamaCppModelLaunchLogWindowQuery.View)
   === LlamaCppModelLaunchLogWindowView.ModelLaunchLog;
+const isLocalInferenceModelCardPrototype = routeParams.get(RendererPrototypeQuery.View)
+  === RendererPrototypeView.LocalInferenceModelCard;
+const isBrowserPreview = typeof window.electron === 'undefined';
 
 const root = ReactDOM.createRoot(rootElement);
 
 async function renderRoot(): Promise<void> {
+  if (isLocalInferenceModelCardPrototype || isBrowserPreview) {
+    const { LocalInferenceModelCardPrototype } = await import(
+      './prototypes/localInference/LocalInferenceModelCardPrototype'
+    );
+    root.render(
+      <React.StrictMode>
+        <TooltipProvider>
+          <LocalInferenceModelCardPrototype />
+        </TooltipProvider>
+      </React.StrictMode>
+    );
+    return;
+  }
+
   if (isModelLaunchLogWindow) {
     const { ModelLaunchLogWindow } = await import('./components/localInference/windows/ModelLaunchLogWindow');
     root.render(
