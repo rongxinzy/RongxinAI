@@ -1,6 +1,12 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@shared/components/ui/card';
 import { AlertCircle, Download, Sparkles } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -31,20 +37,18 @@ const PresetExpertList: React.FC = () => {
   // Derive installed state from Redux: an expert is installed if any agent
   // has a matching presetId (which equals the expert's plugin name).
   const installedPresetIds = new Set(
-    agents
-      .filter((a) => a.source === 'expert-package' && a.presetId)
-      .map((a) => a.presetId),
+    agents.filter(a => a.source === 'expert-package' && a.presetId).map(a => a.presetId),
   );
 
   useEffect(() => {
-    window.electron?.agents?.getPresetExperts().then((result) => {
+    window.electron?.agents?.getPresetExperts().then(result => {
       if (result?.experts) setExperts(result.experts);
     });
   }, []);
 
   const handleInstall = useCallback(async (expert: PresetExpertSummary) => {
     setInstalling(expert.name);
-    setErrors((prev) => {
+    setErrors(prev => {
       const next = { ...prev };
       delete next[expert.name];
       return next;
@@ -55,13 +59,13 @@ const PresetExpertList: React.FC = () => {
         // Refresh agents from DB to update installed state
         await agentService.loadAgents();
       } else {
-        setErrors((prev) => ({
+        setErrors(prev => ({
           ...prev,
           [expert.name]: result?.error || i18nService.t('expertInstallError'),
         }));
       }
     } catch (err) {
-      setErrors((prev) => ({
+      setErrors(prev => ({
         ...prev,
         [expert.name]: err instanceof Error ? err.message : i18nService.t('expertInstallError'),
       }));
@@ -81,7 +85,7 @@ const PresetExpertList: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {experts.map((expert) => {
+      {experts.map(expert => {
         const isInstalled = installedPresetIds.has(expert.name);
         const isCurrent = installing === expert.name;
         const errMsg = errors[expert.name];
@@ -105,7 +109,7 @@ const PresetExpertList: React.FC = () => {
                 {isZh ? expert.displayDescription.zh : expert.displayDescription.en}
               </p>
               <div className="flex flex-wrap gap-1">
-                {expert.tags.map((tag) => (
+                {expert.tags.map(tag => (
                   <Badge key={tag.zh} variant="secondary" className="text-xs">
                     {isZh ? tag.zh : tag.en}
                   </Badge>

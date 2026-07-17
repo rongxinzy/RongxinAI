@@ -5,7 +5,10 @@ function Slider({ className, ...props }: SliderPrimitive.Root.Props<number>) {
   return (
     <SliderPrimitive.Root
       data-slot="slider"
-      className={cn('group/slider flex w-full touch-none items-center data-disabled:opacity-50', className)}
+      className={cn(
+        'group/slider flex w-full touch-none items-center data-disabled:opacity-50',
+        className,
+      )}
       {...props}
     >
       <SliderPrimitive.Control className="relative flex h-5 w-full items-center">

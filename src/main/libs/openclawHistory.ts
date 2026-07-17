@@ -13,7 +13,8 @@ export interface GatewayHistoryEntry {
   model?: string;
 }
 
-const HEARTBEAT_ACK_RE = /^[`*_~"'“”‘’()[\]{}<>.,!?;:，。！？；：\s-]{0,8}HEARTBEAT_OK[`*_~"'“”‘’()[\]{}<>.,!?;:，。！？；：\s-]{0,8}$/i;
+const HEARTBEAT_ACK_RE =
+  /^[`*_~"'“”‘’()[\]{}<>.,!?;:，。！？；：\s-]{0,8}HEARTBEAT_OK[`*_~"'“”‘’()[\]{}<>.,!?;:，。！？；：\s-]{0,8}$/i;
 const SILENT_REPLY_RE = /^\s*NO_REPLY\s*$/i;
 const SILENT_REPLY_TOKEN = 'NO_REPLY';
 const HEARTBEAT_PROMPT_MARKERS = [
@@ -34,7 +35,7 @@ const collectTextChunks = (value: unknown): string[] => {
   }
 
   if (Array.isArray(value)) {
-    return value.flatMap((item) => collectTextChunks(item));
+    return value.flatMap(item => collectTextChunks(item));
   }
 
   if (!isRecord(value)) {
@@ -82,10 +83,12 @@ const parseGatewayTimestamp = (value: unknown): number | undefined => {
 };
 
 const extractGatewayTimestamp = (message: Record<string, unknown>): number | undefined => {
-  return parseGatewayTimestamp(message.timestamp)
-    ?? parseGatewayTimestamp(message.createdAt)
-    ?? parseGatewayTimestamp(message.created_at)
-    ?? parseGatewayTimestamp(message.time);
+  return (
+    parseGatewayTimestamp(message.timestamp) ??
+    parseGatewayTimestamp(message.createdAt) ??
+    parseGatewayTimestamp(message.created_at) ??
+    parseGatewayTimestamp(message.time)
+  );
 };
 
 export const extractGatewayMessageText = (message: unknown): string => {
@@ -147,11 +150,14 @@ export const isHeartbeatPromptText = (text: string): boolean => {
   if (!normalized) {
     return false;
   }
-  return HEARTBEAT_PROMPT_MARKERS.every((marker) => normalized.includes(marker));
+  return HEARTBEAT_PROMPT_MARKERS.every(marker => normalized.includes(marker));
 };
 
 export const shouldSuppressHeartbeatText = (role: GatewayHistoryRole, text: string): boolean => {
-  if ((role === 'assistant' || role === 'system') && (isHeartbeatAckText(text) || isSilentReplyText(text))) {
+  if (
+    (role === 'assistant' || role === 'system') &&
+    (isHeartbeatAckText(text) || isSilentReplyText(text))
+  ) {
     return true;
   }
   if (role === 'user' && isHeartbeatPromptText(text)) {
@@ -178,9 +184,7 @@ export const extractGatewayHistoryEntry = (message: unknown): GatewayHistoryEntr
     return null;
   }
 
-  const reminderSystemMessage = role === 'user'
-    ? buildScheduledReminderSystemMessage(text)
-    : null;
+  const reminderSystemMessage = role === 'user' ? buildScheduledReminderSystemMessage(text) : null;
   const timestamp = extractGatewayTimestamp(message);
   if (reminderSystemMessage) {
     return {
@@ -191,17 +195,31 @@ export const extractGatewayHistoryEntry = (message: unknown): GatewayHistoryEntr
   }
 
   // Extract usage and model for assistant messages
-  let usage: { input?: number; output?: number; cacheRead?: number; totalTokens?: number } | undefined;
+  let usage:
+    | { input?: number; output?: number; cacheRead?: number; totalTokens?: number }
+    | undefined;
   let model: string | undefined;
   if (role === 'assistant') {
     if (isRecord(message.usage)) {
       const u = message.usage as Record<string, unknown>;
-      const input = typeof u.input === 'number' ? u.input
-        : typeof u.inputTokens === 'number' ? u.inputTokens : undefined;
-      const output = typeof u.output === 'number' ? u.output
-        : typeof u.outputTokens === 'number' ? u.outputTokens : undefined;
-      const cacheRead = typeof u.cacheRead === 'number' ? u.cacheRead
-        : typeof u.cacheReadTokens === 'number' ? u.cacheReadTokens : undefined;
+      const input =
+        typeof u.input === 'number'
+          ? u.input
+          : typeof u.inputTokens === 'number'
+            ? u.inputTokens
+            : undefined;
+      const output =
+        typeof u.output === 'number'
+          ? u.output
+          : typeof u.outputTokens === 'number'
+            ? u.outputTokens
+            : undefined;
+      const cacheRead =
+        typeof u.cacheRead === 'number'
+          ? u.cacheRead
+          : typeof u.cacheReadTokens === 'number'
+            ? u.cacheReadTokens
+            : undefined;
       const totalTokens = typeof u.totalTokens === 'number' ? u.totalTokens : undefined;
       if (input != null || output != null || cacheRead != null || totalTokens != null) {
         usage = {
@@ -228,6 +246,6 @@ export const extractGatewayHistoryEntry = (message: unknown): GatewayHistoryEntr
 
 export const extractGatewayHistoryEntries = (messages: unknown[]): GatewayHistoryEntry[] => {
   return messages
-    .map((message) => extractGatewayHistoryEntry(message))
+    .map(message => extractGatewayHistoryEntry(message))
     .filter((entry): entry is GatewayHistoryEntry => entry !== null);
 };

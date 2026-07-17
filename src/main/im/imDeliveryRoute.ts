@@ -35,13 +35,13 @@ export function extractOpenClawDeliveryRoute(entry: unknown): OpenClawDeliveryRo
   }
 
   const typedEntry = entry as OpenClawSessionListEntry;
-  const deliveryContext = isRecord(typedEntry.deliveryContext)
-    ? typedEntry.deliveryContext
-    : null;
+  const deliveryContext = isRecord(typedEntry.deliveryContext) ? typedEntry.deliveryContext : null;
 
-  const channel = readTrimmedString(deliveryContext?.channel) ?? readTrimmedString(typedEntry.lastChannel);
+  const channel =
+    readTrimmedString(deliveryContext?.channel) ?? readTrimmedString(typedEntry.lastChannel);
   const to = readTrimmedString(deliveryContext?.to) ?? readTrimmedString(typedEntry.lastTo);
-  const accountId = readTrimmedString(deliveryContext?.accountId) ?? readTrimmedString(typedEntry.lastAccountId);
+  const accountId =
+    readTrimmedString(deliveryContext?.accountId) ?? readTrimmedString(typedEntry.lastAccountId);
 
   if (!channel || !to) {
     return null;
@@ -102,7 +102,10 @@ export function resolveManagedSessionDeliveryRoute(
   coworkSessionId: string,
   sessions: unknown[],
 ): { sessionKey: string; route: OpenClawDeliveryRoute } | null {
-  return resolveOpenClawDeliveryRouteForSessionKeys([buildManagedSessionKey(coworkSessionId)], sessions);
+  return resolveOpenClawDeliveryRouteForSessionKeys(
+    [buildManagedSessionKey(coworkSessionId)],
+    sessions,
+  );
 }
 
 export function buildDingTalkSendParamsFromRoute(
@@ -119,7 +122,10 @@ export function buildDingTalkSendParamsFromRoute(
   };
 }
 
-export function buildDingTalkSessionKeyCandidates(conversationId: string, agentId?: string): string[] {
+export function buildDingTalkSessionKeyCandidates(
+  conversationId: string,
+  agentId?: string,
+): string[] {
   const normalizedConversationId = conversationId.trim();
   if (!normalizedConversationId) {
     return [];

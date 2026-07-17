@@ -258,7 +258,7 @@ async function installMacDmg(dmgPath: string): Promise<void> {
     );
 
     // Parse mount point from output (last line, last column)
-    const lines = mountOutput.split('\n').filter((l) => l.trim());
+    const lines = mountOutput.split('\n').filter(l => l.trim());
     const lastLine = lines[lines.length - 1];
     const mountMatch = lastLine?.match(/\t(\/Volumes\/.+)$/);
     if (!mountMatch) {
@@ -269,7 +269,7 @@ async function installMacDmg(dmgPath: string): Promise<void> {
 
     // Find .app bundle in mount point
     const entries = await fs.promises.readdir(mountPoint);
-    const appBundle = entries.find((e) => e.endsWith('.app'));
+    const appBundle = entries.find(e => e.endsWith('.app'));
     if (!appBundle) {
       throw new Error('No .app bundle found in DMG');
     }
@@ -303,7 +303,8 @@ async function installMacDmg(dmgPath: string): Promise<void> {
       console.log('[AppUpdate] Normal copy failed, requesting admin privileges...');
       try {
         // For osascript, escape backslashes and double quotes for the inner shell
-        const escapeForInnerShell = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+        const escapeForInnerShell = (s: string) =>
+          s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
         const escapedTarget = escapeForInnerShell(targetApp);
         const escapedSource = escapeForInnerShell(sourceApp);
         await execAsync(

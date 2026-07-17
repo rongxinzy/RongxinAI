@@ -107,13 +107,13 @@ Cowork 是核心会话系统。用户任务从 Renderer 通过 IPC 发送到 Mai
 
 关键流式事件：
 
-| 事件 | 说明 |
-| --- | --- |
-| `message` | 会话新增消息 |
-| `messageUpdate` | 流式内容增量更新 |
+| 事件                | 说明             |
+| ------------------- | ---------------- |
+| `message`           | 会话新增消息     |
+| `messageUpdate`     | 流式内容增量更新 |
 | `permissionRequest` | 工具调用需要审批 |
-| `complete` | 会话执行完成 |
-| `error` | 会话执行失败 |
+| `complete`          | 会话执行完成     |
+| `error`             | 会话执行失败     |
 
 ### 本地推理
 
@@ -127,15 +127,15 @@ Cowork 是核心会话系统。用户任务从 Renderer 通过 IPC 发送到 Mai
 
 常见内置技能：
 
-| 技能 | 用途 |
-| --- | --- |
-| `web-search` | 搜索与资料收集 |
+| 技能                             | 用途              |
+| -------------------------------- | ----------------- |
+| `web-search`                     | 搜索与资料收集    |
 | `docx` / `xlsx` / `pptx` / `pdf` | Office 与文档处理 |
-| `playwright` | 浏览器自动化 |
-| `remotion` | 视频生成 |
-| `imap-smtp-email` | 邮件收发 |
-| `stock-*` | 投研与公告检索 |
-| `skill-creator` | 自定义技能创建 |
+| `playwright`                     | 浏览器自动化      |
+| `remotion`                       | 视频生成          |
+| `imap-smtp-email`                | 邮件收发          |
+| `stock-*`                        | 投研与公告检索    |
+| `skill-creator`                  | 自定义技能创建    |
 
 ### 定时任务
 
@@ -143,18 +143,18 @@ Cowork 是核心会话系统。用户任务从 Renderer 通过 IPC 发送到 Mai
 
 ## 技术栈
 
-| 层 | 技术 |
-| --- | --- |
-| 桌面框架 | Electron 40 |
-| 前端 | React 19 + TypeScript 7 |
-| 构建 | Vite 8（Rolldown） |
-| 样式 | Tailwind CSS 4 |
-| 工具链 | Bun（包管理器）、oxlint、oxfmt |
-| 状态管理 | Redux Toolkit |
-| Agent 运行时 | 全栈自研 |
-| 本地推理 | 全栈自研（GGUF 模型） |
-| 存储 | better-sqlite3 |
-| 渲染 | react-markdown / Mermaid / KaTeX |
+| 层           | 技术                             |
+| ------------ | -------------------------------- |
+| 桌面框架     | Electron 40                      |
+| 前端         | React 19 + TypeScript 7          |
+| 构建         | Vite 8（Rolldown）               |
+| 样式         | Tailwind CSS 4                   |
+| 工具链       | Bun（包管理器）、oxlint、oxfmt   |
+| 状态管理     | Redux Toolkit                    |
+| Agent 运行时 | 全栈自研                         |
+| 本地推理     | 全栈自研（GGUF 模型）            |
+| 存储         | better-sqlite3                   |
+| 渲染         | react-markdown / Mermaid / KaTeX |
 
 ## License
 

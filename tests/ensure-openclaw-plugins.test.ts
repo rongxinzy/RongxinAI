@@ -25,23 +25,26 @@ describe('ensure-openclaw-plugins', () => {
   });
 
   test('appends version as git ref when the spec has no hash', () => {
-    expect(resolveGitPackSpec(
-      'git+https://github.com/example/openclaw-example-channel.git',
-      '1.0.3',
-    )).toBe('git+https://github.com/example/openclaw-example-channel.git#1.0.3');
+    expect(
+      resolveGitPackSpec('git+https://github.com/example/openclaw-example-channel.git', '1.0.3'),
+    ).toBe('git+https://github.com/example/openclaw-example-channel.git#1.0.3');
 
-    expect(resolveGitPackSpec(
-      'git+https://github.com/example/openclaw-example-channel.git#main',
-      '1.0.3',
-    )).toBe('git+https://github.com/example/openclaw-example-channel.git#main');
+    expect(
+      resolveGitPackSpec(
+        'git+https://github.com/example/openclaw-example-channel.git#main',
+        '1.0.3',
+      ),
+    ).toBe('git+https://github.com/example/openclaw-example-channel.git#main');
   });
 
   test('resolves git sources to packed installs', () => {
-    expect(resolvePluginInstallSource({
-      id: 'openclaw-example-channel',
-      npm: 'git+https://github.com/example/openclaw-example-channel.git',
-      version: '1.0.3',
-    })).toEqual({
+    expect(
+      resolvePluginInstallSource({
+        id: 'openclaw-example-channel',
+        npm: 'git+https://github.com/example/openclaw-example-channel.git',
+        version: '1.0.3',
+      }),
+    ).toEqual({
       kind: 'git',
       gitSpec: 'git+https://github.com/example/openclaw-example-channel.git#1.0.3',
       pinnedDisplaySpec: 'git+https://github.com/example/openclaw-example-channel.git#1.0.3',
@@ -49,18 +52,14 @@ describe('ensure-openclaw-plugins', () => {
   });
 
   test('parses git specs into clone url and ref', () => {
-    expect(parseGitSpec(
-      'git+https://github.com/example/openclaw-example-channel.git',
-      '1.1.0',
-    )).toEqual({
+    expect(
+      parseGitSpec('git+https://github.com/example/openclaw-example-channel.git', '1.1.0'),
+    ).toEqual({
       cloneUrl: 'https://github.com/example/openclaw-example-channel.git',
       ref: '1.1.0',
     });
 
-    expect(parseGitSpec(
-      'github:example/openclaw-example-channel#main',
-      '1.1.0',
-    )).toEqual({
+    expect(parseGitSpec('github:example/openclaw-example-channel#main', '1.1.0')).toEqual({
       cloneUrl: 'https://github.com/example/openclaw-example-channel.git',
       ref: 'main',
     });
@@ -92,23 +91,27 @@ describe('ensure-openclaw-plugins', () => {
   });
 
   test('preserves existing registry and local path behavior', () => {
-    expect(resolvePluginInstallSource({
-      id: 'moltbot-popo',
-      npm: 'moltbot-popo',
-      version: '2.0.7',
-      registry: 'https://registry.example.com',
-    })).toEqual({
+    expect(
+      resolvePluginInstallSource({
+        id: 'moltbot-popo',
+        npm: 'moltbot-popo',
+        version: '2.0.7',
+        registry: 'https://registry.example.com',
+      }),
+    ).toEqual({
       kind: 'packed',
       packSpec: 'moltbot-popo@2.0.7',
       pinnedDisplaySpec: 'moltbot-popo@2.0.7',
       registry: 'https://registry.example.com',
     });
 
-    expect(resolvePluginInstallSource({
-      id: 'local-plugin',
-      npm: '/tmp/local-plugin',
-      version: '1.0.0',
-    })).toEqual({
+    expect(
+      resolvePluginInstallSource({
+        id: 'local-plugin',
+        npm: '/tmp/local-plugin',
+        version: '1.0.0',
+      }),
+    ).toEqual({
       kind: 'direct',
       installSpec: '/tmp/local-plugin',
       pinnedDisplaySpec: '/tmp/local-plugin',

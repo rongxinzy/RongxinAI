@@ -1,14 +1,32 @@
 'use strict';
 
 const path = require('path');
-const { existsSync, readdirSync, statSync, mkdirSync, readFileSync, rmSync, cpSync, lstatSync, writeFileSync, linkSync } = require('fs');
+const {
+  existsSync,
+  readdirSync,
+  statSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  cpSync,
+  lstatSync,
+  writeFileSync,
+  linkSync,
+} = require('fs');
 const { spawnSync } = require('child_process');
 const asar = require('@electron/asar');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
-const { ensurePortableUvRuntime, checkRuntimeHealth: checkUvRuntimeHealth } = require('./setup-uv-runtime.js');
+const {
+  ensurePortableUvRuntime,
+  checkRuntimeHealth: checkUvRuntimeHealth,
+} = require('./setup-uv-runtime.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
-const { DIST_DIFFS_EXTENSION_DIR, DIST_EXTENSIONS_DIR, summarizeGatewayAsarEntries } = require('./openclaw-runtime-packaging.cjs');
+const {
+  DIST_DIFFS_EXTENSION_DIR,
+  DIST_EXTENSIONS_DIR,
+  summarizeGatewayAsarEntries,
+} = require('./openclaw-runtime-packaging.cjs');
 
 const WindowsLlamaCppBackendBundleMode = {
   Lite: 'lite',
@@ -32,9 +50,11 @@ const LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES = [
 const DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR = 'C:\\Users\\Administrator\\Downloads';
 
 function resolveWindowsLlamaCppBackendDownloadDir(env = process.env) {
-  return env.ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
-    || env.WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
-    || DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR;
+  return (
+    env.ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR ||
+    env.WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR ||
+    DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
+  );
 }
 
 function resolveLlamaCppBackendSourcePath(projectRoot, relativePath, downloadDir) {
@@ -128,11 +148,11 @@ function isWindowsTarManifestReusable(manifestPath, sources) {
       const before = saved.sources[i];
       const now = current.sources[i];
       if (
-        before.label !== now.label
-        || before.dir !== now.dir
-        || before.prefix !== now.prefix
-        || before.exists !== now.exists
-        || before.latestMtimeMs !== now.latestMtimeMs
+        before.label !== now.label ||
+        before.dir !== now.dir ||
+        before.prefix !== now.prefix ||
+        before.exists !== now.exists ||
+        before.latestMtimeMs !== now.latestMtimeMs
       ) {
         return false;
       }
@@ -171,15 +191,17 @@ function resolveOpenClawRuntimeTargetId(context) {
 }
 
 function resolveWindowsLlamaCppBackendBundleMode(env = process.env) {
-  const raw = (env.ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE || env.WIN_LLAMACPP_BACKEND_BUNDLE || '').trim().toLowerCase();
+  const raw = (env.ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE || env.WIN_LLAMACPP_BACKEND_BUNDLE || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return WindowsLlamaCppBackendBundleMode.Lite;
   if (raw === WindowsLlamaCppBackendBundleMode.Full) return WindowsLlamaCppBackendBundleMode.Full;
   if (raw === WindowsLlamaCppBackendBundleMode.None) return WindowsLlamaCppBackendBundleMode.None;
   if (raw === WindowsLlamaCppBackendBundleMode.Lite) return WindowsLlamaCppBackendBundleMode.Lite;
   throw new Error(
-    '[electron-builder-hooks] Invalid Windows llama.cpp backend bundle mode: '
-    + raw
-    + '. Expected lite, full, or none.',
+    '[electron-builder-hooks] Invalid Windows llama.cpp backend bundle mode: ' +
+      raw +
+      '. Expected lite, full, or none.',
   );
 }
 
@@ -200,30 +222,36 @@ function prepareWindowsLlamaCppBackendResources(mode, env = process.env) {
   );
   if (!existsSync(manifestSourcePath)) {
     throw new Error(
-      '[electron-builder-hooks] Missing Windows llama.cpp backend manifest. '
-      + 'Expected at build/win-lite/manifest.json or '
-      + path.join(downloadDir, 'win-lite', 'manifest.json'),
+      '[electron-builder-hooks] Missing Windows llama.cpp backend manifest. ' +
+        'Expected at build/win-lite/manifest.json or ' +
+        path.join(downloadDir, 'win-lite', 'manifest.json'),
     );
   }
 
   const stagingDir = createCleanWindowsLlamaCppBackendStagingDir(projectRoot);
   const manifest = JSON.parse(readFileSync(manifestSourcePath, 'utf8'));
-  writeFileSync(path.join(stagingDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    path.join(stagingDir, 'manifest.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    'utf8',
+  );
 
   if (mode === WindowsLlamaCppBackendBundleMode.Full) {
-    const archiveNames = Array.from(new Set(
-      (Array.isArray(manifest.backends) ? manifest.backends : [])
-        .flatMap((entry) => [
-          entry?.archive?.assetName,
-          ...(entry?.archive?.parts ?? []).map((part) => part?.assetName),
-          ...(entry?.companions ?? []).flatMap((companion) => [
-            companion?.assetName,
-            ...(companion?.parts ?? []).map((part) => part?.assetName),
-          ]),
-        ])
-        .filter((assetName) => typeof assetName === 'string' && assetName.trim())
-        .map((assetName) => assetName.trim()),
-    ));
+    const archiveNames = Array.from(
+      new Set(
+        (Array.isArray(manifest.backends) ? manifest.backends : [])
+          .flatMap(entry => [
+            entry?.archive?.assetName,
+            ...(entry?.archive?.parts ?? []).map(part => part?.assetName),
+            ...(entry?.companions ?? []).flatMap(companion => [
+              companion?.assetName,
+              ...(companion?.parts ?? []).map(part => part?.assetName),
+            ]),
+          ])
+          .filter(assetName => typeof assetName === 'string' && assetName.trim())
+          .map(assetName => assetName.trim()),
+      ),
+    );
 
     for (const archiveName of archiveNames) {
       const sourcePath = resolveLlamaCppBackendSourcePath(
@@ -233,8 +261,7 @@ function prepareWindowsLlamaCppBackendResources(mode, env = process.env) {
       );
       if (!existsSync(sourcePath)) {
         throw new Error(
-          '[electron-builder-hooks] Missing Windows llama.cpp backend archive: '
-          + sourcePath,
+          '[electron-builder-hooks] Missing Windows llama.cpp backend archive: ' + sourcePath,
         );
       }
       const targetPath = path.join(stagingDir, archiveName);
@@ -261,7 +288,10 @@ function createCleanWindowsLlamaCppBackendStagingDir(projectRoot) {
     mkdirSync(stagingDir, { recursive: true });
     return stagingDir;
   } catch (error) {
-    const fallbackDir = path.join(baseDir, `${LLAMACPP_BACKEND_RESOURCES_DIR}-${process.pid}-${Date.now()}`);
+    const fallbackDir = path.join(
+      baseDir,
+      `${LLAMACPP_BACKEND_RESOURCES_DIR}-${process.pid}-${Date.now()}`,
+    );
     console.warn(
       '[electron-builder-hooks] Could not clean previous llama.cpp backend staging directory, using a fresh one:',
       error,
@@ -276,8 +306,7 @@ function prepareWindowsLlamaCppNsisHelperResources() {
   const helperSourcePath = path.join(__dirname, LLAMACPP_NSIS_HELPER_SCRIPT);
   if (!existsSync(helperSourcePath)) {
     throw new Error(
-      '[electron-builder-hooks] Missing llama.cpp NSIS helper script: '
-      + helperSourcePath,
+      '[electron-builder-hooks] Missing llama.cpp NSIS helper script: ' + helperSourcePath,
     );
   }
 
@@ -296,10 +325,14 @@ function prepareWindowsLlamaCppNsisHelperResources() {
 
   writeFileSync(
     path.join(stagingDir, 'package-closure.json'),
-    `${JSON.stringify({
-      script: LLAMACPP_NSIS_HELPER_SCRIPT,
-      packages: [...packageEntries.keys()].sort(),
-    }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        script: LLAMACPP_NSIS_HELPER_SCRIPT,
+        packages: [...packageEntries.keys()].sort(),
+      },
+      null,
+      2,
+    )}\n`,
     'utf8',
   );
 
@@ -318,7 +351,10 @@ function createCleanWindowsLlamaCppNsisHelperStagingDir(projectRoot) {
     mkdirSync(stagingDir, { recursive: true });
     return stagingDir;
   } catch (error) {
-    const fallbackDir = path.join(baseDir, `${LLAMACPP_NSIS_HELPER_RESOURCES_DIR}-${process.pid}-${Date.now()}`);
+    const fallbackDir = path.join(
+      baseDir,
+      `${LLAMACPP_NSIS_HELPER_RESOURCES_DIR}-${process.pid}-${Date.now()}`,
+    );
     console.warn(
       '[electron-builder-hooks] Could not clean previous llama.cpp NSIS helper staging directory, using a fresh one:',
       error,
@@ -438,19 +474,23 @@ function verifyPreinstalledPlugins(runtimeRoot, buildHint) {
 
   if (missing.length > 0) {
     throw new Error(
-      '[electron-builder-hooks] Preinstalled OpenClaw plugins missing from runtime: '
-      + missing.join(', ')
-      + `. Run \`${buildHint}\` (which includes openclaw:plugins) before packaging.`,
+      '[electron-builder-hooks] Preinstalled OpenClaw plugins missing from runtime: ' +
+        missing.join(', ') +
+        `. Run \`${buildHint}\` (which includes openclaw:plugins) before packaging.`,
     );
   }
 
-  console.log(`[electron-builder-hooks] Verified ${plugins.length} preinstalled OpenClaw plugin(s).`);
+  console.log(
+    `[electron-builder-hooks] Verified ${plugins.length} preinstalled OpenClaw plugin(s).`,
+  );
 }
 
 function hasCompiledLocalExtension(runtimeRoot, extensionId) {
   const pluginDir = path.join(runtimeRoot, 'third-party-extensions', extensionId);
-  return existsSync(path.join(pluginDir, 'openclaw.plugin.json'))
-    && existsSync(path.join(pluginDir, 'index.js'));
+  return (
+    existsSync(path.join(pluginDir, 'openclaw.plugin.json')) &&
+    existsSync(path.join(pluginDir, 'index.js'))
+  );
 }
 
 function precompileLocalExtensions(runtimeRoot, buildHint) {
@@ -462,8 +502,8 @@ function precompileLocalExtensions(runtimeRoot, buildHint) {
 
   if (result.status !== 0) {
     throw new Error(
-      '[electron-builder-hooks] Failed to precompile local OpenClaw extensions. '
-      + `Run \`${buildHint}\` before packaging.`,
+      '[electron-builder-hooks] Failed to precompile local OpenClaw extensions. ' +
+        `Run \`${buildHint}\` before packaging.`,
     );
   }
 }
@@ -471,7 +511,7 @@ function precompileLocalExtensions(runtimeRoot, buildHint) {
 function ensureBundledLocalExtensions(runtimeRoot, buildHint) {
   const requiredLocalExtensions = ['mcp-bridge', 'ask-user-question'];
   const missingCompiledExtensions = requiredLocalExtensions.filter(
-    (extensionId) => !hasCompiledLocalExtension(runtimeRoot, extensionId),
+    extensionId => !hasCompiledLocalExtension(runtimeRoot, extensionId),
   );
 
   if (missingCompiledExtensions.length === 0) {
@@ -479,20 +519,20 @@ function ensureBundledLocalExtensions(runtimeRoot, buildHint) {
   }
 
   console.log(
-    '[electron-builder-hooks] Restoring local OpenClaw extensions before packaging: '
-    + missingCompiledExtensions.join(', '),
+    '[electron-builder-hooks] Restoring local OpenClaw extensions before packaging: ' +
+      missingCompiledExtensions.join(', '),
   );
   syncLocalOpenClawExtensions(runtimeRoot);
   precompileLocalExtensions(runtimeRoot, buildHint);
 
   const stillMissing = requiredLocalExtensions.filter(
-    (extensionId) => !hasCompiledLocalExtension(runtimeRoot, extensionId),
+    extensionId => !hasCompiledLocalExtension(runtimeRoot, extensionId),
   );
   if (stillMissing.length > 0) {
     throw new Error(
-      '[electron-builder-hooks] Bundled OpenClaw runtime is missing compiled local extensions: '
-      + stillMissing.join(', ')
-      + `. Run \`${buildHint}\` before packaging.`,
+      '[electron-builder-hooks] Bundled OpenClaw runtime is missing compiled local extensions: ' +
+        stillMissing.join(', ') +
+        `. Run \`${buildHint}\` before packaging.`,
     );
   }
 }
@@ -503,15 +543,13 @@ function ensureBundledOpenClawRuntime(context) {
 
   ensureBundledLocalExtensions(runtimeRoot, buildHint);
 
-  const requiredExternalPaths = [
-    path.join(runtimeRoot, 'node_modules'),
-  ];
-  const missingExternal = requiredExternalPaths.filter((candidate) => !existsSync(candidate));
+  const requiredExternalPaths = [path.join(runtimeRoot, 'node_modules')];
+  const missingExternal = requiredExternalPaths.filter(candidate => !existsSync(candidate));
   if (missingExternal.length > 0) {
     throw new Error(
-      '[electron-builder-hooks] Bundled OpenClaw runtime is incomplete. Missing: '
-      + missingExternal.join(', ')
-      + `. Run \`${buildHint}\` before packaging.`,
+      '[electron-builder-hooks] Bundled OpenClaw runtime is incomplete. Missing: ' +
+        missingExternal.join(', ') +
+        `. Run \`${buildHint}\` before packaging.`,
     );
   }
 
@@ -524,17 +562,17 @@ function ensureBundledOpenClawRuntime(context) {
   const gatewayBundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs');
   if (!existsSync(gatewayBundlePath)) {
     throw new Error(
-      '[electron-builder-hooks] gateway-bundle.mjs is missing from '
-      + runtimeRoot
-      + '. Run `npm run openclaw:bundle` before packaging.',
+      '[electron-builder-hooks] gateway-bundle.mjs is missing from ' +
+        runtimeRoot +
+        '. Run `npm run openclaw:bundle` before packaging.',
     );
   }
   const gatewayBundleStat = statSync(gatewayBundlePath);
   if (gatewayBundleStat.size < 1_000_000) {
     throw new Error(
-      '[electron-builder-hooks] gateway-bundle.mjs is suspiciously small ('
-      + gatewayBundleStat.size
-      + ' bytes, expected ~27MB). Rebuild with: `npm run openclaw:bundle`.',
+      '[electron-builder-hooks] gateway-bundle.mjs is suspiciously small (' +
+        gatewayBundleStat.size +
+        ' bytes, expected ~27MB). Rebuild with: `npm run openclaw:bundle`.',
     );
   }
 
@@ -545,31 +583,36 @@ function ensureBundledOpenClawRuntime(context) {
       summary = summarizeGatewayAsarEntries(asar.listPackage(gatewayAsarPath));
     } catch (error) {
       throw new Error(
-        '[electron-builder-hooks] Failed to read OpenClaw gateway.asar: '
-        + `${gatewayAsarPath}. ${error instanceof Error ? error.message : String(error)}`,
+        '[electron-builder-hooks] Failed to read OpenClaw gateway.asar: ' +
+          `${gatewayAsarPath}. ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
-    if (!summary.hasOpenClawEntry || !summary.hasControlUiIndex || !summary.hasGatewayEntry || summary.hasBundledExtensions) {
+    if (
+      !summary.hasOpenClawEntry ||
+      !summary.hasControlUiIndex ||
+      !summary.hasGatewayEntry ||
+      summary.hasBundledExtensions
+    ) {
       throw new Error(
-        '[electron-builder-hooks] OpenClaw gateway.asar is incomplete. '
-        + `openclaw.mjs=${summary.hasOpenClawEntry}, control-ui=${summary.hasControlUiIndex}, entry=${summary.hasGatewayEntry}, extensions=${summary.hasBundledExtensions}.`,
+        '[electron-builder-hooks] OpenClaw gateway.asar is incomplete. ' +
+          `openclaw.mjs=${summary.hasOpenClawEntry}, control-ui=${summary.hasControlUiIndex}, entry=${summary.hasGatewayEntry}, extensions=${summary.hasBundledExtensions}.`,
       );
     }
 
     const bundledExtensionsDir = path.join(runtimeRoot, DIST_EXTENSIONS_DIR);
     if (!existsSync(bundledExtensionsDir)) {
       throw new Error(
-        '[electron-builder-hooks] Bundled OpenClaw runtime is missing bare dist/extensions. '
-        + `Expected ${bundledExtensionsDir} after gateway.asar packing.`,
+        '[electron-builder-hooks] Bundled OpenClaw runtime is missing bare dist/extensions. ' +
+          `Expected ${bundledExtensionsDir} after gateway.asar packing.`,
       );
     }
 
     const diffsExtensionDir = path.join(runtimeRoot, DIST_DIFFS_EXTENSION_DIR);
     if (existsSync(diffsExtensionDir)) {
       throw new Error(
-        '[electron-builder-hooks] Bundled OpenClaw runtime still contains the diffs extension. '
-        + `Expected ${diffsExtensionDir} to be removed before packaging.`,
+        '[electron-builder-hooks] Bundled OpenClaw runtime still contains the diffs extension. ' +
+          `Expected ${diffsExtensionDir} to be removed before packaging.`,
       );
     }
 
@@ -581,22 +624,23 @@ function ensureBundledOpenClawRuntime(context) {
     path.join(runtimeRoot, 'dist', 'control-ui', 'index.html'),
   ];
 
-  const hasLegacyEntry = existsSync(path.join(runtimeRoot, 'dist', 'entry.js'))
-    || existsSync(path.join(runtimeRoot, 'dist', 'entry.mjs'));
+  const hasLegacyEntry =
+    existsSync(path.join(runtimeRoot, 'dist', 'entry.js')) ||
+    existsSync(path.join(runtimeRoot, 'dist', 'entry.mjs'));
   if (!hasLegacyEntry) {
     throw new Error(
-      '[electron-builder-hooks] Missing OpenClaw runtime entry. '
-      + `Expected ${path.join(runtimeRoot, 'dist', 'entry.js')} or ${path.join(runtimeRoot, 'dist', 'entry.mjs')}, `
-      + `or ${path.join(runtimeRoot, 'gateway.asar')}.`,
+      '[electron-builder-hooks] Missing OpenClaw runtime entry. ' +
+        `Expected ${path.join(runtimeRoot, 'dist', 'entry.js')} or ${path.join(runtimeRoot, 'dist', 'entry.mjs')}, ` +
+        `or ${path.join(runtimeRoot, 'gateway.asar')}.`,
     );
   }
 
-  const missingLegacy = legacyRequiredPaths.filter((candidate) => !existsSync(candidate));
+  const missingLegacy = legacyRequiredPaths.filter(candidate => !existsSync(candidate));
   if (missingLegacy.length > 0) {
     throw new Error(
-      '[electron-builder-hooks] Bundled OpenClaw legacy runtime is incomplete. Missing: '
-      + missingLegacy.join(', ')
-      + `. Run \`${buildHint}\` before packaging.`,
+      '[electron-builder-hooks] Bundled OpenClaw legacy runtime is incomplete. Missing: ' +
+        missingLegacy.join(', ') +
+        `. Run \`${buildHint}\` before packaging.`,
     );
   }
 }
@@ -629,24 +673,23 @@ function verifyPackagedPortableGitRuntimeDirs(appOutDir) {
     createdDirs.push(dir);
   }
 
-  const missingDirs = requiredDirs.filter((dir) => !existsSync(dir));
+  const missingDirs = requiredDirs.filter(dir => !existsSync(dir));
   if (missingDirs.length > 0) {
     throw new Error(
-      'Windows package is missing required PortableGit runtime directories. '
-      + `Missing: ${missingDirs.join(', ')}`
+      'Windows package is missing required PortableGit runtime directories. ' +
+        `Missing: ${missingDirs.join(', ')}`,
     );
   }
 
   if (createdDirs.length > 0) {
     console.log(
-      '[electron-builder-hooks] Created missing PortableGit runtime directories: '
-      + createdDirs.join(', ')
+      '[electron-builder-hooks] Created missing PortableGit runtime directories: ' +
+        createdDirs.join(', '),
     );
   }
 
   console.log(
-    '[electron-builder-hooks] Verified PortableGit runtime directories: '
-    + requiredDirs.join(', ')
+    '[electron-builder-hooks] Verified PortableGit runtime directories: ' + requiredDirs.join(', '),
   );
 }
 
@@ -666,7 +709,9 @@ function findPackagedPythonExecutable(appOutDir) {
 }
 
 function applyMacIconFix(appPath) {
-  console.log('[electron-builder-hooks] Applying macOS icon fix for Apple Silicon compatibility...');
+  console.log(
+    '[electron-builder-hooks] Applying macOS icon fix for Apple Silicon compatibility...',
+  );
 
   const infoPlistPath = path.join(appPath, 'Contents', 'Info.plist');
   const resourcesPath = path.join(appPath, 'Contents', 'Resources');
@@ -683,16 +728,18 @@ function applyMacIconFix(appPath) {
   }
 
   // Check if CFBundleIconName already exists
-  const checkResult = spawnSync('plutil', [
-    '-extract', 'CFBundleIconName', 'raw', infoPlistPath
-  ], { encoding: 'utf-8' });
+  const checkResult = spawnSync('plutil', ['-extract', 'CFBundleIconName', 'raw', infoPlistPath], {
+    encoding: 'utf-8',
+  });
 
   if (checkResult.status !== 0) {
     // CFBundleIconName doesn't exist, add it
     console.log('[electron-builder-hooks] Adding CFBundleIconName to Info.plist...');
-    const addResult = spawnSync('plutil', [
-      '-insert', 'CFBundleIconName', '-string', 'icon', infoPlistPath
-    ], { encoding: 'utf-8' });
+    const addResult = spawnSync(
+      'plutil',
+      ['-insert', 'CFBundleIconName', '-string', 'icon', infoPlistPath],
+      { encoding: 'utf-8' },
+    );
 
     if (addResult.status === 0) {
       console.log('[electron-builder-hooks] ✓ CFBundleIconName added successfully');
@@ -730,9 +777,13 @@ function removeAllBinDirsInCfmind(appOutDir) {
   console.log('[electron-builder-hooks] Removing node_modules/.bin directories from cfmind...');
 
   let removedCount = 0;
-  const walk = (dir) => {
+  const walk = dir => {
     let entries;
-    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (!entry.isDirectory()) continue;
@@ -746,7 +797,9 @@ function removeAllBinDirsInCfmind(appOutDir) {
   };
   walk(cfmindDir);
 
-  console.log(`[electron-builder-hooks] ✓ Removed ${removedCount} .bin director${removedCount === 1 ? 'y' : 'ies'} from cfmind`);
+  console.log(
+    `[electron-builder-hooks] ✓ Removed ${removedCount} .bin director${removedCount === 1 ? 'y' : 'ies'} from cfmind`,
+  );
 }
 
 /**
@@ -765,14 +818,20 @@ function hasCommand(command) {
 function installSkillDependencies() {
   // Check if npm is available (should be available during build)
   if (!hasCommand('npm')) {
-    console.warn('[electron-builder-hooks] npm not found in PATH, skipping skill dependency installation');
-    console.warn('[electron-builder-hooks]   (This is only a warning - skills will be installed at runtime if needed)');
+    console.warn(
+      '[electron-builder-hooks] npm not found in PATH, skipping skill dependency installation',
+    );
+    console.warn(
+      '[electron-builder-hooks]   (This is only a warning - skills will be installed at runtime if needed)',
+    );
     return;
   }
 
   const skillsDir = path.join(__dirname, '..', 'SKILLs');
   if (!existsSync(skillsDir)) {
-    console.log('[electron-builder-hooks] SKILLs directory not found, skipping skill dependency installation');
+    console.log(
+      '[electron-builder-hooks] SKILLs directory not found, skipping skill dependency installation',
+    );
     return;
   }
 
@@ -827,7 +886,9 @@ function installSkillDependencies() {
     }
   }
 
-  console.log(`[electron-builder-hooks] Skill dependencies: ${installedCount} installed, ${skippedCount} skipped, ${failedCount} failed`);
+  console.log(
+    `[electron-builder-hooks] Skill dependencies: ${installedCount} installed, ${skippedCount} skipped, ${failedCount} failed`,
+  );
 }
 
 async function beforePack(context) {
@@ -836,25 +897,29 @@ async function beforePack(context) {
   installSkillDependencies();
 
   if (isWindowsTarget(context)) {
-    console.log('[electron-builder-hooks] Windows target detected, ensuring portable Python runtime is prepared...');
+    console.log(
+      '[electron-builder-hooks] Windows target detected, ensuring portable Python runtime is prepared...',
+    );
     await ensurePortablePythonRuntime({ required: true });
     const pythonRuntimeRoot = path.join(__dirname, '..', 'resources', 'python-win');
     const pythonRuntimeHealth = checkRuntimeHealth(pythonRuntimeRoot, { requirePip: true });
     if (!pythonRuntimeHealth.ok) {
       throw new Error(
-        'Portable Python runtime health check failed before pack. Missing files: '
-        + pythonRuntimeHealth.missing.join(', ')
+        'Portable Python runtime health check failed before pack. Missing files: ' +
+          pythonRuntimeHealth.missing.join(', '),
       );
     }
 
-    console.log('[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...');
+    console.log(
+      '[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...',
+    );
     await ensurePortableUvRuntime({ required: true });
     const uvRuntimeRoot = path.join(__dirname, '..', 'resources', 'uv-win');
     const uvRuntimeHealth = checkUvRuntimeHealth(uvRuntimeRoot);
     if (!uvRuntimeHealth.ok) {
       throw new Error(
-        'Portable uv runtime health check failed before pack. Missing files: '
-        + uvRuntimeHealth.missing.join(', ')
+        'Portable uv runtime health check failed before pack. Missing files: ' +
+          uvRuntimeHealth.missing.join(', '),
       );
     }
   }
@@ -870,10 +935,14 @@ async function beforePack(context) {
     const outputTar = path.join(buildTarDir, 'win-resources.tar');
     const manifestPath = path.join(buildTarDir, 'win-resources.manifest.json');
     const llamaCppBackendBundleMode = resolveWindowsLlamaCppBackendBundleMode();
-    const llamaCppBackendResources = prepareWindowsLlamaCppBackendResources(llamaCppBackendBundleMode, process.env);
-    const llamaCppNsisHelperResources = llamaCppBackendBundleMode === WindowsLlamaCppBackendBundleMode.None
-      ? null
-      : prepareWindowsLlamaCppNsisHelperResources();
+    const llamaCppBackendResources = prepareWindowsLlamaCppBackendResources(
+      llamaCppBackendBundleMode,
+      process.env,
+    );
+    const llamaCppNsisHelperResources =
+      llamaCppBackendBundleMode === WindowsLlamaCppBackendBundleMode.None
+        ? null
+        : prepareWindowsLlamaCppNsisHelperResources();
     const sources = [
       {
         label: 'OpenClaw runtime',
@@ -901,17 +970,18 @@ async function beforePack(context) {
     );
 
     console.log(`[electron-builder-hooks] Packing combined Windows tar: ${outputTar}`);
-    console.log(`[electron-builder-hooks] Windows llama.cpp backend bundle mode: ${llamaCppBackendBundleMode}`);
+    console.log(
+      `[electron-builder-hooks] Windows llama.cpp backend bundle mode: ${llamaCppBackendBundleMode}`,
+    );
 
-    const canReuseCachedTar = existsSync(outputTar)
-      && statSync(outputTar).size > 0
-      && isWindowsTarManifestReusable(manifestPath, sources);
+    const canReuseCachedTar =
+      existsSync(outputTar) &&
+      statSync(outputTar).size > 0 &&
+      isWindowsTarManifestReusable(manifestPath, sources);
 
     if (canReuseCachedTar) {
       const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
-      console.log(
-        `[electron-builder-hooks] Using cached tar: ${sizeMB} MB`
-      );
+      console.log(`[electron-builder-hooks] Using cached tar: ${sizeMB} MB`);
     } else {
       const manifest = buildWindowsTarManifest(sources);
       const t0 = Date.now();
@@ -920,9 +990,7 @@ async function beforePack(context) {
       require('fs').writeFileSync(manifestPath, manifestPayload, 'utf8');
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
       const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
-      console.log(
-        `[electron-builder-hooks] Combined tar packed in ${elapsed}s: ${sizeMB} MB`
-      );
+      console.log(`[electron-builder-hooks] Combined tar packed in ${elapsed}s: ${sizeMB} MB`);
     }
   }
 
@@ -959,4 +1027,4 @@ module.exports = {
   prepareWindowsLlamaCppNsisHelperResources,
   resolveWindowsLlamaCppBackendBundleMode,
   resolveWindowsLlamaCppBackendDownloadDir,
-}
+};

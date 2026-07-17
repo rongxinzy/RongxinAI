@@ -41,26 +41,28 @@ SMTP_REJECT_UNAUTHORIZED=true     # Set to false for self-signed certs
 
 ## Common Email Servers
 
-| Provider | IMAP Host | IMAP Port | SMTP Host | SMTP Port |
-|----------|-----------|-----------|-----------|-----------|
-| 163.com | imap.163.com | 993 | smtp.163.com | 465 |
-| vip.163.com | imap.vip.163.com | 993 | smtp.vip.163.com | 465 |
-| 126.com | imap.126.com | 993 | smtp.126.com | 465 |
-| vip.126.com | imap.vip.126.com | 993 | smtp.vip.126.com | 465 |
-| 188.com | imap.188.com | 993 | smtp.188.com | 465 |
-| vip.188.com | imap.vip.188.com | 993 | smtp.vip.188.com | 465 |
-| yeah.net | imap.yeah.net | 993 | smtp.yeah.net | 465 |
-| Gmail | imap.gmail.com | 993 | smtp.gmail.com | 587 |
-| Outlook | outlook.office365.com | 993 | smtp.office365.com | 587 |
-| QQ Mail | imap.qq.com | 993 | smtp.qq.com | 587 |
+| Provider    | IMAP Host             | IMAP Port | SMTP Host          | SMTP Port |
+| ----------- | --------------------- | --------- | ------------------ | --------- |
+| 163.com     | imap.163.com          | 993       | smtp.163.com       | 465       |
+| vip.163.com | imap.vip.163.com      | 993       | smtp.vip.163.com   | 465       |
+| 126.com     | imap.126.com          | 993       | smtp.126.com       | 465       |
+| vip.126.com | imap.vip.126.com      | 993       | smtp.vip.126.com   | 465       |
+| 188.com     | imap.188.com          | 993       | smtp.188.com       | 465       |
+| vip.188.com | imap.vip.188.com      | 993       | smtp.vip.188.com   | 465       |
+| yeah.net    | imap.yeah.net         | 993       | smtp.yeah.net      | 465       |
+| Gmail       | imap.gmail.com        | 993       | smtp.gmail.com     | 587       |
+| Outlook     | outlook.office365.com | 993       | smtp.office365.com | 587       |
+| QQ Mail     | imap.qq.com           | 993       | smtp.qq.com        | 587       |
 
 **Important for 163.com:**
+
 - Use **authorization code** (授权码), not account password
 - Enable IMAP/SMTP in web settings first
 
 ## IMAP Commands (Receiving Email)
 
 ### check
+
 Check for new/unread emails.
 
 ```bash
@@ -68,11 +70,13 @@ node scripts/imap.js check [--limit 10] [--mailbox INBOX] [--recent 2h]
 ```
 
 Options:
+
 - `--limit <n>`: Max results (default: 10)
 - `--mailbox <name>`: Mailbox to check (default: INBOX)
 - `--recent <time>`: Only show emails from last X time (e.g., 30m, 2h, 7d)
 
 ### fetch
+
 Fetch full email content by UID.
 
 ```bash
@@ -80,6 +84,7 @@ node scripts/imap.js fetch <uid> [--mailbox INBOX]
 ```
 
 ### download
+
 Download all attachments from an email, or a specific attachment.
 
 ```bash
@@ -87,11 +92,13 @@ node scripts/imap.js download <uid> [--mailbox INBOX] [--dir <path>] [--file <fi
 ```
 
 Options:
+
 - `--mailbox <name>`: Mailbox (default: INBOX)
 - `--dir <path>`: Output directory (default: current directory)
 - `--file <filename>`: Download only the specified attachment (default: download all)
 
 ### search
+
 Search emails with filters.
 
 ```bash
@@ -110,6 +117,7 @@ Options:
 ```
 
 ### mark-read / mark-unread
+
 Mark message(s) as read or unread.
 
 ```bash
@@ -118,6 +126,7 @@ node scripts/imap.js mark-unread <uid> [uid2 uid3...]
 ```
 
 ### list-mailboxes
+
 List all available mailboxes/folders.
 
 ```bash
@@ -127,6 +136,7 @@ node scripts/imap.js list-mailboxes
 ## SMTP Commands (Sending Email)
 
 ### send
+
 Send email via SMTP.
 
 ```bash
@@ -134,10 +144,12 @@ node scripts/smtp.js send --to <email> --subject <text> [options]
 ```
 
 **Required:**
+
 - `--to <email>`: Recipient (comma-separated for multiple)
 - `--subject <text>`: Email subject, or `--subject-file <file>`
 
 **Optional:**
+
 - `--body <text>`: Plain text body
 - `--html`: Send body as HTML
 - `--body-file <file>`: Read body from file
@@ -148,6 +160,7 @@ node scripts/smtp.js send --to <email> --subject <text> [options]
 - `--from <email>`: Override default sender
 
 **Examples:**
+
 ```bash
 # Simple text email
 node scripts/smtp.js send --to recipient@example.com --subject "Hello" --body "World"
@@ -163,6 +176,7 @@ node scripts/smtp.js send --to "a@example.com,b@example.com" --cc "c@example.com
 ```
 
 ### test
+
 Test SMTP connection by sending a test email to yourself.
 
 ```bash
@@ -184,15 +198,18 @@ npm install
 ## Troubleshooting
 
 **Connection timeout:**
+
 - Verify server is running and accessible
 - Check host/port configuration
 
 **Authentication failed:**
+
 - Verify username (usually full email address)
 - Check password is correct
 - For 163.com: use authorization code, not account password
 - For Gmail: use App Password if 2FA enabled
 
 **TLS/SSL errors:**
+
 - Match `IMAP_TLS`/`SMTP_SECURE` setting to server requirements
 - For self-signed certs: set `IMAP_REJECT_UNAUTHORIZED=false` or `SMTP_REJECT_UNAUTHORIZED=false`

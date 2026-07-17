@@ -52,12 +52,15 @@ export async function getNvidiaSmiSnapshot(
 export function parseNvidiaSmiCsv(output: string): NvidiaGpuInfo[] {
   return output
     .split(/\r?\n/)
-    .map((line) => parseNvidiaSmiLine(line))
+    .map(line => parseNvidiaSmiLine(line))
     .filter((gpu): gpu is NvidiaGpuInfo => Boolean(gpu));
 }
 
 function parseNvidiaSmiLine(line: string): NvidiaGpuInfo | null {
-  const parts = line.split(',').map((part) => part.trim()).filter(Boolean);
+  const parts = line
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
   if (parts.length < 4) return null;
 
   const index = Number(parts[0]);

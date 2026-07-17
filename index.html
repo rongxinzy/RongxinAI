@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -6,13 +6,13 @@
     <title>RongxinAI</title>
     <script>
       // 在页面加载前预设主题，避免闪烁
-      (function() {
+      (function () {
         try {
           const savedConfig = localStorage.getItem('app_config');
           if (savedConfig) {
             const config = JSON.parse(savedConfig);
             const theme = config.theme || 'system';
-            
+
             if (theme === 'dark') {
               document.documentElement.classList.add('dark');
               document.documentElement.style.backgroundColor = '#0F1117';
@@ -41,4 +41,4 @@
     <div id="root"></div>
     <script type="module" src="/src/renderer/main.tsx"></script>
   </body>
-</html> 
+</html>

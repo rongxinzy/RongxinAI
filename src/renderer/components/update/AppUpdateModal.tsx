@@ -1,7 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import React from 'react';
 
-import { type AppUpdateRuntimeState,AppUpdateStatus } from '../../../shared/appUpdate/constants';
+import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../../shared/appUpdate/constants';
 import { i18nService } from '../../services/i18n';
 import Modal from '../common/Modal';
 
@@ -40,14 +40,19 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   const isManualUrl = url.includes('#') || url.endsWith('/download-list');
   const isInstalling = updateState.status === AppUpdateStatus.Installing;
   const canDismiss = updateState.status !== AppUpdateStatus.Downloading && !isInstalling;
-  const canInstall = updateState.status === AppUpdateStatus.Ready && updateState.readyFilePath != null;
+  const canInstall =
+    updateState.status === AppUpdateStatus.Ready && updateState.readyFilePath != null;
   const isError = updateState.status === AppUpdateStatus.Error;
-  const isDownloading = updateState.status === AppUpdateStatus.Downloading || updateState.status === AppUpdateStatus.Checking;
+  const isDownloading =
+    updateState.status === AppUpdateStatus.Downloading ||
+    updateState.status === AppUpdateStatus.Checking;
   const showInfoFooter = updateState.status === AppUpdateStatus.Available;
   const isRetryState = updateState.status === AppUpdateStatus.Error;
 
   const title = isError
-    ? (canInstall ? i18nService.t('updateInstallFailed') : i18nService.t('updateDownloadFailed'))
+    ? canInstall
+      ? i18nService.t('updateInstallFailed')
+      : i18nService.t('updateDownloadFailed')
     : canInstall
       ? i18nService.t('updateReadyTitle')
       : isDownloading
@@ -63,19 +68,24 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
         : i18nService.t('updateAvailableConfirm');
 
   return (
-    <Modal onClose={canDismiss ? onCancel : () => {}} overlayClassName="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" className="modal-content w-full max-w-md mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden">
+    <Modal
+      onClose={canDismiss ? onCancel : () => {}}
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
+      className="modal-content w-full max-w-md mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden"
+    >
       <div className="px-5 pt-5 pb-4">
-        <h3 className={`text-base font-semibold ${isError ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
+        <h3
+          className={`text-base font-semibold ${isError ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}
+        >
           {title}
         </h3>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          v{latestVersion}{date ? ` · ${date}` : ''}
+          v{latestVersion}
+          {date ? ` · ${date}` : ''}
         </p>
 
         {currentLog.title && (
-          <p className="mt-3 text-sm font-medium text-foreground">
-            {currentLog.title}
-          </p>
+          <p className="mt-3 text-sm font-medium text-foreground">{currentLog.title}</p>
         )}
 
         {currentLog.content.length > 0 && (
@@ -98,7 +108,10 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
                   style={{ width: `${Math.round(updateState.progress.percent * 100)}%` }}
                 />
               ) : (
-                <div className="h-full bg-primary/60 rounded-full animate-pulse" style={{ width: '100%' }} />
+                <div
+                  className="h-full bg-primary/60 rounded-full animate-pulse"
+                  style={{ width: '100%' }}
+                />
               )}
             </div>
 
@@ -122,7 +135,6 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
           </div>
         )}
 
-
         {updateState.errorMessage && (
           <p className="mt-4 text-sm text-muted-foreground wrap-break-word">
             {updateState.errorMessage}
@@ -132,17 +144,10 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
       {showInfoFooter && (
         <div className="px-5 pb-5 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onCancel}
-          >
+          <Button type="button" variant="ghost" onClick={onCancel}>
             {i18nService.t('updateAvailableCancel')}
           </Button>
-          <Button
-            type="button"
-            onClick={onConfirm}
-          >
+          <Button type="button" onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>
@@ -150,11 +155,7 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
       {isDownloading && (
         <div className="px-5 pb-5 flex items-center justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onCancelDownload}
-          >
+          <Button type="button" variant="ghost" onClick={onCancelDownload}>
             {i18nService.t('updateDownloadCancel')}
           </Button>
         </div>
@@ -162,17 +163,10 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
       {canInstall && (
         <div className="px-5 pb-5 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onCancel}
-          >
+          <Button type="button" variant="ghost" onClick={onCancel}>
             {i18nService.t('updateReadyLater')}
           </Button>
-          <Button
-            type="button"
-            onClick={onConfirm}
-          >
+          <Button type="button" onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>
@@ -186,25 +180,29 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
             fill="none"
             viewBox="0 0 24 24"
           >
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
           </svg>
         </div>
       )}
 
       {isError && !canInstall && (
         <div className="px-5 pb-5 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onCancel}
-          >
+          <Button type="button" variant="ghost" onClick={onCancel}>
             {i18nService.t('updateAvailableCancel')}
           </Button>
-          <Button
-            type="button"
-            onClick={onRetry}
-          >
+          <Button type="button" onClick={onRetry}>
             {confirmLabel}
           </Button>
         </div>

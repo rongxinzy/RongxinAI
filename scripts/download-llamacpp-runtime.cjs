@@ -9,8 +9,7 @@ const tar = require('tar');
 
 const DEFAULT_LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const DEFAULT_LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
-const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL =
-  'https://rongxinai.krli.org/llamacpp';
+const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL = 'https://rongxinai.krli.org/llamacpp';
 const OfficialAssetByTarget = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
@@ -62,7 +61,10 @@ function resolveGitHubRepo(env = process.env) {
   const packageJson = readPackageJson(path.resolve(__dirname, '..'));
   const packageRepo = packageJson?.llamacpp?.runtimeRepo;
   if (typeof packageRepo === 'string' && packageRepo.trim()) {
-    return packageRepo.trim().replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '');
+    return packageRepo
+      .trim()
+      .replace(/^https:\/\/github\.com\//, '')
+      .replace(/\.git$/, '');
   }
 
   return DEFAULT_LLAMACPP_RUNTIME_GITHUB_REPO;
@@ -110,10 +112,10 @@ function resolveOfficialRuntimeCompanionAssetNames(targetId, env = process.env) 
   const configuredTemplates = packageJson?.llamacpp?.runtimeCompanionAssets?.[targetId];
   const templates = Array.isArray(configuredTemplates)
     ? configuredTemplates
-    : CompanionAssetsByTarget[targetId] ?? [];
+    : (CompanionAssetsByTarget[targetId] ?? []);
   return templates
-    .filter((template) => typeof template === 'string' && template.trim())
-    .map((template) => template.trim().replace(/\{tag\}/g, releaseTag));
+    .filter(template => typeof template === 'string' && template.trim())
+    .map(template => template.trim().replace(/\{tag\}/g, releaseTag));
 }
 
 function resolveArchiveExtension(archiveName) {
@@ -134,11 +136,12 @@ function resolveRuntimeDownloadSources(targetId, options = {}) {
 }
 
 function resolveRuntimeCompanionDownloadSources(targetId, options = {}) {
-  return resolveOfficialRuntimeCompanionAssetNames(targetId, options.env ?? process.env)
-    .map((assetName) => ({
+  return resolveOfficialRuntimeCompanionAssetNames(targetId, options.env ?? process.env).map(
+    assetName => ({
       assetName,
       urls: resolveAssetDownloadSources(targetId, assetName, options),
-    }));
+    }),
+  );
 }
 
 function resolveAssetDownloadSources(targetId, assetName, options = {}) {
@@ -147,9 +150,7 @@ function resolveAssetDownloadSources(targetId, assetName, options = {}) {
 
   const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
   if (explicitUrl) {
-    return [explicitUrl
-      .replace(/\{target\}/g, targetId)
-      .replace(/\{asset\}/g, assetName)];
+    return [explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName)];
   }
 
   const baseUrl = env.LLAMACPP_RUNTIME_BASE_URL?.trim();
@@ -170,9 +171,10 @@ function formatDownloadFailureMessage(status, statusText, url, targetId, rootDir
     const repo = resolveGitHubRepo();
     const releaseTag = resolveRuntimeReleaseTag(rootDir);
     const assetName = resolveOfficialRuntimeAssetName(targetId);
-    const acquisitionHint = targetId === 'win-x64-cuda-12'
-      ? 'Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or use npm run llamacpp:runtime:download:win-x64-cuda-12.'
-      : `Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or build locally with npm run llamacpp:runtime:${targetId}.`;
+    const acquisitionHint =
+      targetId === 'win-x64-cuda-12'
+        ? 'Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or use npm run llamacpp:runtime:download:win-x64-cuda-12.'
+        : `Set LLAMACPP_RUNTIME_URL / LLAMACPP_RUNTIME_BASE_URL if you want to use a mirror, or build locally with npm run llamacpp:runtime:${targetId}.`;
     return [
       `Download failed: HTTP ${status} ${statusText}.`,
       `${url} does not exist.`,
@@ -190,7 +192,9 @@ async function downloadFile(url, outputPath, rootDir, targetId) {
     headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-runtime-downloader' },
   });
   if (!response.ok || !response.body) {
-    throw new Error(formatDownloadFailureMessage(response.status, response.statusText, url, targetId, rootDir));
+    throw new Error(
+      formatDownloadFailureMessage(response.status, response.statusText, url, targetId, rootDir),
+    );
   }
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
@@ -211,7 +215,7 @@ async function downloadFile(url, outputPath, rootDir, targetId) {
   }
 
   await new Promise((resolve, reject) => {
-    file.end((error) => error ? reject(error) : resolve());
+    file.end(error => (error ? reject(error) : resolve()));
   });
   if (total > 0) process.stdout.write('\n');
   return url;
@@ -243,7 +247,8 @@ async function main() {
     const urls = resolveRuntimeDownloadSources(targetId, { rootDir });
     const url = urls[0];
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-runtime-'));
-    const archiveName = path.basename(new URL(url).pathname) || resolveOfficialRuntimeAssetName(targetId);
+    const archiveName =
+      path.basename(new URL(url).pathname) || resolveOfficialRuntimeAssetName(targetId);
     const archivePath = path.join(tempDir, archiveName);
     const extractDir = path.join(tempDir, 'extract');
     const sourceUrl = await downloadFileWithFallback(urls, archivePath, rootDir, targetId);
@@ -266,13 +271,14 @@ async function main() {
     throw new Error(`Downloaded runtime is missing ${path.join('bin', executableName)}.`);
   }
 
-  const sync = spawnSync(process.execPath, [
-    path.join(rootDir, 'scripts', 'sync-llamacpp-runtime-current.cjs'),
-    targetId,
-  ], {
-    cwd: rootDir,
-    stdio: 'inherit',
-  });
+  const sync = spawnSync(
+    process.execPath,
+    [path.join(rootDir, 'scripts', 'sync-llamacpp-runtime-current.cjs'), targetId],
+    {
+      cwd: rootDir,
+      stdio: 'inherit',
+    },
+  );
   if (sync.status !== 0) process.exit(sync.status || 1);
 }
 
@@ -289,7 +295,8 @@ async function extractArchive(archivePath, extractDir) {
 }
 
 function installNormalizedRuntime(options) {
-  const { extractDir, targetRuntimeDir, targetId, executableName, rootDir, sourceUrl, assetName } = options;
+  const { extractDir, targetRuntimeDir, targetId, executableName, rootDir, sourceUrl, assetName } =
+    options;
   const executablePath = findExecutablePath(extractDir, executableName);
   if (!executablePath) {
     throw new Error(`Downloaded runtime archive does not contain ${executableName}.`);
@@ -321,38 +328,42 @@ function installNormalizedRuntime(options) {
 }
 
 function downloadFileWithFallbackSync(urls, outputPath, rootDir, targetId) {
-  const result = spawnSync(process.execPath, [
-    __filename,
-    '--download-one',
-    JSON.stringify({ urls, outputPath, rootDir, targetId }),
-  ], {
-    cwd: path.resolve(__dirname, '..'),
-    stdio: 'inherit',
-  });
+  const result = spawnSync(
+    process.execPath,
+    [__filename, '--download-one', JSON.stringify({ urls, outputPath, rootDir, targetId })],
+    {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'inherit',
+    },
+  );
   if (result.status !== 0) {
     throw new Error(`Failed to download companion runtime asset: ${path.basename(outputPath)}`);
   }
 }
 
 function extractArchiveSync(archivePath, extractDir) {
-  const result = spawnSync(process.execPath, [
-    '-e',
+  const result = spawnSync(
+    process.execPath,
     [
-      "const extractZip=require('extract-zip');",
-      "const tar=require('tar');",
-      "const [archive,dir]=process.argv.slice(1);",
-      "(async()=>{",
-      "if(archive.endsWith('.zip')) await extractZip(archive,{dir});",
-      "else if(archive.endsWith('.tar.gz')) await tar.x({file:archive,cwd:dir});",
-      "else throw new Error('Unsupported archive '+archive);",
-      "})().catch(e=>{console.error(e.message);process.exit(1);});",
-    ].join(''),
-    archivePath,
-    extractDir,
-  ], {
-    cwd: path.resolve(__dirname, '..'),
-    stdio: 'inherit',
-  });
+      '-e',
+      [
+        "const extractZip=require('extract-zip');",
+        "const tar=require('tar');",
+        'const [archive,dir]=process.argv.slice(1);',
+        '(async()=>{',
+        "if(archive.endsWith('.zip')) await extractZip(archive,{dir});",
+        "else if(archive.endsWith('.tar.gz')) await tar.x({file:archive,cwd:dir});",
+        "else throw new Error('Unsupported archive '+archive);",
+        '})().catch(e=>{console.error(e.message);process.exit(1);});',
+      ].join(''),
+      archivePath,
+      extractDir,
+    ],
+    {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'inherit',
+    },
+  );
   if (result.status !== 0) {
     throw new Error(`Failed to extract companion runtime asset: ${path.basename(archivePath)}`);
   }
@@ -394,7 +405,7 @@ function findRuntimePayloadDirectory(rootDir) {
     const currentDir = queue.shift();
     if (!currentDir) continue;
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    if (entries.some((entry) => entry.isFile() && /\.(dll|so|dylib)$/i.test(entry.name))) {
+    if (entries.some(entry => entry.isFile() && /\.(dll|so|dylib)$/i.test(entry.name))) {
       if (path.basename(currentDir).toLowerCase() === 'bin') return currentDir;
       fallback ||= currentDir;
     }
@@ -427,23 +438,35 @@ function validateRuntimeTarget(runtimeDir, targetId) {
   try {
     const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
     if (buildInfo && typeof buildInfo.target === 'string' && buildInfo.target !== targetId) {
-      throw new Error(`Downloaded runtime target mismatch: expected ${targetId}, got ${buildInfo.target}.`);
+      throw new Error(
+        `Downloaded runtime target mismatch: expected ${targetId}, got ${buildInfo.target}.`,
+      );
     }
   } catch (error) {
-    throw new Error(`Failed to validate runtime-build-info.json: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to validate runtime-build-info.json: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 if (require.main === module && process.argv[2] === '--download-one') {
   const payload = JSON.parse(process.argv[3] || '{}');
-  downloadFileWithFallback(payload.urls, payload.outputPath, payload.rootDir, payload.targetId)
-    .catch((error) => {
-      console.error(`[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`);
-      process.exit(1);
-    });
+  downloadFileWithFallback(
+    payload.urls,
+    payload.outputPath,
+    payload.rootDir,
+    payload.targetId,
+  ).catch(error => {
+    console.error(
+      `[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  });
 } else if (require.main === module) {
-  main().catch((error) => {
-    console.error(`[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`);
+  main().catch(error => {
+    console.error(
+      `[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exit(1);
   });
 }

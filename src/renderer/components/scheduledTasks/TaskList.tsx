@@ -26,11 +26,7 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
-import {
-  formatNextRunRelative,
-  formatScheduleLabel,
-  getStatusLabelKey,
-} from './utils';
+import { formatNextRunRelative, formatScheduleLabel, getStatusLabelKey } from './utils';
 
 // ── Status to text color mapping ──
 
@@ -61,10 +57,12 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
       onClick={() => dispatch(selectTask(task.id))}
     >
       <TableCell className="max-w-[180px] min-w-0">
-        <div className={cn(
-          'text-sm truncate',
-          task.enabled ? 'text-foreground' : 'text-muted-foreground',
-        )}>
+        <div
+          className={cn(
+            'text-sm truncate',
+            task.enabled ? 'text-foreground' : 'text-muted-foreground',
+          )}
+        >
           {task.name}
         </div>
         {task.description && (
@@ -83,9 +81,16 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
         )}
       </TableCell>
 
-      <TableCell className="w-28" onClick={(e) => e.stopPropagation()}>
+      <TableCell className="w-28" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2">
-          <Badge variant="outline" className={displayStatus ? statusTextClass[displayStatus] || 'text-muted-foreground' : 'text-muted-foreground'}>
+          <Badge
+            variant="outline"
+            className={
+              displayStatus
+                ? statusTextClass[displayStatus] || 'text-muted-foreground'
+                : 'text-muted-foreground'
+            }
+          >
             {statusLabel}
           </Badge>
           <Switch
@@ -184,10 +189,18 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksListColTitle')}</TableHead>
-            <TableHead className="text-muted-foreground">{i18nService.t('scheduledTasksListColSchedule')}</TableHead>
-            <TableHead className="text-muted-foreground w-28">{i18nService.t('scheduledTasksListColStatus')}</TableHead>
-            <TableHead className="text-muted-foreground w-10">{i18nService.t('scheduledTasksListColMore')}</TableHead>
+            <TableHead className="text-muted-foreground">
+              {i18nService.t('scheduledTasksListColTitle')}
+            </TableHead>
+            <TableHead className="text-muted-foreground">
+              {i18nService.t('scheduledTasksListColSchedule')}
+            </TableHead>
+            <TableHead className="text-muted-foreground w-28">
+              {i18nService.t('scheduledTasksListColStatus')}
+            </TableHead>
+            <TableHead className="text-muted-foreground w-10">
+              {i18nService.t('scheduledTasksListColMore')}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -75,7 +75,7 @@ test('getRecentGatewayLogEntries returns retained daily logs in name order', () 
   writeLogFile(dir, 'gateway-2026-05-02.log', cutoffMs - 1);
   writeLogFile(dir, 'gateway.log', now.getTime());
 
-  expect(getRecentGatewayLogEntries(dir, now).map((entry) => entry.archiveName)).toEqual([
+  expect(getRecentGatewayLogEntries(dir, now).map(entry => entry.archiveName)).toEqual([
     'gateway-2026-05-04.log',
     'gateway-2026-05-06.log',
   ]);

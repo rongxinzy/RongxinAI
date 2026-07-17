@@ -1,5 +1,5 @@
 import { execFile } from 'child_process';
-import { type ChildProcessWithoutNullStreams,spawn } from 'child_process';
+import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
@@ -79,18 +79,29 @@ export class OllamaManager extends EventEmitter {
       env: buildOllamaServeEnv(process.env, this.getServiceConfig()),
     });
 
-    this.process.stdout.on('data', (chunk) => console.debug(`[Ollama] ${chunk.toString().trim()}`));
-    this.process.stderr.on('data', (chunk) => console.warn(`[Ollama] ${chunk.toString().trim()}`));
+    this.process.stdout.on('data', chunk => console.debug(`[Ollama] ${chunk.toString().trim()}`));
+    this.process.stderr.on('data', chunk => console.warn(`[Ollama] ${chunk.toString().trim()}`));
     this.process.on('exit', (code, signal) => {
-      console.log(`[Ollama] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
+      console.log(
+        `[Ollama] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`,
+      );
       this.process = null;
       if (this.status.status === 'running' || this.status.status === 'starting') {
-        this.setStatus({ status: 'stopped', executablePath: this.executablePath ?? undefined, managedByApp: false });
+        this.setStatus({
+          status: 'stopped',
+          executablePath: this.executablePath ?? undefined,
+          managedByApp: false,
+        });
       }
     });
-    this.process.on('error', (error) => {
+    this.process.on('error', error => {
       console.warn('[Ollama] process failed:', error);
-      this.setStatus({ status: 'error', error: error.message, executablePath: this.executablePath ?? undefined, managedByApp: false });
+      this.setStatus({
+        status: 'error',
+        error: error.message,
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+      });
     });
 
     await this.waitUntilHealthy(10_000);
@@ -109,12 +120,16 @@ export class OllamaManager extends EventEmitter {
         return this.status;
       }
 
-      this.setStatus({ status: 'stopped', executablePath: this.executablePath ?? undefined, managedByApp: false });
+      this.setStatus({
+        status: 'stopped',
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+      });
       return this.status;
     }
 
     const child = this.process;
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timeout = setTimeout(() => {
         child.kill('SIGKILL');
         resolve();
@@ -136,7 +151,11 @@ export class OllamaManager extends EventEmitter {
       return this.status;
     }
 
-    this.setStatus({ status: 'stopped', executablePath: this.executablePath ?? undefined, managedByApp: false });
+    this.setStatus({
+      status: 'stopped',
+      executablePath: this.executablePath ?? undefined,
+      managedByApp: false,
+    });
     return this.status;
   }
 
@@ -153,19 +172,35 @@ export class OllamaManager extends EventEmitter {
     const installer = new OllamaInstaller((progress: OllamaInstallProgress) => {
       this.emit('install-progress', progress);
     });
-    this.setStatus({ status: 'installing', executablePath: this.executablePath ?? undefined, managedByApp: false });
+    this.setStatus({
+      status: 'installing',
+      executablePath: this.executablePath ?? undefined,
+      managedByApp: false,
+    });
     try {
       const result = await installer.install();
       if (result.needsManual) {
-        this.setStatus({ status: 'not-installed', executablePath: this.executablePath ?? undefined, managedByApp: false });
+        this.setStatus({
+          status: 'not-installed',
+          executablePath: this.executablePath ?? undefined,
+          managedByApp: false,
+        });
         return this.status;
       }
       await this.detect();
       return this.status;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.emit('install-progress', { phase: 'failed', error: message } satisfies OllamaInstallProgress);
-      this.setStatus({ status: 'error', error: message, executablePath: this.executablePath ?? undefined, managedByApp: false });
+      this.emit('install-progress', {
+        phase: 'failed',
+        error: message,
+      } satisfies OllamaInstallProgress);
+      this.setStatus({
+        status: 'error',
+        error: message,
+        executablePath: this.executablePath ?? undefined,
+        managedByApp: false,
+      });
       return this.status;
     }
   }
@@ -188,26 +223,30 @@ export class OllamaManager extends EventEmitter {
     try {
       runningModels = await client.runningModels(QUIT_RUNNING_MODELS_TIMEOUT_MS);
     } catch (error) {
-      console.debug('[Ollama] skipped model unload during quit because running models could not be listed:', error);
+      console.debug(
+        '[Ollama] skipped model unload during quit because running models could not be listed:',
+        error,
+      );
       return;
     }
 
-    const modelNames = Array.from(new Set(
-      runningModels
-        .map((model) => (model.name || model.model || '').trim())
-        .filter(Boolean),
-    ));
+    const modelNames = Array.from(
+      new Set(runningModels.map(model => (model.name || model.model || '').trim()).filter(Boolean)),
+    );
     if (modelNames.length === 0) return;
 
     console.log(`[Ollama] unloading ${modelNames.length} model(s) during app quit`);
     const results = await Promise.allSettled(
-      modelNames.map(async (modelName) => {
+      modelNames.map(async modelName => {
         await client.unloadModel(modelName, QUIT_UNLOAD_MODEL_TIMEOUT_MS);
       }),
     );
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.warn(`[Ollama] failed to unload model ${modelNames[index]} during quit:`, result.reason);
+        console.warn(
+          `[Ollama] failed to unload model ${modelNames[index]} during quit:`,
+          result.reason,
+        );
       }
     });
   }
@@ -232,7 +271,7 @@ export class OllamaManager extends EventEmitter {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       if (await this.isHealthy()) return;
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 250));
     }
     this.setStatus({
       status: 'error',
@@ -242,7 +281,11 @@ export class OllamaManager extends EventEmitter {
     });
   }
 
-  private setStatus(patch: Omit<Partial<OllamaStatusSnapshot>, 'checkedAt'> & { status: OllamaStatusSnapshot['status'] }): void {
+  private setStatus(
+    patch: Omit<Partial<OllamaStatusSnapshot>, 'checkedAt'> & {
+      status: OllamaStatusSnapshot['status'];
+    },
+  ): void {
     this.status = {
       ...this.status,
       ...patch,
@@ -252,13 +295,18 @@ export class OllamaManager extends EventEmitter {
   }
 }
 
-function buildOllamaServeEnv(baseEnv: NodeJS.ProcessEnv, config: OllamaServiceConfig): NodeJS.ProcessEnv {
+function buildOllamaServeEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  config: OllamaServiceConfig,
+): NodeJS.ProcessEnv {
   return {
     ...baseEnv,
     ...(config.cudaVisibleDevices ? { CUDA_VISIBLE_DEVICES: config.cudaVisibleDevices } : {}),
     ...(config.maxLoadedModels ? { OLLAMA_MAX_LOADED_MODELS: config.maxLoadedModels } : {}),
     ...(config.numParallel ? { OLLAMA_NUM_PARALLEL: config.numParallel } : {}),
-    ...(typeof config.schedSpread === 'boolean' ? { OLLAMA_SCHED_SPREAD: String(config.schedSpread) } : {}),
+    ...(typeof config.schedSpread === 'boolean'
+      ? { OLLAMA_SCHED_SPREAD: String(config.schedSpread) }
+      : {}),
   };
 }
 
@@ -273,7 +321,10 @@ export async function findOllamaExecutable(): Promise<string | null> {
   const command = process.platform === 'win32' ? 'where' : 'which';
   try {
     const { stdout } = await execFileAsync(command, ['ollama'], { timeout: 1000 });
-    const first = stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    const first = stdout
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(Boolean);
     return first || null;
   } catch {
     return null;
@@ -296,8 +347,5 @@ function getKnownOllamaExecutablePaths(): string[] {
       path.join(localAppData, 'Ollama', 'ollama.exe'),
     ];
   }
-  return [
-    '/usr/local/bin/ollama',
-    '/usr/bin/ollama',
-  ];
+  return ['/usr/local/bin/ollama', '/usr/bin/ollama'];
 }

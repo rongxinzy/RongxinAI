@@ -26,8 +26,12 @@ function resolveBashExecutable(rootDir) {
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     if (result.status === 0 && result.stdout) {
-      const paths = result.stdout.trim().split(/\r?\n/).map(p => p.trim()).filter(Boolean);
-      const isWslBash = (p) => {
+      const paths = result.stdout
+        .trim()
+        .split(/\r?\n/)
+        .map(p => p.trim())
+        .filter(Boolean);
+      const isWslBash = p => {
         const lower = p.toLowerCase();
         return lower.includes('windowsapps') || lower.includes('system32');
       };
@@ -71,7 +75,9 @@ function resolveBashExecutable(rootDir) {
 
 const targetId = (process.argv[2] || '').trim();
 if (!targetId) {
-  console.error('[run-build-openclaw-runtime] Missing target id (example: mac-arm64, win-x64, linux-x64).');
+  console.error(
+    '[run-build-openclaw-runtime] Missing target id (example: mac-arm64, win-x64, linux-x64).',
+  );
   process.exit(1);
 }
 
@@ -80,7 +86,9 @@ const bashExecutable = resolveBashExecutable(rootDir);
 if (!bashExecutable) {
   console.error('[run-build-openclaw-runtime] bash is required but not found.');
   if (process.platform === 'win32') {
-    console.error('[run-build-openclaw-runtime] Install Git Bash or run `npm run setup:mingit` first.');
+    console.error(
+      '[run-build-openclaw-runtime] Install Git Bash or run `npm run setup:mingit` first.',
+    );
   }
   process.exit(1);
 }

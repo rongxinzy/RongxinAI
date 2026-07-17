@@ -36,8 +36,17 @@
     { "en": "Visualization", "zh": "数据可视化" }
   ],
   "quickPrompts": [
-    { "en": "Help me analyze this sales data and identify trends", "zh": "帮我分析这份销售数据并找出趋势" },
-    { "en": "Create a dashboard plan for tracking key metrics", "zh": "为关键指标设计一个仪表盘方案" },
-    { "en": "Run A/B test analysis on these experiment results", "zh": "对这些实验结果进行 A/B 测试分析" }
+    {
+      "en": "Help me analyze this sales data and identify trends",
+      "zh": "帮我分析这份销售数据并找出趋势"
+    },
+    {
+      "en": "Create a dashboard plan for tracking key metrics",
+      "zh": "为关键指标设计一个仪表盘方案"
+    },
+    {
+      "en": "Run A/B test analysis on these experiment results",
+      "zh": "对这些实验结果进行 A/B 测试分析"
+    }
   ]
 }

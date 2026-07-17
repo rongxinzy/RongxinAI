@@ -114,7 +114,7 @@ class SkillService {
 
   async confirmInstall(
     pendingId: string,
-    action: string
+    action: string,
   ): Promise<{ success: boolean; skills?: Skill[]; error?: string }> {
     try {
       const result = await window.electron.skills.confirmInstall(pendingId, action);
@@ -183,7 +183,7 @@ class SkillService {
 
   async testEmailConnectivity(
     skillId: string,
-    config: Record<string, string>
+    config: Record<string, string>,
   ): Promise<EmailConnectivityTestResult | null> {
     try {
       const result = await window.electron.skills.testEmailConnectivity(skillId, config);
@@ -200,7 +200,7 @@ class SkillService {
   async getAutoRoutingPrompt(): Promise<string | null> {
     try {
       const result = await window.electron.skills.autoRoutingPrompt();
-      return result.success ? (result.prompt || null) : null;
+      return result.success ? result.prompt || null : null;
     } catch (error) {
       console.error('Failed to get auto-routing prompt:', error);
       return null;
@@ -210,7 +210,9 @@ class SkillService {
     return this.localSkillDescriptions.size > 0 || this.marketplaceSkillDescriptions.size > 0;
   }
 
-  async fetchMarketplaceSkills(options: { forceRefresh?: boolean } = {}): Promise<MarketplaceSkill[]> {
+  async fetchMarketplaceSkills(
+    options: { forceRefresh?: boolean } = {},
+  ): Promise<MarketplaceSkill[]> {
     const { forceRefresh = false } = options;
 
     if (!forceRefresh && this.marketplaceCache) {
@@ -237,7 +239,9 @@ class SkillService {
       const json = JSON.parse(result.data);
       const value = json?.data?.value;
       // Store local skill descriptions for i18n lookup
-      const localSkills: LocalSkillInfo[] = Array.isArray(value?.localSkill) ? value.localSkill : [];
+      const localSkills: LocalSkillInfo[] = Array.isArray(value?.localSkill)
+        ? value.localSkill
+        : [];
       this.localSkillDescriptions.clear();
       for (const ls of localSkills) {
         this.localSkillDescriptions.set(ls.name, ls.description);
@@ -263,7 +267,8 @@ class SkillService {
   }
 
   getLocalizedSkillDescription(skillId: string, skillName: string, fallback: string): string {
-    const localDesc = this.localSkillDescriptions.get(skillName) ?? this.localSkillDescriptions.get(skillId);
+    const localDesc =
+      this.localSkillDescriptions.get(skillName) ?? this.localSkillDescriptions.get(skillId);
     if (localDesc != null) return resolveLocalizedText(localDesc);
     const marketDesc = this.marketplaceSkillDescriptions.get(skillId);
     if (marketDesc != null) return resolveLocalizedText(marketDesc);

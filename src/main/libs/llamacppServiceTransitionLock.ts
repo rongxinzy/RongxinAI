@@ -5,10 +5,7 @@ export class LlamaCppServiceTransitionLock {
     return this.active;
   }
 
-  async runExclusive<T>(
-    action: () => Promise<T>,
-    createBlockedError: () => Error,
-  ): Promise<T> {
+  async runExclusive<T>(action: () => Promise<T>, createBlockedError: () => Error): Promise<T> {
     if (this.active) {
       throw createBlockedError();
     }

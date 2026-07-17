@@ -87,7 +87,7 @@ function getMimeType(ext) {
     '.bmp': 'image/bmp',
     '.tiff': 'image/tiff',
     '.tif': 'image/tiff',
-    '.heic': 'image/heic'
+    '.heic': 'image/heic',
   };
   return extToMime[ext.toLowerCase()] || 'image/jpeg';
 }
@@ -145,15 +145,15 @@ async function makeRequest(method, urlStr, headers, body = null) {
       method: method,
       headers: {
         'User-Agent': 'SeedanceVideoGenerator/1.0',
-        ...headers
+        ...headers,
       },
-      timeout: 30000
+      timeout: 30000,
     };
 
-    const req = client.request(options, (res) => {
+    const req = client.request(options, res => {
       let data = '';
 
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         data += chunk;
       });
 
@@ -163,13 +163,13 @@ async function makeRequest(method, urlStr, headers, body = null) {
           resolve({
             status: res.statusCode,
             data: result,
-            headers: res.headers
+            headers: res.headers,
           });
         } catch (e) {
           resolve({
             status: res.statusCode,
             data: data,
-            headers: res.headers
+            headers: res.headers,
           });
         }
       });
@@ -200,12 +200,12 @@ async function downloadFile(urlStr, outputPath) {
       path: urlObj.pathname + urlObj.search,
       method: 'GET',
       headers: {
-        'User-Agent': 'SeedanceVideoGenerator/1.0'
+        'User-Agent': 'SeedanceVideoGenerator/1.0',
       },
-      timeout: 120000
+      timeout: 120000,
     };
 
-    const req = client.request(options, (res) => {
+    const req = client.request(options, res => {
       if (res.statusCode !== 200) {
         reject(new Error(`下载失败 (HTTP ${res.statusCode})`));
         return;
@@ -221,7 +221,7 @@ async function downloadFile(urlStr, outputPath) {
 
       const file = fs.createWriteStream(outputPath);
 
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         downloaded += chunk.length;
         if (totalSize > 0) {
           const percent = Math.floor((downloaded * 100) / totalSize);
@@ -239,7 +239,7 @@ async function downloadFile(urlStr, outputPath) {
         resolve();
       });
 
-      file.on('error', (err) => {
+      file.on('error', err => {
         fs.unlink(outputPath, () => {});
         reject(err);
       });
@@ -261,7 +261,7 @@ async function createVideoTask(prompt, imagePaths = null, options = {}) {
     duration = DEFAULT_DURATION,
     ratio = DEFAULT_RATIO,
     generateAudio = false,
-    watermark = true
+    watermark = true,
   } = options;
 
   // 构建content数组
@@ -274,7 +274,7 @@ async function createVideoTask(prompt, imagePaths = null, options = {}) {
         const processedUrl = await processImagePath(imgPath);
         content.push({
           type: 'image_url',
-          image_url: { url: processedUrl }
+          image_url: { url: processedUrl },
         });
       } catch (e) {
         throw new Error(`图片处理失败: ${e.message}`);
@@ -289,7 +289,7 @@ async function createVideoTask(prompt, imagePaths = null, options = {}) {
     duration,
     ratio,
     generate_audio: generateAudio,
-    watermark
+    watermark,
   };
 
   printInfo('正在提交任务...');
@@ -316,18 +316,17 @@ async function createVideoTask(prompt, imagePaths = null, options = {}) {
       `${BASE_URL}/contents/generations/tasks`,
       {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
+        Authorization: `Bearer ${API_KEY}`,
       },
-      payload
+      payload,
     );
 
     if (response.status !== 200) {
       let errorMsg = `HTTP ${response.status}`;
       if (typeof response.data === 'object' && response.data.error) {
         const errorDetail = response.data.error;
-        errorMsg = typeof errorDetail === 'object'
-          ? errorDetail.message || errorMsg
-          : String(errorDetail);
+        errorMsg =
+          typeof errorDetail === 'object' ? errorDetail.message || errorMsg : String(errorDetail);
       }
 
       if (response.status === 401) {
@@ -357,7 +356,11 @@ async function createVideoTask(prompt, imagePaths = null, options = {}) {
   }
 }
 
-async function pollTaskStatus(taskId, pollInterval = DEFAULT_POLL_INTERVAL, timeout = DEFAULT_TIMEOUT) {
+async function pollTaskStatus(
+  taskId,
+  pollInterval = DEFAULT_POLL_INTERVAL,
+  timeout = DEFAULT_TIMEOUT,
+) {
   const startTime = Date.now();
   let retryCount = 0;
   const maxRetries = 3;
@@ -373,7 +376,7 @@ async function pollTaskStatus(taskId, pollInterval = DEFAULT_POLL_INTERVAL, time
     // 检查超时
     if (elapsed > timeout) {
       throw new Error(
-        `任务超时（${timeout}秒）\n任务ID: ${taskId}\n你可以稍后通过控制台查看任务结果`
+        `任务超时（${timeout}秒）\n任务ID: ${taskId}\n你可以稍后通过控制台查看任务结果`,
       );
     }
 
@@ -382,8 +385,8 @@ async function pollTaskStatus(taskId, pollInterval = DEFAULT_POLL_INTERVAL, time
         'GET',
         `${BASE_URL}/contents/generations/tasks/${taskId}`,
         {
-          'Authorization': `Bearer ${API_KEY}`
-        }
+          Authorization: `Bearer ${API_KEY}`,
+        },
       );
 
       if (response.status !== 200) {
@@ -400,12 +403,13 @@ async function pollTaskStatus(taskId, pollInterval = DEFAULT_POLL_INTERVAL, time
       const result = response.data;
       const status = result.status;
 
-      const statusZh = {
-        'queued': '排队中',
-        'running': '生成中',
-        'succeeded': '完成',
-        'failed': '失败'
-      }[status] || status;
+      const statusZh =
+        {
+          queued: '排队中',
+          running: '生成中',
+          succeeded: '完成',
+          failed: '失败',
+        }[status] || status;
 
       printInfo(`\r[${elapsed}s] 状态: ${statusZh}...`, true);
 
@@ -416,9 +420,8 @@ async function pollTaskStatus(taskId, pollInterval = DEFAULT_POLL_INTERVAL, time
         let errorMsg = '未知错误';
         if (result.error) {
           const errorDetail = result.error;
-          errorMsg = typeof errorDetail === 'object'
-            ? errorDetail.message || errorMsg
-            : String(errorDetail);
+          errorMsg =
+            typeof errorDetail === 'object' ? errorDetail.message || errorMsg : String(errorDetail);
         }
         throw new Error(`任务失败：${errorMsg}`);
       }
@@ -452,7 +455,7 @@ async function main() {
     'no-watermark': false,
     output: 'generated_video.mp4',
     'poll-interval': DEFAULT_POLL_INTERVAL,
-    timeout: DEFAULT_TIMEOUT
+    timeout: DEFAULT_TIMEOUT,
   };
 
   // 解析命令行参数
@@ -508,13 +511,17 @@ async function main() {
     printInfo('='.repeat(50));
 
     // Step 1: 创建任务
-    const taskId = await createVideoTask(options.prompt, options.image.length > 0 ? options.image : null, {
-      model: options.model,
-      duration: options.duration,
-      ratio: options.ratio,
-      generateAudio: options.audio,
-      watermark: !options['no-watermark']
-    });
+    const taskId = await createVideoTask(
+      options.prompt,
+      options.image.length > 0 ? options.image : null,
+      {
+        model: options.model,
+        duration: options.duration,
+        ratio: options.ratio,
+        generateAudio: options.audio,
+        watermark: !options['no-watermark'],
+      },
+    );
 
     printInfo(`任务已创建: ${taskId}`);
 
@@ -558,7 +565,7 @@ async function main() {
 }
 
 // 捕获未处理的 Promise 拒绝
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', err => {
   printError(`未处理的错误: ${err.message}`);
   process.exit(1);
 });

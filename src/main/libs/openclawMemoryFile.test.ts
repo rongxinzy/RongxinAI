@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
   addMemoryEntry,
@@ -151,7 +151,7 @@ test('addMemoryEntry: skips duplicate (same fingerprint)', () => {
   try {
     const filePath = memFilePath(dir);
     addMemoryEntry(filePath, 'I prefer Python');
-    addMemoryEntry(filePath, 'I prefer Python');  // duplicate
+    addMemoryEntry(filePath, 'I prefer Python'); // duplicate
 
     const entries = parseMemoryMd(fs.readFileSync(filePath, 'utf-8'));
     expect(entries.length).toBe(1);
@@ -165,7 +165,7 @@ test('addMemoryEntry: deduplication is case-insensitive', () => {
   try {
     const filePath = memFilePath(dir);
     addMemoryEntry(filePath, 'I love coffee');
-    addMemoryEntry(filePath, 'i love coffee');  // same fingerprint
+    addMemoryEntry(filePath, 'i love coffee'); // same fingerprint
 
     const entries = parseMemoryMd(fs.readFileSync(filePath, 'utf-8'));
     expect(entries.length).toBe(1);
@@ -365,7 +365,9 @@ test('migrateSqliteToMemoryMd: migrates texts to MEMORY.md and marks done', () =
     let done = false;
     const source = {
       isMigrationDone: () => false,
-      markMigrationDone: () => { done = true; },
+      markMigrationDone: () => {
+        done = true;
+      },
       getActiveMemoryTexts: () => ['I live in Beijing', 'I prefer dark mode'],
     };
 
@@ -391,7 +393,9 @@ test('migrateSqliteToMemoryMd: skips duplicates that already exist in MEMORY.md'
     let done = false;
     const source = {
       isMigrationDone: () => false,
-      markMigrationDone: () => { done = true; },
+      markMigrationDone: () => {
+        done = true;
+      },
       getActiveMemoryTexts: () => ['I live in Beijing', 'I prefer Python'],
     };
 
@@ -413,7 +417,9 @@ test('migrateSqliteToMemoryMd: empty source marks done without writing file', ()
     let done = false;
     const source = {
       isMigrationDone: () => false,
-      markMigrationDone: () => { done = true; },
+      markMigrationDone: () => {
+        done = true;
+      },
       getActiveMemoryTexts: () => [],
     };
 

@@ -11,6 +11,7 @@ bash SKILLs/web-search/scripts/start-server.sh
 ```
 
 Expected output:
+
 ```
 ✓ Bridge Server started successfully (PID: 12345)
   Health check: http://127.0.0.1:8923/api/health
@@ -24,6 +25,7 @@ bash SKILLs/web-search/scripts/search.sh "TypeScript tutorial" 5
 ```
 
 Expected output:
+
 ```
 🔍 Searching for: "TypeScript tutorial"
 
@@ -110,6 +112,7 @@ curl http://127.0.0.1:8923/api/health
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -129,6 +132,7 @@ curl -X POST http://127.0.0.1:8923/api/browser/launch \
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -149,6 +153,7 @@ curl -X POST http://127.0.0.1:8923/api/browser/connect \
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -172,6 +177,7 @@ curl -X POST http://127.0.0.1:8923/api/search \
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -206,6 +212,7 @@ curl -X POST http://127.0.0.1:8923/api/page/screenshot \
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -301,6 +308,7 @@ Claude: Let me search for the latest information about React 19.
 **Problem:** Bridge Server fails to start
 
 **Solution:**
+
 ```bash
 # Check if port 8923 is already in use
 lsof -i :8923
@@ -319,6 +327,7 @@ npm run build
 **Problem:** Browser fails to launch
 
 **Solution:**
+
 - Install Google Chrome or Chromium
 - macOS: Download from https://www.google.com/chrome/
 - Linux: `sudo apt install chromium-browser`
@@ -329,6 +338,7 @@ npm run build
 **Problem:** Failed to connect to browser
 
 **Solution:**
+
 ```bash
 # Stop the server
 bash SKILLs/web-search/scripts/stop-server.sh
@@ -346,6 +356,7 @@ bash SKILLs/web-search/scripts/start-server.sh
 **Problem:** Search takes too long or times out
 
 **Solution:**
+
 - Check your internet connection
 - Try a different search query
 - Reduce max results (e.g., 3 instead of 10)

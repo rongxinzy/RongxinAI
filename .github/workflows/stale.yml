@@ -2,7 +2,7 @@ name: Stale
 
 on:
   schedule:
-    - cron: "30 1 * * *"
+    - cron: '30 1 * * *'
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           # Issues
           days-before-issue-stale: 60
           days-before-issue-close: 14
-          stale-issue-label: "stale"
+          stale-issue-label: 'stale'
           stale-issue-message: |
             This issue has been inactive for 60 days. It will be automatically closed in 14 days unless there is new activity.
 
@@ -30,7 +30,7 @@ jobs:
           # Pull Requests
           days-before-pr-stale: 30
           days-before-pr-close: 14
-          stale-pr-label: "stale"
+          stale-pr-label: 'stale'
           stale-pr-message: |
             This pull request has been inactive for 30 days. It will be automatically closed in 14 days unless there is new activity.
 
@@ -39,8 +39,8 @@ jobs:
             This pull request was automatically closed due to inactivity. Feel free to reopen it if you'd like to continue.
 
           # Exempt labels
-          exempt-issue-labels: "pinned,security,bug,enhancement"
-          exempt-pr-labels: "pinned,security,work-in-progress,wip"
+          exempt-issue-labels: 'pinned,security,bug,enhancement'
+          exempt-pr-labels: 'pinned,security,work-in-progress,wip'
 
           # Only label, don't close draft PRs
           exempt-draft-pr: true

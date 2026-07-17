@@ -63,18 +63,18 @@ function parseSSEEvents(raw) {
 
 function collectInputJsonDeltas(events) {
   return events
-    .filter((event) => event.event === 'content_block_delta')
-    .map((event) => event.data)
-    .filter((data) => data?.delta?.type === 'input_json_delta')
-    .map((data) => String(data.delta.partial_json ?? ''));
+    .filter(event => event.event === 'content_block_delta')
+    .map(event => event.data)
+    .filter(data => data?.delta?.type === 'input_json_delta')
+    .map(data => String(data.delta.partial_json ?? ''));
 }
 
 function collectToolUseStarts(events) {
   return events
-    .filter((event) => event.event === 'content_block_start')
-    .map((event) => event.data)
-    .filter((data) => data?.content_block?.type === 'tool_use')
-    .map((data) => ({
+    .filter(event => event.event === 'content_block_start')
+    .map(event => event.data)
+    .filter(data => data?.content_block?.type === 'tool_use')
+    .map(data => ({
       id: String(data.content_block.id ?? ''),
       name: String(data.content_block.name ?? ''),
     }));
@@ -86,13 +86,7 @@ function runResponsesSequence(sequence) {
   const context = testUtils.createResponsesStreamContext();
 
   for (const step of sequence) {
-    testUtils.processResponsesStreamEvent(
-      response,
-      state,
-      context,
-      step.event,
-      step.payload
-    );
+    testUtils.processResponsesStreamEvent(response, state, context, step.event, step.payload);
   }
 
   const events = parseSSEEvents(response.getOutput());
@@ -106,7 +100,8 @@ function runResponsesSequence(sequence) {
 test('A: added -> delta* -> done emits exactly one final arguments payload', () => {
   const responseId = 'resp_a';
   const model = 'gpt-5.2';
-  const finalArguments = '{"questions":[{"header":"安全确认","question":"继续?","options":[{"label":"允许","description":"ok"},{"label":"拒绝","description":"no"}]}],"answers":{}}';
+  const finalArguments =
+    '{"questions":[{"header":"安全确认","question":"继续?","options":[{"label":"允许","description":"ok"},{"label":"拒绝","description":"no"}]}],"answers":{}}';
 
   const result = runResponsesSequence([
     {
@@ -290,7 +285,7 @@ test('C: delta before added keeps correct name/id and does not lose arguments', 
 
   assert.equal(result.inputJsonDeltas.length, 1);
   assert.equal(result.inputJsonDeltas[0], finalArguments);
-  assert.ok(result.toolUseStarts.some((item) => item.name === 'Skill'));
+  assert.ok(result.toolUseStarts.some(item => item.name === 'Skill'));
 });
 
 test('D: output_item.done + function_call_arguments.done emits arguments only once', () => {
@@ -532,8 +527,8 @@ test('F: two interleaved function calls keep arguments isolated', () => {
   ]);
 
   assert.equal(result.inputJsonDeltas.length, 2);
-  assert.equal(result.inputJsonDeltas.filter((item) => item === args1).length, 1);
-  assert.equal(result.inputJsonDeltas.filter((item) => item === args2).length, 1);
+  assert.equal(result.inputJsonDeltas.filter(item => item === args1).length, 1);
+  assert.equal(result.inputJsonDeltas.filter(item => item === args2).length, 1);
 });
 
 test('G: convertChatCompletionsRequestToResponsesRequest auto-injects missing function_call_output', () => {
@@ -560,10 +555,9 @@ test('G: convertChatCompletionsRequestToResponsesRequest auto-injects missing fu
   });
 
   const input = Array.isArray(request.input) ? request.input : [];
-  const autoInjected = input.find((item) => (
-    item?.type === 'function_call_output'
-    && item?.call_id === 'call_missing_output'
-  ));
+  const autoInjected = input.find(
+    item => item?.type === 'function_call_output' && item?.call_id === 'call_missing_output',
+  );
 
   assert.ok(autoInjected, 'expected proxy to auto-inject function_call_output');
   assert.equal(typeof autoInjected.output, 'string');

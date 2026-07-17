@@ -8,15 +8,14 @@ export const LLAMACPP_RUNNING_MODELS_CHANGED_EVENT = 'llamacpp:running-models-ch
 
 type ModelLike = Pick<Model, 'id' | 'providerKey'>;
 
-const sameModelIdentity = (modelA: ModelLike, modelB: ModelLike): boolean => (
-  modelA.id === modelB.id && (modelA.providerKey ?? '') === (modelB.providerKey ?? '')
-);
+const sameModelIdentity = (modelA: ModelLike, modelB: ModelLike): boolean =>
+  modelA.id === modelB.id && (modelA.providerKey ?? '') === (modelB.providerKey ?? '');
 
 export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   const models: Model[] = [];
 
   if (!config.providers) {
-    return config.model.availableModels.map((model) => ({
+    return config.model.availableModels.map(model => ({
       id: model.id,
       name: model.name,
       supportsImage: model.supportsImage ?? false,
@@ -31,7 +30,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
       return;
     }
 
-    providerConfig.models.forEach((model) => {
+    providerConfig.models.forEach(model => {
       models.push({
         id: model.id,
         name: model.name,
@@ -47,7 +46,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
     return models;
   }
 
-  return config.model.availableModels.map((model) => ({
+  return config.model.availableModels.map(model => ({
     id: model.id,
     name: model.name,
     supportsImage: model.supportsImage ?? false,
@@ -57,7 +56,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
 export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]): Model[] {
   const models: Model[] = [];
 
-  runningModels.forEach((model) => {
+  runningModels.forEach(model => {
     const name = model.name?.trim() || model.model?.trim() || model.id?.trim() || '';
     if (!name) {
       return;
@@ -86,8 +85,8 @@ export function mergeAvailableModels(
 ): Model[] {
   const merged = [...configuredModels];
 
-  llamaCppRunningModels.forEach((model) => {
-    if (!merged.some((existing) => sameModelIdentity(existing, model))) {
+  llamaCppRunningModels.forEach(model => {
+    if (!merged.some(existing => sameModelIdentity(existing, model))) {
       merged.push(model);
     }
   });

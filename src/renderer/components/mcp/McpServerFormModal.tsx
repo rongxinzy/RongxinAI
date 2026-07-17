@@ -1,6 +1,12 @@
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { Textarea } from '@shared/components/ui/textarea';
 import React, { useEffect, useState } from 'react';
 
@@ -58,20 +64,22 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
               value,
               required: requiredKeys.has(key) || undefined,
             }))
-          : []
+          : [],
       );
       setUrl(server.url || '');
       setHeaderRows(
         server.headers
           ? Object.entries(server.headers).map(([key, value]) => ({ key, value }))
-          : []
+          : [],
       );
     } else if (registryEntry) {
       // Registry install mode — pre-fill from template
       setName(registryEntry.name);
       const registryDescription =
-        (i18nService.getLanguage() === 'zh' ? registryEntry.description_zh : registryEntry.description_en)
-        || (registryEntry.descriptionKey ? i18nService.t(registryEntry.descriptionKey) : '');
+        (i18nService.getLanguage() === 'zh'
+          ? registryEntry.description_zh
+          : registryEntry.description_en) ||
+        (registryEntry.descriptionKey ? i18nService.t(registryEntry.descriptionKey) : '');
       setDescription(registryDescription);
       setTransportType(registryEntry.transportType);
       setCommand(registryEntry.command);
@@ -262,245 +270,267 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       : i18nService.t('addMcpServer');
 
   // Save button text
-  const saveText = isRegistry && !isEdit
-    ? i18nService.t('mcpInstall')
-    : i18nService.t('saveMcpServer');
+  const saveText =
+    isRegistry && !isEdit ? i18nService.t('mcpInstall') : i18nService.t('saveMcpServer');
 
   return (
-    <Modal onClose={onClose} overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60" className="w-full max-w-lg mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6 max-h-[80vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <div className="text-lg font-semibold text-foreground">
-            {modalTitle}
-          </div>
+    <Modal
+      onClose={onClose}
+      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="w-full max-w-lg mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6 max-h-[80vh] overflow-y-auto"
+    >
+      <div className="flex items-center justify-between mb-5">
+        <div className="text-lg font-semibold text-foreground">{modalTitle}</div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Name */}
+        <div className="space-y-1.5">
+          <label className={labelClass}>
+            {i18nService.t('mcpServerName')}
+            <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+          </label>
+          <Input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder={i18nService.t('mcpServerNamePlaceholder')}
+            className={isRegistry ? readOnlyInputClass : inputClass}
+            readOnly={isRegistry}
+            autoFocus={!isRegistry}
+          />
         </div>
 
-        <div className="space-y-4">
-          {/* Name */}
-          <div className="space-y-1.5">
-            <label className={labelClass}>{i18nService.t('mcpServerName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={i18nService.t('mcpServerNamePlaceholder')}
-              className={isRegistry ? readOnlyInputClass : inputClass}
-              readOnly={isRegistry}
-              autoFocus={!isRegistry}
-            />
-          </div>
+        {/* Description */}
+        <div className="space-y-1.5">
+          <label className={labelClass}>{i18nService.t('mcpServerDescription')}</label>
+          <Input
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder={i18nService.t('mcpServerDescriptionPlaceholder')}
+            className={inputClass}
+          />
+        </div>
 
-          {/* Description */}
-          <div className="space-y-1.5">
-            <label className={labelClass}>{i18nService.t('mcpServerDescription')}</label>
-            <Input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={i18nService.t('mcpServerDescriptionPlaceholder')}
-              className={inputClass}
-            />
-          </div>
+        {/* Transport Type */}
+        <div className="space-y-1.5">
+          <label className={labelClass}>{i18nService.t('mcpTransportType')}</label>
+          <Select
+            value={transportType}
+            onValueChange={value => setTransportType(value as 'stdio' | 'sse' | 'http')}
+            disabled={isRegistry}
+          >
+            <SelectTrigger className={isRegistry ? readOnlyInputClass : inputClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="stdio">{i18nService.t('mcpTransportStdio')}</SelectItem>
+              <SelectItem value="sse">{i18nService.t('mcpTransportSse')}</SelectItem>
+              <SelectItem value="http">{i18nService.t('mcpTransportHttp')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Transport Type */}
-          <div className="space-y-1.5">
-            <label className={labelClass}>{i18nService.t('mcpTransportType')}</label>
-            <Select
-              value={transportType}
-              onValueChange={(value) => setTransportType(value as 'stdio' | 'sse' | 'http')}
-              disabled={isRegistry}
-            >
-              <SelectTrigger className={isRegistry ? readOnlyInputClass : inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="stdio">{i18nService.t('mcpTransportStdio')}</SelectItem>
-                <SelectItem value="sse">{i18nService.t('mcpTransportSse')}</SelectItem>
-                <SelectItem value="http">{i18nService.t('mcpTransportHttp')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* stdio fields */}
+        {transportType === 'stdio' && (
+          <>
+            <div className="space-y-1.5">
+              <label className={labelClass}>
+                {i18nService.t('mcpCommand')}
+                <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+              </label>
+              <Input
+                type="text"
+                value={command}
+                onChange={e => setCommand(e.target.value)}
+                placeholder={i18nService.t('mcpCommandPlaceholder')}
+                className={isRegistry ? readOnlyInputClass : inputClass}
+                readOnly={isRegistry}
+              />
+            </div>
 
-          {/* stdio fields */}
-          {transportType === 'stdio' && (
-            <>
-              <div className="space-y-1.5">
-                <label className={labelClass}>{i18nService.t('mcpCommand')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-                <Input
-                  type="text"
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  placeholder={i18nService.t('mcpCommandPlaceholder')}
-                  className={isRegistry ? readOnlyInputClass : inputClass}
-                  readOnly={isRegistry}
-                />
+            <div className="space-y-1.5">
+              <label className={labelClass}>{i18nService.t('mcpArgs')}</label>
+              <Textarea
+                value={argsText}
+                onChange={e => setArgsText(e.target.value)}
+                placeholder={i18nService.t('mcpArgsPlaceholder')}
+                rows={3}
+                className={inputClass + ' resize-none'}
+                autoFocus={isRegistry}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className={labelClass}>
+                  {i18nService.t('mcpEnvVars')}
+                  {isRegistry && envRows.some(r => r.required) && (
+                    <span className="ml-2 text-[10px] text-red-400 font-normal">
+                      * {i18nService.t('mcpRequiredConfig')}
+                    </span>
+                  )}
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAddEnvRow}
+                  className="h-auto px-0 text-xs text-primary hover:text-primary/80"
+                >
+                  + {i18nService.t('addKeyValue')}
+                </Button>
               </div>
-
-              <div className="space-y-1.5">
-                <label className={labelClass}>{i18nService.t('mcpArgs')}</label>
-                <Textarea
-                  value={argsText}
-                  onChange={(e) => setArgsText(e.target.value)}
-                  placeholder={i18nService.t('mcpArgsPlaceholder')}
-                  rows={3}
-                  className={inputClass + ' resize-none'}
-                  autoFocus={isRegistry}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className={labelClass}>
-                    {i18nService.t('mcpEnvVars')}
-                    {isRegistry && envRows.some(r => r.required) && (
-                      <span className="ml-2 text-[10px] text-red-400 font-normal">
-                        * {i18nService.t('mcpRequiredConfig')}
-                      </span>
-                    )}
-                  </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddEnvRow}
-                    className="h-auto px-0 text-xs text-primary hover:text-primary/80"
-                  >
-                    + {i18nService.t('addKeyValue')}
-                  </Button>
-                </div>
-                {envRows.map((row, index) => (
-                  <div key={index} className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        value={row.key}
-                        onChange={(e) => handleUpdateEnvRow(index, 'key', e.target.value)}
-                        placeholder={i18nService.t('mcpHeaderKey')}
-                        className={row.required ? kvInputClass + ' opacity-60 cursor-not-allowed' : kvInputClass}
-                        readOnly={!!row.required}
-                      />
-                      <Input
-                        type="text"
-                        value={row.value}
-                        onChange={(e) => handleUpdateEnvRow(index, 'value', e.target.value)}
-                        placeholder={row.required ? `${row.key} *` : i18nService.t('mcpHeaderValue')}
-                        className={
-                          envErrors[index]
-                            ? kvInputClass + ' border-red-500 focus-visible:ring-red-500'
-                            : kvInputClass
-                        }
-                        autoFocus={isRegistry && index === 0 && !!row.required}
-                      />
-                      {!row.required && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveEnvRow(index)}
-                          className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 shrink-0"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                          </svg>
-                        </Button>
-                      )}
-                      {row.required && (
-                        <span className="text-red-400 text-xs shrink-0 w-4 text-center">*</span>
-                      )}
-                    </div>
-                    {envErrors[index] && row.required && (
-                      <p className="text-xs text-red-500 ml-[calc(50%+8px)]">
-                        {i18nService.t('mcpEnvRequired')}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* sse / http fields */}
-          {(transportType === 'sse' || transportType === 'http') && (
-            <>
-              <div className="space-y-1.5">
-                <label className={labelClass}>{i18nService.t('mcpUrl')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-                <Input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder={i18nService.t('mcpUrlPlaceholder')}
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className={labelClass}>{i18nService.t('mcpHeaders')}</label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddHeaderRow}
-                    className="h-auto px-0 text-xs text-primary hover:text-primary/80"
-                  >
-                    + {i18nService.t('addKeyValue')}
-                  </Button>
-                </div>
-                {headerRows.map((row, index) => (
-                  <div key={index} className="flex items-center gap-2">
+              {envRows.map((row, index) => (
+                <div key={index} className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
                     <Input
                       type="text"
                       value={row.key}
-                      onChange={(e) => handleUpdateHeaderRow(index, 'key', e.target.value)}
+                      onChange={e => handleUpdateEnvRow(index, 'key', e.target.value)}
                       placeholder={i18nService.t('mcpHeaderKey')}
-                      className={kvInputClass}
+                      className={
+                        row.required
+                          ? kvInputClass + ' opacity-60 cursor-not-allowed'
+                          : kvInputClass
+                      }
+                      readOnly={!!row.required}
                     />
                     <Input
                       type="text"
                       value={row.value}
-                      onChange={(e) => handleUpdateHeaderRow(index, 'value', e.target.value)}
-                      placeholder={i18nService.t('mcpHeaderValue')}
-                      className={kvInputClass}
+                      onChange={e => handleUpdateEnvRow(index, 'value', e.target.value)}
+                      placeholder={row.required ? `${row.key} *` : i18nService.t('mcpHeaderValue')}
+                      className={
+                        envErrors[index]
+                          ? kvInputClass + ' border-red-500 focus-visible:ring-red-500'
+                          : kvInputClass
+                      }
+                      autoFocus={isRegistry && index === 0 && !!row.required}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveHeaderRow(index)}
-                      className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 shrink-0"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                      </svg>
-                    </Button>
+                    {!row.required && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveEnvRow(index)}
+                        className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 shrink-0"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          className="w-4 h-4"
+                        >
+                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                        </svg>
+                      </Button>
+                    )}
+                    {row.required && (
+                      <span className="text-red-400 text-xs shrink-0 w-4 text-center">*</span>
+                    )}
                   </div>
-                ))}
-              </div>
-            </>
-          )}
+                  {envErrors[index] && row.required && (
+                    <p className="text-xs text-red-500 ml-[calc(50%+8px)]">
+                      {i18nService.t('mcpEnvRequired')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
-          {error && (
-            <div className="text-xs text-red-500">{error}</div>
-          )}
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSaving}
-              className="h-8 px-3 text-xs"
-            >
-              {i18nService.t('cancel')}
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="h-8 px-3 text-xs"
-            >
-              {isSaving ? i18nService.t('testing') : saveText}
-            </Button>
-          </div>
+        {/* sse / http fields */}
+        {(transportType === 'sse' || transportType === 'http') && (
+          <>
+            <div className="space-y-1.5">
+              <label className={labelClass}>
+                {i18nService.t('mcpUrl')}
+                <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+              </label>
+              <Input
+                type="text"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                placeholder={i18nService.t('mcpUrlPlaceholder')}
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className={labelClass}>{i18nService.t('mcpHeaders')}</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAddHeaderRow}
+                  className="h-auto px-0 text-xs text-primary hover:text-primary/80"
+                >
+                  + {i18nService.t('addKeyValue')}
+                </Button>
+              </div>
+              {headerRows.map((row, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    value={row.key}
+                    onChange={e => handleUpdateHeaderRow(index, 'key', e.target.value)}
+                    placeholder={i18nService.t('mcpHeaderKey')}
+                    className={kvInputClass}
+                  />
+                  <Input
+                    type="text"
+                    value={row.value}
+                    onChange={e => handleUpdateHeaderRow(index, 'value', e.target.value)}
+                    placeholder={i18nService.t('mcpHeaderValue')}
+                    className={kvInputClass}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveHeaderRow(index)}
+                    className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 shrink-0"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="w-4 h-4"
+                    >
+                      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                    </svg>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {error && <div className="text-xs text-red-500">{error}</div>}
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSaving}
+            className="h-8 px-3 text-xs"
+          >
+            {i18nService.t('cancel')}
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="h-8 px-3 text-xs"
+          >
+            {isSaving ? i18nService.t('testing') : saveText}
+          </Button>
         </div>
+      </div>
     </Modal>
   );
 };

@@ -67,7 +67,12 @@ export function makeCheck(
 }
 
 export function makeMissingCredentialsCheck(fields = 'botToken'): IMConnectivityCheck {
-  return makeCheck('missing_credentials', 'fail', `Missing required credentials: ${fields}`, `Please fill in ${fields}.`);
+  return makeCheck(
+    'missing_credentials',
+    'fail',
+    `Missing required credentials: ${fields}`,
+    `Please fill in ${fields}.`,
+  );
 }
 
 export function makeAuthCheckPass(username = 'test-bot'): IMConnectivityCheck {
@@ -75,7 +80,12 @@ export function makeAuthCheckPass(username = 'test-bot'): IMConnectivityCheck {
 }
 
 export function makeAuthCheckFail(reason = 'invalid token'): IMConnectivityCheck {
-  return makeCheck('auth_check', 'fail', `Authentication failed: ${reason}`, 'Please check your token.');
+  return makeCheck(
+    'auth_check',
+    'fail',
+    `Authentication failed: ${reason}`,
+    'Please check your token.',
+  );
 }
 
 export function makeGatewayRunningCheck(): IMConnectivityCheck {
@@ -85,7 +95,12 @@ export function makeGatewayRunningCheck(): IMConnectivityCheck {
 export function makeInboundActivityCheck(level: 'pass' | 'warn' = 'pass'): IMConnectivityCheck {
   return level === 'pass'
     ? makeCheck('inbound_activity', 'pass', 'Channel has active sessions.')
-    : makeCheck('inbound_activity', 'warn', 'No recent channel activity.', 'Send a test message to verify.');
+    : makeCheck(
+        'inbound_activity',
+        'warn',
+        'No recent channel activity.',
+        'Send a test message to verify.',
+      );
 }
 
 // ── Known platform list (source of truth: src/shared/platform/constants.ts) ──

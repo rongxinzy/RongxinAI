@@ -1,13 +1,7 @@
 ﻿import path from 'node:path';
 
-import type {
-  LlamaCppModelLaunchInput,
-  LlamaCppRunningModel,
-} from '../../shared/llamacpp';
-import {
-  LlamaCppModelLaunchLogLevel,
-  LlamaCppModelLaunchLogPhase,
-} from '../../shared/llamacpp';
+import type { LlamaCppModelLaunchInput, LlamaCppRunningModel } from '../../shared/llamacpp';
+import { LlamaCppModelLaunchLogLevel, LlamaCppModelLaunchLogPhase } from '../../shared/llamacpp';
 import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 import {
   classifyLlamaCppModelLoadError,
@@ -92,10 +86,7 @@ export async function loadLlamaCppModelWithRetry<T>(
       const failureReason = classifyLlamaCppModelLoadError(error);
       attempts.push({ attemptIndex, input: currentInput, failureReason });
 
-      if (
-        attemptIndex >= maxRetries ||
-        !isRetryableLlamaCppModelLoadError(failureReason)
-      ) {
+      if (attemptIndex >= maxRetries || !isRetryableLlamaCppModelLoadError(failureReason)) {
         throw toRetryFailureError(error, failureReason);
       }
 
@@ -118,7 +109,6 @@ export async function loadLlamaCppModelWithRetry<T>(
     reason: classifyLlamaCppModelLoadError(undefined),
   });
 }
-
 
 function describeRetryAttempt(
   input: LlamaCppModelLaunchInput,
@@ -181,7 +171,12 @@ async function unloadTargetModelBeforeRetry(input: {
   const targetModel = runningModels.find(model => shouldUnloadBeforeRetry(model, input.modelName));
   if (!targetModel) return;
 
-  const modelName = (targetModel.name || targetModel.model || targetModel.id || input.modelName).trim();
+  const modelName = (
+    targetModel.name ||
+    targetModel.model ||
+    targetModel.id ||
+    input.modelName
+  ).trim();
   if (!modelName) return;
   await input.unloadModel(modelName);
 }

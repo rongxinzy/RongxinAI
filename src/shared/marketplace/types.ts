@@ -12,7 +12,8 @@ export const MarketplaceCapability = {
   Vision: 'vision',
 } as const;
 
-export type MarketplaceCapability = typeof MarketplaceCapability[keyof typeof MarketplaceCapability];
+export type MarketplaceCapability =
+  (typeof MarketplaceCapability)[keyof typeof MarketplaceCapability];
 
 export type MarketplaceModel = {
   source: MarketplaceSource;

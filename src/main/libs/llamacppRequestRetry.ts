@@ -31,10 +31,8 @@ export async function retryLlamaCppReadRequest<T>(
 }
 
 function isRetryableReadError(error: unknown): boolean {
-  return error instanceof TypeError || (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    error.name === 'AbortError'
+  return (
+    error instanceof TypeError ||
+    (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError')
   );
 }

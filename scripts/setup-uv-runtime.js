@@ -62,15 +62,17 @@ function getWindowsUvAsset() {
   if (arch === 'ARM64') {
     return {
       archive: 'uv-aarch64-pc-windows-msvc.zip',
-      url: process.env.ZHIYUAN_PORTABLE_UV_URL
-        || `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-aarch64-pc-windows-msvc.zip`,
+      url:
+        process.env.ZHIYUAN_PORTABLE_UV_URL ||
+        `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-aarch64-pc-windows-msvc.zip`,
     };
   }
 
   return {
     archive: 'uv-x86_64-pc-windows-msvc.zip',
-    url: process.env.ZHIYUAN_PORTABLE_UV_URL
-      || `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-pc-windows-msvc.zip`,
+    url:
+      process.env.ZHIYUAN_PORTABLE_UV_URL ||
+      `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-pc-windows-msvc.zip`,
   };
 }
 
@@ -149,7 +151,9 @@ async function resolveArchive(required) {
     if (!isNonEmptyFile(envArchive)) {
       throw new Error(`ZHIYUAN_PORTABLE_UV_ARCHIVE points to an invalid file: ${envArchive}`);
     }
-    console.log(`[setup-uv-runtime] Using local archive from ZHIYUAN_PORTABLE_UV_ARCHIVE: ${envArchive}`);
+    console.log(
+      `[setup-uv-runtime] Using local archive from ZHIYUAN_PORTABLE_UV_ARCHIVE: ${envArchive}`,
+    );
     return { archivePath: envArchive, source: 'env-archive' };
   }
 
@@ -163,20 +167,22 @@ async function resolveArchive(required) {
     console.log(`[setup-uv-runtime] Downloading runtime from: ${asset.url}`);
     await downloadArchive(asset.url, DEFAULT_ARCHIVE_PATH);
     const fileSizeMB = (fs.statSync(DEFAULT_ARCHIVE_PATH).size / 1024 / 1024).toFixed(1);
-    console.log(`[setup-uv-runtime] Downloaded archive (${fileSizeMB} MB): ${DEFAULT_ARCHIVE_PATH}`);
+    console.log(
+      `[setup-uv-runtime] Downloaded archive (${fileSizeMB} MB): ${DEFAULT_ARCHIVE_PATH}`,
+    );
     return { archivePath: DEFAULT_ARCHIVE_PATH, source: 'download' };
   } catch (error) {
     if (required) {
       throw new Error(
-        'Unable to obtain portable uv runtime archive. '
-        + 'Set ZHIYUAN_PORTABLE_UV_ARCHIVE to a local offline package or '
-        + 'set ZHIYUAN_PORTABLE_UV_URL to a reachable mirror. '
-        + `Original error: ${error instanceof Error ? error.message : String(error)}`
+        'Unable to obtain portable uv runtime archive. ' +
+          'Set ZHIYUAN_PORTABLE_UV_ARCHIVE to a local offline package or ' +
+          'set ZHIYUAN_PORTABLE_UV_URL to a reachable mirror. ' +
+          `Original error: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
     console.warn(
-      '[setup-uv-runtime] Runtime archive is not available; skip because --required is not set. '
-      + `Reason: ${error instanceof Error ? error.message : String(error)}`
+      '[setup-uv-runtime] Runtime archive is not available; skip because --required is not set. ' +
+        `Reason: ${error instanceof Error ? error.message : String(error)}`,
     );
     return null;
   }
@@ -228,12 +234,13 @@ function findPortableUvExecutables(baseDir = OUTPUT_DIR) {
 
 async function ensurePortableUvRuntime(options = {}) {
   const required = Boolean(options.required);
-  const shouldRun = process.platform === 'win32'
-    || required
-    || process.env.ZHIYUAN_SETUP_UV_RUNTIME_FORCE === '1';
+  const shouldRun =
+    process.platform === 'win32' || required || process.env.ZHIYUAN_SETUP_UV_RUNTIME_FORCE === '1';
 
   if (!shouldRun) {
-    console.log('[setup-uv-runtime] Skip on non-Windows host (pass --required to force cross-platform preparation).');
+    console.log(
+      '[setup-uv-runtime] Skip on non-Windows host (pass --required to force cross-platform preparation).',
+    );
     return { ok: true, skipped: true, uvPath: null, uvxPath: null };
   }
 
@@ -256,8 +263,8 @@ async function ensurePortableUvRuntime(options = {}) {
   const finalHealth = checkRuntimeHealth(OUTPUT_DIR);
   if (!finalHealth.ok) {
     throw new Error(
-      'Portable uv runtime is missing required executables after preparation: '
-      + finalHealth.missing.join(', ')
+      'Portable uv runtime is missing required executables after preparation: ' +
+        finalHealth.missing.join(', '),
     );
   }
 
@@ -273,8 +280,11 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error('[setup-uv-runtime] ERROR:', error instanceof Error ? error.message : String(error));
+  main().catch(error => {
+    console.error(
+      '[setup-uv-runtime] ERROR:',
+      error instanceof Error ? error.message : String(error),
+    );
     process.exit(1);
   });
 }

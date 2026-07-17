@@ -4,7 +4,12 @@ import os from 'os';
 import path from 'path';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { AgentAvatarSvg, DefaultAgentAvatarIcon, DefaultAgentProfile, encodeAgentAvatarIcon } from '../shared/agent';
+import {
+  AgentAvatarSvg,
+  DefaultAgentAvatarIcon,
+  DefaultAgentProfile,
+  encodeAgentAvatarIcon,
+} from '../shared/agent';
 
 vi.mock('electron', () => ({
   app: {
@@ -66,8 +71,11 @@ const createLegacyDatabase = (userDataPath: string): void => {
     );
   `);
 
-  db.prepare('INSERT INTO cowork_config (key, value, updated_at) VALUES (?, ?, ?)')
-    .run('workingDirectory', '/repo/legacy', now);
+  db.prepare('INSERT INTO cowork_config (key, value, updated_at) VALUES (?, ?, ?)').run(
+    'workingDirectory',
+    '/repo/legacy',
+    now,
+  );
   db.prepare(
     `INSERT INTO agents (
       id, name, description, system_prompt, identity, model, icon, skill_ids,
@@ -90,8 +98,10 @@ test('backfills agent working directories from legacy cowork config only once', 
 
   const store = await SqliteStore.create(userDataPath);
   const db = store.getDatabase();
-  const rows = db.prepare('SELECT id, working_directory FROM agents ORDER BY id')
-    .all() as Array<{ id: string; working_directory: string }>;
+  const rows = db.prepare('SELECT id, working_directory FROM agents ORDER BY id').all() as Array<{
+    id: string;
+    working_directory: string;
+  }>;
 
   expect(rows).toEqual([
     { id: 'docs', working_directory: '/repo/legacy' },
@@ -102,7 +112,8 @@ test('backfills agent working directories from legacy cowork config only once', 
   store.close();
 
   const reopenedStore = await SqliteStore.create(userDataPath);
-  const reopenedRows = reopenedStore.getDatabase()
+  const reopenedRows = reopenedStore
+    .getDatabase()
     .prepare('SELECT id, working_directory FROM agents ORDER BY id')
     .all() as Array<{ id: string; working_directory: string }>;
 
@@ -119,9 +130,9 @@ test('upgrades legacy default agent name during migration', async () => {
   createLegacyDatabase(userDataPath);
 
   const store = await SqliteStore.create(userDataPath);
-  const row = store.getDatabase()
-    .prepare("SELECT name FROM agents WHERE id = 'main'")
-    .get() as { name: string };
+  const row = store.getDatabase().prepare("SELECT name FROM agents WHERE id = 'main'").get() as {
+    name: string;
+  };
 
   expect(row.name).toBe(DefaultAgentProfile.Name);
 
@@ -153,7 +164,8 @@ test('migrates legacy agent icons to the default svg avatar', async () => {
   db.close();
 
   const store = await SqliteStore.create(userDataPath);
-  const rows = store.getDatabase()
+  const rows = store
+    .getDatabase()
     .prepare('SELECT id, icon FROM agents ORDER BY id')
     .all() as Array<{ id: string; icon: string }>;
 
@@ -172,10 +184,10 @@ test('adds agent pin columns during migration', async () => {
   createLegacyDatabase(userDataPath);
 
   const store = await SqliteStore.create(userDataPath);
-  const columns = store.getDatabase()
-    .pragma('table_info(agents)') as Array<{ name: string }>;
-  const columnNames = columns.map((column) => column.name);
-  const rows = store.getDatabase()
+  const columns = store.getDatabase().pragma('table_info(agents)') as Array<{ name: string }>;
+  const columnNames = columns.map(column => column.name);
+  const rows = store
+    .getDatabase()
     .prepare('SELECT id, pinned, pin_order FROM agents ORDER BY id')
     .all() as Array<{ id: string; pinned: number; pin_order: number | null }>;
 

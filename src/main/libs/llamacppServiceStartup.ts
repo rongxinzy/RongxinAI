@@ -10,7 +10,7 @@ export const LlamaCppServiceStartupFailureCode = {
 } as const;
 
 export type LlamaCppServiceStartupFailureCode =
-  typeof LlamaCppServiceStartupFailureCode[keyof typeof LlamaCppServiceStartupFailureCode];
+  (typeof LlamaCppServiceStartupFailureCode)[keyof typeof LlamaCppServiceStartupFailureCode];
 
 export const LlamaCppServiceStartupReason = {
   LoadModel: 'load-model',
@@ -20,7 +20,7 @@ export const LlamaCppServiceStartupReason = {
 } as const;
 
 export type LlamaCppServiceStartupReason =
-  typeof LlamaCppServiceStartupReason[keyof typeof LlamaCppServiceStartupReason];
+  (typeof LlamaCppServiceStartupReason)[keyof typeof LlamaCppServiceStartupReason];
 
 export type LlamaCppServiceEnsureSuccess = {
   success: true;
@@ -185,17 +185,13 @@ export async function ensureLlamaCppServiceRunning(
   };
 }
 
-export function classifyLlamaCppServiceStartupFailure(
-  input: LlamaCppServiceStartupFailureInput,
-): {
+export function classifyLlamaCppServiceStartupFailure(input: LlamaCppServiceStartupFailureInput): {
   code: LlamaCppServiceStartupFailureCode;
   detail?: string;
 } {
-  const statuses = [
-    input.detectedStatus,
-    input.startStatus,
-    input.initialStatus,
-  ].filter((status): status is LlamaCppStatusSnapshot => Boolean(status));
+  const statuses = [input.detectedStatus, input.startStatus, input.initialStatus].filter(
+    (status): status is LlamaCppStatusSnapshot => Boolean(status),
+  );
   const combinedText = statuses
     .map(status => `${status.status}\n${status.error ?? ''}`)
     .join('\n')
@@ -315,7 +311,9 @@ function logRunningLlamaCppService(
 ): void {
   if (status.managedByApp) {
     const pidText = status.pid ? ` with pid ${status.pid}` : '';
-    logger.log(`[LlamaCpp] service is already running ${reasonPhrase}, managed by this app${pidText}`);
+    logger.log(
+      `[LlamaCpp] service is already running ${reasonPhrase}, managed by this app${pidText}`,
+    );
     return;
   }
   logger.log(

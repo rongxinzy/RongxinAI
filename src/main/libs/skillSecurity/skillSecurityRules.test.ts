@@ -1,6 +1,6 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
-import { ALL_SECURITY_RULES,getRulesForFile } from './skillSecurityRules';
+import { ALL_SECURITY_RULES, getRulesForFile } from './skillSecurityRules';
 
 function getRuleIds(relativePath: string) {
   return getRulesForFile(relativePath).map((r: { id: string }) => r.id);

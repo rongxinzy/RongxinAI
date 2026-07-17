@@ -95,7 +95,8 @@ if (!openclawConfig || !openclawConfig.version) {
 }
 
 const desiredVersion = openclawConfig.version;
-const repoUrl = process.env.OPENCLAW_REPO || openclawConfig.repo || 'https://github.com/openclaw/openclaw.git';
+const repoUrl =
+  process.env.OPENCLAW_REPO || openclawConfig.repo || 'https://github.com/openclaw/openclaw.git';
 const openclawSrc = process.env.OPENCLAW_SRC || path.resolve(rootDir, '..', 'openclaw');
 
 log(`Desired OpenClaw version: ${desiredVersion}`);
@@ -106,9 +107,9 @@ const gitBin = resolveGitExecutable();
 if (!gitBin) {
   die(
     'git is required but not found.' +
-    (process.platform === 'win32'
-      ? ' Install Git for Windows or run `npm run setup:mingit` first.'
-      : '')
+      (process.platform === 'win32'
+        ? ' Install Git for Windows or run `npm run setup:mingit` first.'
+        : ''),
   );
 }
 
@@ -116,10 +117,9 @@ if (!gitBin) {
 if (!fs.existsSync(openclawSrc)) {
   log(`Cloning ${repoUrl} at tag ${desiredVersion} ...`);
   try {
-    git(
-      ['clone', '--branch', desiredVersion, '--depth', '1', repoUrl, openclawSrc],
-      { stdio: 'inherit' }
-    );
+    git(['clone', '--branch', desiredVersion, '--depth', '1', repoUrl, openclawSrc], {
+      stdio: 'inherit',
+    });
   } catch (e) {
     die(`Failed to clone OpenClaw: ${e.message}`);
   }
@@ -165,7 +165,9 @@ const tagCheck = gitExitCode(['rev-parse', '--verify', `refs/tags/${desiredVersi
   cwd: openclawSrc,
 });
 if (tagCheck !== 0) {
-  die(`Tag ${desiredVersion} not found in the OpenClaw repository. Check openclaw.version in package.json.`);
+  die(
+    `Tag ${desiredVersion} not found in the OpenClaw repository. Check openclaw.version in package.json.`,
+  );
 }
 
 // Discard any local modifications and untracked files (typically build artifacts

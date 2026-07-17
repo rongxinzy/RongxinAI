@@ -17,23 +17,25 @@ official: true
 
 ## 5 Writing Styles
 
-| Style ID | Name | Characteristics | Word Count | Use Cases |
-|----------|------|-----------------|------------|-----------|
-| `deep-analysis` | 深度分析 | Rigorous structure, data-backed | 2000-4000 words | Trend analysis, in-depth reporting |
-| `practical-guide` | 实用指南 | Clear steps, highly actionable | 1500-3000 words | Tool tutorials, how-to guides |
-| `story-driven` | 故事驱动 | Conversational, emotional resonance | 1500-2500 words | Personal stories, case reviews |
-| `opinion` | 观点评论 | Sharp opening, pros/cons argumentation | 1000-2000 words | Hot takes, controversial topics |
-| `news-brief` | 新闻简报 | Inverted pyramid, fact-focused | 500-1000 words | Breaking news, information roundups |
+| Style ID          | Name     | Characteristics                        | Word Count      | Use Cases                           |
+| ----------------- | -------- | -------------------------------------- | --------------- | ----------------------------------- |
+| `deep-analysis`   | 深度分析 | Rigorous structure, data-backed        | 2000-4000 words | Trend analysis, in-depth reporting  |
+| `practical-guide` | 实用指南 | Clear steps, highly actionable         | 1500-3000 words | Tool tutorials, how-to guides       |
+| `story-driven`    | 故事驱动 | Conversational, emotional resonance    | 1500-2500 words | Personal stories, case reviews      |
+| `opinion`         | 观点评论 | Sharp opening, pros/cons argumentation | 1000-2000 words | Hot takes, controversial topics     |
+| `news-brief`      | 新闻简报 | Inverted pyramid, fact-focused         | 500-1000 words  | Breaking news, information roundups |
 
 ## Workflow
 
 ### Step 1: Read the Brief
 
 Obtain topic information from:
+
 1. Entries with status `planned` in `content_calendar.json`
 2. Topic description directly provided by the user
 
 Extract key information:
+
 - Topic direction / title
 - Target audience
 - Writing style (if not specified, recommend based on topic content)
@@ -43,13 +45,13 @@ Extract key information:
 
 If user hasn't specified, recommend based on topic:
 
-| Topic Characteristics | Recommended Style |
-|----------------------|-------------------|
-| Involves data, trends, underlying causes | `deep-analysis` |
-| "How to", "tutorial", "steps" | `practical-guide` |
-| Involves people, experiences, insights | `story-driven` |
-| Involves controversy, hot topic commentary | `opinion` |
-| Breaking events, quick information | `news-brief` |
+| Topic Characteristics                      | Recommended Style |
+| ------------------------------------------ | ----------------- |
+| Involves data, trends, underlying causes   | `deep-analysis`   |
+| "How to", "tutorial", "steps"              | `practical-guide` |
+| Involves people, experiences, insights     | `story-driven`    |
+| Involves controversy, hot topic commentary | `opinion`         |
+| Breaking events, quick information         | `news-brief`      |
 
 Confirm the style choice with the user.
 
@@ -64,6 +66,7 @@ node "$SKILLS_ROOT/content-planner/scripts/wechat_search.js" "topic keywords" -n
 Also use web-search skill for additional materials.
 
 Organize material list:
+
 - Citable data/statistics
 - Reference cases/stories
 - Facts that need verification
@@ -158,6 +161,7 @@ After approval, write content paragraph by paragraph following the outline.
 5. **Use short sentences and line breaks**
 
 **Data integrity rules:**
+
 - If specific data is needed but uncertain, mark `[数据待确认]` and confirm with user
 - Use search tools to verify key facts
 - Can tell fictional stories using "我见过..." or "一个朋友...", but don't fabricate data
@@ -172,6 +176,7 @@ After approval, write content paragraph by paragraph following the outline.
 4. **Must have a clear CTA at the end** (follow/share/comment prompt)
 
 **Markdown Formatting Standards:**
+
 - No first-line indentation, use blank lines to separate paragraphs
 - Maximum 2 heading levels (`##`), no deep nesting
 - Bold only the 1-2 most important words per paragraph
@@ -215,14 +220,14 @@ Content...
 
 Use these psychological strategies:
 
-| Strategy | Description | Example |
-|----------|-------------|---------|
-| Suspense | Spark curiosity | "为什么我放弃了年薪50万的工作" |
-| Benefit | Clarify reader gains | "掌握这3个技巧，效率提升200%" |
-| Pain Point | Hit reader anxiety | "别让这个习惯毁了你的职业生涯" |
-| Numbers | Specific and tangible | "50%的人都误解了这个真相" |
-| Rhetorical | Stimulate thinking | "你真的了解AI吗？" |
-| Contrast | Create contrast | "BAT vs 创业公司：差别在哪" |
+| Strategy   | Description           | Example                        |
+| ---------- | --------------------- | ------------------------------ |
+| Suspense   | Spark curiosity       | "为什么我放弃了年薪50万的工作" |
+| Benefit    | Clarify reader gains  | "掌握这3个技巧，效率提升200%"  |
+| Pain Point | Hit reader anxiety    | "别让这个习惯毁了你的职业生涯" |
+| Numbers    | Specific and tangible | "50%的人都误解了这个真相"      |
+| Rhetorical | Stimulate thinking    | "你真的了解AI吗？"             |
+| Contrast   | Create contrast       | "BAT vs 创业公司：差别在哪"    |
 
 ### Step 2: Score and Filter
 

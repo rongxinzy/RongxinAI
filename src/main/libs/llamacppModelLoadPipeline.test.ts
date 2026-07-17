@@ -9,10 +9,7 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
-import {
-  LlamaCppModelLoadError,
-  LlamaCppModelLoadFailureReason,
-} from './llamacppModelLoadErrors';
+import { LlamaCppModelLoadError, LlamaCppModelLoadFailureReason } from './llamacppModelLoadErrors';
 import { loadLlamaCppModelThroughPipeline } from './llamacppModelLoadPipeline';
 
 describe('llamacppModelLoadPipeline', () => {
@@ -34,18 +31,23 @@ describe('llamacppModelLoadPipeline', () => {
       detectService: async () => runningService(),
     });
 
-    expect(loadModel).toHaveBeenCalledWith(expect.objectContaining({
-      options: expect.objectContaining({
-        device: '0',
-        gpuLayers: 'auto',
+    expect(loadModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          device: '0',
+          gpuLayers: 'auto',
+        }),
       }),
-    }));
+    );
     expect(result.finalInput.options?.device).toBe('0');
     expect(result.runningModels).toHaveLength(1);
   });
 
   test('keeps cpu launch input unchanged for cpu runtime', async () => {
-    const launchInput: LlamaCppModelLaunchInput = { model: 'qwen.gguf', options: { ctxSize: 2048 } };
+    const launchInput: LlamaCppModelLaunchInput = {
+      model: 'qwen.gguf',
+      options: { ctxSize: 2048 },
+    };
     const loadModel = vi.fn(async () => ({
       success: true as const,
       runningModels: [runningModel('qwen.gguf')],
@@ -99,17 +101,19 @@ describe('llamacppModelLoadPipeline', () => {
       runningModels: [runningModel('qwen.gguf')],
     }));
 
-    await expect(loadLlamaCppModelThroughPipeline({
-      launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
-      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
-      runtimeCapabilities: gpuCapabilities(0),
-      nvidiaSnapshot: availableSnapshot([]),
-      modelSizeBytes: gib(7),
-      loadModel,
-      listModels: async () => [],
-      listRunningModels: async () => [],
-      detectService: async () => runningService(),
-    })).rejects.toMatchObject({
+    await expect(
+      loadLlamaCppModelThroughPipeline({
+        launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
+        runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+        runtimeCapabilities: gpuCapabilities(0),
+        nvidiaSnapshot: availableSnapshot([]),
+        modelSizeBytes: gib(7),
+        loadModel,
+        listModels: async () => [],
+        listRunningModels: async () => [],
+        detectService: async () => runningService(),
+      }),
+    ).rejects.toMatchObject({
       reason: LlamaCppModelLoadFailureReason.GpuNotFound,
     } satisfies Partial<LlamaCppModelLoadError>);
 
@@ -117,15 +121,17 @@ describe('llamacppModelLoadPipeline', () => {
   });
 
   test('maps a non-loaded settle result to a startup timeout failure', async () => {
-    await expect(loadLlamaCppModelThroughPipeline({
-      launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
-      runtimeBackend: LlamaCppRuntimeBackend.Cpu,
-      loadModel: async () => ({ success: true, runningModels: [] }),
-      listModels: async () => [loadedModel('qwen.gguf', 'loading')],
-      listRunningModels: async () => [],
-      detectService: async () => runningService(),
-      startupBudgetMs: 0,
-    })).rejects.toMatchObject({
+    await expect(
+      loadLlamaCppModelThroughPipeline({
+        launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
+        runtimeBackend: LlamaCppRuntimeBackend.Cpu,
+        loadModel: async () => ({ success: true, runningModels: [] }),
+        listModels: async () => [loadedModel('qwen.gguf', 'loading')],
+        listRunningModels: async () => [],
+        detectService: async () => runningService(),
+        startupBudgetMs: 0,
+      }),
+    ).rejects.toMatchObject({
       reason: LlamaCppModelLoadFailureReason.StartupTimeout,
     } satisfies Partial<LlamaCppModelLoadError>);
   });
@@ -146,7 +152,9 @@ function gpuCapabilities(
   };
 }
 
-function availableSnapshot(gpus: Array<{ index: number; memoryFreeMiB: number }>): NvidiaSmiSnapshot {
+function availableSnapshot(
+  gpus: Array<{ index: number; memoryFreeMiB: number }>,
+): NvidiaSmiSnapshot {
   return {
     source: 'nvidia-smi',
     available: true,

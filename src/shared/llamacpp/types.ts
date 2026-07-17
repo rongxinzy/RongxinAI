@@ -112,26 +112,26 @@ export type LlamaCppBackendListResult = {
 
 export type LlamaCppRuntimeInstallPlan =
   | {
-    kind: 'ready';
-    executablePath: string;
-  }
+      kind: 'ready';
+      executablePath: string;
+    }
   | {
-    kind: 'download';
-    targetId: string;
-    runtimeRoot: string;
-    executablePath: string;
-    url: string;
-    fallbackUrls?: string[];
-    companionDownloads?: Array<{
-      assetName: string;
+      kind: 'download';
+      targetId: string;
+      runtimeRoot: string;
+      executablePath: string;
       url: string;
       fallbackUrls?: string[];
-    }>;
-  }
+      companionDownloads?: Array<{
+        assetName: string;
+        url: string;
+        fallbackUrls?: string[];
+      }>;
+    }
   | {
-    kind: 'needs-manual';
-    message: string;
-  };
+      kind: 'needs-manual';
+      message: string;
+    };
 
 export type LlamaCppRuntimeInstallResult = {
   success: boolean;

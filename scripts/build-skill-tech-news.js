@@ -21,7 +21,7 @@ esbuild.buildSync({
   outfile: path.resolve(
     __dirname,
     '..',
-    'SKILLs/technology-news-search/scripts/vendor/rss-parser.bundle.js'
+    'SKILLs/technology-news-search/scripts/vendor/rss-parser.bundle.js',
   ),
   minify: true,
 });

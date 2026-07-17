@@ -9,7 +9,8 @@ export function getDefaultLlamaCppModelsDir(input: {
   userDataPath: string;
 }): string {
   if (input.platform === 'win32') {
-    const localAppDataPath = input.localAppDataPath?.trim() || path.join(path.dirname(input.appDataPath), 'Local');
+    const localAppDataPath =
+      input.localAppDataPath?.trim() || path.join(path.dirname(input.appDataPath), 'Local');
     return path.join(localAppDataPath, DEFAULT_WINDOWS_MODEL_LIBRARY_APP_DIR, 'models');
   }
 

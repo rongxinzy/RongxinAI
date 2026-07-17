@@ -1,12 +1,7 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Button21st } from '@shared/components/ui/button-21st';
-import {
-  Card,
-  CardAction,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
+import { Card, CardAction, CardHeader, CardTitle } from '@shared/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -15,11 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@shared/components/ui/hover-card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { Box, Play, Square } from 'lucide-react';
@@ -56,10 +47,7 @@ import {
   reorderLocalModelOrder,
   writeLocalModelOrder,
 } from '../utils/modelOrder';
-import {
-  type LocalModelProvider,
-  resolveLocalModelProvider,
-} from '../utils/modelProvider';
+import { type LocalModelProvider, resolveLocalModelProvider } from '../utils/modelProvider';
 import { formatBytes, formatDate } from '../utils/progress';
 
 const modelProviderIconMap = {
@@ -78,7 +66,8 @@ const modelProviderIconMap = {
 } satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
 const MODEL_CARD_MAX_VISIBLE_TAGS = 6;
-const modelCardTagClassName = 'h-7 rounded-md bg-background px-2.5 py-0 text-xs font-normal shadow-none';
+const modelCardTagClassName =
+  'h-7 rounded-md bg-background px-2.5 py-0 text-xs font-normal shadow-none';
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -91,7 +80,10 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
-  renderLoadButton?: (model: LlamaCppModel, props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
+  renderLoadButton?: (
+    model: LlamaCppModel,
+    props: { disabled: boolean; onClick: () => void },
+  ) => React.ReactNode;
   showRegisteredModelsTitle?: boolean;
 };
 
@@ -198,7 +190,6 @@ export function ModelsPanel({
 
   return (
     <div className="flex flex-col gap-6">
-
       <section className="flex flex-col gap-3">
         {showRegisteredModelsTitle ? (
           <h2 className="text-sm font-semibold text-foreground">
@@ -223,7 +214,9 @@ export function ModelsPanel({
                 onDragOver={event => event.preventDefault()}
                 onDrop={event => handleCardDrop(event, model.name)}
                 onDragEnd={() => setDraggedModelName(null)}
-                renderLoadButton={renderLoadButton ? props => renderLoadButton(model, props) : undefined}
+                renderLoadButton={
+                  renderLoadButton ? props => renderLoadButton(model, props) : undefined
+                }
               />
             ))}
           </div>
@@ -232,7 +225,7 @@ export function ModelsPanel({
 
       <Dialog
         open={Boolean(pendingDeleteModel)}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           if (!open) setPendingDeleteModel(null);
         }}
       >
@@ -242,15 +235,13 @@ export function ModelsPanel({
             <DialogDescription>
               {pendingDeleteRunningModel
                 ? i18nService.t('localInferenceDeleteRunningBlocked')
-                : i18nService.t('localInferenceDeleteConfirmMessage').replace('{name}', pendingDeleteDisplayName)}
+                : i18nService
+                    .t('localInferenceDeleteConfirmMessage')
+                    .replace('{name}', pendingDeleteDisplayName)}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPendingDeleteModel(null)}
-            >
+            <Button type="button" variant="outline" onClick={() => setPendingDeleteModel(null)}>
               {i18nService.t('cancel')}
             </Button>
             <Button
@@ -321,11 +312,7 @@ function ModelCard({
         dragging && 'opacity-50',
       )}
     >
-      <div
-        className={cn(
-          'absolute inset-x-0 top-0 h-0.5 bg-transparent',
-        )}
-      />
+      <div className={cn('absolute inset-x-0 top-0 h-0.5 bg-transparent')} />
       {isRunning ? (
         <span
           aria-label={i18nService.t('localInferenceStatus_running')}
@@ -349,7 +336,9 @@ function ModelCard({
               className="[animation-duration:2s]"
             />
             <span>
-              {i18nService.t(unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading')}
+              {i18nService.t(
+                unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading',
+              )}
             </span>
           </Button21st>
           {loadingModel ? (
@@ -381,12 +370,7 @@ function ModelCard({
 
         {modifiedDate ? (
           <div className="col-start-1 row-start-2 flex items-center gap-1 text-xs leading-4 text-muted-foreground">
-            <img
-              src={clockIconUrl}
-              alt=""
-              aria-hidden="true"
-              className="size-3.5 shrink-0"
-            />
+            <img src={clockIconUrl} alt="" aria-hidden="true" className="size-3.5 shrink-0" />
             <span>{modifiedDate}</span>
           </div>
         ) : null}
@@ -434,11 +418,7 @@ function ModelCard({
           ) : renderLoadButton ? (
             renderLoadButton({ disabled: buttonsDisabled, onClick: onLoadModel })
           ) : (
-            <Button21st
-              type="button"
-              isDisabled={buttonsDisabled}
-              onClick={onLoadModel}
-            >
+            <Button21st type="button" isDisabled={buttonsDisabled} onClick={onLoadModel}>
               <Play data-icon="inline-start" />
               {i18nService.t('start')}
             </Button21st>
@@ -448,7 +428,6 @@ function ModelCard({
     </Card>
   );
 }
-
 
 function LogButtonIcon() {
   return (
@@ -511,7 +490,9 @@ function getModelCardTags(
     formatModelTagValue(model.details?.parameter_size),
     formatModelTagValue(quantization),
     formatModelFormatTag(model.details?.format),
-    contextValue ? `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}` : null,
+    contextValue
+      ? `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`
+      : null,
   ]);
 }
 
@@ -597,11 +578,13 @@ function getPreferredContext(
   runningModel?: LlamaCppRunningModel,
   preference?: LlamaCppModelPreference,
 ): number | undefined {
-  return runningModel?.runtime_context_length
-    ?? preference?.ctxSize
-    ?? model.runtime_context_length
-    ?? model.trained_context_length
-    ?? model.details?.context_length;
+  return (
+    runningModel?.runtime_context_length ??
+    preference?.ctxSize ??
+    model.runtime_context_length ??
+    model.trained_context_length ??
+    model.details?.context_length
+  );
 }
 
 function formatContextValue(value: number): string {

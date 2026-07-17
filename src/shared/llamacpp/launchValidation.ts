@@ -14,9 +14,7 @@ export function resolveLlamaCppLaunchContext(input: {
   const requestedContextLength = normalizePositiveInteger(input.requestedContextLength);
   const trainedContextLength = normalizePositiveInteger(input.trainedContextLength);
   const clamped = Boolean(
-    requestedContextLength
-      && trainedContextLength
-      && requestedContextLength > trainedContextLength,
+    requestedContextLength && trainedContextLength && requestedContextLength > trainedContextLength,
   );
   return {
     effectiveContextLength: clamped ? trainedContextLength : requestedContextLength,

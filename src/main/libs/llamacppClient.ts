@@ -186,10 +186,12 @@ export class LlamaCppClient {
       ),
       body: JSON.stringify({
         model: modelName,
-        messages: [{
-          role: LlamaCppInferenceProbeMessage.Role,
-          content: LlamaCppInferenceProbeMessage.Content,
-        }],
+        messages: [
+          {
+            role: LlamaCppInferenceProbeMessage.Role,
+            content: LlamaCppInferenceProbeMessage.Content,
+          },
+        ],
         max_tokens: 1,
         stream: false,
       }),

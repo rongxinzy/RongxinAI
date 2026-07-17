@@ -24,9 +24,7 @@ test('resolveInitialAppWindowState uses the image-like default size on large dis
 });
 
 test('resolveInitialAppWindowState scales the default size to fit smaller displays', () => {
-  const state = resolveInitialAppWindowState(undefined, [
-    { x: 0, y: 0, width: 1000, height: 650 },
-  ]);
+  const state = resolveInitialAppWindowState(undefined, [{ x: 0, y: 0, width: 1000, height: 650 }]);
 
   expect(state.width).toBe(907);
   expect(state.height).toBe(602);
@@ -53,10 +51,9 @@ test('resolveInitialAppWindowState restores stored bounds on their matching disp
 });
 
 test('resolveInitialAppWindowState scales stale large-display bounds into the visible work area', () => {
-  const state = resolveInitialAppWindowState(
-    { x: 3000, y: 2000, width: 2048, height: 1360 },
-    [{ x: 0, y: 0, width: 1440, height: 900 }],
-  );
+  const state = resolveInitialAppWindowState({ x: 3000, y: 2000, width: 2048, height: 1360 }, [
+    { x: 0, y: 0, width: 1440, height: 900 },
+  ]);
 
   expect(state).toEqual({
     x: 79,

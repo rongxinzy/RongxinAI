@@ -38,7 +38,7 @@ export class BingSearch {
   async search(
     connectionId: string,
     query: string,
-    options: BingSearchOptions = {}
+    options: BingSearchOptions = {},
   ): Promise<SearchResponse> {
     const startTime = Date.now();
     const maxResults = options.maxResults || 10;
@@ -56,7 +56,7 @@ export class BingSearch {
 
       await page.goto(searchUrl, {
         waitUntil: 'domcontentloaded',
-        timeout: navigationTimeout
+        timeout: navigationTimeout,
       });
 
       console.log(`[Bing] Page loaded: ${page.url()}`);
@@ -73,13 +73,13 @@ export class BingSearch {
           results: [],
           totalResults: 0,
           timestamp: Date.now(),
-          duration: Date.now() - startTime
+          duration: Date.now() - startTime,
         };
       }
 
       // Extract search results using page.evaluate
       // Note: Code inside evaluate runs in browser context
-      const results = await page.evaluate((max) => {
+      const results = (await page.evaluate(max => {
         const items = document.querySelectorAll('li.b_algo');
         const extractedResults: Array<{
           title: string;
@@ -105,14 +105,14 @@ export class BingSearch {
                 url,
                 snippet,
                 source: 'bing',
-                position: i + 1
+                position: i + 1,
               });
             }
           }
         }
 
         return extractedResults;
-      }, maxResults) as SearchResult[];
+      }, maxResults)) as SearchResult[];
 
       const duration = Date.now() - startTime;
       console.log(`[Bing] Extracted ${results.length} results in ${duration}ms`);
@@ -123,11 +123,13 @@ export class BingSearch {
         results,
         totalResults: results.length,
         timestamp: Date.now(),
-        duration
+        duration,
       };
     } catch (error) {
       console.error(`[Bing] Search failed:`, error);
-      throw new Error(`Bing search failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Bing search failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -144,16 +146,18 @@ export class BingSearch {
     try {
       await page.goto(url, {
         waitUntil: 'domcontentloaded',
-        timeout: 15000
+        timeout: 15000,
       });
 
-      const content = await page.textContent('body') || '';
+      const content = (await page.textContent('body')) || '';
       console.log(`[Bing] Content retrieved (${content.length} chars)`);
 
       return content;
     } catch (error) {
       console.error(`[Bing] Failed to fetch content:`, error);
-      throw new Error(`Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

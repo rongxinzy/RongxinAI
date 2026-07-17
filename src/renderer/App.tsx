@@ -1,13 +1,10 @@
 import { Button } from '@shared/components/ui/button';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { MessageCircle } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo,useRef, useState } from 'react';
-import { useDispatch,useSelector } from 'react-redux';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
-import {
-  type AppUpdateRuntimeState,
-  AppUpdateStatus,
-} from '../shared/appUpdate/constants';
+import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate/constants';
 import { CoworkView } from './components/cowork';
 import CoworkPermissionModal from './components/cowork/CoworkPermissionModal';
 import CoworkQuestionWizard from './components/cowork/CoworkQuestionWizard';
@@ -27,7 +24,10 @@ import { defaultConfig } from './config';
 import type { ApiConfig } from './services/api';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
-import { collectAvailableModels, LLAMACPP_RUNNING_MODELS_CHANGED_EVENT } from './services/availableModels';
+import {
+  collectAvailableModels,
+  LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+} from './services/availableModels';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
@@ -51,7 +51,9 @@ const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
-  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert'>('cowork');
+  const [mainView, setMainView] = useState<
+    'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert'
+  >('cowork');
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -90,18 +92,18 @@ const App: React.FC = () => {
         }, timeoutMs);
 
         promise.then(
-          (value) => {
+          value => {
             window.clearTimeout(timer);
             resolve(value);
           },
-          (error) => {
+          error => {
             window.clearTimeout(timer);
             reject(error);
-          }
+          },
         );
       });
     },
-    []
+    [],
   );
 
   // 初始化应用
@@ -117,7 +119,11 @@ const App: React.FC = () => {
         const elapsed = Math.round(performance.now() - t0);
         const msg = `initializeApp: ${label} (+${elapsed}ms)`;
         console.info(`[App] ${msg}`);
-        try { window.electron?.log?.fromRenderer?.('info', 'App', msg); } catch { /* preload may not expose this yet */ }
+        try {
+          window.electron?.log?.fromRenderer?.('info', 'App', msg);
+        } catch {
+          /* preload may not expose this yet */
+        }
       };
 
       try {
@@ -158,10 +164,13 @@ const App: React.FC = () => {
         if (resolvedModels.length > 0) {
           dispatch(setAvailableModels(resolvedModels));
           const allModels = store.getState().model.availableModels;
-          const preferredModel = allModels.find(
-            model => model.id === config.model.defaultModel
-              && (!config.model.defaultModelProvider || model.providerKey === config.model.defaultModelProvider)
-          ) ?? allModels[0];
+          const preferredModel =
+            allModels.find(
+              model =>
+                model.id === config.model.defaultModel &&
+                (!config.model.defaultModelProvider ||
+                  model.providerKey === config.model.defaultModelProvider),
+            ) ?? allModels[0];
           dispatch(setDefaultSelectedModel(preferredModel));
         }
         mark('model resolution done');
@@ -169,16 +178,21 @@ const App: React.FC = () => {
         setIsInitialized(true);
         mark('shell ready');
 
-        void waitWithTimeout(scheduledTaskService.init(), 5000, 'scheduledTaskService.init').catch((error) => {
-          console.error('[App] initializeApp: scheduledTaskService.init failed:', error);
-        });
-
+        void waitWithTimeout(scheduledTaskService.init(), 5000, 'scheduledTaskService.init').catch(
+          error => {
+            console.error('[App] initializeApp: scheduledTaskService.init failed:', error);
+          },
+        );
       } catch (error) {
         const elapsed = Math.round(performance.now() - t0);
         const msg = error instanceof Error ? error.message : String(error);
         const detail = `initializeApp FAILED after ${elapsed}ms: ${msg}`;
         console.error(`[App] ${detail}`);
-        try { window.electron?.log?.fromRenderer?.('error', 'App', detail); } catch { /* best-effort */ }
+        try {
+          window.electron?.log?.fromRenderer?.('error', 'App', detail);
+        } catch {
+          /* best-effort */
+        }
         setInitError(i18nService.t('initializationError'));
         setIsInitialized(true);
       }
@@ -208,16 +222,22 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('config-updated', handleConfigUpdated);
-    window.addEventListener(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT, handleLlamaCppRunningModelsChanged);
+    window.addEventListener(
+      LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+      handleLlamaCppRunningModelsChanged,
+    );
     return () => {
       window.removeEventListener('config-updated', handleConfigUpdated);
-      window.removeEventListener(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT, handleLlamaCppRunningModelsChanged);
+      window.removeEventListener(
+        LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+        handleLlamaCppRunningModelsChanged,
+      );
     };
   }, [dispatch, isInitialized]);
 
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {
-      forceLanguageRefresh((prev) => prev + 1);
+      forceLanguageRefresh(prev => prev + 1);
     });
     return () => {
       unsubscribe();
@@ -277,8 +297,8 @@ const App: React.FC = () => {
     if (!isInitialized || !defaultSelectedModel?.id) return;
     const config = configService.getConfig();
     if (
-      config.model.defaultModel === defaultSelectedModel.id
-      && (config.model.defaultModelProvider ?? '') === (defaultSelectedModel.providerKey ?? '')
+      config.model.defaultModel === defaultSelectedModel.id &&
+      (config.model.defaultModelProvider ?? '') === (defaultSelectedModel.providerKey ?? '')
     ) {
       return;
     }
@@ -324,7 +344,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleToggleSidebar = useCallback(() => {
-    setIsSidebarCollapsed((prev) => !prev);
+    setIsSidebarCollapsed(prev => !prev);
   }, []);
 
   const handleNewChat = useCallback(() => {
@@ -334,9 +354,11 @@ const App: React.FC = () => {
     dispatch(clearSelection());
     setMainView('cowork');
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', {
-        detail: { clear: shouldClearInput },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('cowork:focus-input', {
+          detail: { clear: shouldClearInput },
+        }),
+      );
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
@@ -379,7 +401,7 @@ const App: React.FC = () => {
 
     void loadInitialUpdateState();
 
-    const unsubscribe = window.electron.appUpdate.onStateChanged((state) => {
+    const unsubscribe = window.electron.appUpdate.onStateChanged(state => {
       const previousStatus = previousUpdateStatusRef.current;
       previousUpdateStatusRef.current = state.status;
       setAppUpdateState(state);
@@ -387,7 +409,7 @@ const App: React.FC = () => {
       if (state.status === AppUpdateStatus.Ready && previousStatus !== AppUpdateStatus.Ready) {
         if (shouldInstallReadyUpdateRef.current && state.readyFilePath) {
           shouldInstallReadyUpdateRef.current = false;
-          void window.electron.appUpdate.installReady().then((installResult) => {
+          void window.electron.appUpdate.installReady().then(installResult => {
             if (!installResult.success) {
               showToast(installResult.error || i18nService.t('updateInstallFailed'));
             }
@@ -413,7 +435,7 @@ const App: React.FC = () => {
     setShowUpdateModal(true);
   }, [updateInfo]);
 
-const handleConfirmUpdate = useCallback(async () => {
+  const handleConfirmUpdate = useCallback(async () => {
     if (!updateInfo) return;
 
     if (appUpdateState.readyFilePath) {
@@ -425,7 +447,10 @@ const handleConfirmUpdate = useCallback(async () => {
       return;
     }
 
-    if (appUpdateState.status === AppUpdateStatus.Error || appUpdateState.status === AppUpdateStatus.Available) {
+    if (
+      appUpdateState.status === AppUpdateStatus.Error ||
+      appUpdateState.status === AppUpdateStatus.Available
+    ) {
       const isManualUrl = updateInfo.url.includes('#') || updateInfo.url.endsWith('/download-list');
       if (!isManualUrl) {
         shouldInstallReadyUpdateRef.current = appUpdateState.status === AppUpdateStatus.Available;
@@ -471,10 +496,13 @@ const handleConfirmUpdate = useCallback(async () => {
     await window.electron.appUpdate.retryDownload();
   }, [updateInfo]);
 
-  const handlePermissionResponse = useCallback(async (result: CoworkPermissionResult) => {
-    if (!pendingPermission) return;
-    await coworkService.respondToPermission(pendingPermission.requestId, result);
-  }, [pendingPermission]);
+  const handlePermissionResponse = useCallback(
+    async (result: CoworkPermissionResult) => {
+      if (!pendingPermission) return;
+      await coworkService.respondToPermission(pendingPermission.requestId, result);
+    },
+    [pendingPermission],
+  );
 
   const handleCloseSettings = () => {
     setShowSettings(false);
@@ -483,11 +511,13 @@ const handleConfirmUpdate = useCallback(async () => {
       apiKey: config.api.key,
       baseUrl: config.api.baseUrl,
     });
-    void collectAvailableModels(config).then((allModels) => {
-      if (allModels.length > 0) {
-        dispatch(setAvailableModels(allModels));
-      }
-    }).catch(() => undefined);
+    void collectAvailableModels(config)
+      .then(allModels => {
+        if (allModels.length > 0) {
+          dispatch(setAvailableModels(allModels));
+        }
+      })
+      .catch(() => undefined);
   };
 
   const isShortcutInputActive = () => {
@@ -618,10 +648,7 @@ const handleConfirmUpdate = useCallback(async () => {
 
     // 其他情况使用原有的权限模态框
     return (
-      <CoworkPermissionModal
-        permission={pendingPermission}
-        onRespond={handlePermissionResponse}
-      />
+      <CoworkPermissionModal permission={pendingPermission} onRespond={handlePermissionResponse} />
     );
   }, [pendingPermission, handlePermissionResponse]);
 
@@ -673,15 +700,10 @@ const handleConfirmUpdate = useCallback(async () => {
             </div>
             <div className="text-foreground text-xl font-medium text-center">{initError}</div>
             <div className="flex items-center gap-3">
-              <Button
-                onClick={() => window.electron.appInfo.relaunch()}
-              >
+              <Button onClick={() => window.electron.appInfo.relaunch()}>
                 {i18nService.t('restartApp')}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleShowSettings()}
-              >
+              <Button variant="outline" onClick={() => handleShowSettings()}>
                 {i18nService.t('openSettings')}
               </Button>
             </div>
@@ -702,111 +724,118 @@ const handleConfirmUpdate = useCallback(async () => {
   return (
     <TooltipProvider delay={400}>
       <div className="h-screen overflow-hidden flex flex-col bg-surface-raised">
-      {toastMessage && (
-        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
-      )}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar
-          onShowLogin={handleShowLogin}
-          onShowSettings={handleShowSettings}
-          activeView={mainView}
-          onShowSkills={handleShowSkills}
-          onShowCowork={handleShowCowork}
-          onShowScheduledTasks={handleShowScheduledTasks}
-          onShowMcp={handleShowMcp}
-          onShowLocalInference={handleShowLocalInference}
-          onShowExpert={handleShowExpert}
-          onNewChat={handleNewChat}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={handleToggleSidebar}
-          updateBadge={!isSidebarCollapsed ? updateBadge : null}
-          hideLogin={true}
-        />
-        <div className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}>
-          <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
-            <EngineStartupOverlay />
-            {hasMountedLocalInference && (
-              <div className={mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'}>
-                <LocalInferenceView
+        {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <Sidebar
+            onShowLogin={handleShowLogin}
+            onShowSettings={handleShowSettings}
+            activeView={mainView}
+            onShowSkills={handleShowSkills}
+            onShowCowork={handleShowCowork}
+            onShowScheduledTasks={handleShowScheduledTasks}
+            onShowMcp={handleShowMcp}
+            onShowLocalInference={handleShowLocalInference}
+            onShowExpert={handleShowExpert}
+            onNewChat={handleNewChat}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={handleToggleSidebar}
+            updateBadge={!isSidebarCollapsed ? updateBadge : null}
+            hideLogin={true}
+          />
+          <div
+            className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
+          >
+            <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
+              <EngineStartupOverlay />
+              {hasMountedLocalInference && (
+                <div
+                  className={
+                    mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
+                  }
+                >
+                  <LocalInferenceView
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    onToggleSidebar={handleToggleSidebar}
+                    onNewChat={handleNewChat}
+                    updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  />
+                </div>
+              )}
+              {mainView === 'skills' ? (
+                <SkillsView
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  onToggleSidebar={handleToggleSidebar}
+                  onNewChat={handleNewChat}
+                  onCreateSkillByChat={handleCreateSkillByChat}
+                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                />
+              ) : mainView === 'scheduledTasks' ? (
+                <ScheduledTasksView
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
                   updateBadge={isSidebarCollapsed ? updateBadge : null}
                 />
-              </div>
-            )}
-            {mainView === 'skills' ? (
-              <SkillsView
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={handleToggleSidebar}
-                onNewChat={handleNewChat}
-                onCreateSkillByChat={handleCreateSkillByChat}
-                updateBadge={isSidebarCollapsed ? updateBadge : null}
-                readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-              />
-            ) : mainView === 'scheduledTasks' ? (
-              <ScheduledTasksView
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={handleToggleSidebar}
-                onNewChat={handleNewChat}
-                updateBadge={isSidebarCollapsed ? updateBadge : null}
-              />
-            ) : mainView === 'mcp' ? (
-              <McpView
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={handleToggleSidebar}
-                onNewChat={handleNewChat}
-                updateBadge={isSidebarCollapsed ? updateBadge : null}
-              />
-            ) : mainView === 'expert' ? (
-              <ExpertView
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={handleToggleSidebar}
-                onNewChat={handleNewChat}
-                updateBadge={isSidebarCollapsed ? updateBadge : null}
-                readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                onCreateSkillByChat={handleCreateSkillByChat}
-              />
-            ) : mainView === 'localInference' ? null : (
-              <CoworkView
-                onRequestAppSettings={handleShowSettings}
-                onShowSkills={handleShowSkills}
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={handleToggleSidebar}
-                onNewChat={handleNewChat}
-                updateBadge={isSidebarCollapsed ? updateBadge : null}
-              />
-            )}
+              ) : mainView === 'mcp' ? (
+                <McpView
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  onToggleSidebar={handleToggleSidebar}
+                  onNewChat={handleNewChat}
+                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                />
+              ) : mainView === 'expert' ? (
+                <ExpertView
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  onToggleSidebar={handleToggleSidebar}
+                  onNewChat={handleNewChat}
+                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                  onCreateSkillByChat={handleCreateSkillByChat}
+                />
+              ) : mainView === 'localInference' ? null : (
+                <CoworkView
+                  onRequestAppSettings={handleShowSettings}
+                  onShowSkills={handleShowSkills}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  onToggleSidebar={handleToggleSidebar}
+                  onNewChat={handleNewChat}
+                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 设置窗口显示在所有主内容之上，但不影响主界面的交互 */}
-      {showSettings && (
-        <Settings
-          onClose={handleCloseSettings}
-          initialTab={settingsOptions.initialTab}
-          notice={settingsOptions.notice}
-          enterpriseConfig={enterpriseConfig}
-        />
-      )}
-      {showUpdateModal && updateInfo && (
-        <AppUpdateModal
-          updateState={appUpdateState}
-          onCancel={() => {
-            if (appUpdateState.status !== AppUpdateStatus.Downloading && appUpdateState.status !== AppUpdateStatus.Installing) {
-              setShowUpdateModal(false);
-            }
-          }}
-          onConfirm={handleConfirmUpdate}
-          onCancelDownload={handleCancelDownload}
-          onRetry={handleRetryUpdate}
-        />
-      )}
-      {permissionModal}
+        {/* 设置窗口显示在所有主内容之上，但不影响主界面的交互 */}
+        {showSettings && (
+          <Settings
+            onClose={handleCloseSettings}
+            initialTab={settingsOptions.initialTab}
+            notice={settingsOptions.notice}
+            enterpriseConfig={enterpriseConfig}
+          />
+        )}
+        {showUpdateModal && updateInfo && (
+          <AppUpdateModal
+            updateState={appUpdateState}
+            onCancel={() => {
+              if (
+                appUpdateState.status !== AppUpdateStatus.Downloading &&
+                appUpdateState.status !== AppUpdateStatus.Installing
+              ) {
+                setShowUpdateModal(false);
+              }
+            }}
+            onConfirm={handleConfirmUpdate}
+            onCancelDownload={handleCancelDownload}
+            onRetry={handleRetryUpdate}
+          />
+        )}
+        {permissionModal}
       </div>
     </TooltipProvider>
   );
 };
 
-export default App; 
+export default App;

@@ -1,10 +1,6 @@
-import { describe,expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
-import {
-  OpenClawApi,
-  OpenClawProviderId,
-  ProviderName,
-} from '../../shared/providers';
+import { OpenClawApi, OpenClawProviderId, ProviderName } from '../../shared/providers';
 
 const providerApiKeyEnvVar = (providerName: string): string => {
   const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
@@ -31,7 +27,10 @@ describe('providerApiKeyEnvVar', () => {
 });
 
 describe('env var stability on model switch', () => {
-  const simulateCollectEnvVars = (providers: Record<string, { enabled: boolean; apiKey: string }>, serverToken?: string) => {
+  const simulateCollectEnvVars = (
+    providers: Record<string, { enabled: boolean; apiKey: string }>,
+    serverToken?: string,
+  ) => {
     const env: Record<string, string> = {};
 
     if (serverToken) {
@@ -112,7 +111,10 @@ const mapApiTypeToOpenClawApi = (
 
 type ProviderDescriptor = {
   providerId: string;
-  resolveApi: (ctx: { apiType: 'anthropic' | 'openai' | undefined; baseURL: string }) => OpenClawProviderApi;
+  resolveApi: (ctx: {
+    apiType: 'anthropic' | 'openai' | undefined;
+    baseURL: string;
+  }) => OpenClawProviderApi;
   normalizeBaseUrl: (rawBaseUrl: string) => string;
   resolveSessionModelId?: (modelId: string) => string;
   modelDefaults?: Partial<{
@@ -361,7 +363,13 @@ describe('provider registry coverage', () => {
 
 import { buildProviderSelection } from './openclawConfigSync';
 
-const REQUIRED_SELECTION_KEYS = ['providerId', 'legacyModelId', 'sessionModelId', 'primaryModel', 'providerConfig'] as const;
+const REQUIRED_SELECTION_KEYS = [
+  'providerId',
+  'legacyModelId',
+  'sessionModelId',
+  'primaryModel',
+  'providerConfig',
+] as const;
 const REQUIRED_PROVIDER_CONFIG_KEYS = ['baseUrl', 'api', 'auth', 'models'] as const;
 const REQUIRED_MODEL_KEYS = ['id', 'name', 'api', 'input'] as const;
 
@@ -374,7 +382,11 @@ describe('buildProviderSelection contract', () => {
   };
 
   test('output has all required top-level keys', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+    });
     for (const key of REQUIRED_SELECTION_KEYS) {
       expect(result).toHaveProperty(key);
     }
@@ -386,7 +398,11 @@ describe('buildProviderSelection contract', () => {
   });
 
   test('providerConfig has all required keys', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.OpenAI, apiType: 'openai' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.OpenAI,
+      apiType: 'openai',
+    });
     for (const key of REQUIRED_PROVIDER_CONFIG_KEYS) {
       expect(result.providerConfig).toHaveProperty(key);
     }
@@ -401,7 +417,11 @@ describe('buildProviderSelection contract', () => {
   });
 
   test('model.id matches sessionModelId', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+    });
     expect(result.providerConfig.models[0].id).toBe(result.sessionModelId);
   });
 
@@ -411,12 +431,21 @@ describe('buildProviderSelection contract', () => {
   });
 
   test('model.input includes image for vision-supported models', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic', supportsImage: true });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+      supportsImage: true,
+    });
     expect(result.providerConfig.models[0].input).toContain('image');
   });
 
   test('apiKey uses env var placeholder for providers with resolveApiKey', () => {
-    const result = buildProviderSelection({ ...baseOptions, providerName: ProviderName.Anthropic, apiType: 'anthropic' });
+    const result = buildProviderSelection({
+      ...baseOptions,
+      providerName: ProviderName.Anthropic,
+      apiType: 'anthropic',
+    });
     expect(result.providerConfig.apiKey).toMatch(/^\$\{ZHIYUAN_APIKEY_/);
   });
 

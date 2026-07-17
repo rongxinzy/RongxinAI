@@ -3,7 +3,8 @@ export const CoworkSessionExpertSource = {
   Member: 'expert-package-member',
 } as const;
 
-export type CoworkSessionExpertSource = typeof CoworkSessionExpertSource[keyof typeof CoworkSessionExpertSource];
+export type CoworkSessionExpertSource =
+  (typeof CoworkSessionExpertSource)[keyof typeof CoworkSessionExpertSource];
 
 export interface CoworkSessionExpertSnapshot {
   expertId: string;

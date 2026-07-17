@@ -5,7 +5,8 @@ import { parseUserMessageForDisplay } from './userMessageDisplay';
 // ─── Helpers ────────────────────────────────────────────────
 
 const WIN_INBOUND = String.raw`C:\Users\yangwn\AppData\Roaming\ZhiYuanAgent\openclaw\state\media\inbound`;
-const MAC_INBOUND = '/Users/yangwn/Library/Application Support/ZhiYuanAgent/openclaw/state/media/inbound';
+const MAC_INBOUND =
+  '/Users/yangwn/Library/Application Support/ZhiYuanAgent/openclaw/state/media/inbound';
 
 const fileImg = (dir: string, name: string) => `${dir}${dir.includes('\\') ? '\\' : '/'}${name}`;
 
@@ -199,11 +200,7 @@ describe('Pattern B: 飞书 — after server-side stripFeishuSystemHeader', () =
 
 describe('System: / System (untrusted): timestamp lines', () => {
   test('generic channel system header stripped from text message', () => {
-    const input = [
-      'System: [2026-04-28 11:53:11 GMT+8] From user889589',
-      '',
-      '123',
-    ].join('\n');
+    const input = ['System: [2026-04-28 11:53:11 GMT+8] From user889589', '', '123'].join('\n');
 
     const result = parseUserMessageForDisplay(input);
     expect(result).toBe('123');

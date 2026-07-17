@@ -1,8 +1,6 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
-import {
-BindingKind, DeliveryMode,   OriginKind, SessionTarget,
-} from '../constants';
+import { BindingKind, DeliveryMode, OriginKind, SessionTarget } from '../constants';
 import { makeModel } from '../fixtures';
 import { IMTaskPolicy } from './imPolicy';
 
@@ -30,12 +28,16 @@ test('IMPolicy.getCreateDefaults: with telegram origin -> channel is telegram', 
 
 test('IMPolicy.getCreateDefaults: with non-im origin -> throws Error', () => {
   const policy = new IMTaskPolicy();
-  expect(() => policy.getCreateDefaults({ kind: OriginKind.Manual } as any)).toThrow(/Invalid origin/);
+  expect(() => policy.getCreateDefaults({ kind: OriginKind.Manual } as any)).toThrow(
+    /Invalid origin/,
+  );
 });
 
 test('IMPolicy.getCreateDefaults: with cowork origin -> throws Error', () => {
   const policy = new IMTaskPolicy();
-  expect(() => policy.getCreateDefaults({ kind: OriginKind.Cowork, sessionId: 's1' } as any)).toThrow(/Invalid origin/);
+  expect(() =>
+    policy.getCreateDefaults({ kind: OriginKind.Cowork, sessionId: 's1' } as any),
+  ).toThrow(/Invalid origin/);
 });
 
 test('IMPolicy.normalizeDraft: binding platform != delivery channel -> corrects delivery.channel', () => {
@@ -92,7 +94,10 @@ test('IMPolicy.onDeliveryChanged: from announce to different IM channel -> bindi
     binding: { kind: BindingKind.IMSession, platform: 'telegram', conversationId: 'c1' },
     delivery: { mode: DeliveryMode.Announce, channel: 'telegram' },
   });
-  const result = policy.onDeliveryChanged(draft, { mode: DeliveryMode.Announce, channel: 'discord' });
+  const result = policy.onDeliveryChanged(draft, {
+    mode: DeliveryMode.Announce,
+    channel: 'discord',
+  });
   expect(result.binding.kind).toBe(BindingKind.IMSession);
   expect((result.binding as any).platform).toBe('discord');
   expect((result.binding as any).conversationId).toBe('c1');

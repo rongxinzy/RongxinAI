@@ -9,8 +9,8 @@ import {
   SessionTarget as ST,
   WakeMode as WM,
 } from './constants';
-import type { ExecutionBinding,TaskOrigin } from './origin';
-import type { PolicyDelivery,PolicyTaskModel } from './policies/types';
+import type { ExecutionBinding, TaskOrigin } from './origin';
+import type { PolicyDelivery, PolicyTaskModel } from './policies/types';
 
 interface TaskOverrides {
   id?: string;

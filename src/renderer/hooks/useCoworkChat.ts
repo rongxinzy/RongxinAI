@@ -1,7 +1,10 @@
 import { useChat } from '@ai-sdk/react';
 import { useMemo, useRef } from 'react';
 
-import { CoworkChatTransport, type CoworkChatTransportOptions } from '../services/coworkChatTransport';
+import {
+  CoworkChatTransport,
+  type CoworkChatTransportOptions,
+} from '../services/coworkChatTransport';
 import type { CoworkPermissionResult } from '../types/cowork';
 
 export type UseCoworkChatOptions = CoworkChatTransportOptions;
@@ -26,17 +29,19 @@ export function useCoworkChat(options: UseCoworkChatOptions = {}) {
 
   const transport = useMemo(() => {
     // Reuse existing transport if sessionId hasn't changed.
-    if (transportRef.current
-      && transportRef.current.getSessionId() === (options.sessionId ?? null)) {
+    if (
+      transportRef.current &&
+      transportRef.current.getSessionId() === (options.sessionId ?? null)
+    ) {
       return transportRef.current;
     }
     const t = new CoworkChatTransport(options);
     transportRef.current = t;
     return t;
-  // Re-create transport only when session/agent/cwd change — `options` object
-  // identity is intentionally ignored (options.skills/options.systemPrompt are
-  // only read at sendMessage time, not needed for transport identity).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Re-create transport only when session/agent/cwd change — `options` object
+    // identity is intentionally ignored (options.skills/options.systemPrompt are
+    // only read at sendMessage time, not needed for transport identity).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.sessionId, options.agentId, options.cwd]);
 
   const chat = useChat({ transport });
@@ -45,7 +50,10 @@ export function useCoworkChat(options: UseCoworkChatOptions = {}) {
    * Bridge `addToolApprovalResponse` → Cowork's `respondToPermission`.
    * Call this when the user approves or denies a tool-approval-request.
    */
-  const respondToPermission = async (requestId: string, result: CoworkPermissionResult): Promise<boolean> => {
+  const respondToPermission = async (
+    requestId: string,
+    result: CoworkPermissionResult,
+  ): Promise<boolean> => {
     chat.addToolApprovalResponse({
       id: requestId,
       approved: result.behavior === 'allow',

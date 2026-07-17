@@ -42,12 +42,10 @@ test('parseManagedSessionKey handles canonical local session keys', () => {
 });
 
 test('buildManagedSessionKey emits canonical local session keys', () => {
-  expect(
-    buildManagedSessionKey('abc-123'),
-  ).toBe(`agent:${DEFAULT_MANAGED_AGENT_ID}:zhiyuan:abc-123`);
-  expect(
-    buildManagedSessionKey('abc-123', 'secondary'),
-  ).toBe('agent:secondary:zhiyuan:abc-123');
+  expect(buildManagedSessionKey('abc-123')).toBe(
+    `agent:${DEFAULT_MANAGED_AGENT_ID}:zhiyuan:abc-123`,
+  );
+  expect(buildManagedSessionKey('abc-123', 'secondary')).toBe('agent:secondary:zhiyuan:abc-123');
 });
 
 test('parseChannelSessionKey ignores managed local session keys', () => {
@@ -77,29 +75,31 @@ test('channel sync still recognizes real channel session keys', () => {
 test('channel sync stores the real OpenClaw session key when creating a mapping', () => {
   const createSessionMapping = vi.fn();
   const getDefaultCwd = vi.fn((agentId?: string) => `/tmp/${agentId || 'fallback'}`);
-  const createSession = vi.fn((
-    title: string,
-    cwd: string,
-    systemPrompt: string,
-    executionMode: 'local',
-    activeSkillIds: string[],
-    agentId: string,
-  ) => ({
-    id: 'cowork-1',
-    title,
-    claudeSessionId: null,
-    status: 'idle' as const,
-    pinned: false,
-    cwd,
-    systemPrompt,
-    modelOverride: '',
-    executionMode,
-    activeSkillIds,
-    agentId,
-    messages: [],
-    createdAt: 1,
-    updatedAt: 1,
-  }));
+  const createSession = vi.fn(
+    (
+      title: string,
+      cwd: string,
+      systemPrompt: string,
+      executionMode: 'local',
+      activeSkillIds: string[],
+      agentId: string,
+    ) => ({
+      id: 'cowork-1',
+      title,
+      claudeSessionId: null,
+      status: 'idle' as const,
+      pinned: false,
+      cwd,
+      systemPrompt,
+      modelOverride: '',
+      executionMode,
+      activeSkillIds,
+      agentId,
+      messages: [],
+      createdAt: 1,
+      updatedAt: 1,
+    }),
+  );
   const sync = new OpenClawChannelSessionSync({
     coworkStore: {
       getSession: () => null,

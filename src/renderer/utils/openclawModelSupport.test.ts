@@ -114,10 +114,12 @@ describe('resolveOpenClawModelSupport', () => {
 
 describe('buildOpenClawModelValidationTargets', () => {
   test('uses fallback model when primary is empty', () => {
-    expect(buildOpenClawModelValidationTargets({
-      primaryModelRef: '',
-      fallbackModelRef: 'openai/gpt-5.2',
-    })).toEqual([
+    expect(
+      buildOpenClawModelValidationTargets({
+        primaryModelRef: '',
+        fallbackModelRef: 'openai/gpt-5.2',
+      }),
+    ).toEqual([
       {
         kind: OpenClawModelValidationTargetKind.Primary,
         modelRef: 'openai/gpt-5.2',
@@ -126,14 +128,16 @@ describe('buildOpenClawModelValidationTargets', () => {
   });
 
   test('includes triage models when triage is enabled', () => {
-    expect(buildOpenClawModelValidationTargets({
-      primaryModelRef: 'openai/gpt-5.2',
-      triageOverride: {
-        enabled: true,
-        lightModelRef: 'llamacpp/qwen-local-runtime-small',
-        heavyModelRef: 'llamacpp/qwen-local-trained-small',
-      },
-    })).toEqual([
+    expect(
+      buildOpenClawModelValidationTargets({
+        primaryModelRef: 'openai/gpt-5.2',
+        triageOverride: {
+          enabled: true,
+          lightModelRef: 'llamacpp/qwen-local-runtime-small',
+          heavyModelRef: 'llamacpp/qwen-local-trained-small',
+        },
+      }),
+    ).toEqual([
       {
         kind: OpenClawModelValidationTargetKind.Primary,
         modelRef: 'openai/gpt-5.2',
@@ -150,13 +154,15 @@ describe('buildOpenClawModelValidationTargets', () => {
   });
 
   test('deduplicates repeated model refs', () => {
-    expect(buildOpenClawModelValidationTargets({
-      primaryModelRef: 'llamacpp/qwen-local-runtime-small',
-      triageOverride: {
-        enabled: true,
-        lightModelRef: 'llamacpp/qwen-local-runtime-small',
-      },
-    })).toEqual([
+    expect(
+      buildOpenClawModelValidationTargets({
+        primaryModelRef: 'llamacpp/qwen-local-runtime-small',
+        triageOverride: {
+          enabled: true,
+          lightModelRef: 'llamacpp/qwen-local-runtime-small',
+        },
+      }),
+    ).toEqual([
       {
         kind: OpenClawModelValidationTargetKind.Primary,
         modelRef: 'llamacpp/qwen-local-runtime-small',
@@ -167,20 +173,25 @@ describe('buildOpenClawModelValidationTargets', () => {
 
 describe('resolveFirstUnsupportedOpenClawModel', () => {
   test('returns the first failing target', () => {
-    expect(resolveFirstUnsupportedOpenClawModel([
-      {
-        kind: OpenClawModelValidationTargetKind.Primary,
-        modelRef: 'openai/gpt-5.2',
-      },
-      {
-        kind: OpenClawModelValidationTargetKind.TriageLight,
-        modelRef: 'llamacpp/qwen-local-runtime-small',
-      },
-      {
-        kind: OpenClawModelValidationTargetKind.TriageHeavy,
-        modelRef: 'llamacpp/qwen-local-trained-small',
-      },
-    ], baseModels)).toEqual({
+    expect(
+      resolveFirstUnsupportedOpenClawModel(
+        [
+          {
+            kind: OpenClawModelValidationTargetKind.Primary,
+            modelRef: 'openai/gpt-5.2',
+          },
+          {
+            kind: OpenClawModelValidationTargetKind.TriageLight,
+            modelRef: 'llamacpp/qwen-local-runtime-small',
+          },
+          {
+            kind: OpenClawModelValidationTargetKind.TriageHeavy,
+            modelRef: 'llamacpp/qwen-local-trained-small',
+          },
+        ],
+        baseModels,
+      ),
+    ).toEqual({
       modelRef: 'llamacpp/qwen-local-runtime-small',
       reason: OpenClawModelSupportReason.LocalModelRuntimeContextTooSmall,
       targetKind: OpenClawModelValidationTargetKind.TriageLight,
@@ -194,10 +205,12 @@ describe('resolveDraftOpenClawModelRef', () => {
   });
 
   test('preserves unresolved explicit refs', () => {
-    expect(resolveDraftOpenClawModelRef(
-      { id: '__invalid__', name: 'missing-local' } as Model,
-      'llamacpp/missing-local',
-    )).toBe('llamacpp/missing-local');
+    expect(
+      resolveDraftOpenClawModelRef(
+        { id: '__invalid__', name: 'missing-local' } as Model,
+        'llamacpp/missing-local',
+      ),
+    ).toBe('llamacpp/missing-local');
   });
 
   test('returns empty when the selection is cleared', () => {
@@ -207,17 +220,23 @@ describe('resolveDraftOpenClawModelRef', () => {
 
 describe('resolveOpenClawModelSupportMessageKey', () => {
   test('maps reasons to precise i18n keys', () => {
-    expect(resolveOpenClawModelSupportMessageKey(
-      OpenClawModelSupportReason.LocalModelNotRunning,
-    )).toBe('agentLlamaCppModelNotRunningHint');
-    expect(resolveOpenClawModelSupportMessageKey(
-      OpenClawModelSupportReason.LocalModelRuntimeContextUnknown,
-    )).toBe('agentLlamaCppContextUnknownHint');
-    expect(resolveOpenClawModelSupportMessageKey(
-      OpenClawModelSupportReason.LocalModelRuntimeContextTooSmall,
-    )).toBe('agentLlamaCppContextTooSmallHint');
-    expect(resolveOpenClawModelSupportMessageKey(
-      OpenClawModelSupportReason.LocalModelTrainedContextTooSmall,
-    )).toBe('agentLlamaCppTrainedContextTooSmallHint');
+    expect(
+      resolveOpenClawModelSupportMessageKey(OpenClawModelSupportReason.LocalModelNotRunning),
+    ).toBe('agentLlamaCppModelNotRunningHint');
+    expect(
+      resolveOpenClawModelSupportMessageKey(
+        OpenClawModelSupportReason.LocalModelRuntimeContextUnknown,
+      ),
+    ).toBe('agentLlamaCppContextUnknownHint');
+    expect(
+      resolveOpenClawModelSupportMessageKey(
+        OpenClawModelSupportReason.LocalModelRuntimeContextTooSmall,
+      ),
+    ).toBe('agentLlamaCppContextTooSmallHint');
+    expect(
+      resolveOpenClawModelSupportMessageKey(
+        OpenClawModelSupportReason.LocalModelTrainedContextTooSmall,
+      ),
+    ).toBe('agentLlamaCppTrainedContextTooSmallHint');
   });
 });

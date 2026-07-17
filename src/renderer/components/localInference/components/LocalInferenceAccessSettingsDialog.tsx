@@ -120,7 +120,7 @@ export function LocalInferenceAccessSettingsDialog({
               {i18nService.t('localInferenceAccessRequestExample')}
             </div>
             <pre className="overflow-x-auto rounded-md bg-background px-2.5 py-2 text-xs leading-5 text-foreground">
-{`POST ${endpointBase}/chat/completions
+              {`POST ${endpointBase}/chat/completions
 model: "${modelName}"`}
             </pre>
           </div>

@@ -13,10 +13,12 @@ test('finds marketplace download progress by repository id', () => {
     },
   };
 
-  expect(getMarketplaceInstallProgress(progress, {
-    id: 'modelscope-qwen3',
-    repoId: 'Qwen/Qwen3-0.6B-GGUF',
-  })).toBe(progress['Qwen/Qwen3-0.6B-GGUF']);
+  expect(
+    getMarketplaceInstallProgress(progress, {
+      id: 'modelscope-qwen3',
+      repoId: 'Qwen/Qwen3-0.6B-GGUF',
+    }),
+  ).toBe(progress['Qwen/Qwen3-0.6B-GGUF']);
 });
 
 test('falls back to the marketplace model id for progress events from alternate sources', () => {
@@ -29,8 +31,10 @@ test('falls back to the marketplace model id for progress events from alternate 
     },
   };
 
-  expect(getMarketplaceInstallProgress(progress, {
-    id: 'modelscope-qwen3',
-    repoId: 'Qwen/Qwen3-0.6B-GGUF',
-  })).toBe(progress['modelscope-qwen3']);
+  expect(
+    getMarketplaceInstallProgress(progress, {
+      id: 'modelscope-qwen3',
+      repoId: 'Qwen/Qwen3-0.6B-GGUF',
+    }),
+  ).toBe(progress['modelscope-qwen3']);
 });

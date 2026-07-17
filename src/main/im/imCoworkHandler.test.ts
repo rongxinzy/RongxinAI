@@ -6,7 +6,8 @@ import { IMCoworkHandler } from './imCoworkHandler';
 
 class FakeRuntime extends EventEmitter {
   startCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> = [];
-  continueCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> = [];
+  continueCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> =
+    [];
 
   async startSession(sessionId: string, prompt: string, options = {}) {
     this.startCalls.push({ sessionId, prompt, options });
@@ -19,8 +20,12 @@ class FakeRuntime extends EventEmitter {
   stopSession() {}
   stopAllSessions() {}
   respondToPermission() {}
-  isSessionActive() { return false; }
-  getSessionConfirmationMode() { return 'text'; }
+  isSessionActive() {
+    return false;
+  }
+  getSessionConfirmationMode() {
+    return 'text';
+  }
 }
 
 class FakeCoworkStore {
@@ -96,13 +101,15 @@ class FakeIMStore {
   }
 
   getSessionMapping(imConversationId: string, platform: string) {
-    return this.mappings.find((entry) => (
-      entry.imConversationId === imConversationId && entry.platform === platform
-    )) || null;
+    return (
+      this.mappings.find(
+        entry => entry.imConversationId === imConversationId && entry.platform === platform,
+      ) || null
+    );
   }
 
   getSessionMappingByCoworkSessionId(coworkSessionId: string) {
-    return this.mappings.find((entry) => entry.coworkSessionId === coworkSessionId) || null;
+    return this.mappings.find(entry => entry.coworkSessionId === coworkSessionId) || null;
   }
 
   createSessionMapping(imConversationId: string, platform: string, coworkSessionId: string) {
@@ -125,9 +132,9 @@ class FakeIMStore {
   }
 
   deleteSessionMapping(imConversationId: string, platform: string) {
-    this.mappings = this.mappings.filter((entry) => (
-      entry.imConversationId !== imConversationId || entry.platform !== platform
-    ));
+    this.mappings = this.mappings.filter(
+      entry => entry.imConversationId !== imConversationId || entry.platform !== platform,
+    );
   }
 }
 
@@ -191,12 +198,21 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
 
   const [session] = [...coworkStore.sessions.values()];
   expect(session).toBeTruthy();
+  expect((session.messages as Array<Record<string, unknown>>).map(message => message.type)).toEqual(
+    ['user', 'tool_use', 'tool_result', 'assistant'],
+  );
   expect(
-    (session.messages as Array<Record<string, unknown>>).map((message) => message.type),
-  ).toEqual(['user', 'tool_use', 'tool_result', 'assistant']);
-  expect(((session.messages as Array<Record<string, unknown>>)[1].metadata as Record<string, unknown>).toolName).toBe('cron');
-  expect(((session.messages as Array<Record<string, unknown>>)[1].metadata as Record<string, unknown>).toolInput as Record<string, unknown>).toHaveProperty('action', 'add');
-  expect(((session.messages as Array<Record<string, unknown>>)[2].metadata as Record<string, unknown>).isError).toBe(false);
+    ((session.messages as Array<Record<string, unknown>>)[1].metadata as Record<string, unknown>)
+      .toolName,
+  ).toBe('cron');
+  expect(
+    ((session.messages as Array<Record<string, unknown>>)[1].metadata as Record<string, unknown>)
+      .toolInput as Record<string, unknown>,
+  ).toHaveProperty('action', 'add');
+  expect(
+    ((session.messages as Array<Record<string, unknown>>)[2].metadata as Record<string, unknown>)
+      .isError,
+  ).toBe(false);
 
   handler.destroy();
 });
@@ -256,7 +272,7 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
   });
   runtime.emit('complete', session.id, null);
 
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
 
   expect(relayedReplies).toEqual([
     {
@@ -304,7 +320,7 @@ test('async reminder turns on channel-synced sessions are tracked lazily and rel
   });
   runtime.emit('complete', session.id, null);
 
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
 
   expect(relayedReplies).toEqual([
     {
@@ -330,7 +346,7 @@ test('falls back to normal agent execution when detector does not recognize a sc
   });
 
   const pending = handler.processMessage(createMessage({ content: '帮我总结一下今天的会议纪要' }));
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
 
   expect(runtime.startCalls.length).toBe(1);
   expect(runtime.startCalls[0].prompt).toBe('帮我总结一下今天的会议纪要');

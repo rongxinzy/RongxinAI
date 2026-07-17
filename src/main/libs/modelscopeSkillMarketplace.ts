@@ -105,8 +105,8 @@ export async function fetchModelScopeSkillMarketplace(
   const skills = Array.isArray(payload.data?.skills) ? payload.data.skills : [];
   const marketplace = curateFeaturedMarketplace(
     skills
-    .map(skill => toMarketplaceSkill(skill))
-    .filter((skill): skill is MarketplaceSkillRecord => skill !== null),
+      .map(skill => toMarketplaceSkill(skill))
+      .filter((skill): skill is MarketplaceSkillRecord => skill !== null),
   );
   return JSON.stringify({
     data: {
@@ -156,7 +156,7 @@ async function fetchModelScopeSkillsPage(input: {
       `[SkillMarketplace] ModelScope skills request failed: HTTP ${response.status}${detail ? ` ${detail}` : ''}`,
     );
   }
-  return await response.json() as { data?: { skills?: ModelScopeSkillRecord[] } };
+  return (await response.json()) as { data?: { skills?: ModelScopeSkillRecord[] } };
 }
 
 async function fetchModelScopeSkillDetail(
@@ -179,7 +179,7 @@ async function fetchModelScopeSkillDetail(
       `[SkillMarketplace] ModelScope skill detail request failed: HTTP ${response.status}${detail ? ` ${detail}` : ''}`,
     );
   }
-  const payload = await response.json() as { data?: ModelScopeSkillRecord };
+  const payload = (await response.json()) as { data?: ModelScopeSkillRecord };
   if (!payload.data) {
     throw new Error('[SkillMarketplace] ModelScope skill detail response is missing data');
   }
@@ -229,7 +229,10 @@ function toMarketplaceSkill(skill: ModelScopeSkillRecord): MarketplaceSkillRecor
 function buildLocalizedDescription(
   skill: ModelScopeSkillRecord,
 ): string | { zh: string; en: string } {
-  const zh = readNonEmptyString(skill.locales?.zh?.description) || readNonEmptyString(skill.description) || '';
+  const zh =
+    readNonEmptyString(skill.locales?.zh?.description) ||
+    readNonEmptyString(skill.description) ||
+    '';
   const en = readNonEmptyString(skill.locales?.en?.description) || zh;
   return { zh, en };
 }

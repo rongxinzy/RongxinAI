@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 const { IMStore } = require('../dist-electron/main/im/imStore.js');
 
-test('IMStore persists conversation reply routes by platform and conversation ID', (t) => {
+test('IMStore persists conversation reply routes by platform and conversation ID', t => {
   const db = new Database(':memory:');
   t.after(() => db.close());
   const store = new IMStore(db);

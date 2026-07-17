@@ -9,7 +9,7 @@ import { CopyButton } from './CopyButton';
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
   if (!model) return null;
-  return model.includes('/') ? (model.split('/').pop() || model) : model;
+  return model.includes('/') ? model.split('/').pop() || model : model;
 };
 
 export const AssistantBubble: React.FC<{

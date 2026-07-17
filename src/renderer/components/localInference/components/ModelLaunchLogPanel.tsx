@@ -51,10 +51,7 @@ export function ModelLaunchLogPanel({
 
   return (
     <Card className="border-border/80 bg-card/95 shadow-sm">
-      <Collapsible
-        open={!state.collapsed}
-        onOpenChange={open => onCollapsedChange(!open)}
-      >
+      <Collapsible open={!state.collapsed} onOpenChange={open => onCollapsedChange(!open)}>
         <CardHeader className="flex flex-row items-center gap-3 px-4 py-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex min-w-0 items-center gap-2">
@@ -66,24 +63,26 @@ export function ModelLaunchLogPanel({
             </div>
             <div className="truncate text-xs text-muted-foreground">
               {state.modelName
-                ? i18nService.t('localInferenceModelLaunchLogsForModel').replace('{name}', state.modelName)
+                ? i18nService
+                    .t('localInferenceModelLaunchLogsForModel')
+                    .replace('{name}', state.modelName)
                 : i18nService.t('localInferenceModelLaunchLogsWaiting')}
-              {state.collapsed && latestLog
-                ? ` · ${getPhaseLabel(latestLog.phase)}`
-                : ''}
+              {state.collapsed && latestLog ? ` · ${getPhaseLabel(latestLog.phase)}` : ''}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <CollapsibleTrigger render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={i18nService.t(state.collapsed ? 'expand' : 'collapse')}
-              >
-                {state.collapsed ? <ChevronRight /> : <ChevronDown />}
-              </Button>
-            } />
+            <CollapsibleTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={i18nService.t(state.collapsed ? 'expand' : 'collapse')}
+                >
+                  {state.collapsed ? <ChevronRight /> : <ChevronDown />}
+                </Button>
+              }
+            />
             <Button
               type="button"
               variant="ghost"
@@ -142,10 +141,12 @@ function LaunchLogRow({ log }: { log: LlamaCppModelLaunchLogEvent }) {
           <span className="font-medium text-foreground">{getPhaseLabel(log.phase)}</span>
         </div>
         {detailText ? (
-          <div className={cn(
-            'break-all rounded-md bg-muted px-2 py-1 font-mono leading-5 text-muted-foreground',
-            log.level === LlamaCppModelLaunchLogLevel.Error && 'text-destructive',
-          )}>
+          <div
+            className={cn(
+              'break-all rounded-md bg-muted px-2 py-1 font-mono leading-5 text-muted-foreground',
+              log.level === LlamaCppModelLaunchLogLevel.Error && 'text-destructive',
+            )}
+          >
             {detailText}
           </div>
         ) : null}

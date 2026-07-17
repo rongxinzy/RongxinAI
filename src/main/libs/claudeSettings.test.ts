@@ -52,9 +52,12 @@ test('resolveRawApiConfig forwards llama.cpp runtime metadata for the selected r
   expect(runningModel).not.toBeNull();
   updateLlamaCppRunningModels([runningModel!]);
 
-  setStoreGetter(() => ({
-    get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-local') : undefined),
-  } as never));
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-local') : undefined),
+      }) as never,
+  );
 
   const result = resolveRawApiConfig();
   expect(result.config).toEqual({
@@ -92,9 +95,12 @@ test('resolveAllEnabledProviderConfigs only exposes OpenClaw-eligible llama.cpp 
   });
   updateLlamaCppRunningModels([eligible!, fixableButIneligible!, unknownRuntime!]);
 
-  setStoreGetter(() => ({
-    get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-eligible') : undefined),
-  } as never));
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-eligible') : undefined),
+      }) as never,
+  );
 
   const providers = resolveAllEnabledProviderConfigs();
   expect(providers).toEqual([
@@ -121,9 +127,13 @@ test('resolveCurrentApiConfig still resolves a running llama.cpp model even when
   expect(runningModel).not.toBeNull();
   updateLlamaCppRunningModels([runningModel!]);
 
-  setStoreGetter(() => ({
-    get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-small-runtime') : undefined),
-  } as never));
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config' ? createAppConfig('qwen-small-runtime') : undefined,
+      }) as never,
+  );
 
   const result = resolveCurrentApiConfig();
   expect(result.config).toEqual({
@@ -152,9 +162,12 @@ test('resolveRawApiConfigForModelRef resolves an explicit llama.cpp model ref', 
   expect(runningModel).not.toBeNull();
   updateLlamaCppRunningModels([runningModel!]);
 
-  setStoreGetter(() => ({
-    get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-local') : undefined),
-  } as never));
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) => (key === 'app_config' ? createAppConfig('qwen-local') : undefined),
+      }) as never,
+  );
 
   const result = resolveRawApiConfigForModelRef('llamacpp/qwen-explicit');
   expect(result.config).toEqual({

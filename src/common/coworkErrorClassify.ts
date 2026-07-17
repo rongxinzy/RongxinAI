@@ -9,7 +9,15 @@
 import { classifyCoworkError, getUserErrorI18nKey } from './coworkError';
 
 export type { CoworkError, ErrorLogLevel } from './coworkError';
-export { classifyCoworkError, CoworkErrorKind, ENGINE_NOT_READY_CODE, getErrorLogLevel, getUserErrorI18nKey, isTransient, makeCoworkError } from './coworkError';
+export {
+  classifyCoworkError,
+  CoworkErrorKind,
+  ENGINE_NOT_READY_CODE,
+  getErrorLogLevel,
+  getUserErrorI18nKey,
+  isTransient,
+  makeCoworkError,
+} from './coworkError';
 
 /**
  * Classify an error string and return the matching i18n key.
@@ -29,8 +37,6 @@ export function classifyErrorKey(error: string): string | null {
 /** Check if the error string matches any known pattern. */
 function isKnownError(error: string): boolean {
   // Only return null for truly unmatched errors, not for "unknown" kind
-  const knownPatterns = [
-    /unknown error|an unknown error occurred/i,
-  ];
+  const knownPatterns = [/unknown error|an unknown error occurred/i];
   return knownPatterns.some(p => p.test(error));
 }

@@ -16,12 +16,15 @@ import {
 describe('electron-builder Windows llama.cpp packaging hooks', () => {
   test('defaults Windows llama.cpp backend bundle mode to lite', () => {
     expect(resolveWindowsLlamaCppBackendBundleMode({})).toBe(WindowsLlamaCppBackendBundleMode.Lite);
-    expect(resolveWindowsLlamaCppBackendBundleMode({ ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: 'full' }))
-      .toBe(WindowsLlamaCppBackendBundleMode.Full);
-    expect(resolveWindowsLlamaCppBackendBundleMode({ WIN_LLAMACPP_BACKEND_BUNDLE: 'none' }))
-      .toBe(WindowsLlamaCppBackendBundleMode.None);
-    expect(() => resolveWindowsLlamaCppBackendBundleMode({ ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: 'bad' }))
-      .toThrow(/Expected lite, full, or none/);
+    expect(
+      resolveWindowsLlamaCppBackendBundleMode({ ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: 'full' }),
+    ).toBe(WindowsLlamaCppBackendBundleMode.Full);
+    expect(resolveWindowsLlamaCppBackendBundleMode({ WIN_LLAMACPP_BACKEND_BUNDLE: 'none' })).toBe(
+      WindowsLlamaCppBackendBundleMode.None,
+    );
+    expect(() =>
+      resolveWindowsLlamaCppBackendBundleMode({ ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: 'bad' }),
+    ).toThrow(/Expected lite, full, or none/);
   });
 
   test('stages win-lite backend resources without local archives', () => {
@@ -37,13 +40,22 @@ describe('electron-builder Windows llama.cpp packaging hooks', () => {
     expect(fs.existsSync(path.join(resources.dir, LLAMACPP_NSIS_HELPER_SCRIPT))).toBe(true);
 
     for (const packageName of LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES) {
-      expect(fs.existsSync(path.join(resources.dir, 'node_modules', ...packageName.split('/'), 'package.json')))
-        .toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(resources.dir, 'node_modules', ...packageName.split('/'), 'package.json'),
+        ),
+      ).toBe(true);
     }
 
-    expect(fs.existsSync(path.join(resources.dir, 'node_modules', 'yauzl', 'package.json'))).toBe(true);
-    expect(fs.existsSync(path.join(resources.dir, 'node_modules', 'pump', 'package.json'))).toBe(true);
-    const closure = JSON.parse(fs.readFileSync(path.join(resources.dir, 'package-closure.json'), 'utf8'));
+    expect(fs.existsSync(path.join(resources.dir, 'node_modules', 'yauzl', 'package.json'))).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(resources.dir, 'node_modules', 'pump', 'package.json'))).toBe(
+      true,
+    );
+    const closure = JSON.parse(
+      fs.readFileSync(path.join(resources.dir, 'package-closure.json'), 'utf8'),
+    );
     expect(closure.script).toBe(LLAMACPP_NSIS_HELPER_SCRIPT);
     expect(closure.packages).toContain('extract-zip');
     expect(closure.packages).toContain('node-downloader-helper');

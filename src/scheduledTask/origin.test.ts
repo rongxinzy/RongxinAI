@@ -1,14 +1,12 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
-import {
-BindingKind, DeliveryChannel,
-DeliveryMode,   OriginKind, } from './constants';
+import { BindingKind, DeliveryChannel, DeliveryMode, OriginKind } from './constants';
 import { makeTask } from './fixtures';
 import { inferOriginAndBinding } from './origin';
 
 test('infer: managed key without IM channel -> cowork origin + ui_session binding', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:zhiyuan:sess-001', delivery: { mode: DeliveryMode.None } })
+    makeTask({ sessionKey: 'agent:main:zhiyuan:sess-001', delivery: { mode: DeliveryMode.None } }),
   );
   expect(result.origin).toEqual({ kind: OriginKind.Cowork, sessionId: 'sess-001' });
   expect(result.binding).toEqual({ kind: BindingKind.UISession, sessionId: 'sess-001' });
@@ -16,7 +14,10 @@ test('infer: managed key without IM channel -> cowork origin + ui_session bindin
 
 test('infer: managed key with IM announce channel -> im origin + im_session binding', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:zhiyuan:sess-002', delivery: { mode: DeliveryMode.Announce, channel: 'telegram' } })
+    makeTask({
+      sessionKey: 'agent:main:zhiyuan:sess-002',
+      delivery: { mode: DeliveryMode.Announce, channel: 'telegram' },
+    }),
   );
   expect(result.origin.kind).toBe(OriginKind.IM);
   expect((result.origin as any).platform).toBe('telegram');
@@ -27,7 +28,10 @@ test('infer: managed key with IM announce channel -> im origin + im_session bind
 
 test('infer: non-main agentId managed key -> cowork origin', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:secondary:zhiyuan:sess-003', delivery: { mode: DeliveryMode.None } })
+    makeTask({
+      sessionKey: 'agent:secondary:zhiyuan:sess-003',
+      delivery: { mode: DeliveryMode.None },
+    }),
   );
   expect(result.origin).toEqual({ kind: OriginKind.Cowork, sessionId: 'sess-003' });
   expect(result.binding).toEqual({ kind: BindingKind.UISession, sessionId: 'sess-003' });
@@ -35,16 +39,17 @@ test('infer: non-main agentId managed key -> cowork origin', () => {
 
 test('infer: managed key with channel=last -> cowork origin (last is not an IM platform)', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:zhiyuan:sess-004', delivery: { mode: DeliveryMode.Announce, channel: DeliveryChannel.Last } })
+    makeTask({
+      sessionKey: 'agent:main:zhiyuan:sess-004',
+      delivery: { mode: DeliveryMode.Announce, channel: DeliveryChannel.Last },
+    }),
   );
   expect(result.origin.kind).toBe(OriginKind.Cowork);
   expect(result.binding.kind).toBe(BindingKind.UISession);
 });
 
 test('infer: telegram channel key -> im origin + im_session binding', () => {
-  const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:telegram:user:12345' })
-  );
+  const result = inferOriginAndBinding(makeTask({ sessionKey: 'agent:main:telegram:user:12345' }));
   expect(result.origin.kind).toBe(OriginKind.IM);
   expect((result.origin as any).platform).toBe('telegram');
   expect(result.binding.kind).toBe(BindingKind.IMSession);
@@ -54,7 +59,7 @@ test('infer: telegram channel key -> im origin + im_session binding', () => {
 
 test('infer: dingtalk connector channel key -> im origin', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:openai-user:dingtalk-connector:acct1:user:peer1' })
+    makeTask({ sessionKey: 'agent:main:openai-user:dingtalk-connector:acct1:user:peer1' }),
   );
   expect(result.origin.kind).toBe(OriginKind.IM);
   expect((result.origin as any).platform).toBe('dingtalk');
@@ -63,7 +68,7 @@ test('infer: dingtalk connector channel key -> im origin', () => {
 
 test('infer: legacy dingtalk channel key remains readable', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:openai-user:dingtalk:acct1:user:peer1' })
+    makeTask({ sessionKey: 'agent:main:openai-user:dingtalk:acct1:user:peer1' }),
   );
   expect(result.origin.kind).toBe(OriginKind.IM);
   expect((result.origin as any).platform).toBe('dingtalk');
@@ -71,9 +76,7 @@ test('infer: legacy dingtalk channel key remains readable', () => {
 });
 
 test('infer: unknown sessionKey format -> session_key binding fallback', () => {
-  const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'custom:opaque:key:value' })
-  );
+  const result = inferOriginAndBinding(makeTask({ sessionKey: 'custom:opaque:key:value' }));
   expect(result.origin.kind).toBe(OriginKind.Cowork);
   expect((result.origin as any).sessionId).toBe('');
   expect(result.binding.kind).toBe(BindingKind.SessionKey);
@@ -100,7 +103,7 @@ test('infer: empty string sessionKey -> manual origin', () => {
 
 test('infer: sessionKey with whitespace is trimmed before parsing', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: '  agent:main:zhiyuan:sess-trimmed  ' })
+    makeTask({ sessionKey: '  agent:main:zhiyuan:sess-trimmed  ' }),
   );
   expect(result.origin.kind).toBe(OriginKind.Cowork);
   expect((result.origin as any).sessionId).toBe('sess-trimmed');

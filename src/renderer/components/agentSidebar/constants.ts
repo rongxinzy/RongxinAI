@@ -5,7 +5,7 @@ export const AgentSidebarIndicator = {
 } as const;
 
 export type AgentSidebarIndicator =
-  typeof AgentSidebarIndicator[keyof typeof AgentSidebarIndicator];
+  (typeof AgentSidebarIndicator)[keyof typeof AgentSidebarIndicator];
 
 export const AgentSidebarPreferenceKey = {
   State: 'myAgentSidebar.state',
@@ -23,5 +23,7 @@ export const ScheduledSessionTitlePrefix = {
 
 export const isScheduledSessionTitle = (title: string): boolean => {
   const normalizedTitle = title.trim();
-  return Object.values(ScheduledSessionTitlePrefix).some((prefix) => normalizedTitle.startsWith(prefix));
+  return Object.values(ScheduledSessionTitlePrefix).some(prefix =>
+    normalizedTitle.startsWith(prefix),
+  );
 };

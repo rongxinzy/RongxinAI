@@ -29,7 +29,10 @@ function getDefaultExpertPackagesDir() {
 }
 
 function titleCase(name) {
-  return name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return name
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 function renderTemplate(template, vars) {
@@ -402,11 +405,27 @@ function initExpert(name, expertType, outputDir) {
   const vars = { name, agent_name: name, team: name };
 
   if (expertType === 'agent') {
-    fs.writeFileSync(path.join(expertDir, 'plugin.json'), renderTemplate(AGENT_PLUGIN_JSON_TEMPLATE, vars), 'utf-8');
-    fs.writeFileSync(path.join(agentsDir, `${name}.md`), renderTemplate(AGENT_MD_TEMPLATE, vars), 'utf-8');
+    fs.writeFileSync(
+      path.join(expertDir, 'plugin.json'),
+      renderTemplate(AGENT_PLUGIN_JSON_TEMPLATE, vars),
+      'utf-8',
+    );
+    fs.writeFileSync(
+      path.join(agentsDir, `${name}.md`),
+      renderTemplate(AGENT_MD_TEMPLATE, vars),
+      'utf-8',
+    );
   } else {
-    fs.writeFileSync(path.join(expertDir, 'plugin.json'), renderTemplate(TEAM_PLUGIN_JSON_TEMPLATE, vars), 'utf-8');
-    fs.writeFileSync(path.join(agentsDir, `${name}-team-lead.md`), renderTemplate(TEAM_LEAD_MD_TEMPLATE, vars), 'utf-8');
+    fs.writeFileSync(
+      path.join(expertDir, 'plugin.json'),
+      renderTemplate(TEAM_PLUGIN_JSON_TEMPLATE, vars),
+      'utf-8',
+    );
+    fs.writeFileSync(
+      path.join(agentsDir, `${name}-team-lead.md`),
+      renderTemplate(TEAM_LEAD_MD_TEMPLATE, vars),
+      'utf-8',
+    );
     fs.writeFileSync(path.join(agentsDir, 'member-a.md'), TEAM_MEMBER_MD_TEMPLATE, 'utf-8');
   }
 
@@ -430,7 +449,7 @@ function main() {
   }
 
   if (process.argv[3] !== '--type') {
-    console.error("❌ Expected --type option.");
+    console.error('❌ Expected --type option.');
     return 1;
   }
 
@@ -440,7 +459,7 @@ function main() {
   const pathIndex = process.argv.indexOf('--path');
   if (pathIndex !== -1) {
     if (pathIndex + 1 >= process.argv.length) {
-      console.error("❌ --path requires a value.");
+      console.error('❌ --path requires a value.');
       return 1;
     }
     outputDir = path.resolve(process.argv[pathIndex + 1]);

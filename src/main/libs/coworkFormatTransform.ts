@@ -285,8 +285,8 @@ export function anthropicToOpenAI(body: unknown): Record<string, unknown> {
   }
 
   const tools = toArray(source.tools)
-    .filter((tool) => toString(toObject(tool).type) !== 'BatchTool')
-    .map((tool) => {
+    .filter(tool => toString(toObject(tool).type) !== 'BatchTool')
+    .map(tool => {
       const toolObj = toObject(tool);
       return {
         type: 'function',
@@ -386,7 +386,7 @@ export function openAIToAnthropic(body: unknown): Record<string, unknown> {
     content,
     model: toString(source.model),
     stop_reason: mapStopReason(
-      typeof firstChoice.finish_reason === 'string' ? firstChoice.finish_reason : null
+      typeof firstChoice.finish_reason === 'string' ? firstChoice.finish_reason : null,
     ),
     stop_sequence: null,
     usage: {
@@ -410,9 +410,7 @@ export function buildOpenAIChatCompletionsURL(baseURL: string): string {
       return `${normalized}/chat/completions`;
     }
     if (normalized.endsWith('/v1beta') || normalized.endsWith('/v1')) {
-      const betaBase = normalized.endsWith('/v1')
-        ? `${normalized.slice(0, -3)}v1beta`
-        : normalized;
+      const betaBase = normalized.endsWith('/v1') ? `${normalized.slice(0, -3)}v1beta` : normalized;
       return `${betaBase}/openai/chat/completions`;
     }
     return `${normalized}/v1beta/openai/chat/completions`;

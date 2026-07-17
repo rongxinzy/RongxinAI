@@ -9,7 +9,12 @@ import crypto from 'crypto';
 import http from 'http';
 import net from 'net';
 
-import { getToolTextPreview, looksLikeTransportErrorText, serializeForLog, serializeToolContentForLog } from './mcpLog';
+import {
+  getToolTextPreview,
+  looksLikeTransportErrorText,
+  serializeForLog,
+  serializeToolContentForLog,
+} from './mcpLog';
 import type { McpServerManager } from './mcpServerManager';
 
 const log = (level: string, msg: string) => {
@@ -110,8 +115,11 @@ export class McpBridgeServer {
 
     return new Promise((resolve, reject) => {
       const srv = http.createServer((req, res) => {
-        this.handleRequest(req, res).catch((err) => {
-          log('ERROR', `Unhandled error in handleRequest: ${err instanceof Error ? err.message : String(err)}`);
+        this.handleRequest(req, res).catch(err => {
+          log(
+            'ERROR',
+            `Unhandled error in handleRequest: ${err instanceof Error ? err.message : String(err)}`,
+          );
           if (!res.headersSent) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Internal server error' }));
@@ -119,7 +127,7 @@ export class McpBridgeServer {
         });
       });
 
-      srv.on('error', (err) => {
+      srv.on('error', err => {
         log('ERROR', `HTTP server error: ${err.message}`);
         reject(err);
       });
@@ -139,7 +147,7 @@ export class McpBridgeServer {
   async stop(): Promise<void> {
     if (!this.server) return;
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       this.server!.close(() => {
         log('INFO', 'McpBridgeServer stopped');
         this.server = null;
@@ -165,7 +173,10 @@ export class McpBridgeServer {
     // Verify secret token (accept either header name)
     const authHeader = req.headers['x-mcp-bridge-secret'] || req.headers['x-ask-user-secret'];
     if (authHeader !== this.secret) {
-      log('WARN', `Auth rejected for ${req.url}: header=${authHeader ? 'present-but-mismatch' : 'missing'}`);
+      log(
+        'WARN',
+        `Auth rejected for ${req.url}: header=${authHeader ? 'present-but-mismatch' : 'missing'}`,
+      );
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
       return;
@@ -191,7 +202,10 @@ export class McpBridgeServer {
     try {
       const body = await this.readBody(req);
       const input = JSON.parse(body) as { questions?: unknown[] };
-      log('INFO', `AskUser request received, questions=${Array.isArray(input.questions) ? input.questions.length : 0}`);
+      log(
+        'INFO',
+        `AskUser request received, questions=${Array.isArray(input.questions) ? input.questions.length : 0}`,
+      );
 
       if (!Array.isArray(input.questions) || input.questions.length === 0) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -203,7 +217,7 @@ export class McpBridgeServer {
       log('INFO', `AskUser waiting for user response, requestId=${requestId}`);
 
       // Create a Promise that resolves when the user responds or timeout
-      const userResponse = await new Promise<AskUserResponse>((resolve) => {
+      const userResponse = await new Promise<AskUserResponse>(resolve => {
         const timer = setTimeout(() => {
           log('INFO', `AskUser timeout, requestId=${requestId}`);
           this.pendingAskUser.delete(requestId);
@@ -238,7 +252,10 @@ export class McpBridgeServer {
     }
   }
 
-  private async handleMcpExecute(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  private async handleMcpExecute(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+  ): Promise<void> {
     // Abort in-flight MCP tool calls when the gateway drops the HTTP connection
     // (e.g. after chat.abort).  This prevents zombie 60-second MCP timeouts from
     // keeping the gateway run active and blocking new user messages.
@@ -265,7 +282,10 @@ export class McpBridgeServer {
         args: Record<string, unknown>;
       };
 
-      log('INFO', `Execute request received for server="${server}" tool="${tool}" with arguments ${serializeForLog(args || {})}`);
+      log(
+        'INFO',
+        `Execute request received for server="${server}" tool="${tool}" with arguments ${serializeForLog(args || {})}`,
+      );
 
       if (!server || !tool) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -274,12 +294,20 @@ export class McpBridgeServer {
       }
 
       const t0 = Date.now();
-      const result = await this.mcpManager.callTool(server, tool, args || {}, { signal: abortController.signal });
+      const result = await this.mcpManager.callTool(server, tool, args || {}, {
+        signal: abortController.signal,
+      });
       const contentPreview = serializeToolContentForLog(result.content);
       const textPreview = getToolTextPreview(result.content);
-      log('INFO', `Execute completed for server="${server}" tool="${tool}" in ${Date.now() - t0}ms with isError=${result.isError}. Result=${contentPreview}`);
+      log(
+        'INFO',
+        `Execute completed for server="${server}" tool="${tool}" in ${Date.now() - t0}ms with isError=${result.isError}. Result=${contentPreview}`,
+      );
       if (!result.isError && looksLikeTransportErrorText(textPreview)) {
-        log('WARN', `Execute completed for server="${server}" tool="${tool}" with transport-style error text but isError=false. Result text="${textPreview}"`);
+        log(
+          'WARN',
+          `Execute completed for server="${server}" tool="${tool}" with transport-style error text but isError=false. Result text="${textPreview}"`,
+        );
       }
 
       if (!res.writableEnded) {
@@ -291,10 +319,12 @@ export class McpBridgeServer {
       log('ERROR', `Request handling error: ${errMsg}`);
       if (!res.writableEnded) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          content: [{ type: 'text', text: `Bridge error: ${errMsg}` }],
-          isError: true,
-        }));
+        res.end(
+          JSON.stringify({
+            content: [{ type: 'text', text: `Bridge error: ${errMsg}` }],
+            isError: true,
+          }),
+        );
       }
     } finally {
       res.removeListener('close', onClose);

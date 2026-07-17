@@ -59,7 +59,8 @@ function detectModel(messages: UIMessage[]): string {
   if (typeof window !== 'undefined') {
     const modelState = (window as unknown as Record<string, unknown>).__MODEL_STATE__;
     if (modelState && typeof modelState === 'object' && 'defaultSelectedModel' in modelState) {
-      const selected = (modelState as { defaultSelectedModel?: { id?: string } }).defaultSelectedModel;
+      const selected = (modelState as { defaultSelectedModel?: { id?: string } })
+        .defaultSelectedModel;
       if (selected?.id) return selected.id;
     }
   }
@@ -108,7 +109,14 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
       ? normalizeApiFormat(this.options.apiFormat)
       : config.apiFormat;
 
-    const { url, headers, body } = this.buildRequest(messages, provider, config.apiKey, config.baseUrl, modelId, apiFormat);
+    const { url, headers, body } = this.buildRequest(
+      messages,
+      provider,
+      config.apiKey,
+      config.baseUrl,
+      modelId,
+      apiFormat,
+    );
     return this.streamOverIpc(chatId, url, headers, body, abortSignal, apiFormat);
   }
 
@@ -202,7 +210,8 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     baseUrl: string,
     modelId: string,
   ): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
-    const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '') || 'https://generativelanguage.googleapis.com/v1beta';
+    const normalizedBaseUrl =
+      baseUrl.trim().replace(/\/+$/, '') || 'https://generativelanguage.googleapis.com/v1beta';
     const url = `${normalizedBaseUrl}/models/${modelId}:streamGenerateContent?alt=sse`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -218,7 +227,9 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     const contents = nonSystem
       .map(msg => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: extractTextFromUIMessage(msg).trim() ? [{ text: extractTextFromUIMessage(msg) }] : [],
+        parts: extractTextFromUIMessage(msg).trim()
+          ? [{ text: extractTextFromUIMessage(msg) }]
+          : [],
       }))
       .filter(c => c.parts.length > 0);
 
@@ -254,7 +265,7 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
 
         const cleanup: Array<() => void> = [];
 
-        const removeData = window.electron.api.onStreamData(requestId, (chunk) => {
+        const removeData = window.electron.api.onStreamData(requestId, chunk => {
           const lines = chunk.split('\n');
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
@@ -287,7 +298,7 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
         });
         cleanup.push(removeDone);
 
-        const removeError = window.electron.api.onStreamError(requestId, (error) => {
+        const removeError = window.electron.api.onStreamError(requestId, error => {
           const message = typeof error === 'string' ? error : error.message;
           controller.enqueue({ type: 'error', errorText: message });
           close();
@@ -310,14 +321,14 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
             body: JSON.stringify(body),
             requestId,
           })
-          .then((response) => {
+          .then(response => {
             if (!response.ok) {
               const message = response.error || `API request failed (${response.status})`;
               controller.enqueue({ type: 'error', errorText: message });
               close();
             }
           })
-          .catch((error) => {
+          .catch(error => {
             controller.enqueue({
               type: 'error',
               errorText: error instanceof Error ? error.message : String(error),
@@ -434,7 +445,11 @@ class SseChunkParser {
           this.startedReasoningIds.add(this.activeReasoningId);
           chunks.push({ type: 'reasoning-start', id: this.activeReasoningId });
         }
-        chunks.push({ type: 'reasoning-delta', id: this.activeReasoningId, delta: delta.reasoning_content });
+        chunks.push({
+          type: 'reasoning-delta',
+          id: this.activeReasoningId,
+          delta: delta.reasoning_content,
+        });
       }
 
       // Tool calls
@@ -477,7 +492,11 @@ class SseChunkParser {
       if (this.activeToolCall) {
         const rawInput = this.activeToolCall.inputChunks.join('');
         let parsedInput: unknown = rawInput;
-        try { parsedInput = JSON.parse(rawInput); } catch { /* keep raw */ }
+        try {
+          parsedInput = JSON.parse(rawInput);
+        } catch {
+          /* keep raw */
+        }
         if (!this.startedToolIds.has(this.activeToolCall.id)) {
           this.startedToolIds.add(this.activeToolCall.id);
           chunks.push({
@@ -515,7 +534,9 @@ class SseChunkParser {
 
     // Content block start
     if (sseType === 'content_block_start') {
-      const cb = (parsed as { content_block?: { type?: string; id?: string; name?: string; text?: string } }).content_block;
+      const cb = (
+        parsed as { content_block?: { type?: string; id?: string; name?: string; text?: string } }
+      ).content_block;
       if (cb?.type === 'text') {
         this.activeTextId = cb.id || generateId();
         chunks.push({ type: 'text-start', id: this.activeTextId });
@@ -535,7 +556,11 @@ class SseChunkParser {
 
     // Content block delta
     if (sseType === 'content_block_delta') {
-      const deltaObj = (parsed as { delta?: { type?: string; text?: string; thinking?: string; partial_json?: string } }).delta;
+      const deltaObj = (
+        parsed as {
+          delta?: { type?: string; text?: string; thinking?: string; partial_json?: string };
+        }
+      ).delta;
       if (deltaObj?.type === 'text_delta' && typeof deltaObj.text === 'string') {
         if (!this.activeTextId) {
           this.activeTextId = generateId();
@@ -544,9 +569,17 @@ class SseChunkParser {
         chunks.push({ type: 'text-delta', id: this.activeTextId, delta: deltaObj.text });
       } else if (deltaObj?.type === 'thinking_delta' && typeof deltaObj.thinking === 'string') {
         if (this.activeReasoningId) {
-          chunks.push({ type: 'reasoning-delta', id: this.activeReasoningId, delta: deltaObj.thinking });
+          chunks.push({
+            type: 'reasoning-delta',
+            id: this.activeReasoningId,
+            delta: deltaObj.thinking,
+          });
         }
-      } else if (deltaObj?.type === 'input_json_delta' && typeof deltaObj.partial_json === 'string' && this.activeToolCall) {
+      } else if (
+        deltaObj?.type === 'input_json_delta' &&
+        typeof deltaObj.partial_json === 'string' &&
+        this.activeToolCall
+      ) {
         this.activeToolCall.inputChunks.push(deltaObj.partial_json);
       }
       return chunks;
@@ -557,7 +590,11 @@ class SseChunkParser {
       if (this.activeToolCall) {
         const rawInput = this.activeToolCall.inputChunks.join('');
         let parsedInput: unknown = rawInput;
-        try { parsedInput = JSON.parse(rawInput); } catch { /* keep raw */ }
+        try {
+          parsedInput = JSON.parse(rawInput);
+        } catch {
+          /* keep raw */
+        }
         if (!this.startedToolIds.has(this.activeToolCall.id)) {
           this.startedToolIds.add(this.activeToolCall.id);
           chunks.push({
@@ -601,7 +638,19 @@ class SseChunkParser {
     const candidates = (parsed as { candidates?: Array<Record<string, unknown>> }).candidates;
     if (!Array.isArray(candidates)) return [];
 
-    const parts = (candidates[0] as { content?: { parts?: Array<{ text?: string; thought?: boolean; functionCall?: { name: string; args: Record<string, unknown> } }> } } | undefined)?.content?.parts;
+    const parts = (
+      candidates[0] as
+        | {
+            content?: {
+              parts?: Array<{
+                text?: string;
+                thought?: boolean;
+                functionCall?: { name: string; args: Record<string, unknown> };
+              }>;
+            };
+          }
+        | undefined
+    )?.content?.parts;
     if (!parts) return [];
 
     for (const part of parts) {

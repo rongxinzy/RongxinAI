@@ -12,10 +12,18 @@ const fs = require('fs');
 const path = require('path');
 
 const VALID_CATEGORY_IDS = new Set([
-  '01-ProductDesign', '02-Engineering', '03-GameSpatial', '04-DataAI',
-  '05-MarketingGrowth', '06-ContentCreative', '07-SalesCommerce',
-  '08-FinanceInvestment', '09-OperationsHR', '10-ProjectQuality',
-  '11-SecurityCompliance', '12-IndustryConsultant',
+  '01-ProductDesign',
+  '02-Engineering',
+  '03-GameSpatial',
+  '04-DataAI',
+  '05-MarketingGrowth',
+  '06-ContentCreative',
+  '07-SalesCommerce',
+  '08-FinanceInvestment',
+  '09-OperationsHR',
+  '10-ProjectQuality',
+  '11-SecurityCompliance',
+  '12-IndustryConsultant',
 ]);
 
 const VALID_EXPERT_TYPES = new Set(['agent', 'team']);
@@ -90,7 +98,9 @@ function checkI18nArrayField(obj, fieldName, result, expectedCount) {
     return false;
   }
   if (expectedCount !== undefined && arr.length !== expectedCount) {
-    result.error(`plugin.json: '${fieldName}' must have exactly ${expectedCount} items, got ${arr.length}`);
+    result.error(
+      `plugin.json: '${fieldName}' must have exactly ${expectedCount} items, got ${arr.length}`,
+    );
   }
   for (let i = 0; i < arr.length; i += 1) {
     const item = arr[i];
@@ -131,7 +141,10 @@ function parseMdFrontmatter(mdPath) {
     const trimmed = line.trim();
     if (trimmed.includes(':') && !trimmed.startsWith('-') && !trimmed.startsWith('#')) {
       const [key, ...rest] = trimmed.split(':');
-      const value = rest.join(':').trim().replace(/^["']|["']$/g, '');
+      const value = rest
+        .join(':')
+        .trim()
+        .replace(/^["']|["']$/g, '');
       if (value) fm[key.trim()] = value;
     }
   }
@@ -153,7 +166,9 @@ function validatePluginJson(pluginJson, expertDir, result) {
 
   const expertType = pluginJson.expertType;
   if (!VALID_EXPERT_TYPES.has(expertType)) {
-    result.error(`plugin.json: 'expertType' must be one of ${[...VALID_EXPERT_TYPES].join(', ')}, got '${expertType}'`);
+    result.error(
+      `plugin.json: 'expertType' must be one of ${[...VALID_EXPERT_TYPES].join(', ')}, got '${expertType}'`,
+    );
   }
 
   const agentName = pluginJson.agentName || '';
@@ -168,7 +183,9 @@ function validatePluginJson(pluginJson, expertDir, result) {
 
   const categoryId = pluginJson.categoryId;
   if (!VALID_CATEGORY_IDS.has(categoryId)) {
-    result.error(`plugin.json: 'categoryId' must be one of ${[...VALID_CATEGORY_IDS].sort().join(', ')}, got '${categoryId}'`);
+    result.error(
+      `plugin.json: 'categoryId' must be one of ${[...VALID_CATEGORY_IDS].sort().join(', ')}, got '${categoryId}'`,
+    );
   }
 
   checkI18nArrayField(pluginJson, 'tags', result, 3);
@@ -179,7 +196,9 @@ function validatePluginJson(pluginJson, expertDir, result) {
   if (quickPrompts.length > 0 && typeof quickPrompts[0] === 'object') {
     for (const lang of ['en', 'zh']) {
       if (quickPrompts[0][lang] !== defaultInitPrompt[lang]) {
-        result.warn(`plugin.json: 'quickPrompts[0].${lang}' should match 'defaultInitPrompt.${lang}'`);
+        result.warn(
+          `plugin.json: 'quickPrompts[0].${lang}' should match 'defaultInitPrompt.${lang}'`,
+        );
       }
     }
   }
@@ -219,7 +238,9 @@ function validatePluginJson(pluginJson, expertDir, result) {
     if (!Array.isArray(membersDisplay)) {
       result.error("plugin.json: 'members' must be an array for team expert");
     } else {
-      const leadCount = membersDisplay.filter(m => typeof m === 'object' && m && m.role === 'lead').length;
+      const leadCount = membersDisplay.filter(
+        m => typeof m === 'object' && m && m.role === 'lead',
+      ).length;
       if (leadCount !== 1) {
         result.error(`plugin.json: team 'members' must contain exactly one lead, got ${leadCount}`);
       }
@@ -247,17 +268,23 @@ function validateAgentMd(mdPath, result) {
   for (const field of ['displayName', 'profession']) {
     if (!(field in fm)) {
       // Simple parser may not capture nested objects; inspect raw content.
-      const sectionMatch = content.match(new RegExp(`^${field}:\\s*$\\n(.*?)(?=^\\w+:|^---|^#)`, 'ms'));
+      const sectionMatch = content.match(
+        new RegExp(`^${field}:\\s*$\\n(.*?)(?=^\\w+:|^---|^#)`, 'ms'),
+      );
       if (sectionMatch) {
         const section = sectionMatch[1];
         for (const lang of ['en', 'zh']) {
           const langMatch = section.match(new RegExp(`^\\s+${lang}:\\s*"?(.*?)"?$`, 'm'));
           if (!langMatch || hasTodo(langMatch[1])) {
-            result.error(`${path.basename(mdPath)}: frontmatter '${field}.${lang}' is missing or contains [TODO]`);
+            result.error(
+              `${path.basename(mdPath)}: frontmatter '${field}.${lang}' is missing or contains [TODO]`,
+            );
           }
         }
       } else {
-        result.error(`${path.basename(mdPath)}: frontmatter '${field}' is missing or contains [TODO]`);
+        result.error(
+          `${path.basename(mdPath)}: frontmatter '${field}' is missing or contains [TODO]`,
+        );
       }
     }
   }
@@ -265,7 +292,9 @@ function validateAgentMd(mdPath, result) {
   const body = content.replace(/^---.*?---/s, '');
   const todoCount = (body.match(/\[TODO/g) || []).length;
   if (todoCount > 5) {
-    result.warn(`${path.basename(mdPath)}: body still contains many [TODO] placeholders (${todoCount})`);
+    result.warn(
+      `${path.basename(mdPath)}: body still contains many [TODO] placeholders (${todoCount})`,
+    );
   }
 }
 
@@ -303,7 +332,10 @@ function validateExpert(expertPath) {
   if (!fs.existsSync(agentsDir)) {
     result.error('Missing agents/ directory');
   } else {
-    const mdFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md')).map(f => path.join(agentsDir, f));
+    const mdFiles = fs
+      .readdirSync(agentsDir)
+      .filter(f => f.endsWith('.md'))
+      .map(f => path.join(agentsDir, f));
     if (mdFiles.length === 0) {
       result.error('No .md files found in agents/ directory');
     } else {

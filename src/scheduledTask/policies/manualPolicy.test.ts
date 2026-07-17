@@ -1,7 +1,11 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
-BindingKind, DeliveryChannel, DeliveryMode,   OriginKind, SessionTarget,
+  BindingKind,
+  DeliveryChannel,
+  DeliveryMode,
+  OriginKind,
+  SessionTarget,
 } from '../constants';
 import { makeModel } from '../fixtures';
 import { ManualTaskPolicy } from './manualPolicy';
@@ -60,7 +64,10 @@ test('ManualPolicy.onDeliveryChanged: to announce + IM channel -> binding become
     binding: { kind: BindingKind.NewSession },
     delivery: { mode: DeliveryMode.None },
   });
-  const result = policy.onDeliveryChanged(draft, { mode: DeliveryMode.Announce, channel: 'discord' });
+  const result = policy.onDeliveryChanged(draft, {
+    mode: DeliveryMode.Announce,
+    channel: 'discord',
+  });
   expect(result.binding.kind).toBe(BindingKind.IMSession);
   expect((result.binding as any).platform).toBe('discord');
   expect((result.binding as any).conversationId).toBe('');
@@ -95,7 +102,10 @@ test('ManualPolicy.onDeliveryChanged: to announce + last -> delivery updates, bi
     binding: { kind: BindingKind.NewSession },
     delivery: { mode: DeliveryMode.None },
   });
-  const result = policy.onDeliveryChanged(draft, { mode: DeliveryMode.Announce, channel: DeliveryChannel.Last });
+  const result = policy.onDeliveryChanged(draft, {
+    mode: DeliveryMode.Announce,
+    channel: DeliveryChannel.Last,
+  });
   expect(result.delivery).toEqual({ mode: DeliveryMode.Announce, channel: DeliveryChannel.Last });
   expect(result.binding).toEqual(draft.binding);
 });

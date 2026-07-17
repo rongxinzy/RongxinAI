@@ -40,14 +40,20 @@ function formatTime(): string {
 
 function formatExtra(extra?: Record<string, unknown>): string {
   if (!extra || Object.keys(extra).length === 0) return '';
-  return '  ' + Object.entries(extra)
-    .map(([k, v]) => `${k}=${serializeForLog(v)}`)
-    .join(' ');
+  return (
+    '  ' +
+    Object.entries(extra)
+      .map(([k, v]) => `${k}=${serializeForLog(v)}`)
+      .join(' ')
+  );
 }
 
 // ─── Factory ────────────────────────────────────────────────────────────────
 
-export function createLogger(module: string, baseContext?: Record<string, unknown>): StructuredLogger {
+export function createLogger(
+  module: string,
+  baseContext?: Record<string, unknown>,
+): StructuredLogger {
   const logFn = (level: LogLevel, message: string, extra?: Record<string, unknown>) => {
     const time = formatTime();
     const cid = formatCorrelationId();
@@ -59,7 +65,9 @@ export function createLogger(module: string, baseContext?: Record<string, unknow
       cid || '',
       message,
       formatExtra(mergedExtra),
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     // Route to appropriate console method (which is intercepted by electron-log)
     const output = parts.trim();
@@ -83,6 +91,6 @@ export function createLogger(module: string, baseContext?: Record<string, unknow
     info: (m, e) => logFn('INFO', m, e),
     warn: (m, e) => logFn('WARN', m, e),
     error: (m, e) => logFn('ERROR', m, e),
-    withContext: (ctx) => createLogger(module, { ...baseContext, ...ctx }),
+    withContext: ctx => createLogger(module, { ...baseContext, ...ctx }),
   };
 }

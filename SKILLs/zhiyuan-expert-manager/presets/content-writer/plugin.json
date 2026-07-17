@@ -37,7 +37,13 @@
   ],
   "quickPrompts": [
     { "en": "Help me write a product launch announcement", "zh": "帮我写一篇产品发布公告" },
-    { "en": "Write a WeChat official account article about AI", "zh": "写一篇关于 AI 的微信公众号文章" },
-    { "en": "Create 5 social media post ideas for our new feature", "zh": "为新功能创作 5 条社交媒体文案" }
+    {
+      "en": "Write a WeChat official account article about AI",
+      "zh": "写一篇关于 AI 的微信公众号文章"
+    },
+    {
+      "en": "Create 5 social media post ideas for our new feature",
+      "zh": "为新功能创作 5 条社交媒体文案"
+    }
   ]
 }

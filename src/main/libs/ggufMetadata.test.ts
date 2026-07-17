@@ -26,7 +26,10 @@ test('does not enable the toggle for templates without enable_thinking', () => {
 });
 
 test('returns false for invalid GGUF files', () => {
-  const filePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gguf-metadata-')), 'invalid.gguf');
+  const filePath = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'gguf-metadata-')),
+    'invalid.gguf',
+  );
   fs.writeFileSync(filePath, 'not a gguf');
 
   expect(ggufSupportsThinkingToggle(filePath)).toBe(false);
@@ -34,11 +37,9 @@ test('returns false for invalid GGUF files', () => {
 
 function writeGgufMetadata(metadata: Record<string, string>): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gguf-metadata-'));
-  const entries = Object.entries(metadata).map(([key, value]) => Buffer.concat([
-    writeString(key),
-    writeUint32(GgufValueType.String),
-    writeString(value),
-  ]));
+  const entries = Object.entries(metadata).map(([key, value]) =>
+    Buffer.concat([writeString(key), writeUint32(GgufValueType.String), writeString(value)]),
+  );
   const header = Buffer.concat([
     writeUint32(0x46554747),
     writeUint32(3),

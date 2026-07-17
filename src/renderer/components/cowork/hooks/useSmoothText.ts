@@ -32,7 +32,10 @@ export function useSmoothText(target: string, active: boolean): string {
     const step = () => {
       const full = targetRef.current;
       const shown = displayRef.current;
-      if (shown.length >= full.length) { rafRef.current = null; return; }
+      if (shown.length >= full.length) {
+        rafRef.current = null;
+        return;
+      }
       const remaining = full.length - shown.length;
       const stepSize = Math.min(40, Math.max(2, Math.ceil(remaining / 8)));
       const next = full.slice(0, shown.length + stepSize);
@@ -43,7 +46,10 @@ export function useSmoothText(target: string, active: boolean): string {
     rafRef.current = requestAnimationFrame(step);
 
     return () => {
-      if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
   }, [target, active]);
 

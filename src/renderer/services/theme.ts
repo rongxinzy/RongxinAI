@@ -1,5 +1,5 @@
 import type { ThemeDefinition } from '../theme';
-import { allThemes,ThemeManager } from '../theme';
+import { allThemes, ThemeManager } from '../theme';
 import { configService } from './config';
 
 type ThemeType = 'light' | 'dark' | 'system';
@@ -36,7 +36,7 @@ class ThemeService {
 
       // 监听系统主题变化
       if (this.mediaQuery) {
-        this.mediaQueryListener = (e) => {
+        this.mediaQueryListener = e => {
           if (this.currentTheme === 'system') {
             this.applyByAppearance(e.matches ? 'dark' : 'light');
           }

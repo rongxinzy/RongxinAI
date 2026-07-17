@@ -334,7 +334,7 @@ export const TurnBlock: React.FC<{
       </ChainOfThought>
     );
   };
-  const intermediateItems = intermediateGroups.flatMap((group) => group.items);
+  const intermediateItems = intermediateGroups.flatMap(group => group.items);
 
   return (
     <div className="px-4 py-2">
@@ -348,7 +348,8 @@ export const TurnBlock: React.FC<{
                 </ChainOfThoughtHeader>
                 <ChainOfThoughtContent>
                   {intermediateItems.map((item, index) => {
-                    const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
+                    const isAnswer =
+                      item.type === 'assistant' && !item.message.metadata?.isThinking;
                     return renderItem(item, index, false, false, !isAnswer);
                   })}
                 </ChainOfThoughtContent>

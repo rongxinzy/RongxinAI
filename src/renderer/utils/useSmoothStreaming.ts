@@ -23,7 +23,10 @@ export function useSmoothStreaming(rawContent: string, isStreaming: boolean): st
       const target = rawRef.current;
       const cur = displayedRef.current;
       if (cur.length >= target.length) {
-        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
         return;
       }
       const next = target.slice(0, cur.length + CHARS_PER_TICK);
@@ -36,7 +39,10 @@ export function useSmoothStreaming(rawContent: string, isStreaming: boolean): st
   useEffect(() => {
     if (!isStreaming) {
       // Done — flush full content, stop timer.
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       setDisplayed(rawRef.current);
       displayedRef.current = rawRef.current;
       return;
@@ -45,7 +51,12 @@ export function useSmoothStreaming(rawContent: string, isStreaming: boolean): st
     displayedRef.current = '';
     setDisplayed('');
     startTicking();
-    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [isStreaming, startTicking]);
 
   // When new content arrives and the timer has caught up, restart it.

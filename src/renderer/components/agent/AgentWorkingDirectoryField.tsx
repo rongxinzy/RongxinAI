@@ -17,7 +17,11 @@ const truncatePath = (value: string, maxLength = 72): string => {
   return getCompactFolderName(value, maxLength) || value;
 };
 
-const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({ value, onChange, compact = false }) => {
+const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
+  value,
+  onChange,
+  compact = false,
+}) => {
   const handleFolderSelect = (path: string) => {
     onChange(path);
   };
@@ -38,7 +42,9 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
               className="inline-flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg pl-2.5 pr-2"
             >
               <Folder className="h-4 w-4 shrink-0" />
-              <span className={`truncate ${hasValue ? 'text-foreground' : 'text-muted-foreground'}`}>
+              <span
+                className={`truncate ${hasValue ? 'text-foreground' : 'text-muted-foreground'}`}
+              >
                 {truncatePath(value, 40)}
               </span>
             </Button>
@@ -74,7 +80,9 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
             className="min-w-0 flex-1 flex items-center gap-2 justify-start px-3 py-2 h-auto text-sm font-normal"
           >
             <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className={`flex-1 truncate text-left ${value.trim() ? '' : 'text-muted-foreground'}`}>
+            <span
+              className={`flex-1 truncate text-left ${value.trim() ? '' : 'text-muted-foreground'}`}
+            >
               {truncatePath(value)}
             </span>
           </Button>

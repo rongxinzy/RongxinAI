@@ -6,9 +6,7 @@ import type { SqliteStore } from '../sqliteStore';
 
 const TRIAGE_CONFIG_KEY = 'model_triage_config';
 
-export function registerTriageIpcHandlers(options: {
-  getStore: () => SqliteStore;
-}): void {
+export function registerTriageIpcHandlers(options: { getStore: () => SqliteStore }): void {
   ipcMain.handle(TriageIpcChannel.GetConfig, async () => {
     const stored = options.getStore().get<TriageConfig>(TRIAGE_CONFIG_KEY);
     if (stored && typeof stored === 'object' && typeof stored.enabled === 'boolean') {
@@ -51,7 +49,11 @@ function sanitizeTriageConfig(raw: unknown): TriageConfig {
           : DEFAULT_TRIAGE_CONFIG.rules.heavyModelRef,
       maxConversationRoundsForTriage:
         typeof input.rules === 'object' && input.rules !== null
-          ? Math.max(1, Number((input.rules as Record<string, unknown>).maxConversationRoundsForTriage) || DEFAULT_TRIAGE_CONFIG.rules.maxConversationRoundsForTriage)
+          ? Math.max(
+              1,
+              Number((input.rules as Record<string, unknown>).maxConversationRoundsForTriage) ||
+                DEFAULT_TRIAGE_CONFIG.rules.maxConversationRoundsForTriage,
+            )
           : DEFAULT_TRIAGE_CONFIG.rules.maxConversationRoundsForTriage,
       allowCrossProviderSwitch:
         typeof input.rules === 'object' && input.rules !== null
@@ -59,7 +61,11 @@ function sanitizeTriageConfig(raw: unknown): TriageConfig {
           : DEFAULT_TRIAGE_CONFIG.rules.allowCrossProviderSwitch,
       cooldownRounds:
         typeof input.rules === 'object' && input.rules !== null
-          ? Math.max(1, Number((input.rules as Record<string, unknown>).cooldownRounds) || DEFAULT_TRIAGE_CONFIG.rules.cooldownRounds)
+          ? Math.max(
+              1,
+              Number((input.rules as Record<string, unknown>).cooldownRounds) ||
+                DEFAULT_TRIAGE_CONFIG.rules.cooldownRounds,
+            )
           : DEFAULT_TRIAGE_CONFIG.rules.cooldownRounds,
       useLocalModelTriage:
         typeof input.rules === 'object' && input.rules !== null

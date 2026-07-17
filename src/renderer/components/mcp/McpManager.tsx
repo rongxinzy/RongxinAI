@@ -10,7 +10,12 @@ import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
-import { McpMarketplaceCategoryInfo, McpRegistryEntry, McpServerConfig, McpServerFormData } from '../../types/mcp';
+import {
+  McpMarketplaceCategoryInfo,
+  McpRegistryEntry,
+  McpServerConfig,
+  McpServerFormData,
+} from '../../types/mcp';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import McpServerFormModal from './McpServerFormModal';
@@ -49,15 +54,21 @@ const ClampedText: React.FC<{ text: string; className?: string }> = ({ text, cla
   };
 
   const handleLeave = () => {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     setShowFull(false);
   };
 
   return (
     <div className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-      <p ref={textRef} className={`line-clamp-2 ${className}`}>{text}</p>
+      <p ref={textRef} className={`line-clamp-2 ${className}`}>
+        {text}
+      </p>
       {showFull && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 z-50
+        <div
+          className="absolute bottom-full left-0 right-0 mb-1 z-50
           rounded-lg px-3 py-2 text-xs leading-relaxed
           bg-surface-raised text-foreground
           shadow-xl border border-border"
@@ -83,9 +94,15 @@ const McpManager: React.FC = () => {
   const [installingRegistry, setInstallingRegistry] = useState<McpRegistryEntry | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [dynamicRegistry, setDynamicRegistry] = useState<McpRegistryEntry[]>(mcpRegistry);
-  const [dynamicCategories, setDynamicCategories] = useState<ReadonlyArray<{ id: string; key: string; name_zh?: string; name_en?: string }>>(mcpCategories);
+  const [dynamicCategories, setDynamicCategories] =
+    useState<ReadonlyArray<{ id: string; key: string; name_zh?: string; name_en?: string }>>(
+      mcpCategories,
+    );
   const [bridgeSyncing, setBridgeSyncing] = useState(false);
-  const [bridgeSyncResult, setBridgeSyncResult] = useState<{ tools: number; error?: string } | null>(null);
+  const [bridgeSyncResult, setBridgeSyncResult] = useState<{
+    tools: number;
+    error?: string;
+  } | null>(null);
   const currentLanguage = i18nService.getLanguage();
 
   useEffect(() => {
@@ -96,7 +113,9 @@ const McpManager: React.FC = () => {
       dispatch(setMcpServers(loaded));
     };
     loadServers();
-    return () => { isActive = false; };
+    return () => {
+      isActive = false;
+    };
   }, [dispatch]);
 
   useEffect(() => {
@@ -119,7 +138,9 @@ const McpManager: React.FC = () => {
       setDynamicCategories(cats);
     };
     fetchMarketplace();
-    return () => { isActive = false; };
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const installedRegistryIds = useMemo(() => {
@@ -130,12 +151,16 @@ const McpManager: React.FC = () => {
     return ids;
   }, [servers]);
 
-  const getRegistryEntryDescription = useCallback((entry: McpRegistryEntry): string => {
-    const remoteDescription = currentLanguage === 'zh' ? entry.description_zh : entry.description_en;
-    if (remoteDescription) return remoteDescription;
-    if (entry.descriptionKey) return i18nService.t(entry.descriptionKey);
-    return '';
-  }, [currentLanguage]);
+  const getRegistryEntryDescription = useCallback(
+    (entry: McpRegistryEntry): string => {
+      const remoteDescription =
+        currentLanguage === 'zh' ? entry.description_zh : entry.description_en;
+      if (remoteDescription) return remoteDescription;
+      if (entry.descriptionKey) return i18nService.t(entry.descriptionKey);
+      return '';
+    },
+    [currentLanguage],
+  );
 
   const getStdioCommandSummary = (command?: string, args?: string[]): string => {
     if (!command) return '';
@@ -143,17 +168,21 @@ const McpManager: React.FC = () => {
     return `${command} ${args[args.length - 1]}`;
   };
 
-  const getRegistryEntryForServer = useCallback((server: McpServerConfig): McpRegistryEntry | undefined => {
-    if (server.registryId) {
-      return dynamicRegistry.find(entry => entry.id === server.registryId);
-    }
-    if (!server.isBuiltIn) return undefined;
-    return dynamicRegistry.find((entry) => (
-      entry.name.toLowerCase() === server.name.toLowerCase()
-      && entry.transportType === server.transportType
-      && entry.command === server.command
-    ));
-  }, [dynamicRegistry]);
+  const getRegistryEntryForServer = useCallback(
+    (server: McpServerConfig): McpRegistryEntry | undefined => {
+      if (server.registryId) {
+        return dynamicRegistry.find(entry => entry.id === server.registryId);
+      }
+      if (!server.isBuiltIn) return undefined;
+      return dynamicRegistry.find(
+        entry =>
+          entry.name.toLowerCase() === server.name.toLowerCase() &&
+          entry.transportType === server.transportType &&
+          entry.command === server.command,
+      );
+    },
+    [dynamicRegistry],
+  );
 
   const getTransportSummary = (server: McpServerConfig): string => {
     if (server.transportType === 'stdio') {
@@ -167,23 +196,27 @@ const McpManager: React.FC = () => {
     return server.url || '';
   };
 
-  const getInstalledDescription = useCallback((server: McpServerConfig): string => {
-    const persistedDescription = server.description?.trim();
-    if (persistedDescription) return persistedDescription;
-    const registryEntry = getRegistryEntryForServer(server);
-    if (registryEntry) {
-      const registryDescription = getRegistryEntryDescription(registryEntry).trim();
-      if (registryDescription) return registryDescription;
-    }
-    return getTransportSummary(server);
-  }, [getRegistryEntryDescription, getRegistryEntryForServer]);
+  const getInstalledDescription = useCallback(
+    (server: McpServerConfig): string => {
+      const persistedDescription = server.description?.trim();
+      if (persistedDescription) return persistedDescription;
+      const registryEntry = getRegistryEntryForServer(server);
+      if (registryEntry) {
+        const registryDescription = getRegistryEntryDescription(registryEntry).trim();
+        if (registryDescription) return registryDescription;
+      }
+      return getTransportSummary(server);
+    },
+    [getRegistryEntryDescription, getRegistryEntryForServer],
+  );
 
   const filteredInstalled = useMemo(() => {
     const query = searchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
     if (!query) return servers;
-    return servers.filter(server =>
-      server.name.toLowerCase().includes(query)
-      || getInstalledDescription(server).toLowerCase().includes(query)
+    return servers.filter(
+      server =>
+        server.name.toLowerCase().includes(query) ||
+        getInstalledDescription(server).toLowerCase().includes(query),
     );
   }, [servers, searchQuery, getInstalledDescription]);
 
@@ -191,9 +224,8 @@ const McpManager: React.FC = () => {
     const custom = servers.filter(s => !s.isBuiltIn);
     const query = searchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
     if (!query) return custom;
-    return custom.filter(s =>
-      s.name.toLowerCase().includes(query)
-      || s.description.toLowerCase().includes(query)
+    return custom.filter(
+      s => s.name.toLowerCase().includes(query) || s.description.toLowerCase().includes(query),
     );
   }, [servers, searchQuery]);
 
@@ -201,9 +233,10 @@ const McpManager: React.FC = () => {
     const query = searchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
     let entries = [...dynamicRegistry];
     if (query) {
-      entries = entries.filter(e =>
-        e.name.toLowerCase().includes(query)
-        || getRegistryEntryDescription(e).toLowerCase().includes(query)
+      entries = entries.filter(
+        e =>
+          e.name.toLowerCase().includes(query) ||
+          getRegistryEntryDescription(e).toLowerCase().includes(query),
       );
     }
     if (activeCategory !== 'all') {
@@ -269,7 +302,9 @@ const McpManager: React.FC = () => {
     setInstallingRegistry(null);
   };
 
-  const handleSaveForm = async (data: McpServerFormData): Promise<{ success: boolean; error?: string }> => {
+  const handleSaveForm = async (
+    data: McpServerFormData,
+  ): Promise<{ success: boolean; error?: string }> => {
     if (editingServer && editingServer.id) {
       const result = await mcpService.updateServer(editingServer.id, data);
       if (!result.success) {
@@ -313,11 +348,17 @@ const McpManager: React.FC = () => {
       if (syncTimeout) clearTimeout(syncTimeout);
       syncTimeout = setTimeout(() => {
         setBridgeSyncing(false);
-        setBridgeSyncResult({ tools: 0, error: i18nService.t('mcpBridgeSyncError') || 'Sync timed out' });
+        setBridgeSyncResult({
+          tools: 0,
+          error: i18nService.t('mcpBridgeSyncError') || 'Sync timed out',
+        });
       }, 40_000);
     });
-    const cleanupDone = mcpService.onBridgeSyncDone((data) => {
-      if (syncTimeout) { clearTimeout(syncTimeout); syncTimeout = null; }
+    const cleanupDone = mcpService.onBridgeSyncDone(data => {
+      if (syncTimeout) {
+        clearTimeout(syncTimeout);
+        syncTimeout = null;
+      }
       setBridgeSyncing(false);
       setBridgeSyncResult({ tools: data.tools, error: data.error });
       if (!data.error) {
@@ -331,21 +372,13 @@ const McpManager: React.FC = () => {
     };
   }, []);
 
-  const marketplaceCount = useMemo(
-    () => dynamicRegistry.length,
-    [dynamicRegistry]
-  );
+  const marketplaceCount = useMemo(() => dynamicRegistry.length, [dynamicRegistry]);
 
-  const customCount = useMemo(
-    () => servers.filter(s => !s.isBuiltIn).length,
-    [servers]
-  );
+  const customCount = useMemo(() => servers.filter(s => !s.isBuiltIn).length, [servers]);
 
   const tabClass = (tab: McpTab) =>
     `px-4 py-2 text-sm font-medium transition-colors relative ${
-      activeTab === tab
-        ? 'text-foreground'
-        : 'text-muted-foreground hover:hover:text-foreground'
+      activeTab === tab ? 'text-foreground' : 'text-muted-foreground hover:hover:text-foreground'
     }`;
 
   const tabIndicatorClass = (tab: McpTab) =>
@@ -359,9 +392,25 @@ const McpManager: React.FC = () => {
       {bridgeSyncing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="flex flex-col items-center gap-4 px-10 py-8 rounded-2xl bg-surface border border-border shadow-card">
-            <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <svg
+              className="animate-spin h-8 w-8 text-primary"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
             <span className="text-sm text-foreground font-medium">
               {i18nService.t('mcpBridgeSyncing') || 'Syncing MCP tools...'}
@@ -370,25 +419,21 @@ const McpManager: React.FC = () => {
         </div>
       )}
 
-      {actionError && (
-        <ErrorMessage
-          message={actionError}
-          onClose={() => setActionError('')}
-        />
-      )}
+      {actionError && <ErrorMessage message={actionError} onClose={() => setActionError('')} />}
 
       {/* MCP Bridge sync result */}
       {!bridgeSyncing && bridgeSyncResult && (
-        <div className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs border ${
-          bridgeSyncResult.error
-            ? 'dark:bg-red-500/10 bg-red-50 dark:text-red-400 text-red-600 dark:border-red-500/20 border-red-200'
-            : 'dark:bg-green-500/10 bg-green-50 dark:text-green-400 text-green-600 dark:border-green-500/20 border-green-200'
-        }`}>
+        <div
+          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs border ${
+            bridgeSyncResult.error
+              ? 'dark:bg-red-500/10 bg-red-50 dark:text-red-400 text-red-600 dark:border-red-500/20 border-red-200'
+              : 'dark:bg-green-500/10 bg-green-50 dark:text-green-400 text-green-600 dark:border-green-500/20 border-green-200'
+          }`}
+        >
           <span>
             {bridgeSyncResult.error
               ? `${i18nService.t('mcpBridgeSyncError') || 'Sync failed'}: ${bridgeSyncResult.error}`
-              : `${i18nService.t('mcpBridgeSyncDone') || 'MCP tools synced'}: ${bridgeSyncResult.tools} ${bridgeSyncResult.tools === 1 ? 'tool' : 'tools'}`
-            }
+              : `${i18nService.t('mcpBridgeSyncDone') || 'MCP tools synced'}: ${bridgeSyncResult.tools} ${bridgeSyncResult.tools === 1 ? 'tool' : 'tools'}`}
           </span>
           <Button
             type="button"
@@ -405,9 +450,7 @@ const McpManager: React.FC = () => {
       {/* Sticky toolbar: Description + Search + Tabs + Category pills */}
       <div className="sticky top-0 z-10 bg-claude-bg dark:bg-claude-darkBg pb-4 space-y-4 shadow-sm">
         {/* Description */}
-        <p className="text-sm text-muted-foreground">
-          {i18nService.t('mcpDescription')}
-        </p>
+        <p className="text-sm text-muted-foreground">{i18nService.t('mcpDescription')}</p>
 
         {/* Search */}
         <div className="flex items-center gap-3">
@@ -417,7 +460,7 @@ const McpManager: React.FC = () => {
               type="text"
               placeholder={i18nService.t('searchMcpServers')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 rounded-xl bg-surface text-foreground placeholder-secondary border border-border"
             />
             {searchQuery && (
@@ -436,7 +479,12 @@ const McpManager: React.FC = () => {
 
         {/* Tabs */}
         <div className="flex items-center border-b border-border">
-          <Button type="button" variant="ghost" onClick={() => setActiveTab('installed')} className={tabClass('installed')}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setActiveTab('installed')}
+            className={tabClass('installed')}
+          >
             {i18nService.t('mcpInstalled')}
             {servers.length > 0 && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
@@ -445,7 +493,12 @@ const McpManager: React.FC = () => {
             )}
             <div className={tabIndicatorClass('installed')} />
           </Button>
-          <Button type="button" variant="ghost" onClick={() => setActiveTab('marketplace')} className={tabClass('marketplace')}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setActiveTab('marketplace')}
+            className={tabClass('marketplace')}
+          >
             {i18nService.t('mcpMarketplace')}
             {marketplaceCount > 0 && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
@@ -454,7 +507,12 @@ const McpManager: React.FC = () => {
             )}
             <div className={tabIndicatorClass('marketplace')} />
           </Button>
-          <Button type="button" variant="ghost" onClick={() => setActiveTab('custom')} className={tabClass('custom')}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setActiveTab('custom')}
+            className={tabClass('custom')}
+          >
             {i18nService.t('mcpCustom')}
             {customCount > 0 && (
               <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
@@ -468,7 +526,7 @@ const McpManager: React.FC = () => {
         {/* Category filter pills (Marketplace only) */}
         {activeTab === 'marketplace' && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            {dynamicCategories.map((cat) => (
+            {dynamicCategories.map(cat => (
               <Button
                 key={cat.id}
                 type="button"
@@ -477,7 +535,8 @@ const McpManager: React.FC = () => {
                 onClick={() => setActiveCategory(cat.id)}
                 className="h-7 px-2.5 text-xs"
               >
-                {(i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) || i18nService.t(cat.key)}
+                {(i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) ||
+                  i18nService.t(cat.key)}
               </Button>
             ))}
           </div>
@@ -485,172 +544,190 @@ const McpManager: React.FC = () => {
       </div>
 
       <div>
-      {/* ── Tab: Installed ──────────────────────────────── */}
-      {activeTab === 'installed' && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filteredInstalled.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
-              {i18nService.t('mcpNoInstalledServers')}
-            </div>
-          ) : (
-            filteredInstalled.map((server) => {
-              const registryEntry = getRegistryEntryForServer(server);
-              const installedDescription = getInstalledDescription(server);
-              return (
-                <div
-                  key={server.id}
-                  className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
-                        <Plug className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm font-medium text-foreground truncate">
-                        {server.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenEditForm(server)}
-                        className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
-                        title={i18nService.t('editMcpServer')}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRequestDelete(server)}
-                        className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
-                        title={i18nService.t('deleteMcpServer')}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Switch
-                        checked={server.enabled}
-                        onCheckedChange={() => handleToggleEnabled(server.id)}
-                      />
-                    </div>
-                  </div>
-
-                  <ClampedText text={installedDescription} className="text-xs text-muted-foreground mb-2" />
-
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}>
-                      {server.transportType}
-                    </span>
-                    {server.transportType === 'stdio' && server.command && (
-                      <>
-                        <span className="shrink-0">·</span>
-                        <span className="truncate min-w-0">{getStdioCommandSummary(server.command, server.args)}</span>
-                      </>
-                    )}
-                    {(server.transportType === 'sse' || server.transportType === 'http') && server.url && (
-                      <>
-                        <span className="shrink-0">·</span>
-                        <span className="truncate min-w-0">{server.url}</span>
-                      </>
-                    )}
-                    {registryEntry?.requiredEnvKeys && registryEntry.requiredEnvKeys.length > 0 && (
-                      <>
-                        <span className="shrink-0">·</span>
-                        <span className="shrink-0 text-amber-500 dark:text-amber-400">
-                          {registryEntry.requiredEnvKeys.length} key{registryEntry.requiredEnvKeys.length > 1 ? 's' : ''}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* ── Tab: Marketplace ────────────────────────────── */}
-      {activeTab === 'marketplace' && (
-        <div>
+        {/* ── Tab: Installed ──────────────────────────────── */}
+        {activeTab === 'installed' && (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {filteredMarketplace.length === 0 ? (
+            {filteredInstalled.length === 0 ? (
               <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
-                {i18nService.t('noMcpServersAvailable')}
+                {i18nService.t('mcpNoInstalledServers')}
               </div>
             ) : (
-              filteredMarketplace.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
-                        <Plug className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm font-medium text-foreground truncate">
-                        {entry.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {installedRegistryIds.has(entry.id) ? (
-                        <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
-                          {i18nService.t('mcpInstalled')}
+              filteredInstalled.map(server => {
+                const registryEntry = getRegistryEntryForServer(server);
+                const installedDescription = getInstalledDescription(server);
+                return (
+                  <div
+                    key={server.id}
+                    className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
+                          <Plug className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {server.name}
                         </span>
-                      ) : (
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <Button
                           type="button"
-                          onClick={() => handleInstallFromRegistry(entry)}
-                          className="h-7 px-2.5 text-xs"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEditForm(server)}
+                          className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
+                          title={i18nService.t('editMcpServer')}
                         >
-                          {i18nService.t('mcpInstall')}
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRequestDelete(server)}
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                          title={i18nService.t('deleteMcpServer')}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Switch
+                          checked={server.enabled}
+                          onCheckedChange={() => handleToggleEnabled(server.id)}
+                        />
+                      </div>
+                    </div>
+
+                    <ClampedText
+                      text={installedDescription}
+                      className="text-xs text-muted-foreground mb-2"
+                    />
+
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
+                      <span
+                        className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
+                      >
+                        {server.transportType}
+                      </span>
+                      {server.transportType === 'stdio' && server.command && (
+                        <>
+                          <span className="shrink-0">·</span>
+                          <span className="truncate min-w-0">
+                            {getStdioCommandSummary(server.command, server.args)}
+                          </span>
+                        </>
+                      )}
+                      {(server.transportType === 'sse' || server.transportType === 'http') &&
+                        server.url && (
+                          <>
+                            <span className="shrink-0">·</span>
+                            <span className="truncate min-w-0">{server.url}</span>
+                          </>
+                        )}
+                      {registryEntry?.requiredEnvKeys &&
+                        registryEntry.requiredEnvKeys.length > 0 && (
+                          <>
+                            <span className="shrink-0">·</span>
+                            <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                              {registryEntry.requiredEnvKeys.length} key
+                              {registryEntry.requiredEnvKeys.length > 1 ? 's' : ''}
+                            </span>
+                          </>
+                        )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Marketplace ────────────────────────────── */}
+        {activeTab === 'marketplace' && (
+          <div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {filteredMarketplace.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
+                  {i18nService.t('noMcpServersAvailable')}
+                </div>
+              ) : (
+                filteredMarketplace.map(entry => (
+                  <div
+                    key={entry.id}
+                    className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
+                          <Plug className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {entry.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {installedRegistryIds.has(entry.id) ? (
+                          <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
+                            {i18nService.t('mcpInstalled')}
+                          </span>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={() => handleInstallFromRegistry(entry)}
+                            className="h-7 px-2.5 text-xs"
+                          >
+                            {i18nService.t('mcpInstall')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <ClampedText
+                      text={getRegistryEntryDescription(entry)}
+                      className="text-xs text-muted-foreground mb-2"
+                    />
+
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
+                      <span
+                        className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[entry.transportType] || ''}`}
+                      >
+                        {entry.transportType}
+                      </span>
+                      <span className="shrink-0">·</span>
+                      <span className="truncate min-w-0">
+                        {getStdioCommandSummary(entry.command, entry.defaultArgs)}
+                      </span>
+                      {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
+                        <>
+                          <span className="shrink-0">·</span>
+                          <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                            {entry.requiredEnvKeys.length} key
+                            {entry.requiredEnvKeys.length > 1 ? 's' : ''}
+                          </span>
+                        </>
                       )}
                     </div>
                   </div>
-
-                  <ClampedText text={getRegistryEntryDescription(entry)} className="text-xs text-muted-foreground mb-2" />
-
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[entry.transportType] || ''}`}>
-                      {entry.transportType}
-                    </span>
-                    <span className="shrink-0">·</span>
-                    <span className="truncate min-w-0">{getStdioCommandSummary(entry.command, entry.defaultArgs)}</span>
-                    {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
-                      <>
-                        <span className="shrink-0">·</span>
-                        <span className="shrink-0 text-amber-500 dark:text-amber-400">
-                          {entry.requiredEnvKeys.length} key{entry.requiredEnvKeys.length > 1 ? 's' : ''}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── Tab: Custom ─────────────────────────────────── */}
-      {activeTab === 'custom' && (
-        <div className="space-y-6">
-          {/* Custom servers grid (add button + server cards) */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {/* Add custom server card */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleOpenCreateForm}
-              className="rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary dark:hover:border-primary dark:hover:text-primary h-auto min-h-[120px]"
-            >
-              + {i18nService.t('addMcpServer')}
-            </Button>
-            {filteredCustom.map((server) => (
+        {/* ── Tab: Custom ─────────────────────────────────── */}
+        {activeTab === 'custom' && (
+          <div className="space-y-6">
+            {/* Custom servers grid (add button + server cards) */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {/* Add custom server card */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenCreateForm}
+                className="rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary dark:hover:border-primary dark:hover:text-primary h-auto min-h-[120px]"
+              >
+                + {i18nService.t('addMcpServer')}
+              </Button>
+              {filteredCustom.map(server => (
                 <div
                   key={server.id}
                   className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
@@ -692,10 +769,15 @@ const McpManager: React.FC = () => {
                     </div>
                   </div>
 
-                  <ClampedText text={server.description || getTransportSummary(server)} className="text-xs text-muted-foreground mb-2" />
+                  <ClampedText
+                    text={server.description || getTransportSummary(server)}
+                    className="text-xs text-muted-foreground mb-2"
+                  />
 
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
-                    <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}>
+                    <span
+                      className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
+                    >
                       {server.transportType}
                     </span>
                     {server.transportType === 'stdio' && server.command && (
@@ -704,54 +786,55 @@ const McpManager: React.FC = () => {
                         <span className="truncate min-w-0">{server.command}</span>
                       </>
                     )}
-                    {(server.transportType === 'sse' || server.transportType === 'http') && server.url && (
-                      <>
-                        <span className="shrink-0">·</span>
-                        <span className="truncate min-w-0">{server.url}</span>
-                      </>
-                    )}
+                    {(server.transportType === 'sse' || server.transportType === 'http') &&
+                      server.url && (
+                        <>
+                          <span className="shrink-0">·</span>
+                          <span className="truncate min-w-0">{server.url}</span>
+                        </>
+                      )}
                   </div>
                 </div>
               ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
 
       {/* Delete confirmation modal */}
       {pendingDelete && (
-        <Modal onClose={handleCancelDelete} overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60" className="w-full max-w-sm mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-5">
-            <div className="text-lg font-semibold text-foreground">
-              {i18nService.t('deleteMcpServer')}
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {i18nService.t('mcpDeleteConfirm').replace('{name}', pendingDelete.name)}
-            </p>
-            {actionError && (
-              <div className="mt-3 text-xs text-red-500">
-                {actionError}
-              </div>
-            )}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancelDelete}
-                disabled={isDeleting}
-                className="h-8 px-3 text-xs"
-              >
-                {i18nService.t('cancel')}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="h-8 px-3 text-xs"
-              >
-                {i18nService.t('confirmDelete')}
-              </Button>
-            </div>
+        <Modal
+          onClose={handleCancelDelete}
+          overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          className="w-full max-w-sm mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-5"
+        >
+          <div className="text-lg font-semibold text-foreground">
+            {i18nService.t('deleteMcpServer')}
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {i18nService.t('mcpDeleteConfirm').replace('{name}', pendingDelete.name)}
+          </p>
+          {actionError && <div className="mt-3 text-xs text-red-500">{actionError}</div>}
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={isDeleting}
+              className="h-8 px-3 text-xs"
+            >
+              {i18nService.t('cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="h-8 px-3 text-xs"
+            >
+              {i18nService.t('confirmDelete')}
+            </Button>
+          </div>
         </Modal>
       )}
 

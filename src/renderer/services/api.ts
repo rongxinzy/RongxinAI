@@ -2,7 +2,10 @@ import { isProviderEnabled, ProviderName, resolveCodingPlanBaseUrl } from '../..
 import { store } from '../store';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
-import { buildLocalThinkingRequestParams, type DirectChatRequestOptions } from './localThinkingRequest';
+import {
+  buildLocalThinkingRequestParams,
+  type DirectChatRequestOptions,
+} from './localThinkingRequest';
 
 export interface ApiConfig {
   apiKey: string;
@@ -15,7 +18,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public statusCode?: number,
-    public response?: any
+    public response?: any,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -66,7 +69,6 @@ class ApiService {
     if (normalized.endsWith('/chat/completions')) {
       return normalized;
     }
-
 
     // Handle /v1, /v4 etc. versioned paths
     if (/\/v\d+$/.test(normalized)) {
@@ -120,8 +122,7 @@ class ApiService {
   private formatOpenAIMessage(message: ChatMessagePayload, supportsImages: boolean) {
     if (supportsImages && message.images?.length) {
       const parts: Array<
-        | { type: 'text'; text: string }
-        | { type: 'image_url'; image_url: { url: string } }
+        { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
       > = [];
       if (message.content?.trim()) {
         parts.push({ type: 'text', text: message.content });
@@ -147,8 +148,7 @@ class ApiService {
 
     if (role === 'user' && supportsImages && message.images?.length) {
       const parts: Array<
-        | { type: 'input_text'; text: string }
-        | { type: 'input_image'; image_url: string }
+        { type: 'input_text'; text: string } | { type: 'input_image'; image_url: string }
       > = [];
       if (message.content?.trim()) {
         parts.push({ type: 'input_text', text: message.content });
@@ -178,9 +178,8 @@ class ApiService {
       return directOutputText;
     }
 
-    const nestedOutputText = typeof payload?.response?.output_text === 'string'
-      ? payload.response.output_text
-      : '';
+    const nestedOutputText =
+      typeof payload?.response?.output_text === 'string' ? payload.response.output_text : '';
     if (nestedOutputText) {
       return nestedOutputText;
     }
@@ -243,28 +242,48 @@ class ApiService {
   }
 
   private providerRequiresApiKey(provider: string): boolean {
-    return provider !== ProviderName.Ollama
-      && provider !== ProviderName.LlamaCpp
-      && provider !== ProviderName.Copilot;
+    return (
+      provider !== ProviderName.Ollama &&
+      provider !== ProviderName.LlamaCpp &&
+      provider !== ProviderName.Copilot
+    );
   }
 
   // 检测当前选择的模型属于哪个 provider
   private detectProvider(modelId: string, providerHint?: string): string {
     const normalizedHint = providerHint?.toLowerCase();
     if (
-      normalizedHint
-      && (
-        ['openai', 'deepseek', 'moonshot', 'zhipu', 'minimax', 'qwen', 'openrouter', 'gemini', 'anthropic', 'xiaomi', 'stepfun', 'volcengine', 'github-copilot', 'ollama'].includes(normalizedHint)
-        || normalizedHint === ProviderName.LlamaCpp
-        || normalizedHint.startsWith('custom_')
-      )
+      normalizedHint &&
+      ([
+        'openai',
+        'deepseek',
+        'moonshot',
+        'zhipu',
+        'minimax',
+        'qwen',
+        'openrouter',
+        'gemini',
+        'anthropic',
+        'xiaomi',
+        'stepfun',
+        'volcengine',
+        'github-copilot',
+        'ollama',
+      ].includes(normalizedHint) ||
+        normalizedHint === ProviderName.LlamaCpp ||
+        normalizedHint.startsWith('custom_'))
     ) {
       return normalizedHint;
     }
     const normalizedModelId = modelId.toLowerCase();
     if (normalizedModelId.startsWith('claude')) {
       return 'anthropic';
-    } else if (normalizedModelId.startsWith('gpt') || normalizedModelId.startsWith('o1') || normalizedModelId.startsWith('o3') || normalizedModelId.startsWith('o4')) {
+    } else if (
+      normalizedModelId.startsWith('gpt') ||
+      normalizedModelId.startsWith('o1') ||
+      normalizedModelId.startsWith('o3') ||
+      normalizedModelId.startsWith('o4')
+    ) {
       return 'openai';
     } else if (normalizedModelId.startsWith('gemini')) {
       return 'gemini';
@@ -282,7 +301,12 @@ class ApiService {
       return 'xiaomi';
     } else if (normalizedModelId.startsWith('step-')) {
       return 'stepfun';
-    } else if (normalizedModelId.startsWith('doubao') || normalizedModelId.includes('volcengine') || normalizedModelId.includes('ep-') || normalizedModelId.startsWith('ark-')) {
+    } else if (
+      normalizedModelId.startsWith('doubao') ||
+      normalizedModelId.includes('volcengine') ||
+      normalizedModelId.includes('ep-') ||
+      normalizedModelId.startsWith('ark-')
+    ) {
       return 'volcengine';
     }
     return 'openai'; // 默认使用 OpenAI 兼容格式
@@ -294,16 +318,22 @@ class ApiService {
 
     if (appConfig?.providers?.[provider]) {
       const providerConfig = appConfig.providers[provider];
-      if (isProviderEnabled(provider, providerConfig) && (providerConfig.apiKey || !this.providerRequiresApiKey(provider))) {
+      if (
+        isProviderEnabled(provider, providerConfig) &&
+        (providerConfig.apiKey || !this.providerRequiresApiKey(provider))
+      ) {
         let baseUrl = providerConfig.baseUrl;
         let apiFormat = this.normalizeApiFormat(providerConfig.apiFormat);
 
-        if (providerConfig.codingPlanEnabled && (apiFormat === 'anthropic' || apiFormat === 'openai')) {
+        if (
+          providerConfig.codingPlanEnabled &&
+          (apiFormat === 'anthropic' || apiFormat === 'openai')
+        ) {
           const resolved = resolveCodingPlanBaseUrl(provider, true, apiFormat, baseUrl);
           baseUrl = resolved.baseUrl;
           apiFormat = resolved.effectiveFormat;
         }
-        
+
         return {
           apiKey: providerConfig.apiKey,
           baseUrl,
@@ -323,24 +353,28 @@ class ApiService {
     options: DirectChatRequestOptions = {},
   ): Promise<{ content: string; reasoning?: string }> {
     if (!this.config) {
-      throw new ApiError('API configuration not set. Please configure your API settings in the settings menu.');
+      throw new ApiError(
+        'API configuration not set. Please configure your API settings in the settings menu.',
+      );
     }
 
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
     const selectedModel = requestedModelId
-      ? modelState.availableModels.find(model =>
-        model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId,
-      ) ?? modelState.defaultSelectedModel
+      ? (modelState.availableModels.find(
+          model =>
+            model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId,
+        ) ?? modelState.defaultSelectedModel)
       : modelState.defaultSelectedModel;
     const provider = this.detectProvider(
       selectedModel.id,
-      selectedModel.providerKey ?? selectedModel.provider
+      selectedModel.providerKey ?? selectedModel.provider,
     );
     const supportsImages = !!selectedModel.supportsImage;
-    const userMessage: ChatUserMessageInput = typeof message === 'string'
-      ? { content: message }
-      : { content: message.content || '', images: message.images };
+    const userMessage: ChatUserMessageInput =
+      typeof message === 'string'
+        ? { content: message }
+        : { content: message.content || '', images: message.images };
 
     // 尝试获取模型对应 provider 的配置
     let effectiveConfig = this.config;
@@ -350,7 +384,9 @@ class ApiService {
     }
 
     if (this.providerRequiresApiKey(provider) && !effectiveConfig.apiKey) {
-      throw new ApiError('API key is not configured. Please set your API key in the settings menu.');
+      throw new ApiError(
+        'API key is not configured. Please set your API key in the settings menu.',
+      );
     }
 
     // 根据 API 协议格式决定调用方式：
@@ -358,24 +394,49 @@ class ApiService {
     // - openai: OpenAI 兼容协议 (OpenAI provider uses /v1/responses)
     // - gemini: Google Gemini 原生协议 (streamGenerateContent)
     const normalizedApiFormat = this.normalizeApiFormat(effectiveConfig.apiFormat);
-    console.log(`[api-chat] provider=${provider}, model=${selectedModel.id}, apiFormat=${normalizedApiFormat}, baseUrl=${effectiveConfig.baseUrl}`);
+    console.log(
+      `[api-chat] provider=${provider}, model=${selectedModel.id}, apiFormat=${normalizedApiFormat}, baseUrl=${effectiveConfig.baseUrl}`,
+    );
 
     if (normalizedApiFormat === 'gemini') {
-      return this.chatWithGemini(userMessage, onProgress, history, selectedModel.id, effectiveConfig, supportsImages);
+      return this.chatWithGemini(
+        userMessage,
+        onProgress,
+        history,
+        selectedModel.id,
+        effectiveConfig,
+        supportsImages,
+      );
     }
 
     if (normalizedApiFormat === 'anthropic') {
-      return this.chatWithAnthropic(userMessage, onProgress, history, selectedModel.id, effectiveConfig, supportsImages);
+      return this.chatWithAnthropic(
+        userMessage,
+        onProgress,
+        history,
+        selectedModel.id,
+        effectiveConfig,
+        supportsImages,
+      );
     }
 
     try {
-      return await this.chatWithOpenAICompatible(userMessage, onProgress, history, selectedModel.id, effectiveConfig, supportsImages, provider, options);
+      return await this.chatWithOpenAICompatible(
+        userMessage,
+        onProgress,
+        history,
+        selectedModel.id,
+        effectiveConfig,
+        supportsImages,
+        provider,
+        options,
+      );
     } catch (error) {
       // Auto-retry once for GitHub Copilot auth errors (401 / token expired)
       if (
-        provider === 'github-copilot'
-        && error instanceof ApiError
-        && (error.statusCode === 401 || error.statusCode === 403)
+        provider === 'github-copilot' &&
+        error instanceof ApiError &&
+        (error.statusCode === 401 || error.statusCode === 403)
       ) {
         console.log('[api-chat] Copilot auth error detected, attempting token refresh and retry');
         try {
@@ -387,10 +448,22 @@ class ApiService {
               apiKey: result.token,
               ...(result.baseUrl ? { baseUrl: result.baseUrl } : {}),
             };
-            return await this.chatWithOpenAICompatible(userMessage, onProgress, history, selectedModel.id, refreshedConfig, supportsImages, provider, options);
+            return await this.chatWithOpenAICompatible(
+              userMessage,
+              onProgress,
+              history,
+              selectedModel.id,
+              refreshedConfig,
+              supportsImages,
+              provider,
+              options,
+            );
           }
         } catch (refreshError) {
-          console.warn('[api-chat] Copilot token refresh failed, throwing original error:', refreshError);
+          console.warn(
+            '[api-chat] Copilot token refresh failed, throwing original error:',
+            refreshError,
+          );
         }
       }
       throw error;
@@ -404,7 +477,7 @@ class ApiService {
     history: ChatMessagePayload[] = [],
     modelId: string = 'claude-3-5-sonnet-20241022',
     config: ApiConfig = this.config!,
-    supportsImages: boolean = false
+    supportsImages: boolean = false,
   ): Promise<{ content: string; reasoning?: string }> {
     let fullContent = '';
     let fullReasoning = '';
@@ -421,11 +494,14 @@ class ApiService {
       const formattedHistory = nonSystemMessages
         .map(item => this.formatAnthropicMessage(item, supportsImages))
         .filter(Boolean);
-      const formattedUserMessage = this.formatAnthropicMessage({
-        role: 'user',
-        content: message.content,
-        images: message.images,
-      }, supportsImages);
+      const formattedUserMessage = this.formatAnthropicMessage(
+        {
+          role: 'user',
+          content: message.content,
+          images: message.images,
+        },
+        supportsImages,
+      );
       const messages = [
         ...formattedHistory,
         ...(formattedUserMessage ? [formattedUserMessage] : []),
@@ -441,7 +517,9 @@ class ApiService {
       // 添加 system 消息
       if (systemMessages.length > 0) {
         const systemContent = systemMessages
-          .map(m => this.mergeContentWithImageHint(m.content, supportsImages ? undefined : m.images))
+          .map(m =>
+            this.mergeContentWithImageHint(m.content, supportsImages ? undefined : m.images),
+          )
           .filter(Boolean)
           .join('\n');
         if (systemContent) {
@@ -450,14 +528,15 @@ class ApiService {
       }
 
       // 检测是否是 thinking 模型
-      const isThinkingModel = modelId.includes('claude-3-7') ||
-                              modelId.includes('claude-sonnet-4') ||
-                              modelId.includes('claude-opus-4');
+      const isThinkingModel =
+        modelId.includes('claude-3-7') ||
+        modelId.includes('claude-sonnet-4') ||
+        modelId.includes('claude-opus-4');
 
       if (isThinkingModel) {
         requestBody.thinking = {
           type: 'enabled',
-          budget_tokens: 10000
+          budget_tokens: 10000,
         };
         // Thinking 模型需要更大的 max_tokens
         requestBody.max_tokens = 16000;
@@ -467,7 +546,7 @@ class ApiService {
         let aborted = false;
 
         // 设置流式监听器
-        const removeDataListener = window.electron.api.onStreamData(requestId, (chunk) => {
+        const removeDataListener = window.electron.api.onStreamData(requestId, chunk => {
           const lines = chunk.split('\n');
 
           for (const line of lines) {
@@ -505,7 +584,7 @@ class ApiService {
           }
         });
 
-        const removeErrorListener = window.electron.api.onStreamError(requestId, (error) => {
+        const removeErrorListener = window.electron.api.onStreamError(requestId, error => {
           this.cleanup();
           reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
@@ -513,45 +592,58 @@ class ApiService {
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
           aborted = true;
           this.cleanup();
-          resolve({ content: fullContent || 'Response was stopped.', reasoning: fullReasoning || undefined });
+          resolve({
+            content: fullContent || 'Response was stopped.',
+            reasoning: fullReasoning || undefined,
+          });
         });
 
-        this.cleanupFunctions = [removeDataListener, removeDoneListener, removeErrorListener, removeAbortListener];
+        this.cleanupFunctions = [
+          removeDataListener,
+          removeDoneListener,
+          removeErrorListener,
+          removeAbortListener,
+        ];
 
         // 发起流式请求
-        console.log(`[api-chat] Anthropic request: baseUrl=${config.baseUrl}, finalUrl=${config.baseUrl}/v1/messages, model=${modelId}, apiFormat=${config.apiFormat}`);
-        window.electron.api.stream({
-          url: `${config.baseUrl}/v1/messages`,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': config.apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify(requestBody),
-          requestId,
-        }).then((response) => {
-          if (!response.ok && !aborted) {
-            this.cleanup();
-            let errorMessage = 'API request failed';
-            if (response.error) {
-              try {
-                const errorData = JSON.parse(response.error);
-                if (errorData.error?.message) {
-                  errorMessage = errorData.error.message;
+        console.log(
+          `[api-chat] Anthropic request: baseUrl=${config.baseUrl}, finalUrl=${config.baseUrl}/v1/messages, model=${modelId}, apiFormat=${config.apiFormat}`,
+        );
+        window.electron.api
+          .stream({
+            url: `${config.baseUrl}/v1/messages`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': config.apiKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify(requestBody),
+            requestId,
+          })
+          .then(response => {
+            if (!response.ok && !aborted) {
+              this.cleanup();
+              let errorMessage = 'API request failed';
+              if (response.error) {
+                try {
+                  const errorData = JSON.parse(response.error);
+                  if (errorData.error?.message) {
+                    errorMessage = errorData.error.message;
+                  }
+                } catch {
+                  errorMessage = response.error;
                 }
-              } catch {
-                errorMessage = response.error;
               }
+              reject(new ApiError(errorMessage, response.status));
             }
-            reject(new ApiError(errorMessage, response.status));
-          }
-        }).catch((error) => {
-          if (!aborted) {
-            this.cleanup();
-            reject(new ApiError(error.message || 'Network error'));
-          }
-        });
+          })
+          .catch(error => {
+            if (!aborted) {
+              this.cleanup();
+              reject(new ApiError(error.message || 'Network error'));
+            }
+          });
       });
     } catch (error) {
       this.cleanup();
@@ -569,7 +661,7 @@ class ApiService {
     history: ChatMessagePayload[] = [],
     modelId: string = 'gemini-3-pro-preview',
     config: ApiConfig = this.config!,
-    supportsImages: boolean = false
+    supportsImages: boolean = false,
   ): Promise<{ content: string; reasoning?: string }> {
     let fullContent = '';
     let fullReasoning = '';
@@ -610,7 +702,11 @@ class ApiService {
         })),
         {
           role: 'user',
-          parts: formatGeminiParts({ role: 'user', content: message.content, images: message.images }),
+          parts: formatGeminiParts({
+            role: 'user',
+            content: message.content,
+            images: message.images,
+          }),
         },
       ].filter(c => c.parts.length > 0);
 
@@ -618,7 +714,9 @@ class ApiService {
 
       if (systemMessages.length > 0) {
         const systemContent = systemMessages
-          .map(m => this.mergeContentWithImageHint(m.content, supportsImages ? undefined : m.images))
+          .map(m =>
+            this.mergeContentWithImageHint(m.content, supportsImages ? undefined : m.images),
+          )
           .filter(Boolean)
           .join('\n');
         if (systemContent) {
@@ -628,13 +726,15 @@ class ApiService {
 
       requestBody.generationConfig = { maxOutputTokens: 8192 };
 
-      const baseUrl = config.baseUrl.trim().replace(/\/+$/, '') || 'https://generativelanguage.googleapis.com/v1beta';
+      const baseUrl =
+        config.baseUrl.trim().replace(/\/+$/, '') ||
+        'https://generativelanguage.googleapis.com/v1beta';
       const requestUrl = `${baseUrl}/models/${modelId}:streamGenerateContent?alt=sse`;
 
       return new Promise((resolve, reject) => {
         let aborted = false;
 
-        const removeDataListener = window.electron.api.onStreamData(requestId, (chunk) => {
+        const removeDataListener = window.electron.api.onStreamData(requestId, chunk => {
           const lines = chunk.split('\n');
 
           for (const line of lines) {
@@ -671,7 +771,7 @@ class ApiService {
           }
         });
 
-        const removeErrorListener = window.electron.api.onStreamError(requestId, (error) => {
+        const removeErrorListener = window.electron.api.onStreamError(requestId, error => {
           this.cleanup();
           reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
@@ -679,43 +779,56 @@ class ApiService {
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
           aborted = true;
           this.cleanup();
-          resolve({ content: fullContent || 'Response was stopped.', reasoning: fullReasoning || undefined });
+          resolve({
+            content: fullContent || 'Response was stopped.',
+            reasoning: fullReasoning || undefined,
+          });
         });
 
-        this.cleanupFunctions = [removeDataListener, removeDoneListener, removeErrorListener, removeAbortListener];
+        this.cleanupFunctions = [
+          removeDataListener,
+          removeDoneListener,
+          removeErrorListener,
+          removeAbortListener,
+        ];
 
-        console.log(`[api-chat] Gemini request: baseUrl=${config.baseUrl}, finalUrl=${requestUrl}, model=${modelId}`);
-        window.electron.api.stream({
-          url: requestUrl,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': config.apiKey,
-          },
-          body: JSON.stringify(requestBody),
-          requestId,
-        }).then((response) => {
-          if (!response.ok && !aborted) {
-            this.cleanup();
-            let errorMessage = 'API request failed';
-            if (response.error) {
-              try {
-                const errorData = JSON.parse(response.error);
-                if (errorData.error?.message) {
-                  errorMessage = errorData.error.message;
+        console.log(
+          `[api-chat] Gemini request: baseUrl=${config.baseUrl}, finalUrl=${requestUrl}, model=${modelId}`,
+        );
+        window.electron.api
+          .stream({
+            url: requestUrl,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': config.apiKey,
+            },
+            body: JSON.stringify(requestBody),
+            requestId,
+          })
+          .then(response => {
+            if (!response.ok && !aborted) {
+              this.cleanup();
+              let errorMessage = 'API request failed';
+              if (response.error) {
+                try {
+                  const errorData = JSON.parse(response.error);
+                  if (errorData.error?.message) {
+                    errorMessage = errorData.error.message;
+                  }
+                } catch {
+                  errorMessage = response.error;
                 }
-              } catch {
-                errorMessage = response.error;
               }
+              reject(new ApiError(errorMessage, response.status));
             }
-            reject(new ApiError(errorMessage, response.status));
-          }
-        }).catch((error) => {
-          if (!aborted) {
-            this.cleanup();
-            reject(new ApiError(error.message || 'Network error'));
-          }
-        });
+          })
+          .catch(error => {
+            if (!aborted) {
+              this.cleanup();
+              reject(new ApiError(error.message || 'Network error'));
+            }
+          });
       });
     } catch (error) {
       this.cleanup();
@@ -751,21 +864,17 @@ class ApiService {
         content: message.content,
         images: message.images,
       };
-      const messages = [
-        ...history,
-        userMessage,
-      ]
+      const messages = [...history, userMessage]
         .map(item => this.formatOpenAIMessage(item, supportsImages))
         .filter(Boolean);
       const systemInstructions = history
         .filter(item => item.role === 'system')
-        .map(item => this.mergeContentWithImageHint(item.content, supportsImages ? undefined : item.images))
+        .map(item =>
+          this.mergeContentWithImageHint(item.content, supportsImages ? undefined : item.images),
+        )
         .filter(Boolean)
         .join('\n');
-      const responseInputMessages = [
-        ...history.filter(item => item.role !== 'system'),
-        userMessage,
-      ]
+      const responseInputMessages = [...history.filter(item => item.role !== 'system'), userMessage]
         .map(item => this.formatOpenAIResponsesInputMessage(item, supportsImages))
         .filter(Boolean);
 
@@ -775,7 +884,7 @@ class ApiService {
         let currentEvent = '';
 
         // 设置流式监听器
-        const removeDataListener = window.electron.api.onStreamData(requestId, (chunk) => {
+        const removeDataListener = window.electron.api.onStreamData(requestId, chunk => {
           sseBuffer += chunk;
           const lines = sseBuffer.split('\n');
           sseBuffer = lines.pop() ?? '';
@@ -802,24 +911,21 @@ class ApiService {
 
               if (useResponsesApi) {
                 const eventType = currentEvent || String(parsed.type || '');
-                const content = (
-                  (eventType === 'response.output_text.delta' || eventType === 'response.output.delta')
-                  && typeof parsed.delta === 'string'
-                )
-                  ? parsed.delta
-                  : '';
-                const reasoning = (
-                  eventType === 'response.reasoning_summary_text.delta'
-                  && typeof parsed.delta === 'string'
-                )
-                  ? parsed.delta
-                  : '';
-                const completedText = (
-                  eventType === 'response.completed'
-                  || eventType === 'response.output_item.done'
-                )
-                  ? this.extractResponsesOutputText(parsed)
-                  : '';
+                const content =
+                  (eventType === 'response.output_text.delta' ||
+                    eventType === 'response.output.delta') &&
+                  typeof parsed.delta === 'string'
+                    ? parsed.delta
+                    : '';
+                const reasoning =
+                  eventType === 'response.reasoning_summary_text.delta' &&
+                  typeof parsed.delta === 'string'
+                    ? parsed.delta
+                    : '';
+                const completedText =
+                  eventType === 'response.completed' || eventType === 'response.output_item.done'
+                    ? this.extractResponsesOutputText(parsed)
+                    : '';
 
                 if (content) {
                   fullContent += content;
@@ -838,13 +944,14 @@ class ApiService {
 
               const delta = parsed.choices?.[0]?.delta || {};
               const content = typeof delta.content === 'string' ? delta.content : '';
-              const reasoning = typeof delta.reasoning_content === 'string'
-                ? delta.reasoning_content
-                : typeof delta.reasoning === 'string'
-                  ? delta.reasoning
-                  : typeof delta.thoughts === 'string'
-                    ? delta.thoughts
-                    : '';
+              const reasoning =
+                typeof delta.reasoning_content === 'string'
+                  ? delta.reasoning_content
+                  : typeof delta.reasoning === 'string'
+                    ? delta.reasoning
+                    : typeof delta.thoughts === 'string'
+                      ? delta.thoughts
+                      : '';
 
               if (content) {
                 fullContent += content;
@@ -870,7 +977,7 @@ class ApiService {
           }
         });
 
-        const removeErrorListener = window.electron.api.onStreamError(requestId, (error) => {
+        const removeErrorListener = window.electron.api.onStreamError(requestId, error => {
           this.cleanup();
           reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
@@ -878,10 +985,18 @@ class ApiService {
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
           aborted = true;
           this.cleanup();
-          resolve({ content: fullContent || 'Response was stopped.', reasoning: fullReasoning || undefined });
+          resolve({
+            content: fullContent || 'Response was stopped.',
+            reasoning: fullReasoning || undefined,
+          });
         });
 
-        this.cleanupFunctions = [removeDataListener, removeDoneListener, removeErrorListener, removeAbortListener];
+        this.cleanupFunctions = [
+          removeDataListener,
+          removeDoneListener,
+          removeErrorListener,
+          removeAbortListener,
+        ];
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -904,7 +1019,9 @@ class ApiService {
         const requestUrl = useResponsesApi
           ? this.buildOpenAIResponsesUrl(config.baseUrl)
           : this.buildOpenAICompatibleChatCompletionsUrl(config.baseUrl);
-        console.log(`[api-chat] OpenAI-compat request: provider=${provider}, baseUrl=${config.baseUrl}, finalUrl=${requestUrl}, model=${modelId}, apiFormat=${config.apiFormat}`);
+        console.log(
+          `[api-chat] OpenAI-compat request: provider=${provider}, baseUrl=${config.baseUrl}, finalUrl=${requestUrl}, model=${modelId}, apiFormat=${config.apiFormat}`,
+        );
         const requestBody: Record<string, unknown> = useResponsesApi
           ? {
               model: modelId,
@@ -919,36 +1036,42 @@ class ApiService {
         if (useResponsesApi && systemInstructions) {
           requestBody.instructions = systemInstructions;
         }
-        Object.assign(requestBody, buildLocalThinkingRequestParams(provider, options.localThinkingEnabled));
+        Object.assign(
+          requestBody,
+          buildLocalThinkingRequestParams(provider, options.localThinkingEnabled),
+        );
 
-        window.electron.api.stream({
-          url: requestUrl,
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-          requestId,
-        }).then((response) => {
-          if (!response.ok && !aborted) {
-            this.cleanup();
-            let errorMessage = 'API request failed';
-            if (response.error) {
-              try {
-                const errorData = JSON.parse(response.error);
-                if (errorData.error?.message) {
-                  errorMessage = errorData.error.message;
+        window.electron.api
+          .stream({
+            url: requestUrl,
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            requestId,
+          })
+          .then(response => {
+            if (!response.ok && !aborted) {
+              this.cleanup();
+              let errorMessage = 'API request failed';
+              if (response.error) {
+                try {
+                  const errorData = JSON.parse(response.error);
+                  if (errorData.error?.message) {
+                    errorMessage = errorData.error.message;
+                  }
+                } catch {
+                  errorMessage = response.error;
                 }
-              } catch {
-                errorMessage = response.error;
               }
+              reject(new ApiError(errorMessage, response.status));
             }
-            reject(new ApiError(errorMessage, response.status));
-          }
-        }).catch((error) => {
-          if (!aborted) {
-            this.cleanup();
-            reject(new ApiError(error.message || 'Network error'));
-          }
-        });
+          })
+          .catch(error => {
+            if (!aborted) {
+              this.cleanup();
+              reject(new ApiError(error.message || 'Network error'));
+            }
+          });
       });
     } catch (error) {
       this.cleanup();

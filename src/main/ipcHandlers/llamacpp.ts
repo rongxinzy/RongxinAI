@@ -92,11 +92,11 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
 
 export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
   return (
-    reason === 'llamacpp-model-loaded'
-    || reason === 'llamacpp-model-unloaded'
-    || reason === 'llamacpp-model-launched'
-    || reason === 'llamacpp-model-stopped'
-    || reason === 'llamacpp-model-visibility-refresh'
+    reason === 'llamacpp-model-loaded' ||
+    reason === 'llamacpp-model-unloaded' ||
+    reason === 'llamacpp-model-launched' ||
+    reason === 'llamacpp-model-stopped' ||
+    reason === 'llamacpp-model-visibility-refresh'
   );
 }
 
@@ -112,9 +112,9 @@ export function shouldSyncOpenClawForRunningModelRefresh(input: {
   );
 
   return (
-    llamaCppEnabled
-    && (input.runningModelsChanged || input.appConfigChanged)
-    && shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
+    llamaCppEnabled &&
+    (input.runningModelsChanged || input.appConfigChanged) &&
+    shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
   );
 }
 
@@ -128,9 +128,7 @@ export function getLlamaCppLoadedModelLimitViolation(input: {
     targetModelName: input.targetModelName,
     runningModelNames: Array.from(
       new Set(
-        input.runningModels
-          .map(model => (model.name || model.model || '').trim())
-          .filter(Boolean),
+        input.runningModels.map(model => (model.name || model.model || '').trim()).filter(Boolean),
       ),
     ),
   });
@@ -165,17 +163,17 @@ export function hasRecoveredVram(input: {
   return currentFreeMiB - beforeFreeMiB >= requiredRecoveryMiB;
 }
 
-
 function getLlamaCppModelLogClearNames(
   requestedModelName: string,
   runningModel?: { name?: string; model?: string; id?: string },
 ): string[] {
-  return Array.from(new Set([
-    requestedModelName,
-    runningModel?.name,
-    runningModel?.model,
-    runningModel?.id,
-  ].map(value => value?.trim()).filter((value): value is string => Boolean(value))));
+  return Array.from(
+    new Set(
+      [requestedModelName, runningModel?.name, runningModel?.model, runningModel?.id]
+        .map(value => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
 }
 
 function matchesRunningModelName(
@@ -247,7 +245,7 @@ export function registerLlamaCppIpcHandlers(
       forceGatewayRestartIfRunning?: boolean;
     }) => Promise<{ success: boolean; error?: string }>;
   },
-  ): void {
+): void {
   const updateRunningModelBindings = async (
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
     reason: string,
@@ -262,12 +260,14 @@ export function registerLlamaCppIpcHandlers(
     if (appConfigUpdate.changed) {
       store.set('app_config', appConfigUpdate.config);
     }
-    if (shouldSyncOpenClawForRunningModelRefresh({
-      reason,
-      runningModelsChanged,
-      appConfigChanged: appConfigUpdate.changed,
-      appConfig: appConfigUpdate.config,
-    })) {
+    if (
+      shouldSyncOpenClawForRunningModelRefresh({
+        reason,
+        runningModelsChanged,
+        appConfigChanged: appConfigUpdate.changed,
+        appConfig: appConfigUpdate.config,
+      })
+    ) {
       await options.syncOpenClawConfig({
         reason,
         restartGatewayIfRunning: true,
@@ -301,7 +301,9 @@ export function registerLlamaCppIpcHandlers(
     broadcast(LlamaCppIpcChannel.StatusChanged, status);
   const sendProgress = (progress: LlamaCppInstallProgress) =>
     broadcast(LlamaCppIpcChannel.InstallProgress, progress);
-  const { clearModelLaunchLog, sendModelLaunchLog } = registerLlamaCppModelLaunchLogIpcHandlers({ broadcast });
+  const { clearModelLaunchLog, sendModelLaunchLog } = registerLlamaCppModelLaunchLogIpcHandlers({
+    broadcast,
+  });
   const loadModelLock = new LlamaCppModelLoadLock();
   const serviceTransitionLock = new LlamaCppServiceTransitionLock();
   const runServiceTransition = async <T>(action: () => Promise<T>): Promise<T> =>
@@ -329,7 +331,7 @@ export function registerLlamaCppIpcHandlers(
     }
   });
   manager.on('install-progress', sendProgress);
-  manager.on(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, (event) => {
+  manager.on(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, event => {
     for (const modelName of event.modelNames) {
       clearModelLaunchLog(modelName);
     }
@@ -396,65 +398,77 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
-  ipcMain.handle(LlamaCppIpcChannel.Restart, async () => await runServiceTransition(async () => {
-    const wasRunning = manager.getStatus().status === 'running';
-    const nextStatus = await applyLlamaCppServiceTransition({
-      wasRunning,
-      stop: () => manager.stop(),
-      start: () => manager.start(),
-      applyConfig: () => undefined,
-      clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-      refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
-      setBindingRefreshSuppressed: suppressed => {
-        bindingRefreshSuppressed = suppressed;
-        if (suppressed) bindingRefreshGeneration += 1;
-      },
-    });
-    return nextStatus ?? manager.getStatus();
-  }));
+  ipcMain.handle(
+    LlamaCppIpcChannel.Restart,
+    async () =>
+      await runServiceTransition(async () => {
+        const wasRunning = manager.getStatus().status === 'running';
+        const nextStatus = await applyLlamaCppServiceTransition({
+          wasRunning,
+          stop: () => manager.stop(),
+          start: () => manager.start(),
+          applyConfig: () => undefined,
+          clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
+          refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
+          setBindingRefreshSuppressed: suppressed => {
+            bindingRefreshSuppressed = suppressed;
+            if (suppressed) bindingRefreshGeneration += 1;
+          },
+        });
+        return nextStatus ?? manager.getStatus();
+      }),
+  );
   ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
     getLlamaCppServiceConfig(options.getStore()),
   );
-  ipcMain.handle(LlamaCppIpcChannel.SetServiceConfig, async (_event, config: LlamaCppServiceConfig) => {
-    const sanitized = sanitizeLlamaCppServiceConfig(config);
-    options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
-    return sanitized;
-  });
+  ipcMain.handle(
+    LlamaCppIpcChannel.SetServiceConfig,
+    async (_event, config: LlamaCppServiceConfig) => {
+      const sanitized = sanitizeLlamaCppServiceConfig(config);
+      options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
+      return sanitized;
+    },
+  );
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
-  ipcMain.handle(LlamaCppIpcChannel.SetModelsDir, async (_event, modelsDir: unknown) => await runServiceTransition(async () => {
-    const store = options.getStore();
-    const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {};
-    const trimmedModelsDir = typeof modelsDir === 'string' ? modelsDir.trim() : '';
-    const nextConfig = sanitizeLlamaCppServiceConfig({
-      ...currentConfig,
-      modelsDir: trimmedModelsDir || undefined,
-    });
-    const modelsDirChanged = (currentConfig.modelsDir?.trim() || '') !== (nextConfig.modelsDir?.trim() || '');
-    if (!modelsDirChanged) return manager.getModelsDir();
+  ipcMain.handle(
+    LlamaCppIpcChannel.SetModelsDir,
+    async (_event, modelsDir: unknown) =>
+      await runServiceTransition(async () => {
+        const store = options.getStore();
+        const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {};
+        const trimmedModelsDir = typeof modelsDir === 'string' ? modelsDir.trim() : '';
+        const nextConfig = sanitizeLlamaCppServiceConfig({
+          ...currentConfig,
+          modelsDir: trimmedModelsDir || undefined,
+        });
+        const modelsDirChanged =
+          (currentConfig.modelsDir?.trim() || '') !== (nextConfig.modelsDir?.trim() || '');
+        if (!modelsDirChanged) return manager.getModelsDir();
 
-    const wasRunning = manager.getStatus().status === 'running';
-    const nextStatus = await applyLlamaCppServiceTransition({
-      wasRunning,
-      stop: () => manager.stop(),
-      start: () => manager.start(),
-      applyConfig: () => {
-        if (trimmedModelsDir) {
-          fs.mkdirSync(trimmedModelsDir, { recursive: true });
+        const wasRunning = manager.getStatus().status === 'running';
+        const nextStatus = await applyLlamaCppServiceTransition({
+          wasRunning,
+          stop: () => manager.stop(),
+          start: () => manager.start(),
+          applyConfig: () => {
+            if (trimmedModelsDir) {
+              fs.mkdirSync(trimmedModelsDir, { recursive: true });
+            }
+            store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
+          },
+          clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
+          refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
+          setBindingRefreshSuppressed: suppressed => {
+            bindingRefreshSuppressed = suppressed;
+            if (suppressed) bindingRefreshGeneration += 1;
+          },
+        });
+        if (wasRunning && nextStatus?.status !== 'running') {
+          throw new Error(t('llamacppServiceStartupUnknown'));
         }
-        store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
-      },
-      clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-      refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
-      setBindingRefreshSuppressed: suppressed => {
-        bindingRefreshSuppressed = suppressed;
-        if (suppressed) bindingRefreshGeneration += 1;
-      },
-    });
-    if (wasRunning && nextStatus?.status !== 'running') {
-      throw new Error(t('llamacppServiceStartupUnknown'));
-    }
-    return manager.getModelsDir();
-  }));
+        return manager.getModelsDir();
+      }),
+  );
 
   ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
     return await manager.listLocalModels();
@@ -480,7 +494,8 @@ export function registerLlamaCppIpcHandlers(
     const store = options.getStore();
     const modelPreferences = getLlamaCppModelPreferences(store);
     if (modelPreferences[result.removedModelName]) {
-      const { [result.removedModelName]: _removedPreference, ...nextPreferences } = modelPreferences;
+      const { [result.removedModelName]: _removedPreference, ...nextPreferences } =
+        modelPreferences;
       store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
     }
     const current = store.get<LlamaCppOpenClawAppConfig>('app_config');
@@ -511,7 +526,9 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.ImportModelFiles, async (_event, input: unknown) => {
     const paths = Array.isArray(input)
-      ? input.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      ? input.filter(
+          (value): value is string => typeof value === 'string' && value.trim().length > 0,
+        )
       : [];
     if (paths.length === 0) {
       const result: LlamaCppImportModelFilesResult = {
@@ -538,10 +555,16 @@ export function registerLlamaCppIpcHandlers(
     launchLogger.info(LlamaCppModelLaunchLogPhase.Requested, undefined, { modelName });
     if (!modelName) {
       launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, 'Model name is required');
-      throw new Error(t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)));
+      throw new Error(
+        t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)),
+      );
     }
     if (serviceTransitionLock.isActive()) {
-      launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, 'Service transition is active');
+      launchLogger.error(
+        LlamaCppModelLaunchLogPhase.Failed,
+        undefined,
+        'Service transition is active',
+      );
       throw new Error(t('llamacppLoadModelServiceUnavailable'));
     }
     return await loadModelLock.runExclusive(
@@ -604,14 +627,17 @@ export function registerLlamaCppIpcHandlers(
         try {
           const result = await loadLlamaCppModelThroughPipeline({
             launchInput: { ...inputWithPreferences, model: modelName },
-            runtimeBackend: serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
+            runtimeBackend:
+              serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
             runtimeCapabilities,
             nvidiaSnapshot,
             modelSizeBytes: targetModel?.size,
             onLog: launchLogger.report,
-            loadModel: async (loadInput: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> =>
-              manager.loadModel(loadInput),
-            listModels: (timeoutMs: number): Promise<LlamaCppModel[]> => manager.listRouterModels(timeoutMs),
+            loadModel: async (
+              loadInput: LlamaCppModelLaunchInput,
+            ): Promise<LlamaCppModelLaunchResult> => manager.loadModel(loadInput),
+            listModels: (timeoutMs: number): Promise<LlamaCppModel[]> =>
+              manager.listRouterModels(timeoutMs),
             listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
             detectService: (): Promise<LlamaCppStatusSnapshot> => manager.detect(),
             unloadModel: async unloadModelName => {
@@ -629,7 +655,11 @@ export function registerLlamaCppIpcHandlers(
         }
       },
       () => {
-        launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, 'Another model load is in progress');
+        launchLogger.error(
+          LlamaCppModelLaunchLogPhase.Failed,
+          undefined,
+          'Another model load is in progress',
+        );
         return new Error(t('llamacppModelLoadInProgress'));
       },
     );
@@ -740,12 +770,10 @@ export function registerLlamaCppIpcHandlers(
 }
 
 export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceConfig {
-  return sanitizeLlamaCppServiceConfig(
-    {
-      ...DEFAULT_LLAMACPP_SERVICE_CONFIG,
-      ...(store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {}),
-    },
-  );
+  return sanitizeLlamaCppServiceConfig({
+    ...DEFAULT_LLAMACPP_SERVICE_CONFIG,
+    ...(store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {}),
+  });
 }
 
 export function getLlamaCppModelPreferences(store: SqliteStore): LlamaCppModelPreferences {
@@ -853,7 +881,8 @@ function sanitizeLlamaCppModelPreference(preference: unknown): LlamaCppModelPref
       : typeof candidate.ctxSize === 'string'
         ? Number.parseInt(candidate.ctxSize, 10)
         : undefined;
-  const ctxSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
+  const ctxSizeRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
 
   if (
     typeof parsedCtxSize === 'number' &&
@@ -875,18 +904,30 @@ export function sanitizeLlamaCppServiceConfig(
   } | null,
 ): LlamaCppServiceConfig {
   const next: LlamaCppServiceConfig = {};
-  const modelsMaxRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ModelsMax];
-  const timeoutRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Timeout];
-  const threadsHttpRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsHttp];
-  const cacheReuseRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CacheReuse];
-  const cacheRamRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CacheRam];
-  const ctxSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
-  const parallelRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Parallel];
-  const batchSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.BatchSize];
-  const ubatchSizeRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.UbatchSize];
-  const threadsRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Threads];
-  const threadsBatchRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsBatch];
-  const mainGpuRange = LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.MainGpu];
+  const modelsMaxRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ModelsMax];
+  const timeoutRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Timeout];
+  const threadsHttpRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsHttp];
+  const cacheReuseRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CacheReuse];
+  const cacheRamRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CacheRam];
+  const ctxSizeRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
+  const parallelRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Parallel];
+  const batchSizeRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.BatchSize];
+  const ubatchSizeRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.UbatchSize];
+  const threadsRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.Threads];
+  const threadsBatchRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.ThreadsBatch];
+  const mainGpuRange =
+    LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.MainGpu];
   const host = config?.host?.trim();
   const listenHost = config?.listenHost?.trim();
   const port = normalizeIntegerString(config?.port);
@@ -899,9 +940,8 @@ export function sanitizeLlamaCppServiceConfig(
     max: modelsMaxRange.max,
     defaultValue: LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax,
   });
-  const modelsMax = sanitizedModelsMax === '0'
-    ? LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax
-    : sanitizedModelsMax;
+  const modelsMax =
+    sanitizedModelsMax === '0' ? LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax : sanitizedModelsMax;
   const modelsAutoload = config?.modelsAutoload as unknown;
   const timeout = normalizeIntegerStringWithDefault(config?.timeout, {
     min: timeoutRange.min,
@@ -982,7 +1022,8 @@ export function sanitizeLlamaCppServiceConfig(
   if (listenHost) next.listenHost = listenHost;
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
-  if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion)) next.runtimeVersion = runtimeVersion;
+  if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion))
+    next.runtimeVersion = runtimeVersion;
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
   if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
   if (modelsMax) next.modelsMax = modelsMax;
@@ -1028,12 +1069,15 @@ export function sanitizeLlamaCppServiceConfig(
   return next;
 }
 
-function sanitizeLlamaCppBackendRef(input: unknown): { version: string; backend: string; versionBackend: string } | null {
+function sanitizeLlamaCppBackendRef(
+  input: unknown,
+): { version: string; backend: string; versionBackend: string } | null {
   if (!input || typeof input !== 'object') return null;
   const candidate = input as { version?: unknown; backend?: unknown; versionBackend?: unknown };
   let version = typeof candidate.version === 'string' ? candidate.version.trim() : '';
   let backend = typeof candidate.backend === 'string' ? candidate.backend.trim() : '';
-  const versionBackend = typeof candidate.versionBackend === 'string' ? candidate.versionBackend.trim() : '';
+  const versionBackend =
+    typeof candidate.versionBackend === 'string' ? candidate.versionBackend.trim() : '';
   if ((!version || !backend) && versionBackend.includes('/')) {
     const [parsedVersion, parsedBackend] = versionBackend.split('/');
     version = parsedVersion?.trim() ?? '';
@@ -1140,14 +1184,18 @@ function normalizeVisibleDevices(
     return undefined;
   }
 
-  if (!runtimeDevices?.success || !Array.isArray(runtimeDevices.devices) || runtimeDevices.devices.length === 0) {
+  if (
+    !runtimeDevices?.success ||
+    !Array.isArray(runtimeDevices.devices) ||
+    runtimeDevices.devices.length === 0
+  ) {
     const tokens = trimmed
       .split(',')
       .map(part => part.trim())
       .filter(Boolean);
     if (tokens.length === 0) return undefined;
 
-    const normalizedTokens = tokens.map(token => /^[A-Za-z0-9_.:-]+$/.test(token) ? token : '');
+    const normalizedTokens = tokens.map(token => (/^[A-Za-z0-9_.:-]+$/.test(token) ? token : ''));
     if (normalizedTokens.some(token => !token)) {
       return undefined;
     }
@@ -1208,7 +1256,9 @@ function isOnOffAuto(value: unknown): value is 'on' | 'off' | 'auto' {
   return value === 'on' || value === 'off' || value === 'auto';
 }
 
-function isRuntimeBackend(value: unknown): value is NonNullable<LlamaCppServiceConfig['runtimeBackend']> {
+function isRuntimeBackend(
+  value: unknown,
+): value is NonNullable<LlamaCppServiceConfig['runtimeBackend']> {
   return (
     value === LlamaCppRuntimeBackend.Auto ||
     value === LlamaCppRuntimeBackend.Cpu ||

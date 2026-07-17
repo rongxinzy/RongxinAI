@@ -16,12 +16,14 @@ export const ModelScopeStoreKey = {
   ApiToken: 'marketplace_modelscope_token',
 } as const;
 
-export function createModelScopeTokenPool(options: {
-  env?: NodeJS.ProcessEnv;
-  cwd?: string;
-  resourcesPath?: string;
-  extraTokens?: string[];
-} = {}): ModelScopeTokenPool {
+export function createModelScopeTokenPool(
+  options: {
+    env?: NodeJS.ProcessEnv;
+    cwd?: string;
+    resourcesPath?: string;
+    extraTokens?: string[];
+  } = {},
+): ModelScopeTokenPool {
   const tokens = uniqueTokens([
     ...(options.extraTokens ?? []),
     ...parseEnvTokens(options.env ?? process.env),
@@ -43,11 +45,11 @@ export function createModelScopeTokenPool(options: {
 
 function parseEnvTokens(env: NodeJS.ProcessEnv): string[] {
   return splitTokenValue(
-    env.MODELSCOPE_TOKENS
-    || env.MODELSCOPE_TOKEN
-    || env.MODELSCOPE_API_TOKENS
-    || env.MODELSCOPE_API_TOKEN
-    || '',
+    env.MODELSCOPE_TOKENS ||
+      env.MODELSCOPE_TOKEN ||
+      env.MODELSCOPE_API_TOKENS ||
+      env.MODELSCOPE_API_TOKEN ||
+      '',
   );
 }
 
@@ -57,11 +59,11 @@ function readDotEnvTokens(cwd: string): string[] {
   try {
     const parsed = parseDotEnv(fs.readFileSync(envPath, 'utf-8'));
     return splitTokenValue(
-      parsed.MODELSCOPE_TOKENS
-      || parsed.MODELSCOPE_TOKEN
-      || parsed.MODELSCOPE_API_TOKENS
-      || parsed.MODELSCOPE_API_TOKEN
-      || '',
+      parsed.MODELSCOPE_TOKENS ||
+        parsed.MODELSCOPE_TOKEN ||
+        parsed.MODELSCOPE_API_TOKENS ||
+        parsed.MODELSCOPE_API_TOKEN ||
+        '',
     );
   } catch {
     return [];
@@ -69,7 +71,8 @@ function readDotEnvTokens(cwd: string): string[] {
 }
 
 function readTokenResourceCandidates(cwd: string, resourcesPath?: string): string[] {
-  const processResourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const processResourcesPath = (process as NodeJS.Process & { resourcesPath?: string })
+    .resourcesPath;
   const candidates = [
     path.join(cwd, TOKEN_RESOURCE_FILE),
     path.join(cwd, 'resources', TOKEN_RESOURCE_FILE),
@@ -85,7 +88,7 @@ function readTokenResourceFile(filePath: string): string[] {
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as TokenResource;
     if (Array.isArray(parsed.tokens)) {
-      return parsed.tokens.flatMap((value) => splitTokenValue(String(value)));
+      return parsed.tokens.flatMap(value => splitTokenValue(String(value)));
     }
   } catch {
     return [];
@@ -107,7 +110,7 @@ function parseDotEnv(content: string): Record<string, string> {
 
 function unwrapDotEnvValue(value: string): string {
   const quote = value[0];
-  if ((quote === '"' || quote === '\'') && value.endsWith(quote)) {
+  if ((quote === '"' || quote === "'") && value.endsWith(quote)) {
     return value.slice(1, -1);
   }
   return value.replace(/\s+#.*$/, '').trim();

@@ -34,9 +34,15 @@ export type CoworkSessionListInput = z.infer<typeof CoworkSessionListSchema.inpu
 export type CoworkSessionGetMessagesInput = z.infer<typeof CoworkSessionGetMessagesSchema.input>;
 export type CoworkSessionPinInput = z.infer<typeof CoworkSessionPinSchema.input>;
 export type CoworkSessionRenameInput = z.infer<typeof CoworkSessionRenameSchema.input>;
-export type CoworkSessionExportResultImageInput = z.infer<typeof CoworkSessionExportResultImageSchema.input>;
-export type CoworkSessionCaptureImageChunkInput = z.infer<typeof CoworkSessionCaptureImageChunkSchema.input>;
-export type CoworkSessionSaveResultImageInput = z.infer<typeof CoworkSessionSaveResultImageSchema.input>;
+export type CoworkSessionExportResultImageInput = z.infer<
+  typeof CoworkSessionExportResultImageSchema.input
+>;
+export type CoworkSessionCaptureImageChunkInput = z.infer<
+  typeof CoworkSessionCaptureImageChunkSchema.input
+>;
+export type CoworkSessionSaveResultImageInput = z.infer<
+  typeof CoworkSessionSaveResultImageSchema.input
+>;
 export type CoworkSessionExportTextInput = z.infer<typeof CoworkSessionExportTextSchema.input>;
 export type CoworkPermissionRespondInput = z.infer<typeof CoworkPermissionRespondSchema.input>;
 export type CoworkConfigSetInput = z.infer<typeof CoworkConfigSetSchema.input>;
@@ -46,8 +52,9 @@ export type CoworkMemoryUpdateEntryInput = z.infer<typeof CoworkMemoryUpdateEntr
 export type CoworkMemoryDeleteEntryInput = z.infer<typeof CoworkMemoryDeleteEntrySchema.input>;
 
 /** IPC success envelope with optional data fields. */
-export type IpcSuccessPayload<T extends Record<string, unknown> = Record<string, never>> =
-  { success: true } & T;
+export type IpcSuccessPayload<T extends Record<string, unknown> = Record<string, never>> = {
+  success: true;
+} & T;
 
 /** IPC error envelope. */
 export interface IpcErrorPayload {

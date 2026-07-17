@@ -25,9 +25,7 @@ test('extractGatewayMessageText joins text content blocks', () => {
 test('extractGatewayHistoryEntry keeps system messages', () => {
   const entry = extractGatewayHistoryEntry({
     role: 'system',
-    content: [
-      { type: 'text', text: 'Reminder fired' },
-    ],
+    content: [{ type: 'text', text: 'Reminder fired' }],
   });
 
   assert.deepEqual(entry, {

@@ -105,9 +105,10 @@ function balanceSources(articles, maxPerSource = 5) {
 // ── web-search skill integration ──────────────────────────────────
 
 function getWebSearchScriptPath() {
-  const skillsRoot = process.env.SKILLS_ROOT
-    || process.env.ZHIYUAN_SKILLS_ROOT
-    || path.resolve(SCRIPT_DIR, '..', '..');
+  const skillsRoot =
+    process.env.SKILLS_ROOT ||
+    process.env.ZHIYUAN_SKILLS_ROOT ||
+    path.resolve(SCRIPT_DIR, '..', '..');
 
   const p = path.join(skillsRoot, 'web-search', 'scripts', 'search.sh');
   return fs.existsSync(p) ? p : null;
@@ -117,7 +118,10 @@ async function callWebSearch(query, maxResults) {
   const scriptPath = getWebSearchScriptPath();
   if (!scriptPath) return null;
 
-  const tmpFile = path.join(os.tmpdir(), `news-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
+  const tmpFile = path.join(
+    os.tmpdir(),
+    `news-query-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
+  );
   fs.writeFileSync(tmpFile, query, 'utf-8');
 
   const childEnv = { ...process.env };
@@ -150,14 +154,18 @@ async function callWebSearch(query, maxResults) {
     const { stdout } = await execFileAsync(
       bashPath,
       [scriptPath, `@${tmpFile}`, String(maxResults)],
-      { timeout: 30000, maxBuffer: 10 * 1024 * 1024, env: childEnv }
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024, env: childEnv },
     );
     return stdout || '';
   } catch (err) {
     console.error(`    web-search error: ${err.message}`);
     return null;
   } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -204,7 +212,7 @@ function parseWebSearchMarkdown(markdown) {
       source: 'Web Search',
       language: 'auto',
       category: 'web_search',
-      _matchType: 'web_search'
+      _matchType: 'web_search',
     });
   }
 
@@ -225,7 +233,7 @@ async function fetchFromSources(sources, keyword, limit) {
    * Returns:
    *   Array of articles
    */
-  const fetchResults = await asyncPool(CONCURRENCY, sources, async (source) => {
+  const fetchResults = await asyncPool(CONCURRENCY, sources, async source => {
     console.error(`  Fetching from ${source.name}...`);
 
     let articles = [];
@@ -250,14 +258,23 @@ async function fetchFromSources(sources, keyword, limit) {
     if (result.status === 'fulfilled' && Array.isArray(result.value)) {
       articlesList.push(...result.value);
     } else if (result.status === 'rejected') {
-      console.error(`    Error from ${sources[i].name}: ${result.reason?.message || result.reason}`);
+      console.error(
+        `    Error from ${sources[i].name}: ${result.reason?.message || result.reason}`,
+      );
     }
   }
 
   return articlesList;
 }
 
-async function searchNews(keyword, limit = 15, maxPerSource = 5, balance = true, allSources = false, maxAgeDays = 7) {
+async function searchNews(
+  keyword,
+  limit = 15,
+  maxPerSource = 5,
+  balance = true,
+  allSources = false,
+  maxAgeDays = 7,
+) {
   /**
    * Search for tech news across all sources
    *
@@ -283,7 +300,8 @@ async function searchNews(keyword, limit = 15, maxPerSource = 5, balance = true,
   if (!allSources) {
     const domains = classifyKeyword(keyword);
     sources = getSourcesForDomains(networkFilteredSources, domains);
-    usedSmartRouting = sources.length < networkFilteredSources.filter(s => s.enabled !== false).length;
+    usedSmartRouting =
+      sources.length < networkFilteredSources.filter(s => s.enabled !== false).length;
 
     const domainList = Array.from(domains).sort().join(', ');
     console.error(`🎯 Detected domains: ${domainList}`);
@@ -302,17 +320,21 @@ async function searchNews(keyword, limit = 15, maxPerSource = 5, balance = true,
   const fetchedSourceIds = new Set(enabledSources.map(s => s.id));
 
   const fetchTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.error(`\n⏱️  Fetched ${enabledSources.length} sources in ${fetchTime}s (concurrency: ${CONCURRENCY})`);
+  console.error(
+    `\n⏱️  Fetched ${enabledSources.length} sources in ${fetchTime}s (concurrency: ${CONCURRENCY})`,
+  );
 
   // Fallback Layer 1: Expand to all sources if too few results
   let fallbackUsed = 'none';
   if (articlesList.length < FALLBACK_THRESHOLD && usedSmartRouting) {
     const additionalSources = networkFilteredSources.filter(
-      s => s.enabled !== false && !fetchedSourceIds.has(s.id)
+      s => s.enabled !== false && !fetchedSourceIds.has(s.id),
     );
 
     if (additionalSources.length > 0) {
-      console.error(`\n🔄 Too few results (${articlesList.length}), expanding to ${additionalSources.length} more sources...\n`);
+      console.error(
+        `\n🔄 Too few results (${articlesList.length}), expanding to ${additionalSources.length} more sources...\n`,
+      );
       const startTime2 = Date.now();
       const moreArticles = await fetchFromSources(additionalSources, keyword, limit);
       articlesList.push(...moreArticles);
@@ -329,7 +351,9 @@ async function searchNews(keyword, limit = 15, maxPerSource = 5, balance = true,
     if (webSearchScript) {
       const year = new Date().getFullYear();
       const query = `${keyword} 最新新闻 ${year}`;
-      console.error(`\n🌐 Too few results (${articlesList.length}), trying web search: "${query}"...\n`);
+      console.error(
+        `\n🌐 Too few results (${articlesList.length}), trying web search: "${query}"...\n`,
+      );
       const startTimeWs = Date.now();
       const markdown = await callWebSearch(query, 10);
       const webArticles = parseWebSearchMarkdown(markdown);
@@ -346,29 +370,40 @@ async function searchNews(keyword, limit = 15, maxPerSource = 5, balance = true,
   // Fallback Layer 3: Return latest articles without keyword filtering
   if (articlesList.length < FALLBACK_THRESHOLD) {
     // Pick reliable general sources that we haven't fetched without keyword
-    const generalSources = networkFilteredSources.filter(
-      s => s.enabled !== false &&
-           (s.domains || []).includes('general') &&
-           s.category !== 'official_blog'
-    ).slice(0, 6);
+    const generalSources = networkFilteredSources
+      .filter(
+        s =>
+          s.enabled !== false &&
+          (s.domains || []).includes('general') &&
+          s.category !== 'official_blog',
+      )
+      .slice(0, 6);
 
     if (generalSources.length > 0) {
-      console.error(`\n🔄 Still too few results (${articlesList.length}), fetching latest articles from ${generalSources.length} general sources...\n`);
+      console.error(
+        `\n🔄 Still too few results (${articlesList.length}), fetching latest articles from ${generalSources.length} general sources...\n`,
+      );
       const startTime3 = Date.now();
       const latestArticles = await fetchFromSources(generalSources, null, 5); // No keyword!
       // Tag as recommended (not keyword-matched)
-      latestArticles.forEach(a => { a._matchType = 'recommended'; });
+      latestArticles.forEach(a => {
+        a._matchType = 'recommended';
+      });
       articlesList.push(...latestArticles);
       fallbackUsed = 'latest_articles';
       const fetchTime3 = ((Date.now() - startTime3) / 1000).toFixed(1);
-      console.error(`\n⏱️  Latest articles fetch: ${generalSources.length} sources in ${fetchTime3}s`);
+      console.error(
+        `\n⏱️  Latest articles fetch: ${generalSources.length} sources in ${fetchTime3}s`,
+      );
     }
   }
 
   // Filter by freshness
   const freshArticles = filterByFreshness(articlesList, maxAgeDays);
   if (freshArticles.length < articlesList.length) {
-    console.error(`🕐 Freshness filter: kept ${freshArticles.length}/${articlesList.length} articles (max ${maxAgeDays} days)`);
+    console.error(
+      `🕐 Freshness filter: kept ${freshArticles.length}/${articlesList.length} articles (max ${maxAgeDays} days)`,
+    );
   }
 
   // Calculate heat scores
@@ -404,7 +439,7 @@ async function searchNews(keyword, limit = 15, maxPerSource = 5, balance = true,
     total_found: cleanResults.length,
     search_time: new Date().toISOString(),
     fallback_used: fallbackUsed,
-    results: cleanResults
+    results: cleanResults,
   };
 
   return result;
@@ -419,7 +454,7 @@ async function main() {
     'max-per-source': 5,
     'max-age': 7,
     'no-balance': false,
-    'all-sources': false
+    'all-sources': false,
   };
 
   // Simple argument parsing
@@ -465,7 +500,7 @@ async function main() {
       options['max-per-source'],
       !options['no-balance'],
       options['all-sources'],
-      options['max-age']
+      options['max-age'],
     );
 
     // Output JSON to stdout (for Claude to read)
@@ -487,5 +522,5 @@ main().catch(error => {
 module.exports = {
   searchNews,
   loadSources,
-  balanceSources
+  balanceSources,
 };

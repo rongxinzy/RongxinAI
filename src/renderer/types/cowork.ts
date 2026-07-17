@@ -16,7 +16,7 @@ export const CoworkSessionStatusValue = {
 } as const;
 
 export type CoworkSessionStatus =
-  typeof CoworkSessionStatusValue[keyof typeof CoworkSessionStatusValue];
+  (typeof CoworkSessionStatusValue)[keyof typeof CoworkSessionStatusValue];
 
 // Cowork message types
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
@@ -33,7 +33,7 @@ export const OpenClawSessionKeepAlive = {
 } as const;
 
 export type OpenClawSessionKeepAlive =
-  typeof OpenClawSessionKeepAlive[keyof typeof OpenClawSessionKeepAlive];
+  (typeof OpenClawSessionKeepAlive)[keyof typeof OpenClawSessionKeepAlive];
 
 export interface OpenClawSessionPolicyConfig {
   keepAlive: OpenClawSessionKeepAlive;
@@ -121,25 +121,27 @@ export interface CoworkConfig {
   openClawSessionPolicy: OpenClawSessionPolicyConfig;
 }
 
-export type CoworkConfigUpdate = Partial<Pick<
-  CoworkConfig,
-  | 'workingDirectory'
-  | 'executionMode'
-  | 'agentEngine'
-  | 'memoryEnabled'
-  | 'memoryImplicitUpdateEnabled'
-  | 'memoryLlmJudgeEnabled'
-  | 'memoryGuardLevel'
-  | 'memoryUserMemoriesMaxItems'
-  | 'skipMissedJobs'
-  | 'embeddingEnabled'
-  | 'embeddingProvider'
-  | 'embeddingModel'
-  | 'embeddingLocalModelPath'
-  | 'embeddingVectorWeight'
-  | 'embeddingRemoteBaseUrl'
-  | 'embeddingRemoteApiKey'
->>;
+export type CoworkConfigUpdate = Partial<
+  Pick<
+    CoworkConfig,
+    | 'workingDirectory'
+    | 'executionMode'
+    | 'agentEngine'
+    | 'memoryEnabled'
+    | 'memoryImplicitUpdateEnabled'
+    | 'memoryLlmJudgeEnabled'
+    | 'memoryGuardLevel'
+    | 'memoryUserMemoriesMaxItems'
+    | 'skipMissedJobs'
+    | 'embeddingEnabled'
+    | 'embeddingProvider'
+    | 'embeddingModel'
+    | 'embeddingLocalModelPath'
+    | 'embeddingVectorWeight'
+    | 'embeddingRemoteBaseUrl'
+    | 'embeddingRemoteApiKey'
+  >
+>;
 
 export interface CoworkApiConfig {
   apiKey: string;

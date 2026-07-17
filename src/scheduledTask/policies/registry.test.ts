@@ -1,4 +1,4 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { OriginKind } from '../constants';
 import { ManualTaskPolicy } from './manualPolicy';
@@ -10,7 +10,11 @@ test('registry: returns LegacyTaskPolicy for legacy origin', () => {
 });
 
 test('registry: returns IMTaskPolicy for im origin', () => {
-  const policy = taskPolicyRegistry.get({ kind: OriginKind.IM, platform: 'telegram', conversationId: 'c1' });
+  const policy = taskPolicyRegistry.get({
+    kind: OriginKind.IM,
+    platform: 'telegram',
+    conversationId: 'c1',
+  });
   expect(policy.kind).toBe(OriginKind.IM);
 });
 

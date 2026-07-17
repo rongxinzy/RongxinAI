@@ -21,18 +21,19 @@ const extractZip = require('extract-zip');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'python-win');
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'python-win-runtime.zip');
-const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION = process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_VERSION || '3.11.9';
+const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION =
+  process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_VERSION || '3.11.9';
 const DEFAULT_WINDOWS_EMBED_PYTHON_ZIP = `python-${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}-embed-amd64.zip`;
-const DEFAULT_WINDOWS_EMBED_PYTHON_URL = process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_URL
-  || `https://www.python.org/ftp/python/${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}/${DEFAULT_WINDOWS_EMBED_PYTHON_ZIP}`;
-const DEFAULT_GET_PIP_URL = process.env.ZHIYUAN_WINDOWS_GET_PIP_URL || 'https://bootstrap.pypa.io/get-pip.py';
-const DEFAULT_PIP_PYZ_URL = process.env.ZHIYUAN_WINDOWS_PIP_PYZ_URL || 'https://bootstrap.pypa.io/pip/pip.pyz';
+const DEFAULT_WINDOWS_EMBED_PYTHON_URL =
+  process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_URL ||
+  `https://www.python.org/ftp/python/${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}/${DEFAULT_WINDOWS_EMBED_PYTHON_ZIP}`;
+const DEFAULT_GET_PIP_URL =
+  process.env.ZHIYUAN_WINDOWS_GET_PIP_URL || 'https://bootstrap.pypa.io/get-pip.py';
+const DEFAULT_PIP_PYZ_URL =
+  process.env.ZHIYUAN_WINDOWS_PIP_PYZ_URL || 'https://bootstrap.pypa.io/pip/pip.pyz';
 const DEFAULT_RUNTIME_URL = DEFAULT_WINDOWS_EMBED_PYTHON_URL;
 
-const REQUIRED_FILES = [
-  'python.exe',
-  'python3.exe',
-];
+const REQUIRED_FILES = ['python.exe', 'python3.exe'];
 const PIP_EXECUTABLE_CANDIDATES = [
   path.join('Scripts', 'pip.exe'),
   path.join('Scripts', 'pip3.exe'),
@@ -46,12 +47,14 @@ const PIP_MODULE_MAIN_REL_PATH = path.join('Lib', 'site-packages', 'pip', '__mai
 const PIP_MODULE_INIT_REL_PATH = path.join('Lib', 'site-packages', 'pip', '__init__.py');
 
 function hasPipCommand(rootDir) {
-  return PIP_EXECUTABLE_CANDIDATES.some((relPath) => fs.existsSync(path.join(rootDir, relPath)));
+  return PIP_EXECUTABLE_CANDIDATES.some(relPath => fs.existsSync(path.join(rootDir, relPath)));
 }
 
 function hasPipModule(rootDir) {
-  return fs.existsSync(path.join(rootDir, PIP_MODULE_MAIN_REL_PATH))
-    || fs.existsSync(path.join(rootDir, PIP_MODULE_INIT_REL_PATH));
+  return (
+    fs.existsSync(path.join(rootDir, PIP_MODULE_MAIN_REL_PATH)) ||
+    fs.existsSync(path.join(rootDir, PIP_MODULE_INIT_REL_PATH))
+  );
 }
 
 function parseArgs(argv) {
@@ -163,23 +166,27 @@ function createPipWrappers(rootDir) {
 function tryCopyPipFromHostPython(rootDir) {
   const pythonCandidates = ['python3', 'python'];
   for (const candidate of pythonCandidates) {
-    const probe = spawnSync(candidate, [
-      '-c',
+    const probe = spawnSync(
+      candidate,
       [
-        'import importlib.util, json, pathlib',
-        "spec = importlib.util.find_spec('pip')",
-        'if spec is None or not spec.origin:',
-        "  raise SystemExit(2)",
-        'pip_dir = pathlib.Path(spec.origin).resolve().parent',
-        'site_dir = pip_dir.parent',
-        "dist_info = [str(p) for p in site_dir.glob('pip-*.dist-info')]",
-        "print(json.dumps({'pip_dir': str(pip_dir), 'dist_info': dist_info}))",
-      ].join('\n'),
-    ], {
-      encoding: 'utf-8',
-      stdio: 'pipe',
-      timeout: 20_000,
-    });
+        '-c',
+        [
+          'import importlib.util, json, pathlib',
+          "spec = importlib.util.find_spec('pip')",
+          'if spec is None or not spec.origin:',
+          '  raise SystemExit(2)',
+          'pip_dir = pathlib.Path(spec.origin).resolve().parent',
+          'site_dir = pip_dir.parent',
+          "dist_info = [str(p) for p in site_dir.glob('pip-*.dist-info')]",
+          "print(json.dumps({'pip_dir': str(pip_dir), 'dist_info': dist_info}))",
+        ].join('\n'),
+      ],
+      {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+        timeout: 20_000,
+      },
+    );
 
     if (probe.status !== 0 || !probe.stdout) {
       continue;
@@ -254,18 +261,20 @@ async function ensurePipPayload(rootDir, options = {}) {
       console.log(`[setup-python-runtime] Downloading pip runtime from: ${DEFAULT_PIP_PYZ_URL}`);
       await downloadArchive(DEFAULT_PIP_PYZ_URL, pipPyzPath);
       const fileSizeKB = (fs.statSync(pipPyzPath).size / 1024).toFixed(0);
-      console.log(`[setup-python-runtime] Downloaded pip runtime (${fileSizeKB} KB): ${pipPyzPath}`);
+      console.log(
+        `[setup-python-runtime] Downloaded pip runtime (${fileSizeKB} KB): ${pipPyzPath}`,
+      );
     } catch (error) {
       if (required) {
         throw new Error(
-          'Unable to obtain pip runtime archive (pip.pyz). '
-          + 'Set ZHIYUAN_WINDOWS_PIP_PYZ_URL to a reachable mirror if needed. '
-          + `Original error: ${error instanceof Error ? error.message : String(error)}`
+          'Unable to obtain pip runtime archive (pip.pyz). ' +
+            'Set ZHIYUAN_WINDOWS_PIP_PYZ_URL to a reachable mirror if needed. ' +
+            `Original error: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
       console.warn(
-        '[setup-python-runtime] pip runtime archive is not available; continuing without pip. '
-        + `Reason: ${error instanceof Error ? error.message : String(error)}`
+        '[setup-python-runtime] pip runtime archive is not available; continuing without pip. ' +
+          `Reason: ${error instanceof Error ? error.message : String(error)}`,
       );
       return;
     }
@@ -315,7 +324,10 @@ function ensurePython3Alias(rootDir) {
 }
 
 function findRuntimeRoot(baseDir) {
-  const directHealth = checkRuntimeHealth(baseDir, { requirePython3Alias: false, requirePip: false });
+  const directHealth = checkRuntimeHealth(baseDir, {
+    requirePython3Alias: false,
+    requirePip: false,
+  });
   if (directHealth.ok) {
     return baseDir;
   }
@@ -378,7 +390,9 @@ async function resolveArchive(required) {
     if (!isNonEmptyFile(envArchive)) {
       throw new Error(`ZHIYUAN_PORTABLE_PYTHON_ARCHIVE points to an invalid file: ${envArchive}`);
     }
-    console.log(`[setup-python-runtime] Using local archive from ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${envArchive}`);
+    console.log(
+      `[setup-python-runtime] Using local archive from ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${envArchive}`,
+    );
     return { archivePath: envArchive, source: 'env-archive' };
   }
 
@@ -387,20 +401,23 @@ async function resolveArchive(required) {
     return { archivePath: DEFAULT_ARCHIVE_PATH, source: 'cache' };
   }
 
-  const urlFromEnv = typeof process.env.ZHIYUAN_PORTABLE_PYTHON_URL === 'string'
-    ? process.env.ZHIYUAN_PORTABLE_PYTHON_URL.trim()
-    : '';
+  const urlFromEnv =
+    typeof process.env.ZHIYUAN_PORTABLE_PYTHON_URL === 'string'
+      ? process.env.ZHIYUAN_PORTABLE_PYTHON_URL.trim()
+      : '';
   const downloadUrl = urlFromEnv || DEFAULT_RUNTIME_URL;
 
   if (!downloadUrl) {
     if (required) {
       throw new Error(
-        'Portable Python archive is not available. '
-        + 'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or '
-        + 'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.'
+        'Portable Python archive is not available. ' +
+          'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or ' +
+          'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.',
       );
     }
-    console.warn('[setup-python-runtime] Archive URL is not configured; skipping because --required is not set.');
+    console.warn(
+      '[setup-python-runtime] Archive URL is not configured; skipping because --required is not set.',
+    );
     return null;
   }
 
@@ -408,21 +425,23 @@ async function resolveArchive(required) {
     console.log(`[setup-python-runtime] Downloading runtime from: ${downloadUrl}`);
     await downloadArchive(downloadUrl, DEFAULT_ARCHIVE_PATH);
     const fileSizeMB = (fs.statSync(DEFAULT_ARCHIVE_PATH).size / 1024 / 1024).toFixed(1);
-    console.log(`[setup-python-runtime] Downloaded archive (${fileSizeMB} MB): ${DEFAULT_ARCHIVE_PATH}`);
+    console.log(
+      `[setup-python-runtime] Downloaded archive (${fileSizeMB} MB): ${DEFAULT_ARCHIVE_PATH}`,
+    );
     return { archivePath: DEFAULT_ARCHIVE_PATH, source: 'download' };
   } catch (error) {
     if (required) {
       throw new Error(
-        'Unable to obtain portable Python runtime archive. '
-        + 'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local offline package or '
-        + 'set ZHIYUAN_PORTABLE_PYTHON_URL to a reachable mirror. '
-        + `Original error: ${error instanceof Error ? error.message : String(error)}`
+        'Unable to obtain portable Python runtime archive. ' +
+          'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local offline package or ' +
+          'set ZHIYUAN_PORTABLE_PYTHON_URL to a reachable mirror. ' +
+          `Original error: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
     console.warn(
-      '[setup-python-runtime] Runtime archive is not available; skip because --required is not set. '
-      + `Reason: ${error instanceof Error ? error.message : String(error)}`
+      '[setup-python-runtime] Runtime archive is not available; skip because --required is not set. ' +
+        `Reason: ${error instanceof Error ? error.message : String(error)}`,
     );
     return null;
   }
@@ -457,7 +476,7 @@ function runCommand(command, args, options = {}) {
 }
 
 function enableSitePackages(rootDir) {
-  const pthCandidates = fs.readdirSync(rootDir).filter((name) => name.endsWith('._pth'));
+  const pthCandidates = fs.readdirSync(rootDir).filter(name => name.endsWith('._pth'));
   if (pthCandidates.length === 0) {
     throw new Error('Could not find python _pth file in runtime directory.');
   }
@@ -476,7 +495,10 @@ function enableSitePackages(rootDir) {
       hasImportSite = true;
       continue;
     }
-    if (trimmed.toLowerCase() === 'lib\\site-packages' || trimmed.toLowerCase() === 'lib/site-packages') {
+    if (
+      trimmed.toLowerCase() === 'lib\\site-packages' ||
+      trimmed.toLowerCase() === 'lib/site-packages'
+    ) {
       updated.push('Lib\\site-packages');
       hasSitePackages = true;
       continue;
@@ -499,7 +521,9 @@ async function bootstrapRuntimeOnWindows() {
     throw new Error('Windows bootstrap is only supported on Windows hosts.');
   }
 
-  console.log('[setup-python-runtime] No prebuilt archive provided, bootstrapping runtime from python.org on Windows host...');
+  console.log(
+    '[setup-python-runtime] No prebuilt archive provided, bootstrapping runtime from python.org on Windows host...',
+  );
   const tempRoot = fs.mkdtempSync(path.join(PROJECT_ROOT, 'tmp-python-bootstrap-'));
   try {
     const embedZipPath = path.join(tempRoot, DEFAULT_WINDOWS_EMBED_PYTHON_ZIP);
@@ -522,8 +546,8 @@ async function bootstrapRuntimeOnWindows() {
         runCommand(pythonExe, [getPipPath], { timeout: 3 * 60 * 1000 });
       } catch (error) {
         console.warn(
-          '[setup-python-runtime] Failed to bootstrap pip during Windows-host preparation. '
-          + `Python runtime remains usable. Reason: ${error instanceof Error ? error.message : String(error)}`
+          '[setup-python-runtime] Failed to bootstrap pip during Windows-host preparation. ' +
+            `Python runtime remains usable. Reason: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -531,7 +555,9 @@ async function bootstrapRuntimeOnWindows() {
     await ensurePipPayload(OUTPUT_DIR, { required: true });
     const health = checkRuntimeHealth(OUTPUT_DIR, { requirePip: true });
     if (!health.ok) {
-      throw new Error(`Bootstrapped runtime health check failed; missing: ${health.missing.join(', ')}`);
+      throw new Error(
+        `Bootstrapped runtime health check failed; missing: ${health.missing.join(', ')}`,
+      );
     }
 
     console.log('[setup-python-runtime] Windows bootstrap completed successfully');
@@ -561,8 +587,8 @@ async function extractArchiveToRuntime(archivePath) {
     const health = checkRuntimeHealth(OUTPUT_DIR, { requirePip: true });
     if (!health.ok) {
       throw new Error(
-        `Runtime health check failed; missing: ${health.missing.join(', ')}. `
-        + 'Please provide a valid Python runtime archive.'
+        `Runtime health check failed; missing: ${health.missing.join(', ')}. ` +
+          'Please provide a valid Python runtime archive.',
       );
     }
   } finally {
@@ -575,10 +601,7 @@ async function extractArchiveToRuntime(archivePath) {
 }
 
 function findPortablePythonExecutable(baseDir = OUTPUT_DIR) {
-  const candidates = [
-    path.join(baseDir, 'python.exe'),
-    path.join(baseDir, 'python3.exe'),
-  ];
+  const candidates = [path.join(baseDir, 'python.exe'), path.join(baseDir, 'python3.exe')];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       return candidate;
@@ -589,12 +612,15 @@ function findPortablePythonExecutable(baseDir = OUTPUT_DIR) {
 
 async function ensurePortablePythonRuntime(options = {}) {
   const required = Boolean(options.required);
-  const shouldRun = process.platform === 'win32'
-    || required
-    || process.env.ZHIYUAN_SETUP_PYTHON_RUNTIME_FORCE === '1';
+  const shouldRun =
+    process.platform === 'win32' ||
+    required ||
+    process.env.ZHIYUAN_SETUP_PYTHON_RUNTIME_FORCE === '1';
 
   if (!shouldRun) {
-    console.log('[setup-python-runtime] Skip on non-Windows host (pass --required to force cross-platform preparation).');
+    console.log(
+      '[setup-python-runtime] Skip on non-Windows host (pass --required to force cross-platform preparation).',
+    );
     return { ok: true, skipped: true, pythonPath: null };
   }
 
@@ -608,8 +634,8 @@ async function ensurePortablePythonRuntime(options = {}) {
       return { ok: true, skipped: false, pythonPath };
     }
     console.warn(
-      '[setup-python-runtime] Existing runtime found but pip support is incomplete; '
-      + `missing: ${existingFullHealth.missing.join(', ')}. Re-extracting runtime...`
+      '[setup-python-runtime] Existing runtime found but pip support is incomplete; ' +
+        `missing: ${existingFullHealth.missing.join(', ')}. Re-extracting runtime...`,
     );
   }
 
@@ -623,8 +649,8 @@ async function ensurePortablePythonRuntime(options = {}) {
         throw error;
       }
       console.warn(
-        '[setup-python-runtime] Archive extraction or pip payload setup failed; '
-        + `falling back to Windows bootstrap. Reason: ${error instanceof Error ? error.message : String(error)}`
+        '[setup-python-runtime] Archive extraction or pip payload setup failed; ' +
+          `falling back to Windows bootstrap. Reason: ${error instanceof Error ? error.message : String(error)}`,
       );
       await bootstrapRuntimeOnWindows();
     }
@@ -632,9 +658,9 @@ async function ensurePortablePythonRuntime(options = {}) {
     await bootstrapRuntimeOnWindows();
   } else if (required) {
     throw new Error(
-      'Portable Python archive is not available for non-Windows host. '
-      + 'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or '
-      + 'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.'
+      'Portable Python archive is not available for non-Windows host. ' +
+        'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or ' +
+        'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.',
     );
   } else {
     return { ok: true, skipped: true, pythonPath: null };
@@ -644,8 +670,8 @@ async function ensurePortablePythonRuntime(options = {}) {
   const finalHealth = checkRuntimeHealth(OUTPUT_DIR, { requirePip: true });
   if (!finalHealth.ok) {
     throw new Error(
-      'Portable Python runtime is missing required pip components after preparation: '
-      + finalHealth.missing.join(', ')
+      'Portable Python runtime is missing required pip components after preparation: ' +
+        finalHealth.missing.join(', '),
     );
   }
   const finalSize = getDirSize(OUTPUT_DIR);
@@ -661,8 +687,11 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error('[setup-python-runtime] ERROR:', error instanceof Error ? error.message : String(error));
+  main().catch(error => {
+    console.error(
+      '[setup-python-runtime] ERROR:',
+      error instanceof Error ? error.message : String(error),
+    );
     process.exit(1);
   });
 }

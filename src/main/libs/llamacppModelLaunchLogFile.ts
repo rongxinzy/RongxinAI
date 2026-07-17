@@ -22,11 +22,11 @@ const MODEL_LAUNCH_LOG_FILE_NAME_PATTERN =
   /^(.+)_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.txt$/;
 const MODEL_LAUNCH_LOG_MODEL_NAME_DETAIL_PATTERN = /"modelName"\s*:\s*"((?:\\.|[^"\\])*)"/;
 
-export type LlamaCppModelLaunchLogFileStore = ReturnType<typeof createLlamaCppModelLaunchLogFileStore>;
+export type LlamaCppModelLaunchLogFileStore = ReturnType<
+  typeof createLlamaCppModelLaunchLogFileStore
+>;
 
-export function createLlamaCppModelLaunchLogFileStore(input: {
-  userDataPath: string;
-}) {
+export function createLlamaCppModelLaunchLogFileStore(input: { userDataPath: string }) {
   const rootDir = path.join(input.userDataPath, ...MODEL_LAUNCH_LOG_DIR_SEGMENTS);
   const sessionsById = new Map<string, LlamaCppModelLaunchLogSession>();
   const clearedModelNames = new Set<string>();
@@ -98,11 +98,11 @@ export function createLlamaCppModelLaunchLogFileStore(input: {
         .filter(session => !clearedModelNames.has(getLogModelKey(session.modelName)))
         .filter(session => !modelName || isSameLogModelName(session.modelName, modelName));
       if (sessions.length === 0) return null;
-      return sessions.reduce((latest, session) => (
+      return sessions.reduce((latest, session) =>
         new Date(session.updatedAt).getTime() > new Date(latest.updatedAt).getTime()
           ? session
-          : latest
-      ));
+          : latest,
+      );
     },
 
     readSessionLog(sessionId: string): {
@@ -150,7 +150,8 @@ export function createLlamaCppModelLaunchLogFileStore(input: {
 
 function getDiskSessions(rootDir: string): LlamaCppModelLaunchLogSession[] {
   if (!fs.existsSync(rootDir)) return [];
-  return fs.readdirSync(rootDir, { withFileTypes: true })
+  return fs
+    .readdirSync(rootDir, { withFileTypes: true })
     .filter(entry => entry.isFile() && entry.name.endsWith(MODEL_LAUNCH_LOG_EXTENSION))
     .map(entry => createDiskSessionFromFile(rootDir, entry.name))
     .filter((session): session is LlamaCppModelLaunchLogSession => Boolean(session));
@@ -190,9 +191,10 @@ function createDiskSessionFromFile(
   const parsed = parseLogFileName(fileName);
   const startedAt = parsed?.startedAt ?? stats.birthtime.toISOString();
   const updatedAt = stats.mtime.toISOString();
-  const modelName = extractModelNameFromLogContent(content)
-    ?? parsed?.modelName
-    ?? path.basename(fileName, MODEL_LAUNCH_LOG_EXTENSION);
+  const modelName =
+    extractModelNameFromLogContent(content) ??
+    parsed?.modelName ??
+    path.basename(fileName, MODEL_LAUNCH_LOG_EXTENSION);
 
   return {
     sessionId: `${MODEL_LAUNCH_LOG_DISK_SESSION_ID_PREFIX}${fileName}`,
@@ -229,7 +231,9 @@ function parseLogFileName(fileName: string): {
   );
   return {
     modelName,
-    startedAt: Number.isNaN(startedAt.getTime()) ? new Date().toISOString() : startedAt.toISOString(),
+    startedAt: Number.isNaN(startedAt.getTime())
+      ? new Date().toISOString()
+      : startedAt.toISOString(),
   };
 }
 
@@ -246,8 +250,8 @@ function extractModelNameFromLogContent(content: string): string | null {
 
 function getLogFileSessionStatus(content: string): LlamaCppModelLaunchLogSession['status'] {
   if (
-    content.includes(MODEL_LAUNCH_LOG_ERROR_MARKER)
-    || content.includes(getDefaultLogMessage(LlamaCppModelLaunchLogPhase.Failed))
+    content.includes(MODEL_LAUNCH_LOG_ERROR_MARKER) ||
+    content.includes(getDefaultLogMessage(LlamaCppModelLaunchLogPhase.Failed))
   ) {
     return LlamaCppModelLaunchLogSessionStatus.Failed;
   }
@@ -258,8 +262,7 @@ function getLogFileSessionStatus(content: string): LlamaCppModelLaunchLogSession
 }
 
 function getLogFileSequence(content: string): number {
-  return content.split(MODEL_LAUNCH_LOG_LINE_BREAK_PATTERN)
-    .filter(line => line.trim()).length;
+  return content.split(MODEL_LAUNCH_LOG_LINE_BREAK_PATTERN).filter(line => line.trim()).length;
 }
 
 function isSameLogModelName(left: string, right: string): boolean {
@@ -340,8 +343,10 @@ function getSessionStatus(
   event: Pick<LlamaCppModelLaunchLogEvent, 'phase'>,
   current: LlamaCppModelLaunchLogSession['status'] = LlamaCppModelLaunchLogSessionStatus.Starting,
 ): LlamaCppModelLaunchLogSession['status'] {
-  if (event.phase === LlamaCppModelLaunchLogPhase.Succeeded) return LlamaCppModelLaunchLogSessionStatus.Succeeded;
-  if (event.phase === LlamaCppModelLaunchLogPhase.Failed) return LlamaCppModelLaunchLogSessionStatus.Failed;
+  if (event.phase === LlamaCppModelLaunchLogPhase.Succeeded)
+    return LlamaCppModelLaunchLogSessionStatus.Succeeded;
+  if (event.phase === LlamaCppModelLaunchLogPhase.Failed)
+    return LlamaCppModelLaunchLogSessionStatus.Failed;
   return current;
 }
 

@@ -76,7 +76,7 @@ export function setSystemProxyEnabled(enabled: boolean): void {
 }
 
 export function restoreOriginalProxyEnv(): void {
-  PROXY_ENV_KEYS.forEach((key) => {
+  PROXY_ENV_KEYS.forEach(key => {
     setEnvValue(key, originalProxyEnv[key]);
   });
 }

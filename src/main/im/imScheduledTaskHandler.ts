@@ -54,7 +54,12 @@ function buildSystemEventText(body: string): string {
   return `⏰ 提醒：${body}`;
 }
 
-function formatConfirmationText(delayLabel: string, scheduleAt: string, runAt: Date, body: string): string {
+function formatConfirmationText(
+  delayLabel: string,
+  scheduleAt: string,
+  runAt: Date,
+  body: string,
+): string {
   const clockText = extractClockFromIsoWithOffset(scheduleAt) ?? formatLocalClock(runAt);
   return `好的，已设置好提醒！${delayLabel}（${clockText}）会提醒你${body}。`;
 }
@@ -161,7 +166,10 @@ export function looksLikeIMScheduledTaskCandidate(
 ): boolean {
   const normalized = text.trim();
   if (!normalized) {
-    return Array.isArray(attachments) && attachments.some((item) => item.type === 'audio' || item.type === 'voice');
+    return (
+      Array.isArray(attachments) &&
+      attachments.some(item => item.type === 'audio' || item.type === 'voice')
+    );
   }
   return SCHEDULED_TASK_CANDIDATE_RE.test(normalized);
 }
@@ -186,15 +194,16 @@ export function normalizeDetectedScheduledTaskRequest(
   }
 
   const reminderBody = normalizeReminderBody(
-    typeof payload.reminderBody === 'string' ? payload.reminderBody : ''
+    typeof payload.reminderBody === 'string' ? payload.reminderBody : '',
   );
   if (!reminderBody) {
     return null;
   }
 
-  const taskName = typeof payload.taskName === 'string' && payload.taskName.trim()
-    ? normalizeReminderName(payload.taskName)
-    : normalizeReminderName(reminderBody);
+  const taskName =
+    typeof payload.taskName === 'string' && payload.taskName.trim()
+      ? normalizeReminderName(payload.taskName)
+      : normalizeReminderName(reminderBody);
   const payloadText = buildSystemEventText(reminderBody);
   const delayLabel = formatRelativeDelayLabel(now, runAt);
 
@@ -257,7 +266,11 @@ export function createIMScheduledTaskRequestDetector(options: {
         attachments: undefined,
         mediaGroupId: undefined,
       });
-      return normalizeDetectedScheduledTaskRequest(parseDetectionPayload(raw), message.content, now);
+      return normalizeDetectedScheduledTaskRequest(
+        parseDetectionPayload(raw),
+        message.content,
+        now,
+      );
     } catch (error) {
       console.warn('[IMScheduledTask] Scheduled-task detection failed:', error);
       return null;
@@ -266,7 +279,7 @@ export function createIMScheduledTaskRequestDetector(options: {
 }
 
 export function isReminderSystemTurn(messages: Array<{ type: string; content: string }>): boolean {
-  return messages.some((message) => {
+  return messages.some(message => {
     const content = typeof message.content === 'string' ? message.content : '';
     // Only consider user and system messages — tool_use/tool_result/assistant
     // messages may contain reminder text from cron.add payloads which would
@@ -275,10 +288,14 @@ export function isReminderSystemTurn(messages: Array<{ type: string; content: st
       return false;
     }
     if (message.type === 'system') {
-      return parseSimpleScheduledReminderText(content) !== null
-        || parseLegacyScheduledReminderSystemMessage(content) !== null;
+      return (
+        parseSimpleScheduledReminderText(content) !== null ||
+        parseLegacyScheduledReminderSystemMessage(content) !== null
+      );
     }
-    return parseScheduledReminderPrompt(content) !== null
-      || parseSimpleScheduledReminderText(content) !== null;
+    return (
+      parseScheduledReminderPrompt(content) !== null ||
+      parseSimpleScheduledReminderText(content) !== null
+    );
   });
 }

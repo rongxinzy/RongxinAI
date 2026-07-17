@@ -30,26 +30,76 @@ const register = (extensions: string[], info: FileTypeInfo) => {
 // Word
 register(['.doc', '.docx'], { icon: FileText, color: 'text-[#2B579A]', label: 'Word' });
 // Excel
-register(['.xls', '.xlsx', '.csv'], { icon: FileSpreadsheet, color: 'text-[#217346]', label: 'Excel' });
+register(['.xls', '.xlsx', '.csv'], {
+  icon: FileSpreadsheet,
+  color: 'text-[#217346]',
+  label: 'Excel',
+});
 // PPT
 register(['.ppt', '.pptx'], { icon: Presentation, color: 'text-[#D24726]', label: 'PPT' });
 // PDF
 register(['.pdf'], { icon: FileText, color: 'text-[#FF0000]', label: 'PDF' });
 // Archive
-register(['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'], { icon: FileArchive, color: 'text-[#F59E0B]', label: 'Archive' });
+register(['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'], {
+  icon: FileArchive,
+  color: 'text-[#F59E0B]',
+  label: 'Archive',
+});
 // Code
-register(['.js', '.ts', '.tsx', '.jsx', '.py', '.java', '.go', '.rs', '.c', '.cpp', '.h', '.css', '.html', '.xml', '.sh', '.bat', '.rb', '.php', '.swift', '.kt'], { icon: FileCode2, color: 'text-[#8B5CF6]', label: 'Code' });
+register(
+  [
+    '.js',
+    '.ts',
+    '.tsx',
+    '.jsx',
+    '.py',
+    '.java',
+    '.go',
+    '.rs',
+    '.c',
+    '.cpp',
+    '.h',
+    '.css',
+    '.html',
+    '.xml',
+    '.sh',
+    '.bat',
+    '.rb',
+    '.php',
+    '.swift',
+    '.kt',
+  ],
+  { icon: FileCode2, color: 'text-[#8B5CF6]', label: 'Code' },
+);
 // Text / Config
-register(['.txt', '.md', '.log', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.env', '.gitignore'], { icon: FileText, color: 'text-[#6B7280]', label: 'Text' });
+register(
+  ['.txt', '.md', '.log', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.env', '.gitignore'],
+  { icon: FileText, color: 'text-[#6B7280]', label: 'Text' },
+);
 // Audio
-register(['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a', '.wma'], { icon: FileAudio, color: 'text-[#EC4899]', label: 'Audio' });
+register(['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a', '.wma'], {
+  icon: FileAudio,
+  color: 'text-[#EC4899]',
+  label: 'Audio',
+});
 // Video
-register(['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'], { icon: FileVideo, color: 'text-[#6366F1]', label: 'Video' });
+register(['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'], {
+  icon: FileVideo,
+  color: 'text-[#6366F1]',
+  label: 'Video',
+});
 // Image (fallback — used when thumbnail rendering fails)
-register(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.ico', '.avif'], { icon: FileImage, color: 'text-[#3B82F6]', label: 'Image' });
+register(
+  ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.ico', '.avif'],
+  { icon: FileImage, color: 'text-[#3B82F6]', label: 'Image' },
+);
 
 /** Default info for unrecognized file types */
-const DEFAULT_FILE_TYPE_INFO: FileTypeInfo = { icon: FileText, color: 'text-[#9CA3AF]', label: 'File' };
+const DEFAULT_FILE_TYPE_INFO: FileTypeInfo = {
+  icon: FileText,
+  color: 'text-[#9CA3AF]',
+  label: 'File',
+};
 
 /**
  * Get file type icon info from a file name.

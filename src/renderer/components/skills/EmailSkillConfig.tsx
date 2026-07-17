@@ -1,8 +1,23 @@
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { Input } from '@shared/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
-import { CheckCircle, ChevronDown, ChevronUp, Eye, EyeOff, Signal, Sparkles, XCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
+import {
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Signal,
+  Sparkles,
+  XCircle,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -405,7 +420,13 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
       {/* Provider Selection */}
       <div>
         <label className={labelClassName}>{i18nService.t('emailProvider')}</label>
-        <Select value={provider} onValueChange={(value) => handleProviderChange(value ?? '')} onOpenChange={(open) => { if (!open) queuePersist(); }}>
+        <Select
+          value={provider}
+          onValueChange={value => handleProviderChange(value ?? '')}
+          onOpenChange={open => {
+            if (!open) queuePersist();
+          }}
+        >
           <SelectTrigger className={inputClassName}>
             <SelectValue placeholder={i18nService.t('emailSelectProvider')} />
           </SelectTrigger>
@@ -428,7 +449,10 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
       {/* Email */}
       <div>
-        <label className={labelClassName}>{i18nService.t('emailAddress')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
+        <label className={labelClassName}>
+          {i18nService.t('emailAddress')}
+          <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+        </label>
         <div className="relative">
           <Input
             type="email"
@@ -460,7 +484,10 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
       {/* Password */}
       <div>
-        <label className={labelClassName}>{i18nService.t('emailPassword')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
+        <label className={labelClassName}>
+          {i18nService.t('emailPassword')}
+          <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+        </label>
         <div className="relative">
           <Input
             type={showPassword ? 'text' : 'password'}
@@ -496,11 +523,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
                 showPassword ? i18nService.t('hide') || 'Hide' : i18nService.t('show') || 'Show'
               }
             >
-              {showPassword ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
+              {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </Button>
           </div>
         </div>
@@ -526,7 +549,9 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
         <div className="space-y-3 pl-2 border-l-2 border-border">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClassName}>IMAP Host<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
+              <label className={labelClassName}>
+                IMAP Host<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+              </label>
               <div className="relative">
                 <Input
                   type="text"
@@ -589,7 +614,9 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClassName}>SMTP Host<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
+              <label className={labelClassName}>
+                SMTP Host<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+              </label>
               <div className="relative">
                 <Input
                   type="text"
@@ -654,7 +681,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <label className="flex items-center gap-2 text-xs text-foreground">
               <Checkbox
                 checked={imapTls === 'true'}
-                onCheckedChange={(checked) => setImapTls(checked === true ? 'true' : 'false')}
+                onCheckedChange={checked => setImapTls(checked === true ? 'true' : 'false')}
                 onBlur={queuePersist}
                 className="h-3.5 w-3.5"
               />
@@ -663,7 +690,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <label className="flex items-center gap-2 text-xs text-foreground">
               <Checkbox
                 checked={smtpSecure === 'true'}
-                onCheckedChange={(checked) => setSmtpSecure(checked === true ? 'true' : 'false')}
+                onCheckedChange={checked => setSmtpSecure(checked === true ? 'true' : 'false')}
                 onBlur={queuePersist}
                 className="h-3.5 w-3.5"
               />
@@ -675,7 +702,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
             <label className="flex items-center gap-2 text-xs dark:text-claude-darkText text-claude-text">
               <Checkbox
                 checked={rejectUnauthorized === 'false'}
-                onCheckedChange={(checked) => {
+                onCheckedChange={checked => {
                   setRejectUnauthorized(checked === true ? 'false' : 'true');
                   setTimeout(queuePersist, 0);
                 }}

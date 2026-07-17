@@ -43,7 +43,7 @@ function logDir(): string {
  */
 export function initLogger(): void {
   // Daily rotation: one file per calendar day
-  log.transports.file.resolvePathFn = (vars) => {
+  log.transports.file.resolvePathFn = vars => {
     _logDir = vars.libraryDefaultDir;
     return path.join(vars.libraryDefaultDir, `${LOG_BASENAME}-${todayStr()}.log`);
   };
@@ -139,9 +139,10 @@ export function getRecentMainLogEntries(): Array<{ archiveName: string; filePath
 
   const cutoffMs = Date.now() - LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-  return fs.readdirSync(dir)
-    .filter((f) => LOG_FILE_RE.test(f))
-    .map((f) => ({ archiveName: f, filePath: path.join(dir, f) }))
+  return fs
+    .readdirSync(dir)
+    .filter(f => LOG_FILE_RE.test(f))
+    .map(f => ({ archiveName: f, filePath: path.join(dir, f) }))
     .filter(({ filePath }) => {
       try {
         return fs.statSync(filePath).mtimeMs >= cutoffMs;

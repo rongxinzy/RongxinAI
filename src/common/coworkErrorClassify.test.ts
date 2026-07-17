@@ -1,4 +1,4 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { classifyErrorKey } from './coworkErrorClassify';
 
@@ -15,7 +15,11 @@ test('auth: DeepSeek authentication_fails', () => {
 });
 
 test('auth: OpenAI api key not valid', () => {
-  expect(classifyError('Incorrect API key provided: sk-xxx. You can find your API key at https://platform.openai.com/account/api-keys.')).toBe('coworkErrorAuthInvalid');
+  expect(
+    classifyError(
+      'Incorrect API key provided: sk-xxx. You can find your API key at https://platform.openai.com/account/api-keys.',
+    ),
+  ).toBe('coworkErrorAuthInvalid');
 });
 
 test('auth: OpenAI api_key invalid', () => {
@@ -37,11 +41,17 @@ test('auth: unauthorized', () => {
 // ==================== Billing errors ====================
 
 test('billing: DeepSeek insufficient_balance', () => {
-  expect(classifyError('insufficient_balance: Your account does not have enough balance')).toBe('coworkErrorInsufficientBalance');
+  expect(classifyError('insufficient_balance: Your account does not have enough balance')).toBe(
+    'coworkErrorInsufficientBalance',
+  );
 });
 
 test('billing: OpenAI insufficient_quota', () => {
-  expect(classifyError('You exceeded your current quota, please check your plan and billing details. insufficient_quota')).toBe('coworkErrorInsufficientBalance');
+  expect(
+    classifyError(
+      'You exceeded your current quota, please check your plan and billing details. insufficient_quota',
+    ),
+  ).toBe('coworkErrorInsufficientBalance');
 });
 
 test('billing: OpenRouter insufficient credits', () => {
@@ -63,7 +73,9 @@ test('billing: HTTP 402', () => {
 // ==================== Input too long ====================
 
 test('input: context length exceeded', () => {
-  expect(classifyError("This model's maximum context length is 8192 tokens. context length exceeded")).toBe('coworkErrorInputTooLong');
+  expect(
+    classifyError("This model's maximum context length is 8192 tokens. context length exceeded"),
+  ).toBe('coworkErrorInputTooLong');
 });
 
 test('input: input too long', () => {
@@ -71,7 +83,9 @@ test('input: input too long', () => {
 });
 
 test('input: Qwen Range of input length', () => {
-  expect(classifyError('Range of input length should be [1, 6000]')).toBe('coworkErrorInputTooLong');
+  expect(classifyError('Range of input length should be [1, 6000]')).toBe(
+    'coworkErrorInputTooLong',
+  );
 });
 
 test('input: HTTP 413', () => {

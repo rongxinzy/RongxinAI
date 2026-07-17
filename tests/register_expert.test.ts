@@ -4,7 +4,10 @@ import * as path from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { getPiAgentsDir, parseExpertPackage } from '../SKILLs/zhiyuan-expert-manager/scripts/register_expert';
+import {
+  getPiAgentsDir,
+  parseExpertPackage,
+} from '../SKILLs/zhiyuan-expert-manager/scripts/register_expert';
 import { validateExpert } from '../SKILLs/zhiyuan-expert-manager/scripts/validate_expert';
 
 function createMinimalExpertPackage(dir: string, overrides: Record<string, unknown> = {}) {
@@ -40,7 +43,10 @@ function createMinimalExpertPackage(dir: string, overrides: Record<string, unkno
       { en: 'Q&A', zh: '问答' },
     ],
     quickPrompts: [
-      { en: 'Hello, please help me write a Hello World program.', zh: '你好，请帮我写一个 Hello World 程序。' },
+      {
+        en: 'Hello, please help me write a Hello World program.',
+        zh: '你好，请帮我写一个 Hello World 程序。',
+      },
       { en: 'Explain what a variable is.', zh: '解释什么是变量。' },
       { en: 'How do I define a function?', zh: '如何定义一个函数？' },
     ],
@@ -58,11 +64,7 @@ function createMinimalExpertPackage(dir: string, overrides: Record<string, unkno
     '# hello-skill\n\n## 元数据\n- 名称: hello-skill\n- 版本: 1.0.0\n- 类型: tool\n',
     'utf-8',
   );
-  fs.writeFileSync(
-    path.join(skillsDir, 'index.js'),
-    'module.exports = { tools: {} };',
-    'utf-8',
-  );
+  fs.writeFileSync(path.join(skillsDir, 'index.js'), 'module.exports = { tools: {} };', 'utf-8');
 }
 
 describe('parseExpertPackage', () => {
@@ -150,7 +152,11 @@ describe('parseExpertPackage', () => {
       expect(result.piSyncedFiles[0]).toBe('test-code-expert--test-code-assistant.md');
 
       // Verify the MD was copied to pi agents directory
-      const expectedPath = path.join(piAgentsDir, 'agents', 'test-code-expert--test-code-assistant.md');
+      const expectedPath = path.join(
+        piAgentsDir,
+        'agents',
+        'test-code-expert--test-code-assistant.md',
+      );
       expect(fs.existsSync(expectedPath)).toBe(true);
 
       // Verify content is the agent MD

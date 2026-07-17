@@ -16,7 +16,7 @@ workflow:
 default:
   image: rongxinai-ci:latest
   cache:
-    - key: "$CI_COMMIT_REF_SLUG"
+    - key: '$CI_COMMIT_REF_SLUG'
       paths:
         - node_modules/
   before_script:
@@ -35,11 +35,11 @@ stages:
   - build-platforms
 
 variables:
-  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
-  NODEJS_ORG_MIRROR: "https://npmmirror.com/mirrors/node"
+  NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+  NODEJS_ORG_MIRROR: 'https://npmmirror.com/mirrors/node'
   ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-  ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
-  ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
+  ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+  ELECTRON_BUILDER_BINARIES_MIRROR: 'https://npmmirror.com/mirrors/electron-builder-binaries/'
 
 # ═══════════════════════════════════════════════════════
 # Stage 1: Lint（仅变更的 TS/TSX 文件）
@@ -170,22 +170,22 @@ build-windows-lite:
   image: null
   before_script: []
   variables:
-    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
-    ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+    NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+    ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
     GIT_CLEAN_FLAGS: none
     ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: lite
   cache:
-    - key: "win-npm-dev"
+    - key: 'win-npm-dev'
       paths:
         - node_modules/
-    - key: "win-python-3.11.9"
+    - key: 'win-python-3.11.9'
       paths:
         - resources/python-win/
-    - key: "win-openclaw-v2026.4.14"
+    - key: 'win-openclaw-v2026.4.14'
       paths:
         - vendor/openclaw-runtime/win-x64/
         - build-tar/win-resources.tar
-    - key: "win-llamacpp-backends-b9244"
+    - key: 'win-llamacpp-backends-b9244'
       paths:
         - build/win-lite/
         - build/win-full/
@@ -204,22 +204,22 @@ build-windows-full:
   image: null
   before_script: []
   variables:
-    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
-    ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+    NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+    ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
     GIT_CLEAN_FLAGS: none
     ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: full
   cache:
-    - key: "win-npm-dev"
+    - key: 'win-npm-dev'
       paths:
         - node_modules/
-    - key: "win-python-3.11.9"
+    - key: 'win-python-3.11.9'
       paths:
         - resources/python-win/
-    - key: "win-openclaw-v2026.4.14"
+    - key: 'win-openclaw-v2026.4.14'
       paths:
         - vendor/openclaw-runtime/win-x64/
         - build-tar/win-resources.tar
-    - key: "win-llamacpp-backends-b9244"
+    - key: 'win-llamacpp-backends-b9244'
       paths:
         - build/win-lite/
         - build/win-full/
@@ -249,19 +249,19 @@ build-linux:
   # 缓存协同：首次全量安装，后续命中缓存仅校验增量，大幅提速。
   before_script: []
   variables:
-    NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
-    ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+    NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+    ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
     GIT_CLEAN_FLAGS: none
     # 跳过 Electron postinstall 下载
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     # 从内网 GitLab 镜像拉取 OpenClaw 源码（避免 GitHub 不可达）
-    OPENCLAW_REPO: "http://172.18.5.179:8180/rxzy-opensource/openclaw-mirror.git"
-    OPENCLAW_SRC: "${CI_PROJECT_DIR}/vendor/openclaw-src"
+    OPENCLAW_REPO: 'http://172.18.5.179:8180/rxzy-opensource/openclaw-mirror.git'
+    OPENCLAW_SRC: '${CI_PROJECT_DIR}/vendor/openclaw-src'
   cache:
-    - key: "linux-npm-release-1-0"
+    - key: 'linux-npm-release-1-0'
       paths:
         - node_modules/
-    - key: "linux-openclaw-v2026.4.14"
+    - key: 'linux-openclaw-v2026.4.14'
       paths:
         - vendor/openclaw-runtime/linux-x64/
         - vendor/openclaw-src/

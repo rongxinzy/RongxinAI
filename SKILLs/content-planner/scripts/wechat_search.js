@@ -12,32 +12,32 @@
  *   node wechat_search.js "keyword" -r          # resolve real mp.weixin URLs
  */
 
-"use strict";
+'use strict';
 
-const https = require("https");
-const zlib = require("zlib");
-const cheerio = require("cheerio");
+const https = require('https');
+const zlib = require('zlib');
+const cheerio = require('cheerio');
 
 // -------------------------------------------------------------------------
 // User-Agent rotation
 // -------------------------------------------------------------------------
 
 const UA_LIST = [
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edg/125.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
-  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edg/125.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36',
 ];
 
 function randomUA() {
   return UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // -------------------------------------------------------------------------
 // HTTP helpers
@@ -47,9 +47,9 @@ function decompress(buf, encoding) {
   if (!encoding) return buf;
   const enc = String(encoding).toLowerCase();
   try {
-    if (enc.includes("gzip")) return zlib.gunzipSync(buf);
-    if (enc.includes("deflate")) return zlib.inflateSync(buf);
-    if (enc.includes("br")) return zlib.brotliDecompressSync(buf);
+    if (enc.includes('gzip')) return zlib.gunzipSync(buf);
+    if (enc.includes('deflate')) return zlib.inflateSync(buf);
+    if (enc.includes('br')) return zlib.brotliDecompressSync(buf);
   } catch (_) {
     /* fall through */
   }
@@ -62,36 +62,35 @@ function httpsGet(url, extraHeaders = {}, timeoutMs = 20000) {
     const opts = {
       hostname: u.hostname,
       path: u.pathname + u.search,
-      method: "GET",
+      method: 'GET',
       headers: {
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Encoding": "identity",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Encoding': 'identity',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         Host: u.hostname,
         Referer: `https://${u.hostname}/`,
-        "User-Agent": randomUA(),
+        'User-Agent': randomUA(),
         ...extraHeaders,
       },
     };
-    const req = https.request(opts, (res) => {
+    const req = https.request(opts, res => {
       const chunks = [];
-      res.on("data", (c) => chunks.push(c));
-      res.on("end", () => {
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
         const raw = Buffer.concat(chunks);
-        const body = decompress(raw, res.headers["content-encoding"]);
+        const body = decompress(raw, res.headers['content-encoding']);
         resolve({
           status: res.statusCode,
           headers: res.headers,
           body,
-          text: body.toString("utf-8"),
+          text: body.toString('utf-8'),
         });
       });
     });
-    req.on("error", reject);
+    req.on('error', reject);
     req.setTimeout(timeoutMs, () => {
       req.destroy();
-      reject(new Error("timeout"));
+      reject(new Error('timeout'));
     });
     req.end();
   });
@@ -103,22 +102,18 @@ function httpsGet(url, extraHeaders = {}, timeoutMs = 20000) {
 
 async function fetchSogouCookie() {
   try {
-    const resp = await httpsGet(
-      "https://v.sogou.com/v?ie=utf8&query=&p=40030600",
-      {},
-      10000
-    );
-    const raw = resp.headers["set-cookie"];
-    if (!raw) return { str: "", obj: {} };
+    const resp = await httpsGet('https://v.sogou.com/v?ie=utf8&query=&p=40030600', {}, 10000);
+    const raw = resp.headers['set-cookie'];
+    if (!raw) return { str: '', obj: {} };
     const obj = {};
-    raw.forEach((c) => {
-      const kv = c.split(";")[0];
-      const [k, v] = kv.split("=");
+    raw.forEach(c => {
+      const kv = c.split(';')[0];
+      const [k, v] = kv.split('=');
       if (k && v) obj[k.trim()] = v.trim();
     });
-    return { str: raw.map((c) => c.split(";")[0]).join("; "), obj };
+    return { str: raw.map(c => c.split(';')[0]).join('; '), obj };
   } catch (_) {
-    return { str: "", obj: {} };
+    return { str: '', obj: {} };
   }
 }
 
@@ -129,7 +124,7 @@ async function fetchSogouCookie() {
 function extractRedirectUrl(html) {
   // meta refresh
   let m = html.match(
-    /<meta[^>]*http-equiv=["']refresh["'][^>]*content=["']\d+;\s*url=([^"']+)["']/i
+    /<meta[^>]*http-equiv=["']refresh["'][^>]*content=["']\d+;\s*url=([^"']+)["']/i,
   );
   if (m) return m[1];
   // JS location
@@ -142,17 +137,16 @@ function extractRedirectUrl(html) {
   for (const p of html.matchAll(/url\s*\+=\s*'([^']*)'/g)) parts.push(p[1]);
   for (const p of html.matchAll(/url\s*\+=\s*"([^"]*)"/g)) parts.push(p[1]);
   if (parts.length) {
-    const joined = parts.join("");
-    if (joined.includes("mp.weixin.qq.com")) return joined;
+    const joined = parts.join('');
+    if (joined.includes('mp.weixin.qq.com')) return joined;
   }
   return null;
 }
 
 async function resolveRealUrl(sogouUrl, cookieObj) {
-  if (!sogouUrl.includes("weixin.sogou.com")) return sogouUrl;
-  const snuid = cookieObj.SNUID || "";
-  const base =
-    "ABTEST=7|1716888919|v1; IPLOC=CN5101; ariaDefaultTheme=default";
+  if (!sogouUrl.includes('weixin.sogou.com')) return sogouUrl;
+  const snuid = cookieObj.SNUID || '';
+  const base = 'ABTEST=7|1716888919|v1; IPLOC=CN5101; ariaDefaultTheme=default';
   const cookie = snuid ? `${base}; SNUID=${snuid}` : base;
 
   for (let i = 0; i < 2; i++) {
@@ -160,11 +154,11 @@ async function resolveRealUrl(sogouUrl, cookieObj) {
       const resp = await httpsGet(sogouUrl, { Cookie: cookie }, 5000);
       if (resp.status >= 300 && resp.status < 400 && resp.headers.location) {
         const loc = resp.headers.location;
-        if (loc.includes("mp.weixin.qq.com")) return loc;
+        if (loc.includes('mp.weixin.qq.com')) return loc;
       }
       if (resp.status === 200) {
         const redir = extractRedirectUrl(resp.text);
-        if (redir && redir.includes("mp.weixin.qq.com")) return redir;
+        if (redir && redir.includes('mp.weixin.qq.com')) return redir;
       }
       return sogouUrl;
     } catch (_) {
@@ -181,11 +175,11 @@ async function resolveRealUrl(sogouUrl, cookieObj) {
 function toChinaTime(date) {
   const ct = new Date(date.getTime() + 8 * 3600000);
   const y = ct.getUTCFullYear();
-  const mo = String(ct.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(ct.getUTCDate()).padStart(2, "0");
-  const h = String(ct.getUTCHours()).padStart(2, "0");
-  const mi = String(ct.getUTCMinutes()).padStart(2, "0");
-  const s = String(ct.getUTCSeconds()).padStart(2, "0");
+  const mo = String(ct.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(ct.getUTCDate()).padStart(2, '0');
+  const h = String(ct.getUTCHours()).padStart(2, '0');
+  const mi = String(ct.getUTCMinutes()).padStart(2, '0');
+  const s = String(ct.getUTCSeconds()).padStart(2, '0');
   return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
 }
 
@@ -197,28 +191,28 @@ function relativeTimeLabel(ts) {
   if (days > 0) return `${days}天前`;
   if (hours > 0) return `${hours}小时前`;
   if (mins > 0) return `${mins}分钟前`;
-  return "刚刚";
+  return '刚刚';
 }
 
 function parseArticle($, el) {
   const $el = $(el);
-  const $link = $el.find("h3 a");
+  const $link = $el.find('h3 a');
   if (!$link.length) return null;
 
   const title = $link.text().trim();
-  let url = $link.attr("href") || "";
-  if (url.startsWith("/")) url = `https://weixin.sogou.com${url}`;
+  let url = $link.attr('href') || '';
+  if (url.startsWith('/')) url = `https://weixin.sogou.com${url}`;
 
-  const summary = $el.find("p.txt-info").text().trim();
+  const summary = $el.find('p.txt-info').text().trim();
 
-  let datetime = "";
-  let timeDesc = "";
-  let source = "";
+  let datetime = '';
+  let timeDesc = '';
+  let source = '';
 
-  const $sp = $el.find(".s-p");
+  const $sp = $el.find('.s-p');
   if ($sp.length) {
     // timestamp from script tag
-    const script = $sp.find(".s2 script").text();
+    const script = $sp.find('.s2 script').text();
     const tsMatch = script.match(/(\d{10})/);
     if (tsMatch) {
       const ts = parseInt(tsMatch[1]) * 1000;
@@ -227,9 +221,7 @@ function parseArticle($, el) {
     }
     // source
     const $src =
-      $sp.find(".all-time-y2").length > 0
-        ? $sp.find(".all-time-y2")
-        : $sp.find("a.account");
+      $sp.find('.all-time-y2').length > 0 ? $sp.find('.all-time-y2') : $sp.find('a.account');
     source = $src.text().trim();
   }
 
@@ -238,10 +230,10 @@ function parseArticle($, el) {
 
 function parseSearchPage(html, max) {
   const $ = cheerio.load(html);
-  const $list = $("ul.news-list");
+  const $list = $('ul.news-list');
   if (!$list.length) return [];
   const out = [];
-  $list.find("li").each((_, el) => {
+  $list.find('li').each((_, el) => {
     if (out.length >= max) return false;
     const a = parseArticle($, el);
     if (a) out.push(a);
@@ -284,7 +276,7 @@ async function searchArticles(query, maxResults, shouldResolve) {
     for (let i = 0; i < result.length; i++) {
       const a = result[i];
       const real = await resolveRealUrl(a.url, cookieObj);
-      const resolved = !real.includes("weixin.sogou.com");
+      const resolved = !real.includes('weixin.sogou.com');
       if (resolved) {
         a.url = real;
         ok++;
@@ -303,19 +295,19 @@ async function searchArticles(query, maxResults, shouldResolve) {
 // -------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  let query = "";
+  let query = '';
   let num = 10;
-  let output = "";
+  let output = '';
   let resolve = false;
 
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "-n" || argv[i] === "--num") {
+    if (argv[i] === '-n' || argv[i] === '--num') {
       num = parseInt(argv[++i]) || 10;
-    } else if (argv[i] === "-o" || argv[i] === "--output") {
-      output = argv[++i] || "";
-    } else if (argv[i] === "-r" || argv[i] === "--resolve-url") {
+    } else if (argv[i] === '-o' || argv[i] === '--output') {
+      output = argv[++i] || '';
+    } else if (argv[i] === '-r' || argv[i] === '--resolve-url') {
       resolve = true;
-    } else if (!argv[i].startsWith("-")) {
+    } else if (!argv[i].startsWith('-')) {
       query = argv[i];
     }
   }
@@ -350,7 +342,7 @@ async function main() {
   const jsonStr = JSON.stringify(payload, null, 2);
 
   if (output) {
-    require("fs").writeFileSync(output, jsonStr, "utf-8");
+    require('fs').writeFileSync(output, jsonStr, 'utf-8');
     console.error(`已保存: ${output}`);
   }
 
@@ -360,8 +352,8 @@ async function main() {
 module.exports = { searchArticles };
 
 if (require.main === module) {
-  main().catch((e) => {
-    console.error("搜索失败:", e.message);
+  main().catch(e => {
+    console.error('搜索失败:', e.message);
     process.exit(1);
   });
 }

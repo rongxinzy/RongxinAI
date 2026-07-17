@@ -70,8 +70,6 @@ export async function openLlamaCppModelLaunchLogWindow(
   await window.loadURL(url.toString());
 }
 
-
-
 function getLogWindowIndexHtmlPath(): string {
   const candidates = [
     path.join(__dirname, '..', 'dist', 'index.html'),
@@ -90,14 +88,17 @@ function getLogWindowPreloadPath(): string {
 }
 
 function bindModelLaunchLogWindowDiagnostics(window: BrowserWindow): void {
-  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    if (!isMainFrame) return;
-    console.error('[LlamaCpp] Model launch log window failed to load:', {
-      errorCode,
-      errorDescription,
-      validatedURL,
-    });
-  });
+  window.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame) return;
+      console.error('[LlamaCpp] Model launch log window failed to load:', {
+        errorCode,
+        errorDescription,
+        validatedURL,
+      });
+    },
+  );
 
   window.webContents.on('preload-error', (_event, preloadPath, error) => {
     console.error('[LlamaCpp] Model launch log window preload failed:', preloadPath, error);
@@ -162,9 +163,7 @@ function getModelLaunchLogWindowTitle(input: LlamaCppOpenModelLaunchLogWindowInp
     : t('llamacppModelLaunchLogWindowTitle');
 }
 
-function buildLogWindowQuery(
-  input: LlamaCppOpenModelLaunchLogWindowInput,
-): Record<string, string> {
+function buildLogWindowQuery(input: LlamaCppOpenModelLaunchLogWindowInput): Record<string, string> {
   return {
     [LlamaCppModelLaunchLogWindowQuery.View]: LlamaCppModelLaunchLogWindowView.ModelLaunchLog,
     ...(input.sessionId ? { [LlamaCppModelLaunchLogWindowQuery.SessionId]: input.sessionId } : {}),

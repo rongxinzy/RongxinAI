@@ -43,9 +43,8 @@ jobs:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-
-      
-      - run: npm install
 
+      - run: npm install
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -56,7 +55,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-build
@@ -77,9 +76,8 @@ jobs:
           path: ~\AppData\Local\npm-cache
           key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-
-      
-      - run: npm install
 
+      - run: npm install
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -89,14 +87,14 @@ jobs:
         run: npm run setup:python-runtime
         env:
           ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
-      
+
       - name: Build Windows
         run: npm run dist:win
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build
@@ -117,14 +115,13 @@ jobs:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-
-      
+
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
-      
-      - run: npm install
 
+      - run: npm install
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -134,7 +131,7 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      
+
       - uses: actions/upload-artifact@v4
         with:
           name: linux-build
@@ -150,12 +147,12 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:

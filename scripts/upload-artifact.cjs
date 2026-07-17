@@ -49,9 +49,12 @@ function uploadArtifact(localPath, remotePath, options = {}) {
   const curlArgs = [
     '-f', // fail on HTTP error
     '-sS', // silent but show errors
-    '-u', `${frogName}:${frogPw}`,
-    '-T', resolvedLocal,
-    '-H', 'X-Checksum-Deploy:false',
+    '-u',
+    `${frogName}:${frogPw}`,
+    '-T',
+    resolvedLocal,
+    '-H',
+    'X-Checksum-Deploy:false',
   ];
 
   // Explicitly pass proxy if set, to ensure curl uses it
@@ -62,7 +65,7 @@ function uploadArtifact(localPath, remotePath, options = {}) {
 
   curlArgs.push(url);
 
-  const cmd = `curl ${curlArgs.map((a) => `"${a}"`).join(' ')}`;
+  const cmd = `curl ${curlArgs.map(a => `"${a}"`).join(' ')}`;
   execSync(cmd, { stdio: 'inherit', env: process.env });
 
   console.log('[upload-artifact] Upload successful');
@@ -75,7 +78,9 @@ if (require.main === module) {
     console.error('');
     console.error('Examples:');
     console.error('  node upload-artifact.cjs dist/app.zip releases/app-latest.zip');
-    console.error('  node upload-artifact.cjs dist/app.zip releases/app-latest.zip libs-release-local');
+    console.error(
+      '  node upload-artifact.cjs dist/app.zip releases/app-latest.zip libs-release-local',
+    );
     process.exit(1);
   }
 

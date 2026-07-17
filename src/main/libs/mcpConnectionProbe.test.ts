@@ -12,7 +12,10 @@ const {
   listToolsMock: vi.fn<() => Promise<{ tools: unknown[] }>>(),
   closeClientMock: vi.fn<() => Promise<void>>(),
   closeTransportMock: vi.fn<() => Promise<void>>(),
-  resolveStdioCommandMock: vi.fn<() => Promise<{ command: string; args: string[]; env: Record<string, string> | undefined }>>(),
+  resolveStdioCommandMock:
+    vi.fn<
+      () => Promise<{ command: string; args: string[]; env: Record<string, string> | undefined }>
+    >(),
   getEnhancedEnvMock: vi.fn<() => Promise<Record<string, string>>>(),
 }));
 
@@ -128,7 +131,10 @@ test('probeMcpConnection passes headers to SSE transports', async () => {
   });
 
   expect(connectMock).toHaveBeenCalledTimes(1);
-  const transport = connectMock.mock.calls[0]?.[0] as { url?: URL; options?: { requestInit?: RequestInit } };
+  const transport = connectMock.mock.calls[0]?.[0] as {
+    url?: URL;
+    options?: { requestInit?: RequestInit };
+  };
   expect(transport.url?.toString()).toBe('http://localhost:3000/sse');
   expect(transport.options).toEqual({
     requestInit: {

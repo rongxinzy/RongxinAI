@@ -1,10 +1,12 @@
 import type { LlamaCppBackendRef, LlamaCppRuntimeDevice } from '../../shared/llamacpp';
 
 export function backendRequiresDeviceValidation(ref: LlamaCppBackendRef): boolean {
-  return ref.backend.includes('cuda')
-    || ref.backend.includes('vulkan')
-    || ref.backend.includes('hip')
-    || ref.backend.includes('opencl-adreno');
+  return (
+    ref.backend.includes('cuda') ||
+    ref.backend.includes('vulkan') ||
+    ref.backend.includes('hip') ||
+    ref.backend.includes('opencl-adreno')
+  );
 }
 
 export function validateBackendDevices(
@@ -27,12 +29,12 @@ export function validateBackendDevices(
       : 'The selected HIP backend did not detect any HIP/ROCm devices.';
   }
   if (ref.backend.includes('opencl-adreno')) {
-    return devices.some(device =>
-      device.backend === 'opencl' || /adreno/i.test(device.name) || /adreno/i.test(device.id)
+    return devices.some(
+      device =>
+        device.backend === 'opencl' || /adreno/i.test(device.name) || /adreno/i.test(device.id),
     )
       ? undefined
       : 'The selected OpenCL Adreno backend did not detect any Adreno/OpenCL devices.';
   }
   return undefined;
 }
-

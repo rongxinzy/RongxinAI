@@ -21,7 +21,10 @@ export function formatGatewayLogDateKey(date = new Date()): string {
 }
 
 export function getGatewayLogPath(logsDir: string, date = new Date()): string {
-  return path.join(logsDir, `${GATEWAY_LOG_PREFIX}-${formatGatewayLogDateKey(date)}${GATEWAY_LOG_SUFFIX}`);
+  return path.join(
+    logsDir,
+    `${GATEWAY_LOG_PREFIX}-${formatGatewayLogDateKey(date)}${GATEWAY_LOG_SUFFIX}`,
+  );
 }
 
 export function getRecentGatewayLogEntries(logsDir: string, now = new Date()): GatewayLogEntry[] {
@@ -29,9 +32,10 @@ export function getRecentGatewayLogEntries(logsDir: string, now = new Date()): G
 
   const cutoffMs = now.getTime() - GATEWAY_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-  return fs.readdirSync(logsDir)
-    .filter((fileName) => GATEWAY_DAILY_LOG_RE.test(fileName))
-    .map((fileName) => ({ archiveName: fileName, filePath: path.join(logsDir, fileName) }))
+  return fs
+    .readdirSync(logsDir)
+    .filter(fileName => GATEWAY_DAILY_LOG_RE.test(fileName))
+    .map(fileName => ({ archiveName: fileName, filePath: path.join(logsDir, fileName) }))
     .filter(({ filePath }) => {
       try {
         return fs.statSync(filePath).mtimeMs >= cutoffMs;
@@ -49,8 +53,9 @@ export function pruneGatewayLogs(logsDir: string, now = new Date()): void {
 
   for (const fileName of fs.readdirSync(logsDir)) {
     const isLegacyGatewayLog = fileName === LEGACY_GATEWAY_LOG_FILE_NAME;
-    const isExpiredDailyGatewayLog = GATEWAY_DAILY_LOG_RE.test(fileName)
-      && isFileOlderThan(path.join(logsDir, fileName), cutoffMs);
+    const isExpiredDailyGatewayLog =
+      GATEWAY_DAILY_LOG_RE.test(fileName) &&
+      isFileOlderThan(path.join(logsDir, fileName), cutoffMs);
 
     if (!isLegacyGatewayLog && !isExpiredDailyGatewayLog) continue;
 

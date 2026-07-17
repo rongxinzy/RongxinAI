@@ -25,7 +25,7 @@ export function getModelIdentityKey(model: Pick<Model, 'id' | 'providerKey'>): s
 
 export function isSameModelIdentity(
   modelA: Pick<Model, 'id' | 'providerKey'>,
-  modelB: Pick<Model, 'id' | 'providerKey'>
+  modelB: Pick<Model, 'id' | 'providerKey'>,
 ): boolean {
   if (modelA.id !== modelB.id) {
     return false;
@@ -96,10 +96,12 @@ function syncSelectedModelByAgent(
 }
 
 const initialState: ModelState = {
-  defaultSelectedModel: availableModels.find(
-    model => model.id === defaultConfig.model.defaultModel
-      && (!defaultModelProvider || model.providerKey === defaultModelProvider)
-  ) || availableModels[0],
+  defaultSelectedModel:
+    availableModels.find(
+      model =>
+        model.id === defaultConfig.model.defaultModel &&
+        (!defaultModelProvider || model.providerKey === defaultModelProvider),
+    ) || availableModels[0],
   selectedModelByAgent: {},
   availableModels: availableModels,
 };
@@ -122,8 +124,8 @@ const modelSlice = createSlice({
       state.availableModels = [...serverModels, ...action.payload];
       availableModels = state.availableModels;
       if (state.availableModels.length > 0) {
-        const matchedModel = state.availableModels.find(
-          m => isSameModelIdentity(m, state.defaultSelectedModel),
+        const matchedModel = state.availableModels.find(m =>
+          isSameModelIdentity(m, state.defaultSelectedModel),
         );
         state.defaultSelectedModel = matchedModel ?? state.availableModels[0];
       }
@@ -134,14 +136,14 @@ const modelSlice = createSlice({
       state.availableModels = [...action.payload, ...userModels];
       availableModels = state.availableModels;
       if (state.availableModels.length > 0) {
-        const matchedModel = state.availableModels.find(
-          m => isSameModelIdentity(m, state.defaultSelectedModel),
+        const matchedModel = state.availableModels.find(m =>
+          isSameModelIdentity(m, state.defaultSelectedModel),
         );
         state.defaultSelectedModel = matchedModel ?? state.availableModels[0];
       }
       syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
     },
-    clearServerModels: (state) => {
+    clearServerModels: state => {
       state.availableModels = state.availableModels.filter(m => !m.isServerModel);
       availableModels = state.availableModels;
       if (state.defaultSelectedModel.isServerModel && state.availableModels.length > 0) {

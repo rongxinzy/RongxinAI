@@ -5,7 +5,7 @@
  *   - hasMoreSessions initial state
  *   - addMessage updates totalMessages
  */
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import coworkReducer, {
   addMessage,
@@ -15,17 +15,28 @@ import coworkReducer, {
   setHasMoreSessions,
   setSessions,
 } from '../renderer/store/slices/coworkSlice';
-import type { CoworkMessage,CoworkSession, CoworkSessionSummary } from '../renderer/types/cowork';
+import type { CoworkMessage, CoworkSession, CoworkSessionSummary } from '../renderer/types/cowork';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makeSession(id: string, updatedAt = Date.now()): CoworkSessionSummary {
-  return { id, title: `Session ${id}`, status: 'idle', pinned: false, createdAt: updatedAt, updatedAt };
+  return {
+    id,
+    title: `Session ${id}`,
+    status: 'idle',
+    pinned: false,
+    createdAt: updatedAt,
+    updatedAt,
+  };
 }
 
-function makeFullSession(id: string, messages: CoworkMessage[] = [], messagesOffset = 0): CoworkSession {
+function makeFullSession(
+  id: string,
+  messages: CoworkMessage[] = [],
+  messagesOffset = 0,
+): CoworkSession {
   const now = Date.now();
   return {
     id,
@@ -95,20 +106,26 @@ test('setSessions: replaces existing sessions and resets hasMoreSessions to fals
 
 test('appendSessions: appends new sessions to existing list', () => {
   let state = coworkReducer(emptyState, setSessions([makeSession('a'), makeSession('b')]));
-  state = coworkReducer(state, appendSessions({
-    sessions: [makeSession('c'), makeSession('d')],
-    hasMore: false,
-  }));
+  state = coworkReducer(
+    state,
+    appendSessions({
+      sessions: [makeSession('c'), makeSession('d')],
+      hasMore: false,
+    }),
+  );
   expect(state.sessions.length).toBe(4);
   expect(state.sessions.map(s => s.id)).toEqual(['a', 'b', 'c', 'd']);
 });
 
 test('appendSessions: does not add duplicate session IDs', () => {
   let state = coworkReducer(emptyState, setSessions([makeSession('a'), makeSession('b')]));
-  state = coworkReducer(state, appendSessions({
-    sessions: [makeSession('b'), makeSession('c')],  // 'b' is a duplicate
-    hasMore: false,
-  }));
+  state = coworkReducer(
+    state,
+    appendSessions({
+      sessions: [makeSession('b'), makeSession('c')], // 'b' is a duplicate
+      hasMore: false,
+    }),
+  );
   expect(state.sessions.length).toBe(3);
   expect(state.sessions.map(s => s.id)).toEqual(['a', 'b', 'c']);
 });
@@ -160,11 +177,14 @@ test('prependMessages: inserts older messages before existing ones', () => {
   let state = coworkReducer(emptyState, setCurrentSession(session));
 
   const olderMessages = [makeMessage('m3'), makeMessage('m4'), makeMessage('m5')];
-  state = coworkReducer(state, prependMessages({
-    sessionId: 'sess1',
-    messages: olderMessages,
-    newOffset: 2,
-  }));
+  state = coworkReducer(
+    state,
+    prependMessages({
+      sessionId: 'sess1',
+      messages: olderMessages,
+      newOffset: 2,
+    }),
+  );
 
   expect(state.currentSession?.messages.length).toBe(6);
   expect(state.currentSession?.messages[0].id).toBe('m3');
@@ -179,11 +199,14 @@ test('prependMessages: does not add duplicate message IDs', () => {
 
   // Overlap: m5 already exists
   const incoming = [makeMessage('m4'), makeMessage('m5')];
-  state = coworkReducer(state, prependMessages({
-    sessionId: 'sess1',
-    messages: incoming,
-    newOffset: 3,
-  }));
+  state = coworkReducer(
+    state,
+    prependMessages({
+      sessionId: 'sess1',
+      messages: incoming,
+      newOffset: 3,
+    }),
+  );
 
   expect(state.currentSession?.messages.length).toBe(3);
   expect(state.currentSession?.messages.map(m => m.id)).toEqual(['m4', 'm5', 'm6']);
@@ -193,11 +216,14 @@ test('prependMessages: no-op when sessionId does not match current session', () 
   const session = makeFullSession('sess1', [makeMessage('m1')], 0);
   let state = coworkReducer(emptyState, setCurrentSession(session));
 
-  state = coworkReducer(state, prependMessages({
-    sessionId: 'OTHER',
-    messages: [makeMessage('m0')],
-    newOffset: 0,
-  }));
+  state = coworkReducer(
+    state,
+    prependMessages({
+      sessionId: 'OTHER',
+      messages: [makeMessage('m0')],
+      newOffset: 0,
+    }),
+  );
 
   expect(state.currentSession?.messages.length).toBe(1);
   expect(state.currentSession?.messagesOffset).toBe(0);
@@ -207,11 +233,14 @@ test('prependMessages: no-op when messages array is empty', () => {
   const session = makeFullSession('sess1', [makeMessage('m1')], 5);
   let state = coworkReducer(emptyState, setCurrentSession(session));
 
-  state = coworkReducer(state, prependMessages({
-    sessionId: 'sess1',
-    messages: [],
-    newOffset: 3,
-  }));
+  state = coworkReducer(
+    state,
+    prependMessages({
+      sessionId: 'sess1',
+      messages: [],
+      newOffset: 3,
+    }),
+  );
 
   expect(state.currentSession?.messages.length).toBe(1);
   expect(state.currentSession?.messagesOffset).toBe(5); // unchanged
@@ -221,11 +250,14 @@ test('prependMessages: updates messagesOffset to newOffset', () => {
   const session = makeFullSession('sess1', [makeMessage('m51')], 50);
   let state = coworkReducer(emptyState, setCurrentSession(session));
 
-  state = coworkReducer(state, prependMessages({
-    sessionId: 'sess1',
-    messages: [makeMessage('m1')],
-    newOffset: 0,
-  }));
+  state = coworkReducer(
+    state,
+    prependMessages({
+      sessionId: 'sess1',
+      messages: [makeMessage('m1')],
+      newOffset: 0,
+    }),
+  );
 
   expect(state.currentSession?.messagesOffset).toBe(0);
 });

@@ -1,4 +1,10 @@
-import type { LocalizedQuickAction, Prompt, QuickAction, QuickActionsConfig, QuickActionsI18n } from '../types/quickAction';
+import type {
+  LocalizedQuickAction,
+  Prompt,
+  QuickAction,
+  QuickActionsConfig,
+  QuickActionsI18n,
+} from '../types/quickAction';
 import { i18nService } from './i18n';
 
 const CONFIG_PATH = './quick-actions.json';
@@ -76,9 +82,9 @@ class QuickActionService {
             id: prompt.id,
             label: promptI18n?.label || prompt.id,
             description: promptI18n?.description,
-            prompt: promptI18n?.prompt || ''
+            prompt: promptI18n?.prompt || '',
           };
-        })
+        }),
       };
     });
   }
@@ -119,7 +125,9 @@ class QuickActionService {
   /**
    * 根据 skillMapping 获取对应的快捷操作（已本地化）
    */
-  async getLocalizedActionBySkillMapping(skillMapping: string): Promise<LocalizedQuickAction | undefined> {
+  async getLocalizedActionBySkillMapping(
+    skillMapping: string,
+  ): Promise<LocalizedQuickAction | undefined> {
     const actions = await this.getLocalizedActions();
     return actions.find(action => action.skillMapping === skillMapping);
   }

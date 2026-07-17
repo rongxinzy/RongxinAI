@@ -17,7 +17,13 @@ import path from 'path';
 
 import type { McpServerRecord } from '../mcpStore';
 import { getElectronNodeRuntimePath, getEnhancedEnv } from './coworkUtil';
-import { getToolTextPreview, looksLikeTransportErrorText, serializeForLog, serializeToolContentForLog, truncateForLog } from './mcpLog';
+import {
+  getToolTextPreview,
+  looksLikeTransportErrorText,
+  serializeForLog,
+  serializeToolContentForLog,
+  truncateForLog,
+} from './mcpLog';
 import { getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
 
@@ -50,8 +56,14 @@ function raceAbortSignal<T>(promise: Promise<T>, signal: AbortSignal, reason: st
     const onAbort = () => reject(new Error(reason));
     signal.addEventListener('abort', onAbort, { once: true });
     promise.then(
-      (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
-      (err) => { signal.removeEventListener('abort', onAbort); reject(err); },
+      value => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      err => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      },
     );
   });
 }
@@ -126,7 +138,10 @@ function ensureWindowsHideInitScript(): string | null {
     }
     return scriptPath;
   } catch (e) {
-    log('WARN', `Failed to create Windows hide init script: ${e instanceof Error ? e.message : String(e)}`);
+    log(
+      'WARN',
+      `Failed to create Windows hide init script: ${e instanceof Error ? e.message : String(e)}`,
+    );
     return null;
   }
 }
@@ -171,7 +186,9 @@ function findSystemNodePath(): string | null {
         return resolved;
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   _systemNodePath = false;
   log('INFO', 'System Node.js not found on PATH');
   return null;
@@ -182,20 +199,26 @@ function findSystemNodePath(): string | null {
  */
 function isNodeCommand(normalized: string): 'node' | 'npx' | 'npm' | null {
   if (
-    normalized === 'node' || normalized === 'node.exe'
-    || normalized.endsWith('\\node.cmd') || normalized.endsWith('/node.cmd')
+    normalized === 'node' ||
+    normalized === 'node.exe' ||
+    normalized.endsWith('\\node.cmd') ||
+    normalized.endsWith('/node.cmd')
   ) {
     return 'node';
   }
   if (
-    normalized === 'npx' || normalized === 'npx.cmd'
-    || normalized.endsWith('\\npx.cmd') || normalized.endsWith('/npx.cmd')
+    normalized === 'npx' ||
+    normalized === 'npx.cmd' ||
+    normalized.endsWith('\\npx.cmd') ||
+    normalized.endsWith('/npx.cmd')
   ) {
     return 'npx';
   }
   if (
-    normalized === 'npm' || normalized === 'npm.cmd'
-    || normalized.endsWith('\\npm.cmd') || normalized.endsWith('/npm.cmd')
+    normalized === 'npm' ||
+    normalized === 'npm.cmd' ||
+    normalized.endsWith('\\npm.cmd') ||
+    normalized.endsWith('/npm.cmd')
   ) {
     return 'npm';
   }
@@ -203,10 +226,12 @@ function isNodeCommand(normalized: string): 'node' | 'npx' | 'npm' | null {
 }
 
 function isPythonCommand(normalized: string): boolean {
-  return normalized === 'python'
-    || normalized === 'python.exe'
-    || normalized === 'python3'
-    || normalized === 'python3.exe';
+  return (
+    normalized === 'python' ||
+    normalized === 'python.exe' ||
+    normalized === 'python3' ||
+    normalized === 'python3.exe'
+  );
 }
 
 function isUvCommand(normalized: string): 'uv' | 'uvx' | null {
@@ -231,9 +256,7 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
   let effectiveCommand = stdioCommand;
   const stdioArgs = server.args || [];
   let effectiveArgs = [...stdioArgs];
-  let stdioEnv = server.env && Object.keys(server.env).length > 0
-    ? { ...server.env }
-    : undefined;
+  let stdioEnv = server.env && Object.keys(server.env).length > 0 ? { ...server.env } : undefined;
   let shouldInjectWindowsHide = false;
 
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
@@ -244,10 +267,12 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
     const uvCommandType = isUvCommand(normalized);
 
     if (isPythonCommand(normalized)) {
-      const pythonRoots = [getUserPythonRoot(), getBundledPythonRoot()].filter((value): value is string => Boolean(value));
+      const pythonRoots = [getUserPythonRoot(), getBundledPythonRoot()].filter(
+        (value): value is string => Boolean(value),
+      );
       const bundledPythonPath = pythonRoots
-        .map((root) => path.join(root, 'python.exe'))
-        .find((candidate) => fs.existsSync(candidate));
+        .map(root => path.join(root, 'python.exe'))
+        .find(candidate => fs.existsSync(candidate));
       if (bundledPythonPath) {
         effectiveCommand = bundledPythonPath;
         log('INFO', `"${server.name}": using bundled Python runtime "${bundledPythonPath}"`);
@@ -268,7 +293,9 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
       const npxCliJs = npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '';
       const npmCliJs = npmBinDir ? path.join(npmBinDir, 'npm-cli.js') : '';
 
-      const withElectronNodeEnv = (base: Record<string, string> | undefined): Record<string, string> => ({
+      const withElectronNodeEnv = (
+        base: Record<string, string> | undefined,
+      ): Record<string, string> => ({
         ...(base || {}),
         ELECTRON_RUN_AS_NODE: '1',
         ZHIYUAN_ELECTRON_PATH: electronNodeRuntimePath,
@@ -295,22 +322,44 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
         const systemNode = findSystemNodePath();
         if (systemNode) {
           effectiveCommand = systemNode;
-          log('WARN', `"${server.name}": bundled ${nodeCommandType} shim is unavailable, falling back to system Node.js "${systemNode}"`);
+          log(
+            'WARN',
+            `"${server.name}": bundled ${nodeCommandType} shim is unavailable, falling back to system Node.js "${systemNode}"`,
+          );
         }
       }
     }
   }
 
   // macOS packaged: rewrite absolute command pointing to app executable
-  if (app.isPackaged && process.platform === 'darwin' && stdioCommand && path.isAbsolute(stdioCommand)) {
+  if (
+    app.isPackaged &&
+    process.platform === 'darwin' &&
+    stdioCommand &&
+    path.isAbsolute(stdioCommand)
+  ) {
     const commandCandidates = new Set([stdioCommand, path.resolve(stdioCommand)]);
     const appExecCandidates = new Set([
-      process.execPath, path.resolve(process.execPath),
-      electronNodeRuntimePath, path.resolve(electronNodeRuntimePath),
+      process.execPath,
+      path.resolve(process.execPath),
+      electronNodeRuntimePath,
+      path.resolve(electronNodeRuntimePath),
     ]);
-    try { commandCandidates.add(fs.realpathSync.native(stdioCommand)); } catch { /* ignore */ }
-    try { appExecCandidates.add(fs.realpathSync.native(process.execPath)); } catch { /* ignore */ }
-    try { appExecCandidates.add(fs.realpathSync.native(electronNodeRuntimePath)); } catch { /* ignore */ }
+    try {
+      commandCandidates.add(fs.realpathSync.native(stdioCommand));
+    } catch {
+      /* ignore */
+    }
+    try {
+      appExecCandidates.add(fs.realpathSync.native(process.execPath));
+    } catch {
+      /* ignore */
+    }
+    try {
+      appExecCandidates.add(fs.realpathSync.native(electronNodeRuntimePath));
+    } catch {
+      /* ignore */
+    }
 
     if (Array.from(commandCandidates).some(c => appExecCandidates.has(c))) {
       effectiveCommand = electronNodeRuntimePath;
@@ -360,7 +409,7 @@ export class McpServerManager {
     log('INFO', `Starting ${enabledServers.length} MCP servers`);
 
     const results = await Promise.allSettled(
-      enabledServers.map(server => this.startSingleServer(server))
+      enabledServers.map(server => this.startSingleServer(server)),
     );
 
     // Collect tools from all successfully started servers
@@ -401,11 +450,16 @@ export class McpServerManager {
       const enhancedEnv = await getEnhancedEnv();
       const spawnEnv: Record<string, string> = {
         ...Object.fromEntries(
-          Object.entries(enhancedEnv).filter((e): e is [string, string] => typeof e[1] === 'string'),
+          Object.entries(enhancedEnv).filter(
+            (e): e is [string, string] => typeof e[1] === 'string',
+          ),
         ),
         ...(resolved.env || {}),
       };
-      log('INFO', `Starting "${record.name}" via stdio: command=${resolved.command}, args=${serializeForLog(resolved.args)}, configuredEnvKeys=${summarizeConfiguredEnvKeys(resolved.env)}, proxy=${isProxyConfigured(spawnEnv) ? 'enabled' : 'disabled'}`);
+      log(
+        'INFO',
+        `Starting "${record.name}" via stdio: command=${resolved.command}, args=${serializeForLog(resolved.args)}, configuredEnvKeys=${summarizeConfiguredEnvKeys(resolved.env)}, proxy=${isProxyConfigured(spawnEnv) ? 'enabled' : 'disabled'}`,
+      );
 
       const stdioTransport = new StdioClientTransport({
         command: resolved.command,
@@ -425,7 +479,10 @@ export class McpServerManager {
     } else {
       const rawUrl = record.url?.trim();
       if (!rawUrl) {
-        log('WARN', `Server "${record.name}" has no URL configured for ${record.transportType} transport`);
+        log(
+          'WARN',
+          `Server "${record.name}" has no URL configured for ${record.transportType} transport`,
+        );
         return null;
       }
 
@@ -433,17 +490,17 @@ export class McpServerManager {
       try {
         parsedUrl = new URL(rawUrl);
       } catch (error) {
-        log('WARN', `Server "${record.name}" has invalid URL "${rawUrl}": ${error instanceof Error ? error.message : String(error)}`);
+        log(
+          'WARN',
+          `Server "${record.name}" has invalid URL "${rawUrl}": ${error instanceof Error ? error.message : String(error)}`,
+        );
         return null;
       }
 
       const requestInit = this.buildRemoteRequestInit(record);
       if (record.transportType === 'sse') {
         log('INFO', `Starting "${record.name}" via SSE: url=${parsedUrl.toString()}`);
-        transport = new SSEClientTransport(
-          parsedUrl,
-          requestInit ? { requestInit } : undefined,
-        );
+        transport = new SSEClientTransport(parsedUrl, requestInit ? { requestInit } : undefined);
       } else {
         log('INFO', `Starting "${record.name}" via Streamable HTTP: url=${parsedUrl.toString()}`);
         transport = new StreamableHTTPClientTransport(
@@ -463,11 +520,14 @@ export class McpServerManager {
       log('INFO', `Connected to MCP server "${record.name}"`);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      const stderrSummary = recentStderr.length > 0
-        ? ` | recent stderr: ${summarizeRecentStderr(recentStderr)}`
-        : '';
+      const stderrSummary =
+        recentStderr.length > 0 ? ` | recent stderr: ${summarizeRecentStderr(recentStderr)}` : '';
       log('ERROR', `Failed to connect to "${record.name}": ${errMsg}${stderrSummary}`);
-      try { await transport.close(); } catch { /* ignore */ }
+      try {
+        await transport.close();
+      } catch {
+        /* ignore */
+      }
       return null;
     }
 
@@ -481,9 +541,15 @@ export class McpServerManager {
         description: t.description || '',
         inputSchema: (t.inputSchema || {}) as Record<string, unknown>,
       }));
-      log('INFO', `Server "${record.name}": discovered ${tools.length} tools: [${tools.map(t => t.name).join(', ')}]`);
+      log(
+        'INFO',
+        `Server "${record.name}": discovered ${tools.length} tools: [${tools.map(t => t.name).join(', ')}]`,
+      );
     } catch (error) {
-      log('WARN', `Failed to list tools from "${record.name}": ${error instanceof Error ? error.message : String(error)}`);
+      log(
+        'WARN',
+        `Failed to list tools from "${record.name}": ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     const managed: ManagedMcpServer = { record, client, transport, tools, recentStderr };
@@ -518,7 +584,10 @@ export class McpServerManager {
     try {
       const startedAt = Date.now();
       const argsPreview = serializeForLog(args);
-      log('INFO', `Calling tool "${toolName}" on server "${serverName}" with arguments ${argsPreview}`);
+      log(
+        'INFO',
+        `Calling tool "${toolName}" on server "${serverName}" with arguments ${argsPreview}`,
+      );
 
       // Race the tool call against the abort signal so that in-flight MCP calls
       // return immediately when the gateway drops the HTTP connection (e.g. after chat.abort).
@@ -537,20 +606,32 @@ export class McpServerManager {
       const contentPreview = serializeToolContentForLog(content);
       const textPreview = getToolTextPreview(content);
       const recentStderr = summarizeRecentStderr(server.recentStderr);
-      log('INFO', `Tool "${toolName}" on "${serverName}" completed in ${elapsedMs}ms with isError=${result.isError === true}. Result=${contentPreview}`);
+      log(
+        'INFO',
+        `Tool "${toolName}" on "${serverName}" completed in ${elapsedMs}ms with isError=${result.isError === true}. Result=${contentPreview}`,
+      );
       if (result.isError === true) {
         const stderrSuffix = recentStderr ? ` | recent stderr: ${recentStderr}` : '';
-        log('WARN', `Tool "${toolName}" on "${serverName}" returned isError=true. Result text="${textPreview || '(none)'}"${stderrSuffix}`);
+        log(
+          'WARN',
+          `Tool "${toolName}" on "${serverName}" returned isError=true. Result text="${textPreview || '(none)'}"${stderrSuffix}`,
+        );
       } else if (looksLikeTransportErrorText(textPreview)) {
         const stderrSuffix = recentStderr ? ` | recent stderr: ${recentStderr}` : '';
-        log('WARN', `Tool "${toolName}" on "${serverName}" returned transport-style error text without isError. Result text="${textPreview}"${stderrSuffix}`);
+        log(
+          'WARN',
+          `Tool "${toolName}" on "${serverName}" returned transport-style error text without isError. Result text="${textPreview}"${stderrSuffix}`,
+        );
       }
       return { content, isError: result.isError === true };
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       const recentStderr = summarizeRecentStderr(server.recentStderr);
       const stderrSuffix = recentStderr ? ` | recent stderr: ${recentStderr}` : '';
-      log('ERROR', `Tool call "${toolName}" on "${serverName}" failed. Arguments=${serializeForLog(args)}${stderrSuffix} | error=${errMsg}`);
+      log(
+        'ERROR',
+        `Tool call "${toolName}" on "${serverName}" failed. Arguments=${serializeForLog(args)}${stderrSuffix} | error=${errMsg}`,
+      );
       return {
         content: [{ type: 'text', text: `Tool execution error: ${errMsg}` }],
         isError: true,
@@ -572,9 +653,12 @@ export class McpServerManager {
             await server.client.close();
             log('INFO', `Stopped MCP server "${name}"`);
           } catch (error) {
-            log('WARN', `Error stopping "${name}": ${error instanceof Error ? error.message : String(error)}`);
+            log(
+              'WARN',
+              `Error stopping "${name}": ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
-        })()
+        })(),
       );
     }
 

@@ -1,6 +1,12 @@
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
 import { Textarea } from '@shared/components/ui/textarea';
 import type { Platform } from '@shared/platform';
@@ -17,8 +23,27 @@ import { imService } from '../../services/im';
 import { RootState } from '../../store';
 import type { Model } from '../../store/slices/modelSlice';
 import type { Agent } from '../../types/agent';
-import type { DingTalkInstanceConfig, DingTalkInstanceStatus, DiscordInstanceConfig, DiscordInstanceStatus, FeishuInstanceConfig, FeishuInstanceStatus, IMGatewayConfig, IMGatewayStatus, QQInstanceConfig, QQInstanceStatus, TelegramInstanceConfig, TelegramInstanceStatus, WecomInstanceConfig, WecomInstanceStatus } from '../../types/im';
-import { getAgentDisplayName, getAgentDisplayNameById, isDefaultAgentId } from '../../utils/agentDisplay';
+import type {
+  DingTalkInstanceConfig,
+  DingTalkInstanceStatus,
+  DiscordInstanceConfig,
+  DiscordInstanceStatus,
+  FeishuInstanceConfig,
+  FeishuInstanceStatus,
+  IMGatewayConfig,
+  IMGatewayStatus,
+  QQInstanceConfig,
+  QQInstanceStatus,
+  TelegramInstanceConfig,
+  TelegramInstanceStatus,
+  WecomInstanceConfig,
+  WecomInstanceStatus,
+} from '../../types/im';
+import {
+  getAgentDisplayName,
+  getAgentDisplayNameById,
+  isDefaultAgentId,
+} from '../../utils/agentDisplay';
 import { isModelSelectableForOpenClaw } from '../../utils/llamacppOpenClawEligibility';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import {
@@ -39,10 +64,29 @@ import AgentSkillSelector from './AgentSkillSelector';
 import { AgentConfirmDialogVariant, AgentDetailTab } from './constants';
 
 type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'qq' | 'wecom' | 'telegram' | 'discord';
-type MultiInstanceConfig = DingTalkInstanceConfig | FeishuInstanceConfig | QQInstanceConfig | WecomInstanceConfig | TelegramInstanceConfig | DiscordInstanceConfig;
-type MultiInstanceStatus = DingTalkInstanceStatus | FeishuInstanceStatus | QQInstanceStatus | WecomInstanceStatus | TelegramInstanceStatus | DiscordInstanceStatus;
+type MultiInstanceConfig =
+  | DingTalkInstanceConfig
+  | FeishuInstanceConfig
+  | QQInstanceConfig
+  | WecomInstanceConfig
+  | TelegramInstanceConfig
+  | DiscordInstanceConfig;
+type MultiInstanceStatus =
+  | DingTalkInstanceStatus
+  | FeishuInstanceStatus
+  | QQInstanceStatus
+  | WecomInstanceStatus
+  | TelegramInstanceStatus
+  | DiscordInstanceStatus;
 
-const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = ['dingtalk', 'feishu', 'qq', 'wecom', 'telegram', 'discord'];
+const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = [
+  'dingtalk',
+  'feishu',
+  'qq',
+  'wecom',
+  'telegram',
+  'discord',
+];
 
 const isMultiInstancePlatform = (platform: Platform): platform is MultiInstancePlatform =>
   MULTI_INSTANCE_PLATFORMS.includes(platform as MultiInstancePlatform);
@@ -75,7 +119,10 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
 
   // Agent triage state — useReducer to avoid races
   const [triageCustom, setTriageCustom] = useState(false);
-  const triageReducer = (s: AgentTriageOverride, a: Partial<AgentTriageOverride>) => ({ ...s, ...a });
+  const triageReducer = (s: AgentTriageOverride, a: Partial<AgentTriageOverride>) => ({
+    ...s,
+    ...a,
+  });
   const [triageOverride, dispatchTriage] = useReducer(triageReducer, {});
   const initialTriageRef = useRef<AgentTriageOverride | null>(null);
 
@@ -132,17 +179,33 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       setUserInfo(nextUserInfo);
       setIcon(a.icon);
       const resolvedModel = a.model
-        ? availableModels.find((candidate) => toOpenClawModelRef(candidate) === a.model) ?? null
+        ? (availableModels.find(candidate => toOpenClawModelRef(candidate) === a.model) ?? null)
         : null;
-      setModel(resolvedModel ?? (isLlamaCppModelRef(a.model)
-        ? { id: '__invalid__', name: a.model.split('/').pop() || a.model } as Model
-        : null));
+      setModel(
+        resolvedModel ??
+          (isLlamaCppModelRef(a.model)
+            ? ({ id: '__invalid__', name: a.model.split('/').pop() || a.model } as Model)
+            : null),
+      );
       setWorkingDirectory(a.workingDirectory ?? '');
       setSkillIds(a.skillIds ?? []);
       // Load triage override
       const loadedTriage = a.triageOverride ?? {};
-      dispatchTriage({ enabled: undefined, lightModelRef: undefined, heavyModelRef: undefined, allowCrossProviderSwitch: undefined, ...loadedTriage });
-      setTriageCustom(Boolean(loadedTriage.enabled !== undefined || loadedTriage.lightModelRef || loadedTriage.heavyModelRef || loadedTriage.allowCrossProviderSwitch !== undefined));
+      dispatchTriage({
+        enabled: undefined,
+        lightModelRef: undefined,
+        heavyModelRef: undefined,
+        allowCrossProviderSwitch: undefined,
+        ...loadedTriage,
+      });
+      setTriageCustom(
+        Boolean(
+          loadedTriage.enabled !== undefined ||
+          loadedTriage.lightModelRef ||
+          loadedTriage.heavyModelRef ||
+          loadedTriage.allowCrossProviderSwitch !== undefined,
+        ),
+      );
       initialTriageRef.current = loadedTriage;
       initialValuesRef.current = {
         name: a.name,
@@ -158,7 +221,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     })();
 
     // Load IM config and status for bindings
-    imService.loadConfig().then((cfg) => {
+    imService.loadConfig().then(cfg => {
       if (cfg && !cancelled) {
         setImConfig(cfg);
         const bindings = cfg.settings?.platformAgentBindings || {};
@@ -188,18 +251,43 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     if (icon !== init.icon) return true;
     if ((model ? toOpenClawModelRef(model) : '') !== init.model) return true;
     if (workingDirectory !== init.workingDirectory) return true;
-    if (skillIds.length !== init.skillIds.length || skillIds.some((id, i) => id !== init.skillIds[i])) return true;
-    if (boundKeys.size !== initialBoundKeys.size || [...boundKeys].some((k) => !initialBoundKeys.has(k))) return true;
-    const currentTriage = triageCustom ? {
-      ...triageOverride,
-      ...(triageOverride.enabled === undefined ? {} : { enabled: triageOverride.enabled }),
-    } : {};
-    const prevTriage = initialTriageRef.current && Object.keys(initialTriageRef.current).length > 0
-      ? initialTriageRef.current
+    if (
+      skillIds.length !== init.skillIds.length ||
+      skillIds.some((id, i) => id !== init.skillIds[i])
+    )
+      return true;
+    if (
+      boundKeys.size !== initialBoundKeys.size ||
+      [...boundKeys].some(k => !initialBoundKeys.has(k))
+    )
+      return true;
+    const currentTriage = triageCustom
+      ? {
+          ...triageOverride,
+          ...(triageOverride.enabled === undefined ? {} : { enabled: triageOverride.enabled }),
+        }
       : {};
+    const prevTriage =
+      initialTriageRef.current && Object.keys(initialTriageRef.current).length > 0
+        ? initialTriageRef.current
+        : {};
     if (JSON.stringify(currentTriage) !== JSON.stringify(prevTriage)) return true;
     return false;
-  }, [name, description, systemPrompt, identity, userInfo, icon, model, workingDirectory, skillIds, boundKeys, initialBoundKeys, triageCustom, triageOverride]);
+  }, [
+    name,
+    description,
+    systemPrompt,
+    identity,
+    userInfo,
+    icon,
+    model,
+    workingDirectory,
+    skillIds,
+    boundKeys,
+    initialBoundKeys,
+    triageCustom,
+    triageOverride,
+  ]);
 
   if (!agentId) return null;
 
@@ -230,9 +318,11 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         availableModels,
       );
       if (unsupportedModel) {
-        window.dispatchEvent(new CustomEvent('app:showToast', {
-          detail: i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)),
-        }));
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)),
+          }),
+        );
         return;
       }
     }
@@ -250,7 +340,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         triageOverride: triageCustom ? triageOverride : null,
       });
       if (!result) {
-        window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }));
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }),
+        );
         return;
       }
       const bootstrapWrites = isMainAgent
@@ -259,20 +351,20 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
             coworkService.writeBootstrapFile('SOUL.md', systemPrompt),
             coworkService.writeBootstrapFile('USER.md', userInfo),
           ]
-        : [
-            coworkService.writeBootstrapFile('USER.md', userInfo),
-          ];
+        : [coworkService.writeBootstrapFile('USER.md', userInfo)];
       if (bootstrapWrites.length > 0) {
         const bootstrapSaved = await Promise.all(bootstrapWrites);
-        if (bootstrapSaved.some((saved) => !saved)) {
-          window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }));
+        if (bootstrapSaved.some(saved => !saved)) {
+          window.dispatchEvent(
+            new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }),
+          );
           return;
         }
       }
       // Persist IM bindings if changed
       const bindingsChanged =
         boundKeys.size !== initialBoundKeys.size ||
-        [...boundKeys].some((k) => !initialBoundKeys.has(k));
+        [...boundKeys].some(k => !initialBoundKeys.has(k));
       if (bindingsChanged && imConfig) {
         const currentBindings = { ...(imConfig.settings?.platformAgentBindings || {}) };
         // Remove old bindings for this agent
@@ -294,7 +386,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       }
       onClose();
     } catch {
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }));
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }),
+      );
     } finally {
       setSaving(false);
     }
@@ -349,9 +443,8 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     return getAgentDisplayNameById(aid, agents);
   };
 
-  const nameInputValue = isMainAgent && !nameTouched
-    ? getAgentDisplayName({ id: agentId, name })
-    : name;
+  const nameInputValue =
+    isMainAgent && !nameTouched ? getAgentDisplayName({ id: agentId, name }) : name;
 
   const tabs: { key: AgentDetailTab; label: string }[] = [
     { key: AgentDetailTab.Identity, label: i18nService.t('coworkBootstrapIdentityTitle') },
@@ -370,14 +463,10 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
     hint?: string,
   ) => (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      {hint && (
-        <p className="shrink-0 text-xs leading-5 text-muted-foreground">
-          {hint}
-        </p>
-      )}
+      {hint && <p className="shrink-0 text-xs leading-5 text-muted-foreground">{hint}</p>}
       <Textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
         className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-muted-foreground/45 focus-visible:ring-0"
@@ -413,14 +502,17 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         >
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center">
-              <img src={logo} alt={i18nService.t(platform)} className="w-6 h-6 object-contain rounded" />
+              <img
+                src={logo}
+                alt={i18nService.t(platform)}
+                className="w-6 h-6 object-contain rounded"
+              />
             </div>
             <div>
-              <div className="text-sm font-medium text-foreground">
-                {i18nService.t(platform)}
-              </div>
+              <div className="text-sm font-medium text-foreground">{i18nService.t(platform)}</div>
               <div className="text-xs text-muted-foreground/50">
-                {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
+                {i18nService.t('agentIMNotConfiguredHint') ||
+                  'Please configure in Settings > IM Bots first'}
               </div>
             </div>
           </div>
@@ -436,11 +528,13 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
         {/* Platform header */}
         <div className="flex items-center gap-3 px-3 py-2.5 bg-surface-raised">
           <div className="flex h-8 w-8 items-center justify-center">
-            <img src={logo} alt={i18nService.t(platform)} className="w-6 h-6 object-contain rounded" />
+            <img
+              src={logo}
+              alt={i18nService.t(platform)}
+              className="w-6 h-6 object-contain rounded"
+            />
           </div>
-          <span className="text-sm font-semibold text-foreground">
-            {i18nService.t(platform)}
-          </span>
+          <span className="text-sm font-semibold text-foreground">{i18nService.t(platform)}</span>
         </div>
         {/* Instance list */}
         {connectedInstances.map((inst: MultiInstanceConfig, idx: number) => {
@@ -461,20 +555,17 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
             >
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                <span className="text-sm text-foreground">
-                  {inst.instanceName}
-                </span>
+                <span className="text-sm text-foreground">{inst.instanceName}</span>
                 {boundToOther && otherAgentName && (
                   <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                    {(i18nService.t('agentIMBoundToOther') || '→ {agent}').replace('{agent}', otherAgentName)}
+                    {(i18nService.t('agentIMBoundToOther') || '→ {agent}').replace(
+                      '{agent}',
+                      otherAgentName,
+                    )}
                   </span>
                 )}
               </div>
-              {boundToOther ? (
-                <div className="w-9 h-5" />
-              ) : (
-                renderToggle(isBound)
-              )}
+              {boundToOther ? <div className="w-9 h-5" /> : renderToggle(isBound)}
             </div>
           );
         })}
@@ -508,27 +599,37 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
       >
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center">
-            <img src={logo} alt={i18nService.t(platform)} className="w-6 h-6 object-contain rounded" />
+            <img
+              src={logo}
+              alt={i18nService.t(platform)}
+              className="w-6 h-6 object-contain rounded"
+            />
           </div>
           <div>
-            <div className="text-sm font-medium text-foreground">
-              {i18nService.t(platform)}
-            </div>
+            <div className="text-sm font-medium text-foreground">{i18nService.t(platform)}</div>
             {!configured && (
               <div className="text-xs text-muted-foreground/50">
-                {i18nService.t('agentIMNotConfiguredHint') || 'Please configure in Settings > IM Bots first'}
+                {i18nService.t('agentIMNotConfiguredHint') ||
+                  'Please configure in Settings > IM Bots first'}
               </div>
             )}
           </div>
           {boundToOther && otherAgentName && (
             <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-              {(i18nService.t('agentIMBoundToOther') || '→ {agent}').replace('{agent}', otherAgentName)}
+              {(i18nService.t('agentIMBoundToOther') || '→ {agent}').replace(
+                '{agent}',
+                otherAgentName,
+              )}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {configured ? (
-            boundToOther ? <div className="w-9 h-5" /> : renderToggle(isBound)
+            boundToOther ? (
+              <div className="w-9 h-5" />
+            ) : (
+              renderToggle(isBound)
+            )
           ) : (
             <span className="text-xs text-muted-foreground/50">
               {i18nService.t('agentIMNotConfigured') || 'Not configured'}
@@ -566,7 +667,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               <Input
                 type="text"
                 value={nameInputValue}
-                onChange={(e) => {
+                onChange={e => {
                   setNameTouched(true);
                   setName(e.target.value);
                 }}
@@ -577,7 +678,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
               <Input
                 type="text"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={e => setDescription(e.target.value)}
                 placeholder={i18nService.t('agentDescriptionPlaceholder')}
                 aria-label={i18nService.t('agentDescription')}
                 className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
@@ -591,7 +692,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
 
         {/* Tab bar */}
         <div className="flex shrink-0 border-b border-border px-4">
-          {tabs.map((tab) => (
+          {tabs.map(tab => (
             <Button
               key={tab.key}
               type="button"
@@ -613,29 +714,32 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
 
         {/* Tab content */}
         <div className="px-4 py-3 overflow-y-auto flex-1 min-h-0">
-          {activeTab === AgentDetailTab.Prompt && renderTextEditor(
-            systemPrompt,
-            setSystemPrompt,
-            i18nService.t('coworkBootstrapPlaceholder'),
-            i18nService.t('coworkBootstrapSoulTitle'),
-            i18nService.t('coworkBootstrapSoulHint'),
-          )}
+          {activeTab === AgentDetailTab.Prompt &&
+            renderTextEditor(
+              systemPrompt,
+              setSystemPrompt,
+              i18nService.t('coworkBootstrapPlaceholder'),
+              i18nService.t('coworkBootstrapSoulTitle'),
+              i18nService.t('coworkBootstrapSoulHint'),
+            )}
 
-          {activeTab === AgentDetailTab.Identity && renderTextEditor(
-            identity,
-            setIdentity,
-            i18nService.t('coworkBootstrapPlaceholder'),
-            i18nService.t('coworkBootstrapIdentityTitle'),
-            i18nService.t('coworkBootstrapIdentityHint'),
-          )}
+          {activeTab === AgentDetailTab.Identity &&
+            renderTextEditor(
+              identity,
+              setIdentity,
+              i18nService.t('coworkBootstrapPlaceholder'),
+              i18nService.t('coworkBootstrapIdentityTitle'),
+              i18nService.t('coworkBootstrapIdentityHint'),
+            )}
 
-          {activeTab === AgentDetailTab.User && renderTextEditor(
-            userInfo,
-            setUserInfo,
-            i18nService.t('coworkBootstrapPlaceholder'),
-            i18nService.t('coworkBootstrapUserTitle'),
-            i18nService.t('coworkBootstrapUserHint'),
-          )}
+          {activeTab === AgentDetailTab.User &&
+            renderTextEditor(
+              userInfo,
+              setUserInfo,
+              i18nService.t('coworkBootstrapPlaceholder'),
+              i18nService.t('coworkBootstrapUserTitle'),
+              i18nService.t('coworkBootstrapUserHint'),
+            )}
 
           {activeTab === AgentDetailTab.Skills && (
             <AgentSkillSelector selectedSkillIds={skillIds} onChange={setSkillIds} />
@@ -645,8 +749,12 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
             <div className="h-full overflow-y-auto">
               <div className="space-y-1">
                 {PlatformRegistry.platforms
-                  .filter((platform) => (getVisibleIMPlatforms(i18nService.getLanguage()) as readonly string[]).includes(platform))
-                  .map((platform) => {
+                  .filter(platform =>
+                    (
+                      getVisibleIMPlatforms(i18nService.getLanguage()) as readonly string[]
+                    ).includes(platform),
+                  )
+                  .map(platform => {
                     if (isMultiInstancePlatform(platform)) {
                       return renderMultiInstancePlatform(platform);
                     }
@@ -671,7 +779,7 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                   </div>
                   <Switch
                     checked={!!triageOverride.enabled}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={checked => {
                       setTriageCustom(true);
                       dispatchTriage({ enabled: checked });
                     }}
@@ -685,19 +793,25 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       <h4 className="text-sm font-medium text-foreground">路由策略</h4>
                       <div className="space-y-2">
                         <div className="flex items-start gap-2">
-                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-green-500/15 text-[10px] font-medium text-green-600">轻</span>
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-green-500/15 text-[10px] font-medium text-green-600">
+                            轻
+                          </span>
                           <div className="text-xs text-muted-foreground">
                             {i18nService.t('agentTriageLightModelHint')}
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-500/15 text-[10px] font-medium text-blue-600">标</span>
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-blue-500/15 text-[10px] font-medium text-blue-600">
+                            标
+                          </span>
                           <div className="text-xs text-muted-foreground">
                             {i18nService.t('agentTriageStandardNote')}
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500/15 text-[10px] font-medium text-red-600">强</span>
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500/15 text-[10px] font-medium text-red-600">
+                            强
+                          </span>
                           <div className="text-xs text-muted-foreground">
                             {i18nService.t('agentTriageHeavyModelHint')}
                           </div>
@@ -712,14 +826,16 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       </label>
                       <Select
                         value={triageOverride.lightModelRef || undefined}
-                        onValueChange={(value) => dispatchTriage({ lightModelRef: value || undefined })}
+                        onValueChange={value =>
+                          dispatchTriage({ lightModelRef: value || undefined })
+                        }
                       >
                         <SelectTrigger className="w-full text-sm border-border bg-surface text-foreground">
                           <SelectValue placeholder="不指定（使用 Agent 默认模型）" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">不指定（使用 Agent 默认模型）</SelectItem>
-                          {availableModels.map((m) => {
+                          {availableModels.map(m => {
                             const ref = `${m.providerKey || 'unknown'}/${m.id}`;
                             return (
                               <SelectItem
@@ -749,14 +865,16 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       </label>
                       <Select
                         value={triageOverride.heavyModelRef || undefined}
-                        onValueChange={(value) => dispatchTriage({ heavyModelRef: value || undefined })}
+                        onValueChange={value =>
+                          dispatchTriage({ heavyModelRef: value || undefined })
+                        }
                       >
                         <SelectTrigger className="w-full text-sm border-border bg-surface text-foreground">
                           <SelectValue placeholder="不指定（使用 Agent 默认模型）" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">不指定（使用 Agent 默认模型）</SelectItem>
-                          {availableModels.map((m) => {
+                          {availableModels.map(m => {
                             const ref = `${m.providerKey || 'unknown'}/${m.id}`;
                             return (
                               <SelectItem
@@ -786,7 +904,9 @@ const AgentSettingsPanel: React.FC<AgentSettingsPanelProps> = ({ agentId, onClos
                       </span>
                       <Switch
                         checked={!!triageOverride.allowCrossProviderSwitch}
-                        onCheckedChange={(checked) => dispatchTriage({ allowCrossProviderSwitch: checked })}
+                        onCheckedChange={checked =>
+                          dispatchTriage({ allowCrossProviderSwitch: checked })
+                        }
                       />
                     </label>
 

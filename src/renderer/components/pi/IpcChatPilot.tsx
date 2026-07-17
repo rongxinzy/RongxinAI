@@ -5,7 +5,7 @@ import { Input } from '@shared/components/ui/input';
 import { Send, StopCircle } from 'lucide-react';
 import React, { useState } from 'react';
 
-import { type UIMessage,useIpcChat } from '../../hooks/useIpcChat';
+import { type UIMessage, useIpcChat } from '../../hooks/useIpcChat';
 
 /**
  * AI SDK v6 + ai-elements pilot chat component.
@@ -32,7 +32,7 @@ export const IpcChatPilot: React.FC = () => {
   const getMessageText = (message: UIMessage): string =>
     message.parts
       .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-      .map((part) => part.text)
+      .map(part => part.text)
       .join('');
 
   return (
@@ -47,10 +47,7 @@ export const IpcChatPilot: React.FC = () => {
             </div>
           )}
           {messages.map((message: UIMessage) => (
-            <Message
-              key={message.id}
-              from={message.role === 'user' ? 'user' : 'assistant'}
-            >
+            <Message key={message.id} from={message.role === 'user' ? 'user' : 'assistant'}>
               <MessageContent>
                 {message.role === 'assistant' ? (
                   <MessageResponse>{getMessageText(message)}</MessageResponse>
@@ -73,7 +70,7 @@ export const IpcChatPilot: React.FC = () => {
       <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-border p-3">
         <Input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={e => setInput(e.target.value)}
           placeholder="Type a message..."
           disabled={status === 'submitted' || status === 'streaming'}
           className="flex-1"

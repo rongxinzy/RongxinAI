@@ -35,7 +35,9 @@ interface TokenState {
 let tokenState: TokenState | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 let refreshInFlight: Promise<void> | undefined;
-let getStoreFn: (() => { get: (key: string) => unknown; set: (key: string, value: unknown) => void }) | null = null;
+let getStoreFn:
+  | (() => { get: (key: string) => unknown; set: (key: string, value: unknown) => void })
+  | null = null;
 let onTokenRefreshCallbacks: Array<(state: TokenState) => void> = [];
 
 /**
@@ -141,7 +143,9 @@ export async function refreshCopilotTokenNow(): Promise<TokenState> {
         expiresAt,
         githubToken,
       };
-      console.log(`[CopilotTokenManager] token refreshed, expires in ${Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))}s`);
+      console.log(
+        `[CopilotTokenManager] token refreshed, expires in ${Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))}s`,
+      );
 
       // Push updated token to all renderer windows
       broadcastTokenUpdate(token, baseUrl);
@@ -173,15 +177,15 @@ export function isCopilotAuthError(errorText: string): boolean {
   if (!errorText) return false;
   const lower = errorText.toLowerCase();
   return (
-    lower.includes('401')
-    || lower.includes('unauthorized')
-    || lower.includes('token expired')
-    || lower.includes('invalid token')
-    || lower.includes('authentication')
-    || lower.includes('auth')
+    lower.includes('401') ||
+    lower.includes('unauthorized') ||
+    lower.includes('token expired') ||
+    lower.includes('invalid token') ||
+    lower.includes('authentication') ||
+    lower.includes('auth') ||
     // GitHub Copilot specific
-    || lower.includes('editor-version')
-    || lower.includes('ide auth')
+    lower.includes('editor-version') ||
+    lower.includes('ide auth')
   );
 }
 
@@ -189,7 +193,14 @@ export function isCopilotAuthError(errorText: string): boolean {
  * Register a callback to be invoked whenever the Copilot token is refreshed.
  * Returns an unsubscribe function.
  */
-export function onCopilotTokenRefreshed(callback: (state: { copilotToken: string; baseUrl: string; expiresAt: number; githubToken: string }) => void): () => void {
+export function onCopilotTokenRefreshed(
+  callback: (state: {
+    copilotToken: string;
+    baseUrl: string;
+    expiresAt: number;
+    githubToken: string;
+  }) => void,
+): () => void {
   onTokenRefreshCallbacks.push(callback);
   return () => {
     onTokenRefreshCallbacks = onTokenRefreshCallbacks.filter(cb => cb !== callback);
@@ -239,7 +250,10 @@ function broadcastTokenUpdate(newToken: string, newBaseUrl: string): void {
   const windows = BrowserWindow.getAllWindows();
   for (const win of windows) {
     if (!win.isDestroyed()) {
-      win.webContents.send('github-copilot:token-updated', { token: newToken, baseUrl: newBaseUrl });
+      win.webContents.send('github-copilot:token-updated', {
+        token: newToken,
+        baseUrl: newBaseUrl,
+      });
     }
   }
 }

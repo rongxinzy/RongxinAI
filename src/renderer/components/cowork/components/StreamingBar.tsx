@@ -5,16 +5,36 @@ import type { CoworkMessage } from '../../../types/cowork';
 
 export const TypingDots: React.FC = () => (
   <div className="flex items-center space-x-1.5 py-1">
-    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+    <div
+      className="w-2 h-2 rounded-full bg-primary animate-bounce"
+      style={{ animationDelay: '0ms' }}
+    />
+    <div
+      className="w-2 h-2 rounded-full bg-primary animate-bounce"
+      style={{ animationDelay: '150ms' }}
+    />
+    <div
+      className="w-2 h-2 rounded-full bg-primary animate-bounce"
+      style={{ animationDelay: '300ms' }}
+    />
   </div>
 );
 
-export const ArtifactPanelIcon: React.FC<React.SVGProps<SVGSVGElement> & { open?: boolean }> = ({ open, ...props }) => {
+export const ArtifactPanelIcon: React.FC<React.SVGProps<SVGSVGElement> & { open?: boolean }> = ({
+  open,
+  ...props
+}) => {
   const dividerX = open ? 10.5 : 12.5;
   return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <rect x="1.5" y="2" width="13" height="12" rx="2" />
       <line x1={dividerX} y1="2" x2={dividerX} y2="14" />
     </svg>
@@ -38,7 +58,8 @@ export const StreamingBar: React.FC<{ messages: CoworkMessage[] }> = ({ messages
       if (msg.type === 'tool_use') {
         const id = msg.metadata?.toolUseId;
         if (typeof id === 'string' && !toolResultIds.has(id)) {
-          const toolName = typeof msg.metadata?.toolName === 'string' ? msg.metadata.toolName : null;
+          const toolName =
+            typeof msg.metadata?.toolName === 'string' ? msg.metadata.toolName : null;
           if (toolName) return `${i18nService.t('coworkToolRunning')} ${toolName}...`;
         }
       }

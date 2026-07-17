@@ -8,17 +8,24 @@ import {
   InputGroupInput,
 } from '@shared/components/ui/input-group';
 import { Label } from '@shared/components/ui/label';
-import { Download, ExternalLink, Eye, EyeOff, RefreshCw, Search, SlidersHorizontal, Square, X } from 'lucide-react';
+import {
+  Download,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Square,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
 import { EmptyState, InstallProgressBar } from '../components/Common';
-import {
-  localInferenceMutedTextClass,
-  localInferenceSoftTextClass,
-} from '../constants';
+import { localInferenceMutedTextClass, localInferenceSoftTextClass } from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   capabilityLabel,
@@ -159,7 +166,9 @@ export function MarketplacePanel({
             <div className="flex items-center gap-3">
               <h2
                 className={
-                  hasSearched ? 'text-base font-semibold text-foreground' : 'text-2xl font-semibold text-foreground'
+                  hasSearched
+                    ? 'text-base font-semibold text-foreground'
+                    : 'text-2xl font-semibold text-foreground'
                 }
               >
                 {i18nService.t('marketplaceTitle')}
@@ -182,7 +191,9 @@ export function MarketplacePanel({
               </Button>
             </div>
             {hasSearched && (
-              <p className={`mt-1 text-xs ${localInferenceMutedTextClass}`}>{i18nService.t('marketplaceDescription')}</p>
+              <p className={`mt-1 text-xs ${localInferenceMutedTextClass}`}>
+                {i18nService.t('marketplaceDescription')}
+              </p>
             )}
           </div>
         </div>
@@ -193,7 +204,11 @@ export function MarketplacePanel({
             onSearch();
           }}
         >
-          <div className={hasSearched ? 'rounded-lg border border-border bg-surface p-3' : 'bg-transparent p-0'}>
+          <div
+            className={
+              hasSearched ? 'rounded-lg border border-border bg-surface p-3' : 'bg-transparent p-0'
+            }
+          >
             <div className="flex gap-2">
               <InputGroup className={hasSearched ? 'h-9 flex-1' : 'h-16 flex-1 rounded-2xl'}>
                 <InputGroupAddon>
@@ -211,7 +226,9 @@ export function MarketplacePanel({
                 disabled={marketplaceLoading}
                 className={hasSearched ? 'h-9 text-xs' : 'h-16 rounded-2xl px-8 text-lg'}
               >
-                {marketplaceLoading && <RefreshCw data-icon="inline-start" className="animate-spin" />}
+                {marketplaceLoading && (
+                  <RefreshCw data-icon="inline-start" className="animate-spin" />
+                )}
                 {i18nService.t('marketplaceSearch')}
               </Button>
             </div>
@@ -259,7 +276,9 @@ export function MarketplacePanel({
       )}
 
       {marketplaceLoading ? (
-        <div className={`flex min-h-[620px] items-center justify-center text-sm ${localInferenceMutedTextClass}`}>
+        <div
+          className={`flex min-h-[620px] items-center justify-center text-sm ${localInferenceMutedTextClass}`}
+        >
           <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
           {i18nService.t('loading')}
         </div>
@@ -282,16 +301,14 @@ export function MarketplacePanel({
                       <CardTitle className="max-h-10 min-w-0 overflow-hidden break-all text-sm leading-5">
                         {model.repoId}
                       </CardTitle>
-                      <Badge variant="secondary">
-                        {model.recommendedTag}
-                      </Badge>
-                      <Badge variant="outline">
-                        {capabilityLabel(model.capability)}
-                      </Badge>
+                      <Badge variant="secondary">{model.recommendedTag}</Badge>
+                      <Badge variant="outline">{capabilityLabel(model.capability)}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
-                    <p className={`max-h-10 overflow-hidden text-xs leading-5 ${localInferenceMutedTextClass}`}>
+                    <p
+                      className={`max-h-10 overflow-hidden text-xs leading-5 ${localInferenceMutedTextClass}`}
+                    >
                       {model.description}
                     </p>
                     <div className="flex max-h-5 flex-wrap gap-1.5 overflow-hidden">
@@ -309,7 +326,9 @@ export function MarketplacePanel({
                   </CardContent>
                   {progress && (
                     <div className="border-t border-border px-3 py-2">
-                      <div className={`flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}>
+                      <div
+                        className={`flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}
+                      >
                         <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
                         {typeof progress.percent === 'number' && <span>{progress.percent}%</span>}
                       </div>
@@ -317,7 +336,9 @@ export function MarketplacePanel({
                     </div>
                   )}
                   <CardFooter className="justify-between gap-2 p-3">
-                    <span className={`text-xs ${localInferenceMutedTextClass}`}>{formatDownloadCount(model.downloads)}</span>
+                    <span className={`text-xs ${localInferenceMutedTextClass}`}>
+                      {formatDownloadCount(model.downloads)}
+                    </span>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {model.detailUrl && (
                         <Button
@@ -367,7 +388,9 @@ export function MarketplacePanel({
               >
                 {i18nService.t('skillMarketplacePrevPage')}
               </Button>
-              <span className={`inline-flex h-8 min-w-16 items-center justify-center text-sm ${localInferenceMutedTextClass}`}>
+              <span
+                className={`inline-flex h-8 min-w-16 items-center justify-center text-sm ${localInferenceMutedTextClass}`}
+              >
                 {currentPage}/{pageCount} {i18nService.t('marketplacePageUnit')}
               </span>
               <Button
@@ -434,11 +457,7 @@ export function MarketplacePanel({
                   aria-label={i18nService.t(tokenInputVisible ? 'hide' : 'show')}
                   size="icon-xs"
                 >
-                  {tokenInputVisible ? (
-                    <EyeOff />
-                  ) : (
-                    <Eye />
-                  )}
+                  {tokenInputVisible ? <EyeOff /> : <Eye />}
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
@@ -462,11 +481,7 @@ export function MarketplacePanel({
               >
                 {i18nService.t('cancel')}
               </Button>
-              <Button
-                type="button"
-                onClick={() => void handleSaveToken()}
-                size="sm"
-              >
+              <Button type="button" onClick={() => void handleSaveToken()} size="sm">
                 {i18nService.t('marketplaceTokenSave')}
               </Button>
             </div>

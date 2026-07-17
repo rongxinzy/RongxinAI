@@ -86,8 +86,8 @@ test('collectAvailableModels merges running llama.cpp models only when provider 
   const models = await collectAvailableModels(config);
 
   expect(listRunningModels).toHaveBeenCalledTimes(1);
-  const llamaCppModel = models.find(model =>
-    model.providerKey === ProviderName.LlamaCpp && model.id === 'qwen-local',
+  const llamaCppModel = models.find(
+    model => model.providerKey === ProviderName.LlamaCpp && model.id === 'qwen-local',
   );
   expect(llamaCppModel).toBeDefined();
   expect(llamaCppModel?.llamaCppOpenClawEligibility).toMatchObject({

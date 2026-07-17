@@ -50,7 +50,7 @@ export const CoworkErrorKind = {
   Unknown: 'unknown',
 } as const;
 
-export type CoworkErrorKind = typeof CoworkErrorKind[keyof typeof CoworkErrorKind];
+export type CoworkErrorKind = (typeof CoworkErrorKind)[keyof typeof CoworkErrorKind];
 
 // ─── CoworkError ────────────────────────────────────────────────────────────
 
@@ -93,7 +93,8 @@ const RULES: ErrorRule[] = [
   // ── Auth (most specific first) ──────────────────────────────────────────
   {
     kind: CoworkErrorKind.AuthExpired,
-    pattern: /authentication[_\s](?:error|fails?)|api[_\s]key.*(?:invalid|expired|not[_\s]valid)|invalid.*api.*key|incorrect.*api.*key|unauthorized|PERMISSION_DENIED|\b401\b/i,
+    pattern:
+      /authentication[_\s](?:error|fails?)|api[_\s]key.*(?:invalid|expired|not[_\s]valid)|invalid.*api.*key|incorrect.*api.*key|unauthorized|PERMISSION_DENIED|\b401\b/i,
     extract: () => ({ statusCode: 401 }),
   },
 
@@ -107,14 +108,16 @@ const RULES: ErrorRule[] = [
   // ── Budget ──────────────────────────────────────────────────────────────
   {
     kind: CoworkErrorKind.BudgetExceeded,
-    pattern: /insufficient.*(?:balance|quota|credits)|billing|quota[_\s]exceeded|Arrearage|account.*not.*in.*good.*standing|余额不足|\b402\b/i,
+    pattern:
+      /insufficient.*(?:balance|quota|credits)|billing|quota[_\s]exceeded|Arrearage|account.*not.*in.*good.*standing|余额不足|\b402\b/i,
     extract: () => ({ statusCode: 402 }),
   },
 
   // ── Input too long ──────────────────────────────────────────────────────
   {
     kind: CoworkErrorKind.InputTooLong,
-    pattern: /input.*too.*long|context.*length.*exceeded|range of input length|\b413\b|payload.*too.*large|request.*entity.*too.*large|max[_\s]tokens/i,
+    pattern:
+      /input.*too.*long|context.*length.*exceeded|range of input length|\b413\b|payload.*too.*large|request.*entity.*too.*large|max[_\s]tokens/i,
     extract: () => ({ statusCode: 413 }),
   },
 
@@ -127,7 +130,8 @@ const RULES: ErrorRule[] = [
   // ── Content filtered ────────────────────────────────────────────────────
   {
     kind: CoworkErrorKind.ContentFiltered,
-    pattern: /DataInspectionFailed|content.*(?:review|filter)|审核未通过|未通过.*审核|inappropriate.*content|\b451\b|flagged.*input/i,
+    pattern:
+      /DataInspectionFailed|content.*(?:review|filter)|审核未通过|未通过.*审核|inappropriate.*content|\b451\b|flagged.*input/i,
     extract: () => ({ statusCode: 451 }),
   },
 
@@ -152,7 +156,8 @@ const RULES: ErrorRule[] = [
   // ── Network ─────────────────────────────────────────────────────────────
   {
     kind: CoworkErrorKind.NetworkError,
-    pattern: /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|could not connect|connection.*refused|network.*error/i,
+    pattern:
+      /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|could not connect|connection.*refused|network.*error/i,
   },
 
   // ── Server ──────────────────────────────────────────────────────────────
@@ -233,7 +238,11 @@ export function classifyCoworkError(rawError: string): CoworkError {
  * Convenience: classify + keep existing API compatibility.
  * Returns a CoworkError with the given kind and message.
  */
-export function makeCoworkError(kind: CoworkErrorKind, message: string, extra?: Partial<CoworkError>): CoworkError {
+export function makeCoworkError(
+  kind: CoworkErrorKind,
+  message: string,
+  extra?: Partial<CoworkError>,
+): CoworkError {
   return { kind, message, ...extra };
 }
 

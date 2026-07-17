@@ -38,7 +38,7 @@ export class GoogleSearch {
   async search(
     connectionId: string,
     query: string,
-    options: GoogleSearchOptions = {}
+    options: GoogleSearchOptions = {},
   ): Promise<SearchResponse> {
     const startTime = Date.now();
     const maxResults = options.maxResults || 10;
@@ -55,7 +55,7 @@ export class GoogleSearch {
 
       await page.goto(searchUrl, {
         waitUntil: 'domcontentloaded',
-        timeout: navigationTimeout
+        timeout: navigationTimeout,
       });
 
       console.log(`[Google] Page loaded: ${page.url()}`);
@@ -71,7 +71,7 @@ export class GoogleSearch {
         throw new Error('Google search results did not load in time');
       }
 
-      const results = await page.evaluate((max) => {
+      const results = (await page.evaluate(max => {
         const parseGoogleUrl = (rawUrl: string): string => {
           if (!rawUrl) {
             return '';
@@ -147,7 +147,7 @@ export class GoogleSearch {
             url,
             snippet,
             source: 'google',
-            position: extractedResults.length + 1
+            position: extractedResults.length + 1,
           });
         }
 
@@ -173,13 +173,13 @@ export class GoogleSearch {
               url,
               snippet: '',
               source: 'google',
-              position: extractedResults.length + 1
+              position: extractedResults.length + 1,
             });
           }
         }
 
         return extractedResults;
-      }, maxResults) as SearchResult[];
+      }, maxResults)) as SearchResult[];
 
       if (results.length === 0) {
         throw new Error('Google returned no parsable results');
@@ -194,11 +194,13 @@ export class GoogleSearch {
         results,
         totalResults: results.length,
         timestamp: Date.now(),
-        duration
+        duration,
       };
     } catch (error) {
       console.error('[Google] Search failed:', error);
-      throw new Error(`Google search failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Google search failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -215,16 +217,18 @@ export class GoogleSearch {
     try {
       await page.goto(url, {
         waitUntil: 'domcontentloaded',
-        timeout: 15000
+        timeout: 15000,
       });
 
-      const content = await page.textContent('body') || '';
+      const content = (await page.textContent('body')) || '';
       console.log(`[Google] Content retrieved (${content.length} chars)`);
 
       return content;
     } catch (error) {
       console.error('[Google] Failed to fetch content:', error);
-      throw new Error(`Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -238,7 +242,7 @@ export class GoogleSearch {
     return (
       bodyText.includes('unusual traffic') ||
       bodyText.includes('before you continue to google') ||
-      bodyText.includes('this site can\'t be reached')
+      bodyText.includes("this site can't be reached")
     );
   }
 }

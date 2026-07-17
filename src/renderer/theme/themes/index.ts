@@ -1,4 +1,4 @@
-import { classicDark }  from './classic-dark';
+import { classicDark } from './classic-dark';
 import { classicLight } from './classic-light';
 import { cyber } from './cyber';
 import { dawn } from './dawn';
@@ -33,4 +33,4 @@ export const allThemes: ThemeDefinition[] = [
 ];
 
 /** Quick lookup by theme ID */
-export const themeMap = new Map(allThemes.map((t) => [t.meta.id, t]));
+export const themeMap = new Map(allThemes.map(t => [t.meta.id, t]));

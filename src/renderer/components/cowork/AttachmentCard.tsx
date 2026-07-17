@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { FileImage, X } from 'lucide-react';
-import React, { useEffect,useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { DraftAttachment } from '../../store/slices/coworkSlice';
@@ -55,7 +55,9 @@ const ImageCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [attachment.dataUrl, attachment.path]);
 
   const showFallback = imgError || (!thumbUrl && !loading);

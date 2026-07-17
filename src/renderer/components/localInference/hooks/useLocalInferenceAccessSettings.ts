@@ -34,11 +34,7 @@ type UseLocalInferenceAccessSettingsInput = {
   runAction: (action: () => Promise<void>) => Promise<void>;
   refreshLocalModels: () => Promise<LlamaCppModel[]>;
   onRestartStatus: (status: LlamaCppStatusSnapshot) => void;
-  showToast: (
-    message: string,
-    kind?: LocalInferenceToastKindType,
-    autoDismiss?: boolean,
-  ) => void;
+  showToast: (message: string, kind?: LocalInferenceToastKindType, autoDismiss?: boolean) => void;
 };
 
 type UseLocalInferenceAccessSettingsResult = {
@@ -71,14 +67,13 @@ export function useLocalInferenceAccessSettings(
   const [draftAllowLanAccess, setDraftAllowLanAccess] = useState(false);
 
   const currentHost =
-    serviceConfig.listenHost?.trim() ||
-    serviceConfig.host?.trim() ||
-    LLAMACPP_LOCALHOST_HOST;
+    serviceConfig.listenHost?.trim() || serviceConfig.host?.trim() || LLAMACPP_LOCALHOST_HOST;
   const currentPort = serviceConfig.port?.trim() || LLAMACPP_DEFAULT_PORT;
   const allowLanAccess = currentHost === LLAMACPP_LAN_HOST;
   const exampleModelName = useMemo(
     () =>
-      (runningModels[0]?.name || runningModels[0]?.model || localModels[0]?.name || '').trim() || undefined,
+      (runningModels[0]?.name || runningModels[0]?.model || localModels[0]?.name || '').trim() ||
+      undefined,
     [localModels, runningModels],
   );
 
@@ -92,9 +87,7 @@ export function useLocalInferenceAccessSettings(
     void refreshServiceConfig()
       .then(nextConfig => {
         const nextHost =
-          nextConfig.listenHost?.trim() ||
-          nextConfig.host?.trim() ||
-          LLAMACPP_LOCALHOST_HOST;
+          nextConfig.listenHost?.trim() || nextConfig.host?.trim() || LLAMACPP_LOCALHOST_HOST;
         setDraftAllowLanAccess(nextHost === LLAMACPP_LAN_HOST);
         setAccessSettingsOpen(true);
       })
@@ -127,11 +120,8 @@ export function useLocalInferenceAccessSettings(
           notifyLlamaCppRunningModelsChanged();
         }
         setDraftAllowLanAccess(
-          (
-            nextConfig.listenHost?.trim() ||
-            nextConfig.host?.trim() ||
-            LLAMACPP_LOCALHOST_HOST
-          ) === LLAMACPP_LAN_HOST,
+          (nextConfig.listenHost?.trim() || nextConfig.host?.trim() || LLAMACPP_LOCALHOST_HOST) ===
+            LLAMACPP_LAN_HOST,
         );
         setAccessSettingsOpen(false);
         showToast(
@@ -146,14 +136,7 @@ export function useLocalInferenceAccessSettings(
         throw error;
       }
     });
-  }, [
-    draftAllowLanAccess,
-    isRunning,
-    refreshLocalModels,
-    runAction,
-    onRestartStatus,
-    showToast,
-  ]);
+  }, [draftAllowLanAccess, isRunning, refreshLocalModels, runAction, onRestartStatus, showToast]);
 
   return {
     accessSettingsOpen,

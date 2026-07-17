@@ -12,7 +12,13 @@
 import { describe, expect, test } from 'vitest';
 
 import type { IMConnectivityTestResult, Platform } from '../types';
-import { ALL_IM_PLATFORMS, buildProbeResult, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  ALL_IM_PLATFORMS,
+  buildProbeResult,
+  makeAuthCheckPass,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 // ── Payload helpers (mirrors cron SystemEvent shape) ──
 
@@ -137,8 +143,13 @@ describe('Cron × Channel Probe Integration', () => {
     expect(ALL_IM_PLATFORMS).toHaveLength(7);
 
     const expectedPlatforms: Platform[] = [
-      'telegram', 'discord', 'feishu', 'dingtalk',
-      'wecom', 'weixin', 'qq',
+      'telegram',
+      'discord',
+      'feishu',
+      'dingtalk',
+      'wecom',
+      'weixin',
+      'qq',
     ];
     const actual = [...ALL_IM_PLATFORMS].sort();
     const expected = [...expectedPlatforms].sort();

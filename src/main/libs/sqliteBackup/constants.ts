@@ -3,8 +3,7 @@ export const SqliteBackupTrigger = {
   Manual: 'manual',
 } as const;
 
-export type SqliteBackupTrigger =
-  typeof SqliteBackupTrigger[keyof typeof SqliteBackupTrigger];
+export type SqliteBackupTrigger = (typeof SqliteBackupTrigger)[keyof typeof SqliteBackupTrigger];
 
 export const SQLITE_BACKUP_DIR_NAME = 'backups/sqlite';
 export const SQLITE_BACKUP_SNAPSHOTS_DIR_NAME = 'snapshots';

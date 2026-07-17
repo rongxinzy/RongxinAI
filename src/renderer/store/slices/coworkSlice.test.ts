@@ -42,28 +42,31 @@ test('defaults hidden OpenClaw session policy to thirty days', () => {
 });
 
 test('setConfig preserves loaded OpenClaw session policy', () => {
-  const state = coworkReducer(undefined, setConfig({
-    workingDirectory: '/tmp',
-    systemPrompt: '',
-    executionMode: 'local',
-    agentEngine: 'openclaw',
-    memoryEnabled: true,
-    memoryImplicitUpdateEnabled: true,
-    memoryLlmJudgeEnabled: false,
-    memoryGuardLevel: 'strict',
-    memoryUserMemoriesMaxItems: 12,
-    skipMissedJobs: false,
-    embeddingEnabled: false,
-    embeddingProvider: 'openai',
-    embeddingModel: '',
-    embeddingLocalModelPath: '',
-    embeddingVectorWeight: 0.7,
-    embeddingRemoteBaseUrl: '',
-    embeddingRemoteApiKey: '',
-    openClawSessionPolicy: {
-      keepAlive: '365d',
-    },
-  }));
+  const state = coworkReducer(
+    undefined,
+    setConfig({
+      workingDirectory: '/tmp',
+      systemPrompt: '',
+      executionMode: 'local',
+      agentEngine: 'openclaw',
+      memoryEnabled: true,
+      memoryImplicitUpdateEnabled: true,
+      memoryLlmJudgeEnabled: false,
+      memoryGuardLevel: 'strict',
+      memoryUserMemoriesMaxItems: 12,
+      skipMissedJobs: false,
+      embeddingEnabled: false,
+      embeddingProvider: 'openai',
+      embeddingModel: '',
+      embeddingLocalModelPath: '',
+      embeddingVectorWeight: 0.7,
+      embeddingRemoteBaseUrl: '',
+      embeddingRemoteApiKey: '',
+      openClawSessionPolicy: {
+        keepAlive: '365d',
+      },
+    }),
+  );
 
   expect(state.config.openClawSessionPolicy.keepAlive).toBe('365d');
 });
@@ -94,33 +97,48 @@ test('updateCurrentSessionModelOverride only patches the active session', () => 
 });
 
 test('addSession preserves the agent id in session summaries', () => {
-  const state = coworkReducer(undefined, addSession(makeSession({
-    id: 'session-agent-2',
-    agentId: 'agent-2',
-  })));
+  const state = coworkReducer(
+    undefined,
+    addSession(
+      makeSession({
+        id: 'session-agent-2',
+        agentId: 'agent-2',
+      }),
+    ),
+  );
 
   expect(state.sessions[0].agentId).toBe('agent-2');
 });
 
 test('setCurrentSession preserves the agent id when inserting a summary', () => {
-  const state = coworkReducer(undefined, setCurrentSession(makeSession({
-    id: 'session-agent-3',
-    agentId: 'agent-3',
-  })));
+  const state = coworkReducer(
+    undefined,
+    setCurrentSession(
+      makeSession({
+        id: 'session-agent-3',
+        agentId: 'agent-3',
+      }),
+    ),
+  );
 
   expect(state.sessions[0].agentId).toBe('agent-3');
 });
 
 test('updateSessionStatus marks completed inactive sessions unread', () => {
-  const state = coworkReducer(undefined, setSessions([{
-    id: 'session-1',
-    title: 'Completed task',
-    status: CoworkSessionStatusValue.Running,
-    pinned: false,
-    agentId: 'main',
-    createdAt: 1,
-    updatedAt: 1,
-  }]));
+  const state = coworkReducer(
+    undefined,
+    setSessions([
+      {
+        id: 'session-1',
+        title: 'Completed task',
+        status: CoworkSessionStatusValue.Running,
+        pinned: false,
+        agentId: 'main',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ]),
+  );
 
   const completedState = coworkReducer(
     state,
@@ -135,15 +153,20 @@ test('updateSessionStatus marks completed inactive sessions unread', () => {
 
 test('updateSessionStatus does not mark the active completed session unread', () => {
   const state = coworkReducer(
-    coworkReducer(undefined, setSessions([{
-      id: 'session-1',
-      title: 'Active task',
-      status: CoworkSessionStatusValue.Running,
-      pinned: false,
-      agentId: 'main',
-      createdAt: 1,
-      updatedAt: 1,
-    }])),
+    coworkReducer(
+      undefined,
+      setSessions([
+        {
+          id: 'session-1',
+          title: 'Active task',
+          status: CoworkSessionStatusValue.Running,
+          pinned: false,
+          agentId: 'main',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ]),
+    ),
     setCurrentSessionId('session-1'),
   );
 

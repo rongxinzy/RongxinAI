@@ -5,10 +5,7 @@ import type {
   LlamaCppRunningModel,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import {
-  LlamaCppModelLaunchLogLevel,
-  LlamaCppModelLaunchLogPhase,
-} from '../../shared/llamacpp';
+import { LlamaCppModelLaunchLogLevel, LlamaCppModelLaunchLogPhase } from '../../shared/llamacpp';
 import type { LlamaCppModelLaunchLogReporter } from './llamacppModelLaunchLog';
 
 export const LlamaCppModelStartupSettleStatus = {
@@ -21,7 +18,7 @@ export const LlamaCppModelStartupSettleStatus = {
 } as const;
 
 export type LlamaCppModelStartupSettleStatus =
-  typeof LlamaCppModelStartupSettleStatus[keyof typeof LlamaCppModelStartupSettleStatus];
+  (typeof LlamaCppModelStartupSettleStatus)[keyof typeof LlamaCppModelStartupSettleStatus];
 
 export const LlamaCppModelStartupObservedState = {
   Loaded: 'loaded',
@@ -34,26 +31,26 @@ export const LlamaCppModelStartupObservedState = {
 } as const;
 
 export type LlamaCppModelStartupObservedState =
-  typeof LlamaCppModelStartupObservedState[keyof typeof LlamaCppModelStartupObservedState];
+  (typeof LlamaCppModelStartupObservedState)[keyof typeof LlamaCppModelStartupObservedState];
 
 export type LlamaCppModelStartupSettleResult =
   | {
-    status: typeof LlamaCppModelStartupSettleStatus.Loaded;
-    runningModels: LlamaCppRunningModel[];
-    model: LlamaCppModel;
-  }
+      status: typeof LlamaCppModelStartupSettleStatus.Loaded;
+      runningModels: LlamaCppRunningModel[];
+      model: LlamaCppModel;
+    }
   | {
-    status: Exclude<
-      LlamaCppModelStartupSettleStatus,
-      typeof LlamaCppModelStartupSettleStatus.Loaded
-    >;
-    observedState: LlamaCppModelStartupObservedState;
-    runningModels: LlamaCppRunningModel[];
-    model?: LlamaCppModel;
-    serviceStatus?: LlamaCppStatusSnapshot;
-    detail?: string;
-    unloadedAfterTimeout?: boolean;
-  };
+      status: Exclude<
+        LlamaCppModelStartupSettleStatus,
+        typeof LlamaCppModelStartupSettleStatus.Loaded
+      >;
+      observedState: LlamaCppModelStartupObservedState;
+      runningModels: LlamaCppRunningModel[];
+      model?: LlamaCppModel;
+      serviceStatus?: LlamaCppStatusSnapshot;
+      detail?: string;
+      unloadedAfterTimeout?: boolean;
+    };
 
 /**
  * Inputs are intentionally function-based so the later orchestrator can wire this module
@@ -106,7 +103,6 @@ export async function settleLlamaCppModelStartup(
   const requestTimeoutMs =
     input.requestTimeoutMs ?? LLAMACPP_MODEL_STARTUP_SETTLE_REQUEST_TIMEOUT_MS;
 
-
   let lastObservedState: LlamaCppModelStartupObservedState | null = null;
 
   while (true) {
@@ -123,10 +119,11 @@ export async function settleLlamaCppModelStartup(
       if (observation.observedState !== lastObservedState) {
         lastObservedState = observation.observedState;
         input.onLog?.({
-          level: observation.status === LlamaCppModelStartupSettleStatus.Failed
-            || observation.status === LlamaCppModelStartupSettleStatus.ServiceUnavailable
-            ? LlamaCppModelLaunchLogLevel.Warn
-            : LlamaCppModelLaunchLogLevel.Info,
+          level:
+            observation.status === LlamaCppModelStartupSettleStatus.Failed ||
+            observation.status === LlamaCppModelStartupSettleStatus.ServiceUnavailable
+              ? LlamaCppModelLaunchLogLevel.Warn
+              : LlamaCppModelLaunchLogLevel.Info,
           phase: LlamaCppModelLaunchLogPhase.WaitingReady,
           detail: {
             observedState: observation.observedState,
@@ -172,21 +169,21 @@ export async function settleLlamaCppModelStartup(
 
 type ModelStartupObservation =
   | {
-    status: typeof LlamaCppModelStartupSettleStatus.Loaded;
-    runningModels: LlamaCppRunningModel[];
-    model: LlamaCppModel;
-  }
+      status: typeof LlamaCppModelStartupSettleStatus.Loaded;
+      runningModels: LlamaCppRunningModel[];
+      model: LlamaCppModel;
+    }
   | {
-    status: Exclude<
-      LlamaCppModelStartupSettleStatus,
-      typeof LlamaCppModelStartupSettleStatus.Loaded
-    >;
-    observedState: LlamaCppModelStartupObservedState;
-    runningModels: LlamaCppRunningModel[];
-    model?: LlamaCppModel;
-    serviceStatus?: LlamaCppStatusSnapshot;
-    detail?: string;
-  };
+      status: Exclude<
+        LlamaCppModelStartupSettleStatus,
+        typeof LlamaCppModelStartupSettleStatus.Loaded
+      >;
+      observedState: LlamaCppModelStartupObservedState;
+      runningModels: LlamaCppRunningModel[];
+      model?: LlamaCppModel;
+      serviceStatus?: LlamaCppStatusSnapshot;
+      detail?: string;
+    };
 
 // Reads the current service/model state once and normalizes raw llama.cpp statuses.
 async function inspectModelStartup(input: {

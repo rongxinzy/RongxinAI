@@ -22,7 +22,11 @@ function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-function useFileContent(artifact: Artifact): { data: ArrayBuffer | null; loading: boolean; error: string | null } {
+function useFileContent(artifact: Artifact): {
+  data: ArrayBuffer | null;
+  loading: boolean;
+  error: string | null;
+} {
   const [data, setData] = useState<ArrayBuffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +38,15 @@ function useFileContent(artifact: Artifact): { data: ArrayBuffer | null; loading
       if (artifact.content) {
         try {
           const buf = dataUrlToArrayBuffer(artifact.content);
-          if (!cancelled) { setData(buf); setLoading(false); }
+          if (!cancelled) {
+            setData(buf);
+            setLoading(false);
+          }
         } catch (e) {
-          if (!cancelled) { setError(e instanceof Error ? e.message : String(e)); setLoading(false); }
+          if (!cancelled) {
+            setError(e instanceof Error ? e.message : String(e));
+            setLoading(false);
+          }
         }
         return;
       }
@@ -75,7 +85,9 @@ function useFileContent(artifact: Artifact): { data: ArrayBuffer | null; loading
     };
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [artifact.content, artifact.filePath]);
 
   return { data, loading, error };
@@ -93,7 +105,10 @@ const DocxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const [rendered, setRendered] = useState(false);
 
   useEffect(() => {
-    if (loadError) { setError(loadError); return; }
+    if (loadError) {
+      setError(loadError);
+      return;
+    }
     if (!data || !containerRef.current) return;
 
     let cancelled = false;
@@ -123,7 +138,9 @@ const DocxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     };
 
     render();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [data, loadError]);
 
   // Adaptive zoom based on container width
@@ -201,7 +218,10 @@ interface CellData {
 }
 
 interface MergeRange {
-  sr: number; sc: number; er: number; ec: number;
+  sr: number;
+  sc: number;
+  er: number;
+  ec: number;
 }
 
 interface SheetData {
@@ -242,7 +262,10 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const parentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (loadError) { setError(loadError); return; }
+    if (loadError) {
+      setError(loadError);
+      return;
+    }
     if (!data) return;
 
     let cancelled = false;
@@ -287,10 +310,14 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
             rows.push(row);
           }
 
-          const merges: MergeRange[] = (sheet['!merges'] || []).map((m: { s: { r: number; c: number }; e: { r: number; c: number } }) => ({
-            sr: m.s.r - range.s.r, sc: m.s.c - range.s.c,
-            er: m.e.r - range.s.r, ec: m.e.c - range.s.c,
-          }));
+          const merges: MergeRange[] = (sheet['!merges'] || []).map(
+            (m: { s: { r: number; c: number }; e: { r: number; c: number } }) => ({
+              sr: m.s.r - range.s.r,
+              sc: m.s.c - range.s.c,
+              er: m.e.r - range.s.r,
+              ec: m.e.c - range.s.c,
+            }),
+          );
           applyMerges(rows, merges);
 
           return { name, rows, colCount };
@@ -303,7 +330,9 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     };
 
     parse();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [data, loadError, artifact.fileName, artifact.filePath]);
 
   if (error) {
@@ -357,7 +386,10 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         <div style={{ width: totalWidth, minWidth: '100%' }}>
           {/* Header */}
           {headerRow && (
-            <div className="flex sticky top-0 z-10 border-b border-[#e0e0e0] bg-[#f0f2f5]" style={{ height: HEADER_HEIGHT }}>
+            <div
+              className="flex sticky top-0 z-10 border-b border-[#e0e0e0] bg-[#f0f2f5]"
+              style={{ height: HEADER_HEIGHT }}
+            >
               {headerRow.map((cell, i) => {
                 if (cell.hidden) return null;
                 const span = cell.colSpan || 1;
@@ -481,12 +513,18 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
     const ro = new ResizeObserver(measure);
     ro.observe(container);
-    return () => { ro.disconnect(); if (timer) clearTimeout(timer); };
+    return () => {
+      ro.disconnect();
+      if (timer) clearTimeout(timer);
+    };
   }, [renderWidth, pdfDoc]);
 
   // Load PDF document
   useEffect(() => {
-    if (loadError) { setError(loadError); return; }
+    if (loadError) {
+      setError(loadError);
+      return;
+    }
     if (!data) return;
 
     let cancelled = false;
@@ -494,7 +532,10 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     const loadPdf = async () => {
       try {
         const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.mjs',
+          import.meta.url,
+        ).href;
 
         const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
         if (cancelled) return;
@@ -507,7 +548,9 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     };
 
     loadPdf();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [data, loadError]);
 
   if (error) {
@@ -534,11 +577,12 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         {pageCount} {t('artifactPdfPageCount')}
       </div>
       <div ref={containerRef} className="flex-1 overflow-auto p-6">
-        {renderWidth > 0 && pages.map(pageNum => (
-          <div key={pageNum} style={{ marginBottom: PDF_PAGE_GAP }}>
-            <PdfPageCanvas pdfDoc={pdfDoc} pageNumber={pageNum} width={renderWidth} />
-          </div>
-        ))}
+        {renderWidth > 0 &&
+          pages.map(pageNum => (
+            <div key={pageNum} style={{ marginBottom: PDF_PAGE_GAP }}>
+              <PdfPageCanvas pdfDoc={pdfDoc} pageNumber={pageNum} width={renderWidth} />
+            </div>
+          ))}
       </div>
     </div>
   );
@@ -661,7 +705,10 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const PPTX_RENDER_WIDTH = 600;
 
   useEffect(() => {
-    if (loadError) { setError(loadError); return; }
+    if (loadError) {
+      setError(loadError);
+      return;
+    }
     if (!data) return;
 
     let cancelled = false;
@@ -682,7 +729,10 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         const previewer = pptxPreview.init(offscreen, { width: PPTX_RENDER_WIDTH, mode: 'list' });
         await previewer.preview(fixedData);
 
-        if (cancelled) { document.body.removeChild(offscreen); return; }
+        if (cancelled) {
+          document.body.removeChild(offscreen);
+          return;
+        }
 
         const count = previewer.slideCount || 0;
         setSlideCount(count);
@@ -691,7 +741,8 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         document.body.removeChild(offscreen);
 
         if (count > 0 && renderedHtml.length > 200 && iframeRef.current && !cancelled) {
-          const iframeDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
+          const iframeDoc =
+            iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
           if (iframeDoc) {
             iframeDoc.open();
             iframeDoc.write(`<!DOCTYPE html><html><head><style>
@@ -714,7 +765,9 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     };
 
     render();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [data, loadError]);
 
   // Adaptive zoom for PPTX container
@@ -777,13 +830,20 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 };
 
 // HTML slides fallback: load slideN.html files from the same directory
-const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({ artifact, data }) => {
+const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
+  artifact,
+  data,
+}) => {
   const [slideHtmls, setSlideHtmls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [useTextFallback, setUseTextFallback] = useState(false);
 
   useEffect(() => {
-    if (!artifact.filePath) { setUseTextFallback(true); setLoading(false); return; }
+    if (!artifact.filePath) {
+      setUseTextFallback(true);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
@@ -824,11 +884,17 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
     };
 
     loadSlideHtmls();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [artifact.filePath]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full text-muted text-sm">{t('artifactDocumentLoading')}</div>;
+    return (
+      <div className="flex items-center justify-center h-full text-muted text-sm">
+        {t('artifactDocumentLoading')}
+      </div>
+    );
   }
 
   if (useTextFallback) {
@@ -858,7 +924,10 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
 };
 
 // Text extraction fallback for PPTX
-interface SlideContent { index: number; texts: string[]; }
+interface SlideContent {
+  index: number;
+  texts: string[];
+}
 
 async function parsePptxSlides(data: ArrayBuffer): Promise<SlideContent[]> {
   const JSZip = (await import('jszip')).default;
@@ -893,14 +962,27 @@ const PptxTextFallback: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
 
   useEffect(() => {
     let cancelled = false;
-    parsePptxSlides(data).then(result => {
-      if (!cancelled) { setSlides(result); setParsed(true); }
-    }).catch(() => { if (!cancelled) setParsed(true); });
-    return () => { cancelled = true; };
+    parsePptxSlides(data)
+      .then(result => {
+        if (!cancelled) {
+          setSlides(result);
+          setParsed(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setParsed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [data]);
 
   if (!parsed) {
-    return <div className="flex items-center justify-center h-full text-muted text-sm">{t('artifactDocumentLoading')}</div>;
+    return (
+      <div className="flex items-center justify-center h-full text-muted text-sm">
+        {t('artifactDocumentLoading')}
+      </div>
+    );
   }
 
   return (
@@ -917,7 +999,9 @@ const PptxTextFallback: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
             {slide.texts.length > 0 ? (
               <div className="space-y-1">
                 {slide.texts.map((text, i) => (
-                  <div key={i} className="text-sm text-foreground">{text}</div>
+                  <div key={i} className="text-sm text-foreground">
+                    {text}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -943,18 +1027,13 @@ const FileInfoFallback: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
-      <div className="text-5xl">
-        {ext === '.pptx' ? '📊' : ext === '.xlsx' ? '📑' : '📄'}
-      </div>
+      <div className="text-5xl">{ext === '.pptx' ? '📊' : ext === '.xlsx' ? '📑' : '📄'}</div>
       <div className="text-center">
         <div className="text-sm font-medium">{artifact.fileName || artifact.title}</div>
         <div className="text-xs text-muted mt-1">{ext.toUpperCase().slice(1)}</div>
       </div>
       {artifact.filePath && (
-        <Button
-          onClick={handleOpenWithApp}
-          className="px-3 py-1.5 text-xs rounded mt-2 h-auto"
-        >
+        <Button onClick={handleOpenWithApp} className="px-3 py-1.5 text-xs rounded mt-2 h-auto">
           {t('artifactOpenWithApp')}
         </Button>
       )}

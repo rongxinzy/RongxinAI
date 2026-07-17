@@ -44,7 +44,7 @@ export class PlaywrightManager {
    */
   private async getCDPWebSocketUrl(port: number): Promise<string> {
     const response = await fetch(`http://127.0.0.1:${port}/json/version`);
-    const data = await response.json() as { webSocketDebuggerUrl: string };
+    const data = (await response.json()) as { webSocketDebuggerUrl: string };
     return data.webSocketDebuggerUrl;
   }
 
@@ -79,7 +79,7 @@ export class PlaywrightManager {
         browser,
         context,
         pages: new Map(),
-        connectedAt: Date.now()
+        connectedAt: Date.now(),
       };
 
       this.connections.set(connectionId, connection);
@@ -88,7 +88,9 @@ export class PlaywrightManager {
       return connectionId;
     } catch (error) {
       console.error(`[Playwright] Failed to connect to CDP:`, error);
-      throw new Error(`Failed to connect to CDP: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to connect to CDP: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -119,7 +121,9 @@ export class PlaywrightManager {
         return page;
       } catch (error) {
         this.connections.delete(connectionId);
-        throw new Error(`Connection became invalid: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Connection became invalid: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
@@ -152,7 +156,9 @@ export class PlaywrightManager {
       return page;
     } catch (error) {
       this.connections.delete(connectionId);
-      throw new Error(`Connection became invalid: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Connection became invalid: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -187,7 +193,7 @@ export class PlaywrightManager {
     return Array.from(this.connections.values()).map(conn => ({
       id: conn.id,
       connectedAt: conn.connectedAt,
-      pageCount: conn.context.pages().filter(page => !page.isClosed()).length
+      pageCount: conn.context.pages().filter(page => !page.isClosed()).length,
     }));
   }
 

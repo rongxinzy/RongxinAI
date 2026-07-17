@@ -12,7 +12,7 @@ Mediabunny can extract the width and height of a video file. It works in browser
 ## Getting video dimensions
 
 ```tsx
-import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
+import { Input, ALL_FORMATS, UrlSource } from 'mediabunny';
 
 export const getVideoDimensions = async (src: string) => {
   const input = new Input({
@@ -24,7 +24,7 @@ export const getVideoDimensions = async (src: string) => {
 
   const videoTrack = await input.getPrimaryVideoTrack();
   if (!videoTrack) {
-    throw new Error("No video track found");
+    throw new Error('No video track found');
   }
 
   return {
@@ -37,8 +37,8 @@ export const getVideoDimensions = async (src: string) => {
 ## Usage
 
 ```tsx
-const dimensions = await getVideoDimensions("https://remotion.media/video.mp4");
-console.log(dimensions.width);  // e.g. 1920
+const dimensions = await getVideoDimensions('https://remotion.media/video.mp4');
+console.log(dimensions.width); // e.g. 1920
 console.log(dimensions.height); // e.g. 1080
 ```
 
@@ -47,7 +47,7 @@ console.log(dimensions.height); // e.g. 1080
 For local files, use `FileSource` instead of `UrlSource`:
 
 ```tsx
-import { Input, ALL_FORMATS, FileSource } from "mediabunny";
+import { Input, ALL_FORMATS, FileSource } from 'mediabunny';
 
 const input = new Input({
   formats: ALL_FORMATS,
@@ -62,7 +62,7 @@ const height = videoTrack.displayHeight;
 ## Using with staticFile in Remotion
 
 ```tsx
-import { staticFile } from "remotion";
+import { staticFile } from 'remotion';
 
-const dimensions = await getVideoDimensions(staticFile("video.mp4"));
+const dimensions = await getVideoDimensions(staticFile('video.mp4'));
 ```

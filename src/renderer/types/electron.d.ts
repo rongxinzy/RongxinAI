@@ -412,21 +412,35 @@ interface IElectronAPI {
     cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
     onStatusChanged: (callback: (snapshot: OllamaStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: OllamaInstallProgress) => void) => () => void;
-    onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
-    onChatStreamChunk: (callback: (payload: { requestId: string; chunk: OllamaChatChunk }) => void) => () => void;
+    onPullProgress: (
+      callback: (payload: { name: string; chunk: Record<string, unknown> }) => void,
+    ) => () => void;
+    onChatStreamChunk: (
+      callback: (payload: { requestId: string; chunk: OllamaChatChunk }) => void,
+    ) => () => void;
   };
   llamacpp: {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
     fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
-    listRuntimeDevices: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeListDevicesResult>;
+    listRuntimeDevices: (
+      input?: import('../../shared/llamacpp').LlamaCppBackendRef,
+    ) => Promise<LlamaCppRuntimeListDevicesResult>;
     getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     listBackends: () => Promise<import('../../shared/llamacpp').LlamaCppBackendListResult>;
-    getBackendSelection: () => Promise<import('../../shared/llamacpp').LlamaCppBackendRef | undefined>;
-    setBackendSelection: (input: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
-    installBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeInstallResult>;
-    uninstallBackend: (input?: import('../../shared/llamacpp').LlamaCppBackendRef) => Promise<LlamaCppRuntimeUninstallResult>;
+    getBackendSelection: () => Promise<
+      import('../../shared/llamacpp').LlamaCppBackendRef | undefined
+    >;
+    setBackendSelection: (
+      input: import('../../shared/llamacpp').LlamaCppBackendRef,
+    ) => Promise<LlamaCppRuntimeInstallResult>;
+    installBackend: (
+      input?: import('../../shared/llamacpp').LlamaCppBackendRef,
+    ) => Promise<LlamaCppRuntimeInstallResult>;
+    uninstallBackend: (
+      input?: import('../../shared/llamacpp').LlamaCppBackendRef,
+    ) => Promise<LlamaCppRuntimeUninstallResult>;
     uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
     start: () => Promise<LlamaCppStatusSnapshot>;
     stop: () => Promise<LlamaCppStatusSnapshot>;
@@ -438,23 +452,48 @@ interface IElectronAPI {
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;
     importModelFiles: (paths: string[]) => Promise<LlamaCppImportModelFilesResult>;
-    deleteModel: (name: string) => Promise<{ success: boolean; deleted?: boolean; reason?: 'not-local-file' | 'not-app-managed'; error?: string; removedModelName?: string; clearedDefaultModel?: boolean }>;
+    deleteModel: (
+      name: string,
+    ) => Promise<{
+      success: boolean;
+      deleted?: boolean;
+      reason?: 'not-local-file' | 'not-app-managed';
+      error?: string;
+      removedModelName?: string;
+      clearedDefaultModel?: boolean;
+    }>;
     showModel: (name: string) => Promise<unknown>;
     getModelPreferences: () => Promise<LlamaCppModelPreferences>;
-    setModelPreference: (input: LlamaCppSetModelPreferenceInput) => Promise<LlamaCppModelPreferences>;
+    setModelPreference: (
+      input: LlamaCppSetModelPreferenceInput,
+    ) => Promise<LlamaCppModelPreferences>;
     loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
     unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
-    getLatestModelLaunchLogSession: (input?: LlamaCppLatestModelLaunchLogSessionInput) => Promise<LlamaCppModelLaunchLogSession | null>;
-    readModelLaunchLogFile: (input: LlamaCppReadModelLaunchLogFileInput) => Promise<LlamaCppReadModelLaunchLogFileResult>;
-    openModelLaunchLogWindow: (input?: LlamaCppOpenModelLaunchLogWindowInput) => Promise<LlamaCppOpenModelLaunchLogWindowResult>;
-    installModel: (input: LlamaCppInstallModelInput) => Promise<{ success: boolean; cancelled?: boolean }>;
+    getLatestModelLaunchLogSession: (
+      input?: LlamaCppLatestModelLaunchLogSessionInput,
+    ) => Promise<LlamaCppModelLaunchLogSession | null>;
+    readModelLaunchLogFile: (
+      input: LlamaCppReadModelLaunchLogFileInput,
+    ) => Promise<LlamaCppReadModelLaunchLogFileResult>;
+    openModelLaunchLogWindow: (
+      input?: LlamaCppOpenModelLaunchLogWindowInput,
+    ) => Promise<LlamaCppOpenModelLaunchLogWindowResult>;
+    installModel: (
+      input: LlamaCppInstallModelInput,
+    ) => Promise<{ success: boolean; cancelled?: boolean }>;
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
     onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
     onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
     onModelLaunchLog: (callback: (event: LlamaCppModelLaunchLogEvent) => void) => () => void;
-    onModelLaunchLogCleared: (callback: (event: LlamaCppModelLaunchLogClearedEvent) => void) => () => void;
-    onModelLaunchLogWindowTargetChanged: (callback: (target: LlamaCppModelLaunchLogWindowTarget) => void) => () => void;
-    onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) => () => void;
+    onModelLaunchLogCleared: (
+      callback: (event: LlamaCppModelLaunchLogClearedEvent) => void,
+    ) => () => void;
+    onModelLaunchLogWindowTargetChanged: (
+      callback: (target: LlamaCppModelLaunchLogWindowTarget) => void,
+    ) => () => void;
+    onPullProgress: (
+      callback: (payload: { name: string; chunk: Record<string, unknown> }) => void,
+    ) => () => void;
   };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
@@ -471,14 +510,61 @@ interface IElectronAPI {
   agents: {
     list: () => Promise<Agent[]>;
     get: (id: string) => Promise<Agent | null>;
-    create: (request: { id?: string; name: string; description?: string; systemPrompt?: string; identity?: string; model?: string; workingDirectory?: string; icon?: string; skillIds?: string[]; source?: string; presetId?: string }) => Promise<Agent>;
-    update: (id: string, updates: { name?: string; description?: string; systemPrompt?: string; identity?: string; model?: string; workingDirectory?: string; icon?: string; skillIds?: string[]; enabled?: boolean; pinned?: boolean; triageOverride?: import('../../shared/triage').AgentTriageOverride | null }) => Promise<Agent>;
+    create: (request: {
+      id?: string;
+      name: string;
+      description?: string;
+      systemPrompt?: string;
+      identity?: string;
+      model?: string;
+      workingDirectory?: string;
+      icon?: string;
+      skillIds?: string[];
+      source?: string;
+      presetId?: string;
+    }) => Promise<Agent>;
+    update: (
+      id: string,
+      updates: {
+        name?: string;
+        description?: string;
+        systemPrompt?: string;
+        identity?: string;
+        model?: string;
+        workingDirectory?: string;
+        icon?: string;
+        skillIds?: string[];
+        enabled?: boolean;
+        pinned?: boolean;
+        triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
+      },
+    ) => Promise<Agent>;
     delete: (id: string) => Promise<boolean>;
     presets: () => Promise<PresetAgent[]>;
     presetTemplates: () => Promise<PresetAgent[]>;
     addPreset: (presetId: string) => Promise<Agent>;
-    importExpertPackage: (expertDir: string) => Promise<{ success: boolean; agentIds?: string[]; expertType?: string; name?: string; error?: string }>;
-    getPresetExperts: () => Promise<{ experts: Array<{ name: string; displayName: { en: string; zh: string }; profession: { en: string; zh: string }; displayDescription: { en: string; zh: string }; categoryId: string; tags: Array<{ en: string; zh: string }>; quickPrompts: Array<{ en: string; zh: string }>; path: string }>; error?: string }>;
+    importExpertPackage: (
+      expertDir: string,
+    ) => Promise<{
+      success: boolean;
+      agentIds?: string[];
+      expertType?: string;
+      name?: string;
+      error?: string;
+    }>;
+    getPresetExperts: () => Promise<{
+      experts: Array<{
+        name: string;
+        displayName: { en: string; zh: string };
+        profession: { en: string; zh: string };
+        displayDescription: { en: string; zh: string };
+        categoryId: string;
+        tags: Array<{ en: string; zh: string }>;
+        quickPrompts: Array<{ en: string; zh: string }>;
+        path: string;
+      }>;
+      error?: string;
+    }>;
   };
   api: {
     fetch: (options: {
@@ -524,8 +610,14 @@ interface IElectronAPI {
       onProgress: (callback: (status: OpenClawEngineStatus) => void) => () => void;
     };
     sessionPolicy: {
-      get: () => Promise<{ success: boolean; config?: OpenClawSessionPolicyConfig; error?: string }>;
-      set: (config: OpenClawSessionPolicyConfig) => Promise<{ success: boolean; config?: OpenClawSessionPolicyConfig; error?: string }>;
+      get: () => Promise<{
+        success: boolean;
+        config?: OpenClawSessionPolicyConfig;
+        error?: string;
+      }>;
+      set: (
+        config: OpenClawSessionPolicyConfig,
+      ) => Promise<{ success: boolean; config?: OpenClawSessionPolicyConfig; error?: string }>;
     };
     session: {
       patch: (options: {
@@ -547,9 +639,27 @@ interface IElectronAPI {
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
   cowork: {
-    listWorkspaces: () => Promise<{ success: boolean; workspaces?: import('../../shared/workspace').Workspace[]; error?: string }>;
-    ensureWorkspace: (options: { path: string; name?: string }) => Promise<{ success: boolean; workspace?: import('../../shared/workspace').Workspace; error?: string }>;
-    renameWorkspace: (id: string, name: string) => Promise<{ success: boolean; workspace?: import('../../shared/workspace').Workspace; error?: string }>;
+    listWorkspaces: () => Promise<{
+      success: boolean;
+      workspaces?: import('../../shared/workspace').Workspace[];
+      error?: string;
+    }>;
+    ensureWorkspace: (options: {
+      path: string;
+      name?: string;
+    }) => Promise<{
+      success: boolean;
+      workspace?: import('../../shared/workspace').Workspace;
+      error?: string;
+    }>;
+    renameWorkspace: (
+      id: string,
+      name: string,
+    ) => Promise<{
+      success: boolean;
+      workspace?: import('../../shared/workspace').Workspace;
+      error?: string;
+    }>;
     startSession: (options: {
       prompt: string;
       cwd?: string;
@@ -602,7 +712,12 @@ interface IElectronAPI {
     remoteManaged: (
       sessionId: string,
     ) => Promise<{ success: boolean; remoteManaged: boolean; error?: string }>;
-    listSessions: (options?: { limit?: number; offset?: number; agentId?: string; workspaceId?: string }) => Promise<{
+    listSessions: (options?: {
+      limit?: number;
+      offset?: number;
+      agentId?: string;
+      workspaceId?: string;
+    }) => Promise<{
       success: boolean;
       sessions?: CoworkSessionSummary[];
       hasMore?: boolean;
@@ -673,7 +788,12 @@ interface IElectronAPI {
       callback: (data: { sessionId: string; message: CoworkMessage }) => void,
     ) => () => void;
     onStreamMessageUpdate: (
-      callback: (data: { sessionId: string; messageId: string; content: string; metadata?: Record<string, unknown> }) => void,
+      callback: (data: {
+        sessionId: string;
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }) => void,
     ) => () => void;
     onStreamPermission: (
       callback: (data: { sessionId: string; request: CoworkPermissionRequest }) => void,
@@ -682,17 +802,38 @@ interface IElectronAPI {
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => () => void;
-    onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) => () => void;
+    onStreamError: (
+      callback: (data: { sessionId: string; error: CoworkError }) => void,
+    ) => () => void;
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => () => void;
   };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
-    selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; path: string | null }>;
-    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; paths: string[] }>;
-    saveInlineFile: (options: { dataBase64: string; fileName?: string; mimeType?: string; cwd?: string }) => Promise<{ success: boolean; path: string | null; error?: string }>;
-    readFileAsDataUrl: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
-    generateThumbnail: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
-    showMessageBox: (options: { message: string; type?: 'none' | 'info' | 'error' | 'question' | 'warning'; title?: string }) => Promise<{ response: number }>;
+    selectFile: (options?: {
+      title?: string;
+      filters?: { name: string; extensions: string[] }[];
+    }) => Promise<{ success: boolean; path: string | null }>;
+    selectFiles: (options?: {
+      title?: string;
+      filters?: { name: string; extensions: string[] }[];
+    }) => Promise<{ success: boolean; paths: string[] }>;
+    saveInlineFile: (options: {
+      dataBase64: string;
+      fileName?: string;
+      mimeType?: string;
+      cwd?: string;
+    }) => Promise<{ success: boolean; path: string | null; error?: string }>;
+    readFileAsDataUrl: (
+      filePath: string,
+    ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+    generateThumbnail: (
+      filePath: string,
+    ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+    showMessageBox: (options: {
+      message: string;
+      type?: 'none' | 'info' | 'error' | 'question' | 'warning';
+      title?: string;
+    }) => Promise<{ response: number }>;
   };
   shell: {
     openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>;
@@ -715,7 +856,10 @@ interface IElectronAPI {
   };
   appUpdate: {
     getState: () => Promise<AppUpdateRuntimeState>;
-    checkNow: (options?: { manual?: boolean; userId?: string | null }) => Promise<AppUpdateCheckResult>;
+    checkNow: (options?: {
+      manual?: boolean;
+      userId?: string | null;
+    }) => Promise<AppUpdateCheckResult>;
     retryDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
@@ -981,9 +1125,7 @@ interface IElectronAPI {
   };
   auth: {
     login: (loginUrl?: string) => Promise<{ success: boolean; error?: string }>;
-    exchange: (
-      code: string,
-    ) => Promise<{
+    exchange: (code: string) => Promise<{
       success: boolean;
       user?: import('../store/slices/authSlice').UserProfile;
       quota?: {
@@ -1060,7 +1202,10 @@ interface IElectronAPI {
         clientSecret?: string;
         error?: string;
       }>;
-      verify: (clientId: string, clientSecret: string) => Promise<{
+      verify: (
+        clientId: string,
+        clientSecret: string,
+      ) => Promise<{
         success: boolean;
         error?: string;
       }>;
@@ -1334,11 +1479,6 @@ interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
 }
 
-
-
-
-
-
 interface WeixinOpenClawConfig {
   enabled: boolean;
   accountId: string;
@@ -1466,7 +1606,6 @@ interface WecomGatewayStatus {
   lastInboundAt: number | null;
   lastOutboundAt: number | null;
 }
-
 
 interface WeixinGatewayStatus {
   connected: boolean;

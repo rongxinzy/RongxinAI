@@ -3,9 +3,12 @@ export type ScheduledReminderPrompt = {
   currentTime?: string;
 };
 
-const SCHEDULED_REMINDER_PREFIX = 'A scheduled reminder has been triggered. The reminder content is:';
-const SCHEDULED_REMINDER_INTERNAL_INSTRUCTION = 'Handle this reminder internally. Do not relay it to the user unless explicitly requested.';
-const SCHEDULED_REMINDER_RELAY_INSTRUCTION = 'Please relay this reminder to the user in a helpful and friendly way.';
+const SCHEDULED_REMINDER_PREFIX =
+  'A scheduled reminder has been triggered. The reminder content is:';
+const SCHEDULED_REMINDER_INTERNAL_INSTRUCTION =
+  'Handle this reminder internally. Do not relay it to the user unless explicitly requested.';
+const SCHEDULED_REMINDER_RELAY_INSTRUCTION =
+  'Please relay this reminder to the user in a helpful and friendly way.';
 const CURRENT_TIME_PREFIX = 'Current time:';
 const LEGACY_SYSTEM_LINE_RE = /^System:\s*(?:\[(.+?)\]\s*)?(⏰.+)$/u;
 const SIMPLE_REMINDER_RE = /^⏰(?:\s|$)/u;
@@ -20,7 +23,8 @@ export function parseScheduledReminderPrompt(text: string): ScheduledReminderPro
   let currentTime: string | undefined;
   const currentTimeIndex = remainder.lastIndexOf(CURRENT_TIME_PREFIX);
   if (currentTimeIndex >= 0) {
-    currentTime = remainder.slice(currentTimeIndex + CURRENT_TIME_PREFIX.length).trim() || undefined;
+    currentTime =
+      remainder.slice(currentTimeIndex + CURRENT_TIME_PREFIX.length).trim() || undefined;
     remainder = remainder.slice(0, currentTimeIndex).trim();
   }
 
@@ -40,7 +44,9 @@ export function parseScheduledReminderPrompt(text: string): ScheduledReminderPro
   };
 }
 
-export function parseLegacyScheduledReminderSystemMessage(text: string): ScheduledReminderPrompt | null {
+export function parseLegacyScheduledReminderSystemMessage(
+  text: string,
+): ScheduledReminderPrompt | null {
   const trimmed = text.trim();
   const firstLine = trimmed.split(/\r?\n/u, 1)[0]?.trim() ?? '';
   const match = firstLine.match(LEGACY_SYSTEM_LINE_RE);
@@ -51,10 +57,12 @@ export function parseLegacyScheduledReminderSystemMessage(text: string): Schedul
   const rest = trimmed.slice(firstLine.length).trim();
   const wrappedPrompt = rest ? parseScheduledReminderPrompt(rest) : null;
 
-  return wrappedPrompt ?? {
-    reminderText: match[2].trim(),
-    ...(match[1]?.trim() ? { currentTime: match[1].trim() } : {}),
-  };
+  return (
+    wrappedPrompt ?? {
+      reminderText: match[2].trim(),
+      ...(match[1]?.trim() ? { currentTime: match[1].trim() } : {}),
+    }
+  );
 }
 
 export function isSimpleScheduledReminderText(text: string): boolean {

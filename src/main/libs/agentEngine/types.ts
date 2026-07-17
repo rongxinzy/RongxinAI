@@ -29,7 +29,12 @@ export interface PermissionRequest {
 
 export interface CoworkRuntimeEvents {
   message: (sessionId: string, message: CoworkMessage) => void;
-  messageUpdate: (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => void;
+  messageUpdate: (
+    sessionId: string,
+    messageId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ) => void;
   permissionRequest: (sessionId: string, request: PermissionRequest) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
@@ -76,16 +81,14 @@ export type CoworkContinueOptions = {
 };
 
 export interface CoworkRuntime {
-  on<U extends keyof CoworkRuntimeEvents>(
-    event: U,
-    listener: CoworkRuntimeEvents[U],
-  ): this;
-  off<U extends keyof CoworkRuntimeEvents>(
-    event: U,
-    listener: CoworkRuntimeEvents[U],
-  ): this;
+  on<U extends keyof CoworkRuntimeEvents>(event: U, listener: CoworkRuntimeEvents[U]): this;
+  off<U extends keyof CoworkRuntimeEvents>(event: U, listener: CoworkRuntimeEvents[U]): this;
   startSession(sessionId: string, prompt: string, options?: CoworkStartOptions): Promise<void>;
-  continueSession(sessionId: string, prompt: string, options?: CoworkContinueOptions): Promise<void>;
+  continueSession(
+    sessionId: string,
+    prompt: string,
+    options?: CoworkContinueOptions,
+  ): Promise<void>;
   patchSession?(sessionId: string, patch: OpenClawSessionPatch): Promise<void>;
   stopSession(sessionId: string): void;
   stopAllSessions(): void;

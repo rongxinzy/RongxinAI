@@ -46,13 +46,9 @@ export function resolveLocalModelProvider(model: LlamaCppModel): LocalModelProvi
 }
 
 function getModelProviderCandidates(model: LlamaCppModel): string[] {
-  return [
-    model.details?.family,
-    model.name,
-    model.model,
-    model.id,
-    getFileName(model.path),
-  ].filter((value): value is string => Boolean(value?.trim()));
+  return [model.details?.family, model.name, model.model, model.id, getFileName(model.path)].filter(
+    (value): value is string => Boolean(value?.trim()),
+  );
 }
 
 function getFileName(path?: string): string | undefined {

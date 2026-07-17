@@ -3,12 +3,7 @@ import {
   parseChannelSessionKey,
   parseManagedSessionKey,
 } from '../main/libs/openclawChannelSessionSync';
-import {
-  BindingKind,
-  DeliveryChannel,
-  DeliveryMode,
-  OriginKind,
-} from './constants';
+import { BindingKind, DeliveryChannel, DeliveryMode, OriginKind } from './constants';
 
 // Re-declare origin/binding types here so common/ doesn't depend on renderer/
 // These MUST be kept in sync with src/renderer/types/scheduledTask.ts
@@ -24,7 +19,12 @@ export type TaskOrigin =
 export type ExecutionBinding =
   | { kind: typeof BindingKind.NewSession }
   | { kind: typeof BindingKind.UISession; sessionId: string }
-  | { kind: typeof BindingKind.IMSession; platform: string; conversationId: string; sessionId?: string }
+  | {
+      kind: typeof BindingKind.IMSession;
+      platform: string;
+      conversationId: string;
+      sessionId?: string;
+    }
   | { kind: typeof BindingKind.SessionKey; sessionKey: string };
 
 /** Minimal ScheduledTask shape needed for inference (avoids importing renderer types) */
@@ -50,10 +50,11 @@ export function inferOriginAndBinding(task: InferableTask): {
     const parsed = parseManagedSessionKey(sk);
     if (parsed) {
       const channel = task.delivery?.channel;
-      const isIMChannel = task.delivery?.mode === DeliveryMode.Announce
-        && typeof channel === 'string'
-        && channel.length > 0
-        && channel !== DeliveryChannel.Last;
+      const isIMChannel =
+        task.delivery?.mode === DeliveryMode.Announce &&
+        typeof channel === 'string' &&
+        channel.length > 0 &&
+        channel !== DeliveryChannel.Last;
 
       if (isIMChannel) {
         return {
@@ -79,7 +80,11 @@ export function inferOriginAndBinding(task: InferableTask): {
     const channelInfo = parseChannelSessionKey(sk);
     if (channelInfo) {
       return {
-        origin: { kind: OriginKind.IM, platform: channelInfo.platform, conversationId: channelInfo.conversationId },
+        origin: {
+          kind: OriginKind.IM,
+          platform: channelInfo.platform,
+          conversationId: channelInfo.conversationId,
+        },
         binding: {
           kind: BindingKind.IMSession,
           platform: channelInfo.platform,

@@ -5,18 +5,21 @@ import { i18nService } from '../../../services/i18n';
 export const hasText = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
-export const toTrimmedString = (value: unknown): string | null => (
-  typeof value === 'string' && value.trim() ? value.trim() : null
-);
+export const toTrimmedString = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() ? value.trim() : null;
 
 export const formatUnknown = (value: unknown): string => {
   if (typeof value === 'string') return value;
-  try { return JSON.stringify(value, null, 2); } catch { return String(value); }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 };
 
 export const getStringArray = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
-  const lines = value.filter((item) => typeof item === 'string') as string[];
+  const lines = value.filter(item => typeof item === 'string') as string[];
   return lines.length > 0 ? lines.join('\n') : null;
 };
 
@@ -26,7 +29,11 @@ export const truncatePreview = (value: string, maxLength = 120): string =>
 export const formatStructuredText = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return value;
-  try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { return value; }
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return value;
+  }
 };
 
 // ── ANSI / error tags ──
@@ -42,20 +49,35 @@ export const normalizeToolResultText = (value: string): string => {
 
 // ── Tool name normalization ──
 
-export const normalizeToolName = (value: string): string => value.toLowerCase().replace(/[\s_]+/g, '');
+export const normalizeToolName = (value: string): string =>
+  value.toLowerCase().replace(/[\s_]+/g, '');
 
 export const getToolDisplayName = (toolName: string | undefined): string => {
   if (!toolName) return 'Tool';
   switch (normalizeToolName(toolName)) {
-    case 'cron': return 'Cron';
-    case 'exec': case 'bash': case 'shell': return 'Bash';
-    case 'read': case 'readfile': return 'Read';
-    case 'write': case 'writefile': return 'Write';
-    case 'edit': case 'editfile': return 'Edit';
-    case 'multiedit': return 'MultiEdit';
-    case 'mcp': return 'MCP';
-    case 'process': return 'Process';
-    default: return toolName;
+    case 'cron':
+      return 'Cron';
+    case 'exec':
+    case 'bash':
+    case 'shell':
+      return 'Bash';
+    case 'read':
+    case 'readfile':
+      return 'Read';
+    case 'write':
+    case 'writefile':
+      return 'Write';
+    case 'edit':
+    case 'editfile':
+      return 'Edit';
+    case 'multiedit':
+      return 'MultiEdit';
+    case 'mcp':
+      return 'MCP';
+    case 'process':
+      return 'Process';
+    default:
+      return toolName;
   }
 };
 
@@ -93,18 +115,24 @@ export const getToolInputString = (
 export const getCronToolSummary = (input: Record<string, unknown>): string | null => {
   const action = getToolInputString(input, ['action']);
   if (!action) return null;
-  const job = input.job && typeof input.job === 'object'
-    ? input.job as Record<string, unknown>
-    : null;
+  const job =
+    input.job && typeof input.job === 'object' ? (input.job as Record<string, unknown>) : null;
   const jobName = job ? getToolInputString(job, ['name', 'id']) : null;
-  const jobId = getToolInputString(input, ['jobId', 'id']) ?? (job ? getToolInputString(job, ['id']) : null);
+  const jobId =
+    getToolInputString(input, ['jobId', 'id']) ?? (job ? getToolInputString(job, ['id']) : null);
   const wakeText = getToolInputString(input, ['text']);
   switch (action) {
-    case 'add': return [action, jobName ?? jobId].filter(Boolean).join(' · ');
-    case 'update': case 'remove': case 'run': case 'runs':
+    case 'add':
+      return [action, jobName ?? jobId].filter(Boolean).join(' · ');
+    case 'update':
+    case 'remove':
+    case 'run':
+    case 'runs':
       return [action, jobId ?? jobName].filter(Boolean).join(' · ');
-    case 'wake': return [action, wakeText].filter(Boolean).join(' · ');
-    default: return action;
+    case 'wake':
+      return [action, wakeText].filter(Boolean).join(' · ');
+    default:
+      return action;
   }
 };
 
@@ -119,8 +147,7 @@ export type ParsedTodoItem = {
 };
 
 const normalizeTodoStatus = (value: unknown): TodoStatus => {
-  const normalized = typeof value === 'string'
-    ? value.trim().toLowerCase().replace(/-/g, '_') : '';
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase().replace(/-/g, '_') : '';
   if (normalized === 'completed') return 'completed';
   if (normalized === 'in_progress' || normalized === 'running') return 'in_progress';
   if (normalized === 'pending' || normalized === 'todo') return 'pending';
@@ -132,22 +159,26 @@ export const parseTodoWriteItems = (input: unknown): ParsedTodoItem[] | null => 
   const record = input as Record<string, unknown>;
   if (!Array.isArray(record.todos)) return null;
   const parsedItems = record.todos
-    .map((rawTodo) => {
+    .map(rawTodo => {
       if (!rawTodo || typeof rawTodo !== 'object') return null;
       const todo = rawTodo as Record<string, unknown>;
       const activeForm = toTrimmedString(todo.activeForm);
       const content = toTrimmedString(todo.content);
       const primaryText = activeForm ?? content ?? i18nService.t('coworkTodoUntitled');
       const secondaryText = content && content !== primaryText ? content : null;
-      return { primaryText, secondaryText, status: normalizeTodoStatus(todo.status) } satisfies ParsedTodoItem;
+      return {
+        primaryText,
+        secondaryText,
+        status: normalizeTodoStatus(todo.status),
+      } satisfies ParsedTodoItem;
     })
     .filter((item): item is ParsedTodoItem => item !== null);
   return parsedItems.length > 0 ? parsedItems : null;
 };
 
 export const getTodoWriteSummary = (items: ParsedTodoItem[]): string => {
-  const completedCount = items.filter((item) => item.status === 'completed').length;
-  const inProgressCount = items.filter((item) => item.status === 'in_progress').length;
+  const completedCount = items.filter(item => item.status === 'completed').length;
+  const inProgressCount = items.filter(item => item.status === 'in_progress').length;
   const pendingCount = items.length - completedCount - inProgressCount;
   const summary = [
     `${items.length} ${i18nService.t('coworkTodoItems')}`,
@@ -155,7 +186,7 @@ export const getTodoWriteSummary = (items: ParsedTodoItem[]): string => {
     `${inProgressCount} ${i18nService.t('coworkTodoInProgress')}`,
     `${pendingCount} ${i18nService.t('coworkTodoPending')}`,
   ];
-  const activeItem = items.find((item) => item.status === 'in_progress');
+  const activeItem = items.find(item => item.status === 'in_progress');
   if (activeItem) summary.push(activeItem.primaryText);
   return summary.join(' · ');
 };
@@ -164,7 +195,7 @@ export const getTodoWriteSummary = (items: ParsedTodoItem[]): string => {
 
 export const getToolInputSummary = (
   toolName: string | undefined,
-  toolInput?: Record<string, unknown>
+  toolInput?: Record<string, unknown>,
 ): string | null => {
   if (!toolName || !toolInput) return null;
   const input = toolInput as Record<string, unknown>;
@@ -173,18 +204,29 @@ export const getToolInputSummary = (
     return items ? getTodoWriteSummary(items) : null;
   }
   switch (normalizeToolName(toolName)) {
-    case 'cron': return getCronToolSummary(input);
-    case 'bash': case 'exec': case 'shell':
-      return getToolInputString(input, ['command', 'cmd', 'script'])
-        ?? getStringArray(input.commands);
-    case 'read': case 'readfile':
-    case 'write': case 'writefile':
-    case 'edit': case 'editfile':
+    case 'cron':
+      return getCronToolSummary(input);
+    case 'bash':
+    case 'exec':
+    case 'shell':
+      return (
+        getToolInputString(input, ['command', 'cmd', 'script']) ?? getStringArray(input.commands)
+      );
+    case 'read':
+    case 'readfile':
+    case 'write':
+    case 'writefile':
+    case 'edit':
+    case 'editfile':
     case 'multiedit':
-      return getToolInputString(input, ['file_path', 'path', 'filePath', 'target_file', 'targetFile'])
-        ?? (typeof input.content === 'string' && input.content.trim()
-          ? truncatePreview(input.content.split('\n')[0].trim()) : null);
-    case 'glob': case 'grep':
+      return (
+        getToolInputString(input, ['file_path', 'path', 'filePath', 'target_file', 'targetFile']) ??
+        (typeof input.content === 'string' && input.content.trim()
+          ? truncatePreview(input.content.split('\n')[0].trim())
+          : null)
+      );
+    case 'glob':
+    case 'grep':
       return getToolInputString(input, ['pattern', 'query']);
     case 'task':
       return getToolInputString(input, ['description', 'task']);
@@ -196,7 +238,8 @@ export const getToolInputSummary = (
       if (action && sessionId) return `${action} · ${sessionId}`;
       return action ?? sessionId;
     }
-    default: return null;
+    default:
+      return null;
   }
 };
 
@@ -204,7 +247,7 @@ export const getToolInputSummary = (
 
 export const formatToolInput = (
   toolName: string | undefined,
-  toolInput?: Record<string, unknown>
+  toolInput?: Record<string, unknown>,
 ): string | null => {
   if (!toolInput) return null;
   const summary = getToolInputSummary(toolName, toolInput);
@@ -212,28 +255,32 @@ export const formatToolInput = (
   return formatUnknown(toolInput);
 };
 
-export const getToolResultDisplay = (
-  message: { content: string; metadata?: Record<string, unknown> | null }
-): string => {
+export const getToolResultDisplay = (message: {
+  content: string;
+  metadata?: Record<string, unknown> | null;
+}): string => {
   const meta = message.metadata;
   if (hasText(message.content))
     return formatStructuredText(normalizeToolResultText(message.content));
   if (hasText(meta?.toolResult))
     return formatStructuredText(normalizeToolResultText(meta?.toolResult ?? ''));
-  if (hasText(meta?.error))
-    return formatStructuredText(normalizeToolResultText(meta?.error ?? ''));
+  if (hasText(meta?.error)) return formatStructuredText(normalizeToolResultText(meta?.error ?? ''));
   return '';
 };
 
 /** Like getToolResultDisplay but preserves ANSI escape sequences for Terminal rendering. */
-export const getRawToolResult = (
-  message: { content: string; metadata?: Record<string, unknown> | null },
-): string => {
+export const getRawToolResult = (message: {
+  content: string;
+  metadata?: Record<string, unknown> | null;
+}): string => {
   const meta = message.metadata;
-  const raw = hasText(message.content) ? message.content
-    : hasText(meta?.toolResult) ? meta?.toolResult
-    : hasText(meta?.error) ? meta?.error
-    : '';
+  const raw = hasText(message.content)
+    ? message.content
+    : hasText(meta?.toolResult)
+      ? meta?.toolResult
+      : hasText(meta?.error)
+        ? meta?.error
+        : '';
   if (!raw) return '';
   const trimmed = (raw ?? '').trim();
   const errorTagMatch = trimmed.match(/^<tool_use_error>([\s\S]*?)<\/tool_use_error>$/i);

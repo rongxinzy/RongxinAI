@@ -52,7 +52,12 @@ function createRuntimeRoot(): string {
   return dir;
 }
 
-function writeInstalledBackend(runtimeRoot: string, version: string, backend: string, platform: NodeJS.Platform): void {
+function writeInstalledBackend(
+  runtimeRoot: string,
+  version: string,
+  backend: string,
+  platform: NodeJS.Platform,
+): void {
   const ref = toBackendRef(version, backend);
   const executableName = platform === 'win32' ? 'llama-server.exe' : 'llama-server';
   const backendDir = getLlamaCppBackendDir(runtimeRoot, ref);
@@ -60,27 +65,31 @@ function writeInstalledBackend(runtimeRoot: string, version: string, backend: st
   fs.writeFileSync(path.join(backendDir, 'bin', executableName), '');
   fs.writeFileSync(
     path.join(backendDir, 'runtime-build-info.json'),
-    JSON.stringify({
-      version,
-      backend,
-      target: backend,
-      source: 'test',
-    }, null, 2),
+    JSON.stringify(
+      {
+        version,
+        backend,
+        target: backend,
+        source: 'test',
+      },
+      null,
+      2,
+    ),
     'utf8',
   );
 }
 
-async function createBackendZipArchive(zipPath: string, entries: Array<{ name: string; content: string }>): Promise<void> {
+async function createBackendZipArchive(
+  zipPath: string,
+  entries: Array<{ name: string; content: string }>,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const zip = new ZipFile();
     for (const entry of entries) {
       zip.addBuffer(Buffer.from(entry.content, 'utf8'), entry.name);
     }
     zip.end();
-    zip.outputStream
-      .pipe(fs.createWriteStream(zipPath))
-      .on('close', resolve)
-      .on('error', reject);
+    zip.outputStream.pipe(fs.createWriteStream(zipPath)).on('close', resolve).on('error', reject);
   });
 }
 
@@ -127,9 +136,7 @@ async function createArchiveServer(input: {
     }
 
     const rangeHeader = req.headers.range;
-    const range = typeof rangeHeader === 'string'
-      ? /^bytes=(\d+)-$/.exec(rangeHeader)
-      : null;
+    const range = typeof rangeHeader === 'string' ? /^bytes=(\d+)-$/.exec(rangeHeader) : null;
     if (range) {
       const start = Number(range[1]);
       const chunk = input.archiveBytes.subarray(start);
@@ -170,12 +177,13 @@ async function createArchiveServer(input: {
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     requests,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close(error => {
-        if (error) reject(error);
-        else resolve();
-      });
-    }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close(error => {
+          if (error) reject(error);
+          else resolve();
+        });
+      }),
   };
 }
 
@@ -353,73 +361,86 @@ describe('llamacpp backend manager', () => {
   test('reads a root manifest and aggregates version manifests', async () => {
     const originalFetch = global.fetch;
     const responses = new Map<string, any>([
-      ['https://example.com/llamacpp/manifest.json', {
-        schemaVersion: 1,
-        defaultVersion: 'b9518',
-        versions: ['b9518', 'b9244'],
-        publicBaseUrl: 'https://example.com/llamacpp',
-      }],
-      ['https://example.com/llamacpp/b9518/manifest.json', {
-        schemaVersion: 1,
-        defaultVersion: 'b9518',
-        releaseBaseUrl: 'https://example.com/llamacpp/b9518',
-        backends: [
-          {
-            version: 'b9518',
-            backend: 'win-x64-cuda-13',
-            platform: 'win32',
-            arch: 'x64',
-            accelerator: 'cuda',
-            cudaMajor: '13',
-            archive: { assetName: 'llama-b9518-bin-win-cuda-13.3-x64.zip' },
-          },
-        ],
-      }],
-      ['https://example.com/llamacpp/b9244/manifest.json', {
-        schemaVersion: 1,
-        defaultVersion: 'b9244',
-        releaseBaseUrl: 'https://example.com/llamacpp/b9244',
-        backends: [
-          {
-            version: 'b9244',
-            backend: 'win-x64-cuda-12',
-            platform: 'win32',
-            arch: 'x64',
-            accelerator: 'cuda',
-            cudaMajor: '12',
-            archive: { assetName: 'llama-b9244-bin-win-cuda-12.4-x64.zip' },
-          },
-        ],
-      }],
+      [
+        'https://example.com/llamacpp/manifest.json',
+        {
+          schemaVersion: 1,
+          defaultVersion: 'b9518',
+          versions: ['b9518', 'b9244'],
+          publicBaseUrl: 'https://example.com/llamacpp',
+        },
+      ],
+      [
+        'https://example.com/llamacpp/b9518/manifest.json',
+        {
+          schemaVersion: 1,
+          defaultVersion: 'b9518',
+          releaseBaseUrl: 'https://example.com/llamacpp/b9518',
+          backends: [
+            {
+              version: 'b9518',
+              backend: 'win-x64-cuda-13',
+              platform: 'win32',
+              arch: 'x64',
+              accelerator: 'cuda',
+              cudaMajor: '13',
+              archive: { assetName: 'llama-b9518-bin-win-cuda-13.3-x64.zip' },
+            },
+          ],
+        },
+      ],
+      [
+        'https://example.com/llamacpp/b9244/manifest.json',
+        {
+          schemaVersion: 1,
+          defaultVersion: 'b9244',
+          releaseBaseUrl: 'https://example.com/llamacpp/b9244',
+          backends: [
+            {
+              version: 'b9244',
+              backend: 'win-x64-cuda-12',
+              platform: 'win32',
+              arch: 'x64',
+              accelerator: 'cuda',
+              cudaMajor: '12',
+              archive: { assetName: 'llama-b9244-bin-win-cuda-12.4-x64.zip' },
+            },
+          ],
+        },
+      ],
     ]);
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      const payload = responses.get(url);
-      if (!payload) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        const payload = responses.get(url);
+        if (!payload) {
+          return {
+            ok: false,
+            status: 404,
+            statusText: 'Not Found',
+            json: async () => ({}),
+          };
+        }
         return {
-          ok: false,
-          status: 404,
-          statusText: 'Not Found',
-          json: async () => ({}),
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => payload,
         };
-      }
-      return {
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => payload,
-      };
-    }) as typeof fetch);
+      }) as typeof fetch,
+    );
 
     try {
       const manifest = await fetchLlamaCppBackendManifest({
         LLAMACPP_BACKEND_MANIFEST_URL: 'https://example.com/llamacpp/manifest.json',
       });
       expect(manifest.defaultVersion).toBe('b9518');
-      expect(manifest.backends.map(backend => backend.versionBackend ?? `${backend.version}/${backend.backend}`)).toEqual([
-        'b9518/win-x64-cuda-13',
-        'b9244/win-x64-cuda-12',
-      ]);
+      expect(
+        manifest.backends.map(
+          backend => backend.versionBackend ?? `${backend.version}/${backend.backend}`,
+        ),
+      ).toEqual(['b9518/win-x64-cuda-13', 'b9244/win-x64-cuda-12']);
       expect(manifest.backends[0]?.archive.url).toBe(
         'https://example.com/llamacpp/b9518/llama-b9518-bin-win-cuda-13.3-x64.zip',
       );
@@ -464,9 +485,12 @@ describe('llamacpp backend manager', () => {
     Object.defineProperty(process, 'platform', {
       value: 'win32',
     });
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      throw new Error('fetch should not be called');
-    }) as typeof fetch);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('fetch should not be called');
+      }) as typeof fetch,
+    );
 
     try {
       const manifest = await fetchLlamaCppBackendManifest({});
@@ -491,15 +515,19 @@ describe('llamacpp backend manager', () => {
     fs.mkdirSync(path.join(backendDir, 'bin'), { recursive: true });
     fs.writeFileSync(
       path.join(backendDir, 'runtime-build-info.json'),
-      JSON.stringify({
-        version: ref.version,
-        backend: ref.backend,
-        target: ref.backend,
-        source: 'local',
-        platform: 'win32',
-        arch: 'arm64',
-        accelerator: 'cpu',
-      }, null, 2),
+      JSON.stringify(
+        {
+          version: ref.version,
+          backend: ref.backend,
+          target: ref.backend,
+          source: 'local',
+          platform: 'win32',
+          arch: 'arm64',
+          accelerator: 'cpu',
+        },
+        null,
+        2,
+      ),
       'utf8',
     );
 
@@ -542,7 +570,9 @@ describe('llamacpp backend manager', () => {
 
       expect(result.selection?.versionBackend).toBe('b9505/win-x64');
       expect(readCurrentBackendRef(runtimeRoot)?.versionBackend).toBe('b9505/win-x64');
-      expect(result.backends.find(backend => backend.versionBackend === 'b9505/win-x64')).toMatchObject({
+      expect(
+        result.backends.find(backend => backend.versionBackend === 'b9505/win-x64'),
+      ).toMatchObject({
         installed: true,
         current: true,
       });
@@ -652,10 +682,12 @@ describe('llamacpp backend manager', () => {
 
     expect(result.success).toBe(true);
     expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'win32'))).toBe(true);
-    expect(progressEvents.some(progress =>
-      progress.phase === 'downloading-progress' &&
-      progress.total === archiveBytes.length
-    )).toBe(true);
+    expect(
+      progressEvents.some(
+        progress =>
+          progress.phase === 'downloading-progress' && progress.total === archiveBytes.length,
+      ),
+    ).toBe(true);
   });
 
   test('reports real download progress for backend installation', async () => {
@@ -695,7 +727,9 @@ describe('llamacpp backend manager', () => {
 
     try {
       const originalMkdtempSync = fs.mkdtempSync;
-      const installTempDir = originalMkdtempSync(path.join(os.tmpdir(), 'llamacpp-backend-resume-'));
+      const installTempDir = originalMkdtempSync(
+        path.join(os.tmpdir(), 'llamacpp-backend-resume-'),
+      );
       tempDirs.push(installTempDir);
       fs.writeFileSync(
         path.join(installTempDir, 'llama-b9518-bin-win-cpu-x64.zip'),
@@ -723,9 +757,19 @@ describe('llamacpp backend manager', () => {
         progress => progress.phase === 'downloading-progress',
       );
       expect(downloadEvents.length).toBeGreaterThan(0);
-      expect(downloadEvents.some(progress => typeof progress.completed === 'number' && progress.completed > 0)).toBe(true);
-      expect(downloadEvents.some(progress => typeof progress.total === 'number' && progress.total === archiveBytes.length)).toBe(true);
-      expect(downloadEvents.some(progress => typeof progress.speed === 'number' && progress.speed > 0)).toBe(true);
+      expect(
+        downloadEvents.some(
+          progress => typeof progress.completed === 'number' && progress.completed > 0,
+        ),
+      ).toBe(true);
+      expect(
+        downloadEvents.some(
+          progress => typeof progress.total === 'number' && progress.total === archiveBytes.length,
+        ),
+      ).toBe(true);
+      expect(
+        downloadEvents.some(progress => typeof progress.speed === 'number' && progress.speed > 0),
+      ).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'installing')).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'detecting')).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'done')).toBe(true);

@@ -74,19 +74,20 @@ python "$SKILLS_ROOT/stock-announcements/scripts/announcements.py" 000858 --deta
 
 ## Parameters
 
-| 参数 | 说明 | 示例 | 默认值 |
-|------|------|------|--------|
-| `stock_code` | 股票代码（必填） | 000001, 600000.SS | - |
-| `--days` | 最近N天 | 7 | 30 |
-| `--format` | 输出格式 | json/text | text |
-| `--keyword` | 标题关键词筛选 | 业绩 | None |
-| `--detail` | 提取PDF内容并总结 | — | false |
+| 参数         | 说明              | 示例              | 默认值 |
+| ------------ | ----------------- | ----------------- | ------ |
+| `stock_code` | 股票代码（必填）  | 000001, 600000.SS | -      |
+| `--days`     | 最近N天           | 7                 | 30     |
+| `--format`   | 输出格式          | json/text         | text   |
+| `--keyword`  | 标题关键词筛选    | 业绩              | None   |
+| `--detail`   | 提取PDF内容并总结 | —                 | false  |
 
 ## Workflow
 
 ### Step 1: 识别股票代码
 
 用户可能提供以下任一格式：
+
 - 公司名称："五粮液" → 先用 web-search 查询股票代码
 - Yahoo Finance格式："000858.SZ" → 提取纯数字代码
 - 纯代码："000858" → 直接传递
@@ -101,6 +102,7 @@ python "$SKILLS_ROOT/stock-announcements/scripts/announcements.py" <股票代码
 ### Step 3: 解读结果
 
 Agent 应该：
+
 1. 提取关键信息（标题、类型、日期）
 2. 分类汇总（业绩类、股东类、重大合同等）
 3. 标注重要性（🔴高/🟡中/⚪低）

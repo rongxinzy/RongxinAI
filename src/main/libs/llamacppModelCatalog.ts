@@ -115,4 +115,3 @@ function isGgufPath(value: string): boolean {
   const pathname = /^https?:\/\//i.test(value) ? new URL(value).pathname : value;
   return pathname.toLowerCase().endsWith('.gguf');
 }
-

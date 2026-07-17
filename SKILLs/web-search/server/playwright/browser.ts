@@ -29,7 +29,7 @@ export function getChromePath(): string {
       '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       '/Applications/Chromium.app/Contents/MacOS/Chromium',
       '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-      join(process.env.HOME || '', 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+      join(process.env.HOME || '', 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
     );
   } else if (platform === 'win32') {
     // Windows
@@ -41,7 +41,7 @@ export function getChromePath(): string {
       join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
       join(programFiles, 'Microsoft\\Edge\\Application\\msedge.exe'),
       join(programFilesX86, 'Microsoft\\Edge\\Application\\msedge.exe'),
-      join(process.env.LOCALAPPDATA || '', 'Microsoft\\Edge\\Application\\msedge.exe')
+      join(process.env.LOCALAPPDATA || '', 'Microsoft\\Edge\\Application\\msedge.exe'),
     );
   } else {
     // Linux
@@ -52,7 +52,7 @@ export function getChromePath(): string {
       '/usr/bin/chromium-browser',
       '/usr/bin/microsoft-edge',
       '/usr/bin/microsoft-edge-stable',
-      '/snap/bin/chromium'
+      '/snap/bin/chromium',
     );
   }
 
@@ -63,7 +63,7 @@ export function getChromePath(): string {
   }
 
   throw new Error(
-    'No Chromium-based browser found (Chrome/Edge/Chromium). Please install one and retry.'
+    'No Chromium-based browser found (Chrome/Edge/Chromium). Please install one and retry.',
   );
 }
 
@@ -111,7 +111,9 @@ function resolveHeadlessMode(configHeadless: boolean): boolean {
     return false;
   }
 
-  const hasDisplay = Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY || process.env.MIR_SOCKET);
+  const hasDisplay = Boolean(
+    process.env.DISPLAY || process.env.WAYLAND_DISPLAY || process.env.MIR_SOCKET,
+  );
   if (hasDisplay) {
     return false;
   }
@@ -123,7 +125,11 @@ function resolveHeadlessMode(configHeadless: boolean): boolean {
 /**
  * Wait for CDP port to become available
  */
-async function waitForCDP(port: number, browserProcess: ChildProcess, timeoutMs: number = 10000): Promise<void> {
+async function waitForCDP(
+  port: number,
+  browserProcess: ChildProcess,
+  timeoutMs: number = 10000,
+): Promise<void> {
   const startTime = Date.now();
   let attempts = 0;
 
@@ -131,13 +137,15 @@ async function waitForCDP(port: number, browserProcess: ChildProcess, timeoutMs:
     if (browserProcess.exitCode !== null || browserProcess.signalCode !== null) {
       const exitCode = browserProcess.exitCode ?? 'null';
       const signal = browserProcess.signalCode ?? 'none';
-      throw new Error(`Chrome process exited before CDP was ready (exitCode=${exitCode}, signal=${signal})`);
+      throw new Error(
+        `Chrome process exited before CDP was ready (exitCode=${exitCode}, signal=${signal})`,
+      );
     }
 
     attempts++;
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-        signal: AbortSignal.timeout(2000)
+        signal: AbortSignal.timeout(2000),
       });
       if (response.ok) {
         console.log(`[Browser] CDP ready after ${attempts} attempts (${Date.now() - startTime}ms)`);
@@ -147,7 +155,9 @@ async function waitForCDP(port: number, browserProcess: ChildProcess, timeoutMs:
     } catch {
       // Port not ready yet, continue waiting
       if (attempts % 5 === 0) {
-        console.log(`[Browser] CDP attempt ${attempts}: still waiting... (${Date.now() - startTime}ms elapsed)`);
+        console.log(
+          `[Browser] CDP attempt ${attempts}: still waiting... (${Date.now() - startTime}ms elapsed)`,
+        );
       }
     }
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -176,7 +186,7 @@ export async function launchBrowser(config: BrowserConfig): Promise<BrowserInsta
     `--remote-debugging-port=${cdpPort}`,
     '--remote-debugging-address=127.0.0.1',
     `--user-data-dir=${userDataDir}`, // Always use isolated user data dir
-    ...runtimeChromeFlags
+    ...runtimeChromeFlags,
   ];
 
   if (runtimeHeadless) {
@@ -192,25 +202,28 @@ export async function launchBrowser(config: BrowserConfig): Promise<BrowserInsta
   // Spawn Chrome process
   const browserProcess = spawn(chromePath, args, {
     detached: false,
-    stdio: ['ignore', 'pipe', 'pipe'] // Capture stdout and stderr
+    stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout and stderr
   });
   const recentStderr: string[] = [];
 
   // Log Chrome output for debugging
   if (browserProcess.stdout) {
-    browserProcess.stdout.on('data', (data) => {
+    browserProcess.stdout.on('data', data => {
       console.log(`[Browser stdout] ${data.toString().trim()}`);
     });
   }
   if (browserProcess.stderr) {
-    browserProcess.stderr.on('data', (data) => {
+    browserProcess.stderr.on('data', data => {
       const message = data.toString().trim();
       console.log(`[Browser stderr] ${message}`);
       if (!message) {
         return;
       }
 
-      for (const line of message.split('\n').map((item: string) => item.trim()).filter(Boolean)) {
+      for (const line of message
+        .split('\n')
+        .map((item: string) => item.trim())
+        .filter(Boolean)) {
         recentStderr.push(line);
       }
       while (recentStderr.length > 12) {
@@ -244,7 +257,7 @@ export async function launchBrowser(config: BrowserConfig): Promise<BrowserInsta
     pid: browserProcess.pid,
     cdpPort,
     headless: runtimeHeadless,
-    startTime: Date.now()
+    startTime: Date.now(),
   };
 }
 

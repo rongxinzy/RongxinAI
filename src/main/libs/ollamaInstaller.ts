@@ -33,8 +33,9 @@ export class OllamaInstaller {
       downloadsDir,
       config.mirrorDownload[process.platform],
     );
-    const installerPath = presetInstallerPath
-      ?? await this.downloadMirrorInstaller(downloadsDir, config.mirrorDownload[process.platform]);
+    const installerPath =
+      presetInstallerPath ??
+      (await this.downloadMirrorInstaller(downloadsDir, config.mirrorDownload[process.platform]));
 
     if (!installerPath) {
       this.emitProgress({
@@ -66,13 +67,18 @@ export class OllamaInstaller {
       for (const filename of expectedFilenames) {
         const candidate = path.join(dir, filename);
         if (await fileExists(candidate)) {
-          const expectedSize = path.resolve(dir) === resolvedDownloadsDir
-            ? expectedDownloadSize ??= await getRemoteContentLength(mirrorUrl)
-            : null;
-          if (!await isUsableInstaller(candidate, filename, expectedSize)) {
+          const expectedSize =
+            path.resolve(dir) === resolvedDownloadsDir
+              ? (expectedDownloadSize ??= await getRemoteContentLength(mirrorUrl))
+              : null;
+          if (!(await isUsableInstaller(candidate, filename, expectedSize))) {
             continue;
           }
-          this.emitProgress({ phase: 'preset-found', installerPath: candidate, message: 'Found preset installer' });
+          this.emitProgress({
+            phase: 'preset-found',
+            installerPath: candidate,
+            message: 'Found preset installer',
+          });
           return candidate;
         }
       }
@@ -80,11 +86,16 @@ export class OllamaInstaller {
     return null;
   }
 
-  private async downloadMirrorInstaller(downloadsDir: string, mirrorUrl?: string): Promise<string | null> {
+  private async downloadMirrorInstaller(
+    downloadsDir: string,
+    mirrorUrl?: string,
+  ): Promise<string | null> {
     if (!mirrorUrl) return null;
 
     this.emitProgress({ phase: 'downloading', message: 'Downloading Ollama installer' });
-    const filename = path.basename(new URL(mirrorUrl).pathname) || getPlatformInstallerFilenames(getOllamaInstallConfig())[0];
+    const filename =
+      path.basename(new URL(mirrorUrl).pathname) ||
+      getPlatformInstallerFilenames(getOllamaInstallConfig())[0];
     const targetPath = path.join(downloadsDir, filename);
     const tempPath = `${targetPath}.download`;
 
@@ -93,12 +104,15 @@ export class OllamaInstaller {
 
       const response = await fetch(mirrorUrl);
       if (!response.ok || !response.body) {
-        this.emitProgress({ phase: 'failed', error: `Ollama download failed: HTTP ${response.status}` });
+        this.emitProgress({
+          phase: 'failed',
+          error: `Ollama download failed: HTTP ${response.status}`,
+        });
         return null;
       }
 
       const total = Number(response.headers.get('content-length') ?? 0);
-      const downloaded = await writeResponseBodyToFile(response.body, tempPath, total, (percent) => {
+      const downloaded = await writeResponseBodyToFile(response.body, tempPath, total, percent => {
         this.emitProgress({
           phase: 'downloading-progress',
           percent,
@@ -108,7 +122,7 @@ export class OllamaInstaller {
       if (total > 0 && downloaded !== total) {
         throw new Error(`Installer download incomplete: ${downloaded}/${total} bytes`);
       }
-      if (!await isUsableInstaller(tempPath, filename, total > 0 ? total : null)) {
+      if (!(await isUsableInstaller(tempPath, filename, total > 0 ? total : null))) {
         throw new Error('Downloaded installer failed validation');
       }
 
@@ -132,9 +146,10 @@ export class OllamaInstaller {
     if (process.platform === 'darwin') {
       if (installerPath.endsWith('.dmg')) {
         const mountOutput = await execFileAsync('hdiutil', ['attach', installerPath, '-nobrowse']);
-        const volumePath = mountOutput.stdout.split('\n')
-          .map((line) => line.trim().split(/\s+/).pop())
-          .find((part) => part?.startsWith('/Volumes/'));
+        const volumePath = mountOutput.stdout
+          .split('\n')
+          .map(line => line.trim().split(/\s+/).pop())
+          .find(part => part?.startsWith('/Volumes/'));
         if (!volumePath) throw new Error('Unable to locate mounted Ollama volume');
         try {
           await execFileAsync('cp', ['-R', path.join(volumePath, 'Ollama.app'), '/Applications/']);
@@ -223,7 +238,10 @@ async function writeResponseBodyToFile(
   }
 }
 
-function writeChunk(fileStream: ReturnType<typeof createWriteStream>, chunk: Uint8Array): Promise<void> {
+function writeChunk(
+  fileStream: ReturnType<typeof createWriteStream>,
+  chunk: Uint8Array,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     fileStream.write(Buffer.from(chunk), (error?: Error | null) => {
       if (error) {
@@ -249,11 +267,16 @@ function closeWriteStream(fileStream: ReturnType<typeof createWriteStream>): Pro
   });
 }
 
-async function isUsableInstaller(filePath: string, filename = filePath, expectedSize?: number | null): Promise<boolean> {
+async function isUsableInstaller(
+  filePath: string,
+  filename = filePath,
+  expectedSize?: number | null,
+): Promise<boolean> {
   const fileStat = await stat(filePath).catch((): null => null);
   if (!fileStat) return false;
   if (typeof fileStat.isFile === 'function' && !fileStat.isFile()) return false;
-  if (typeof expectedSize === 'number' && expectedSize > 0 && fileStat.size !== expectedSize) return false;
+  if (typeof expectedSize === 'number' && expectedSize > 0 && fileStat.size !== expectedSize)
+    return false;
   if (fileStat.size < MIN_INSTALLER_SIZE_BYTES) return false;
 
   const expectedHeader = getExpectedInstallerHeader(filename);

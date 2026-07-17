@@ -67,7 +67,9 @@ export function getUserUvRoot(): string {
 }
 
 export function findBundledUvExecutable(name: 'uv.exe' | 'uvx.exe'): string | null {
-  const candidates = [getUserUvRoot(), getBundledUvRoot()].filter((value): value is string => Boolean(value));
+  const candidates = [getUserUvRoot(), getBundledUvRoot()].filter((value): value is string =>
+    Boolean(value),
+  );
   for (const root of candidates) {
     if (!fs.existsSync(root)) continue;
     const found = findExecutable(root, name);
@@ -78,7 +80,9 @@ export function findBundledUvExecutable(name: 'uv.exe' | 'uvx.exe'): string | nu
   return null;
 }
 
-export function appendUvRuntimeToEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {
+export function appendUvRuntimeToEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
   if (process.platform !== 'win32') {
     return env;
   }
@@ -92,7 +96,15 @@ export function appendUvRuntimeToEnv(env: Record<string, string | undefined>): R
   const current = env.PATH || '';
   const parts = current ? current.split(';') : [];
   const normalizedDir = runtimeDir.toLowerCase().replace(/[\\/]+$/, '');
-  if (!parts.some((entry) => entry.trim().toLowerCase().replace(/[\\/]+$/, '') === normalizedDir)) {
+  if (
+    !parts.some(
+      entry =>
+        entry
+          .trim()
+          .toLowerCase()
+          .replace(/[\\/]+$/, '') === normalizedDir,
+    )
+  ) {
     env.PATH = [runtimeDir, ...parts.filter(Boolean)].join(';');
   }
   env.ZHIYUAN_UV_ROOT = runtimeDir;

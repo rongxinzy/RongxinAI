@@ -47,7 +47,12 @@ import {
   AgentLifecyclePhase,
   type AgentLifecyclePhase as AgentLifecyclePhaseValue,
 } from './constants';
-import { classifyMessage, createTriageState, extractProviderId, shouldAllowSwitch } from './modelTriage';
+import {
+  classifyMessage,
+  createTriageState,
+  extractProviderId,
+  shouldAllowSwitch,
+} from './modelTriage';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -131,7 +136,9 @@ type OpenClawRuntimeAdapterOptions = {
   isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
   getModelContextWindow?: (modelRef: string) => number | undefined;
   getTriageConfig?: () => TriageConfig;
-  getAgent?: (agentId: string) => { triageOverride?: import('../../../shared/triage').AgentTriageOverride } | null;
+  getAgent?: (
+    agentId: string,
+  ) => { triageOverride?: import('../../../shared/triage').AgentTriageOverride } | null;
 };
 
 type ChatEventState = 'delta' | 'final' | 'aborted' | 'error';
@@ -1937,29 +1944,47 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     // Merge Agent-level triage override with global defaults
     const agentRecord = agentId ? this.options.getAgent?.(agentId) : null;
     const agentTriage = agentRecord?.triageOverride;
-    const triageConfig: TriageConfig | null = (agentTriage?.enabled || globalTriage?.enabled) ? {
-      ...globalTriage,
-      enabled: agentTriage?.enabled ?? globalTriage?.enabled ?? false,
-      rules: {
-        ...globalTriage?.rules,
-        ...(agentTriage?.lightModelRef !== undefined ? { lightModelRef: agentTriage.lightModelRef } : {}),
-        ...(agentTriage?.heavyModelRef !== undefined ? { heavyModelRef: agentTriage.heavyModelRef } : {}),
-        ...(agentTriage?.allowCrossProviderSwitch !== undefined ? { allowCrossProviderSwitch: agentTriage.allowCrossProviderSwitch } : {}),
-      },
-    } as TriageConfig : null;
+    const triageConfig: TriageConfig | null =
+      agentTriage?.enabled || globalTriage?.enabled
+        ? ({
+            ...globalTriage,
+            enabled: agentTriage?.enabled ?? globalTriage?.enabled ?? false,
+            rules: {
+              ...globalTriage?.rules,
+              ...(agentTriage?.lightModelRef !== undefined
+                ? { lightModelRef: agentTriage.lightModelRef }
+                : {}),
+              ...(agentTriage?.heavyModelRef !== undefined
+                ? { heavyModelRef: agentTriage.heavyModelRef }
+                : {}),
+              ...(agentTriage?.allowCrossProviderSwitch !== undefined
+                ? { allowCrossProviderSwitch: agentTriage.allowCrossProviderSwitch }
+                : {}),
+            },
+          } as TriageConfig)
+        : null;
     if (!triageConfig?.enabled) {
-      console.debug('[ModelTriage] skipped: triage not enabled', `agentId=${agentId}`, `agentTriageEnabled=${agentTriage?.enabled}`, `globalEnabled=${globalTriage?.enabled}`);
+      console.debug(
+        '[ModelTriage] skipped: triage not enabled',
+        `agentId=${agentId}`,
+        `agentTriageEnabled=${agentTriage?.enabled}`,
+        `globalEnabled=${globalTriage?.enabled}`,
+      );
     } else if (session.modelOverride) {
-      console.debug('[ModelTriage] skipped: session has modelOverride', `sessionId=${sessionId}`, `override=${session.modelOverride}`);
+      console.debug(
+        '[ModelTriage] skipped: session has modelOverride',
+        `sessionId=${sessionId}`,
+        `override=${session.modelOverride}`,
+      );
     } else if (!currentModel) {
-      console.debug('[ModelTriage] skipped: no currentModel', `sessionId=${sessionId}`, `agentId=${agentId}`);
+      console.debug(
+        '[ModelTriage] skipped: no currentModel',
+        `sessionId=${sessionId}`,
+        `agentId=${agentId}`,
+      );
     }
-    if (
-      triageConfig?.enabled &&
-      !session.modelOverride &&
-      currentModel
-    ) {
-      const conversationDepth = (session.messages?.length ?? 0);
+    if (triageConfig?.enabled && !session.modelOverride && currentModel) {
+      const conversationDepth = session.messages?.length ?? 0;
       const classification = await classifyMessage(prompt, conversationDepth, triageConfig);
 
       if (classification.modelRef) {

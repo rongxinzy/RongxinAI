@@ -81,7 +81,9 @@ function logLine(message) {
     try {
       fs.writeSync(logFd, `${line}\n`);
     } catch (error) {
-      console.error(`${formatTimestamp()} [unpack-cfmind] Failed to write install log: ${stringifyError(error)}`);
+      console.error(
+        `${formatTimestamp()} [unpack-cfmind] Failed to write install log: ${stringifyError(error)}`,
+      );
       logFd = null;
     }
   }
@@ -132,12 +134,12 @@ function loadTarModule() {
 // 执行解压
 // ============================================================
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', err => {
   logLine(`[unpack-cfmind] phase=uncaught-exception error=${stringifyError(err)}`);
   closeLogFile();
   process.exit(1);
 });
-process.on('unhandledRejection', (reason) => {
+process.on('unhandledRejection', reason => {
   logLine(`[unpack-cfmind] phase=unhandled-rejection error=${stringifyError(reason)}`);
   closeLogFile();
   process.exit(1);
@@ -164,7 +166,7 @@ try {
     file: tarPath,
     cwd: destDir,
     sync: true,
-    onentry: (entry) => {
+    onentry: entry => {
       const entryPath = String(entry?.path || '');
       const root = entryPath.split(/[\\/]/)[0] || '(root)';
       const size = Number(entry?.size || 0);
@@ -182,7 +184,7 @@ try {
 
       if (root !== currentRoot) {
         currentRoot = root;
-        nextRootProgressBytes = stats.bytes + (25 * 1024 * 1024);
+        nextRootProgressBytes = stats.bytes + 25 * 1024 * 1024;
         logLine(`[unpack-cfmind] phase=root-start root=${root} entry=${entryPath}`);
       }
 
@@ -209,7 +211,9 @@ try {
   });
 
   const elapsedMs = Date.now() - t0;
-  logLine(`[unpack-cfmind] phase=extract-complete entries=${extractedEntries} bytes=${extractedBytes} elapsed_ms=${elapsedMs}`);
+  logLine(
+    `[unpack-cfmind] phase=extract-complete entries=${extractedEntries} bytes=${extractedBytes} elapsed_ms=${elapsedMs}`,
+  );
 
   for (const [root, stats] of rootStats.entries()) {
     const elapsedMs = Date.now() - stats.startedAtMs;

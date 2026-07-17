@@ -1,8 +1,4 @@
-import {
-  AgentAvatarSvg,
-  DefaultAgentAvatar,
-  parseAgentAvatarIcon,
-} from '@shared/agent/avatar';
+import { AgentAvatarSvg, DefaultAgentAvatar, parseAgentAvatarIcon } from '@shared/agent/avatar';
 import React from 'react';
 
 import artboardIconUrl from '../../assets/agent-avatars/artboard.svg';
@@ -146,14 +142,18 @@ const AgentAvatarIcon: React.FC<AgentAvatarIconProps> = ({
     };
 
     return (
-      <span className={`inline-flex shrink-0 items-center justify-center rounded-full text-foreground ${className}`}>
+      <span
+        className={`inline-flex shrink-0 items-center justify-center rounded-full text-foreground ${className}`}
+      >
         <span aria-hidden="true" className={`inline-block ${iconClassName}`} style={maskStyle} />
       </span>
     );
   }
 
   return (
-    <span className={`inline-flex shrink-0 items-center justify-center leading-none ${className} ${legacyClassName}`}>
+    <span
+      className={`inline-flex shrink-0 items-center justify-center leading-none ${className} ${legacyClassName}`}
+    >
       {normalized || fallbackText}
     </span>
   );

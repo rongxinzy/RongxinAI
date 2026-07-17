@@ -15,7 +15,7 @@ export const StoreIpc = {
   Set: 'store:set',
   Remove: 'store:remove',
 } as const;
-export type StoreIpc = typeof StoreIpc[keyof typeof StoreIpc];
+export type StoreIpc = (typeof StoreIpc)[keyof typeof StoreIpc];
 
 // ─── Skills ─────────────────────────────────────────────────────────────────
 export const SkillsIpc = {
@@ -32,7 +32,7 @@ export const SkillsIpc = {
   FetchMarketplace: 'skills:fetchMarketplace',
   Changed: 'skills:changed',
 } as const;
-export type SkillsIpc = typeof SkillsIpc[keyof typeof SkillsIpc];
+export type SkillsIpc = (typeof SkillsIpc)[keyof typeof SkillsIpc];
 
 // ─── MCP ────────────────────────────────────────────────────────────────────
 export const McpIpc = {
@@ -47,26 +47,26 @@ export const McpIpc = {
   BridgeSyncStart: 'mcp:bridge:syncStart',
   BridgeSyncDone: 'mcp:bridge:syncDone',
 } as const;
-export type McpIpc = typeof McpIpc[keyof typeof McpIpc];
+export type McpIpc = (typeof McpIpc)[keyof typeof McpIpc];
 
 // ─── Hardware ───────────────────────────────────────────────────────────────
 export const HardwareIpc = {
   NvidiaSmi: 'hardware:nvidia-smi',
 } as const;
-export type HardwareIpc = typeof HardwareIpc[keyof typeof HardwareIpc];
+export type HardwareIpc = (typeof HardwareIpc)[keyof typeof HardwareIpc];
 
 // ─── Permissions ────────────────────────────────────────────────────────────
 export const PermissionsIpc = {
   CheckCalendar: 'permissions:checkCalendar',
   RequestCalendar: 'permissions:requestCalendar',
 } as const;
-export type PermissionsIpc = typeof PermissionsIpc[keyof typeof PermissionsIpc];
+export type PermissionsIpc = (typeof PermissionsIpc)[keyof typeof PermissionsIpc];
 
 // ─── Enterprise ─────────────────────────────────────────────────────────────
 export const EnterpriseIpc = {
   GetConfig: 'enterprise:getConfig',
 } as const;
-export type EnterpriseIpc = typeof EnterpriseIpc[keyof typeof EnterpriseIpc];
+export type EnterpriseIpc = (typeof EnterpriseIpc)[keyof typeof EnterpriseIpc];
 
 // ─── API (HTTP proxy) ───────────────────────────────────────────────────────
 export const ApiIpc = {
@@ -89,7 +89,7 @@ export const WindowIpc = {
   ShowSystemMenu: 'window:showSystemMenu',
   StateChanged: 'window:state-changed',
 } as const;
-export type WindowIpc = typeof WindowIpc[keyof typeof WindowIpc];
+export type WindowIpc = (typeof WindowIpc)[keyof typeof WindowIpc];
 
 // ─── App-level config ───────────────────────────────────────────────────────
 export const AppConfigIpc = {
@@ -99,7 +99,7 @@ export const AppConfigIpc = {
   GenerateSessionTitle: 'generate-session-title',
   GetRecentCwds: 'get-recent-cwds',
 } as const;
-export type AppConfigIpc = typeof AppConfigIpc[keyof typeof AppConfigIpc];
+export type AppConfigIpc = (typeof AppConfigIpc)[keyof typeof AppConfigIpc];
 
 // ─── OpenClaw Engine ────────────────────────────────────────────────────────
 export const OpenClawEngineIpc = {
@@ -109,7 +109,7 @@ export const OpenClawEngineIpc = {
   RestartGateway: 'openclaw:engine:restartGateway',
   OnProgress: 'openclaw:engine:onProgress',
 } as const;
-export type OpenClawEngineIpc = typeof OpenClawEngineIpc[keyof typeof OpenClawEngineIpc];
+export type OpenClawEngineIpc = (typeof OpenClawEngineIpc)[keyof typeof OpenClawEngineIpc];
 
 // ─── Cowork Session ─────────────────────────────────────────────────────────
 export const CoworkSessionIpc = {
@@ -131,20 +131,20 @@ export const CoworkSessionIpc = {
   SaveResultImage: 'cowork:session:saveResultImage',
   ExportText: 'cowork:session:exportText',
 } as const;
-export type CoworkSessionIpc = typeof CoworkSessionIpc[keyof typeof CoworkSessionIpc];
+export type CoworkSessionIpc = (typeof CoworkSessionIpc)[keyof typeof CoworkSessionIpc];
 
 // ─── Cowork Permission ──────────────────────────────────────────────────────
 export const CoworkPermissionIpc = {
   Respond: 'cowork:permission:respond',
 } as const;
-export type CoworkPermissionIpc = typeof CoworkPermissionIpc[keyof typeof CoworkPermissionIpc];
+export type CoworkPermissionIpc = (typeof CoworkPermissionIpc)[keyof typeof CoworkPermissionIpc];
 
 // ─── Cowork Config ──────────────────────────────────────────────────────────
 export const CoworkConfigIpc = {
   Get: 'cowork:config:get',
   Set: 'cowork:config:set',
 } as const;
-export type CoworkConfigIpc = typeof CoworkConfigIpc[keyof typeof CoworkConfigIpc];
+export type CoworkConfigIpc = (typeof CoworkConfigIpc)[keyof typeof CoworkConfigIpc];
 
 // ─── Cowork Memory ──────────────────────────────────────────────────────────
 export const CoworkMemoryIpc = {
@@ -154,14 +154,14 @@ export const CoworkMemoryIpc = {
   DeleteEntry: 'cowork:memory:deleteEntry',
   GetStats: 'cowork:memory:getStats',
 } as const;
-export type CoworkMemoryIpc = typeof CoworkMemoryIpc[keyof typeof CoworkMemoryIpc];
+export type CoworkMemoryIpc = (typeof CoworkMemoryIpc)[keyof typeof CoworkMemoryIpc];
 
 // ─── Cowork Bootstrap ───────────────────────────────────────────────────────
 export const CoworkBootstrapIpc = {
   Read: 'cowork:bootstrap:read',
   Write: 'cowork:bootstrap:write',
 } as const;
-export type CoworkBootstrapIpc = typeof CoworkBootstrapIpc[keyof typeof CoworkBootstrapIpc];
+export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof CoworkBootstrapIpc];
 
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {
@@ -173,7 +173,7 @@ export const CoworkStreamIpc = {
   Error: 'cowork:stream:error',
   SessionsChanged: 'cowork:sessions:changed',
 } as const;
-export type CoworkStreamIpc = typeof CoworkStreamIpc[keyof typeof CoworkStreamIpc];
+export type CoworkStreamIpc = (typeof CoworkStreamIpc)[keyof typeof CoworkStreamIpc];
 
 // ─── Dialog ─────────────────────────────────────────────────────────────────
 export const DialogIpc = {
@@ -185,7 +185,7 @@ export const DialogIpc = {
   GenerateThumbnail: 'dialog:generateThumbnail',
   ShowMessageBox: 'dialog:showMessageBox',
 } as const;
-export type DialogIpc = typeof DialogIpc[keyof typeof DialogIpc];
+export type DialogIpc = (typeof DialogIpc)[keyof typeof DialogIpc];
 
 // ─── Shell ──────────────────────────────────────────────────────────────────
 export const ShellIpc = {
@@ -194,7 +194,7 @@ export const ShellIpc = {
   OpenExternal: 'shell:openExternal',
   OpenHtmlInBrowser: 'shell:openHtmlInBrowser',
 } as const;
-export type ShellIpc = typeof ShellIpc[keyof typeof ShellIpc];
+export type ShellIpc = (typeof ShellIpc)[keyof typeof ShellIpc];
 
 // ─── App (lifecycle) ────────────────────────────────────────────────────────
 export const AppIpc = {
@@ -206,7 +206,7 @@ export const AppIpc = {
   GetSystemLocale: 'app:getSystemLocale',
   Relaunch: 'app:relaunch',
 } as const;
-export type AppIpc = typeof AppIpc[keyof typeof AppIpc];
+export type AppIpc = (typeof AppIpc)[keyof typeof AppIpc];
 
 // ─── Log ────────────────────────────────────────────────────────────────────
 export const LogIpc = {
@@ -215,7 +215,7 @@ export const LogIpc = {
   ExportZip: 'log:exportZip',
   FromRenderer: 'log:fromRenderer',
 } as const;
-export type LogIpc = typeof LogIpc[keyof typeof LogIpc];
+export type LogIpc = (typeof LogIpc)[keyof typeof LogIpc];
 
 // ─── IM ─────────────────────────────────────────────────────────────────────
 export const ImIpc = {
@@ -242,7 +242,7 @@ export const ImIpc = {
   StatusChange: 'im:status:change',
   MessageReceived: 'im:message:received',
 } as const;
-export type ImIpc = typeof ImIpc[keyof typeof ImIpc];
+export type ImIpc = (typeof ImIpc)[keyof typeof ImIpc];
 
 // ─── IM Multi-Instance factories ────────────────────────────────────────────
 export const ImInstanceIpc = {
@@ -265,7 +265,7 @@ export const ImInstanceIpc = {
   discordDelete: 'im:discord:instance:delete',
   discordSetConfig: 'im:discord:instance:config:set',
 } as const;
-export type ImInstanceIpc = typeof ImInstanceIpc[keyof typeof ImInstanceIpc];
+export type ImInstanceIpc = (typeof ImInstanceIpc)[keyof typeof ImInstanceIpc];
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 export const AuthIpc = {
@@ -282,7 +282,7 @@ export const AuthIpc = {
   Callback: 'auth:callback',
   QuotaChanged: 'auth:quotaChanged',
 } as const;
-export type AuthIpc = typeof AuthIpc[keyof typeof AuthIpc];
+export type AuthIpc = (typeof AuthIpc)[keyof typeof AuthIpc];
 
 // ─── Feishu Install ─────────────────────────────────────────────────────────
 export const FeishuInstallIpc = {
@@ -290,7 +290,7 @@ export const FeishuInstallIpc = {
   Poll: 'feishu:install:poll',
   Verify: 'feishu:install:verify',
 } as const;
-export type FeishuInstallIpc = typeof FeishuInstallIpc[keyof typeof FeishuInstallIpc];
+export type FeishuInstallIpc = (typeof FeishuInstallIpc)[keyof typeof FeishuInstallIpc];
 
 // ─── DingTalk Install ───────────────────────────────────────────────────────
 export const DingTalkInstallIpc = {
@@ -298,7 +298,7 @@ export const DingTalkInstallIpc = {
   Poll: 'dingtalk:install:poll',
   Verify: 'dingtalk:install:verify',
 } as const;
-export type DingTalkInstallIpc = typeof DingTalkInstallIpc[keyof typeof DingTalkInstallIpc];
+export type DingTalkInstallIpc = (typeof DingTalkInstallIpc)[keyof typeof DingTalkInstallIpc];
 
 // ─── GitHub Copilot ─────────────────────────────────────────────────────────
 export const GitHubCopilotIpc = {
@@ -309,7 +309,7 @@ export const GitHubCopilotIpc = {
   RefreshToken: 'github-copilot:refresh-token',
   TokenUpdated: 'github-copilot:token-updated',
 } as const;
-export type GitHubCopilotIpc = typeof GitHubCopilotIpc[keyof typeof GitHubCopilotIpc];
+export type GitHubCopilotIpc = (typeof GitHubCopilotIpc)[keyof typeof GitHubCopilotIpc];
 
 // ─── OpenAI Codex OAuth ─────────────────────────────────────────────────────
 export const OpenAICodexOAuthIpc = {
@@ -318,10 +318,10 @@ export const OpenAICodexOAuthIpc = {
   Logout: 'openai-codex-oauth:logout',
   Status: 'openai-codex-oauth:status',
 } as const;
-export type OpenAICodexOAuthIpc = typeof OpenAICodexOAuthIpc[keyof typeof OpenAICodexOAuthIpc];
+export type OpenAICodexOAuthIpc = (typeof OpenAICodexOAuthIpc)[keyof typeof OpenAICodexOAuthIpc];
 
 // ─── Network ────────────────────────────────────────────────────────────────
 export const NetworkIpc = {
   StatusChange: 'network:status-change',
 } as const;
-export type NetworkIpc = typeof NetworkIpc[keyof typeof NetworkIpc];
+export type NetworkIpc = (typeof NetworkIpc)[keyof typeof NetworkIpc];

@@ -30,16 +30,18 @@ declare module '@earendil-works/pi-coding-agent' {
       prompt(text: string): Promise<void>;
       abort(): Promise<void>;
       setModel(model: unknown): Promise<void>;
-      subscribe(listener: (event: {
-        type: string;
-        message?: {
-          id?: string;
-          role: string;
-          content: string | Array<{ type: string; text?: string; textDelta?: string }>;
-          stopReason?: string;
-          errorMessage?: string;
-        };
-      }) => void): () => void;
+      subscribe(
+        listener: (event: {
+          type: string;
+          message?: {
+            id?: string;
+            role: string;
+            content: string | Array<{ type: string; text?: string; textDelta?: string }>;
+            stopReason?: string;
+            errorMessage?: string;
+          };
+        }) => void,
+      ): () => void;
     };
   }>;
 }

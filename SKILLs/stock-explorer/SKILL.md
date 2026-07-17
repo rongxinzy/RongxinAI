@@ -60,7 +60,7 @@ python "$SKILLS_ROOT/stock-explorer/scripts/quote.py" pro 002368.SZ 6mo --rsi --
 
 - `--rsi` : RSI(14) - 超买超卖指标
 - `--macd`: MACD(12,26,9) - 趋势动量指标
-- `--bb`  : Bollinger Bands(20,2) - 布林带
+- `--bb` : Bollinger Bands(20,2) - 布林带
 - `--vwap`: VWAP - 成交量加权均价
 - `--atr` : ATR(14) - 平均真实波幅
 

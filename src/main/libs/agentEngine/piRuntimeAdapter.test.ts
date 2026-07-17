@@ -4,7 +4,7 @@
  * Tests CoworkRuntime contract compliance using mocked Pi SDK modules.
  */
 
-import { beforeEach,describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -138,21 +138,29 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('should inject the session system prompt through Pi resource loading', async () => {
-      await adapter.startSession('test', 'Hello Pi', { systemPrompt: 'You are the selected expert.' });
+      await adapter.startSession('test', 'Hello Pi', {
+        systemPrompt: 'You are the selected expert.',
+      });
 
-      expect(mockDefaultResourceLoader).toHaveBeenCalledWith(expect.objectContaining({
-        agentDir: '/tmp/pi-agent',
-        cwd: process.cwd(),
-        appendSystemPromptOverride: expect.any(Function),
-        systemPromptOverride: expect.any(Function),
-      }));
+      expect(mockDefaultResourceLoader).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentDir: '/tmp/pi-agent',
+          cwd: process.cwd(),
+          appendSystemPromptOverride: expect.any(Function),
+          systemPromptOverride: expect.any(Function),
+        }),
+      );
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         systemPromptOverride: (base: string | undefined) => string | undefined;
       };
-      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe('You are the selected expert.');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(expect.objectContaining({
-        resourceLoader: expect.any(Object),
-      }));
+      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe(
+        'You are the selected expert.',
+      );
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceLoader: expect.any(Object),
+        }),
+      );
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('systemPrompt');
     });
 
@@ -160,13 +168,15 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello Pi', { modelOverride: 'llamacpp/qwen-local' });
 
       expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('llamacpp/qwen-local');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(expect.objectContaining({
-        model: expect.objectContaining({
-          provider: 'llamacpp',
-          id: 'qwen-local',
-          baseUrl: 'http://127.0.0.1:11434/v1',
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            provider: 'llamacpp',
+            id: 'qwen-local',
+            baseUrl: 'http://127.0.0.1:11434/v1',
+          }),
         }),
-      }));
+      );
       expect(mockGetModel).not.toHaveBeenCalled();
       expect(mockAuthStorage.setRuntimeApiKey).toHaveBeenCalledWith('llamacpp', 'sk-test');
     });
@@ -176,12 +186,14 @@ describe('PiRuntimeAdapter', () => {
 
       expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('openai/gpt-5.2');
       expect(mockGetModel).toHaveBeenCalledWith('openai', 'gpt-5.2');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(expect.objectContaining({
-        model: expect.objectContaining({
-          provider: 'openai',
-          id: 'gpt-5.2',
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            provider: 'openai',
+            id: 'gpt-5.2',
+          }),
         }),
-      }));
+      );
       expect(mockAuthStorage.setRuntimeApiKey).toHaveBeenCalledWith('openai', 'sk-openai');
     });
 
@@ -220,7 +232,9 @@ describe('PiRuntimeAdapter', () => {
 
     it('should recreate an active session when its system prompt changes', async () => {
       await adapter.startSession('test', 'First', { systemPrompt: 'You are the original expert.' });
-      await adapter.continueSession('test', 'Second', { systemPrompt: 'You are the replacement expert.' });
+      await adapter.continueSession('test', 'Second', {
+        systemPrompt: 'You are the replacement expert.',
+      });
 
       expect(mockSession.abort).toHaveBeenCalled();
       expect(mockDefaultResourceLoader).toHaveBeenCalledTimes(2);
@@ -304,7 +318,9 @@ describe('PiRuntimeAdapter', () => {
   describe('respondToPermission', () => {
     it('should be a no-op for unknown request IDs', () => {
       expect(() => adapter.respondToPermission('unknown', { behavior: 'allow' })).not.toThrow();
-      expect(() => adapter.respondToPermission('unknown', { behavior: 'deny', message: 'no' })).not.toThrow();
+      expect(() =>
+        adapter.respondToPermission('unknown', { behavior: 'deny', message: 'no' }),
+      ).not.toThrow();
     });
   });
 
@@ -344,7 +360,7 @@ describe('PiRuntimeAdapter', () => {
         args: { command: 'ls' },
       });
 
-      const toolUse = messages.find((m) => m.type === 'tool_use');
+      const toolUse = messages.find(m => m.type === 'tool_use');
       expect(toolUse).toBeDefined();
       expect(toolUse!.metadata?.toolName).toBe('Bash');
       expect(toolUse!.metadata?.toolUseId).toBe('call-1');
@@ -352,7 +368,8 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('should emit a linked tool_result message on tool_execution_end', async () => {
-      const messages: Array<{ type: string; content: string; metadata?: Record<string, unknown> }> = [];
+      const messages: Array<{ type: string; content: string; metadata?: Record<string, unknown> }> =
+        [];
       adapter.on('message', (_sid, msg) => messages.push(msg as never));
       await adapter.startSession('test', 'Do something');
 
@@ -365,7 +382,7 @@ describe('PiRuntimeAdapter', () => {
         isError: false,
       });
 
-      const toolResult = messages.find((m) => m.type === 'tool_result');
+      const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult).toBeDefined();
       expect(toolResult!.metadata?.toolUseId).toBe('call-1');
       expect(toolResult!.metadata?.isError).toBe(false);
@@ -379,7 +396,13 @@ describe('PiRuntimeAdapter', () => {
       });
       await adapter.startSession('test', 'Do something');
 
-      const endEvent = { type: 'tool_execution_end', toolCallId: 'call-1', toolName: 'Bash', result: 'x', isError: false };
+      const endEvent = {
+        type: 'tool_execution_end',
+        toolCallId: 'call-1',
+        toolName: 'Bash',
+        result: 'x',
+        isError: false,
+      };
       listener!(endEvent);
       listener!(endEvent);
 
@@ -399,7 +422,7 @@ describe('PiRuntimeAdapter', () => {
         isError: true,
       });
 
-      const toolResult = messages.find((m) => m.type === 'tool_result');
+      const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult!.metadata?.isError).toBe(true);
     });
   });
@@ -439,7 +462,9 @@ describe('PiRuntimeAdapter', () => {
       adapter.on('message', (_sid, msg) => {
         if ((msg as { type: string }).type === 'assistant') assistantMessages.push(msg as never);
       });
-      adapter.on('messageUpdate', (_sid, messageId, content) => updates.push({ messageId, content }));
+      adapter.on('messageUpdate', (_sid, messageId, content) =>
+        updates.push({ messageId, content }),
+      );
 
       await adapter.startSession('test', 'Hi');
       driveAssistantTurn('Hello world');
@@ -474,50 +499,79 @@ describe('PiRuntimeAdapter', () => {
 
       // Three accumulating snapshots (as Pi sends them), not deltas.
       listener!({ type: 'turn_start' });
-      listener!({ type: 'message_update', message: { role: 'assistant', content: [{ type: 'text', text: 'Hel' }] } });
-      listener!({ type: 'message_update', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] } });
-      listener!({ type: 'message_update', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello world' }] } });
-      listener!({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello world' }], stopReason: 'stop' } });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Hel' }] },
+      });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] },
+      });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Hello world' }] },
+      });
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Hello world' }],
+          stopReason: 'stop',
+        },
+      });
 
       // The final content must be exactly the last snapshot — NOT "HelHelloHello world".
       expect(updates[updates.length - 1]).toBe('Hello world');
       // No emitted content should ever contain a duplicated prefix.
-      expect(updates.some((c) => c.includes('HelHello') || c.includes('HelloHello'))).toBe(false);
+      expect(updates.some(c => c.includes('HelHello') || c.includes('HelloHello'))).toBe(false);
     });
 
     it('should render thinking as a separate isThinking message, not as the answer', async () => {
       const messages: Array<{ id: string; metadata?: Record<string, unknown> }> = [];
       adapter.on('message', (_sid, msg) => messages.push(msg as never));
       const updates: Array<{ messageId: string; metadata?: Record<string, unknown> }> = [];
-      adapter.on('messageUpdate', (_sid, messageId, _c, metadata) => updates.push({ messageId, metadata }));
+      adapter.on('messageUpdate', (_sid, messageId, _c, metadata) =>
+        updates.push({ messageId, metadata }),
+      );
 
       await adapter.startSession('test', 'Think then answer');
       listener!({ type: 'turn_start' });
       // A snapshot containing both thinking and answer blocks.
       listener!({
         type: 'message_update',
-        message: { role: 'assistant', content: [
-          { type: 'thinking', thinking: 'Let me reason...' },
-          { type: 'text', text: 'The answer is 42.' },
-        ] },
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'Let me reason...' },
+            { type: 'text', text: 'The answer is 42.' },
+          ],
+        },
       });
       listener!({
         type: 'message_end',
-        message: { role: 'assistant', content: [
-          { type: 'thinking', thinking: 'Let me reason...' },
-          { type: 'text', text: 'The answer is 42.' },
-        ], stopReason: 'stop' },
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'Let me reason...' },
+            { type: 'text', text: 'The answer is 42.' },
+          ],
+          stopReason: 'stop',
+        },
       });
 
       // Two distinct assistant messages: one thinking, one answer — with different ids.
-      const thinkingMsg = messages.find((m) => m.metadata?.isThinking === true);
-      const answerMsg = messages.find((m) => m.metadata?.isThinking !== true && (m.metadata as Record<string, unknown>)?.isStreaming !== undefined);
+      const thinkingMsg = messages.find(m => m.metadata?.isThinking === true);
+      const answerMsg = messages.find(
+        m =>
+          m.metadata?.isThinking !== true &&
+          (m.metadata as Record<string, unknown>)?.isStreaming !== undefined,
+      );
       expect(thinkingMsg).toBeDefined();
       expect(answerMsg).toBeDefined();
       expect(thinkingMsg!.id).not.toBe(answerMsg!.id);
 
       // The thinking message must be finalized WITH isThinking:true (never as a plain answer).
-      const thinkingFinal = updates.filter((u) => u.messageId === thinkingMsg!.id).pop();
+      const thinkingFinal = updates.filter(u => u.messageId === thinkingMsg!.id).pop();
       expect(thinkingFinal?.metadata?.isThinking).toBe(true);
       expect(thinkingFinal?.metadata?.isFinal).toBe(true);
     });
@@ -533,7 +587,10 @@ describe('PiRuntimeAdapter', () => {
         // Rapid snapshots 50ms apart (faster than the 200ms throttle window).
         const snaps = ['a', 'ab', 'abc', 'abcd', 'abcde'];
         for (const s of snaps) {
-          listener!({ type: 'message_update', message: { role: 'assistant', content: [{ type: 'text', text: s }] } });
+          listener!({
+            type: 'message_update',
+            message: { role: 'assistant', content: [{ type: 'text', text: s }] },
+          });
           vi.advanceTimersByTime(50);
         }
         // Let any trailing throttle timer fire.

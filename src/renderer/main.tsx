@@ -5,7 +5,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 
-import { LlamaCppModelLaunchLogWindowQuery, LlamaCppModelLaunchLogWindowView } from '../shared/llamacpp';
+import {
+  LlamaCppModelLaunchLogWindowQuery,
+  LlamaCppModelLaunchLogWindowView,
+} from '../shared/llamacpp';
 import { RendererPrototypeQuery, RendererPrototypeView } from './prototypes/constants';
 
 const rootElement = document.getElementById('root');
@@ -14,55 +17,53 @@ if (!rootElement) {
 }
 
 const routeParams = new URLSearchParams(window.location.search);
-const isModelLaunchLogWindow = routeParams.get(LlamaCppModelLaunchLogWindowQuery.View)
-  === LlamaCppModelLaunchLogWindowView.ModelLaunchLog;
-const isLocalInferenceModelCardPrototype = routeParams.get(RendererPrototypeQuery.View)
-  === RendererPrototypeView.LocalInferenceModelCard;
+const isModelLaunchLogWindow =
+  routeParams.get(LlamaCppModelLaunchLogWindowQuery.View) ===
+  LlamaCppModelLaunchLogWindowView.ModelLaunchLog;
+const isLocalInferenceModelCardPrototype =
+  routeParams.get(RendererPrototypeQuery.View) === RendererPrototypeView.LocalInferenceModelCard;
 const isBrowserPreview = typeof window.electron === 'undefined';
 
 const root = ReactDOM.createRoot(rootElement);
 
 async function renderRoot(): Promise<void> {
   if (isLocalInferenceModelCardPrototype || isBrowserPreview) {
-    const { LocalInferenceModelCardPrototype } = await import(
-      './prototypes/localInference/LocalInferenceModelCardPrototype'
-    );
+    const { LocalInferenceModelCardPrototype } =
+      await import('./prototypes/localInference/LocalInferenceModelCardPrototype');
     root.render(
       <React.StrictMode>
         <TooltipProvider>
           <LocalInferenceModelCardPrototype />
         </TooltipProvider>
-      </React.StrictMode>
+      </React.StrictMode>,
     );
     return;
   }
 
   if (isModelLaunchLogWindow) {
-    const { ModelLaunchLogWindow } = await import('./components/localInference/windows/ModelLaunchLogWindow');
+    const { ModelLaunchLogWindow } =
+      await import('./components/localInference/windows/ModelLaunchLogWindow');
     root.render(
       <React.StrictMode>
         <TooltipProvider>
           <ModelLaunchLogWindow />
         </TooltipProvider>
-      </React.StrictMode>
+      </React.StrictMode>,
     );
     return;
   }
 
-  const [{ default: App }, { store }] = await Promise.all([
-    import('./App'),
-    import('./store'),
-  ]);
+  const [{ default: App }, { store }] = await Promise.all([import('./App'), import('./store')]);
   root.render(
     <React.StrictMode>
       <Provider store={store}>
         <App />
       </Provider>
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 }
 
-void renderRoot().catch((error) => {
+void renderRoot().catch(error => {
   console.error('Failed to render the app:', error);
   try {
     window.electron?.log?.fromRenderer?.(

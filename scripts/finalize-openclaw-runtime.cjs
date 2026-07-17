@@ -41,8 +41,13 @@ if (!fs.existsSync(openclawEntry)) {
 if (!fs.existsSync(path.join(runtimeRoot, DIST_CONTROL_UI_INDEX))) {
   fail(`Missing control UI before finalize: ${path.join(runtimeRoot, DIST_CONTROL_UI_INDEX)}`);
 }
-if (!fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_JS)) && !fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_MJS))) {
-  fail(`Missing dist entry before finalize: ${path.join(runtimeRoot, DIST_ENTRY_JS)} or ${path.join(runtimeRoot, DIST_ENTRY_MJS)}`);
+if (
+  !fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_JS)) &&
+  !fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_MJS))
+) {
+  fail(
+    `Missing dist entry before finalize: ${path.join(runtimeRoot, DIST_ENTRY_JS)} or ${path.join(runtimeRoot, DIST_ENTRY_MJS)}`,
+  );
 }
 if (!fs.existsSync(bundlePath)) {
   fail(`Missing gateway bundle before finalize: ${bundlePath}`);
@@ -57,7 +62,12 @@ const requiredSourceEntries = ['openclaw.mjs', 'dist'];
 const listAsarEntries = () => {
   const summary = summarizeGatewayAsarEntries(asar.listPackage(gatewayAsarPath));
 
-  if (!summary.hasOpenClawEntry || !summary.hasControlUiIndex || !summary.hasGatewayEntry || summary.hasBundledExtensions) {
+  if (
+    !summary.hasOpenClawEntry ||
+    !summary.hasControlUiIndex ||
+    !summary.hasGatewayEntry ||
+    summary.hasBundledExtensions
+  ) {
     fail(
       `gateway.asar validation failed (openclaw.mjs=${summary.hasOpenClawEntry}, control-ui=${summary.hasControlUiIndex}, entry=${summary.hasGatewayEntry}, extensions=${summary.hasBundledExtensions})`,
     );
@@ -90,10 +100,17 @@ const listAsarEntries = () => {
     fail(`Expected gateway.asar to exist after finalize: ${gatewayAsarPath}`);
   }
   if (fs.existsSync(openclawEntry)) {
-    fail(`Expected openclaw.mjs to be packed into gateway.asar, but unpacked file still exists: ${openclawEntry}`);
+    fail(
+      `Expected openclaw.mjs to be packed into gateway.asar, but unpacked file still exists: ${openclawEntry}`,
+    );
   }
-  if (fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_JS)) || fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_MJS))) {
-    fail('Expected dist/entry.* to be packed into gateway.asar, but unpacked entry files still exist.');
+  if (
+    fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_JS)) ||
+    fs.existsSync(path.join(runtimeRoot, DIST_ENTRY_MJS))
+  ) {
+    fail(
+      'Expected dist/entry.* to be packed into gateway.asar, but unpacked entry files still exist.',
+    );
   }
   if (!fs.existsSync(path.join(runtimeRoot, DIST_CONTROL_UI_INDEX))) {
     fail('dist/control-ui/index.html is missing after finalize.');
@@ -106,7 +123,7 @@ const listAsarEntries = () => {
   }
 
   console.log(`[finalize-openclaw-runtime] Finalized runtime at ${runtimeRoot}`);
-})().catch((error) => {
+})().catch(error => {
   console.error(error?.stack || String(error));
   process.exit(1);
 });

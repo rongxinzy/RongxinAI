@@ -104,35 +104,78 @@
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
   @keyframes fade-in-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   @keyframes fade-in-down {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
   @keyframes shimmer {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(100%); }
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
   }
   @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-3px); }
-    40% { transform: translateX(3px); }
-    60% { transform: translateX(-2px); }
-    80% { transform: translateX(2px); }
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-3px);
+    }
+    40% {
+      transform: translateX(3px);
+    }
+    60% {
+      transform: translateX(-2px);
+    }
+    80% {
+      transform: translateX(2px);
+    }
   }
   @keyframes message-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
@@ -155,7 +198,7 @@
   }
   & code::before,
   & code::after {
-    content: "";
+    content: '';
   }
   & pre {
     background-color: var(--zy-surface-raised);
@@ -168,7 +211,10 @@
     border-left-color: var(--zy-primary);
     color: var(--zy-text-secondary);
   }
-  & h1, & h2, & h3, & h4 {
+  & h1,
+  & h2,
+  & h3,
+  & h4 {
     color: var(--zy-text-primary);
   }
   & strong {
@@ -217,7 +263,8 @@
 table {
   border-collapse: collapse;
 }
-th, td {
+th,
+td {
   border-color: var(--zy-border);
 }
 th {
@@ -242,12 +289,12 @@ td {
 [data-language] {
   background-color: var(--zy-surface) !important;
 }
-[data-language] [class*="bg-muted"] {
+[data-language] [class*='bg-muted'] {
   background-color: var(--zy-surface) !important;
 }
 
 /* ── Streamdown 2.5 raw code-block (fallback) ── */
-div[class~="bg-sidebar"][class~="my-4"] {
+div[class~='bg-sidebar'][class~='my-4'] {
   overflow: hidden !important;
   border-radius: 0.5rem !important;
   border: 1px solid var(--zy-border) !important;
@@ -258,7 +305,7 @@ div[class~="bg-sidebar"][class~="my-4"] {
   margin: 0.75rem 0 !important;
 }
 /* Header row */
-div[class~="bg-sidebar"][class~="my-4"] > div:first-child {
+div[class~='bg-sidebar'][class~='my-4'] > div:first-child {
   display: flex !important;
   align-items: center !important;
   border-bottom: 1px solid var(--zy-border) !important;
@@ -270,13 +317,13 @@ div[class~="bg-sidebar"][class~="my-4"] > div:first-child {
   padding-bottom: 0.5rem !important;
 }
 /* Code body */
-div[class~="bg-sidebar"][class~="my-4"] > div:last-child {
+div[class~='bg-sidebar'][class~='my-4'] > div:last-child {
   border: none !important;
   border-radius: 0 !important;
   padding: 1rem !important;
   background: transparent !important;
 }
-div[class~="bg-sidebar"][class~="my-4"] > div:last-child pre {
+div[class~='bg-sidebar'][class~='my-4'] > div:last-child pre {
   background: transparent !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -306,7 +353,10 @@ blockquote {
 }
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter',
+    system-ui, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.6;
   font-weight: 400;
 
@@ -318,7 +368,10 @@ blockquote {
 
 /* Theme colors are driven by CSS variables from themes.css.
  * color-scheme is set by the [data-theme] selectors. */
-body, #root, .App, main {
+body,
+#root,
+.App,
+main {
   background-color: var(--zy-background);
   color: var(--zy-foreground);
 }
@@ -441,14 +494,14 @@ select::-ms-expand {
 }
 
 /* Command palette InputGroup — suppress blue focus ring from InputGroup base class */
-[data-slot="command-input-group"]:has([data-slot="input-group-control"]:focus-visible) {
+[data-slot='command-input-group']:has([data-slot='input-group-control']:focus-visible) {
   --tw-ring-shadow: 0 0 #0000;
   box-shadow: 0 0 #0000;
   border-color: var(--zy-input-border);
 }
 
 /* ModelSelector — hide dialog overlay so list appears as a dropdown */
-[data-slot="dialog-portal"]:has([data-slot="model-selector-content"]) [data-slot="dialog-overlay"] {
+[data-slot='dialog-portal']:has([data-slot='model-selector-content']) [data-slot='dialog-overlay'] {
   display: none;
 }
 
@@ -469,7 +522,7 @@ select::-ms-expand {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
   animation: shimmer 1.5s infinite;
 }
 
@@ -498,8 +551,12 @@ select::-ms-expand {
   box-shadow: 0 0 6px var(--zy-primary-muted);
 }
 @keyframes streaming-slide {
-  0% { left: -40%; }
-  100% { left: 100%; }
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 /* Respect reduced-motion preference */
@@ -516,54 +573,56 @@ select::-ms-expand {
 /* Switch: shadcn uses hsl(var(--primary)) → hsl(#3B82F6) = invalid CSS with zhiyuan hex values.
    Define track colors and transition directly, bypassing the broken hsl() wrapper.
    !important required — base-ui may strip transition classes at runtime. */
-[data-slot="switch"] {
-  transition: background-color 200ms ease, box-shadow 200ms ease !important;
+[data-slot='switch'] {
+  transition:
+    background-color 200ms ease,
+    box-shadow 200ms ease !important;
 }
-[data-slot="switch"][data-unchecked] {
+[data-slot='switch'][data-unchecked] {
   background-color: var(--zy-surface-raised);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
 }
-[data-slot="switch"][data-checked] {
+[data-slot='switch'][data-checked] {
   background-color: var(--zy-primary);
 }
-[data-slot="switch-thumb"] {
+[data-slot='switch-thumb'] {
   transition: transform 200ms ease !important;
 }
-[data-slot="switch-thumb"][data-unchecked] {
+[data-slot='switch-thumb'][data-unchecked] {
   transform: translateX(0);
 }
-[data-slot="switch-thumb"][data-checked] {
+[data-slot='switch-thumb'][data-checked] {
   transform: translateX(calc(100% - 2px));
 }
 
 /* Slider: zhiyuan theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
-[data-slot="slider-track"] {
+[data-slot='slider-track'] {
   background-color: var(--zy-surface-raised);
 }
-[data-slot="slider-indicator"] {
+[data-slot='slider-indicator'] {
   background-color: var(--zy-primary);
 }
-[data-slot="slider-thumb"] {
+[data-slot='slider-thumb'] {
   background-color: var(--zy-surface);
   border-color: var(--zy-primary);
 }
-[data-slot="slider-thumb"]:focus-visible {
+[data-slot='slider-thumb']:focus-visible {
   box-shadow: 0 0 0 2px var(--zy-primary-muted);
 }
 
 /* Download progress uses Slider for consistent geometry, without an interactive thumb. */
-[data-slot="slider"][data-download-progress] [data-slot="slider-indicator"] {
+[data-slot='slider'][data-download-progress] [data-slot='slider-indicator'] {
   background-color: var(--zy-success);
 }
-[data-slot="slider"][data-download-progress] [data-slot="slider-thumb"] {
+[data-slot='slider'][data-download-progress] [data-slot='slider-thumb'] {
   display: none;
 }
 
 /* Local inference tabs need a stronger active state than the neutral tab rail. */
-[data-local-inference-tabs] [data-slot="tabs-list"] {
+[data-local-inference-tabs] [data-slot='tabs-list'] {
   background-color: var(--zy-surface-raised);
 }
-[data-local-inference-tabs] [data-slot="tabs-trigger"][data-active] {
+[data-local-inference-tabs] [data-slot='tabs-trigger'][data-active] {
   background-color: var(--zy-primary);
   color: var(--zy-primary-foreground);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
@@ -572,98 +631,98 @@ select::-ms-expand {
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
    via the Tailwind plugin which uses var(--zy-*) directly. */
-[data-slot="dialog-content"] {
+[data-slot='dialog-content'] {
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 }
-[data-slot="dialog-footer"] {
+[data-slot='dialog-footer'] {
   background-color: var(--zy-surface);
   border-top-color: var(--zy-border);
 }
-[data-slot="button"].bg-primary {
+[data-slot='button'].bg-primary {
   background-color: var(--zy-primary);
   color: var(--zy-primary-foreground);
 }
-[data-slot="button"].bg-primary:hover {
+[data-slot='button'].bg-primary:hover {
   background-color: var(--zy-primary-hover);
 }
-[data-slot="button"].border-border {
+[data-slot='button'].border-border {
   border-color: var(--zy-border);
 }
-[data-slot="button"].bg-background {
+[data-slot='button'].bg-background {
   background-color: var(--zy-surface);
 }
-[data-slot="button"].bg-secondary {
+[data-slot='button'].bg-secondary {
   background-color: var(--zy-surface-raised);
   color: var(--zy-foreground);
 }
-[data-slot="button"].text-destructive {
+[data-slot='button'].text-destructive {
   color: var(--zy-destructive);
 }
-[data-slot="button"][data-local-inference-unload-button="true"] {
+[data-slot='button'][data-local-inference-unload-button='true'] {
   background-color: var(--zy-destructive);
   border-color: var(--zy-destructive);
   color: var(--zy-destructive-foreground);
 }
-[data-slot="button"][data-local-inference-unload-button="true"]:hover:not(:disabled) {
+[data-slot='button'][data-local-inference-unload-button='true']:hover:not(:disabled) {
   background-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
   border-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
   color: var(--zy-destructive-foreground);
 }
-[data-slot="toggle"][aria-pressed="true"] {
+[data-slot='toggle'][aria-pressed='true'] {
   background-color: var(--zy-surface-raised);
   color: var(--zy-foreground);
 }
 
 /* Base UI select popup dimensions use runtime CSS variables. */
-[data-slot="select-content"] {
+[data-slot='select-content'] {
   width: var(--anchor-width) !important;
   max-height: var(--available-height) !important;
   transform-origin: var(--transform-origin) !important;
 }
 
 /* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
-[data-mode="work-chat"][data-slot="switch"] {
+[data-mode='work-chat'][data-slot='switch'] {
   width: 100% !important;
   height: 28px !important;
 }
 /* Work/Chat toggle — track color token (darker than sidebar bg-surface-raised #F0F1F4) */
 :root {
-  --work-chat-track-bg: #E5E7EB;
+  --work-chat-track-bg: #e5e7eb;
 }
 .dark {
-  --work-chat-track-bg: #2D3039;
+  --work-chat-track-bg: #2d3039;
 }
 
 /* Track: bordered to distinguish from sidebar bg, relative for absolute thumb */
-[data-mode="work-chat"][data-slot="switch"][data-unchecked],
-[data-mode="work-chat"][data-slot="switch"][data-checked] {
+[data-mode='work-chat'][data-slot='switch'][data-unchecked],
+[data-mode='work-chat'][data-slot='switch'][data-checked] {
   background-color: var(--work-chat-track-bg) !important;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.10) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
   border-color: var(--zy-border) !important;
   position: relative !important;
 }
 /* Track: allow thumb overflow */
-[data-mode="work-chat"][data-slot="switch"] {
+[data-mode='work-chat'][data-slot='switch'] {
   overflow: visible !important;
 }
 /* Thumb: glass, centered at 25%/75%, crosses track center */
-[data-mode="work-chat"] [data-slot="switch-thumb"] {
+[data-mode='work-chat'] [data-slot='switch-thumb'] {
   width: calc(50% + 12px) !important;
   height: calc(100% + 8px) !important;
   border-radius: 9999px !important;
   box-shadow:
-    0 4px 14px rgba(0,0,0,0.16),
-    0 1px 3px rgba(0,0,0,0.06) !important;
+    0 4px 14px rgba(0, 0, 0, 0.16),
+    0 1px 3px rgba(0, 0, 0, 0.06) !important;
   position: absolute !important;
   transition: left 200ms ease !important;
 }
-[data-mode="work-chat"] [data-slot="switch-thumb"][data-unchecked] {
+[data-mode='work-chat'] [data-slot='switch-thumb'][data-unchecked] {
   left: -6px;
   top: -4px;
   transform: none;
   translate: none !important;
 }
-[data-mode="work-chat"] [data-slot="switch-thumb"][data-checked] {
+[data-mode='work-chat'] [data-slot='switch-thumb'][data-checked] {
   left: calc(50% - 6px);
   top: -4px;
   transform: none;
@@ -671,22 +730,22 @@ select::-ms-expand {
 }
 
 /* ButtonGroup: joined buttons — Tailwind v4 *:data-slot: variant chain. */
-[data-slot="button-group"] > [data-slot] {
+[data-slot='button-group'] > [data-slot] {
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
 }
-[data-slot="button-group"] > [data-slot]:not(:has(~ [data-slot])) {
+[data-slot='button-group'] > [data-slot]:not(:has(~ [data-slot])) {
   border-top-right-radius: var(--zy-radius) !important;
   border-bottom-right-radius: var(--zy-radius) !important;
 }
-[data-slot="button-group"] > [data-slot] ~ [data-slot] {
+[data-slot='button-group'] > [data-slot] ~ [data-slot] {
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
   border-left-width: 0 !important;
 }
 
 /* Select: match dropdown width to trigger. */
-[data-slot="select-content"] {
+[data-slot='select-content'] {
   width: var(--anchor-width) !important;
   max-height: var(--available-height) !important;
   transform-origin: var(--transform-origin) !important;

@@ -1,6 +1,12 @@
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { Textarea } from '@shared/components/ui/textarea';
 import { PlatformRegistry } from '@shared/platform';
 import React, { useEffect, useRef, useState } from 'react';
@@ -245,7 +251,14 @@ function previewCron(expr: string): { ok: true; label: string } | { ok: false } 
   }
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSaved, onDirtyChange }) => {
+const TaskForm: React.FC<TaskFormProps> = ({
+  mode,
+  task,
+  prefill,
+  onCancel,
+  onSaved,
+  onDirtyChange,
+}) => {
   const [form, setForm] = useState<FormState>(() => createFormState(task, prefill));
   const initialFormRef = useRef<string>(JSON.stringify(createFormState(task, prefill)));
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
@@ -316,17 +329,19 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
 
     let cancelled = false;
     const selectedChannelOption = channelOptions.find(
-      (option) => option.value === form.notifyChannel && option.accountId === form.notifyAccountId,
+      option => option.value === form.notifyChannel && option.accountId === form.notifyAccountId,
     );
     setConversationsLoading(true);
-    void scheduledTaskService.listChannelConversations(
-      form.notifyChannel,
-      form.notifyAccountId,
-      selectedChannelOption?.filterAccountId ?? form.notifyAccountId,
-    ).then((result) => {
-      if (cancelled) return;
-      setConversations(result);
-      setConversationsLoading(false);
+    void scheduledTaskService
+      .listChannelConversations(
+        form.notifyChannel,
+        form.notifyAccountId,
+        selectedChannelOption?.filterAccountId ?? form.notifyAccountId,
+      )
+      .then(result => {
+        if (cancelled) return;
+        setConversations(result);
+        setConversationsLoading(false);
 
         if (result.length > 0 && !form.notifyTo) {
           setForm(current => ({ ...current, notifyTo: result[0].conversationId }));
@@ -336,7 +351,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.notifyChannel, form.notifyAccountId, channelOptions]);
 
   // Live cron preview
@@ -412,7 +427,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    let agentRecord: Awaited<ReturnType<NonNullable<typeof window.electron>['agents']['get']>> | null = null;
+    let agentRecord: Awaited<
+      ReturnType<NonNullable<typeof window.electron>['agents']['get']>
+    > | null = null;
     if (form.agentId) {
       try {
         agentRecord = await window.electron?.agents?.get(form.agentId);
@@ -496,16 +513,27 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
   };
 
   const renderPlanSelect = () => (
-    <Select value={form.planType} onValueChange={value => value && updateForm({ planType: value as PlanType })}>
+    <Select
+      value={form.planType}
+      onValueChange={value => value && updateForm({ planType: value as PlanType })}
+    >
       <SelectTrigger className="flex-1 min-w-0">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="once">{i18nService.t('scheduledTasksFormScheduleModeOnce')}</SelectItem>
-        <SelectItem value="hourly">{i18nService.t('scheduledTasksFormScheduleModeHourly')}</SelectItem>
-        <SelectItem value="daily">{i18nService.t('scheduledTasksFormScheduleModeDaily')}</SelectItem>
-        <SelectItem value="weekly">{i18nService.t('scheduledTasksFormScheduleModeWeekly')}</SelectItem>
-        <SelectItem value="monthly">{i18nService.t('scheduledTasksFormScheduleModeMonthly')}</SelectItem>
+        <SelectItem value="hourly">
+          {i18nService.t('scheduledTasksFormScheduleModeHourly')}
+        </SelectItem>
+        <SelectItem value="daily">
+          {i18nService.t('scheduledTasksFormScheduleModeDaily')}
+        </SelectItem>
+        <SelectItem value="weekly">
+          {i18nService.t('scheduledTasksFormScheduleModeWeekly')}
+        </SelectItem>
+        <SelectItem value="monthly">
+          {i18nService.t('scheduledTasksFormScheduleModeMonthly')}
+        </SelectItem>
         <SelectItem value="cron">
           {i18nService.t(
             'scheduledTasksFormScheduleModeCronCustom' as Parameters<typeof i18nService.t>[0],
@@ -580,7 +608,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {/* Minute */}
               <Select
                 value={form.cronBuilder.minute}
-                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, minute: value } })}
+                onValueChange={value =>
+                  value && updateForm({ cronBuilder: { ...form.cronBuilder, minute: value } })
+                }
               >
                 <SelectTrigger className={fieldSelectClass}>
                   <SelectValue />
@@ -601,7 +631,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {/* Hour */}
               <Select
                 value={form.cronBuilder.hour}
-                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, hour: value } })}
+                onValueChange={value =>
+                  value && updateForm({ cronBuilder: { ...form.cronBuilder, hour: value } })
+                }
               >
                 <SelectTrigger className={fieldSelectClass}>
                   <SelectValue />
@@ -622,7 +654,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {/* DOM (day of month) */}
               <Select
                 value={form.cronBuilder.dom}
-                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, dom: value } })}
+                onValueChange={value =>
+                  value && updateForm({ cronBuilder: { ...form.cronBuilder, dom: value } })
+                }
               >
                 <SelectTrigger className={fieldSelectClass}>
                   <SelectValue />
@@ -639,7 +673,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {/* Month */}
               <Select
                 value={form.cronBuilder.month}
-                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, month: value } })}
+                onValueChange={value =>
+                  value && updateForm({ cronBuilder: { ...form.cronBuilder, month: value } })
+                }
               >
                 <SelectTrigger className={fieldSelectClass}>
                   <SelectValue />
@@ -656,7 +692,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {/* DOW (day of week) */}
               <Select
                 value={form.cronBuilder.dow}
-                onValueChange={value => value && updateForm({ cronBuilder: { ...form.cronBuilder, dow: value } })}
+                onValueChange={value =>
+                  value && updateForm({ cronBuilder: { ...form.cronBuilder, dow: value } })
+                }
               >
                 <SelectTrigger className={fieldSelectClass}>
                   <SelectValue />
@@ -1025,8 +1063,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
       <div className="flex items-center gap-3">
         <Select
           value={form.notifyChannel}
-          onValueChange={(value) => {
-            updateForm({ notifyChannel: value ?? 'none', notifyTo: '', notifyAccountId: undefined });
+          onValueChange={value => {
+            updateForm({
+              notifyChannel: value ?? 'none',
+              notifyTo: '',
+              notifyAccountId: undefined,
+            });
           }}
         >
           <SelectTrigger className={showConversationSelector ? 'flex-1 min-w-0' : 'w-full'}>
@@ -1063,11 +1105,13 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
         {showConversationSelector && (
           <Select
             value={form.notifyTo}
-            onValueChange={(value) => updateForm({ notifyTo: value ?? '' })}
+            onValueChange={value => updateForm({ notifyTo: value ?? '' })}
             disabled={conversationsLoading}
           >
             <SelectTrigger className="flex-1 min-w-0">
-              <SelectValue placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')} />
+              <SelectValue
+                placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
+              />
             </SelectTrigger>
             <SelectContent>
               {conversations.length === 0 ? (
@@ -1075,7 +1119,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
                   {i18nService.t('scheduledTasksFormNotifyConversationNone')}
                 </div>
               ) : (
-                conversations.map((conv) => (
+                conversations.map(conv => (
                   <SelectItem key={conv.conversationId} value={conv.conversationId}>
                     {conv.conversationId}
                   </SelectItem>
@@ -1094,86 +1138,93 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
       <div className="flex-1 overflow-y-auto py-3 min-h-0">
         <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full">
           <h2 className="text-[14px] font-normal leading-5 text-muted-foreground">
-          {mode === 'create'
-            ? i18nService.t('scheduledTasksFormCreate')
-            : i18nService.t('scheduledTasksFormUpdate')}
-        </h2>
+            {mode === 'create'
+              ? i18nService.t('scheduledTasksFormCreate')
+              : i18nService.t('scheduledTasksFormUpdate')}
+          </h2>
 
-        {/* Task name */}
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormName')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span></label>
-          <Input
-            type="text"
-            value={form.name}
-            onChange={event => updateForm({ name: event.target.value.slice(0, TASK_NAME_MAX_LENGTH) })}
-            maxLength={TASK_NAME_MAX_LENGTH}
-            className="w-full"
-            placeholder={i18nService.t('scheduledTasksFormNamePlaceholder')}
-          />
-          {errors.name && <p className={errorClass}>{errors.name}</p>}
-        </div>
-
-        {/* Model binding */}
-        <div>
-          <label className={labelClass}>
-            {i18nService.t('scheduledTasksFormModel')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-          </label>
-          <Select
-            value={form.modelId}
-            onValueChange={value => {
-              updateForm({ modelId: value ?? '' });
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={i18nService.t('scheduledTasksFormModelPlaceholder')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="" disabled>
-                {i18nService.t('scheduledTasksFormModelPlaceholder')}
-              </SelectItem>
-              {availableModels.map(m => (
-                <SelectItem key={m.id} value={toOpenClawModelRef(m)}>
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.modelId && <p className={errorClass}>{errors.modelId}</p>}
-        </div>
-
-        {/* Schedule */}
-        <div>
-          {renderScheduleRow()}
-          {errors.schedule && <p className={errorClass}>{errors.schedule}</p>}
-        </div>
-
-        {/* Prompt / payload */}
-        <div>
-          <div className="flex items-end justify-between mb-1">
-            <label className={labelClass} style={{ marginBottom: 0 }}>
-              {i18nService.t('scheduledTasksFormPayloadTextAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+          {/* Task name */}
+          <div>
+            <label className={labelClass}>
+              {i18nService.t('scheduledTasksFormName')}
+              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
             </label>
-          </div>
-          <div className="rounded-lg border border-border bg-(--zy-surface)">
-            <Textarea
-              value={form.payloadText}
-              onChange={event => updateForm({ payloadText: event.target.value })}
-              className="resize-y"
-              style={{ minHeight: '80px', height: '120px' }}
-              placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
+            <Input
+              type="text"
+              value={form.name}
+              onChange={event =>
+                updateForm({ name: event.target.value.slice(0, TASK_NAME_MAX_LENGTH) })
+              }
+              maxLength={TASK_NAME_MAX_LENGTH}
+              className="w-full"
+              placeholder={i18nService.t('scheduledTasksFormNamePlaceholder')}
             />
+            {errors.name && <p className={errorClass}>{errors.name}</p>}
           </div>
-          <p className={hintClass}>
-            {i18nService.t(
-              'scheduledTasksFormPayloadTextAgentHint' as Parameters<typeof i18nService.t>[0],
-            )}
-          </p>
 
-          {errors.payloadText && <p className={errorClass}>{errors.payloadText}</p>}
-        </div>
+          {/* Model binding */}
+          <div>
+            <label className={labelClass}>
+              {i18nService.t('scheduledTasksFormModel')}
+              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+            </label>
+            <Select
+              value={form.modelId}
+              onValueChange={value => {
+                updateForm({ modelId: value ?? '' });
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={i18nService.t('scheduledTasksFormModelPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="" disabled>
+                  {i18nService.t('scheduledTasksFormModelPlaceholder')}
+                </SelectItem>
+                {availableModels.map(m => (
+                  <SelectItem key={m.id} value={toOpenClawModelRef(m)}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.modelId && <p className={errorClass}>{errors.modelId}</p>}
+          </div>
 
-        {/* Notification */}
-        {renderNotifyRow()}
+          {/* Schedule */}
+          <div>
+            {renderScheduleRow()}
+            {errors.schedule && <p className={errorClass}>{errors.schedule}</p>}
+          </div>
+
+          {/* Prompt / payload */}
+          <div>
+            <div className="flex items-end justify-between mb-1">
+              <label className={labelClass} style={{ marginBottom: 0 }}>
+                {i18nService.t('scheduledTasksFormPayloadTextAgent')}
+                <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+              </label>
+            </div>
+            <div className="rounded-lg border border-border bg-(--zy-surface)">
+              <Textarea
+                value={form.payloadText}
+                onChange={event => updateForm({ payloadText: event.target.value })}
+                className="resize-y"
+                style={{ minHeight: '80px', height: '120px' }}
+                placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
+              />
+            </div>
+            <p className={hintClass}>
+              {i18nService.t(
+                'scheduledTasksFormPayloadTextAgentHint' as Parameters<typeof i18nService.t>[0],
+              )}
+            </p>
+
+            {errors.payloadText && <p className={errorClass}>{errors.payloadText}</p>}
+          </div>
+
+          {/* Notification */}
+          {renderNotifyRow()}
         </div>
       </div>
 

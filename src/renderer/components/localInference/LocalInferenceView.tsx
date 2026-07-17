@@ -71,8 +71,7 @@ const LlamaCppServiceAction = {
   Refresh: 'refresh',
 } as const;
 
-type LlamaCppServiceAction =
-  (typeof LlamaCppServiceAction)[keyof typeof LlamaCppServiceAction];
+type LlamaCppServiceAction = (typeof LlamaCppServiceAction)[keyof typeof LlamaCppServiceAction];
 
 let cachedStatus: OllamaStatusSnapshot | null = null;
 
@@ -142,7 +141,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const showToast = useCallback(
     (
       message: string,
-        kind: LocalInferenceToastKindType = LocalInferenceToastKind.Info,
+      kind: LocalInferenceToastKindType = LocalInferenceToastKind.Info,
       autoDismiss = true,
     ) => {
       if (toastTimerRef.current) {
@@ -183,9 +182,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [clearInstallProgressDismissTimer],
   );
 
-  const searchMarketplace = useCallback(async (
-    params: MarketplaceSearchParams,
-  ) => {
+  const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
     const id = ++marketplaceSearchRef.current;
     setMarketplaceLoading(true);
     setMarketplaceError(null);
@@ -258,8 +255,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const deadline = Date.now() + LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS;
       let latestModels = await refreshRunningModels();
       while (
-        latestModels.some(model => model.name === modelName || model.model === modelName)
-        && Date.now() < deadline
+        latestModels.some(model => model.name === modelName || model.model === modelName) &&
+        Date.now() < deadline
       ) {
         await new Promise<void>(resolve => {
           window.setTimeout(resolve, LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS);
@@ -431,7 +428,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   useEffect(() => {
     const unsubscribers = [
-      window.electron.llamacpp.onStatusChanged((nextStatus) => {
+      window.electron.llamacpp.onStatusChanged(nextStatus => {
         cachedStatus = nextStatus;
         setStatus(nextStatus);
         if (nextStatus.status !== 'running') {
@@ -649,19 +646,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <LocalInferenceTabSelector
-              activeTab={activeTab}
-              onActiveTabChange={setActiveTab}
-            />
+            <LocalInferenceTabSelector activeTab={activeTab} onActiveTabChange={setActiveTab} />
             <div className="flex flex-wrap items-center gap-2">
               {activeTab === 'models' ? (
                 <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={openAccessSettings}
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={openAccessSettings}>
                     <Globe data-icon="inline-start" />
                     {i18nService.t('localInferenceAccessSettings')}
                   </Button>
@@ -751,8 +740,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         runningContextSize={
           contextModel
             ? runningModels.find(
-              model => model.name === contextModel.name || model.model === contextModel.name,
-            )?.runtime_context_length
+                model => model.name === contextModel.name || model.model === contextModel.name,
+              )?.runtime_context_length
             : undefined
         }
         onClose={() => setContextModel(null)}
@@ -772,8 +761,7 @@ function getModelCardBusyState(input: {
   globalLoading: boolean;
 }): { cardBusy: boolean; buttonsDisabled: boolean } {
   const cardBusy = Boolean(
-    input.loadingModelName === input.modelName ||
-    input.unloadingModelName === input.modelName,
+    input.loadingModelName === input.modelName || input.unloadingModelName === input.modelName,
   );
   const anotherModelLoading = Boolean(
     input.loadingModelName && input.loadingModelName !== input.modelName,
@@ -852,4 +840,3 @@ export const __test__formatInstallProgressSummary = (
 ) => formatInstallProgressSummary(progress);
 
 export default LocalInferenceView;
-

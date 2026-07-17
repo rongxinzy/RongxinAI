@@ -32,4 +32,3 @@ export const smallDangerButtonClass =
 export const localInferenceMutedTextClass = 'text-foreground/70';
 export const localInferenceSoftTextClass = 'text-foreground/75';
 export const localInferencePlaceholderTextClass = 'text-foreground/45';
-

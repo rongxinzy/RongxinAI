@@ -2,51 +2,51 @@
 
 ## 基础字段（必填）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `name` | string | 唯一标识，小写字母+连字符，也是包名 |
-| `version` | string | 语义化版本号（MAJOR.MINOR.PATCH） |
-| `description` | string | 英文一句话描述 |
+| 字段          | 类型   | 说明                                |
+| ------------- | ------ | ----------------------------------- |
+| `name`        | string | 唯一标识，小写字母+连字符，也是包名 |
+| `version`     | string | 语义化版本号（MAJOR.MINOR.PATCH）   |
+| `description` | string | 英文一句话描述                      |
 
 ## 可选基础字段
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `author` | `{name, email}` | 作者信息 |
-| `license` | string | 许可证 |
+| 字段      | 类型            | 说明     |
+| --------- | --------------- | -------- |
+| `author`  | `{name, email}` | 作者信息 |
+| `license` | string          | 许可证   |
 
 ## 类型字段
 
-| 字段 | 说明 |
-|------|------|
-| `expertType` | `"agent"` / `"team"` |
-| `agentName` | 主 Agent 名称（对应 agents/ 下 MD 文件名，不含 .md） |
-| `teamInfo` | team 时必填：`{leadAgent, memberAgents[]}` |
+| 字段         | 说明                                                 |
+| ------------ | ---------------------------------------------------- |
+| `expertType` | `"agent"` / `"team"`                                 |
+| `agentName`  | 主 Agent 名称（对应 agents/ 下 MD 文件名，不含 .md） |
+| `teamInfo`   | team 时必填：`{leadAgent, memberAgents[]}`           |
 
 ## 资源声明
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `agents` | string[] | Agent 定义文件路径列表 |
+| 字段     | 类型     | 说明                                               |
+| -------- | -------- | -------------------------------------------------- |
+| `agents` | string[] | Agent 定义文件路径列表                             |
 | `skills` | string[] | Skill 目录路径列表（会被复制到 RongxinAI SKILLs/） |
 
 ## 展示字段（必填）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `displayName` | `{en, zh}` | 展示名称 |
-| `profession` | `{en, zh}` | 职业/定位。**Team 型须与 displayName 一致** |
-| `displayDescription` | `{en, zh}` | 展示描述。**中文 40-50字** |
-| `categoryId` | string | 行业分类 ID |
-| `defaultInitPrompt` | `{en, zh}` | 默认引导语。**须与 quickPrompts 第一条一致** |
-| `plugin` | string | 值与 `name` 一致 |
-| `tags` | `{en, zh}[]` | 擅长领域标签（**固定 3 个**） |
-| `quickPrompts` | `{en, zh}[]` | 推荐提示词（**固定 3 个**） |
+| 字段                 | 类型         | 说明                                         |
+| -------------------- | ------------ | -------------------------------------------- |
+| `displayName`        | `{en, zh}`   | 展示名称                                     |
+| `profession`         | `{en, zh}`   | 职业/定位。**Team 型须与 displayName 一致**  |
+| `displayDescription` | `{en, zh}`   | 展示描述。**中文 40-50字**                   |
+| `categoryId`         | string       | 行业分类 ID                                  |
+| `defaultInitPrompt`  | `{en, zh}`   | 默认引导语。**须与 quickPrompts 第一条一致** |
+| `plugin`             | string       | 值与 `name` 一致                             |
+| `tags`               | `{en, zh}[]` | 擅长领域标签（**固定 3 个**）                |
+| `quickPrompts`       | `{en, zh}[]` | 推荐提示词（**固定 3 个**）                  |
 
 ## Team 专用字段
 
-| 字段 | 说明 |
-|------|------|
+| 字段        | 说明                                                      |
+| ----------- | --------------------------------------------------------- |
 | `members[]` | 每个成员含 `{id, name:{en,zh}, profession:{en,zh}, role}` |
 
 - `role` 取值：`"lead"` 或 `"member"`
@@ -122,11 +122,7 @@
     "memberAgents": ["{member-a}", "{member-b}"]
   },
 
-  "agents": [
-    "./agents/{team}-team-lead.md",
-    "./agents/{member-a}.md",
-    "./agents/{member-b}.md"
-  ],
+  "agents": ["./agents/{team}-team-lead.md", "./agents/{member-a}.md", "./agents/{member-b}.md"],
 
   "displayName": {
     "en": "{English team name}",

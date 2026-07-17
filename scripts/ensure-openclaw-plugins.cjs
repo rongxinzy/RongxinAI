@@ -51,9 +51,13 @@ function copyDirRecursive(src, dest) {
  * based on the symlink target structure (../pkgName/relative/to/bin).
  */
 function fixBinSymlinks(baseDir) {
-  const walk = (dir) => {
+  const walk = dir => {
     let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
@@ -70,7 +74,7 @@ function fixBinSymlinks(baseDir) {
         const nmIdx = target.lastIndexOf(nmSegment);
         if (nmIdx === -1) continue;
         const relToNm = target.slice(nmIdx + nmSegment.length); // "qrcode/bin/qrcode"
-        const newTarget = path.join('..', relToNm);              // "../qrcode/bin/qrcode"
+        const newTarget = path.join('..', relToNm); // "../qrcode/bin/qrcode"
         try {
           fs.unlinkSync(full);
           fs.symlinkSync(newTarget, full);
@@ -183,9 +187,7 @@ function buildGitEnv() {
  * OPENCLAW_STATE_DIR to control where plugins are installed.
  */
 function runOpenClawCli(args, opts = {}) {
-  const openclawMjs = path.join(
-    rootDir, 'vendor', 'openclaw-runtime', 'current', 'openclaw.mjs'
-  );
+  const openclawMjs = path.join(rootDir, 'vendor', 'openclaw-runtime', 'current', 'openclaw.mjs');
 
   if (!fs.existsSync(openclawMjs)) {
     throw new Error(`OpenClaw CLI not found at ${openclawMjs}`);
@@ -206,7 +208,7 @@ function runOpenClawCli(args, opts = {}) {
     const stderr = (result.stderr || '').trim();
     throw new Error(
       `openclaw ${args.join(' ')} exited with code ${result.status}` +
-      (stderr ? `\n${stderr}` : '')
+        (stderr ? `\n${stderr}` : ''),
     );
   }
 
@@ -241,8 +243,7 @@ function npmPack(packSpec, registry, outputDir) {
   if (result.status !== 0) {
     const stderr = (result.stderr || '').trim();
     throw new Error(
-      `npm pack ${packSpec} exited with code ${result.status}` +
-      (stderr ? `\n${stderr}` : '')
+      `npm pack ${packSpec} exited with code ${result.status}` + (stderr ? `\n${stderr}` : ''),
     );
   }
 
@@ -277,7 +278,7 @@ function gitCloneAndPack(spec, version, outputDir) {
       const stderr = (initResult.stderr || '').trim();
       throw new Error(
         `git init ${sourceDir} exited with code ${initResult.status}` +
-        (stderr ? `\n${stderr}` : '')
+          (stderr ? `\n${stderr}` : ''),
       );
     }
 
@@ -289,13 +290,15 @@ function gitCloneAndPack(spec, version, outputDir) {
       timeout: 5 * 60 * 1000,
     });
     if (remoteResult.error) {
-      throw new Error(`git remote add origin ${parsed.cloneUrl} failed: ${remoteResult.error.message}`);
+      throw new Error(
+        `git remote add origin ${parsed.cloneUrl} failed: ${remoteResult.error.message}`,
+      );
     }
     if (remoteResult.status !== 0) {
       const stderr = (remoteResult.stderr || '').trim();
       throw new Error(
         `git remote add origin ${parsed.cloneUrl} exited with code ${remoteResult.status}` +
-        (stderr ? `\n${stderr}` : '')
+          (stderr ? `\n${stderr}` : ''),
       );
     }
 
@@ -307,13 +310,15 @@ function gitCloneAndPack(spec, version, outputDir) {
       timeout: 5 * 60 * 1000,
     });
     if (fetchResult.error) {
-      throw new Error(`git fetch ${parsed.cloneUrl} ${parsed.ref} failed: ${fetchResult.error.message}`);
+      throw new Error(
+        `git fetch ${parsed.cloneUrl} ${parsed.ref} failed: ${fetchResult.error.message}`,
+      );
     }
     if (fetchResult.status !== 0) {
       const stderr = (fetchResult.stderr || '').trim();
       throw new Error(
         `git fetch ${parsed.cloneUrl} ${parsed.ref} exited with code ${fetchResult.status}` +
-        (stderr ? `\n${stderr}` : '')
+          (stderr ? `\n${stderr}` : ''),
       );
     }
 
@@ -331,7 +336,7 @@ function gitCloneAndPack(spec, version, outputDir) {
       const stderr = (checkoutResult.stderr || '').trim();
       throw new Error(
         `git checkout FETCH_HEAD exited with code ${checkoutResult.status}` +
-        (stderr ? `\n${stderr}` : '')
+          (stderr ? `\n${stderr}` : ''),
       );
     }
   } else {
@@ -356,7 +361,7 @@ function gitCloneAndPack(spec, version, outputDir) {
       const stderr = (cloneResult.stderr || '').trim();
       throw new Error(
         `git clone ${parsed.cloneUrl} exited with code ${cloneResult.status}` +
-        (stderr ? `\n${stderr}` : '')
+          (stderr ? `\n${stderr}` : ''),
       );
     }
   }
@@ -423,7 +428,7 @@ function main() {
     if (!plugin.id || !plugin.npm || !plugin.version) {
       die(
         `Invalid plugin declaration: ${JSON.stringify(plugin)}. ` +
-        'Each plugin must have "id", "npm", and "version" fields.'
+          'Each plugin must have "id", "npm", and "version" fields.',
       );
     }
   }
@@ -502,7 +507,7 @@ function main() {
               npm_config_legacy_peer_deps: 'true',
             },
             stdio: 'inherit',
-          }
+          },
         );
 
         // The CLI installs to {OPENCLAW_STATE_DIR}/extensions/{pluginId}/
@@ -517,8 +522,10 @@ function main() {
           }
           // Use the first (and likely only) directory
           const actualDir = path.join(extDir, entries[0]);
-          if (!fs.existsSync(path.join(actualDir, 'openclaw.plugin.json')) &&
-              !fs.existsSync(path.join(actualDir, 'package.json'))) {
+          if (
+            !fs.existsSync(path.join(actualDir, 'openclaw.plugin.json')) &&
+            !fs.existsSync(path.join(actualDir, 'package.json'))
+          ) {
             throw new Error(`Installed plugin directory ${entries[0]} has no plugin manifest`);
           }
           // Copy the actual directory
@@ -549,9 +556,9 @@ function main() {
               installedAt: new Date().toISOString(),
             },
             null,
-            2
+            2,
           ) + '\n',
-          'utf-8'
+          'utf-8',
         );
 
         log(`Downloaded and cached ${id}@${version}.`);
@@ -612,7 +619,10 @@ function main() {
       const marker = 'configSchema: {';
       const idx = src.indexOf(marker);
       if (idx !== -1) {
-        src = src.slice(0, idx) + 'gatewayMethods: ["web.login.start", "web.login.wait"],\n  ' + src.slice(idx);
+        src =
+          src.slice(0, idx) +
+          'gatewayMethods: ["web.login.start", "web.login.wait"],\n  ' +
+          src.slice(idx);
         fs.writeFileSync(weixinChannelPath, src);
         log('Patched openclaw-weixin/src/channel.ts: added gatewayMethods declaration');
       }
@@ -627,7 +637,13 @@ function main() {
   // This causes all inbound messages from non-bot senders to be silently
   // dropped as "unauthorized" even when the config specifies dmPolicy:"open"
   // with allowFrom:["*"].  Patch it to read from deps.config.channels.
-  const weixinProcessMsgPath = path.join(runtimeExtensionsDir, 'openclaw-weixin', 'src', 'messaging', 'process-message.ts');
+  const weixinProcessMsgPath = path.join(
+    runtimeExtensionsDir,
+    'openclaw-weixin',
+    'src',
+    'messaging',
+    'process-message.ts',
+  );
   if (fs.existsSync(weixinProcessMsgPath)) {
     let pmSrc = fs.readFileSync(weixinProcessMsgPath, 'utf8');
     const dmPolicyPatchMarker = 'chanCfg_dmPolicy_patch';
@@ -643,13 +659,17 @@ function main() {
         pmSrc = pmSrc.replaceAll(oldDmPolicy, patchedDmPolicy);
         pmSrc = pmSrc.replace(
           oldAllowFrom,
-          `configuredAllowFrom: (() => { const _cc = (deps.config.channels)?.['openclaw-weixin'] ?? {}; return Array.isArray(_cc.allowFrom) ? _cc.allowFrom.map(String) : []; })(),`
+          `configuredAllowFrom: (() => { const _cc = (deps.config.channels)?.['openclaw-weixin'] ?? {}; return Array.isArray(_cc.allowFrom) ? _cc.allowFrom.map(String) : []; })(),`,
         );
         fs.writeFileSync(weixinProcessMsgPath, pmSrc);
-        log('Patched openclaw-weixin/src/messaging/process-message.ts: dmPolicy/allowFrom now read from config');
+        log(
+          'Patched openclaw-weixin/src/messaging/process-message.ts: dmPolicy/allowFrom now read from config',
+        );
       }
     } else {
-      log('openclaw-weixin/src/messaging/process-message.ts dmPolicy patch already applied, skipping');
+      log(
+        'openclaw-weixin/src/messaging/process-message.ts dmPolicy patch already applied, skipping',
+      );
     }
   }
 
@@ -733,7 +753,14 @@ exports.plugin = {
   //
   // Fix: after extracting the filename, detect Latin-1-garbled UTF-8 bytes
   // and re-decode them correctly.
-  const larkMediaPath = path.join(runtimeExtensionsDir, 'openclaw-lark', 'src', 'messaging', 'outbound', 'media.js');
+  const larkMediaPath = path.join(
+    runtimeExtensionsDir,
+    'openclaw-lark',
+    'src',
+    'messaging',
+    'outbound',
+    'media.js',
+  );
   if (fs.existsSync(larkMediaPath)) {
     let mediaSrc = fs.readFileSync(larkMediaPath, 'utf8');
     const patchMarker = 'fixLatin1GarbledUtf8';
@@ -769,7 +796,9 @@ function ${patchMarker}(name) {
           mediaSrc = mediaSrc.slice(0, fnIdx) + helperFn + mediaSrc.slice(fnIdx);
         }
         fs.writeFileSync(larkMediaPath, mediaSrc);
-        log('Patched openclaw-lark/media.js: fix Content-Disposition filename encoding for Chinese');
+        log(
+          'Patched openclaw-lark/media.js: fix Content-Disposition filename encoding for Chinese',
+        );
       } else {
         log('openclaw-lark/media.js: fileName assignment pattern not found, skipping patch');
       }
@@ -790,20 +819,26 @@ function ${patchMarker}(name) {
   // Fix: on Windows, normalise backslashes to forward slashes and use three
   // slashes after `file:` so the hostname is always empty.
   const dingtalkMsgHandlerPath = path.join(
-    runtimeExtensionsDir, 'dingtalk-connector', 'src', 'core', 'message-handler.ts'
+    runtimeExtensionsDir,
+    'dingtalk-connector',
+    'src',
+    'core',
+    'message-handler.ts',
   );
   if (fs.existsSync(dingtalkMsgHandlerPath)) {
     let dtSrc = fs.readFileSync(dingtalkMsgHandlerPath, 'utf8');
-    const brokenPattern = "imageLocalPaths.map(p => `![image](file://${p})`)";
+    const brokenPattern = 'imageLocalPaths.map(p => `![image](file://${p})`)';
     if (dtSrc.includes(brokenPattern)) {
       dtSrc = dtSrc.replace(
         brokenPattern,
-        "imageLocalPaths.map(p => { if (process.platform !== 'win32') return `![image](file://${p})`; const n = p.replace(/\\\\/g, '/'); return `![image](file:///${n})`; })"
+        "imageLocalPaths.map(p => { if (process.platform !== 'win32') return `![image](file://${p})`; const n = p.replace(/\\\\/g, '/'); return `![image](file:///${n})`; })",
       );
       fs.writeFileSync(dingtalkMsgHandlerPath, dtSrc);
       log('Patched dingtalk-connector/message-handler.ts: fixed file:// URL format for Windows');
     } else {
-      log('dingtalk-connector/message-handler.ts: file:// pattern not found or already patched, skipping');
+      log(
+        'dingtalk-connector/message-handler.ts: file:// pattern not found or already patched, skipping',
+      );
     }
   } else {
     log('dingtalk-connector not found, skipping file:// URL patch');

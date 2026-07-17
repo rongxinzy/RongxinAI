@@ -1,4 +1,4 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
   buildDingTalkSendParamsFromRoute,
@@ -86,19 +86,23 @@ test('route lookup can match DingTalk channel session keys discovered outside th
 
 test('delivery route extraction ignores incomplete session rows and non-dingtalk channels', () => {
   expect(extractOpenClawDeliveryRoute({ key: 'agent:main:zhiyuan:session-3' })).toBe(null);
-  expect(buildDingTalkSendParamsFromRoute({
-    channel: 'telegram',
-    to: 'chat:123',
-    accountId: 'default',
-  })).toBe(null);
+  expect(
+    buildDingTalkSendParamsFromRoute({
+      channel: 'telegram',
+      to: 'chat:123',
+      accountId: 'default',
+    }),
+  ).toBe(null);
 });
 
 test('legacy dingtalk route is still accepted for send params', () => {
-  expect(buildDingTalkSendParamsFromRoute({
-    channel: 'dingtalk',
-    to: 'user:legacy-user',
-    accountId: 'acct-1',
-  })).toEqual({
+  expect(
+    buildDingTalkSendParamsFromRoute({
+      channel: 'dingtalk',
+      to: 'user:legacy-user',
+      accountId: 'acct-1',
+    }),
+  ).toEqual({
     target: 'user:legacy-user',
     accountId: 'acct-1',
   });

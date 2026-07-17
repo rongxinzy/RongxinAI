@@ -6,7 +6,8 @@ const CIRCULAR_VALUE = '[circular]';
 const TRUNCATED_ITEMS_KEY = '__truncatedItems';
 const TRUNCATED_KEYS_KEY = '__truncatedKeys';
 
-export const SENSITIVE_LOG_KEY_PATTERN = /(api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token|bearer|credential|private[-_]?key|client[-_]?secret|app[-_]?secret|bot[-_]?token)/i;
+export const SENSITIVE_LOG_KEY_PATTERN =
+  /(api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token|bearer|credential|private[-_]?key|client[-_]?secret|app[-_]?secret|bot[-_]?token)/i;
 
 const TRANSPORT_ERROR_TEXT_PATTERNS = [
   /fetch failed/i,
@@ -25,16 +26,14 @@ const TRANSPORT_ERROR_TEXT_PATTERNS = [
 
 function sanitizeForLogInternal(value: unknown, seen: WeakSet<object>, keyName?: string): unknown {
   if (typeof value === 'string') {
-    return SENSITIVE_LOG_KEY_PATTERN.test(keyName || '')
-      ? REDACTED_VALUE
-      : truncateForLog(value);
+    return SENSITIVE_LOG_KEY_PATTERN.test(keyName || '') ? REDACTED_VALUE : truncateForLog(value);
   }
 
   if (
-    value === null
-    || value === undefined
-    || typeof value === 'number'
-    || typeof value === 'boolean'
+    value === null ||
+    value === undefined ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
   ) {
     return value;
   }
@@ -46,7 +45,7 @@ function sanitizeForLogInternal(value: unknown, seen: WeakSet<object>, keyName?:
   if (Array.isArray(value)) {
     const next = value
       .slice(0, MAX_LOG_ARRAY_ITEMS)
-      .map((item) => sanitizeForLogInternal(item, seen));
+      .map(item => sanitizeForLogInternal(item, seen));
     if (value.length > MAX_LOG_ARRAY_ITEMS) {
       next.push(`${TRUNCATED_ITEMS_KEY}:${value.length - MAX_LOG_ARRAY_ITEMS}`);
     }
@@ -92,5 +91,5 @@ export function looksLikeTransportErrorText(text: string): boolean {
   if (!normalized) {
     return false;
   }
-  return TRANSPORT_ERROR_TEXT_PATTERNS.some((pattern) => pattern.test(normalized));
+  return TRANSPORT_ERROR_TEXT_PATTERNS.some(pattern => pattern.test(normalized));
 }

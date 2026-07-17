@@ -211,7 +211,19 @@ const isLikelyLocalFilePath = (href: string): boolean => {
   const extMatch = base.match(/\.([A-Za-z0-9]{1,6})$/);
   if (!extMatch) return false;
   const ext = extMatch[1].toLowerCase();
-  const commonTlds = new Set(['com', 'net', 'org', 'io', 'cn', 'co', 'ai', 'app', 'dev', 'gov', 'edu']);
+  const commonTlds = new Set([
+    'com',
+    'net',
+    'org',
+    'io',
+    'cn',
+    'co',
+    'ai',
+    'app',
+    'dev',
+    'gov',
+    'edu',
+  ]);
   return !commonTlds.has(ext);
 };
 
@@ -229,7 +241,7 @@ const toFileHref = (filePath: string): string => {
 const getLocalPathFromLink = (
   href: string | null,
   text: string,
-  resolveLocalFilePath?: (href: string, text: string) => string | null
+  resolveLocalFilePath?: (href: string, text: string) => string | null,
 ): string | null => {
   if (!href) return null;
   const resolved = resolveLocalFilePath ? resolveLocalFilePath(href, text) : null;
@@ -243,7 +255,7 @@ const getLocalPathFromLink = (
 const findFallbackPathFromContext = (
   anchor: HTMLAnchorElement | null,
   fileName: string,
-  resolveLocalFilePath?: (href: string, text: string) => string | null
+  resolveLocalFilePath?: (href: string, text: string) => string | null,
 ): string | null => {
   const trimmedName = fileName.trim();
   if (!trimmedName || trimmedName.includes('/') || trimmedName.includes('\\')) {
@@ -280,7 +292,10 @@ const createMarkdownComponents = (
   onImageClick?: (image: { src: string; alt?: string | null }) => void,
 ) => ({
   p: ({ node: _node, className: _className, children, ...props }: any) => (
-    <p className="my-1 first:mt-0 last:mb-0 leading-[23px] text-foreground/90 wrap-break-word" {...props}>
+    <p
+      className="my-1 first:mt-0 last:mb-0 leading-[23px] text-foreground/90 wrap-break-word"
+      {...props}
+    >
       {children}
     </p>
   ),
@@ -320,13 +335,14 @@ const createMarkdownComponents = (
     </li>
   ),
   blockquote: ({ node: _node, className: _className, children, ...props }: any) => (
-    <blockquote className="border-l-4 border-primary pl-4 py-1 my-2 bg-surface-raised/30 rounded-r-lg text-foreground/90" {...props}>
+    <blockquote
+      className="border-l-4 border-primary pl-4 py-1 my-2 bg-surface-raised/30 rounded-r-lg text-foreground/90"
+      {...props}
+    >
       {children}
     </blockquote>
   ),
-  pre: ({ node: _node, className: _className, children }: any) => (
-    <>{children}</>
-  ),
+  pre: ({ node: _node, className: _className, children }: any) => <>{children}</>,
   code: CodeBlock,
   table: ({ node: _node, className: _className, children, ...props }: any) => (
     <div className="my-4 overflow-x-auto rounded-xl border border-border">
@@ -374,14 +390,14 @@ const createMarkdownComponents = (
         className={`max-w-full max-h-96 object-contain rounded-xl my-4${onImageClick ? ' cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
         src={resolvedSrc}
         alt={alt}
-        onClick={onImageClick && resolvedSrc ? () => onImageClick({ src: resolvedSrc, alt }) : undefined}
+        onClick={
+          onImageClick && resolvedSrc ? () => onImageClick({ src: resolvedSrc, alt }) : undefined
+        }
         {...props}
       />
     );
   },
-  hr: ({ node: _node, ...props }: any) => (
-    <hr className="my-5 border-border" {...props} />
-  ),
+  hr: ({ node: _node, ...props }: any) => <hr className="my-5 border-border" {...props} />,
   a: ({ node: _node, href, className: _className, children, ...props }: any) => {
     if (typeof href === 'string' && href.startsWith('#artifact-')) {
       return null;
@@ -390,14 +406,15 @@ const createMarkdownComponents = (
     const hrefValue = typeof href === 'string' ? href.trim() : '';
     const isExternalLink = !!hrefValue && isExternalHref(hrefValue);
     const linkText = Array.isArray(children) ? children.join('') : String(children ?? '');
-    const resolvedPath = hrefValue && !isExternalLink && resolveLocalFilePath
-      ? resolveLocalFilePath(hrefValue, linkText)
-      : null;
-    const isLocalFilePath = !!hrefValue && !isExternalLink && (resolvedPath || isLikelyLocalFilePath(hrefValue));
+    const resolvedPath =
+      hrefValue && !isExternalLink && resolveLocalFilePath
+        ? resolveLocalFilePath(hrefValue, linkText)
+        : null;
+    const isLocalFilePath =
+      !!hrefValue && !isExternalLink && (resolvedPath || isLikelyLocalFilePath(hrefValue));
 
     if (isLocalFilePath) {
-      const rawPath = resolvedPath
-        ?? stripFileProtocol(stripHashAndQuery(hrefValue));
+      const rawPath = resolvedPath ?? stripFileProtocol(stripHashAndQuery(hrefValue));
       const decodedPath = safeDecodeURIComponent(rawPath);
       const filePath = decodedPath || rawPath;
       const isDirectoryLink = looksLikeDirectory(filePath);
@@ -412,11 +429,7 @@ const createMarkdownComponents = (
             return;
           }
 
-          const fallbackPath = findFallbackPathFromContext(
-            anchor,
-            linkText,
-            resolveLocalFilePath
-          );
+          const fallbackPath = findFallbackPathFromContext(anchor, linkText, resolveLocalFilePath);
           if (fallbackPath) {
             const fallbackResult = await window.electron.shell.openPath(fallbackPath);
             if (!fallbackResult?.success) {
@@ -453,9 +466,9 @@ const createMarkdownComponents = (
           const fallbackPath = findFallbackPathFromContext(
             linkedAnchor,
             linkText,
-            resolveLocalFilePath
+            resolveLocalFilePath,
           );
-          if (fallbackPath && fallbackPath !== filePath && await tryReveal(fallbackPath)) {
+          if (fallbackPath && fallbackPath !== filePath && (await tryReveal(fallbackPath))) {
             return;
           }
 
@@ -558,9 +571,12 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
 }) => {
   const components = useMemo(
     () => createMarkdownComponents(resolveLocalFilePath, showRevealInFolderAction, onImageClick),
-    [resolveLocalFilePath, showRevealInFolderAction, onImageClick]
+    [resolveLocalFilePath, showRevealInFolderAction, onImageClick],
   );
-  const normalizedContent = useMemo(() => normalizeDisplayMath(encodeFileUrlsInMarkdown(content)), [content]);
+  const normalizedContent = useMemo(
+    () => normalizeDisplayMath(encodeFileUrlsInMarkdown(content)),
+    [content],
+  );
   return (
     <div className={`markdown-content text-[15px] leading-[23px] ${className}`}>
       <ReactMarkdown

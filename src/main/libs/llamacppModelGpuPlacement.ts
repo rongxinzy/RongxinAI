@@ -17,7 +17,7 @@ export const LlamaCppModelGpuPlacementMode = {
 } as const;
 
 export type LlamaCppModelGpuPlacementMode =
-  typeof LlamaCppModelGpuPlacementMode[keyof typeof LlamaCppModelGpuPlacementMode];
+  (typeof LlamaCppModelGpuPlacementMode)[keyof typeof LlamaCppModelGpuPlacementMode];
 
 export const LlamaCppModelGpuPlacementDefaults = {
   VramSafetyRatio: 0.8,
@@ -38,20 +38,20 @@ export type LlamaCppModelGpuPlacementInput = {
 
 export type LlamaCppModelGpuPlacementResult =
   | {
-    success: true;
-    mode: LlamaCppModelGpuPlacementMode;
-    input: LlamaCppModelLaunchInput;
-    selectedGpuIndexes?: number[];
-    requiredVramMiB?: number;
-    availableVramMiB?: number;
-  }
+      success: true;
+      mode: LlamaCppModelGpuPlacementMode;
+      input: LlamaCppModelLaunchInput;
+      selectedGpuIndexes?: number[];
+      requiredVramMiB?: number;
+      availableVramMiB?: number;
+    }
   | {
-    success: false;
-    reason: LlamaCppModelLoadFailureReasonType;
-    detail?: string;
-    requiredVramMiB?: number;
-    availableVramMiB?: number;
-  };
+      success: false;
+      reason: LlamaCppModelLoadFailureReasonType;
+      detail?: string;
+      requiredVramMiB?: number;
+      availableVramMiB?: number;
+    };
 
 type GpuMemoryCandidate = {
   index: number;
@@ -109,8 +109,12 @@ export function planLlamaCppModelGpuPlacement(
   }
 
   const requiredVramMiB = estimateRequiredVramMiB(input);
-  const sortedCandidates = [...candidates].sort((left, right) => right.memoryFreeMiB - left.memoryFreeMiB);
-  const singleGpu = sortedCandidates.find(candidate => hasEnoughVram(candidate.memoryFreeMiB, requiredVramMiB));
+  const sortedCandidates = [...candidates].sort(
+    (left, right) => right.memoryFreeMiB - left.memoryFreeMiB,
+  );
+  const singleGpu = sortedCandidates.find(candidate =>
+    hasEnoughVram(candidate.memoryFreeMiB, requiredVramMiB),
+  );
 
   if (singleGpu) {
     return createGpuPlacementSuccess({
@@ -150,12 +154,15 @@ export function estimateRequiredLlamaCppModelVramMiB(input: {
   modelSizeBytes?: number;
   ctxSize?: number;
 }): number {
-  const modelSizeMiB = input.modelSizeBytes && input.modelSizeBytes > 0
-    ? Math.ceil(input.modelSizeBytes / 1024 / 1024)
-    : 0;
-  const contextBufferMiB = input.ctxSize && input.ctxSize > 0
-    ? Math.ceil(input.ctxSize / 1024) * LlamaCppModelGpuPlacementDefaults.ContextBufferPer1024TokensMiB
-    : 0;
+  const modelSizeMiB =
+    input.modelSizeBytes && input.modelSizeBytes > 0
+      ? Math.ceil(input.modelSizeBytes / 1024 / 1024)
+      : 0;
+  const contextBufferMiB =
+    input.ctxSize && input.ctxSize > 0
+      ? Math.ceil(input.ctxSize / 1024) *
+        LlamaCppModelGpuPlacementDefaults.ContextBufferPer1024TokensMiB
+      : 0;
 
   return Math.ceil(
     modelSizeMiB * LlamaCppModelGpuPlacementDefaults.ModelSizeMultiplier + contextBufferMiB,
@@ -239,7 +246,9 @@ function getGpuProbeFailure(
   return null;
 }
 
-function getGpuMemoryCandidates(snapshot: NvidiaSmiSnapshot | null | undefined): GpuMemoryCandidate[] {
+function getGpuMemoryCandidates(
+  snapshot: NvidiaSmiSnapshot | null | undefined,
+): GpuMemoryCandidate[] {
   if (!snapshot?.available) return [];
 
   return snapshot.gpus
@@ -262,7 +271,9 @@ function hasEnoughVram(availableVramMiB: number, requiredVramMiB: number): boole
 }
 
 function createGpuPlacementSuccess(input: {
-  mode: typeof LlamaCppModelGpuPlacementMode.SingleGpu | typeof LlamaCppModelGpuPlacementMode.MultiGpu;
+  mode:
+    | typeof LlamaCppModelGpuPlacementMode.SingleGpu
+    | typeof LlamaCppModelGpuPlacementMode.MultiGpu;
   launchInput: LlamaCppModelLaunchInput;
   selectedGpuIndexes: number[];
   requiredVramMiB: number;

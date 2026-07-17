@@ -24,52 +24,68 @@ test('llama.cpp service defaults are explicit and stable', () => {
 
 test('resolveAutomaticLlamaCppContextSize uses the local two-tier VRAM defaults', () => {
   expect(resolveAutomaticLlamaCppContextSize(null)).toBe('8192');
-  expect(resolveAutomaticLlamaCppContextSize({
-    source: 'nvidia-smi',
-    available: true,
-    checkedAt: '2026-07-03T00:00:00.000Z',
-    gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 4096 }],
-  })).toBe('8192');
-  expect(resolveAutomaticLlamaCppContextSize({
-    source: 'nvidia-smi',
-    available: true,
-    checkedAt: '2026-07-03T00:00:00.000Z',
-    gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 19 * 1024 }],
-  })).toBe('8192');
-  expect(resolveAutomaticLlamaCppContextSize({
-    source: 'nvidia-smi',
-    available: true,
-    checkedAt: '2026-07-03T00:00:00.000Z',
-    gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 20 * 1024 }],
-  })).toBe('32768');
-});
-
-test('applyAutomaticLlamaCppServiceDefaults fills ctxSize only when unset', () => {
-  expect(applyAutomaticLlamaCppServiceDefaults({
-    host: '127.0.0.1',
-  }, {
-    nvidiaSnapshot: {
+  expect(
+    resolveAutomaticLlamaCppContextSize({
+      source: 'nvidia-smi',
+      available: true,
+      checkedAt: '2026-07-03T00:00:00.000Z',
+      gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 4096 }],
+    }),
+  ).toBe('8192');
+  expect(
+    resolveAutomaticLlamaCppContextSize({
       source: 'nvidia-smi',
       available: true,
       checkedAt: '2026-07-03T00:00:00.000Z',
       gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 19 * 1024 }],
-    },
-  })).toEqual({
+    }),
+  ).toBe('8192');
+  expect(
+    resolveAutomaticLlamaCppContextSize({
+      source: 'nvidia-smi',
+      available: true,
+      checkedAt: '2026-07-03T00:00:00.000Z',
+      gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 20 * 1024 }],
+    }),
+  ).toBe('32768');
+});
+
+test('applyAutomaticLlamaCppServiceDefaults fills ctxSize only when unset', () => {
+  expect(
+    applyAutomaticLlamaCppServiceDefaults(
+      {
+        host: '127.0.0.1',
+      },
+      {
+        nvidiaSnapshot: {
+          source: 'nvidia-smi',
+          available: true,
+          checkedAt: '2026-07-03T00:00:00.000Z',
+          gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 19 * 1024 }],
+        },
+      },
+    ),
+  ).toEqual({
     host: '127.0.0.1',
     ctxSize: '8192',
   });
 
-  expect(applyAutomaticLlamaCppServiceDefaults({
-    host: '127.0.0.1',
-    ctxSize: '8192',
-  }, {
-    nvidiaSnapshot: {
-      source: 'nvidia-smi',
-      available: true,
-      checkedAt: '2026-07-03T00:00:00.000Z',
-      gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 48 * 1024 }],
-    },
-  })).toEqual({
+  expect(
+    applyAutomaticLlamaCppServiceDefaults(
+      {
+        host: '127.0.0.1',
+        ctxSize: '8192',
+      },
+      {
+        nvidiaSnapshot: {
+          source: 'nvidia-smi',
+          available: true,
+          checkedAt: '2026-07-03T00:00:00.000Z',
+          gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: 48 * 1024 }],
+        },
+      },
+    ),
+  ).toEqual({
     host: '127.0.0.1',
     ctxSize: '8192',
   });

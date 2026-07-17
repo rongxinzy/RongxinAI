@@ -1,7 +1,10 @@
 import { Button } from '@shared/components/ui/button';
 import React from 'react';
 
-import { AppUpdateStatus, type AppUpdateStatus as AppUpdateStatusValue } from '../../../shared/appUpdate/constants';
+import {
+  AppUpdateStatus,
+  type AppUpdateStatus as AppUpdateStatusValue,
+} from '../../../shared/appUpdate/constants';
 import { i18nService } from '../../services/i18n';
 
 interface AppUpdateBadgeProps {
@@ -11,13 +14,14 @@ interface AppUpdateBadgeProps {
 }
 
 const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, onClick }) => {
-  const label = status === AppUpdateStatus.Ready
-    ? i18nService.t('updateReadyPill')
-    : status === AppUpdateStatus.Downloading
-      ? i18nService.t('updateDownloadingPill')
-      : status === AppUpdateStatus.Error
-        ? i18nService.t('updateErrorPill')
-        : i18nService.t('updateAvailablePill');
+  const label =
+    status === AppUpdateStatus.Ready
+      ? i18nService.t('updateReadyPill')
+      : status === AppUpdateStatus.Downloading
+        ? i18nService.t('updateDownloadingPill')
+        : status === AppUpdateStatus.Error
+          ? i18nService.t('updateErrorPill')
+          : i18nService.t('updateAvailablePill');
 
   return (
     <Button

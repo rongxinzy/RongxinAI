@@ -11,10 +11,7 @@ import fs from 'fs';
 import path from 'path';
 
 import type { SqliteStore } from '../sqliteStore';
-import {
-  getMainAgentWorkspacePath,
-  syncMemoryFileOnWorkspaceChange,
-} from './openclawMemoryFile';
+import { getMainAgentWorkspacePath, syncMemoryFileOnWorkspaceChange } from './openclawMemoryFile';
 
 const TAG = '[OpenClaw Migration]';
 const MIGRATION_KEY = 'migration.mainAgentWorkspace.v3.completed';
@@ -29,8 +26,8 @@ type CopyResult = {
 
 function mergeResult(results: CopyResult[]): CopyResult {
   return {
-    changed: results.some((result) => result.changed),
-    error: results.some((result) => result.error),
+    changed: results.some(result => result.changed),
+    error: results.some(result => result.error),
   };
 }
 
@@ -83,7 +80,10 @@ function copyFilePreservingDestination(src: string, dest: string): CopyResult {
     console.warn(`${TAG} Preserved conflicting file as ${conflictPath}`);
     return { changed: true, error: false };
   } catch (err) {
-    console.warn(`${TAG} Failed to copy ${src} to ${dest}:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `${TAG} Failed to copy ${src} to ${dest}:`,
+      err instanceof Error ? err.message : err,
+    );
     return { changed: false, error: true };
   }
 }
@@ -106,7 +106,10 @@ function copyIfNeeded(src: string, dest: string): CopyResult {
     fs.writeFileSync(dest, srcContent, 'utf8');
     return { changed: true, error: false };
   } catch (err) {
-    console.warn(`${TAG} Failed to copy ${src} to ${dest}:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `${TAG} Failed to copy ${src} to ${dest}:`,
+      err instanceof Error ? err.message : err,
+    );
     return { changed: false, error: true };
   }
 }
@@ -133,7 +136,10 @@ function mergeDirIfNeeded(src: string, dest: string): CopyResult {
     }
     return mergeResult(results);
   } catch (err) {
-    console.warn(`${TAG} Failed to merge directory ${src} to ${dest}:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `${TAG} Failed to merge directory ${src} to ${dest}:`,
+      err instanceof Error ? err.message : err,
+    );
     return { changed: false, error: true };
   }
 }
@@ -182,7 +188,10 @@ function mergeAgentsMdUserContent(src: string, dest: string): CopyResult {
     fs.writeFileSync(dest, nextContent, 'utf8');
     return { changed: true, error: false };
   } catch (err) {
-    console.warn(`${TAG} Failed to migrate AGENTS.md user content:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `${TAG} Failed to migrate AGENTS.md user content:`,
+      err instanceof Error ? err.message : err,
+    );
     return { changed: false, error: true };
   }
 }
@@ -202,13 +211,18 @@ export function migrateMainAgentWorkspace(
   const oldDir = (oldWorkingDirectory || '').trim();
   const newDir = getMainAgentWorkspacePath(stateDir);
 
-  console.log(`${TAG} Starting main agent workspace migration: ${oldDir || '(empty)'} to ${newDir}`);
+  console.log(
+    `${TAG} Starting main agent workspace migration: ${oldDir || '(empty)'} to ${newDir}`,
+  );
 
   // Ensure destination exists
   try {
     fs.mkdirSync(newDir, { recursive: true });
   } catch (err) {
-    console.warn(`${TAG} Failed to create destination workspace:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `${TAG} Failed to create destination workspace:`,
+      err instanceof Error ? err.message : err,
+    );
     return;
   }
 
@@ -241,7 +255,9 @@ export function migrateMainAgentWorkspace(
   // 2. Migrate MEMORY.md via merge-dedup
   try {
     const result = syncMemoryFileOnWorkspaceChange(oldDir, newDir);
-    console.log(`${TAG} MEMORY.md migration: synced=${result.synced}${result.error ? `, error=${result.error}` : ''}`);
+    console.log(
+      `${TAG} MEMORY.md migration: synced=${result.synced}${result.error ? `, error=${result.error}` : ''}`,
+    );
     if (result.error) {
       results.push({ changed: false, error: true });
     }
@@ -272,8 +288,10 @@ export function migrateMainAgentWorkspace(
     }
   }
 
-  if (results.some((result) => result.error)) {
-    console.warn(`${TAG} Main agent workspace migration completed with errors; it will retry on next startup`);
+  if (results.some(result => result.error)) {
+    console.warn(
+      `${TAG} Main agent workspace migration completed with errors; it will retry on next startup`,
+    );
     return;
   }
 

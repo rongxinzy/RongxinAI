@@ -4,7 +4,13 @@
 import { describe, test } from 'vitest';
 
 import { runChannelProbeContract } from './channel-probe.contract';
-import { buildProbeResult, makeAuthCheckFail, makeAuthCheckPass, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  buildProbeResult,
+  makeAuthCheckFail,
+  makeAuthCheckPass,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 describe('Channel probe contract: wecom', () => {
   test('missing_credentials path conforms to contract', () => {
@@ -15,7 +21,11 @@ describe('Channel probe contract: wecom', () => {
     runChannelProbeContract({
       platform: 'wecom',
       result: buildProbeResult('wecom', {
-        checks: [makeAuthCheckPass('wwxxx'), makeGatewayRunningCheck(), makeInboundActivityCheck('pass')],
+        checks: [
+          makeAuthCheckPass('wwxxx'),
+          makeGatewayRunningCheck(),
+          makeInboundActivityCheck('pass'),
+        ],
       }),
     });
   });

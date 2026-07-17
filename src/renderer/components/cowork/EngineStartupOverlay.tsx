@@ -51,11 +51,11 @@ const EngineStartupOverlay: React.FC = () => {
   }, [clearHideTimer]);
 
   useEffect(() => {
-    coworkService.getOpenClawEngineStatus().then((s) => {
+    coworkService.getOpenClawEngineStatus().then(s => {
       if (s) setStatus(s);
     });
 
-    const unsubscribe = coworkService.onOpenClawEngineStatus((s) => {
+    const unsubscribe = coworkService.onOpenClawEngineStatus(s => {
       setStatus(s);
 
       const shouldShow = s.phase === 'starting' || s.phase === 'compiling' || s.phase === 'error';
@@ -77,13 +77,16 @@ const EngineStartupOverlay: React.FC = () => {
   }, [clearHideTimer]);
 
   const retry = useCallback(() => {
-    coworkService.restartOpenClawGateway().catch(() => { /* handled by status event */ });
+    coworkService.restartOpenClawGateway().catch(() => {
+      /* handled by status event */
+    });
   }, []);
 
-  const displayStatus = status &&
+  const displayStatus =
+    status &&
     (status.phase === 'starting' || status.phase === 'compiling' || status.phase === 'error')
-    ? status
-    : stickyStatusRef.current;
+      ? status
+      : stickyStatusRef.current;
 
   if (!visible || !displayStatus) {
     return null;
@@ -92,9 +95,10 @@ const EngineStartupOverlay: React.FC = () => {
   const isStarting = displayStatus.phase === 'starting' || displayStatus.phase === 'compiling';
   const isError = displayStatus.phase === 'error';
 
-  const progressPercent = typeof displayStatus.progressPercent === 'number'
-    ? Math.max(0, Math.min(100, Math.round(displayStatus.progressPercent)))
-    : null;
+  const progressPercent =
+    typeof displayStatus.progressPercent === 'number'
+      ? Math.max(0, Math.min(100, Math.round(displayStatus.progressPercent)))
+      : null;
 
   const tone = isError
     ? {
@@ -157,11 +161,11 @@ export function useGatewayReady(): boolean {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    coworkService.getOpenClawEngineStatus().then((s) => {
+    coworkService.getOpenClawEngineStatus().then(s => {
       setReady(s?.phase === 'running');
     });
 
-    const unsubscribe = coworkService.onOpenClawEngineStatus((s) => {
+    const unsubscribe = coworkService.onOpenClawEngineStatus(s => {
       setReady(s.phase === 'running');
     });
 

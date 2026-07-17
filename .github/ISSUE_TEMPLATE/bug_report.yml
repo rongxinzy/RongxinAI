@@ -60,7 +60,7 @@ body:
       placeholder: |
         - OS: 
         - ZhiYuanAgent Version: 
-        - Node.js Version: 
+        - Node.js Version:
     validations:
       required: true
 

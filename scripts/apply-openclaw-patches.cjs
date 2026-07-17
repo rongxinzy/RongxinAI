@@ -47,11 +47,14 @@ if (!fs.existsSync(path.join(openclawSrc, 'package.json'))) {
 }
 
 if (!fs.existsSync(patchesDir)) {
-  console.log(`[apply-openclaw-patches] No patches directory for ${openclawVersion}, nothing to do.`);
+  console.log(
+    `[apply-openclaw-patches] No patches directory for ${openclawVersion}, nothing to do.`,
+  );
   process.exit(0);
 }
 
-const patchFiles = fs.readdirSync(patchesDir)
+const patchFiles = fs
+  .readdirSync(patchesDir)
   .filter(f => f.endsWith('.patch'))
   .sort();
 
@@ -60,7 +63,9 @@ if (patchFiles.length === 0) {
   process.exit(0);
 }
 
-console.log(`[apply-openclaw-patches] Applying patches for openclaw ${openclawVersion} (${patchFiles.length} file(s))`);
+console.log(
+  `[apply-openclaw-patches] Applying patches for openclaw ${openclawVersion} (${patchFiles.length} file(s))`,
+);
 
 // Reset openclaw source to a clean tag state before applying patches.
 // This removes stale patches left by a different ZhiYuanAgent branch that may have
@@ -139,15 +144,21 @@ for (const patchFile of patchFiles) {
       const patchDoesNotApply = stderr.includes('patch does not apply');
 
       if (alreadyExists || patchDoesNotApply) {
-        console.log(`[apply-openclaw-patches] Already applied (forward check confirms): ${patchFile}`);
+        console.log(
+          `[apply-openclaw-patches] Already applied (forward check confirms): ${patchFile}`,
+        );
         skipped++;
         continue;
       }
 
       // Genuinely cannot apply — report error.
       console.error(`[apply-openclaw-patches] Patch does not apply cleanly: ${patchFile}`);
-      console.error(`[apply-openclaw-patches] This usually means the openclaw version has changed.`);
-      console.error(`[apply-openclaw-patches] Regenerate patches or update to match the new source.`);
+      console.error(
+        `[apply-openclaw-patches] This usually means the openclaw version has changed.`,
+      );
+      console.error(
+        `[apply-openclaw-patches] Regenerate patches or update to match the new source.`,
+      );
       if (stderr) console.error(stderr);
       process.exit(1);
     }
@@ -169,9 +180,13 @@ for (const patchFile of patchFiles) {
   } finally {
     // Clean up temporary normalized patch file.
     if (needsNormalize && fs.existsSync(patchPath)) {
-      try { fs.unlinkSync(patchPath); } catch {}
+      try {
+        fs.unlinkSync(patchPath);
+      } catch {}
     }
   }
 }
 
-console.log(`[apply-openclaw-patches] Done. Applied: ${applied}, Skipped (already applied): ${skipped}`);
+console.log(
+  `[apply-openclaw-patches] Done. Applied: ${applied}, Skipped (already applied): ${skipped}`,
+);

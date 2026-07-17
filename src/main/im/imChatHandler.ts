@@ -6,10 +6,7 @@
 import axios from 'axios';
 
 import { buildIMMediaInstruction } from './imMediaInstruction';
-import {
-  IMMessage,
-  IMSettings,
-} from './types';
+import { IMMessage, IMSettings } from './types';
 
 // LLM Configuration interface (mirrors app_config structure)
 interface LLMConfig {
@@ -58,18 +55,14 @@ export class IMChatHandler {
     if (this.options.imSettings.skillsEnabled && this.options.getSkillsPrompt) {
       const skillsPrompt = await this.options.getSkillsPrompt();
       if (skillsPrompt) {
-        systemPrompt = systemPrompt
-          ? `${systemPrompt}\n\n${skillsPrompt}`
-          : skillsPrompt;
+        systemPrompt = systemPrompt ? `${systemPrompt}\n\n${skillsPrompt}` : skillsPrompt;
       }
     }
 
     // Append IM media sending instruction
     const mediaInstruction = buildIMMediaInstruction(this.options.imSettings);
     if (mediaInstruction) {
-      systemPrompt = systemPrompt
-        ? `${systemPrompt}\n\n${mediaInstruction}`
-        : mediaInstruction;
+      systemPrompt = systemPrompt ? `${systemPrompt}\n\n${mediaInstruction}` : mediaInstruction;
     }
 
     // Call LLM API
@@ -83,7 +76,7 @@ export class IMChatHandler {
   private async callLLM(
     config: LLMConfig,
     userMessage: string,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<string> {
     const provider = this.detectProvider(config);
 
@@ -115,9 +108,9 @@ export class IMChatHandler {
     }
 
     const isGeminiLike =
-      config.provider === 'gemini'
-      || config.model?.startsWith('gemini')
-      || normalized.includes('generativelanguage.googleapis.com');
+      config.provider === 'gemini' ||
+      config.model?.startsWith('gemini') ||
+      normalized.includes('generativelanguage.googleapis.com');
     if (isGeminiLike) {
       if (normalized.endsWith('/v1beta/openai') || normalized.endsWith('/v1/openai')) {
         return `${normalized}/chat/completions`;
@@ -164,10 +157,12 @@ export class IMChatHandler {
     const resolvedModel = normalizedModel.includes('/')
       ? normalizedModel.slice(normalizedModel.lastIndexOf('/') + 1)
       : normalizedModel;
-    return resolvedModel.startsWith('gpt-5')
-      || resolvedModel.startsWith('o1')
-      || resolvedModel.startsWith('o3')
-      || resolvedModel.startsWith('o4');
+    return (
+      resolvedModel.startsWith('gpt-5') ||
+      resolvedModel.startsWith('o1') ||
+      resolvedModel.startsWith('o3') ||
+      resolvedModel.startsWith('o4')
+    );
   }
 
   /**
@@ -176,7 +171,7 @@ export class IMChatHandler {
   private async callAnthropicAPI(
     config: LLMConfig,
     userMessage: string,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<string> {
     const url = `${config.baseUrl.replace(/\/$/, '')}/v1/messages`;
 
@@ -216,7 +211,7 @@ export class IMChatHandler {
   private async callOpenAICompatibleAPI(
     config: LLMConfig,
     userMessage: string,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<string> {
     const useResponsesApi = this.shouldUseOpenAIResponsesApi(config);
     const url = useResponsesApi
@@ -291,7 +286,7 @@ export class IMChatHandler {
    * Process message with streaming (for AI cards)
    */
   async *processMessageStream(
-    message: IMMessage
+    message: IMMessage,
   ): AsyncGenerator<{ content: string; done: boolean }> {
     const llmConfig = await this.options.getLLMConfig();
     if (!llmConfig) {
@@ -306,9 +301,7 @@ export class IMChatHandler {
     if (this.options.imSettings.skillsEnabled && this.options.getSkillsPrompt) {
       const skillsPrompt = await this.options.getSkillsPrompt();
       if (skillsPrompt) {
-        systemPrompt = systemPrompt
-          ? `${systemPrompt}\n\n${skillsPrompt}`
-          : skillsPrompt;
+        systemPrompt = systemPrompt ? `${systemPrompt}\n\n${skillsPrompt}` : skillsPrompt;
       }
     }
 

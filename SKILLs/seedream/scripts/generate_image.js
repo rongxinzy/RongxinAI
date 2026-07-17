@@ -47,7 +47,7 @@ function validateConfig() {
     printInfo('  export ARK_API_KEY="你的API密钥"');
     printInfo('');
     printInfo('  # 永久生效（推荐）');
-    printInfo("  echo 'export ARK_API_KEY=\"你的API密钥\"' >> ~/.zshrc");
+    printInfo('  echo \'export ARK_API_KEY="你的API密钥"\' >> ~/.zshrc');
     printInfo('  source ~/.zshrc');
     printInfo('');
     printInfo('【Windows PowerShell】');
@@ -55,7 +55,9 @@ function validateConfig() {
     printInfo('  $env:ARK_API_KEY="你的API密钥"');
     printInfo('');
     printInfo('  # 永久生效（推荐）');
-    printInfo("  [System.Environment]::SetEnvironmentVariable('ARK_API_KEY', '你的API密钥', 'User')");
+    printInfo(
+      "  [System.Environment]::SetEnvironmentVariable('ARK_API_KEY', '你的API密钥', 'User')",
+    );
     printInfo('');
     printInfo('【验证设置】');
     printInfo('  # macOS/Linux');
@@ -85,7 +87,7 @@ function getMimeType(ext) {
     '.bmp': 'image/bmp',
     '.tiff': 'image/tiff',
     '.tif': 'image/tiff',
-    '.heic': 'image/heic'
+    '.heic': 'image/heic',
   };
   return extToMime[ext.toLowerCase()] || 'image/jpeg';
 }
@@ -143,15 +145,15 @@ async function makeRequest(method, urlStr, headers, body = null) {
       method: method,
       headers: {
         'User-Agent': 'SeedreamImageGenerator/1.0',
-        ...headers
+        ...headers,
       },
-      timeout: 120000
+      timeout: 120000,
     };
 
-    const req = client.request(options, (res) => {
+    const req = client.request(options, res => {
       let data = '';
 
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         data += chunk;
       });
 
@@ -161,13 +163,13 @@ async function makeRequest(method, urlStr, headers, body = null) {
           resolve({
             status: res.statusCode,
             data: result,
-            headers: res.headers
+            headers: res.headers,
           });
         } catch (e) {
           resolve({
             status: res.statusCode,
             data: data,
-            headers: res.headers
+            headers: res.headers,
           });
         }
       });
@@ -198,12 +200,12 @@ async function downloadFile(urlStr, outputPath) {
       path: urlObj.pathname + urlObj.search,
       method: 'GET',
       headers: {
-        'User-Agent': 'SeedreamImageGenerator/1.0'
+        'User-Agent': 'SeedreamImageGenerator/1.0',
       },
-      timeout: 60000
+      timeout: 60000,
     };
 
-    const req = client.request(options, (res) => {
+    const req = client.request(options, res => {
       if (res.statusCode !== 200) {
         reject(new Error(`下载失败 (HTTP ${res.statusCode})`));
         return;
@@ -219,7 +221,7 @@ async function downloadFile(urlStr, outputPath) {
 
       const file = fs.createWriteStream(outputPath);
 
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         downloaded += chunk.length;
         if (totalSize > 0) {
           const percent = Math.floor((downloaded * 100) / totalSize);
@@ -237,7 +239,7 @@ async function downloadFile(urlStr, outputPath) {
         resolve();
       });
 
-      file.on('error', (err) => {
+      file.on('error', err => {
         fs.unlink(outputPath, () => {});
         reject(err);
       });
@@ -260,7 +262,7 @@ async function generateImage(prompt, imagePaths = null, options = {}) {
     watermark = true,
     sequential = false,
     maxImages = 4,
-    enableSearch = false
+    enableSearch = false,
   } = options;
 
   // 构建请求payload
@@ -269,7 +271,7 @@ async function generateImage(prompt, imagePaths = null, options = {}) {
     prompt,
     size,
     response_format: 'url',
-    watermark
+    watermark,
   };
 
   // 添加图片
@@ -338,18 +340,17 @@ async function generateImage(prompt, imagePaths = null, options = {}) {
       `${BASE_URL}/images/generations`,
       {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
+        Authorization: `Bearer ${API_KEY}`,
       },
-      payload
+      payload,
     );
 
     if (response.status !== 200) {
       let errorMsg = `HTTP ${response.status}`;
       if (typeof response.data === 'object' && response.data.error) {
         const errorDetail = response.data.error;
-        errorMsg = typeof errorDetail === 'object'
-          ? errorDetail.message || errorMsg
-          : String(errorDetail);
+        errorMsg =
+          typeof errorDetail === 'object' ? errorDetail.message || errorMsg : String(errorDetail);
       }
 
       if (response.status === 401) {
@@ -387,7 +388,7 @@ async function main() {
     sequential: false,
     'max-images': 4,
     search: false,
-    output: 'generated_image.png'
+    output: 'generated_image.png',
   };
 
   // 解析命令行参数
@@ -444,8 +445,8 @@ async function main() {
         watermark: !options['no-watermark'],
         sequential: options.sequential,
         maxImages: options['max-images'],
-        enableSearch: options.search
-      }
+        enableSearch: options.search,
+      },
     );
 
     // 下载图片
@@ -524,7 +525,7 @@ async function main() {
 }
 
 // 捕获未处理的 Promise 拒绝
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', err => {
   printError(`未处理的错误: ${err.message}`);
   process.exit(1);
 });

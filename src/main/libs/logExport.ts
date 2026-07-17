@@ -26,7 +26,7 @@ export async function exportLogsZip(input: ExportLogsZipInput): Promise<ExportLo
   // pipeline() can reject immediately instead of hanging until timeout.
   // Cast needed because @types/yazl types outputStream as NodeJS.ReadableStream,
   // but the runtime value is a PassThrough which has destroy().
-  zipFile.on('error', (err) => {
+  zipFile.on('error', err => {
     (zipFile.outputStream as unknown as { destroy(err: Error): void }).destroy(err as Error);
   });
 
@@ -77,7 +77,11 @@ export async function exportLogsZip(input: ExportLogsZipInput): Promise<ExportLo
     outputStream.destroy();
     pipelinePromise.catch(() => {});
     // Remove the partial zip so users don't find a corrupt file on disk.
-    try { fs.unlinkSync(input.outputPath); } catch { /* ignore cleanup errors */ }
+    try {
+      fs.unlinkSync(input.outputPath);
+    } catch {
+      /* ignore cleanup errors */
+    }
     throw err;
   } finally {
     clearTimeout(timer);

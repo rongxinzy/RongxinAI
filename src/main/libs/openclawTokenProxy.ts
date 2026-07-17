@@ -17,7 +17,9 @@ export type OpenClawTokenProxyConfig = {
   getServerBaseUrl: () => string;
 };
 
-export function startOpenClawTokenProxy(config: OpenClawTokenProxyConfig): Promise<{ port: number }> {
+export function startOpenClawTokenProxy(
+  config: OpenClawTokenProxyConfig,
+): Promise<{ port: number }> {
   tokenGetter = config.getAuthTokens;
   tokenRefresher = config.refreshToken;
   serverBaseUrlGetter = config.getServerBaseUrl;
@@ -47,7 +49,7 @@ export function startOpenClawTokenProxy(config: OpenClawTokenProxyConfig): Promi
       }
     });
 
-    server.on('error', (err) => {
+    server.on('error', err => {
       console.error('[OpenClawTokenProxy] server error:', err);
       reject(err);
     });
@@ -94,13 +96,25 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const upstreamPath = `/api/proxy${req.url || '/'}`;
     const upstreamUrl = `${serverBaseUrl}${upstreamPath}`;
 
-    const result = await forwardRequest(upstreamUrl, req.method || 'POST', tokens.accessToken, body, req.headers);
+    const result = await forwardRequest(
+      upstreamUrl,
+      req.method || 'POST',
+      tokens.accessToken,
+      body,
+      req.headers,
+    );
 
     if ((result.status === 401 || result.status === 403) && tokenRefresher) {
       console.log(`[OpenClawTokenProxy] received ${result.status}, attempting token refresh`);
       const newToken = await tokenRefresher('openclaw-proxy');
       if (newToken) {
-        const retryResult = await forwardRequest(upstreamUrl, req.method || 'POST', newToken, body, req.headers);
+        const retryResult = await forwardRequest(
+          upstreamUrl,
+          req.method || 'POST',
+          newToken,
+          body,
+          req.headers,
+        );
         pipeResponse(retryResult, res);
         return;
       }
@@ -131,7 +145,7 @@ async function forwardRequest(
   incomingHeaders: http.IncomingHttpHeaders,
 ): Promise<UpstreamResult> {
   const headers: Record<string, string> = {
-    'Authorization': `Bearer ${accessToken}`,
+    Authorization: `Bearer ${accessToken}`,
     'Content-Type': incomingHeaders['content-type'] || 'application/json',
   };
 
@@ -175,7 +189,11 @@ async function forwardRequest(
 function pipeResponse(result: UpstreamResult, res: http.ServerResponse): void {
   res.writeHead(result.status, result.headers);
 
-  if (result.isStream && 'pipe' in result.body && typeof (result.body as NodeJS.ReadableStream).pipe === 'function') {
+  if (
+    result.isStream &&
+    'pipe' in result.body &&
+    typeof (result.body as NodeJS.ReadableStream).pipe === 'function'
+  ) {
     (result.body as NodeJS.ReadableStream).pipe(res);
   } else if (Buffer.isBuffer(result.body)) {
     res.end(result.body);
@@ -184,17 +202,20 @@ function pipeResponse(result: UpstreamResult, res: http.ServerResponse): void {
     const webStream = result.body as unknown as ReadableStream<Uint8Array>;
     const reader = webStream.getReader();
     const pump = (): void => {
-      reader.read().then(({ done, value }) => {
-        if (done) {
+      reader
+        .read()
+        .then(({ done, value }) => {
+          if (done) {
+            res.end();
+            return;
+          }
+          res.write(value);
+          pump();
+        })
+        .catch(err => {
+          console.error('[OpenClawTokenProxy] stream read error:', err);
           res.end();
-          return;
-        }
-        res.write(value);
-        pump();
-      }).catch((err) => {
-        console.error('[OpenClawTokenProxy] stream read error:', err);
-        res.end();
-      });
+        });
     };
     pump();
   }

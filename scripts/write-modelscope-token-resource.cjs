@@ -45,16 +45,20 @@ function splitTokens(value) {
 
 function main() {
   const localEnv = readLocalDotEnv();
-  const tokens = [...new Set([
-    ...splitTokens(process.env.MODELSCOPE_TOKENS),
-    ...splitTokens(process.env.MODELSCOPE_TOKEN),
-    ...splitTokens(localEnv.MODELSCOPE_TOKENS),
-    ...splitTokens(localEnv.MODELSCOPE_TOKEN),
-  ])];
+  const tokens = [
+    ...new Set([
+      ...splitTokens(process.env.MODELSCOPE_TOKENS),
+      ...splitTokens(process.env.MODELSCOPE_TOKEN),
+      ...splitTokens(localEnv.MODELSCOPE_TOKENS),
+      ...splitTokens(localEnv.MODELSCOPE_TOKEN),
+    ]),
+  ];
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify({ tokens }, null, 2) + '\n', 'utf-8');
-  console.log(`[ModelScope] wrote ${tokens.length} token(s) to resources/modelscope.tokens.local.json`);
+  console.log(
+    `[ModelScope] wrote ${tokens.length} token(s) to resources/modelscope.tokens.local.json`,
+  );
 }
 
 main();

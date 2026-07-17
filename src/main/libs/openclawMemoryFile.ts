@@ -184,7 +184,7 @@ export function parseMemoryMd(content: string): OpenClawMemoryEntry[] {
  */
 export function serializeMemoryMd(entries: OpenClawMemoryEntry[]): string {
   if (entries.length === 0) return `${HEADER}\n`;
-  const lines = entries.map((e) => formatMemoryLine(e));
+  const lines = entries.map(e => formatMemoryLine(e));
   return `${HEADER}\n\n${lines.join('\n')}\n`;
 }
 
@@ -204,10 +204,7 @@ export function serializeMemoryMd(entries: OpenClawMemoryEntry[]): string {
  *      - Other bullet lines → keep as-is.
  *   4. Append genuinely new entries (not present in original) at the end.
  */
-function rebuildMemoryMd(
-  originalContent: string,
-  entries: OpenClawMemoryEntry[],
-): string {
+function rebuildMemoryMd(originalContent: string, entries: OpenClawMemoryEntry[]): string {
   if (!originalContent.trim()) {
     return serializeMemoryMd(entries);
   }
@@ -220,7 +217,7 @@ function rebuildMemoryMd(
 
   // Parse original bullets to know what existed before
   const originalEntries = parseMemoryMd(originalContent);
-  const originalIds = new Set(originalEntries.map((e) => e.id));
+  const originalIds = new Set(originalEntries.map(e => e.id));
 
   // Identify new entries (not in original) to append later
   const newEntries: OpenClawMemoryEntry[] = [];
@@ -258,7 +255,7 @@ function rebuildMemoryMd(
             // Keep it at its original position, preserving source if available
             const desiredText = desiredById.get(fp)!;
             // Look up the full entry to preserve source metadata
-            const desiredEntry = entries.find((e) => e.text === desiredText);
+            const desiredEntry = entries.find(e => e.text === desiredText);
             const source = desiredEntry?.source || parseSourceFromLine(line.trim());
             // Preserve original indentation
             const indent = line.match(/^(\s*)/)?.[1] ?? '';
@@ -301,8 +298,8 @@ function rebuildMemoryMd(
   // matched to an original bullet (e.g. entries whose text was updated,
   // producing a new id). These are effectively "updated" entries that
   // lost their positional anchor.
-  const remaining = entries.filter((e) => {
-    return !newEntries.some((ne) => ne.id === e.id) && desiredById.has(e.id);
+  const remaining = entries.filter(e => {
+    return !newEntries.some(ne => ne.id === e.id) && desiredById.has(e.id);
   });
   if (remaining.length > 0) {
     const lastLine = result[result.length - 1];
@@ -333,7 +330,10 @@ function readFileOrEmpty(filePath: string): string {
       return fs.readFileSync(filePath, 'utf8');
     }
   } catch (error) {
-    console.warn(`${TAG} Failed to read file ${filePath}:`, error instanceof Error ? error.message : error);
+    console.warn(
+      `${TAG} Failed to read file ${filePath}:`,
+      error instanceof Error ? error.message : error,
+    );
   }
   return '';
 }
@@ -369,7 +369,7 @@ export function addMemoryEntry(
     source: source || null,
   };
 
-  if (entries.some((e) => e.id === entry.id)) {
+  if (entries.some(e => e.id === entry.id)) {
     console.log(`${TAG} addMemoryEntry: duplicate skipped (id=${entry.id.slice(0, 8)}…)`);
     return entry;
   }
@@ -379,7 +379,9 @@ export function addMemoryEntry(
   const sourceInfo = entry.source
     ? ` [source:s=${entry.source.sessionId}:r=${entry.source.role}:t=${entry.source.date}]`
     : '';
-  console.log(`${TAG} addMemoryEntry: added "${trimmed.slice(0, 40)}…" (id=${entry.id.slice(0, 8)}…)${sourceInfo}`);
+  console.log(
+    `${TAG} addMemoryEntry: added "${trimmed.slice(0, 40)}…" (id=${entry.id.slice(0, 8)}…)${sourceInfo}`,
+  );
   return entry;
 }
 
@@ -392,7 +394,7 @@ export function updateMemoryEntry(
   if (!trimmed) throw new Error('Memory text is required');
 
   const entries = readMemoryEntries(filePath);
-  const idx = entries.findIndex((e) => e.id === id);
+  const idx = entries.findIndex(e => e.id === id);
   if (idx === -1) {
     console.warn(`${TAG} updateMemoryEntry: entry not found (id=${id.slice(0, 8)}…)`);
     return null;
@@ -413,26 +415,25 @@ export function updateMemoryEntry(
 
 export function deleteMemoryEntry(filePath: string, id: string): boolean {
   const entries = readMemoryEntries(filePath);
-  const target = entries.find((e) => e.id === id);
-  const filtered = entries.filter((e) => e.id !== id);
+  const target = entries.find(e => e.id === id);
+  const filtered = entries.filter(e => e.id !== id);
   if (filtered.length === entries.length) {
     console.warn(`${TAG} deleteMemoryEntry: entry not found (id=${id.slice(0, 8)}…)`);
     return false;
   }
 
   writeMemoryEntries(filePath, filtered);
-  console.log(`${TAG} deleteMemoryEntry: removed "${target?.text.slice(0, 40)}…" (${entries.length} → ${filtered.length})`);
+  console.log(
+    `${TAG} deleteMemoryEntry: removed "${target?.text.slice(0, 40)}…" (${entries.length} → ${filtered.length})`,
+  );
   return true;
 }
 
-export function searchMemoryEntries(
-  filePath: string,
-  query: string,
-): OpenClawMemoryEntry[] {
+export function searchMemoryEntries(filePath: string, query: string): OpenClawMemoryEntry[] {
   const q = query.toLowerCase().trim();
   if (!q) return readMemoryEntries(filePath);
   const all = readMemoryEntries(filePath);
-  const results = all.filter((e) => e.text.toLowerCase().includes(q));
+  const results = all.filter(e => e.text.toLowerCase().includes(q));
   console.log(`${TAG} searchMemoryEntries: query="${q}" → ${results.length}/${all.length} matched`);
   return results;
 }
@@ -454,10 +455,7 @@ export interface MigrationDataSource {
  * Migrate old SQLite user_memories to MEMORY.md.
  * Returns the number of entries migrated (0 if already done or nothing to migrate).
  */
-export function migrateSqliteToMemoryMd(
-  filePath: string,
-  source: MigrationDataSource,
-): number {
+export function migrateSqliteToMemoryMd(filePath: string, source: MigrationDataSource): number {
   if (source.isMigrationDone()) return 0;
 
   console.log(`${TAG} Migration: starting SQLite → MEMORY.md migration (target: ${filePath})`);
@@ -473,7 +471,7 @@ export function migrateSqliteToMemoryMd(
 
   try {
     const existing = readMemoryEntries(filePath);
-    const existingIds = new Set(existing.map((e) => e.id));
+    const existingIds = new Set(existing.map(e => e.id));
     console.log(`${TAG} Migration: MEMORY.md has ${existing.length} existing entries`);
 
     let added = 0;
@@ -495,7 +493,9 @@ export function migrateSqliteToMemoryMd(
       writeMemoryEntries(filePath, existing);
     }
 
-    console.log(`${TAG} Migration: completed — added=${added}, skipped(duplicate)=${skipped}, total=${existing.length}`);
+    console.log(
+      `${TAG} Migration: completed — added=${added}, skipped(duplicate)=${skipped}, total=${existing.length}`,
+    );
     source.markMigrationDone();
     return added;
   } catch (error) {
@@ -509,8 +509,10 @@ export function migrateSqliteToMemoryMd(
 // Bootstrap file management (IDENTITY.md, USER.md, SOUL.md)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_IDENTITY_ZH = '你是知远智能体，英文产品名是 ZhiYuan Agent。知远智能体 (ZhiYuan Agent) 是北京容芯致远的产品；只有当用户询问产品归属、公司背景或品牌关系时才说明公司信息。知远智能体和 ZhiYuan Agent 是唯一正式产品名，不要翻译、缩写、替换或改写成其他品牌、代号、模型名、运行时名称或预设角色。用户问你是谁时，只回答“我是知远智能体。”如有帮助，可补充“英文名是 ZhiYuan Agent。”OpenClaw、Ollama 和 Cowork 是底层实现细节，只有在用户询问运行时、本地模型或集成方式时才说明。你可以在应用授权范围内协助处理本地文件、代码、文档、网页搜索、定时任务和办公自动化。';
-const DEFAULT_IDENTITY_EN = 'You are 知远智能体 (ZhiYuan Agent). The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent. 知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远; mention the company only when the user asks about product ownership, company background, or brand affiliation. Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, shorten, replace, or paraphrase them into any other brand, codename, model name, runtime name, or preset role. When asked who you are, answer only with the official product identity. In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体." In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details. You can help with local files, code, documents, web research, scheduled tasks, and productivity automation within the app\'s available permissions.';
+const DEFAULT_IDENTITY_ZH =
+  '你是知远智能体，英文产品名是 ZhiYuan Agent。知远智能体 (ZhiYuan Agent) 是北京容芯致远的产品；只有当用户询问产品归属、公司背景或品牌关系时才说明公司信息。知远智能体和 ZhiYuan Agent 是唯一正式产品名，不要翻译、缩写、替换或改写成其他品牌、代号、模型名、运行时名称或预设角色。用户问你是谁时，只回答“我是知远智能体。”如有帮助，可补充“英文名是 ZhiYuan Agent。”OpenClaw、Ollama 和 Cowork 是底层实现细节，只有在用户询问运行时、本地模型或集成方式时才说明。你可以在应用授权范围内协助处理本地文件、代码、文档、网页搜索、定时任务和办公自动化。';
+const DEFAULT_IDENTITY_EN =
+  'You are 知远智能体 (ZhiYuan Agent). The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent. 知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远; mention the company only when the user asks about product ownership, company background, or brand affiliation. Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, shorten, replace, or paraphrase them into any other brand, codename, model name, runtime name, or preset role. When asked who you are, answer only with the official product identity. In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体." In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details. You can help with local files, code, documents, web research, scheduled tasks, and productivity automation within the app\'s available permissions.';
 
 function getDefaultIdentity(): string {
   try {
@@ -525,7 +527,9 @@ const BOOTSTRAP_ALLOWLIST = new Set(['IDENTITY.md', 'USER.md', 'SOUL.md']);
 
 function validateBootstrapFilename(filename: string): void {
   if (!BOOTSTRAP_ALLOWLIST.has(filename)) {
-    throw new Error(`Invalid bootstrap filename: ${filename}. Allowed: ${[...BOOTSTRAP_ALLOWLIST].join(', ')}`);
+    throw new Error(
+      `Invalid bootstrap filename: ${filename}. Allowed: ${[...BOOTSTRAP_ALLOWLIST].join(', ')}`,
+    );
   }
 }
 
@@ -535,7 +539,10 @@ function validateBootstrapFilename(filename: string): void {
  * NOTE: The parameter represents the agent's workspace path (e.g. from
  * `getMainAgentWorkspacePath()`), not the user-visible working directory.
  */
-export function resolveBootstrapFilePath(workingDirectory: string | undefined, filename: string): string {
+export function resolveBootstrapFilePath(
+  workingDirectory: string | undefined,
+  filename: string,
+): string {
   validateBootstrapFilename(filename);
   const dir = (workingDirectory || '').trim();
   return path.join(dir || DEFAULT_OPENCLAW_WORKSPACE, filename);
@@ -552,11 +559,17 @@ export function readBootstrapFile(workingDirectory: string | undefined, filename
 /**
  * Write content to a bootstrap file, creating the directory if needed.
  */
-export function writeBootstrapFile(workingDirectory: string | undefined, filename: string, content: string): void {
+export function writeBootstrapFile(
+  workingDirectory: string | undefined,
+  filename: string,
+  content: string,
+): void {
   const filePath = resolveBootstrapFilePath(workingDirectory, filename);
   ensureDir(filePath);
   fs.writeFileSync(filePath, content, 'utf8');
-  console.log(`${TAG} writeBootstrapFile: wrote ${filename} (${content.length} chars) to ${filePath}`);
+  console.log(
+    `${TAG} writeBootstrapFile: wrote ${filename} (${content.length} chars) to ${filePath}`,
+  );
 }
 
 /**
@@ -590,9 +603,7 @@ export function buildMemorySource(
   role: MemorySource['role'],
   date?: string,
 ): MemorySource {
-  const shortId = sessionId
-    ? sessionId.replace(/-/g, '').slice(0, 8)
-    : null;
+  const shortId = sessionId ? sessionId.replace(/-/g, '').slice(0, 8) : null;
   return {
     sessionId: shortId,
     role,
@@ -639,7 +650,7 @@ export function syncMemoryFileOnWorkspaceChange(
     }
 
     const newEntries = readMemoryEntries(newPath);
-    const newIds = new Set(newEntries.map((e) => e.id));
+    const newIds = new Set(newEntries.map(e => e.id));
 
     let added = 0;
     for (const entry of oldEntries) {
@@ -664,7 +675,9 @@ export function syncMemoryFileOnWorkspaceChange(
       fs.mkdirSync(memoryDir, { recursive: true });
     }
 
-    console.log(`${TAG} Workspace sync: done — copied ${added} new entries (old=${oldEntries.length}, new total=${newEntries.length})`);
+    console.log(
+      `${TAG} Workspace sync: done — copied ${added} new entries (old=${oldEntries.length}, new total=${newEntries.length})`,
+    );
     return { synced: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

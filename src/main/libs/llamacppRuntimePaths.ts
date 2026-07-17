@@ -10,10 +10,7 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import {
-  LlamaCppRuntimeBackend,
-  LlamaCppRuntimeCudaMajor,
-} from '../../shared/llamacpp';
+import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { isPathInside } from './llamacppModelCatalog';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { resolveLlamaCppRuntimeTargetId } from './llamacppRuntimeInstaller';
@@ -82,10 +79,9 @@ export function buildLlamaCppExecutableCandidates(input: {
 }): string[] {
   const extension = input.platform === 'win32' ? '.exe' : '';
   const join = (...segments: string[]) =>
-    (
-      input.platform === 'win32'
-        ? path.win32.join(...segments)
-        : path.posix.join(...segments)
+    (input.platform === 'win32'
+      ? path.win32.join(...segments)
+      : path.posix.join(...segments)
     ).replace(/\\/g, '/');
   const candidates = [
     input.envPath?.trim(),
@@ -99,10 +95,33 @@ export function buildLlamaCppExecutableCandidates(input: {
   if (!input.isPackaged) {
     candidates.push(
       join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-      join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'build', 'bin', `llama-server${extension}`),
-      join(input.appRoot, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
+      join(
+        input.appRoot,
+        'vendor',
+        'llamacpp-runtime',
+        'current',
+        'build',
+        'bin',
+        `llama-server${extension}`,
+      ),
+      join(
+        input.appRoot,
+        'vendor',
+        'llamacpp-runtime',
+        'current',
+        'bin',
+        `llama-server${extension}`,
+      ),
       join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', `llama-server${extension}`),
-      join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'build', 'bin', `llama-server${extension}`),
+      join(
+        input.cwd,
+        'vendor',
+        'llamacpp-runtime',
+        'current',
+        'build',
+        'bin',
+        `llama-server${extension}`,
+      ),
       join(input.cwd, 'vendor', 'llamacpp-runtime', 'current', 'bin', `llama-server${extension}`),
       '/opt/homebrew/bin/llama-server',
       '/usr/local/bin/llama-server',
@@ -205,15 +224,10 @@ export function resolveLlamaCppRuntimeMetadata(
   };
 }
 
-export function resolveExecutableDir(
-  executablePath: string,
-  platform: NodeJS.Platform,
-): string {
+export function resolveExecutableDir(executablePath: string, platform: NodeJS.Platform): string {
   const normalizedPath = executablePath.trim();
   if (!normalizedPath) return '';
-  return platform === 'win32'
-    ? path.win32.dirname(normalizedPath)
-    : path.dirname(normalizedPath);
+  return platform === 'win32' ? path.win32.dirname(normalizedPath) : path.dirname(normalizedPath);
 }
 
 export function prependEnvPathEntry(
@@ -226,7 +240,10 @@ export function prependEnvPathEntry(
   const key = Object.keys(env).find(name => name.toUpperCase() === variableName) ?? variableName;
   const currentValue = env[key]?.trim() ?? '';
   const entries = currentValue
-    ? currentValue.split(delimiter).map(item => item.trim()).filter(Boolean)
+    ? currentValue
+        .split(delimiter)
+        .map(item => item.trim())
+        .filter(Boolean)
     : [];
   if (entries.includes(entry)) {
     env[key] = entries.join(delimiter);
@@ -249,12 +266,14 @@ function getManagedRuntimeRootForExecutable(executablePath: string): string | un
   return undefined;
 }
 
-function readRuntimeBuildMetadata(runtimeRoot: string): {
-  target?: string;
-  backend?: string;
-  version?: string;
-  source?: string;
-} | undefined {
+function readRuntimeBuildMetadata(runtimeRoot: string):
+  | {
+      target?: string;
+      backend?: string;
+      version?: string;
+      source?: string;
+    }
+  | undefined {
   const buildInfoPath = path.join(runtimeRoot, 'runtime-build-info.json');
   try {
     const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8')) as {
@@ -264,7 +283,8 @@ function readRuntimeBuildMetadata(runtimeRoot: string): {
       version?: string;
       source?: string;
     };
-    const target = buildInfo.target?.trim() || buildInfo.targetId?.trim() || buildInfo.backend?.trim();
+    const target =
+      buildInfo.target?.trim() || buildInfo.targetId?.trim() || buildInfo.backend?.trim();
     return {
       ...(target ? { target } : {}),
       ...(buildInfo.backend?.trim() ? { backend: buildInfo.backend.trim() } : {}),

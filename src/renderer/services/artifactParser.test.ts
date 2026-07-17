@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
-import { normalizeFilePathForDedup, parseFileLinksFromMessage, parseFilePathsFromText, parseToolArtifact } from './artifactParser';
+import {
+  normalizeFilePathForDedup,
+  parseFileLinksFromMessage,
+  parseFilePathsFromText,
+  parseToolArtifact,
+} from './artifactParser';
 
 describe('normalizeFilePathForDedup', () => {
   test('strips leading / before Windows drive letter', () => {
@@ -89,7 +94,8 @@ describe('parseToolArtifact', () => {
     const linkArtifacts = parseFileLinksFromMessage(linkContent, 'msg1', 'sess1');
     expect(linkArtifacts).toHaveLength(1);
 
-    expect(normalizeFilePathForDedup(toolPath))
-      .toBe(normalizeFilePathForDedup(linkArtifacts[0].filePath!));
+    expect(normalizeFilePathForDedup(toolPath)).toBe(
+      normalizeFilePathForDedup(linkArtifacts[0].filePath!),
+    );
   });
 });

@@ -17,7 +17,7 @@ const IMAP_ID = {
   name: 'moltbot',
   version: '0.0.1',
   vendor: 'netease',
-  'support-email': 'kefu@188.com'
+  'support-email': 'kefu@188.com',
 };
 
 const DEFAULT_MAILBOX = process.env.IMAP_MAILBOX || 'INBOX';
@@ -58,7 +58,9 @@ function createImapConfig() {
     connTimeout: 10000,
     authTimeout: 10000,
   };
-  console.error(`[imap-debug] Config: host=${config.host}, port=${config.port}, user=${config.user}, tls=${config.tls}, rejectUnauthorized=${config.tlsOptions.rejectUnauthorized}, hasPassword=${!!config.password}`);
+  console.error(
+    `[imap-debug] Config: host=${config.host}, port=${config.port}, user=${config.user}, tls=${config.tls}, rejectUnauthorized=${config.tlsOptions.rejectUnauthorized}, hasPassword=${!!config.password}`,
+  );
   return config;
 }
 
@@ -77,7 +79,7 @@ async function connect() {
       console.error('[imap-debug] Connection ready, sending ID command...');
       // Send IMAP ID command for 163.com compatibility
       if (typeof imap.id === 'function') {
-        imap.id(IMAP_ID, (err) => {
+        imap.id(IMAP_ID, err => {
           if (err) {
             console.warn('[imap-debug] Warning: IMAP ID command failed:', err.message);
           } else {
@@ -92,8 +94,15 @@ async function connect() {
       }
     });
 
-    imap.once('error', (err) => {
-      console.error('[imap-debug] Connection error:', err.message, 'code:', err.code, 'source:', err.source);
+    imap.once('error', err => {
+      console.error(
+        '[imap-debug] Connection error:',
+        err.message,
+        'code:',
+        err.code,
+        'source:',
+        err.source,
+      );
       reject(new Error(`IMAP connection failed: ${err.message}`));
     });
 
@@ -129,13 +138,13 @@ function searchMessages(imap, criteria, fetchOptions) {
       const fetch = imap.fetch(results, fetchOptions);
       const messages = [];
 
-      fetch.on('message', (msg) => {
+      fetch.on('message', msg => {
         const parts = [];
 
         msg.on('body', (stream, info) => {
           let buffer = '';
 
-          stream.on('data', (chunk) => {
+          stream.on('data', chunk => {
             buffer += chunk.toString('utf8');
           });
 
@@ -144,8 +153,8 @@ function searchMessages(imap, criteria, fetchOptions) {
           });
         });
 
-        msg.once('attributes', (attrs) => {
-          parts.forEach((part) => {
+        msg.once('attributes', attrs => {
+          parts.forEach(part => {
             part.attributes = attrs;
           });
         });
@@ -157,7 +166,7 @@ function searchMessages(imap, criteria, fetchOptions) {
         });
       });
 
-      fetch.once('error', (err) => {
+      fetch.once('error', err => {
         reject(err);
       });
 
@@ -175,7 +184,9 @@ async function parseEmail(bodyStr, { includeAttachments = false, summaryOnly = f
 
   const snippet = parsed.text
     ? parsed.text.slice(0, 200)
-    : (parsed.html ? parsed.html.slice(0, 200).replace(/<[^>]*>/g, '') : '');
+    : parsed.html
+      ? parsed.html.slice(0, 200).replace(/<[^>]*>/g, '')
+      : '';
 
   // Format date as ISO 8601 with local timezone offset (e.g. "2026-03-03T07:50:00+08:00")
   // This avoids JSON.stringify converting Date to UTC, and is consistent across all platforms
@@ -187,14 +198,15 @@ async function parseEmail(bodyStr, { includeAttachments = false, summaryOnly = f
       console.error(`[imap-debug] date ISO(UTC): ${d.toISOString()}`);
       console.error(`[imap-debug] date toString(local): ${d.toString()}`);
       console.error(`[imap-debug] date timezoneOffset: ${d.getTimezoneOffset()} min`);
-      const pad = (n) => String(n).padStart(2, '0');
+      const pad = n => String(n).padStart(2, '0');
       const tzOffset = -d.getTimezoneOffset();
       const sign = tzOffset >= 0 ? '+' : '-';
       const tzHours = pad(Math.floor(Math.abs(tzOffset) / 60));
       const tzMinutes = pad(Math.abs(tzOffset) % 60);
-      dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-        + `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-        + `${sign}${tzHours}:${tzMinutes}`;
+      dateStr =
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+        `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+        `${sign}${tzHours}:${tzMinutes}`;
       console.error(`[imap-debug] date formatted: ${dateStr}`);
     } catch (e) {
       dateStr = parsed.date.toISOString();
@@ -207,7 +219,7 @@ async function parseEmail(bodyStr, { includeAttachments = false, summaryOnly = f
     subject: parsed.subject || '(no subject)',
     date: dateStr,
     snippet,
-    attachments: parsed.attachments?.map((a) => ({
+    attachments: parsed.attachments?.map(a => ({
       filename: a.filename,
       contentType: a.contentType,
       size: a.size,
@@ -226,7 +238,12 @@ async function parseEmail(bodyStr, { includeAttachments = false, summaryOnly = f
 }
 
 // Check for new/unread emails
-async function checkEmails(mailbox = DEFAULT_MAILBOX, limit = 10, recentTime = null, unreadOnly = false) {
+async function checkEmails(
+  mailbox = DEFAULT_MAILBOX,
+  limit = 10,
+  recentTime = null,
+  unreadOnly = false,
+) {
   const imap = await connect();
 
   try {
@@ -249,11 +266,13 @@ async function checkEmails(mailbox = DEFAULT_MAILBOX, limit = 10, recentTime = n
     const messages = await searchMessages(imap, searchCriteria, fetchOptions);
 
     // Sort by date (newest first) - parse from message attributes
-    const sortedMessages = messages.sort((a, b) => {
-      const dateA = a.attributes.date ? new Date(a.attributes.date) : new Date(0);
-      const dateB = b.attributes.date ? new Date(b.attributes.date) : new Date(0);
-      return dateB - dateA;
-    }).slice(0, limit);
+    const sortedMessages = messages
+      .sort((a, b) => {
+        const dateA = a.attributes.date ? new Date(a.attributes.date) : new Date(0);
+        const dateB = b.attributes.date ? new Date(b.attributes.date) : new Date(0);
+        return dateB - dateA;
+      })
+      .slice(0, limit);
 
     const results = [];
 
@@ -307,7 +326,12 @@ async function fetchEmail(uid, mailbox = DEFAULT_MAILBOX) {
 }
 
 // Download attachments from email
-async function downloadAttachments(uid, mailbox = DEFAULT_MAILBOX, outputDir = '.', specificFilename = null) {
+async function downloadAttachments(
+  uid,
+  mailbox = DEFAULT_MAILBOX,
+  outputDir = '.',
+  specificFilename = null,
+) {
   const imap = await connect();
 
   try {
@@ -440,11 +464,13 @@ async function searchEmails(options) {
     const results = [];
 
     // Sort by date (newest first)
-    const sortedMessages = messages.sort((a, b) => {
-      const dateA = a.attributes.date ? new Date(a.attributes.date) : new Date(0);
-      const dateB = b.attributes.date ? new Date(b.attributes.date) : new Date(0);
-      return dateB - dateA;
-    }).slice(0, limit);
+    const sortedMessages = messages
+      .sort((a, b) => {
+        const dateA = a.attributes.date ? new Date(a.attributes.date) : new Date(0);
+        const dateB = b.attributes.date ? new Date(b.attributes.date) : new Date(0);
+        return dateB - dateA;
+      })
+      .slice(0, limit);
 
     for (const item of sortedMessages) {
       const parsed = await parseEmail(item.body, { summaryOnly: true });
@@ -469,7 +495,7 @@ async function markAsRead(uids, mailbox = DEFAULT_MAILBOX) {
     await openBox(imap, mailbox);
 
     return new Promise((resolve, reject) => {
-      imap.addFlags(uids, '\\Seen', (err) => {
+      imap.addFlags(uids, '\\Seen', err => {
         if (err) reject(err);
         else resolve({ success: true, uids, action: 'marked as read' });
       });
@@ -487,7 +513,7 @@ async function markAsUnread(uids, mailbox = DEFAULT_MAILBOX) {
     await openBox(imap, mailbox);
 
     return new Promise((resolve, reject) => {
-      imap.delFlags(uids, '\\Seen', (err) => {
+      imap.delFlags(uids, '\\Seen', err => {
         if (err) reject(err);
         else resolve({ success: true, uids, action: 'marked as unread' });
       });
@@ -544,7 +570,7 @@ async function main() {
           options.mailbox || DEFAULT_MAILBOX,
           parseInt(options.limit) || 10,
           options.recent || null,
-          options.unseen === 'true' // if --unseen is set, only get unread messages
+          options.unseen === 'true', // if --unseen is set, only get unread messages
         );
         break;
 
@@ -559,7 +585,12 @@ async function main() {
         if (!positional[0]) {
           throw new Error('UID required: node imap.js download <uid>');
         }
-        result = await downloadAttachments(positional[0], options.mailbox, options.dir || '.', options.file || null);
+        result = await downloadAttachments(
+          positional[0],
+          options.mailbox,
+          options.dir || '.',
+          options.file || null,
+        );
         break;
 
       case 'search':
@@ -586,7 +617,9 @@ async function main() {
 
       default:
         console.error('Unknown command:', command);
-        console.error('Available commands: check, fetch, download, search, mark-read, mark-unread, list-mailboxes');
+        console.error(
+          'Available commands: check, fetch, download, search, mark-read, mark-unread, list-mailboxes',
+        );
         process.exit(1);
     }
 

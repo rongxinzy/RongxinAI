@@ -1,6 +1,10 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
-import { analyzeIMReply, FAILED_REMINDER_FAILURE_REPLY,UNSCHEDULED_REMINDER_FAILURE_REPLY } from './imReplyGuard';
+import {
+  analyzeIMReply,
+  FAILED_REMINDER_FAILURE_REPLY,
+  UNSCHEDULED_REMINDER_FAILURE_REPLY,
+} from './imReplyGuard';
 
 test('guards IM reminder commitment when no cron.add succeeded', () => {
   const analysis = analyzeIMReply([

@@ -1,7 +1,13 @@
 import { store } from '../store';
-import { setAuthLoading, setLoggedIn, setLoggedOut, setProfileSummary,updateQuota } from '../store/slices/authSlice';
+import {
+  setAuthLoading,
+  setLoggedIn,
+  setLoggedOut,
+  setProfileSummary,
+  updateQuota,
+} from '../store/slices/authSlice';
 import type { Model } from '../store/slices/modelSlice';
-import { clearServerModels,setServerModels } from '../store/slices/modelSlice';
+import { clearServerModels, setServerModels } from '../store/slices/modelSlice';
 
 class AuthService {
   private unsubCallback: (() => void) | null = null;
@@ -41,7 +47,7 @@ class AuthService {
     });
 
     // Refresh quota and models when Electron window gains focus — user may have purchased on portal
-    this.unsubWindowState = window.electron.window.onStateChanged((state) => {
+    this.unsubWindowState = window.electron.window.onStateChanged(state => {
       if (state.isFocused && store.getState().auth.isLoggedIn) {
         const now = Date.now();
         if (now - this.lastRefreshTime > 30_000) {
@@ -148,15 +154,23 @@ class AuthService {
     try {
       const modelsResult = await window.electron.auth.getModels();
       if (modelsResult.success && modelsResult.models) {
-        const serverModels: Model[] = modelsResult.models.map((m: { modelId: string; modelName: string; provider: string; apiFormat: string; supportsImage?: boolean }) => ({
-          id: m.modelId,
-          name: m.modelName,
-          provider: m.provider,
-          providerKey: 'zhiyuan-server',
-          isServerModel: true,
-          serverApiFormat: m.apiFormat,
-          supportsImage: m.supportsImage ?? false,
-        }));
+        const serverModels: Model[] = modelsResult.models.map(
+          (m: {
+            modelId: string;
+            modelName: string;
+            provider: string;
+            apiFormat: string;
+            supportsImage?: boolean;
+          }) => ({
+            id: m.modelId,
+            name: m.modelName,
+            provider: m.provider,
+            providerKey: 'zhiyuan-server',
+            isServerModel: true,
+            serverApiFormat: m.apiFormat,
+            supportsImage: m.supportsImage ?? false,
+          }),
+        );
         store.dispatch(setServerModels(serverModels));
       }
     } catch {

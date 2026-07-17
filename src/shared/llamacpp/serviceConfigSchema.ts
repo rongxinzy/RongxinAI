@@ -19,7 +19,7 @@ export const LlamaCppStructuredServiceFieldKey = {
 } as const;
 
 export type LlamaCppStructuredServiceFieldKey =
-  typeof LlamaCppStructuredServiceFieldKey[keyof typeof LlamaCppStructuredServiceFieldKey];
+  (typeof LlamaCppStructuredServiceFieldKey)[keyof typeof LlamaCppStructuredServiceFieldKey];
 
 export const LLAMACPP_STRUCTURED_SERVICE_FIELD_KEYS = [
   LlamaCppStructuredServiceFieldKey.ModelsMax,
@@ -54,7 +54,7 @@ export const LlamaCppStructuredServiceFieldErrorCode = {
 } as const;
 
 export type LlamaCppStructuredServiceFieldErrorCode =
-  typeof LlamaCppStructuredServiceFieldErrorCode[keyof typeof LlamaCppStructuredServiceFieldErrorCode];
+  (typeof LlamaCppStructuredServiceFieldErrorCode)[keyof typeof LlamaCppStructuredServiceFieldErrorCode];
 
 export type LlamaCppStructuredServiceFieldError = {
   code: LlamaCppStructuredServiceFieldErrorCode;
@@ -62,14 +62,13 @@ export type LlamaCppStructuredServiceFieldError = {
   max?: number;
 };
 
-type StructuredConfigInput =
-  Partial<Record<LlamaCppStructuredServiceFieldKey, string>> & {
-    splitMode?: LlamaCppServiceConfig['splitMode'] | string;
-    runtimeDevices?: {
-      success: boolean;
-      devices?: Array<{ id?: string; name?: string; backend?: string }>;
-    } | null;
-  };
+type StructuredConfigInput = Partial<Record<LlamaCppStructuredServiceFieldKey, string>> & {
+  splitMode?: LlamaCppServiceConfig['splitMode'] | string;
+  runtimeDevices?: {
+    success: boolean;
+    devices?: Array<{ id?: string; name?: string; backend?: string }>;
+  } | null;
+};
 
 export const LlamaCppGpuDetectionState = {
   Unknown: 'unknown',
@@ -79,7 +78,7 @@ export const LlamaCppGpuDetectionState = {
 } as const;
 
 export type LlamaCppGpuDetectionState =
-  typeof LlamaCppGpuDetectionState[keyof typeof LlamaCppGpuDetectionState];
+  (typeof LlamaCppGpuDetectionState)[keyof typeof LlamaCppGpuDetectionState];
 
 export const LLAMACPP_STRUCTURED_INTEGER_RANGES = {
   [LlamaCppStructuredServiceFieldKey.ModelsMax]: { min: 0, max: 256 },
@@ -94,21 +93,25 @@ export const LLAMACPP_STRUCTURED_INTEGER_RANGES = {
   [LlamaCppStructuredServiceFieldKey.UbatchSize]: { min: 1, max: 65_536 },
   [LlamaCppStructuredServiceFieldKey.Threads]: { min: -1, max: 512 },
   [LlamaCppStructuredServiceFieldKey.ThreadsBatch]: { min: -1, max: 512 },
-} as const satisfies Partial<Record<LlamaCppStructuredServiceFieldKey, { min: number; max: number }>>;
+} as const satisfies Partial<
+  Record<LlamaCppStructuredServiceFieldKey, { min: number; max: number }>
+>;
 
 export const LLAMACPP_GPU_LAYERS_MAX = 4_096;
 
-export function validateLlamaCppStructuredServiceConfig(
-  input: StructuredConfigInput,
-): {
+export function validateLlamaCppStructuredServiceConfig(input: StructuredConfigInput): {
   hasErrors: boolean;
-  fieldErrors: Partial<Record<LlamaCppStructuredServiceFieldKey, LlamaCppStructuredServiceFieldError>>;
+  fieldErrors: Partial<
+    Record<LlamaCppStructuredServiceFieldKey, LlamaCppStructuredServiceFieldError>
+  >;
 } {
   const fieldErrors: Partial<
     Record<LlamaCppStructuredServiceFieldKey, LlamaCppStructuredServiceFieldError>
   > = {};
 
-  for (const field of Object.keys(LLAMACPP_STRUCTURED_INTEGER_RANGES) as Array<keyof typeof LLAMACPP_STRUCTURED_INTEGER_RANGES>) {
+  for (const field of Object.keys(LLAMACPP_STRUCTURED_INTEGER_RANGES) as Array<
+    keyof typeof LLAMACPP_STRUCTURED_INTEGER_RANGES
+  >) {
     const error = validateIntegerField(input[field], LLAMACPP_STRUCTURED_INTEGER_RANGES[field]);
     if (error) fieldErrors[field] = error;
   }
@@ -196,11 +199,13 @@ export function getLlamaCppAcceleratorDevices(
     const backend = typeof device.backend === 'string' ? device.backend.trim().toLowerCase() : '';
     const id = device.id.trim();
     if (backend === 'cpu' || id.toUpperCase() === 'CPU') return [];
-    return [{
-      id,
-      name: typeof device.name === 'string' ? device.name.trim() : undefined,
-      backend: device.backend,
-    }];
+    return [
+      {
+        id,
+        name: typeof device.name === 'string' ? device.name.trim() : undefined,
+        backend: device.backend,
+      },
+    ];
   });
 }
 
@@ -233,7 +238,9 @@ function validateIndexedDeviceField(
     return { code: LlamaCppStructuredServiceFieldErrorCode.DeviceUnavailable };
   }
   const parts = trimmed.split(',').map(part => Number.parseInt(part.trim(), 10));
-  if (parts.some(index => !Number.isFinite(index) || index < 0 || index >= acceleratorDevices.length)) {
+  if (
+    parts.some(index => !Number.isFinite(index) || index < 0 || index >= acceleratorDevices.length)
+  ) {
     return {
       code: LlamaCppStructuredServiceFieldErrorCode.DeviceOutOfRange,
       min: 0,
@@ -279,7 +286,10 @@ function validateTensorSplitField(
   if (splitMode !== 'tensor') {
     return { code: LlamaCppStructuredServiceFieldErrorCode.TensorSplitRequiresMode };
   }
-  const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+  const parts = trimmed
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
   if (parts.length === 0) {
     return { code: LlamaCppStructuredServiceFieldErrorCode.TensorSplitFormat };
   }

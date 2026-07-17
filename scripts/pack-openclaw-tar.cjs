@@ -68,7 +68,7 @@ const EXCLUDED_DIRS = new Set([
   'examples',
   'coverage',
   '.venv',
-  '.bin',  // node_modules/.bin contains symlinks that break tar on cross-platform builds
+  '.bin', // node_modules/.bin contains symlinks that break tar on cross-platform builds
 ]);
 
 const EXCLUDED_ENVFILE = /^\.env(\..+)?$/i;
@@ -84,7 +84,7 @@ function shouldExclude(entryPath) {
 
   // Check file exclusion
   if (EXCLUDED_ENVFILE.test(basename)) return true;
-  if (EXCLUDED_FILE_PATTERNS.some((p) => p.test(basename))) return true;
+  if (EXCLUDED_FILE_PATTERNS.some(p => p.test(basename))) return true;
 
   return false;
 }
@@ -94,8 +94,18 @@ function shouldExclude(entryPath) {
 function writeExcludeFile(excludeFile) {
   const patterns = [];
   // Excluded directories (anywhere in tree)
-  const dirs = ['test', 'tests', '__tests__', '__mocks__', '.github',
-                'example', 'examples', 'coverage', '.venv', '.bin'];
+  const dirs = [
+    'test',
+    'tests',
+    '__tests__',
+    '__mocks__',
+    '.github',
+    'example',
+    'examples',
+    'coverage',
+    '.venv',
+    '.bin',
+  ];
   for (const d of dirs) {
     patterns.push(`*/${d}`);
   }
@@ -108,13 +118,27 @@ function writeExcludeFile(excludeFile) {
 
   // Excluded file name patterns
   const names = [
-    '.env', '.env.*',
-    '.eslintrc*', '.prettierrc*', '.editorconfig',
-    '.npmignore', '.gitignore', '.gitattributes',
-    'README*', 'readme*', 'CHANGELOG*', 'HISTORY*',
-    'LICENSE*', 'LICENCE*', 'AUTHORS*', 'CONTRIBUTORS*',
-    'tsconfig*.json', 'jest.config*', 'vitest.config*',
-    '*.test.*', '*.spec.*',
+    '.env',
+    '.env.*',
+    '.eslintrc*',
+    '.prettierrc*',
+    '.editorconfig',
+    '.npmignore',
+    '.gitignore',
+    '.gitattributes',
+    'README*',
+    'readme*',
+    'CHANGELOG*',
+    'HISTORY*',
+    'LICENSE*',
+    'LICENCE*',
+    'AUTHORS*',
+    'CONTRIBUTORS*',
+    'tsconfig*.json',
+    'jest.config*',
+    'vitest.config*',
+    '*.test.*',
+    '*.spec.*',
   ];
   for (const n of names) {
     patterns.push(n);
@@ -169,12 +193,12 @@ function packSingleSource(sourceDir, outputTar, prefix) {
       prefix: prefix || '',
       sync: true,
       follow: true,
-      filter: (filePath) => !shouldExclude(filePath),
+      filter: filePath => !shouldExclude(filePath),
     },
-    fs.readdirSync(sourceDir).filter((name) => {
+    fs.readdirSync(sourceDir).filter(name => {
       if (EXCLUDED_DIRS.has(name.toLowerCase())) return false;
       return true;
-    })
+    }),
   );
 
   return { totalFiles: entries.length, skipped };
@@ -220,13 +244,17 @@ function packMultipleSources(sources, outputTar) {
         includedPrefixes.push(prefix);
       }
 
-      console.log(`[pack-openclaw-tar] Creating tar with tar.exe (${includedPrefixes.join(', ')})...`);
+      console.log(
+        `[pack-openclaw-tar] Creating tar with tar.exe (${includedPrefixes.join(', ')})...`,
+      );
       const tTar = Date.now();
 
       const tarArgs = [
-        '-cf', outputTar,
+        '-cf',
+        outputTar,
         `--exclude-from=${excludeFile}`,
-        '-C', stagingDir,
+        '-C',
+        stagingDir,
         ...includedPrefixes,
       ];
 
@@ -236,14 +264,22 @@ function packMultipleSources(sources, outputTar) {
       });
 
       const tarElapsed = ((Date.now() - tTar) / 1000).toFixed(1);
-      console.log(`[pack-openclaw-tar] tar.exe completed in ${tarElapsed}s, ${excludeCount} exclude rules`);
+      console.log(
+        `[pack-openclaw-tar] tar.exe completed in ${tarElapsed}s, ${excludeCount} exclude rules`,
+      );
     } finally {
       // Clean up junctions and staging dir
       for (const prefix of includedPrefixes) {
-        try { fs.unlinkSync(path.join(stagingDir, prefix)); } catch {}
+        try {
+          fs.unlinkSync(path.join(stagingDir, prefix));
+        } catch {}
       }
-      try { fs.unlinkSync(excludeFile); } catch {}
-      try { fs.rmdirSync(stagingDir); } catch {}
+      try {
+        fs.unlinkSync(excludeFile);
+      } catch {}
+      try {
+        fs.rmdirSync(stagingDir);
+      } catch {}
     }
   } else {
     // ── JS fallback (non-Windows) ──
@@ -266,7 +302,7 @@ function packMultipleSources(sources, outputTar) {
         prefix,
         sync: true,
         follow: true,
-        filter: (filePath) => {
+        filter: filePath => {
           const included = !shouldExclude(filePath);
           if (included) sourceFiles++;
           return included;
@@ -276,13 +312,13 @@ function packMultipleSources(sources, outputTar) {
       if (first) {
         tar.create(
           opts,
-          fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
+          fs.readdirSync(dir).filter(n => !EXCLUDED_DIRS.has(n.toLowerCase())),
         );
         first = false;
       } else {
         tar.replace(
           opts,
-          fs.readdirSync(dir).filter((n) => !EXCLUDED_DIRS.has(n.toLowerCase()))
+          fs.readdirSync(dir).filter(n => !EXCLUDED_DIRS.has(n.toLowerCase())),
         );
       }
 
@@ -319,17 +355,15 @@ function main() {
     packMultipleSources(sources, outputTar);
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     const sizeMB = (fs.statSync(outputTar).size / (1024 * 1024)).toFixed(1);
-    console.log(
-      `[pack-openclaw-tar] Done in ${elapsed}s: ${sizeMB} MB`
-    );
+    console.log(`[pack-openclaw-tar] Done in ${elapsed}s: ${sizeMB} MB`);
     return;
   }
 
   // Single directory mode
-  const sourceDir = process.argv[2]
-    || path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current');
-  const outputTar = process.argv[3]
-    || path.join(projectRoot, 'vendor', 'openclaw-runtime', 'cfmind.tar');
+  const sourceDir =
+    process.argv[2] || path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current');
+  const outputTar =
+    process.argv[3] || path.join(projectRoot, 'vendor', 'openclaw-runtime', 'cfmind.tar');
 
   if (!fs.existsSync(sourceDir)) {
     console.error(`[pack-openclaw-tar] Source directory not found: ${sourceDir}`);
@@ -348,7 +382,7 @@ function main() {
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   const sizeMB = (fs.statSync(outputTar).size / (1024 * 1024)).toFixed(1);
   console.log(
-    `[pack-openclaw-tar] Done in ${elapsed}s: ${totalFiles} files, ${skipped} skipped, ${sizeMB} MB`
+    `[pack-openclaw-tar] Done in ${elapsed}s: ${totalFiles} files, ${skipped} skipped, ${sizeMB} MB`,
   );
 }
 

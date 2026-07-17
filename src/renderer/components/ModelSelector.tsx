@@ -15,10 +15,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { i18nService } from '../services/i18n';
 import { RootState } from '../store';
 import type { Model } from '../store/slices/modelSlice';
-import {
-  getModelIdentityKey,
-  setSelectedModel,
-} from '../store/slices/modelSlice';
+import { getModelIdentityKey, setSelectedModel } from '../store/slices/modelSlice';
 
 interface ModelSelectorProps {
   dropdownDirection?: 'up' | 'down' | 'auto';
@@ -44,7 +41,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   const controlled = onChange !== undefined;
   const globalSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
-  const selectedModel = controlled ? value ?? null : globalSelectedModel;
+  const selectedModel = controlled ? (value ?? null) : globalSelectedModel;
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [resolvedSide, setResolvedSide] = React.useState<'top' | 'bottom'>('bottom');
@@ -67,7 +64,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       return;
     }
 
-    const model = availableModels.find((m) => getModelIdentityKey(m) === key) ?? null;
+    const model = availableModels.find(m => getModelIdentityKey(m) === key) ?? null;
     if (!model || (isModelSelectable && !isModelSelectable(model))) {
       return;
     }
@@ -87,8 +84,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     );
   }
 
-  const serverModels = availableModels.filter((m) => m.isServerModel);
-  const userModels = availableModels.filter((m) => !m.isServerModel);
+  const serverModels = availableModels.filter(m => m.isServerModel);
+  const userModels = availableModels.filter(m => !m.isServerModel);
   const hasBothGroups = serverModels.length > 0 && userModels.length > 0;
   const currentKey = selectedModel ? getModelIdentityKey(selectedModel) : '__default__';
   const triggerLabel = selectedModel?.name ?? defaultLabel ?? '';
@@ -157,9 +154,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
               </SelectGroup>
             </>
           ) : (
-            <SelectGroup>
-              {availableModels.map(renderModelItem)}
-            </SelectGroup>
+            <SelectGroup>{availableModels.map(renderModelItem)}</SelectGroup>
           )}
         </SelectContent>
       </Select>

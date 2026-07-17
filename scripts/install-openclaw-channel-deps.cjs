@@ -33,17 +33,17 @@ const LABEL = '[install-openclaw-channel-deps]';
 // Packages that dist/ chunks import via bare specifiers but are only shipped
 // inside individual extension node_modules.
 const CHANNEL_DEPS = [
-  '@buape/carbon',                  // discord
-  '@larksuiteoapi/node-sdk',        // feishu / lark
-  'grammy',                         // telegram
-  '@grammyjs/runner',               // telegram
+  '@buape/carbon', // discord
+  '@larksuiteoapi/node-sdk', // feishu / lark
+  'grammy', // telegram
+  '@grammyjs/runner', // telegram
   '@grammyjs/transformer-throttler', // telegram
 ];
 
 function main() {
   const projectRoot = path.resolve(__dirname, '..');
-  const runtimeRoot = process.argv[2]
-    || path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current');
+  const runtimeRoot =
+    process.argv[2] || path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current');
 
   if (!fs.existsSync(runtimeRoot)) {
     console.error(`${LABEL} Runtime root not found: ${runtimeRoot}`);
@@ -57,7 +57,7 @@ function main() {
   }
 
   // Filter out packages that are already present in root node_modules.
-  const missing = CHANNEL_DEPS.filter((dep) => {
+  const missing = CHANNEL_DEPS.filter(dep => {
     const depDir = path.join(nodeModulesDir, ...dep.split('/'));
     return !fs.existsSync(depDir);
   });
@@ -67,7 +67,9 @@ function main() {
     return;
   }
 
-  console.log(`${LABEL} Installing ${missing.length} missing channel dep(s): ${missing.join(', ')}`);
+  console.log(
+    `${LABEL} Installing ${missing.length} missing channel dep(s): ${missing.join(', ')}`,
+  );
 
   const isWin = process.platform === 'win32';
   const npmCmd = isWin ? 'npm.cmd' : 'npm';
@@ -93,7 +95,7 @@ function main() {
   }
 
   // Verify installation
-  const stillMissing = missing.filter((dep) => {
+  const stillMissing = missing.filter(dep => {
     const depDir = path.join(nodeModulesDir, ...dep.split('/'));
     return !fs.existsSync(depDir);
   });

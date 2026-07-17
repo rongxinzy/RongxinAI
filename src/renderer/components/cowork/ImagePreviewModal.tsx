@@ -38,12 +38,12 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
 
   const label = getImageLabel(image);
 
-  const handleBackdropMouseDown: React.MouseEventHandler<HTMLDivElement> = (event) => {
+  const handleBackdropMouseDown: React.MouseEventHandler<HTMLDivElement> = event => {
     event.stopPropagation();
     mouseDownOnBackdropRef.current = event.target === event.currentTarget;
   };
 
-  const handleBackdropClick: React.MouseEventHandler<HTMLDivElement> = (event) => {
+  const handleBackdropClick: React.MouseEventHandler<HTMLDivElement> = event => {
     event.stopPropagation();
     if (event.target === event.currentTarget && mouseDownOnBackdropRef.current) {
       mouseDownOnBackdropRef.current = false;
@@ -80,8 +80,8 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
       >
         <div
           className="flex max-h-full max-w-full flex-col items-center gap-3"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
+          onMouseDown={event => event.stopPropagation()}
+          onClick={event => event.stopPropagation()}
         >
           <div className="max-w-[min(90vw,720px)] truncate rounded-full bg-black/35 px-3 py-1 text-center text-xs font-medium text-white/85 ring-1 ring-white/10">
             {label}

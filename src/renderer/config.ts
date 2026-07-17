@@ -1,4 +1,4 @@
-import { type ProviderConfig,ProviderRegistry } from '@shared/providers';
+import { type ProviderConfig, ProviderRegistry } from '@shared/providers';
 
 // 配置类型定义
 export interface AppConfig {
@@ -32,7 +32,6 @@ export interface AppConfig {
   app: {
     port: number;
     isDevelopment: boolean;
-
   };
   // 工作模式 ('work' | 'chat')
   workMode?: 'work' | 'chat';
@@ -71,9 +70,7 @@ export const defaultConfig: AppConfig = {
     baseUrl: 'https://api.deepseek.com/anthropic',
   },
   model: {
-    availableModels: [
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false },
-    ],
+    availableModels: [{ id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false }],
     defaultModel: 'deepseek-reasoner',
     defaultModelProvider: 'deepseek',
   },
@@ -86,14 +83,13 @@ export const defaultConfig: AppConfig = {
   app: {
     port: 3000,
     isDevelopment: process.env.NODE_ENV === 'development',
-
   },
   shortcuts: {
     newChat: 'Ctrl+N',
     search: 'Ctrl+F',
     settings: 'Ctrl+,',
     sendMessage: 'Enter',
-  }
+  },
 };
 
 // 配置存储键
@@ -140,9 +136,10 @@ export const getProviderDisplayName = (
   providerConfig?: { displayName?: string },
 ): string => {
   if (isCustomProvider(providerKey)) {
-    const name = providerConfig && typeof providerConfig.displayName === 'string'
-      ? providerConfig.displayName
-      : '';
+    const name =
+      providerConfig && typeof providerConfig.displayName === 'string'
+        ? providerConfig.displayName
+        : '';
     return name || getCustomProviderDefaultName(providerKey);
   }
   const def = ProviderRegistry.get(providerKey);

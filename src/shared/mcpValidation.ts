@@ -21,7 +21,7 @@ function isValidDomainHostname(hostname: string): boolean {
   }
 
   const labels = normalized.split('.');
-  return labels.every((label) => {
+  return labels.every(label => {
     if (!URL_HOST_LABEL_PATTERN.test(label)) {
       return false;
     }

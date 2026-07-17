@@ -1,7 +1,11 @@
 // ── URI / path helpers ──
 
 export const safeDecodeURIComponent = (value: string): string => {
-  try { return decodeURIComponent(value); } catch { return value; }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 };
 
 export const stripHashAndQuery = (value: string): string => value.split('#')[0].split('?')[0];
@@ -14,11 +18,11 @@ export const stripFileProtocol = (value: string): string => {
 
 export const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(value);
 
-export const isAbsolutePath = (value: string): boolean => (
-  value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value)
-);
+export const isAbsolutePath = (value: string): boolean =>
+  value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
 
-export const isRelativePath = (value: string): boolean => !isAbsolutePath(value) && !hasScheme(value);
+export const isRelativePath = (value: string): boolean =>
+  !isAbsolutePath(value) && !hasScheme(value);
 
 /**
  * Parse `file:///root/path::relative/path` syntax into a single absolute path.
@@ -45,7 +49,7 @@ export const parseRootRelativePath = (value: string): string | null => {
  * Normalize a potentially-file-scheme path string into its decoded local form.
  */
 export const normalizeLocalPath = (
-  value: string
+  value: string,
 ): { path: string; isRelative: boolean; isAbsolute: boolean } | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;

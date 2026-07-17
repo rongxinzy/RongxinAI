@@ -1,5 +1,13 @@
 import { AgentId } from '@shared/agent';
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@shared/components/ui/command';
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@shared/components/ui/command';
 import { Spinner } from '@shared/components/ui/spinner';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -26,7 +34,12 @@ interface CoworkSearchModalProps {
 }
 
 const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
-  isOpen, onClose, sessions, currentSessionId: _currentSessionId, onSelectSession, workMode = 'work',
+  isOpen,
+  onClose,
+  sessions,
+  currentSessionId: _currentSessionId,
+  onSelectSession,
+  workMode = 'work',
 }) => {
   const agents = useSelector((state: RootState) => state.agent.agents);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,13 +48,13 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
 
   const modeFilteredSessions = useMemo(() => {
     return searchSessions.filter(s =>
-      workMode === 'chat' ? s.mode === 'chat' : s.mode !== 'chat'
+      workMode === 'chat' ? s.mode === 'chat' : s.mode !== 'chat',
     );
   }, [searchSessions, workMode]);
 
   const agentNameBySessionId = useMemo(() => {
     const names = new Map<string, string>();
-    searchSessions.forEach((session) => {
+    searchSessions.forEach(session => {
       const agentId = getSessionAgentId(session);
       names.set(session.id, getAgentDisplayNameById(agentId, agents) ?? agentId);
     });
@@ -51,26 +64,38 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
   const filteredSessions = useMemo(() => {
     const trimmedQuery = searchQuery.trim().toLowerCase();
     if (!trimmedQuery) return modeFilteredSessions;
-    return modeFilteredSessions.filter((session) => {
+    return modeFilteredSessions.filter(session => {
       const agentName = agentNameBySessionId.get(session.id) ?? '';
-      return session.title.toLowerCase().includes(trimmedQuery) || agentName.toLowerCase().includes(trimmedQuery);
+      return (
+        session.title.toLowerCase().includes(trimmedQuery) ||
+        agentName.toLowerCase().includes(trimmedQuery)
+      );
     });
   }, [agentNameBySessionId, searchQuery, modeFilteredSessions]);
 
-  useEffect(() => { if (!isOpen) setSearchQuery(''); }, [isOpen]);
-  useEffect(() => { if (!isOpen) setSearchSessions(sessions); }, [isOpen, sessions]);
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('');
+  }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) setSearchSessions(sessions);
+  }, [isOpen, sessions]);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     setIsLoading(true);
-    void coworkService.listSessionsForSearch(SEARCH_SESSION_LIMIT, 0)
-      .then((result) => {
+    void coworkService
+      .listSessionsForSearch(SEARCH_SESSION_LIMIT, 0)
+      .then(result => {
         if (cancelled) return;
-        setSearchSessions(result?.success ? result.sessions ?? [] : []);
+        setSearchSessions(result?.success ? (result.sessions ?? []) : []);
       })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, workMode]);
 
   const handleSelectSession = async (session: CoworkSessionSummary) => {
@@ -81,7 +106,9 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
   return (
     <CommandDialog
       open={isOpen}
-      onOpenChange={(open) => { if (!open) onClose(); }}
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
       title={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
       description={i18nService.t(workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks')}
       className="ring-0 bg-background"
@@ -90,7 +117,9 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
         <CommandInput
           value={searchQuery}
           onValueChange={setSearchQuery}
-          placeholder={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
+          placeholder={i18nService.t(
+            workMode === 'chat' ? 'searchChatConversations' : 'searchConversations',
+          )}
         />
         <CommandList className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2">
           {isLoading ? (
@@ -98,12 +127,19 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
               <Spinner />
             </div>
           ) : filteredSessions.length === 0 ? (
-            <CommandEmpty>{i18nService.t(workMode === 'chat' ? 'searchChatNoResults' : 'searchNoResults')}</CommandEmpty>
+            <CommandEmpty>
+              {i18nService.t(workMode === 'chat' ? 'searchChatNoResults' : 'searchNoResults')}
+            </CommandEmpty>
           ) : (
-            <CommandGroup heading={i18nService.t(workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks')}>
-              {filteredSessions.map((session) => {
+            <CommandGroup
+              heading={i18nService.t(
+                workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks',
+              )}
+            >
+              {filteredSessions.map(session => {
                 const isRunning = session.status === CoworkSessionStatusValue.Running;
-                const agentName = agentNameBySessionId.get(session.id) ?? getSessionAgentId(session);
+                const agentName =
+                  agentNameBySessionId.get(session.id) ?? getSessionAgentId(session);
                 return (
                   <CommandItem
                     key={session.id}
@@ -114,7 +150,9 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                     {isRunning && <Spinner />}
                     <span className="min-w-0 flex-1 truncate">{session.title}</span>
                     {workMode !== 'chat' && (
-                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{agentName}</span>
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                        {agentName}
+                      </span>
                     )}
                   </CommandItem>
                 );

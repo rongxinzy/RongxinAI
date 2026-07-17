@@ -35,21 +35,33 @@ const targetExecutable = path.join(runtimeDir, 'bin', executableName);
 
 if (!fs.existsSync(targetExecutable)) {
   console.error(`[llamacpp-runtime-host] Missing prebuilt llama.cpp runtime for ${targetId}.`);
-  console.error('[llamacpp-runtime-host] Run `npm run llamacpp:runtime:download` to fetch the prebuilt runtime, or set LLAMACPP_BIN to an existing llama-server executable.');
+  console.error(
+    '[llamacpp-runtime-host] Run `npm run llamacpp:runtime:download` to fetch the prebuilt runtime, or set LLAMACPP_BIN to an existing llama-server executable.',
+  );
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, [
-  path.join(rootDir, 'scripts', 'sync-llamacpp-runtime-current.cjs'),
-  targetId,
-], {
-  cwd: rootDir,
-  stdio: 'inherit',
-});
+const result = spawnSync(
+  process.execPath,
+  [path.join(rootDir, 'scripts', 'sync-llamacpp-runtime-current.cjs'), targetId],
+  {
+    cwd: rootDir,
+    stdio: 'inherit',
+  },
+);
 
-const currentExecutable = path.join(rootDir, 'vendor', 'llamacpp-runtime', 'current', 'bin', executableName);
+const currentExecutable = path.join(
+  rootDir,
+  'vendor',
+  'llamacpp-runtime',
+  'current',
+  'bin',
+  executableName,
+);
 if (result.status === 0 && fs.existsSync(currentExecutable)) {
-  console.log(`[llamacpp-runtime-host] Runtime ready: ${path.relative(rootDir, currentExecutable)}`);
+  console.log(
+    `[llamacpp-runtime-host] Runtime ready: ${path.relative(rootDir, currentExecutable)}`,
+  );
 }
 
 process.exit(typeof result.status === 'number' ? result.status : 1);

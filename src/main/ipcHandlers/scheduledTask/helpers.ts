@@ -12,7 +12,14 @@ export function initScheduledTaskHelpers(d: ScheduledTaskHelperDeps): void {
   deps = d;
 }
 
-const MULTI_INSTANCE_CONFIG_KEYS = new Set(['dingtalk', 'feishu', 'qq', 'wecom', 'telegram', 'discord']);
+const MULTI_INSTANCE_CONFIG_KEYS = new Set([
+  'dingtalk',
+  'feishu',
+  'qq',
+  'wecom',
+  'telegram',
+  'discord',
+]);
 
 function isConfigKeyEnabled(key: string, value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -21,7 +28,7 @@ function isConfigKeyEnabled(key: string, value: unknown): boolean {
     const instances = (value as { instances?: unknown[] }).instances;
     if (!Array.isArray(instances) || instances.length === 0) return false;
     return instances.some(
-      (inst) => inst && typeof inst === 'object' && (inst as { enabled?: boolean }).enabled,
+      inst => inst && typeof inst === 'object' && (inst as { enabled?: boolean }).enabled,
     );
   }
 
@@ -56,8 +63,8 @@ export function listScheduledTaskChannels(): Array<{
     if (MULTI_INSTANCE_CONFIG_KEYS.has(key)) {
       const instances = (value as { instances?: unknown[] }).instances ?? [];
       const entries = instances
-        .filter((inst) => inst && typeof inst === 'object' && (inst as { enabled?: boolean }).enabled)
-        .map((inst) => {
+        .filter(inst => inst && typeof inst === 'object' && (inst as { enabled?: boolean }).enabled)
+        .map(inst => {
           const i = inst as { instanceId?: string; instanceName?: string };
           const accountId = (i.instanceId ?? '').slice(0, 8);
           return {
@@ -66,7 +73,7 @@ export function listScheduledTaskChannels(): Array<{
             filterAccountId: accountId || undefined,
           };
         })
-        .filter((e) => e.accountId);
+        .filter(e => e.accountId);
       if (entries.length > 0) instancesByPlatform.set(key, entries);
     }
   }

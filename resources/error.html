@@ -1,56 +1,61 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Error - 知远</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f5f5f5;
-            color: #333;
-        }
-        .error-container {
-            text-align: center;
-            padding: 2rem;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #e53e3e;
-            margin-bottom: 1rem;
-        }
-        p {
-            margin-bottom: 1.5rem;
-            color: #666;
-        }
-        button {
-            background-color: #3182ce;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.2s;
-        }
-        button:hover {
-            background-color: #2c5282;
-        }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+          'Open Sans', 'Helvetica Neue', sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f5f5f5;
+        color: #333;
+      }
+      .error-container {
+        text-align: center;
+        padding: 2rem;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #e53e3e;
+        margin-bottom: 1rem;
+      }
+      p {
+        margin-bottom: 1.5rem;
+        color: #666;
+      }
+      button {
+        background-color: #3182ce;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.2s;
+      }
+      button:hover {
+        background-color: #2c5282;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="error-container">
-        <h1>Connection Error</h1>
-        <p>Unable to connect to the development server. Please make sure the server is running and try again.</p>
-        <button onclick="window.location.reload()">Retry</button>
+      <h1>Connection Error</h1>
+      <p>
+        Unable to connect to the development server. Please make sure the server is running and try
+        again.
+      </p>
+      <button onclick="window.location.reload()">Retry</button>
     </div>
-</body>
+  </body>
 </html>

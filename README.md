@@ -102,13 +102,13 @@ Cowork is the primary session system. A task is sent from the Renderer to the Ma
 
 Key stream events:
 
-| Event | Description |
-| --- | --- |
-| `message` | A new message enters the session |
-| `messageUpdate` | Incremental streaming content update |
-| `permissionRequest` | A tool call requires approval |
-| `complete` | The session has finished |
-| `error` | The session failed |
+| Event               | Description                          |
+| ------------------- | ------------------------------------ |
+| `message`           | A new message enters the session     |
+| `messageUpdate`     | Incremental streaming content update |
+| `permissionRequest` | A tool call requires approval        |
+| `complete`          | The session has finished             |
+| `error`             | The session failed                   |
 
 ### Local Inference
 
@@ -122,15 +122,15 @@ The `SKILLs/` directory contains built-in skills, and `SKILLs/skills.config.json
 
 Common built-in skills:
 
-| Skill | Purpose |
-| --- | --- |
-| `web-search` | Search and research |
-| `docx` / `xlsx` / `pptx` / `pdf` | Office and document processing |
-| `playwright` | Browser automation |
-| `remotion` | Video generation |
-| `imap-smtp-email` | Email send and receive |
-| `stock-*` | Investment research and announcements |
-| `skill-creator` | Custom skill creation |
+| Skill                            | Purpose                               |
+| -------------------------------- | ------------------------------------- |
+| `web-search`                     | Search and research                   |
+| `docx` / `xlsx` / `pptx` / `pdf` | Office and document processing        |
+| `playwright`                     | Browser automation                    |
+| `remotion`                       | Video generation                      |
+| `imap-smtp-email`                | Email send and receive                |
+| `stock-*`                        | Investment research and announcements |
+| `skill-creator`                  | Custom skill creation                 |
 
 ### Scheduled Tasks
 
@@ -138,18 +138,18 @@ Scheduled tasks can be created from natural language or through the GUI. When a 
 
 ## Tech Stack
 
-| Layer | Technology |
-| --- | --- |
-| Desktop | Electron 40 |
-| Frontend | React 19 + TypeScript 7 |
-| Build | Vite 8 (Rolldown) |
-| Styling | Tailwind CSS 4 |
-| Tooling | Bun (package manager), oxlint, oxfmt |
-| State | Redux Toolkit |
-| Agent runtime | Self-developed |
-| Local inference | Self-developed (GGUF models) |
-| Storage | better-sqlite3 |
-| Rendering | react-markdown / Mermaid / KaTeX |
+| Layer           | Technology                           |
+| --------------- | ------------------------------------ |
+| Desktop         | Electron 40                          |
+| Frontend        | React 19 + TypeScript 7              |
+| Build           | Vite 8 (Rolldown)                    |
+| Styling         | Tailwind CSS 4                       |
+| Tooling         | Bun (package manager), oxlint, oxfmt |
+| State           | Redux Toolkit                        |
+| Agent runtime   | Self-developed                       |
+| Local inference | Self-developed (GGUF models)         |
+| Storage         | better-sqlite3                       |
+| Rendering       | react-markdown / Mermaid / KaTeX     |
 
 ## License
 

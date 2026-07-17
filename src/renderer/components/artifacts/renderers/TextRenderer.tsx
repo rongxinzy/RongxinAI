@@ -7,9 +7,7 @@ import type { Artifact } from '@/types/artifact';
 const t = (key: string) => i18nService.t(key);
 
 function useIsDark() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark')
-  );
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.classList.contains('dark'));
@@ -25,11 +23,15 @@ function detectCsv(content: string, fileName?: string): boolean {
   const lines = content.split('\n').slice(0, 5);
   if (lines.length < 2) return false;
   const commaCount = lines[0].split(',').length;
-  return commaCount >= 2 && lines.slice(1).every(l => l.split(',').length === commaCount || l.trim() === '');
+  return (
+    commaCount >= 2 &&
+    lines.slice(1).every(l => l.split(',').length === commaCount || l.trim() === '')
+  );
 }
 
 function parseCsv(content: string): string[][] {
-  return content.split('\n')
+  return content
+    .split('\n')
     .filter(line => line.trim() !== '')
     .map(line => line.split(',').map(cell => cell.trim()));
 }
@@ -44,19 +46,17 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
 
   const isCsv = useMemo(
     () => detectCsv(artifact.content, artifact.fileName),
-    [artifact.content, artifact.fileName]
+    [artifact.content, artifact.fileName],
   );
 
   const csvData = useMemo(
-    () => (isCsv && showTable) ? parseCsv(artifact.content) : null,
-    [isCsv, showTable, artifact.content]
+    () => (isCsv && showTable ? parseCsv(artifact.content) : null),
+    [isCsv, showTable, artifact.content],
   );
 
   if (!artifact.content) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">
-        No content
-      </div>
+      <div className="flex items-center justify-center h-full text-muted text-sm">No content</div>
     );
   }
 
@@ -101,7 +101,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
             </thead>
             <tbody>
               {csvData.slice(1).map((row, ri) => (
-                <tr key={ri} className={ri % 2 === 0 ? '' : (isDark ? 'bg-white/2' : 'bg-black/2')}>
+                <tr key={ri} className={ri % 2 === 0 ? '' : isDark ? 'bg-white/2' : 'bg-black/2'}>
                   {row.map((cell, ci) => (
                     <td key={ci} className="px-3 py-1 border-b border-border/50 whitespace-nowrap">
                       {cell}
@@ -112,15 +112,23 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
             </tbody>
           </table>
         ) : (
-          <pre className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre-wrap wrap-break-word min-h-full ${
-            isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
-          }`}>
+          <pre
+            className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre-wrap wrap-break-word min-h-full ${
+              isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
+            }`}
+          >
             {lines.map((line, i) => (
               <span key={i} className="flex">
-                <span className="select-none text-muted/50 pr-4 text-right inline-block" style={{ minWidth: `${lineNumWidth + 1}ch` }}>
+                <span
+                  className="select-none text-muted/50 pr-4 text-right inline-block"
+                  style={{ minWidth: `${lineNumWidth + 1}ch` }}
+                >
                   {i + 1}
                 </span>
-                <span className="flex-1">{line}{'\n'}</span>
+                <span className="flex-1">
+                  {line}
+                  {'\n'}
+                </span>
               </span>
             ))}
           </pre>

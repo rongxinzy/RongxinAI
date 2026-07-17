@@ -4,18 +4,18 @@ export interface UserProfile {
   yid: string;
   nickname: string;
   avatarUrl: string | null;
-  phone?: string | null;   // exchange endpoint only, always null currently
-  userId?: string;         // exchange endpoint only (string "6")
-  id?: number;             // profile endpoint only (number 6)
-  status?: number;         // profile endpoint only
+  phone?: string | null; // exchange endpoint only, always null currently
+  userId?: string; // exchange endpoint only (string "6")
+  id?: number; // profile endpoint only (number 6)
+  status?: number; // profile endpoint only
 }
 
 export interface UserQuota {
-  planName: string;           // "免费", "标准", "进阶", "专业"
+  planName: string; // "免费", "标准", "进阶", "专业"
   subscriptionStatus: string; // "free" | "active"
-  creditsLimit: number;       // total credits limit
-  creditsUsed: number;        // credits used
-  creditsRemaining: number;   // credits remaining
+  creditsLimit: number; // total credits limit
+  creditsUsed: number; // credits used
+  creditsRemaining: number; // credits remaining
 }
 
 export interface CreditItem {
@@ -79,5 +79,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAuthLoading, setLoggedIn, setLoggedOut, updateQuota, setProfileSummary } = authSlice.actions;
+export const { setAuthLoading, setLoggedIn, setLoggedOut, updateQuota, setProfileSummary } =
+  authSlice.actions;
 export default authSlice.reducer;

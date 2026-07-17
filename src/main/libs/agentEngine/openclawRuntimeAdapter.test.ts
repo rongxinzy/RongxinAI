@@ -18,9 +18,13 @@ function setAvailabilityGuard(
   adapter: OpenClawRuntimeAdapter,
   guard: (modelRef: string) => { available: boolean; message?: string },
 ): void {
-  (adapter as unknown as {
-    options: { isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string } };
-  }).options = {
+  (
+    adapter as unknown as {
+      options: {
+        isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
+      };
+    }
+  ).options = {
     ...(adapter as unknown as { options: Record<string, unknown> }).options,
     isModelAvailableForSession: guard,
   };
@@ -150,8 +154,9 @@ test('patchSession rejects IM channel sessions when the real OpenClaw key is mis
     persistedSessionKey: null,
   });
 
-  await expect(adapter.patchSession('session-1', { model: 'zhiyuan-server/qwen3.6-plus' }))
-    .rejects.toThrow('Cannot patch IM channel session because the OpenClaw session key is missing.');
+  await expect(
+    adapter.patchSession('session-1', { model: 'zhiyuan-server/qwen3.6-plus' }),
+  ).rejects.toThrow('Cannot patch IM channel session because the OpenClaw session key is missing.');
 
   expect(requests).toHaveLength(0);
 });
@@ -173,13 +178,15 @@ test('patchSession keeps managed-key fallback for normal Cowork sessions', async
   });
 });
 
-function createRunTurnAdapter(options: {
-  sessionModelOverride?: string;
-  agentModel?: string;
-  cachedModel?: string;
-  holdFirstModelPatch?: boolean;
-  sessionCwd?: string;
-} = {}) {
+function createRunTurnAdapter(
+  options: {
+    sessionModelOverride?: string;
+    agentModel?: string;
+    cachedModel?: string;
+    holdFirstModelPatch?: boolean;
+    sessionCwd?: string;
+  } = {},
+) {
   const session = {
     id: 'session-1',
     title: 'Test Session',
@@ -200,10 +207,10 @@ function createRunTurnAdapter(options: {
   let firstModelPatchStartedResolve: (() => void) | null = null;
   let firstModelPatchRelease: (() => void) | null = null;
   let modelPatchCount = 0;
-  const firstModelPatchStarted = new Promise<void>((resolve) => {
+  const firstModelPatchStarted = new Promise<void>(resolve => {
     firstModelPatchStartedResolve = resolve;
   });
-  const firstModelPatchBlocked = new Promise<void>((resolve) => {
+  const firstModelPatchBlocked = new Promise<void>(resolve => {
     firstModelPatchRelease = resolve;
   });
   const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
@@ -226,19 +233,20 @@ function createRunTurnAdapter(options: {
     },
     updateMessage: (sessionId: string, messageId: string, patch: Record<string, unknown>) => {
       expect(sessionId).toBe(session.id);
-      const message = session.messages.find((entry) => entry.id === messageId);
+      const message = session.messages.find(entry => entry.id === messageId);
       if (message) {
         Object.assign(message, patch);
       }
     },
     deleteMessage: () => true,
-    getAgent: (agentId: string) => (agentId === 'main'
-      ? {
-        id: 'main',
-        name: 'Main',
-        model: options.agentModel ?? 'zhiyuan-server/qwen3.5-plus',
-      }
-      : null),
+    getAgent: (agentId: string) =>
+      agentId === 'main'
+        ? {
+            id: 'main',
+            name: 'Main',
+            model: options.agentModel ?? 'zhiyuan-server/qwen3.5-plus',
+          }
+        : null,
     updateAgent: () => {},
   };
   const engineManager = {
@@ -269,21 +277,26 @@ function createRunTurnAdapter(options: {
         return { messages: [] };
       }
       if (method === 'chat.send') {
-        const runId = typeof requestParams.idempotencyKey === 'string'
-          ? requestParams.idempotencyKey
-          : 'run-1';
-        const sessionKey = typeof requestParams.sessionKey === 'string'
-          ? requestParams.sessionKey
-          : 'agent:main:zhiyuan:session-1';
+        const runId =
+          typeof requestParams.idempotencyKey === 'string' ? requestParams.idempotencyKey : 'run-1';
+        const sessionKey =
+          typeof requestParams.sessionKey === 'string'
+            ? requestParams.sessionKey
+            : 'agent:main:zhiyuan:session-1';
         queueMicrotask(() => {
-          (adapter as unknown as {
-            handleChatEvent: (payload: unknown, seq?: number) => void;
-          }).handleChatEvent({
-            state: 'final',
-            runId,
-            sessionKey,
-            message: { role: 'assistant', content: 'Done' },
-          }, 1);
+          (
+            adapter as unknown as {
+              handleChatEvent: (payload: unknown, seq?: number) => void;
+            }
+          ).handleChatEvent(
+            {
+              state: 'final',
+              runId,
+              sessionKey,
+              message: { role: 'assistant', content: 'Done' },
+            },
+            1,
+          );
         });
         return { runId };
       }
@@ -317,7 +330,7 @@ test('continueSession patches a session override before chat.send even when the 
 
   await adapter.continueSession('session-1', 'hello');
 
-  expect(requests.map((request) => request.method).slice(0, 3)).toEqual([
+  expect(requests.map(request => request.method).slice(0, 3)).toEqual([
     'sessions.patch',
     'chat.history',
     'chat.send',
@@ -330,15 +343,11 @@ test('continueSession patches a session override before chat.send even when the 
 
 test('continueSession waits for an in-flight model patch before chat.send', async () => {
   const model = 'zhiyuan-server/qwen3.6-plus';
-  const {
-    adapter,
-    requests,
-    firstModelPatchStarted,
-    releaseFirstModelPatch,
-  } = createRunTurnAdapter({
-    sessionModelOverride: model,
-    holdFirstModelPatch: true,
-  });
+  const { adapter, requests, firstModelPatchStarted, releaseFirstModelPatch } =
+    createRunTurnAdapter({
+      sessionModelOverride: model,
+      holdFirstModelPatch: true,
+    });
 
   const patchPromise = adapter.patchSession('session-1', { model });
   await firstModelPatchStarted;
@@ -347,13 +356,13 @@ test('continueSession waits for an in-flight model patch before chat.send', asyn
   await Promise.resolve();
   await Promise.resolve();
 
-  expect(requests.map((request) => request.method)).toEqual(['sessions.patch']);
+  expect(requests.map(request => request.method)).toEqual(['sessions.patch']);
 
   releaseFirstModelPatch();
   await patchPromise;
   await continuePromise;
 
-  expect(requests.map((request) => request.method).slice(0, 4)).toEqual([
+  expect(requests.map(request => request.method).slice(0, 4)).toEqual([
     'sessions.patch',
     'sessions.patch',
     'chat.history',
@@ -368,7 +377,7 @@ test('continueSession sends the session cwd to OpenClaw chat.send', async () => 
 
   await adapter.continueSession('session-1', 'hello');
 
-  const chatSend = requests.find((request) => request.method === 'chat.send');
+  const chatSend = requests.find(request => request.method === 'chat.send');
   expect(chatSend?.params).toMatchObject({
     cwd: path.resolve('/tmp/zhiyuan-selected-project'),
   });
@@ -383,8 +392,9 @@ test('continueSession rejects an unavailable llama.cpp model before patching or 
     message: 'This llama.cpp model is not running.',
   }));
 
-  await expect(adapter.continueSession('session-1', 'hello'))
-    .rejects.toThrow('This llama.cpp model is not running.');
+  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow(
+    'This llama.cpp model is not running.',
+  );
 
   expect(requests).toEqual([]);
 });
@@ -403,7 +413,7 @@ test('continueSession rejects running llama.cpp models when runtime context leng
     '未报告实际可用上下文窗口',
   );
 
-  expect(requests.some((request) => request.method === 'chat.send')).toBe(false);
+  expect(requests.some(request => request.method === 'chat.send')).toBe(false);
 });
 
 test('continueSession allows new llama.cpp turns when only context window is cached', async () => {
@@ -415,16 +425,18 @@ test('continueSession allows new llama.cpp turns when only context window is cac
     ...(adapter as unknown as { options: Record<string, unknown> }).options,
     getModelContextWindow: () => 32768,
   };
-  (adapter as unknown as {
-    sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
-  }).sessionTokenBudgetCache.set(
-    'agent:main:zhiyuan:session-1',
-    { contextTokens: 32768 },
-  );
+  (
+    adapter as unknown as {
+      sessionTokenBudgetCache: Map<
+        string,
+        { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }
+      >;
+    }
+  ).sessionTokenBudgetCache.set('agent:main:zhiyuan:session-1', { contextTokens: 32768 });
 
   await adapter.continueSession('session-1', 'hello');
 
-  expect(requests.some((request) => request.method === 'chat.send')).toBe(true);
+  expect(requests.some(request => request.method === 'chat.send')).toBe(true);
 });
 
 test('continueSession rejects llama.cpp turns when the runtime context window is below the OpenClaw minimum', async () => {
@@ -436,16 +448,18 @@ test('continueSession rejects llama.cpp turns when the runtime context window is
     ...(adapter as unknown as { options: Record<string, unknown> }).options,
     getModelContextWindow: () => 4096,
   };
-  (adapter as unknown as {
-    sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
-  }).sessionTokenBudgetCache.set(
-    'agent:main:zhiyuan:session-1',
-    { contextTokens: 4096 },
-  );
+  (
+    adapter as unknown as {
+      sessionTokenBudgetCache: Map<
+        string,
+        { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }
+      >;
+    }
+  ).sessionTokenBudgetCache.set('agent:main:zhiyuan:session-1', { contextTokens: 4096 });
 
   await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow('ctx-size');
 
-  expect(requests.some((request) => request.method === 'chat.send')).toBe(false);
+  expect(requests.some(request => request.method === 'chat.send')).toBe(false);
 });
 
 test('continueSession rejects llama.cpp turns when fresh total tokens exceed runtime window', async () => {
@@ -457,18 +471,22 @@ test('continueSession rejects llama.cpp turns when fresh total tokens exceed run
     ...(adapter as unknown as { options: Record<string, unknown> }).options,
     getModelContextWindow: () => 32768,
   };
-  (adapter as unknown as {
-    sessionTokenBudgetCache: Map<string, { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }>;
-  }).sessionTokenBudgetCache.set(
-    'agent:main:zhiyuan:session-1',
-    { contextTokens: 32768, totalTokens: 30000, totalTokensFresh: true },
-  );
+  (
+    adapter as unknown as {
+      sessionTokenBudgetCache: Map<
+        string,
+        { contextTokens?: number; totalTokens?: number; totalTokensFresh?: boolean }
+      >;
+    }
+  ).sessionTokenBudgetCache.set('agent:main:zhiyuan:session-1', {
+    contextTokens: 32768,
+    totalTokens: 30000,
+    totalTokensFresh: true,
+  });
 
-  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow(
-    '已接近上下文上限',
-  );
+  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow('已接近上下文上限');
 
-  expect(requests.some((request) => request.method === 'chat.send')).toBe(false);
+  expect(requests.some(request => request.method === 'chat.send')).toBe(false);
 });
 
 test('patchSession rejects an unavailable llama.cpp model before sessions.patch', async () => {
@@ -478,8 +496,9 @@ test('patchSession rejects an unavailable llama.cpp model before sessions.patch'
     message: 'This llama.cpp model is not running.',
   }));
 
-  await expect(adapter.patchSession('session-1', { model: 'llamacpp/qwen-local' }))
-    .rejects.toThrow('This llama.cpp model is not running.');
+  await expect(adapter.patchSession('session-1', { model: 'llamacpp/qwen-local' })).rejects.toThrow(
+    'This llama.cpp model is not running.',
+  );
 
   expect(requests).toEqual([]);
 });
@@ -504,7 +523,8 @@ function createReconcileStore(messages: Array<Record<string, unknown>>) {
   };
   let nextId = session.messages.length + 1;
   let replaceCallCount = 0;
-  let lastReplaceArgs: { sessionId: string; authoritative: Array<Record<string, unknown>> } | null = null;
+  let lastReplaceArgs: { sessionId: string; authoritative: Array<Record<string, unknown>> } | null =
+    null;
 
   return {
     session,
@@ -529,17 +549,20 @@ function createReconcileStore(messages: Array<Record<string, unknown>>) {
       },
       updateMessage: (sessionId: string, messageId: string, patch: Record<string, unknown>) => {
         expect(sessionId).toBe(session.id);
-        const message = session.messages.find((m) => m.id === messageId);
+        const message = session.messages.find(m => m.id === messageId);
         if (!message) return false;
         Object.assign(message, patch);
         return true;
       },
-      replaceConversationMessages: (sessionId: string, authoritative: Array<Record<string, unknown>>) => {
+      replaceConversationMessages: (
+        sessionId: string,
+        authoritative: Array<Record<string, unknown>>,
+      ) => {
         replaceCallCount++;
         lastReplaceArgs = { sessionId, authoritative };
         // Simulate: remove old user/assistant, insert new ones
         session.messages = session.messages.filter(
-          (m) => m.type !== 'user' && m.type !== 'assistant',
+          m => m.type !== 'user' && m.type !== 'assistant',
         );
         for (const entry of authoritative) {
           session.messages.push({
@@ -717,7 +740,9 @@ test('reconcileWithHistory: content mismatch — triggers replace', async () => 
 
   expect(getReplaceCallCount()).toBe(1);
   const args = getLastReplaceArgs()!;
-  expect((args.authoritative[1] as Record<string, unknown>).text).toBe('Full complete response from the model.');
+  expect((args.authoritative[1] as Record<string, unknown>).text).toBe(
+    'Full complete response from the model.',
+  );
 });
 
 test('lifecycle fallback repairs managed session assistant text from history', async () => {
@@ -737,7 +762,13 @@ test('lifecycle fallback repairs managed session assistant text from history', a
   ].join('\n');
   const { session, store, getReplaceCallCount } = createReconcileStore([
     { id: 'msg-1', type: 'user', content: '以表格总结 OpenClaw', timestamp: 1, metadata: {} },
-    { id: 'msg-2', type: 'assistant', content: brokenTable, timestamp: 2, metadata: { isStreaming: true } },
+    {
+      id: 'msg-2',
+      type: 'assistant',
+      content: brokenTable,
+      timestamp: 2,
+      metadata: { isStreaming: true },
+    },
   ]);
 
   const adapter = new OpenClawRuntimeAdapter(store, {});
@@ -783,7 +814,7 @@ test('lifecycle fallback repairs managed session assistant text from history', a
   await adapter.completeChannelTurnFallback(session.id, turn);
 
   expect(getReplaceCallCount()).toBe(0);
-  expect(session.messages.find((message) => message.id === 'msg-2')?.content).toBe(finalTable);
+  expect(session.messages.find(message => message.id === 'msg-2')?.content).toBe(finalTable);
   expect(session.status).toBe('completed');
 });
 
@@ -821,7 +852,13 @@ test('late lifecycle fallback event does not reopen a completed managed session'
 test('late event for a closed run does not recreate a managed session turn', () => {
   const { session, store } = createReconcileStore([
     { id: 'msg-1', type: 'user', content: 'hello', timestamp: 1, metadata: {} },
-    { id: 'msg-2', type: 'assistant', content: 'done', timestamp: 2, metadata: { isStreaming: false, isFinal: true } },
+    {
+      id: 'msg-2',
+      type: 'assistant',
+      content: 'done',
+      timestamp: 2,
+      metadata: { isStreaming: false, isFinal: true },
+    },
   ]);
   const adapter = new OpenClawRuntimeAdapter(store, {});
   const sessionKey = `agent:main:zhiyuan:${session.id}`;
@@ -961,7 +998,13 @@ test('reconcileWithHistory: tail window starting with assistant updates anchored
 test('reconcileWithHistory: tail window repairs stale leading assistant before anchor', async () => {
   const { session, store, getReplaceCallCount, getLastReplaceArgs } = createReconcileStore([
     { id: 'msg-1', type: 'user', content: 'First question', timestamp: 1, metadata: {} },
-    { id: 'msg-2', type: 'assistant', content: 'Stale previous answer', timestamp: 2, metadata: {} },
+    {
+      id: 'msg-2',
+      type: 'assistant',
+      content: 'Stale previous answer',
+      timestamp: 2,
+      metadata: {},
+    },
     { id: 'msg-3', type: 'user', content: 'Second question', timestamp: 3, metadata: {} },
     { id: 'msg-4', type: 'assistant', content: 'Streaming partial...', timestamp: 4, metadata: {} },
   ]);
@@ -1047,7 +1090,9 @@ test('reconcileWithHistory: gateway error — does not crash', async () => {
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
-    request: async () => { throw new Error('Network timeout'); },
+    request: async () => {
+      throw new Error('Network timeout');
+    },
   };
 
   // Should not throw
@@ -1085,7 +1130,9 @@ test('reconcileWithHistory: tail content mismatch — replaces only tail, preser
   expect((args.authoritative[0] as Record<string, unknown>).text).toBe('First question');
   expect((args.authoritative[1] as Record<string, unknown>).text).toBe('First answer');
   expect((args.authoritative[2] as Record<string, unknown>).text).toBe('Second question');
-  expect((args.authoritative[3] as Record<string, unknown>).text).toBe('Full complete answer from gateway.');
+  expect((args.authoritative[3] as Record<string, unknown>).text).toBe(
+    'Full complete answer from gateway.',
+  );
 });
 
 test('reconcileWithHistory: long conversation — preserves prefix, replaces tail', async () => {
@@ -1093,12 +1140,25 @@ test('reconcileWithHistory: long conversation — preserves prefix, replaces tai
   const localMessages = [];
   for (let i = 1; i <= 10; i++) {
     localMessages.push(
-      { id: `msg-u${i}`, type: 'user', content: `Question ${i}`, timestamp: i * 2 - 1, metadata: {} },
-      { id: `msg-a${i}`, type: 'assistant', content: `Answer ${i}`, timestamp: i * 2, metadata: {} },
+      {
+        id: `msg-u${i}`,
+        type: 'user',
+        content: `Question ${i}`,
+        timestamp: i * 2 - 1,
+        metadata: {},
+      },
+      {
+        id: `msg-a${i}`,
+        type: 'assistant',
+        content: `Answer ${i}`,
+        timestamp: i * 2,
+        metadata: {},
+      },
     );
   }
 
-  const { session, store, getReplaceCallCount, getLastReplaceArgs } = createReconcileStore(localMessages);
+  const { session, store, getReplaceCallCount, getLastReplaceArgs } =
+    createReconcileStore(localMessages);
 
   const adapter = new OpenClawRuntimeAdapter(store, {});
   adapter.gatewayClient = {
@@ -1251,10 +1311,13 @@ function createHistoryStore(messages: Array<Record<string, unknown>>) {
         session.messages.push(created);
         return created;
       },
-      replaceConversationMessages: (sessionId: string, authoritative: Array<Record<string, unknown>>) => {
+      replaceConversationMessages: (
+        sessionId: string,
+        authoritative: Array<Record<string, unknown>>,
+      ) => {
         expect(sessionId).toBe(session.id);
         session.messages = session.messages.filter(
-          (message) => message.type !== 'user' && message.type !== 'assistant',
+          message => message.type !== 'user' && message.type !== 'assistant',
         );
         for (const entry of authoritative) {
           session.messages.push({
@@ -1272,12 +1335,18 @@ function createHistoryStore(messages: Array<Record<string, unknown>>) {
 }
 
 const getSystemMessages = (session: { messages: Array<{ type: string }> }) =>
-  session.messages.filter((message) => message.type === 'system');
+  session.messages.filter(message => message.type === 'system');
 
 test('syncFullChannelHistory seeds gateway history cursor so old reminders are not replayed', async () => {
   const { session, store } = createHistoryStore([
     { id: 'msg-1', type: 'user', content: 'old user', timestamp: 1, metadata: {} },
-    { id: 'msg-2', type: 'assistant', content: 'old assistant', timestamp: 2, metadata: { isStreaming: false, isFinal: true } },
+    {
+      id: 'msg-2',
+      type: 'assistant',
+      content: 'old assistant',
+      timestamp: 2,
+      metadata: { isStreaming: false, isFinal: true },
+    },
   ]);
   const historyMessages = [
     { role: 'user', content: 'old user' },
@@ -1307,7 +1376,13 @@ test('syncFullChannelHistory seeds gateway history cursor so old reminders are n
 test('prefetchChannelUserMessages also consumes existing reminder history backlog', async () => {
   const { session, store } = createHistoryStore([
     { id: 'msg-1', type: 'user', content: 'old user', timestamp: 1, metadata: {} },
-    { id: 'msg-2', type: 'assistant', content: 'old assistant', timestamp: 2, metadata: { isStreaming: false, isFinal: true } },
+    {
+      id: 'msg-2',
+      type: 'assistant',
+      content: 'old assistant',
+      timestamp: 2,
+      metadata: { isStreaming: false, isFinal: true },
+    },
   ]);
   const historyMessages = [
     { role: 'user', content: 'old user' },
@@ -1326,7 +1401,9 @@ test('prefetchChannelUserMessages also consumes existing reminder history backlo
   await adapter.prefetchChannelUserMessages(session.id, 'dingtalk-connector:acct:user');
 
   expect(adapter.gatewayHistoryCountBySession.get(session.id)).toBe(historyMessages.length);
-  expect(session.messages.filter((message: Record<string, unknown>) => message.type === 'user').length).toBe(2);
+  expect(
+    session.messages.filter((message: Record<string, unknown>) => message.type === 'user').length,
+  ).toBe(2);
 
   adapter.syncSystemMessagesFromHistory(session.id, historyMessages, {
     previousCountKnown: adapter.gatewayHistoryCountBySession.has(session.id),
@@ -1349,7 +1426,7 @@ test('syncSystemMessagesFromHistory skips pure heartbeat ack system messages', (
     previousCount: 0,
   });
 
-  expect(getSystemMessages(session).map((message) => message.content)).toEqual(['Reminder fired']);
+  expect(getSystemMessages(session).map(message => message.content)).toEqual(['Reminder fired']);
 });
 
 test('collectChannelHistoryEntries skips heartbeat prompt and ack messages', () => {
@@ -1379,7 +1456,10 @@ test('getSessionKeysForSession prefers channel keys before managed fallback', ()
   const { store } = createHistoryStore([]);
   const adapter = new OpenClawRuntimeAdapter(store, {});
 
-  adapter.rememberSessionKey('session-1', 'agent:main:openai-user:dingtalk-connector:__default__:2459325231940374');
+  adapter.rememberSessionKey(
+    'session-1',
+    'agent:main:openai-user:dingtalk-connector:__default__:2459325231940374',
+  );
   adapter.rememberSessionKey('session-1', 'agent:main:zhiyuan:session-1');
 
   expect(adapter.getSessionKeysForSession('session-1')).toEqual([

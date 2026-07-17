@@ -8,10 +8,7 @@ import type {
   LlamaCppRuntimeListDevicesResult,
   LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
-import {
-  LlamaCppRuntimeBackend,
-  LlamaCppServiceConfigFieldKey,
-} from '../../shared/llamacpp';
+import { LlamaCppRuntimeBackend, LlamaCppServiceConfigFieldKey } from '../../shared/llamacpp';
 import {
   prependEnvPathEntry,
   resolveExecutableDir,
@@ -183,7 +180,11 @@ export async function listLlamaCppRuntimeHelpFlags(input: {
   const runner = input.runner ?? (execFileAsync as ExecFileRunner);
   try {
     const { stdout, stderr } = await runner(input.executablePath, ['--help'], {
-      env: buildLlamaCppServeEnv(input.baseEnv ?? process.env, input.executablePath, input.platform),
+      env: buildLlamaCppServeEnv(
+        input.baseEnv ?? process.env,
+        input.executablePath,
+        input.platform,
+      ),
       encoding: 'utf8',
       maxBuffer: 512 * 1024,
       timeout: LLAMACPP_HELP_PROBE_TIMEOUT_MS,
@@ -224,7 +225,11 @@ export async function listLlamaCppRuntimeDevices(input: {
   const metadata = resolveLlamaCppRuntimeMetadata(input.executablePath);
   try {
     const { stdout, stderr } = await runner(input.executablePath, ['--list-devices'], {
-      env: buildLlamaCppServeEnv(input.baseEnv ?? process.env, input.executablePath, input.platform),
+      env: buildLlamaCppServeEnv(
+        input.baseEnv ?? process.env,
+        input.executablePath,
+        input.platform,
+      ),
       encoding: 'utf8',
       maxBuffer: 256 * 1024,
       timeout: 10_000,
@@ -275,7 +280,10 @@ export function resolveLlamaCppDeviceSelection(
 ): string {
   const trimmed = rawValue.trim();
   if (!trimmed) return trimmed;
-  const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+  const parts = trimmed
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
   if (parts.length === 0) return '';
   if (!parts.every(part => /^\d+$/.test(part))) {
     return parts.every(part => devices.some(device => device.id === part || device.name === part))
@@ -316,8 +324,7 @@ export function buildLlamaCppServiceConfigFieldSupport(input: {
       unknownHelpSupport || hasFlag('--cache-prompt', '--no-cache-prompt'),
     [LlamaCppServiceConfigFieldKey.CacheReuse]: unknownHelpSupport || hasFlag('--cache-reuse'),
     [LlamaCppServiceConfigFieldKey.CacheRam]: unknownHelpSupport || hasFlag('--cache-ram'),
-    [LlamaCppServiceConfigFieldKey.Device]:
-      hasGpu && (unknownHelpSupport || hasFlag('--device')),
+    [LlamaCppServiceConfigFieldKey.Device]: hasGpu && (unknownHelpSupport || hasFlag('--device')),
     [LlamaCppServiceConfigFieldKey.SplitMode]:
       hasMultiGpu && (unknownHelpSupport || hasFlag('--split-mode')),
     [LlamaCppServiceConfigFieldKey.TensorSplit]:
@@ -359,4 +366,3 @@ function inferLlamaCppDeviceBackend(id: string, name: string): string {
 export function isGpuLikeRuntimeDevice(device: LlamaCppRuntimeDevice): boolean {
   return device.backend !== 'cpu' && device.backend !== 'unknown';
 }
-

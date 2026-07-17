@@ -1,7 +1,4 @@
-import {
-  Dialog,
-  DialogContent,
-} from '@shared/components/ui/dialog';
+import { Dialog, DialogContent } from '@shared/components/ui/dialog';
 import React from 'react';
 
 interface ModalProps {
@@ -31,12 +28,13 @@ const Modal: React.FC<ModalProps> = ({
   const open = isOpen !== false;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-      <DialogContent
-        className={className}
-        showCloseButton={false}
-        onClick={onClick}
-      >
+    <Dialog
+      open={open}
+      onOpenChange={nextOpen => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      <DialogContent className={className} showCloseButton={false} onClick={onClick}>
         {children}
       </DialogContent>
     </Dialog>

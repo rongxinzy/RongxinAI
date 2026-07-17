@@ -113,7 +113,7 @@ class GgufReader {
   private readArray(retainStrings: boolean): unknown[] | undefined {
     const valueType = this.readUint32();
     const length = this.readUint64();
-    const values = retainStrings ? [] as unknown[] : undefined;
+    const values = retainStrings ? ([] as unknown[]) : undefined;
     for (let index = 0; index < length; index += 1) {
       const value = this.readValue(valueType, retainStrings);
       if (values) values.push(value);
@@ -158,8 +158,10 @@ class GgufReader {
   private bufferLength = 0;
 
   private hasBufferedRange(length: number): boolean {
-    return this.position >= this.bufferStart
-      && this.position + length <= this.bufferStart + this.bufferLength;
+    return (
+      this.position >= this.bufferStart &&
+      this.position + length <= this.bufferStart + this.bufferLength
+    );
   }
 
   private fillBuffer(): void {

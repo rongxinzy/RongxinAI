@@ -1,8 +1,5 @@
 import { LOCAL_INFERENCE_SESSION_STORAGE_KEY } from '../constants';
-import type {
-  LocalInferenceSessionState,
-  LocalInferenceTab,
-} from '../types';
+import type { LocalInferenceSessionState, LocalInferenceTab } from '../types';
 
 export function readLocalInferenceSessionState(): LocalInferenceSessionState | null {
   try {
@@ -29,4 +26,3 @@ export function writeLocalInferenceSessionState(state: LocalInferenceSessionStat
 export function isLocalInferenceTab(value: unknown): value is LocalInferenceTab {
   return value === 'models' || value === 'marketplace';
 }
-

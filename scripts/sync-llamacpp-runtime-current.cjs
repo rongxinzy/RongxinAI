@@ -31,4 +31,6 @@ try {
 
 const linkType = process.platform === 'win32' ? 'junction' : 'dir';
 fs.symlinkSync(targetRuntimeDir, currentRuntimeDir, linkType);
-console.log(`[sync-llamacpp-runtime-current] Synced ${targetId} -> vendor/llamacpp-runtime/current`);
+console.log(
+  `[sync-llamacpp-runtime-current] Synced ${targetId} -> vendor/llamacpp-runtime/current`,
+);

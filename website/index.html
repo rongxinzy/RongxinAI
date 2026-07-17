@@ -1,742 +1,1933 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="dark">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZhiYuan Agent — Local AI Agent Workspace</title>
-  <meta name="description" content="ZhiYuan Agent is an all-in-one local AI Agent workspace with a fully self-developed stack. Cowork sessions, local inference, skills, MCP, scheduled tasks, and IM channels — all local-first." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2334D399' /%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' font-weight='700' fill='%23000'%3EL%3C/text%3E%3C/svg%3E" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <style>
-    /* ── Reset & Base ── */
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{scroll-behavior:smooth;font-size:16px}
-    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#071013;color:#E5E7EB;line-height:1.6;-webkit-font-smoothing:antialiased}
-    a{color:inherit;text-decoration:none}
-    img{max-width:100%;display:block}
-    ul{list-style:none}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZhiYuan Agent — Local AI Agent Workspace</title>
+    <meta
+      name="description"
+      content="ZhiYuan Agent is an all-in-one local AI Agent workspace with a fully self-developed stack. Cowork sessions, local inference, skills, MCP, scheduled tasks, and IM channels — all local-first."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2334D399' /%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' font-weight='700' fill='%23000'%3EL%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ── Reset & Base ── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        scroll-behavior: smooth;
+        font-size: 16px;
+      }
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: #071013;
+        color: #e5e7eb;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      img {
+        max-width: 100%;
+        display: block;
+      }
+      ul {
+        list-style: none;
+      }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar{width:8px}
-    ::-webkit-scrollbar-track{background:#0B1020}
-    ::-webkit-scrollbar-thumb{background:#1f2937;border-radius:8px}
+      /* ── Scrollbar ── */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0b1020;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1f2937;
+        border-radius: 8px;
+      }
 
-    /* ── Container ── */
-    .container{max-width:1200px;margin:0 auto;padding:0 24px}
-    @media(min-width:768px){.container{padding:0 32px}}
+      /* ── Container ── */
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      @media (min-width: 768px) {
+        .container {
+          padding: 0 32px;
+        }
+      }
 
-    /* ── Buttons ── */
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;transition:all 0.25s ease;border:none;line-height:1}
-    .btn-primary{background:linear-gradient(135deg,#34D399,#0EA5E9);color:#071013}
-    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(52,211,153,0.3)}
-    .btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,0.15);color:#D1D5DB}
-    .btn-outline:hover{border-color:#34D399;color:#34D399;transform:translateY(-2px)}
-    .btn-sm{padding:8px 18px;font-size:13px;border-radius:8px}
-    .btn-group{display:flex;flex-wrap:wrap;gap:14px;margin-top:28px;justify-content:center}
+      /* ── Buttons ── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 28px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        border: none;
+        line-height: 1;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #34d399, #0ea5e9);
+        color: #071013;
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(52, 211, 153, 0.3);
+      }
+      .btn-outline {
+        background: transparent;
+        border: 1.5px solid rgba(255, 255, 255, 0.15);
+        color: #d1d5db;
+      }
+      .btn-outline:hover {
+        border-color: #34d399;
+        color: #34d399;
+        transform: translateY(-2px);
+      }
+      .btn-sm {
+        padding: 8px 18px;
+        font-size: 13px;
+        border-radius: 8px;
+      }
+      .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 28px;
+        justify-content: center;
+      }
 
-    /* ── Navbar ── */
-    nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:14px 0;backdrop-filter:blur(16px);background:rgba(7,16,19,0.85);border-bottom:1px solid rgba(255,255,255,0.06)}
-    nav .container{display:flex;align-items:center;justify-content:space-between}
-    .nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
-    .nav-logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#34D399,#0EA5E9);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#071013}
-    .nav-links{display:none;gap:32px;font-size:14px;font-weight:500;color:#9CA3AF}
-    .nav-links a{transition:color 0.2s}
-    .nav-links a:hover{color:#34D399}
-    @media(min-width:768px){.nav-links{display:flex}}
-    .nav-cta{display:none}
-    @media(min-width:768px){.nav-cta{display:inline-flex}}
-    .mobile-menu-btn{display:flex;background:none;border:none;color:#D1D5DB;cursor:pointer;padding:6px}
-    @media(min-width:768px){.mobile-menu-btn{display:none}}
+      /* ── Navbar ── */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        padding: 14px 0;
+        backdrop-filter: blur(16px);
+        background: rgba(7, 16, 19, 0.85);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      nav .container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 20px;
+      }
+      .nav-logo-icon {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #34d399, #0ea5e9);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 18px;
+        color: #071013;
+      }
+      .nav-links {
+        display: none;
+        gap: 32px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #9ca3af;
+      }
+      .nav-links a {
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: #34d399;
+      }
+      @media (min-width: 768px) {
+        .nav-links {
+          display: flex;
+        }
+      }
+      .nav-cta {
+        display: none;
+      }
+      @media (min-width: 768px) {
+        .nav-cta {
+          display: inline-flex;
+        }
+      }
+      .mobile-menu-btn {
+        display: flex;
+        background: none;
+        border: none;
+        color: #d1d5db;
+        cursor: pointer;
+        padding: 6px;
+      }
+      @media (min-width: 768px) {
+        .mobile-menu-btn {
+          display: none;
+        }
+      }
 
-    /* ── Section common ── */
-    section{padding:100px 0}
-    .section-label{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px}
-    .section-label-green{background:rgba(52,211,153,0.12);color:#34D399;border:1px solid rgba(52,211,153,0.2)}
-    .section-label-blue{background:rgba(56,189,248,0.12);color:#38BDF8;border:1px solid rgba(56,189,248,0.2)}
-    .section-label-purple{background:rgba(167,139,250,0.12);color:#A78BFA;border:1px solid rgba(167,139,250,0.2)}
-    .section-title{font-size:clamp(28px,4vw,44px);font-weight:800;line-height:1.2;margin-bottom:16px}
-    .section-title .highlight-green{background:linear-gradient(135deg,#34D399,#0EA5E9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .section-title .highlight-blue{background:linear-gradient(135deg,#38BDF8,#6366F1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .section-title .highlight-purple{background:linear-gradient(135deg,#A78BFA,#F472B6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .section-desc{font-size:18px;color:#9CA3AF;max-width:640px;margin:0 auto 48px;text-align:center;line-height:1.7}
-    .section-header{text-align:center;margin-bottom:56px}
+      /* ── Section common ── */
+      section {
+        padding: 100px 0;
+      }
+      .section-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 16px;
+      }
+      .section-label-green {
+        background: rgba(52, 211, 153, 0.12);
+        color: #34d399;
+        border: 1px solid rgba(52, 211, 153, 0.2);
+      }
+      .section-label-blue {
+        background: rgba(56, 189, 248, 0.12);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.2);
+      }
+      .section-label-purple {
+        background: rgba(167, 139, 250, 0.12);
+        color: #a78bfa;
+        border: 1px solid rgba(167, 139, 250, 0.2);
+      }
+      .section-title {
+        font-size: clamp(28px, 4vw, 44px);
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 16px;
+      }
+      .section-title .highlight-green {
+        background: linear-gradient(135deg, #34d399, #0ea5e9);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .section-title .highlight-blue {
+        background: linear-gradient(135deg, #38bdf8, #6366f1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .section-title .highlight-purple {
+        background: linear-gradient(135deg, #a78bfa, #f472b6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .section-desc {
+        font-size: 18px;
+        color: #9ca3af;
+        max-width: 640px;
+        margin: 0 auto 48px;
+        text-align: center;
+        line-height: 1.7;
+      }
+      .section-header {
+        text-align: center;
+        margin-bottom: 56px;
+      }
 
-    /* ── Hero ── */
-    .hero{padding:160px 0 80px;position:relative;overflow:hidden}
-    .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 600px 400px at 50% 30%,rgba(52,211,153,0.08),transparent);pointer-events:none}
-    .hero-grid{display:grid;grid-template-columns:1fr;gap:48px;align-items:center}
-    @media(min-width:900px){.hero-grid{grid-template-columns:1fr 1fr;gap:64px}}
-    .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);color:#6EE7B7;margin-bottom:24px}
-    .hero h1{font-size:clamp(36px,5vw,56px);font-weight:900;line-height:1.15;margin-bottom:20px}
-    .hero h1 span{background:linear-gradient(135deg,#34D399,#0EA5E9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .hero p{font-size:clamp(16px,1.3vw,20px);color:#9CA3AF;max-width:540px;line-height:1.7}
-    .hero-stats{display:flex;gap:32px;margin-top:36px;flex-wrap:wrap}
-    .hero-stat{text-align:center}
-    .hero-stat-num{font-size:28px;font-weight:800;background:linear-gradient(135deg,#34D399,#0EA5E9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .hero-stat-label{font-size:13px;color:#6B7280;margin-top:2px}
-    .hero-visual{position:relative;display:flex;justify-content:center;align-items:center}
-    .hero-card{width:100%;max-width:480px;background:linear-gradient(145deg,#0B1F1E,#111827);border-radius:24px;border:1px solid rgba(255,255,255,0.06);padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
-    .hero-card-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06)}
-    .hero-card-dots{display:flex;gap:6px}
-    .hero-card-dot{width:10px;height:10px;border-radius:50%}
-    .hero-card-dot:nth-child(1){background:#ef4444}
-    .hero-card-dot:nth-child(2){background:#f59e0b}
-    .hero-card-dot:nth-child(3){background:#34D399}
-    .hero-card-title{font-size:13px;font-weight:600;color:#6B7280;margin-left:auto}
-    .hero-message{padding:14px 18px;border-radius:14px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.12);margin-bottom:14px;font-size:14px;line-height:1.6}
-    .hero-message-role{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#34D399;margin-bottom:4px}
-    .hero-message p{color:#D1D5DB}
-    .hero-message-agent{background:rgba(56,189,248,0.08);border-color:rgba(56,189,248,0.12)}
-    .hero-message-agent .hero-message-role{color:#38BDF8}
-    .hero-tool-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;margin-top:14px;font-size:13px;color:#9CA3AF}
-    .hero-tool-dot{width:6px;height:6px;border-radius:50%;background:#34D399;animation:pulse 2s infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-    .hero-tool-bar strong{color:#D1D5DB;font-weight:600}
+      /* ── Hero ── */
+      .hero {
+        padding: 160px 0 80px;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 600px 400px at 50% 30%,
+          rgba(52, 211, 153, 0.08),
+          transparent
+        );
+        pointer-events: none;
+      }
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 48px;
+        align-items: center;
+      }
+      @media (min-width: 900px) {
+        .hero-grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 64px;
+        }
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        background: rgba(52, 211, 153, 0.1);
+        border: 1px solid rgba(52, 211, 153, 0.2);
+        color: #6ee7b7;
+        margin-bottom: 24px;
+      }
+      .hero h1 {
+        font-size: clamp(36px, 5vw, 56px);
+        font-weight: 900;
+        line-height: 1.15;
+        margin-bottom: 20px;
+      }
+      .hero h1 span {
+        background: linear-gradient(135deg, #34d399, #0ea5e9);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .hero p {
+        font-size: clamp(16px, 1.3vw, 20px);
+        color: #9ca3af;
+        max-width: 540px;
+        line-height: 1.7;
+      }
+      .hero-stats {
+        display: flex;
+        gap: 32px;
+        margin-top: 36px;
+        flex-wrap: wrap;
+      }
+      .hero-stat {
+        text-align: center;
+      }
+      .hero-stat-num {
+        font-size: 28px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #34d399, #0ea5e9);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .hero-stat-label {
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 2px;
+      }
+      .hero-visual {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .hero-card {
+        width: 100%;
+        max-width: 480px;
+        background: linear-gradient(145deg, #0b1f1e, #111827);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 28px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      }
+      .hero-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .hero-card-dots {
+        display: flex;
+        gap: 6px;
+      }
+      .hero-card-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .hero-card-dot:nth-child(1) {
+        background: #ef4444;
+      }
+      .hero-card-dot:nth-child(2) {
+        background: #f59e0b;
+      }
+      .hero-card-dot:nth-child(3) {
+        background: #34d399;
+      }
+      .hero-card-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+        margin-left: auto;
+      }
+      .hero-message {
+        padding: 14px 18px;
+        border-radius: 14px;
+        background: rgba(52, 211, 153, 0.08);
+        border: 1px solid rgba(52, 211, 153, 0.12);
+        margin-bottom: 14px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .hero-message-role {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #34d399;
+        margin-bottom: 4px;
+      }
+      .hero-message p {
+        color: #d1d5db;
+      }
+      .hero-message-agent {
+        background: rgba(56, 189, 248, 0.08);
+        border-color: rgba(56, 189, 248, 0.12);
+      }
+      .hero-message-agent .hero-message-role {
+        color: #38bdf8;
+      }
+      .hero-tool-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 10px;
+        margin-top: 14px;
+        font-size: 13px;
+        color: #9ca3af;
+      }
+      .hero-tool-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #34d399;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .hero-tool-bar strong {
+        color: #d1d5db;
+        font-weight: 600;
+      }
 
-    /* ── Features ── */
-    #features{background:#0B1020}
-    .features-grid{display:grid;grid-template-columns:1fr;gap:20px}
-    @media(min-width:600px){.features-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(min-width:900px){.features-grid{grid-template-columns:repeat(3,1fr)}}
-    .feature-card{background:linear-gradient(145deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:32px 28px;transition:all 0.3s ease;position:relative;overflow:hidden}
-    .feature-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:999px;opacity:0;transition:opacity 0.3s}
-    .feature-card:hover{transform:translateY(-4px);border-color:rgba(52,211,153,0.15);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
-    .feature-card:hover::before{opacity:1}
-    .feature-card:nth-child(1)::before{background:linear-gradient(90deg,#34D399,#0EA5E9)}
-    .feature-card:nth-child(2)::before{background:linear-gradient(90deg,#38BDF8,#6366F1)}
-    .feature-card:nth-child(3)::before{background:linear-gradient(90deg,#A78BFA,#F472B6)}
-    .feature-card:nth-child(4)::before{background:linear-gradient(90deg,#f59e0b,#ef4444)}
-    .feature-card:nth-child(5)::before{background:linear-gradient(90deg,#34D399,#22D3EE)}
-    .feature-card:nth-child(6)::before{background:linear-gradient(90deg,#A78BFA,#60A5FA)}
-    .feature-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:18px;background:rgba(52,211,153,0.1);color:#34D399}
-    .feature-card:nth-child(2) .feature-icon{background:rgba(56,189,248,0.1);color:#38BDF8}
-    .feature-card:nth-child(3) .feature-icon{background:rgba(167,139,250,0.1);color:#A78BFA}
-    .feature-card:nth-child(4) .feature-icon{background:rgba(245,158,11,0.1);color:#f59e0b}
-    .feature-card:nth-child(5) .feature-icon{background:rgba(34,211,238,0.1);color:#22D3EE}
-    .feature-card:nth-child(6) .feature-icon{background:rgba(96,165,250,0.1);color:#60A5FA}
-    .feature-card h3{font-size:18px;font-weight:700;margin-bottom:10px;color:#F3F4F6}
-    .feature-card p{font-size:14px;color:#9CA3AF;line-height:1.7}
-    .feature-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
-    .feature-tag{padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(255,255,255,0.05);color:#6B7280;border:1px solid rgba(255,255,255,0.06)}
+      /* ── Features ── */
+      #features {
+        background: #0b1020;
+      }
+      .features-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      @media (min-width: 600px) {
+        .features-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (min-width: 900px) {
+        .features-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .feature-card {
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 20px;
+        padding: 32px 28px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        border-radius: 999px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .feature-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(52, 211, 153, 0.15);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+      }
+      .feature-card:hover::before {
+        opacity: 1;
+      }
+      .feature-card:nth-child(1)::before {
+        background: linear-gradient(90deg, #34d399, #0ea5e9);
+      }
+      .feature-card:nth-child(2)::before {
+        background: linear-gradient(90deg, #38bdf8, #6366f1);
+      }
+      .feature-card:nth-child(3)::before {
+        background: linear-gradient(90deg, #a78bfa, #f472b6);
+      }
+      .feature-card:nth-child(4)::before {
+        background: linear-gradient(90deg, #f59e0b, #ef4444);
+      }
+      .feature-card:nth-child(5)::before {
+        background: linear-gradient(90deg, #34d399, #22d3ee);
+      }
+      .feature-card:nth-child(6)::before {
+        background: linear-gradient(90deg, #a78bfa, #60a5fa);
+      }
+      .feature-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        margin-bottom: 18px;
+        background: rgba(52, 211, 153, 0.1);
+        color: #34d399;
+      }
+      .feature-card:nth-child(2) .feature-icon {
+        background: rgba(56, 189, 248, 0.1);
+        color: #38bdf8;
+      }
+      .feature-card:nth-child(3) .feature-icon {
+        background: rgba(167, 139, 250, 0.1);
+        color: #a78bfa;
+      }
+      .feature-card:nth-child(4) .feature-icon {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+      }
+      .feature-card:nth-child(5) .feature-icon {
+        background: rgba(34, 211, 238, 0.1);
+        color: #22d3ee;
+      }
+      .feature-card:nth-child(6) .feature-icon {
+        background: rgba(96, 165, 250, 0.1);
+        color: #60a5fa;
+      }
+      .feature-card h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #f3f4f6;
+      }
+      .feature-card p {
+        font-size: 14px;
+        color: #9ca3af;
+        line-height: 1.7;
+      }
+      .feature-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 14px;
+      }
+      .feature-tag {
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.05);
+        color: #6b7280;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
 
-    /* ── Architecture ── */
-    #architecture{background:#071013}
-    .arch-diagram{max-width:900px;margin:0 auto;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);background:#0B1020;position:relative}
-    .arch-diagram svg{width:100%;height:auto;display:block}
-    .arch-layers{display:grid;grid-template-columns:1fr;gap:16px;margin-top:40px}
-    @media(min-width:600px){.arch-layers{grid-template-columns:repeat(3,1fr)}}
-    .arch-layer{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:24px;text-align:center}
-    .arch-layer-icon{font-size:28px;margin-bottom:8px}
-    .arch-layer h4{font-size:15px;font-weight:700;margin-bottom:4px}
-    .arch-layer p{font-size:13px;color:#6B7280}
+      /* ── Architecture ── */
+      #architecture {
+        background: #071013;
+      }
+      .arch-diagram {
+        max-width: 900px;
+        margin: 0 auto;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: #0b1020;
+        position: relative;
+      }
+      .arch-diagram svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .arch-layers {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-top: 40px;
+      }
+      @media (min-width: 600px) {
+        .arch-layers {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .arch-layer {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+      }
+      .arch-layer-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+      .arch-layer h4 {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .arch-layer p {
+        font-size: 13px;
+        color: #6b7280;
+      }
 
-    /* ── Skills ── */
-    #skills{background:#0B1020}
-    .skills-grid{display:grid;grid-template-columns:1fr;gap:12px;max-width:900px;margin:0 auto}
-    @media(min-width:600px){.skills-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(min-width:900px){.skills-grid{grid-template-columns:repeat(3,1fr)}}
-    .skill-item{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);transition:all 0.2s;font-size:14px}
-    .skill-item:hover{background:rgba(52,211,153,0.04);border-color:rgba(52,211,153,0.12);transform:translateY(-1px)}
-    .skill-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-    .skill-item span{color:#D1D5DB;font-weight:500}
-    .skill-item small{color:#6B7280;margin-left:auto;font-size:12px}
+      /* ── Skills ── */
+      #skills {
+        background: #0b1020;
+      }
+      .skills-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      @media (min-width: 600px) {
+        .skills-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (min-width: 900px) {
+        .skills-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .skill-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.2s;
+        font-size: 14px;
+      }
+      .skill-item:hover {
+        background: rgba(52, 211, 153, 0.04);
+        border-color: rgba(52, 211, 153, 0.12);
+        transform: translateY(-1px);
+      }
+      .skill-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      .skill-item span {
+        color: #d1d5db;
+        font-weight: 500;
+      }
+      .skill-item small {
+        color: #6b7280;
+        margin-left: auto;
+        font-size: 12px;
+      }
 
-    /* ── Tech Stack ── */
-    #techstack{background:#071013}
-    .tech-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:800px;margin:0 auto}
-    @media(min-width:600px){.tech-grid{grid-template-columns:repeat(4,1fr)}}
-    .tech-item{text-align:center;padding:20px 12px;border-radius:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);transition:all 0.2s}
-    .tech-item:hover{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1)}
-    .tech-item .tech-name{font-weight:700;font-size:15px;margin-bottom:2px}
-    .tech-item .tech-layer{font-size:12px;color:#6B7280}
-    .tech-item .tech-icon{font-size:28px;margin-bottom:8px}
+      /* ── Tech Stack ── */
+      #techstack {
+        background: #071013;
+      }
+      .tech-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      @media (min-width: 600px) {
+        .tech-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+      .tech-item {
+        text-align: center;
+        padding: 20px 12px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.2s;
+      }
+      .tech-item:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+      .tech-item .tech-name {
+        font-weight: 700;
+        font-size: 15px;
+        margin-bottom: 2px;
+      }
+      .tech-item .tech-layer {
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .tech-item .tech-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
 
-    /* ── Security ── */
-    #security{background:#0B1020}
-    .security-cards{display:grid;grid-template-columns:1fr;gap:20px}
-    @media(min-width:600px){.security-cards{grid-template-columns:repeat(3,1fr)}}
-    .security-card{text-align:center;padding:36px 24px;border-radius:20px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);transition:all 0.3s}
-    .security-card:hover{transform:translateY(-4px)}
-    .security-card-icon{font-size:36px;margin-bottom:16px}
-    .security-card h3{font-size:17px;font-weight:700;margin-bottom:8px}
-    .security-card p{font-size:14px;color:#9CA3AF;line-height:1.6}
+      /* ── Security ── */
+      #security {
+        background: #0b1020;
+      }
+      .security-cards {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      @media (min-width: 600px) {
+        .security-cards {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .security-card {
+        text-align: center;
+        padding: 36px 24px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        transition: all 0.3s;
+      }
+      .security-card:hover {
+        transform: translateY(-4px);
+      }
+      .security-card-icon {
+        font-size: 36px;
+        margin-bottom: 16px;
+      }
+      .security-card h3 {
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .security-card p {
+        font-size: 14px;
+        color: #9ca3af;
+        line-height: 1.6;
+      }
 
-    /* ── CTA ── */
-    #cta{background:linear-gradient(180deg,#0B1020,#071013);padding:100px 0;position:relative;overflow:hidden}
-    #cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 700px 400px at 50% 50%,rgba(52,211,153,0.06),transparent);pointer-events:none}
-    .cta-box{max-width:700px;margin:0 auto;text-align:center;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:32px;padding:56px 32px;position:relative}
-    .cta-box h2{font-size:clamp(24px,3vw,36px);font-weight:800;margin-bottom:12px}
-    .cta-box p{color:#9CA3AF;margin-bottom:32px;font-size:16px;line-height:1.6}
-    .cta-buttons{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
-    .cta-button{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:14px;font-weight:700;font-size:15px;transition:all 0.25s;cursor:pointer;border:none}
-    .cta-button-primary{background:linear-gradient(135deg,#34D399,#0EA5E9);color:#071013}
-    .cta-button-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(52,211,153,0.3)}
-    .cta-button-secondary{background:rgba(255,255,255,0.06);color:#D1D5DB;border:1px solid rgba(255,255,255,0.1)}
-    .cta-button-secondary:hover{background:rgba(255,255,255,0.1);transform:translateY(-2px)}
-    .cta-meta{display:flex;justify-content:center;gap:24px;margin-top:28px;font-size:13px;color:#6B7280;flex-wrap:wrap}
-    .cta-meta span{display:flex;align-items:center;gap:4px}
+      /* ── CTA ── */
+      #cta {
+        background: linear-gradient(180deg, #0b1020, #071013);
+        padding: 100px 0;
+        position: relative;
+        overflow: hidden;
+      }
+      #cta::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 700px 400px at 50% 50%,
+          rgba(52, 211, 153, 0.06),
+          transparent
+        );
+        pointer-events: none;
+      }
+      .cta-box {
+        max-width: 700px;
+        margin: 0 auto;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 32px;
+        padding: 56px 32px;
+        position: relative;
+      }
+      .cta-box h2 {
+        font-size: clamp(24px, 3vw, 36px);
+        font-weight: 800;
+        margin-bottom: 12px;
+      }
+      .cta-box p {
+        color: #9ca3af;
+        margin-bottom: 32px;
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      .cta-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: center;
+      }
+      .cta-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 32px;
+        border-radius: 14px;
+        font-weight: 700;
+        font-size: 15px;
+        transition: all 0.25s;
+        cursor: pointer;
+        border: none;
+      }
+      .cta-button-primary {
+        background: linear-gradient(135deg, #34d399, #0ea5e9);
+        color: #071013;
+      }
+      .cta-button-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(52, 211, 153, 0.3);
+      }
+      .cta-button-secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: #d1d5db;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .cta-button-secondary:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+      }
+      .cta-meta {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 28px;
+        font-size: 13px;
+        color: #6b7280;
+        flex-wrap: wrap;
+      }
+      .cta-meta span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
 
-    /* ── Footer ── */
-    footer{background:#071013;border-top:1px solid rgba(255,255,255,0.05);padding:48px 0 36px}
-    .footer-grid{display:grid;grid-template-columns:1fr;gap:32px;margin-bottom:32px}
-    @media(min-width:600px){.footer-grid{grid-template-columns:2fr 1fr 1fr 1fr}}
-    .footer-brand .nav-logo{margin-bottom:12px}
-    .footer-brand p{font-size:14px;color:#6B7280;max-width:320px;line-height:1.6}
-    .footer-col h4{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9CA3AF;margin-bottom:16px}
-    .footer-col a{display:block;font-size:14px;color:#6B7280;padding:5px 0;transition:color 0.2s}
-    .footer-col a:hover{color:#34D399}
-    .footer-bottom{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);font-size:13px;color:#4B5563}
-    .footer-socials{display:flex;gap:12px}
-    .footer-socials a{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-size:16px;transition:all 0.2s;color:#6B7280}
-    .footer-socials a:hover{background:rgba(52,211,153,0.1);color:#34D399}
+      /* ── Footer ── */
+      footer {
+        background: #071013;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 48px 0 36px;
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 32px;
+        margin-bottom: 32px;
+      }
+      @media (min-width: 600px) {
+        .footer-grid {
+          grid-template-columns: 2fr 1fr 1fr 1fr;
+        }
+      }
+      .footer-brand .nav-logo {
+        margin-bottom: 12px;
+      }
+      .footer-brand p {
+        font-size: 14px;
+        color: #6b7280;
+        max-width: 320px;
+        line-height: 1.6;
+      }
+      .footer-col h4 {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #9ca3af;
+        margin-bottom: 16px;
+      }
+      .footer-col a {
+        display: block;
+        font-size: 14px;
+        color: #6b7280;
+        padding: 5px 0;
+        transition: color 0.2s;
+      }
+      .footer-col a:hover {
+        color: #34d399;
+      }
+      .footer-bottom {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding-top: 24px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 13px;
+        color: #4b5563;
+      }
+      .footer-socials {
+        display: flex;
+        gap: 12px;
+      }
+      .footer-socials a {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: all 0.2s;
+        color: #6b7280;
+      }
+      .footer-socials a:hover {
+        background: rgba(52, 211, 153, 0.1);
+        color: #34d399;
+      }
 
-    /* ── Mobile menu ── */
-    .mobile-menu{display:none;position:fixed;top:60px;left:0;right:0;background:rgba(7,16,19,0.98);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06);padding:20px 24px;z-index:999}
-    .mobile-menu.open{display:block}
-    .mobile-menu a{display:block;padding:12px 0;font-weight:500;color:#9CA3AF;border-bottom:1px solid rgba(255,255,255,0.04)}
-    .mobile-menu a:hover{color:#34D399}
-    .mobile-menu .btn{margin-top:12px;width:100%;justify-content:center}
+      /* ── Mobile menu ── */
+      .mobile-menu {
+        display: none;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        background: rgba(7, 16, 19, 0.98);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 20px 24px;
+        z-index: 999;
+      }
+      .mobile-menu.open {
+        display: block;
+      }
+      .mobile-menu a {
+        display: block;
+        padding: 12px 0;
+        font-weight: 500;
+        color: #9ca3af;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .mobile-menu a:hover {
+        color: #34d399;
+      }
+      .mobile-menu .btn {
+        margin-top: 12px;
+        width: 100%;
+        justify-content: center;
+      }
 
-    /* ── Animations ── */
-    .fade-in{opacity:0;transform:translateY(24px);transition:all 0.6s ease}
-    .fade-in.visible{opacity:1;transform:translateY(0)}
+      /* ── Animations ── */
+      .fade-in {
+        opacity: 0;
+        transform: translateY(24px);
+        transition: all 0.6s ease;
+      }
+      .fade-in.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
 
-    /* ── Responsive tweaks ── */
-    @media(max-width:600px){
-      .hero{padding:120px 0 48px}
-      .btn-group .btn{width:100%;justify-content:center}
-    }
-  </style>
-</head>
-<body>
-
-  <!-- ═══ Navbar ═══ -->
-  <nav>
-    <div class="container">
-      <a href="#" class="nav-logo">
-        <span class="nav-logo-icon">L</span>
-        <span>ZhiYuan Agent</span>
-      </a>
-      <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#skills">Skills</a>
-        <a href="#security">Security</a>
-        <a href="https://github.com/rongxinzy/RongxinAI" target="_blank">GitHub</a>
-      </div>
-      <a href="#cta" class="btn btn-primary btn-sm nav-cta">Get Started</a>
-      <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-      </button>
-    </div>
-  </nav>
-
-  <!-- Mobile Menu -->
-  <div class="mobile-menu" id="mobileMenu">
-    <a href="#features" onclick="closeMobileMenu()">Features</a>
-    <a href="#architecture" onclick="closeMobileMenu()">Architecture</a>
-    <a href="#skills" onclick="closeMobileMenu()">Skills</a>
-    <a href="#security" onclick="closeMobileMenu()">Security</a>
-    <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" onclick="closeMobileMenu()">GitHub</a>
-    <a href="#cta" class="btn btn-primary btn-sm" onclick="closeMobileMenu()">Get Started</a>
-  </div>
-
-  <!-- ═══ Hero ═══ -->
-  <section class="hero">
-    <div class="container">
-      <div class="hero-grid">
-        <div>
-          <div class="hero-badge">
-            <span>v2026.6 — Open Source</span>
-          </div>
-          <h1>Your Local <span>AI Agent</span> Workspace</h1>
-          <p>ZhiYuan Agent combines a self-developed agent runtime, self-developed local inference, built-in skills, MCP integrations, scheduled tasks, and IM channels — all running locally on your machine with full privacy control.</p>
-          <div class="btn-group" style="justify-content:flex-start">
-            <a href="#cta" class="btn btn-primary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Download
-            </a>
-            <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" class="btn btn-outline">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-              View on GitHub
-            </a>
-          </div>
-          <div class="hero-stats">
-            <div class="hero-stat">
-              <div class="hero-stat-num">40K+</div>
-              <div class="hero-stat-label">GGUF Models</div>
-            </div>
-            <div class="hero-stat">
-              <div class="hero-stat-num">7</div>
-              <div class="hero-stat-label">IM Channels</div>
-            </div>
-            <div class="hero-stat">
-              <div class="hero-stat-num">30+</div>
-              <div class="hero-stat-label">Built-in Skills</div>
-            </div>
-            <div class="hero-stat">
-              <div class="hero-stat-num">24<</div>
-              <div class="hero-stat-label">Node.js</div>
-            </div>
-          </div>
-        </div>
-        <div class="hero-visual">
-          <div class="hero-card">
-            <div class="hero-card-header">
-              <div class="hero-card-dots">
-                <span class="hero-card-dot"></span>
-                <span class="hero-card-dot"></span>
-                <span class="hero-card-dot"></span>
-              </div>
-              <span class="hero-card-title">Cowork Session</span>
-            </div>
-            <div class="hero-message">
-              <div class="hero-message-role">You</div>
-              <p>Analyze this quarterly report and summarize key findings. Generate a PowerPoint deck with the results.</p>
-            </div>
-            <div class="hero-message hero-message-agent">
-              <div class="hero-message-role">ZhiYuan Agent</div>
-              <p>Reading the report... I'll extract financial highlights, compare YoY growth, and build the slides.</p>
-            </div>
-            <div class="hero-tool-bar">
-              <span class="hero-tool-dot"></span>
-              <span><strong>tools:</strong> read file, shell, python · 2 pending</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Features ═══ -->
-  <section id="features">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label section-label-green">Capabilities</div>
-        <h2 class="section-title">Everything an <span class="highlight-green">AI Agent</span> Needs</h2>
-        <p class="section-desc">ZhiYuan Agent is not just a chat UI. It's an execution environment where Agents work on your machine, access tools, run code, and stay reachable through your everyday channels.</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          </div>
-          <h3>Cowork Agent Workflows</h3>
-          <p>Multi-step tasks with file tools, shell commands, browser automation, document processing, and approval-gated actions. Real-time streaming of messages, tool calls, and permission requests.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">Agent Runtime</span>
-            <span class="feature-tag">Stream Events</span>
-            <span class="feature-tag">Permission Control</span>
-          </div>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          </div>
-          <h3>Local Inference</h3>
-          <p>Manage local GGUF models with a full lifecycle: install, list, load, configure launch parameters (context length, GPU offload, threads), and run the inference service locally. Model marketplace backed by ModelScope with 40K+ models.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">GGUF Models</span>
-            <span class="feature-tag">GPU Offload</span>
-            <span class="feature-tag">ModelScope</span>
-          </div>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          </div>
-          <h3>Skills &amp; MCP Integration</h3>
-          <p>30+ built-in skills for web search, document generation (docx/xlsx/pptx/pdf), browser automation, video creation, email, stock research, and more. Connect external tools through Model Context Protocol (MCP).</p>
-          <div class="feature-tags">
-            <span class="feature-tag">Built-in Skills</span>
-            <span class="feature-tag">MCP Protocol</span>
-            <span class="feature-tag">Custom Skills</span>
-          </div>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <h3>Scheduled Tasks</h3>
-          <p>Create recurring jobs from natural language or the GUI — daily briefings, email follow-ups, report generation, stock monitoring, and more. Results stay in the app and can be delivered via IM or email.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">Cron Triggers</span>
-            <span class="feature-tag">Background Tasks</span>
-            <span class="feature-tag">Channel Delivery</span>
-          </div>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <h3>IM &amp; Email Channels</h3>
-          <p>Reach your Agent through WeChat, WeCom (WeChat Work), DingTalk, Feishu/Lark, QQ, and Email. Configure any combination as input and output channels for task creation and result delivery.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">WeChat</span>
-            <span class="feature-tag">DingTalk</span>
-            <span class="feature-tag">Feishu</span>
-            <span class="feature-tag">QQ</span>
-            <span class="feature-tag">Email</span>
-          </div>
-        </div>
-        <div class="feature-card fade-in">
-          <div class="feature-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          </div>
-          <h3>Artifacts &amp; Rich Preview</h3>
-          <p>Render code outputs inline — HTML pages in sandboxed iframes, SVG graphics, Mermaid diagrams, React components, and syntax-highlighted code. Resizable side panel with copy, download, and zoom controls.</p>
-          <div class="feature-tags">
-            <span class="feature-tag">HTML</span>
-            <span class="feature-tag">SVG</span>
-            <span class="feature-tag">Mermaid</span>
-            <span class="feature-tag">React</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Architecture ═══ -->
-  <section id="architecture">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label section-label-blue">Architecture</div>
-        <h2 class="section-title">Strict <span class="highlight-blue">Process Isolation</span></h2>
-        <p class="section-desc">Electron with context isolation, IPC-only communication, and sandboxed renderer. Your data stays in local SQLite — sessions, config, memory, and task metadata never leave your machine.</p>
-      </div>
-      <div class="arch-diagram fade-in">
-        <!-- Inlined architecture SVG (monochrome, TikZ-style) -->
-        <svg width="100%" height="auto" viewBox="0 0 1120 880" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:1120px;margin:0 auto;background:#fff">
-          <defs>
-            <pattern id="a-hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-              <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.7"/>
-            </pattern>
-            <marker id="a-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
-              <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
-            </marker>
-            <style>
-              .at { fill: #000; font-family: 'Latin Modern Roman', 'CMU Serif', 'STIX Two Text', 'Times New Roman', serif; }
-              .abox { fill: #fff; stroke: #000; stroke-width: 1.6; }
-              .agrp { fill: none; stroke: #000; stroke-width: 1.4; stroke-dasharray: 7 5; }
-              .aln  { stroke: #000; stroke-width: 1.6; }
-            </style>
-          </defs>
-          <rect width="1120" height="880" fill="#fff"/>
-          <text x="560" y="50" text-anchor="middle" class="at" font-size="26" font-weight="700">ZhiYuan Agent — Local AI Agent Workspace</text>
-          <text x="560" y="80" text-anchor="middle" class="at" font-size="15" font-style="italic">Fully self-developed stack &#183; agent runtime and local inference built in-house &#183; Electron owns the desktop security boundary</text>
-
-          <rect x="60" y="110" width="1000" height="300" class="agrp"/>
-          <text x="82" y="142" class="at" font-size="18" font-weight="700">Electron Main Process</text>
-
-          <rect x="95" y="165" width="350" height="95" fill="url(#a-hatch)" stroke="#000" stroke-width="1.6"/>
-          <text x="115" y="201" class="at" font-size="17" font-weight="700">Agent Runtime</text>
-          <text x="115" y="227" class="at" font-size="13">Cowork sessions, tools, approvals</text>
-          <rect x="352" y="178" width="78" height="24" fill="#fff" stroke="#000" stroke-width="1.2"/>
-          <text x="391" y="195" text-anchor="middle" class="at" font-size="13" font-weight="700">primary</text>
-
-          <rect x="470" y="165" width="270" height="95" class="abox"/>
-          <text x="490" y="201" class="at" font-size="17" font-weight="700">Local Inference</text>
-          <text x="490" y="227" class="at" font-size="13">GGUF models, launch options,</text>
-          <text x="490" y="247" class="at" font-size="13">marketplace</text>
-
-          <rect x="765" y="165" width="270" height="95" class="abox"/>
-          <text x="785" y="201" class="at" font-size="17" font-weight="700">Skill / MCP Manager</text>
-          <text x="785" y="227" class="at" font-size="13">Built-in skills, marketplace,</text>
-          <text x="785" y="247" class="at" font-size="13">external tools</text>
-
-          <rect x="95" y="290" width="350" height="95" class="abox"/>
-          <text x="115" y="326" class="at" font-size="17" font-weight="700">SQLite Storage</text>
-          <text x="115" y="352" class="at" font-size="13">Sessions, config, memory, tasks</text>
-
-          <rect x="470" y="290" width="270" height="95" class="abox"/>
-          <text x="490" y="326" class="at" font-size="17" font-weight="700">Scheduled Tasks</text>
-          <text x="490" y="352" class="at" font-size="13">Cron, background triggers, delivery</text>
-
-          <rect x="765" y="290" width="270" height="95" class="abox"/>
-          <text x="785" y="326" class="at" font-size="17" font-weight="700">IM / Email Gateway</text>
-          <text x="785" y="352" class="at" font-size="13">WeChat, WeCom, DingTalk,</text>
-          <text x="785" y="372" class="at" font-size="13">Feishu/Lark, QQ, Email</text>
-
-          <line x1="560" y1="410" x2="560" y2="462" class="aln" marker-start="url(#a-arr)" marker-end="url(#a-arr)"/>
-          <text x="578" y="442" class="at" font-size="12" font-style="italic">IPC invoke</text>
-          <rect x="420" y="465" width="280" height="70" class="abox"/>
-          <text x="560" y="497" text-anchor="middle" class="at" font-size="16" font-weight="700">Preload Script</text>
-          <text x="560" y="521" text-anchor="middle" class="at" font-size="12" font-style="italic">contextBridge &#183; IPC secure bridge</text>
-          <line x1="560" y1="535" x2="560" y2="587" class="aln" marker-start="url(#a-arr)" marker-end="url(#a-arr)"/>
-          <text x="578" y="568" class="at" font-size="12" font-style="italic">stream events</text>
-
-          <rect x="60" y="590" width="1000" height="200" class="agrp"/>
-          <text x="82" y="622" class="at" font-size="18" font-weight="700">Renderer Process (React)</text>
-
-          <rect x="95" y="655" width="215" height="85" class="abox"/>
-          <text x="202" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Redux State</text>
-          <rect x="335" y="655" width="250" height="85" class="abox"/>
-          <text x="460" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Cowork / Inference UI</text>
-          <rect x="610" y="655" width="220" height="85" class="abox"/>
-          <text x="720" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Artifacts Preview</text>
-          <rect x="855" y="655" width="180" height="85" class="abox"/>
-          <text x="945" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">Settings / Market</text>
-        </svg>
-      </div>
-      <div class="arch-layers fade-in">
-        <div class="arch-layer">
-          <div class="arch-layer-icon">🛡️</div>
-          <h4>Main Process</h4>
-          <p>Agent runtime, local inference service, SQLite storage, gateway integrations</p>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-layer-icon">🔗</div>
-          <h4>Preload / IPC</h4>
-          <p>contextBridge secure boundary, typed IPC channels for session and API ops</p>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-layer-icon">⚛️</div>
-          <h4>Renderer (React)</h4>
-          <p>Redux state, cowork UI, artifact previews, settings, model marketplace</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Skills ═══ -->
-  <section id="skills">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label section-label-purple">Ecosystem</div>
-        <h2 class="section-title">30+ <span class="highlight-purple">Built-in Skills</span></h2>
-        <p class="section-desc">From document generation to stock analysis, browser automation to video creation — extend ZhiYuan Agent's capabilities without writing a single line of code.</p>
-      </div>
-      <div class="skills-grid fade-in">
-        <div class="skill-item"><span class="skill-icon">🔍</span><span>Web Search</span><small>search & research</small></div>
-        <div class="skill-item"><span class="skill-icon">📄</span><span>Word (docx)</span><small>document generation</small></div>
-        <div class="skill-item"><span class="skill-icon">📊</span><span>Excel (xlsx)</span><small>spreadsheet processing</small></div>
-        <div class="skill-item"><span class="skill-icon">📽️</span><span>PowerPoint (pptx)</span><small>slide creation</small></div>
-        <div class="skill-item"><span class="skill-icon">📕</span><span>PDF</span><small>read & extract</small></div>
-        <div class="skill-item"><span class="skill-icon">🌐</span><span>Playwright</span><small>browser automation</small></div>
-        <div class="skill-item"><span class="skill-icon">🎬</span><span>Remotion</span><small>video generation</small></div>
-        <div class="skill-item"><span class="skill-icon">✉️</span><span>IMAP/SMTP Email</span><small>send & receive</small></div>
-        <div class="skill-item"><span class="skill-icon">📈</span><span>Stock Analyzer</span><small>investment research</small></div>
-        <div class="skill-item"><span class="skill-icon">📰</span><span>Stock Announcements</span><small>regulatory filings</small></div>
-        <div class="skill-item"><span class="skill-icon">🏢</span><span>Stock Explorer</span><small>company data</small></div>
-        <div class="skill-item"><span class="skill-icon">🎵</span><span>Music Search</span><small>audio discovery</small></div>
-        <div class="skill-item"><span class="skill-icon">🎨</span><span>Canvas Design</span><small>UI mockups</small></div>
-        <div class="skill-item"><span class="skill-icon">🎮</span><span>Develop Web Game</span><small>game prototyping</small></div>
-        <div class="skill-item"><span class="skill-icon">🖌️</span><span>Frontend Design</span><small>code generation</small></div>
-        <div class="skill-item"><span class="skill-icon">🧠</span><span>Skill Creator</span><small>custom skill builder</small></div>
-        <div class="skill-item"><span class="skill-icon">📅</span><span>Content Planner</span><small>content scheduling</small></div>
-        <div class="skill-item"><span class="skill-icon">🌤️</span><span>Weather</span><small>forecast data</small></div>
-        <div class="skill-item"><span class="skill-icon">📰</span><span>Tech News Search</span><small>tech news</small></div>
-        <div class="skill-item"><span class="skill-icon">🎬</span><span>Films Search</span><small>movie info</small></div>
-        <div class="skill-item"><span class="skill-icon">📝</span><span>Article Writer</span><small>long-form writing</small></div>
-        <div class="skill-item"><span class="skill-icon">📋</span><span>Create Plan</span><small>plan generation</small></div>
-        <div class="skill-item"><span class="skill-icon">🔥</span><span>Daily Trending</span><small>trending topics</small></div>
-        <div class="skill-item"><span class="skill-icon">⚙️</span><span>Local Tools</span><small>system utilities</small></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Tech Stack ═══ -->
-  <section id="techstack">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label section-label-green">Stack</div>
-        <h2 class="section-title">Built with Modern <span class="highlight-green">Technology</span></h2>
-        <p class="section-desc">A full-stack Electron application with React frontend, self-developed agent runtime, and self-developed local inference.</p>
-      </div>
-      <div class="tech-grid fade-in">
-        <div class="tech-item">
-          <div class="tech-icon">⚡</div>
-          <div class="tech-name">Electron 40</div>
-          <div class="tech-layer">Desktop Framework</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">⚛️</div>
-          <div class="tech-name">React 19</div>
-          <div class="tech-layer">Frontend</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">📦</div>
-          <div class="tech-name">Vite 5</div>
-          <div class="tech-layer">Build Tool</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">🎨</div>
-          <div class="tech-name">Tailwind CSS</div>
-          <div class="tech-layer">Styling</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">🔄</div>
-          <div class="tech-name">Redux Toolkit</div>
-          <div class="tech-layer">State Management</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">🦙</div>
-          <div class="tech-name">Local Inference</div>
-          <div class="tech-layer">Local Inference</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">🐙</div>
-          <div class="tech-name">Agent Runtime</div>
-          <div class="tech-layer">Agent Runtime</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">🗄️</div>
-          <div class="tech-name">better-sqlite3</div>
-          <div class="tech-layer">Local Storage</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">📝</div>
-          <div class="tech-name">TypeScript</div>
-          <div class="tech-layer">Language</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">📐</div>
-          <div class="tech-name">Mermaid.js</div>
-          <div class="tech-layer">Diagram Rendering</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">📊</div>
-          <div class="tech-name">KaTeX</div>
-          <div class="tech-layer">Math Rendering</div>
-        </div>
-        <div class="tech-item">
-          <div class="tech-icon">✅</div>
-          <div class="tech-name">Vitest</div>
-          <div class="tech-layer">Testing</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Security ═══ -->
-  <section id="security">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label section-label-blue">Privacy First</div>
-        <h2 class="section-title">Your Data Stays <span class="highlight-blue">Local</span></h2>
-        <p class="section-desc">Every session, config, skill, task, and memory lives in local SQLite. No telemetry, no cloud dependency — unless you choose to connect to an API.</p>
-      </div>
-      <div class="security-cards fade-in">
-        <div class="security-card">
-          <div class="security-card-icon">🔒</div>
-          <h3>Process Isolation</h3>
-          <p>Context isolation enabled, node integration disabled, sandbox enabled. The renderer communicates exclusively through typed IPC channels — no direct filesystem or network access.</p>
-        </div>
-        <div class="security-card">
-          <div class="security-card-icon">🛡️</div>
-          <h3>Approval-Gated Actions</h3>
-          <p>Risky tool calls — shell execution, file modifications, browser automation — require explicit user approval. A permission modal lets you review each action before it runs.</p>
-        </div>
-        <div class="security-card">
-          <div class="security-card-icon">🧹</div>
-          <h3>Sandboxed Artifacts</h3>
-          <p>HTML rendered in sandboxed iframes with no allow-same-origin. SVG sanitized by DOMPurify. React components isolated in iframes with no network access. Mermaid with strict security level.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ CTA ═══ -->
-  <section id="cta">
-    <div class="container">
-      <div class="cta-box fade-in">
-        <div class="section-label section-label-green" style="margin:0 auto 16px">Open Source</div>
-        <h2>Ready to run <span style="background:linear-gradient(135deg,#34D399,#0EA5E9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">your own AI Agent</span>?</h2>
-        <p>ZhiYuan Agent is free and open source under the MIT License. Clone the repo, install dependencies, and start building.</p>
-        <div class="cta-buttons">
-          <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" class="cta-button cta-button-primary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-            View on GitHub
-          </a>
-          <a href="https://github.com/rongxinzy/RongxinAI/fork" target="_blank" class="cta-button cta-button-secondary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Fork on GitHub
-          </a>
-        </div>
-        <div class="cta-meta">
-          <span>📦 npm install</span>
-          <span>⚡ npm run electron:dev</span>
-          <span>🔧 Node.js ≥24</span>
-          <span>📄 MIT License</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Footer ═══ -->
-  <footer>
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="#" class="nav-logo">
-            <span class="nav-logo-icon">L</span>
-            <span>ZhiYuan Agent</span>
-          </a>
-          <p>An all-in-one local AI Agent workspace with a fully self-developed stack. Built by 北京容芯致远.</p>
-        </div>
-        <div class="footer-col">
-          <h4>Product</h4>
+      /* ── Responsive tweaks ── */
+      @media (max-width: 600px) {
+        .hero {
+          padding: 120px 0 48px;
+        }
+        .btn-group .btn {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══ Navbar ═══ -->
+    <nav>
+      <div class="container">
+        <a href="#" class="nav-logo">
+          <span class="nav-logo-icon">L</span>
+          <span>ZhiYuan Agent</span>
+        </a>
+        <div class="nav-links">
           <a href="#features">Features</a>
           <a href="#architecture">Architecture</a>
           <a href="#skills">Skills</a>
           <a href="#security">Security</a>
+          <a href="https://github.com/rongxinzy/RongxinAI" target="_blank">GitHub</a>
         </div>
-        <div class="footer-col">
-          <h4>Resources</h4>
-          <a href="https://github.com/rongxinzy/RongxinAI/blob/main/README.md" target="_blank">Documentation</a>
-          <a href="https://github.com/rongxinzy/RongxinAI/releases" target="_blank">Releases</a>
-          <a href="https://github.com/rongxinzy/RongxinAI/issues" target="_blank">Issues</a>
-          <a href="https://github.com/rongxinzy/RongxinAI/blob/main/LICENSE" target="_blank">License</a>
-        </div>
-        <div class="footer-col">
-          <h4>Company</h4>
-          <a href="#">北京容芯致远</a>
-          <a href="mailto:dev@zhiyuan.com">Contact</a>
-        </div>
+        <a href="#cta" class="btn btn-primary btn-sm nav-cta">Get Started</a>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
       </div>
-      <div class="footer-bottom">
-        <span>&copy; 2026 北京容芯致远. MIT License.</span>
-        <div class="footer-socials">
-          <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" title="GitHub">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          </a>
-        </div>
-      </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#features" onclick="closeMobileMenu()">Features</a>
+      <a href="#architecture" onclick="closeMobileMenu()">Architecture</a>
+      <a href="#skills" onclick="closeMobileMenu()">Skills</a>
+      <a href="#security" onclick="closeMobileMenu()">Security</a>
+      <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" onclick="closeMobileMenu()"
+        >GitHub</a
+      >
+      <a href="#cta" class="btn btn-primary btn-sm" onclick="closeMobileMenu()">Get Started</a>
     </div>
-  </footer>
 
-  <script>
-    // ── Mobile Menu ──
-    function toggleMobileMenu() {
-      document.getElementById('mobileMenu').classList.toggle('open');
-    }
-    function closeMobileMenu() {
-      document.getElementById('mobileMenu').classList.remove('open');
-    }
+    <!-- ═══ Hero ═══ -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-grid">
+          <div>
+            <div class="hero-badge">
+              <span>v2026.6 — Open Source</span>
+            </div>
+            <h1>Your Local <span>AI Agent</span> Workspace</h1>
+            <p>
+              ZhiYuan Agent combines a self-developed agent runtime, self-developed local inference,
+              built-in skills, MCP integrations, scheduled tasks, and IM channels — all running
+              locally on your machine with full privacy control.
+            </p>
+            <div class="btn-group" style="justify-content: flex-start">
+              <a href="#cta" class="btn btn-primary">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Download
+              </a>
+              <a
+                href="https://github.com/rongxinzy/RongxinAI"
+                target="_blank"
+                class="btn btn-outline"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"
+                  />
+                </svg>
+                View on GitHub
+              </a>
+            </div>
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <div class="hero-stat-num">40K+</div>
+                <div class="hero-stat-label">GGUF Models</div>
+              </div>
+              <div class="hero-stat">
+                <div class="hero-stat-num">7</div>
+                <div class="hero-stat-label">IM Channels</div>
+              </div>
+              <div class="hero-stat">
+                <div class="hero-stat-num">30+</div>
+                <div class="hero-stat-label">Built-in Skills</div>
+              </div>
+              <div class="hero-stat">
+                <div class="hero-stat-num">24<</div>
+                <div class="hero-stat-label">Node.js</div>
+              </div>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="hero-card">
+              <div class="hero-card-header">
+                <div class="hero-card-dots">
+                  <span class="hero-card-dot"></span>
+                  <span class="hero-card-dot"></span>
+                  <span class="hero-card-dot"></span>
+                </div>
+                <span class="hero-card-title">Cowork Session</span>
+              </div>
+              <div class="hero-message">
+                <div class="hero-message-role">You</div>
+                <p>
+                  Analyze this quarterly report and summarize key findings. Generate a PowerPoint
+                  deck with the results.
+                </p>
+              </div>
+              <div class="hero-message hero-message-agent">
+                <div class="hero-message-role">ZhiYuan Agent</div>
+                <p>
+                  Reading the report... I'll extract financial highlights, compare YoY growth, and
+                  build the slides.
+                </p>
+              </div>
+              <div class="hero-tool-bar">
+                <span class="hero-tool-dot"></span>
+                <span><strong>tools:</strong> read file, shell, python · 2 pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    // ── Scroll-based fade-in animation ──
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
+    <!-- ═══ Features ═══ -->
+    <section id="features">
+      <div class="container">
+        <div class="section-header fade-in">
+          <div class="section-label section-label-green">Capabilities</div>
+          <h2 class="section-title">
+            Everything an <span class="highlight-green">AI Agent</span> Needs
+          </h2>
+          <p class="section-desc">
+            ZhiYuan Agent is not just a chat UI. It's an execution environment where Agents work on
+            your machine, access tools, run code, and stay reachable through your everyday channels.
+          </p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+            </div>
+            <h3>Cowork Agent Workflows</h3>
+            <p>
+              Multi-step tasks with file tools, shell commands, browser automation, document
+              processing, and approval-gated actions. Real-time streaming of messages, tool calls,
+              and permission requests.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">Agent Runtime</span>
+              <span class="feature-tag">Stream Events</span>
+              <span class="feature-tag">Permission Control</span>
+            </div>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+            <h3>Local Inference</h3>
+            <p>
+              Manage local GGUF models with a full lifecycle: install, list, load, configure launch
+              parameters (context length, GPU offload, threads), and run the inference service
+              locally. Model marketplace backed by ModelScope with 40K+ models.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">GGUF Models</span>
+              <span class="feature-tag">GPU Offload</span>
+              <span class="feature-tag">ModelScope</span>
+            </div>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </div>
+            <h3>Skills &amp; MCP Integration</h3>
+            <p>
+              30+ built-in skills for web search, document generation (docx/xlsx/pptx/pdf), browser
+              automation, video creation, email, stock research, and more. Connect external tools
+              through Model Context Protocol (MCP).
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">Built-in Skills</span>
+              <span class="feature-tag">MCP Protocol</span>
+              <span class="feature-tag">Custom Skills</span>
+            </div>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
+            <h3>Scheduled Tasks</h3>
+            <p>
+              Create recurring jobs from natural language or the GUI — daily briefings, email
+              follow-ups, report generation, stock monitoring, and more. Results stay in the app and
+              can be delivered via IM or email.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">Cron Triggers</span>
+              <span class="feature-tag">Background Tasks</span>
+              <span class="feature-tag">Channel Delivery</span>
+            </div>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <h3>IM &amp; Email Channels</h3>
+            <p>
+              Reach your Agent through WeChat, WeCom (WeChat Work), DingTalk, Feishu/Lark, QQ, and
+              Email. Configure any combination as input and output channels for task creation and
+              result delivery.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">WeChat</span>
+              <span class="feature-tag">DingTalk</span>
+              <span class="feature-tag">Feishu</span>
+              <span class="feature-tag">QQ</span>
+              <span class="feature-tag">Email</span>
+            </div>
+          </div>
+          <div class="feature-card fade-in">
+            <div class="feature-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <h3>Artifacts &amp; Rich Preview</h3>
+            <p>
+              Render code outputs inline — HTML pages in sandboxed iframes, SVG graphics, Mermaid
+              diagrams, React components, and syntax-highlighted code. Resizable side panel with
+              copy, download, and zoom controls.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">HTML</span>
+              <span class="feature-tag">SVG</span>
+              <span class="feature-tag">Mermaid</span>
+              <span class="feature-tag">React</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Architecture ═══ -->
+    <section id="architecture">
+      <div class="container">
+        <div class="section-header fade-in">
+          <div class="section-label section-label-blue">Architecture</div>
+          <h2 class="section-title">
+            Strict <span class="highlight-blue">Process Isolation</span>
+          </h2>
+          <p class="section-desc">
+            Electron with context isolation, IPC-only communication, and sandboxed renderer. Your
+            data stays in local SQLite — sessions, config, memory, and task metadata never leave
+            your machine.
+          </p>
+        </div>
+        <div class="arch-diagram fade-in">
+          <!-- Inlined architecture SVG (monochrome, TikZ-style) -->
+          <svg
+            width="100%"
+            height="auto"
+            viewBox="0 0 1120 880"
+            preserveAspectRatio="xMidYMid meet"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style="max-width: 1120px; margin: 0 auto; background: #fff"
+          >
+            <defs>
+              <pattern
+                id="a-hatch"
+                width="8"
+                height="8"
+                patternTransform="rotate(45)"
+                patternUnits="userSpaceOnUse"
+              >
+                <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.7" />
+              </pattern>
+              <marker
+                id="a-arr"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="7.5"
+                markerHeight="7.5"
+                orient="auto-start-reverse"
+              >
+                <path d="M0,0 L10,5 L0,10 z" fill="#000" />
+              </marker>
+              <style>
+                .at {
+                  fill: #000;
+                  font-family:
+                    'Latin Modern Roman', 'CMU Serif', 'STIX Two Text', 'Times New Roman', serif;
+                }
+                .abox {
+                  fill: #fff;
+                  stroke: #000;
+                  stroke-width: 1.6;
+                }
+                .agrp {
+                  fill: none;
+                  stroke: #000;
+                  stroke-width: 1.4;
+                  stroke-dasharray: 7 5;
+                }
+                .aln {
+                  stroke: #000;
+                  stroke-width: 1.6;
+                }
+              </style>
+            </defs>
+            <rect width="1120" height="880" fill="#fff" />
+            <text x="560" y="50" text-anchor="middle" class="at" font-size="26" font-weight="700">
+              ZhiYuan Agent — Local AI Agent Workspace
+            </text>
+            <text x="560" y="80" text-anchor="middle" class="at" font-size="15" font-style="italic">
+              Fully self-developed stack &#183; agent runtime and local inference built in-house
+              &#183; Electron owns the desktop security boundary
+            </text>
+
+            <rect x="60" y="110" width="1000" height="300" class="agrp" />
+            <text x="82" y="142" class="at" font-size="18" font-weight="700">
+              Electron Main Process
+            </text>
+
+            <rect
+              x="95"
+              y="165"
+              width="350"
+              height="95"
+              fill="url(#a-hatch)"
+              stroke="#000"
+              stroke-width="1.6"
+            />
+            <text x="115" y="201" class="at" font-size="17" font-weight="700">Agent Runtime</text>
+            <text x="115" y="227" class="at" font-size="13">Cowork sessions, tools, approvals</text>
+            <rect
+              x="352"
+              y="178"
+              width="78"
+              height="24"
+              fill="#fff"
+              stroke="#000"
+              stroke-width="1.2"
+            />
+            <text x="391" y="195" text-anchor="middle" class="at" font-size="13" font-weight="700">
+              primary
+            </text>
+
+            <rect x="470" y="165" width="270" height="95" class="abox" />
+            <text x="490" y="201" class="at" font-size="17" font-weight="700">Local Inference</text>
+            <text x="490" y="227" class="at" font-size="13">GGUF models, launch options,</text>
+            <text x="490" y="247" class="at" font-size="13">marketplace</text>
+
+            <rect x="765" y="165" width="270" height="95" class="abox" />
+            <text x="785" y="201" class="at" font-size="17" font-weight="700">
+              Skill / MCP Manager
+            </text>
+            <text x="785" y="227" class="at" font-size="13">Built-in skills, marketplace,</text>
+            <text x="785" y="247" class="at" font-size="13">external tools</text>
+
+            <rect x="95" y="290" width="350" height="95" class="abox" />
+            <text x="115" y="326" class="at" font-size="17" font-weight="700">SQLite Storage</text>
+            <text x="115" y="352" class="at" font-size="13">Sessions, config, memory, tasks</text>
+
+            <rect x="470" y="290" width="270" height="95" class="abox" />
+            <text x="490" y="326" class="at" font-size="17" font-weight="700">Scheduled Tasks</text>
+            <text x="490" y="352" class="at" font-size="13">
+              Cron, background triggers, delivery
+            </text>
+
+            <rect x="765" y="290" width="270" height="95" class="abox" />
+            <text x="785" y="326" class="at" font-size="17" font-weight="700">
+              IM / Email Gateway
+            </text>
+            <text x="785" y="352" class="at" font-size="13">WeChat, WeCom, DingTalk,</text>
+            <text x="785" y="372" class="at" font-size="13">Feishu/Lark, QQ, Email</text>
+
+            <line
+              x1="560"
+              y1="410"
+              x2="560"
+              y2="462"
+              class="aln"
+              marker-start="url(#a-arr)"
+              marker-end="url(#a-arr)"
+            />
+            <text x="578" y="442" class="at" font-size="12" font-style="italic">IPC invoke</text>
+            <rect x="420" y="465" width="280" height="70" class="abox" />
+            <text x="560" y="497" text-anchor="middle" class="at" font-size="16" font-weight="700">
+              Preload Script
+            </text>
+            <text
+              x="560"
+              y="521"
+              text-anchor="middle"
+              class="at"
+              font-size="12"
+              font-style="italic"
+            >
+              contextBridge &#183; IPC secure bridge
+            </text>
+            <line
+              x1="560"
+              y1="535"
+              x2="560"
+              y2="587"
+              class="aln"
+              marker-start="url(#a-arr)"
+              marker-end="url(#a-arr)"
+            />
+            <text x="578" y="568" class="at" font-size="12" font-style="italic">stream events</text>
+
+            <rect x="60" y="590" width="1000" height="200" class="agrp" />
+            <text x="82" y="622" class="at" font-size="18" font-weight="700">
+              Renderer Process (React)
+            </text>
+
+            <rect x="95" y="655" width="215" height="85" class="abox" />
+            <text x="202" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">
+              Redux State
+            </text>
+            <rect x="335" y="655" width="250" height="85" class="abox" />
+            <text x="460" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">
+              Cowork / Inference UI
+            </text>
+            <rect x="610" y="655" width="220" height="85" class="abox" />
+            <text x="720" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">
+              Artifacts Preview
+            </text>
+            <rect x="855" y="655" width="180" height="85" class="abox" />
+            <text x="945" y="705" text-anchor="middle" class="at" font-size="15" font-weight="700">
+              Settings / Market
+            </text>
+          </svg>
+        </div>
+        <div class="arch-layers fade-in">
+          <div class="arch-layer">
+            <div class="arch-layer-icon">🛡️</div>
+            <h4>Main Process</h4>
+            <p>Agent runtime, local inference service, SQLite storage, gateway integrations</p>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-layer-icon">🔗</div>
+            <h4>Preload / IPC</h4>
+            <p>contextBridge secure boundary, typed IPC channels for session and API ops</p>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-layer-icon">⚛️</div>
+            <h4>Renderer (React)</h4>
+            <p>Redux state, cowork UI, artifact previews, settings, model marketplace</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Skills ═══ -->
+    <section id="skills">
+      <div class="container">
+        <div class="section-header fade-in">
+          <div class="section-label section-label-purple">Ecosystem</div>
+          <h2 class="section-title">30+ <span class="highlight-purple">Built-in Skills</span></h2>
+          <p class="section-desc">
+            From document generation to stock analysis, browser automation to video creation —
+            extend ZhiYuan Agent's capabilities without writing a single line of code.
+          </p>
+        </div>
+        <div class="skills-grid fade-in">
+          <div class="skill-item">
+            <span class="skill-icon">🔍</span><span>Web Search</span
+            ><small>search & research</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📄</span><span>Word (docx)</span
+            ><small>document generation</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📊</span><span>Excel (xlsx)</span
+            ><small>spreadsheet processing</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📽️</span><span>PowerPoint (pptx)</span
+            ><small>slide creation</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📕</span><span>PDF</span><small>read & extract</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🌐</span><span>Playwright</span
+            ><small>browser automation</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🎬</span><span>Remotion</span><small>video generation</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">✉️</span><span>IMAP/SMTP Email</span
+            ><small>send & receive</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📈</span><span>Stock Analyzer</span
+            ><small>investment research</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📰</span><span>Stock Announcements</span
+            ><small>regulatory filings</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🏢</span><span>Stock Explorer</span><small>company data</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🎵</span><span>Music Search</span
+            ><small>audio discovery</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🎨</span><span>Canvas Design</span><small>UI mockups</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🎮</span><span>Develop Web Game</span
+            ><small>game prototyping</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🖌️</span><span>Frontend Design</span
+            ><small>code generation</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🧠</span><span>Skill Creator</span
+            ><small>custom skill builder</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📅</span><span>Content Planner</span
+            ><small>content scheduling</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🌤️</span><span>Weather</span><small>forecast data</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📰</span><span>Tech News Search</span><small>tech news</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🎬</span><span>Films Search</span><small>movie info</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📝</span><span>Article Writer</span
+            ><small>long-form writing</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">📋</span><span>Create Plan</span><small>plan generation</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">🔥</span><span>Daily Trending</span
+            ><small>trending topics</small>
+          </div>
+          <div class="skill-item">
+            <span class="skill-icon">⚙️</span><span>Local Tools</span
+            ><small>system utilities</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Tech Stack ═══ -->
+    <section id="techstack">
+      <div class="container">
+        <div class="section-header fade-in">
+          <div class="section-label section-label-green">Stack</div>
+          <h2 class="section-title">
+            Built with Modern <span class="highlight-green">Technology</span>
+          </h2>
+          <p class="section-desc">
+            A full-stack Electron application with React frontend, self-developed agent runtime, and
+            self-developed local inference.
+          </p>
+        </div>
+        <div class="tech-grid fade-in">
+          <div class="tech-item">
+            <div class="tech-icon">⚡</div>
+            <div class="tech-name">Electron 40</div>
+            <div class="tech-layer">Desktop Framework</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">⚛️</div>
+            <div class="tech-name">React 19</div>
+            <div class="tech-layer">Frontend</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">📦</div>
+            <div class="tech-name">Vite 5</div>
+            <div class="tech-layer">Build Tool</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">🎨</div>
+            <div class="tech-name">Tailwind CSS</div>
+            <div class="tech-layer">Styling</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">🔄</div>
+            <div class="tech-name">Redux Toolkit</div>
+            <div class="tech-layer">State Management</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">🦙</div>
+            <div class="tech-name">Local Inference</div>
+            <div class="tech-layer">Local Inference</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">🐙</div>
+            <div class="tech-name">Agent Runtime</div>
+            <div class="tech-layer">Agent Runtime</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">🗄️</div>
+            <div class="tech-name">better-sqlite3</div>
+            <div class="tech-layer">Local Storage</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">📝</div>
+            <div class="tech-name">TypeScript</div>
+            <div class="tech-layer">Language</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">📐</div>
+            <div class="tech-name">Mermaid.js</div>
+            <div class="tech-layer">Diagram Rendering</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">📊</div>
+            <div class="tech-name">KaTeX</div>
+            <div class="tech-layer">Math Rendering</div>
+          </div>
+          <div class="tech-item">
+            <div class="tech-icon">✅</div>
+            <div class="tech-name">Vitest</div>
+            <div class="tech-layer">Testing</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Security ═══ -->
+    <section id="security">
+      <div class="container">
+        <div class="section-header fade-in">
+          <div class="section-label section-label-blue">Privacy First</div>
+          <h2 class="section-title">Your Data Stays <span class="highlight-blue">Local</span></h2>
+          <p class="section-desc">
+            Every session, config, skill, task, and memory lives in local SQLite. No telemetry, no
+            cloud dependency — unless you choose to connect to an API.
+          </p>
+        </div>
+        <div class="security-cards fade-in">
+          <div class="security-card">
+            <div class="security-card-icon">🔒</div>
+            <h3>Process Isolation</h3>
+            <p>
+              Context isolation enabled, node integration disabled, sandbox enabled. The renderer
+              communicates exclusively through typed IPC channels — no direct filesystem or network
+              access.
+            </p>
+          </div>
+          <div class="security-card">
+            <div class="security-card-icon">🛡️</div>
+            <h3>Approval-Gated Actions</h3>
+            <p>
+              Risky tool calls — shell execution, file modifications, browser automation — require
+              explicit user approval. A permission modal lets you review each action before it runs.
+            </p>
+          </div>
+          <div class="security-card">
+            <div class="security-card-icon">🧹</div>
+            <h3>Sandboxed Artifacts</h3>
+            <p>
+              HTML rendered in sandboxed iframes with no allow-same-origin. SVG sanitized by
+              DOMPurify. React components isolated in iframes with no network access. Mermaid with
+              strict security level.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ CTA ═══ -->
+    <section id="cta">
+      <div class="container">
+        <div class="cta-box fade-in">
+          <div class="section-label section-label-green" style="margin: 0 auto 16px">
+            Open Source
+          </div>
+          <h2>
+            Ready to run
+            <span
+              style="
+                background: linear-gradient(135deg, #34d399, #0ea5e9);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+              "
+              >your own AI Agent</span
+            >?
+          </h2>
+          <p>
+            ZhiYuan Agent is free and open source under the MIT License. Clone the repo, install
+            dependencies, and start building.
+          </p>
+          <div class="cta-buttons">
+            <a
+              href="https://github.com/rongxinzy/RongxinAI"
+              target="_blank"
+              class="cta-button cta-button-primary"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"
+                />
+              </svg>
+              View on GitHub
+            </a>
+            <a
+              href="https://github.com/rongxinzy/RongxinAI/fork"
+              target="_blank"
+              class="cta-button cta-button-secondary"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              Fork on GitHub
+            </a>
+          </div>
+          <div class="cta-meta">
+            <span>📦 npm install</span>
+            <span>⚡ npm run electron:dev</span>
+            <span>🔧 Node.js ≥24</span>
+            <span>📄 MIT License</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Footer ═══ -->
+    <footer>
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a href="#" class="nav-logo">
+              <span class="nav-logo-icon">L</span>
+              <span>ZhiYuan Agent</span>
+            </a>
+            <p>
+              An all-in-one local AI Agent workspace with a fully self-developed stack. Built by
+              北京容芯致远.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="#features">Features</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#skills">Skills</a>
+            <a href="#security">Security</a>
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <a href="https://github.com/rongxinzy/RongxinAI/blob/main/README.md" target="_blank"
+              >Documentation</a
+            >
+            <a href="https://github.com/rongxinzy/RongxinAI/releases" target="_blank">Releases</a>
+            <a href="https://github.com/rongxinzy/RongxinAI/issues" target="_blank">Issues</a>
+            <a href="https://github.com/rongxinzy/RongxinAI/blob/main/LICENSE" target="_blank"
+              >License</a
+            >
+          </div>
+          <div class="footer-col">
+            <h4>Company</h4>
+            <a href="#">北京容芯致远</a>
+            <a href="mailto:dev@zhiyuan.com">Contact</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; 2026 北京容芯致远. MIT License.</span>
+          <div class="footer-socials">
+            <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" title="GitHub">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // ── Mobile Menu ──
+      function toggleMobileMenu() {
+        document.getElementById('mobileMenu').classList.toggle('open');
+      }
+      function closeMobileMenu() {
+        document.getElementById('mobileMenu').classList.remove('open');
+      }
+
+      // ── Scroll-based fade-in animation ──
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+
+      document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+      // ── Navbar background on scroll ──
+      document.addEventListener('scroll', () => {
+        const nav = document.querySelector('nav');
+        if (window.scrollY > 20) {
+          nav.style.background = 'rgba(7,16,19,0.95)';
+        } else {
+          nav.style.background = 'rgba(7,16,19,0.85)';
         }
       });
-    }, { threshold: 0.1 });
-
-    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-
-    // ── Navbar background on scroll ──
-    document.addEventListener('scroll', () => {
-      const nav = document.querySelector('nav');
-      if (window.scrollY > 20) {
-        nav.style.background = 'rgba(7,16,19,0.95)';
-      } else {
-        nav.style.background = 'rgba(7,16,19,0.85)';
-      }
-    });
-  </script>
-
-</body>
+    </script>
+  </body>
 </html>

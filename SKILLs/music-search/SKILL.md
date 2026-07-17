@@ -24,12 +24,12 @@ bash "$SKILLS_ROOT/music-search/scripts/music-search.sh" search "关键词" [选
 
 **选项：**
 
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--pan <type>` | 筛选网盘类型: `quark`, `baidu`, `aliyun`, `uc`, `all` | `all` |
-| `--format <f>` | 筛选音频格式: `flac`, `ape`, `wav`, `dsd`, `hires`, `mp3`, `aac`, `all` | `all` |
-| `--limit <n>` | 每个平台最大结果数 | `5` |
-| `--engine <e>` | 搜索引擎: `deep`, `web` | `deep` |
+| 参数           | 说明                                                                    | 默认值 |
+| -------------- | ----------------------------------------------------------------------- | ------ |
+| `--pan <type>` | 筛选网盘类型: `quark`, `baidu`, `aliyun`, `uc`, `all`                   | `all`  |
+| `--format <f>` | 筛选音频格式: `flac`, `ape`, `wav`, `dsd`, `hires`, `mp3`, `aac`, `all` | `all`  |
+| `--limit <n>`  | 每个平台最大结果数                                                      | `5`    |
+| `--engine <e>` | 搜索引擎: `deep`, `web`                                                 | `deep` |
 
 **引擎说明：**
 
@@ -56,6 +56,7 @@ bash "$SKILLS_ROOT/music-search/scripts/music-search.sh" search "陈奕迅 十�
 ```
 
 Windows 系统使用 PowerShell 脚本：
+
 ```powershell
 powershell -File "$SKILLS_ROOT/music-search/scripts/music-search.ps1" search "周杰伦 范特西" --pan quark
 ```
@@ -89,6 +90,7 @@ bash "$SKILLS_ROOT/music-search/scripts/music-search.sh" resolve "https://exampl
 > 用户：帮我找一下周杰伦范特西专辑的无损资源，要FLAC格式
 >
 > Agent：
+>
 > 1. 执行 `search "周杰伦 范特西" --format flac`
 > 2. 从 JSON 结果中取出匹配项
 > 3. 返回：标题 + 格式 + 网盘链接 + 提取码（如有）
@@ -119,6 +121,7 @@ bash "$SKILLS_ROOT/music-search/scripts/music-search.sh" resolve "https://exampl
 ```
 
 **字段说明：**
+
 - `pan`: 网盘类型 — `quark`(夸克), `baidu`(百度), `aliyun`(阿里), `uc`(UC), `magnet`(磁力)
 - `format`: 检测到的音频格式 — `FLAC`, `APE`, `WAV`, `DSD`, `Hi-Res`, `AIFF`, `MP3`, `AAC`, `OGG`, 空字符串表示未检测到
 - `source`: 结果来源 — `deep-search`(深度抓取), `web-search`(搜索摘要)

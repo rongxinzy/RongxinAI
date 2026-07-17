@@ -28,15 +28,17 @@ import {
 import { MarketplaceService } from './marketplaceService';
 
 test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
-  expect(buildLlamaCppExecutableCandidates({
-    platform: 'win32',
-    isPackaged: true,
-    resourceRoot: 'C:/App/resources',
-    appRoot: 'C:/App/resources/app.asar',
-    cwd: 'C:/work/ZhiYuanAgent',
-    userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime',
-    envPath: 'C:/custom/env/llama-server.exe',
-  }).slice(0, 4)).toEqual([
+  expect(
+    buildLlamaCppExecutableCandidates({
+      platform: 'win32',
+      isPackaged: true,
+      resourceRoot: 'C:/App/resources',
+      appRoot: 'C:/App/resources/app.asar',
+      cwd: 'C:/work/ZhiYuanAgent',
+      userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime',
+      envPath: 'C:/custom/env/llama-server.exe',
+    }).slice(0, 4),
+  ).toEqual([
     'C:/custom/env/llama-server.exe',
     'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime/current/build/bin/llama-server.exe',
     'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime/current/bin/llama-server.exe',
@@ -54,12 +56,14 @@ test('buildLlamaCppExecutableCandidates only includes dev vendor and system path
     userRuntimeRoot: '/Users/tester/Library/Application Support/ZhiYuanAgent/llamacpp-runtime',
   });
 
-  expect(candidates).toEqual(expect.arrayContaining([
-    '/repo/vendor/llamacpp-runtime/current/llama-server',
-    '/repo/vendor/llamacpp-runtime/current/build/bin/llama-server',
-    '/repo/vendor/llamacpp-runtime/current/bin/llama-server',
-    '/opt/homebrew/bin/llama-server',
-  ]));
+  expect(candidates).toEqual(
+    expect.arrayContaining([
+      '/repo/vendor/llamacpp-runtime/current/llama-server',
+      '/repo/vendor/llamacpp-runtime/current/build/bin/llama-server',
+      '/repo/vendor/llamacpp-runtime/current/bin/llama-server',
+      '/opt/homebrew/bin/llama-server',
+    ]),
+  );
 });
 
 test('buildLlamaCppExecutableCandidates omits dev vendor and system paths in packaged app', () => {
@@ -77,14 +81,18 @@ test('buildLlamaCppExecutableCandidates omits dev vendor and system paths in pac
 });
 
 test('isPathInside matches only paths inside the managed runtime root', () => {
-  expect(isPathInside(
-    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime/current/bin/llama-server',
-    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime',
-  )).toBe(true);
-  expect(isPathInside(
-    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime-older/current/bin/llama-server',
-    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime',
-  )).toBe(false);
+  expect(
+    isPathInside(
+      '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime/current/bin/llama-server',
+      '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime',
+    ),
+  ).toBe(true);
+  expect(
+    isPathInside(
+      '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime-older/current/bin/llama-server',
+      '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime',
+    ),
+  ).toBe(false);
 });
 
 test('buildLlamaServerArgs uses the fixed local router defaults and model discovery flags', () => {
@@ -105,34 +113,40 @@ test('buildLlamaServerArgs uses the fixed local router defaults and model discov
 });
 
 test('buildLlamaServerArgs maps llama.cpp server and router options from service config', () => {
-  expect(buildLlamaServerArgs({
-    host: '127.0.0.2',
-    port: '18080',
-    modelsMax: '1',
-    modelsAutoload: false,
-    timeout: '900',
-    threadsHttp: '4',
-    cachePrompt: false,
-    cacheReuse: '256',
-    cacheRam: '4096',
-    ctxCheckpoints: '16',
-    checkpointEveryNt: '4096',
-    ctxSize: '8192',
-    parallel: '2',
-    batchSize: '512',
-    ubatchSize: '128',
-    gpuLayers: 'all',
-    threads: '8',
-    threadsBatch: '4',
-    flashAttn: 'auto',
-    reasoning: 'off',
-    reasoningFormat: 'none',
-    reasoningBudget: '0',
-    jinja: 'on',
-    chatTemplate: 'chatml',
-    noMmap: true,
-    mlock: true,
-  }, '/models/custom', '/presets/custom.ini')).toEqual([
+  expect(
+    buildLlamaServerArgs(
+      {
+        host: '127.0.0.2',
+        port: '18080',
+        modelsMax: '1',
+        modelsAutoload: false,
+        timeout: '900',
+        threadsHttp: '4',
+        cachePrompt: false,
+        cacheReuse: '256',
+        cacheRam: '4096',
+        ctxCheckpoints: '16',
+        checkpointEveryNt: '4096',
+        ctxSize: '8192',
+        parallel: '2',
+        batchSize: '512',
+        ubatchSize: '128',
+        gpuLayers: 'all',
+        threads: '8',
+        threadsBatch: '4',
+        flashAttn: 'auto',
+        reasoning: 'off',
+        reasoningFormat: 'none',
+        reasoningBudget: '0',
+        jinja: 'on',
+        chatTemplate: 'chatml',
+        noMmap: true,
+        mlock: true,
+      },
+      '/models/custom',
+      '/presets/custom.ini',
+    ),
+  ).toEqual([
     '--host',
     '127.0.0.2',
     '--port',
@@ -189,29 +203,37 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
 });
 
 test('buildLlamaServerArgs always disables router model autoload', () => {
-  expect(buildLlamaServerArgs({
-    modelsAutoload: true,
-  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
-    '--no-models-autoload',
-  ]));
+  expect(
+    buildLlamaServerArgs(
+      {
+        modelsAutoload: true,
+      },
+      '/models/custom',
+      '/presets/custom.ini',
+    ),
+  ).toEqual(expect.arrayContaining(['--no-models-autoload']));
 
-  expect(buildLlamaServerArgs({
-    modelsMax: '2',
-    modelsAutoload: true,
-  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
-    '--models-max',
-    '2',
-    '--no-models-autoload',
-  ]));
+  expect(
+    buildLlamaServerArgs(
+      {
+        modelsMax: '2',
+        modelsAutoload: true,
+      },
+      '/models/custom',
+      '/presets/custom.ini',
+    ),
+  ).toEqual(expect.arrayContaining(['--models-max', '2', '--no-models-autoload']));
 
-  expect(buildLlamaServerArgs({
-    modelsMax: '1',
-    modelsAutoload: true,
-  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
-    '--models-max',
-    '1',
-    '--no-models-autoload',
-  ]));
+  expect(
+    buildLlamaServerArgs(
+      {
+        modelsMax: '1',
+        modelsAutoload: true,
+      },
+      '/models/custom',
+      '/presets/custom.ini',
+    ),
+  ).toEqual(expect.arrayContaining(['--models-max', '1', '--no-models-autoload']));
 });
 
 test('shouldEnableLlamaCppModelsAutoload only allows single-model residency', () => {
@@ -237,52 +259,60 @@ test('uses the default timeout for connection and load operations when config is
 });
 
 test('selectLlamaCppRuntimeTarget chooses fixed CUDA 12 on Windows NVIDIA auto mode', () => {
-  expect(selectLlamaCppRuntimeTarget({
-    platform: 'win32',
-    arch: 'x64',
-    runtimeBackend: LlamaCppRuntimeBackend.Auto,
-    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
-    hasNvidiaGpu: true,
-  })).toEqual({
+  expect(
+    selectLlamaCppRuntimeTarget({
+      platform: 'win32',
+      arch: 'x64',
+      runtimeBackend: LlamaCppRuntimeBackend.Auto,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+      hasNvidiaGpu: true,
+    }),
+  ).toEqual({
     ok: true,
     targetId: 'win-x64-cuda-12',
   });
 });
 
 test('selectLlamaCppRuntimeTarget falls back to CPU on Windows auto mode without NVIDIA', () => {
-  expect(selectLlamaCppRuntimeTarget({
-    platform: 'win32',
-    arch: 'x64',
-    runtimeBackend: LlamaCppRuntimeBackend.Auto,
-    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
-    hasNvidiaGpu: false,
-  })).toEqual({
+  expect(
+    selectLlamaCppRuntimeTarget({
+      platform: 'win32',
+      arch: 'x64',
+      runtimeBackend: LlamaCppRuntimeBackend.Auto,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+      hasNvidiaGpu: false,
+    }),
+  ).toEqual({
     ok: true,
     targetId: 'win-x64',
   });
 });
 
 test('selectLlamaCppRuntimeTarget keeps CPU when explicitly requested on Windows', () => {
-  expect(selectLlamaCppRuntimeTarget({
-    platform: 'win32',
-    arch: 'x64',
-    runtimeBackend: LlamaCppRuntimeBackend.Cpu,
-    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
-    hasNvidiaGpu: true,
-  })).toEqual({
+  expect(
+    selectLlamaCppRuntimeTarget({
+      platform: 'win32',
+      arch: 'x64',
+      runtimeBackend: LlamaCppRuntimeBackend.Cpu,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+      hasNvidiaGpu: true,
+    }),
+  ).toEqual({
     ok: true,
     targetId: 'win-x64',
   });
 });
 
 test('selectLlamaCppRuntimeTarget fails when CUDA is forced without NVIDIA', () => {
-  expect(selectLlamaCppRuntimeTarget({
-    platform: 'win32',
-    arch: 'x64',
-    runtimeBackend: LlamaCppRuntimeBackend.Cuda,
-    runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
-    hasNvidiaGpu: false,
-  })).toEqual({
+  expect(
+    selectLlamaCppRuntimeTarget({
+      platform: 'win32',
+      arch: 'x64',
+      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+      hasNvidiaGpu: false,
+    }),
+  ).toEqual({
     ok: false,
     error: 'CUDA runtime requires an NVIDIA GPU on Windows.',
   });
@@ -296,91 +326,108 @@ test('resolveLlamaCppRuntimeTargetPreference defaults to auto CUDA 12 preference
 });
 
 test('buildLlamaServerArgs keeps advanced GPU routing settings as restart-only server flags', () => {
-  expect(buildLlamaServerArgs({
-    device: '0,1',
-    splitMode: 'layer',
-    tensorSplit: '3,2',
-  }, '/models/custom', '/presets/custom.ini')).toContain('--device');
-  expect(buildLlamaServerArgs({
-    device: '0,1',
-    splitMode: 'layer',
-    tensorSplit: '3,2',
-  }, '/models/custom', '/presets/custom.ini')).toEqual(expect.arrayContaining([
-    '--device',
-    '0,1',
-    '--split-mode',
-    'layer',
-    '--tensor-split',
-    '3,2',
-  ]));
+  expect(
+    buildLlamaServerArgs(
+      {
+        device: '0,1',
+        splitMode: 'layer',
+        tensorSplit: '3,2',
+      },
+      '/models/custom',
+      '/presets/custom.ini',
+    ),
+  ).toContain('--device');
+  expect(
+    buildLlamaServerArgs(
+      {
+        device: '0,1',
+        splitMode: 'layer',
+        tensorSplit: '3,2',
+      },
+      '/models/custom',
+      '/presets/custom.ini',
+    ),
+  ).toEqual(
+    expect.arrayContaining(['--device', '0,1', '--split-mode', 'layer', '--tensor-split', '3,2']),
+  );
 });
 
 test('filterLlamaCppServiceConfigByRuntimeCapabilities drops unsupported and hidden runtime fields', () => {
-  expect(filterLlamaCppServiceConfigByRuntimeCapabilities(
-    {
-      device: 'CUDA0',
-      splitMode: 'layer',
-      tensorSplit: '3,2',
-      mainGpu: '0',
-      flashAttn: 'auto',
-      cachePrompt: false,
-      cacheReuse: '256',
-      cacheRam: '4096',
-    },
-    {
-      success: true,
-      flags: [],
-      deviceProbeSucceeded: true,
-      devices: [{ id: 'METAL0', name: 'Apple GPU', backend: 'metal' }],
-      backendKinds: ['metal'],
-      gpuDeviceCount: 1,
-      supports: {
-        device: true,
-        splitMode: false,
-        tensorSplit: false,
-        mainGpu: false,
-        flashAttn: true,
-        cachePrompt: true,
-        cacheReuse: true,
-        cacheRam: true,
+  expect(
+    filterLlamaCppServiceConfigByRuntimeCapabilities(
+      {
+        device: 'CUDA0',
+        splitMode: 'layer',
+        tensorSplit: '3,2',
+        mainGpu: '0',
+        flashAttn: 'auto',
+        cachePrompt: false,
+        cacheReuse: '256',
+        cacheRam: '4096',
       },
-    },
-  )).toEqual({
+      {
+        success: true,
+        flags: [],
+        deviceProbeSucceeded: true,
+        devices: [{ id: 'METAL0', name: 'Apple GPU', backend: 'metal' }],
+        backendKinds: ['metal'],
+        gpuDeviceCount: 1,
+        supports: {
+          device: true,
+          splitMode: false,
+          tensorSplit: false,
+          mainGpu: false,
+          flashAttn: true,
+          cachePrompt: true,
+          cacheReuse: true,
+          cacheRam: true,
+        },
+      },
+    ),
+  ).toEqual({
     flashAttn: 'auto',
     cachePrompt: false,
   });
 });
 
 test('buildLlamaCppServeEnv prepends the resolved runtime bin directory to PATH on Windows', () => {
-  expect(buildLlamaCppServeEnv(
-    { PATH: 'C:\\Windows\\System32' },
-    'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
-    'win32',
-  )).toEqual({
+  expect(
+    buildLlamaCppServeEnv(
+      { PATH: 'C:\\Windows\\System32' },
+      'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+      'win32',
+    ),
+  ).toEqual({
     PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
   });
 });
 
 test('buildLlamaCppServeEnv does not duplicate PATH entries on Windows', () => {
-  expect(buildLlamaCppServeEnv(
-    {
-      PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
-    },
-    'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
-    'win32',
-  )).toEqual({
+  expect(
+    buildLlamaCppServeEnv(
+      {
+        PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+      },
+      'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+      'win32',
+    ),
+  ).toEqual({
     PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
   });
 });
 
 test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
-  expect(parseLlamaCppListDevicesOutput([
-    'Available devices:',
-    '  CUDA0: NVIDIA GeForce RTX 4090 (24564 MiB, 0 MiB free)',
-    '  CUDA1: NVIDIA GeForce RTX 3090',
-    '  GPU0: Adreno X1-85 (OpenCL)',
-    '  CPU: CPU',
-  ].join('\n'))).toEqual([
+  expect(
+    parseLlamaCppListDevicesOutput(
+      [
+        'Available devices:',
+        '  CUDA0: NVIDIA GeForce RTX 4090 (24564 MiB, 0 MiB free)',
+        '  CUDA1: NVIDIA GeForce RTX 3090',
+        '  GPU0: Adreno X1-85 (OpenCL)',
+        '  CPU: CPU',
+      ].join('\n'),
+    ),
+  ).toEqual([
     { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
     { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
     { id: 'GPU0', name: 'Adreno X1-85', backend: 'opencl' },
@@ -389,46 +436,53 @@ test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
 });
 
 test('parseLlamaCppHelpFlags extracts normalized long flags from help output', () => {
-  expect(parseLlamaCppHelpFlags([
-    'Usage: llama-server [options]',
-    '  --models-max N           maximum concurrently loaded models',
-    '  --flash-attn {on,off,auto}',
-    '  --no-jinja, --jinja      toggle jinja support',
-  ].join('\n'))).toEqual([
-    '--flash-attn',
-    '--jinja',
-    '--models-max',
-    '--no-jinja',
-  ]);
+  expect(
+    parseLlamaCppHelpFlags(
+      [
+        'Usage: llama-server [options]',
+        '  --models-max N           maximum concurrently loaded models',
+        '  --flash-attn {on,off,auto}',
+        '  --no-jinja, --jinja      toggle jinja support',
+      ].join('\n'),
+    ),
+  ).toEqual(['--flash-attn', '--jinja', '--models-max', '--no-jinja']);
 });
 
 test('resolveLlamaCppDeviceSelection maps numeric indexes to llama.cpp device ids', () => {
-  expect(resolveLlamaCppDeviceSelection('0,1', [
-    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
-    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
-    { id: 'CPU', name: 'CPU', backend: 'cpu' },
-  ])).toBe('CUDA0,CUDA1');
+  expect(
+    resolveLlamaCppDeviceSelection('0,1', [
+      { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+      { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+      { id: 'CPU', name: 'CPU', backend: 'cpu' },
+    ]),
+  ).toBe('CUDA0,CUDA1');
 });
 
 test('resolveLlamaCppDeviceSelection preserves explicit llama.cpp device ids', () => {
-  expect(resolveLlamaCppDeviceSelection('CUDA0,CUDA1', [
-    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
-    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
-  ])).toBe('CUDA0,CUDA1');
+  expect(
+    resolveLlamaCppDeviceSelection('CUDA0,CUDA1', [
+      { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+      { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+    ]),
+  ).toBe('CUDA0,CUDA1');
 });
 
 test('resolveLlamaCppDeviceSelection falls back to the default visible-device behavior when an index cannot be resolved', () => {
-  expect(resolveLlamaCppDeviceSelection('0,4', [
-    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
-    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
-  ])).toBe('');
+  expect(
+    resolveLlamaCppDeviceSelection('0,4', [
+      { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+      { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+    ]),
+  ).toBe('');
 });
 
 test('resolveLlamaCppDeviceSelection falls back to the default visible-device behavior for invalid free-form values', () => {
-  expect(resolveLlamaCppDeviceSelection('bad-input', [
-    { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
-    { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
-  ])).toBe('');
+  expect(
+    resolveLlamaCppDeviceSelection('bad-input', [
+      { id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' },
+      { id: 'CUDA1', name: 'NVIDIA GeForce RTX 3090', backend: 'cuda' },
+    ]),
+  ).toBe('');
 });
 
 test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', async () => {
@@ -446,11 +500,13 @@ test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', asyn
     },
   });
 
-  expect(calls).toEqual([{
-    file: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
-    args: ['--list-devices'],
-    pathValue: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
-  }]);
+  expect(calls).toEqual([
+    {
+      file: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+      args: ['--list-devices'],
+      pathValue: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+    },
+  ]);
   expect(result).toEqual({
     success: true,
     executablePath: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
@@ -460,18 +516,20 @@ test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', asyn
 });
 
 test('modelLaunchOptionsToPreset writes model startup parameters for models-preset.ini', () => {
-  expect(modelLaunchOptionsToPreset({
-    ctxSize: 8192,
-    gpuLayers: 32,
-    threads: 8,
-    batchSize: 512,
-    ubatchSize: 128,
-    mmap: false,
-    flashAttn: 'on',
-    reasoning: 'auto',
-    reasoningFormat: 'deepseek',
-    chatTemplate: 'chatml',
-  })).toEqual({
+  expect(
+    modelLaunchOptionsToPreset({
+      ctxSize: 8192,
+      gpuLayers: 32,
+      threads: 8,
+      batchSize: 512,
+      ubatchSize: 128,
+      mmap: false,
+      flashAttn: 'on',
+      reasoning: 'auto',
+      reasoningFormat: 'deepseek',
+      chatTemplate: 'chatml',
+    }),
+  ).toEqual({
     'ctx-size': 8192,
     'n-gpu-layers': 32,
     threads: 8,
@@ -497,12 +555,42 @@ test('mergeLocalModels ignores router aliases and non-GGUF paths in the local fi
     details: { format: 'gguf' },
   };
 
-  expect(mergeLocalModels([
-    { name: 'default', id: 'default', model: 'default', status: 'unloaded', details: { format: 'gguf' } },
-    { name: 'readme', id: 'readme', model: 'readme', path: '/models/README.md', status: 'unloaded' },
-    { name: 'external', id: 'external', model: 'external', path: '/external/manual.gguf', status: 'unloaded' },
-    { name: 'qwen-local', id: 'qwen-local', model: 'qwen-local', path: '/models/qwen-local.gguf', size: 8, status: 'loaded' },
-  ], [scannedModel])).toEqual([
+  expect(
+    mergeLocalModels(
+      [
+        {
+          name: 'default',
+          id: 'default',
+          model: 'default',
+          status: 'unloaded',
+          details: { format: 'gguf' },
+        },
+        {
+          name: 'readme',
+          id: 'readme',
+          model: 'readme',
+          path: '/models/README.md',
+          status: 'unloaded',
+        },
+        {
+          name: 'external',
+          id: 'external',
+          model: 'external',
+          path: '/external/manual.gguf',
+          status: 'unloaded',
+        },
+        {
+          name: 'qwen-local',
+          id: 'qwen-local',
+          model: 'qwen-local',
+          path: '/models/qwen-local.gguf',
+          size: 8,
+          status: 'loaded',
+        },
+      ],
+      [scannedModel],
+    ),
+  ).toEqual([
     expect.objectContaining({
       name: 'external',
       path: '/external/manual.gguf',
@@ -522,25 +610,26 @@ test('listLocalModels keeps the current models directory as the source of truth'
   fs.writeFileSync(currentModelPath, 'gguf');
 
   const manager = new LlamaCppManager(() => ({ modelsDir }));
-  manager.client = async () => ({
-    listModels: async () => ([
-      {
-        name: 'current-model',
-        id: 'current-model',
-        model: 'current-model',
-        path: currentModelPath,
-        size: 8,
-        status: 'loaded',
-      },
-      {
-        name: 'stale-model',
-        id: 'stale-model',
-        model: 'stale-model',
-        path: path.join(os.tmpdir(), 'stale-model.gguf'),
-        status: 'unloaded',
-      },
-    ]),
-  } as any);
+  manager.client = async () =>
+    ({
+      listModels: async () => [
+        {
+          name: 'current-model',
+          id: 'current-model',
+          model: 'current-model',
+          path: currentModelPath,
+          size: 8,
+          status: 'loaded',
+        },
+        {
+          name: 'stale-model',
+          id: 'stale-model',
+          model: 'stale-model',
+          path: path.join(os.tmpdir(), 'stale-model.gguf'),
+          status: 'unloaded',
+        },
+      ],
+    }) as any;
 
   await expect(manager.listLocalModels()).resolves.toEqual([
     expect.objectContaining({
@@ -556,9 +645,10 @@ test('listRunningModels refreshes GGUF thinking capabilities when the cache is c
   const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-running-thinking-'));
   fs.writeFileSync(path.join(modelsDir, 'qwen-local.gguf'), 'gguf');
   const manager = new LlamaCppManager(() => ({ modelsDir }));
-  manager.client = async () => ({
-    runningModels: async () => [{ name: 'qwen-local' }],
-  } as any);
+  manager.client = async () =>
+    ({
+      runningModels: async () => [{ name: 'qwen-local' }],
+    }) as any;
 
   await expect(manager.listRunningModels()).resolves.toEqual([
     expect.objectContaining({
@@ -571,13 +661,14 @@ test('listRunningModels refreshes GGUF thinking capabilities when the cache is c
 test('listRunningModels tolerates a transient router connection failure after startup', async () => {
   const manager = new LlamaCppManager(() => ({}));
   let attempts = 0;
-  manager.client = async () => ({
-    runningModels: async () => {
-      attempts += 1;
-      if (attempts === 1) throw new TypeError('fetch failed');
-      return [{ name: 'qwen-local' }];
-    },
-  } as any);
+  manager.client = async () =>
+    ({
+      runningModels: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new TypeError('fetch failed');
+        return [{ name: 'qwen-local' }];
+      },
+    }) as any;
 
   await expect(manager.listRunningModels()).resolves.toEqual([
     expect.objectContaining({ name: 'qwen-local' }),
@@ -588,7 +679,7 @@ test('listRunningModels tolerates a transient router connection failure after st
 test('listRunningModels bounds each router readiness request to a short timeout', async () => {
   const manager = new LlamaCppManager(() => ({}));
   const runningModels = vi.fn(async () => []);
-  manager.client = async () => ({ runningModels } as any);
+  manager.client = async () => ({ runningModels }) as any;
 
   await manager.listRunningModels();
 
@@ -596,36 +687,34 @@ test('listRunningModels bounds each router readiness request to a short timeout'
 });
 
 test('extractModelScopeFilePaths reads nested ModelScope repo file payloads', () => {
-  expect(extractModelScopeFilePaths({
-    Data: {
-      Files: [
-        { Path: 'README.md' },
-        { Path: 'qwen3-8b-q4_k_m.gguf' },
-        { FilePath: 'subdir/qwen3-8b-q8_0.gguf' },
-      ],
-    },
-  })).toEqual([
-    'README.md',
-    'qwen3-8b-q4_k_m.gguf',
-    'subdir/qwen3-8b-q8_0.gguf',
-  ]);
+  expect(
+    extractModelScopeFilePaths({
+      Data: {
+        Files: [
+          { Path: 'README.md' },
+          { Path: 'qwen3-8b-q4_k_m.gguf' },
+          { FilePath: 'subdir/qwen3-8b-q8_0.gguf' },
+        ],
+      },
+    }),
+  ).toEqual(['README.md', 'qwen3-8b-q4_k_m.gguf', 'subdir/qwen3-8b-q8_0.gguf']);
 });
 
 test('chooseModelScopeInstallFile prefers a normal Q4_K_M GGUF model file', () => {
-  expect(chooseModelScopeInstallFile([
-    'README.md',
-    'mmproj-model-f16.gguf',
-    'qwen3-8b-q8_0.gguf',
-    'qwen3-8b-q4_k_m.gguf',
-  ])).toBe('qwen3-8b-q4_k_m.gguf');
+  expect(
+    chooseModelScopeInstallFile([
+      'README.md',
+      'mmproj-model-f16.gguf',
+      'qwen3-8b-q8_0.gguf',
+      'qwen3-8b-q4_k_m.gguf',
+    ]),
+  ).toBe('qwen3-8b-q4_k_m.gguf');
 });
 
 test('chooseModelScopeInstallFile rejects repositories without GGUF model files', () => {
-  expect(chooseModelScopeInstallFile([
-    'config.json',
-    'model.safetensors',
-    'tokenizer.json',
-  ])).toBeUndefined();
+  expect(
+    chooseModelScopeInstallFile(['config.json', 'model.safetensors', 'tokenizer.json']),
+  ).toBeUndefined();
 });
 
 test('scanLocalGgufModels finds nested ModelScope downloads', () => {
@@ -648,7 +737,13 @@ test('scanLocalGgufModels finds nested ModelScope downloads', () => {
 test('loadModel reloads the router catalog after writing a new model preset', async () => {
   const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-load-'));
   const presetPath = path.join(modelsDir, 'models-preset.ini');
-  const ggufPath = path.join(modelsDir, 'modelscope', 'unsloth', 'Qwen3.5-0.8B-GGUF', 'Qwen3.5-0.8B-Q4_0.gguf');
+  const ggufPath = path.join(
+    modelsDir,
+    'modelscope',
+    'unsloth',
+    'Qwen3.5-0.8B-GGUF',
+    'Qwen3.5-0.8B-Q4_0.gguf',
+  );
   fs.mkdirSync(path.dirname(ggufPath), { recursive: true });
   fs.writeFileSync(ggufPath, 'gguf');
 
@@ -656,27 +751,24 @@ test('loadModel reloads the router catalog after writing a new model preset', as
   manager.getPresetPath = () => presetPath;
 
   const calls: string[] = [];
-  manager.client = async () => ({
-    listModels: async () => {
-      calls.push(fs.existsSync(presetPath) ? 'reload-after-preset' : 'reload-before-preset');
-      return [];
-    },
-    loadModel: async () => {
-      calls.push('load');
-      return { success: true, runningModels: [] };
-    },
-  } as any);
+  manager.client = async () =>
+    ({
+      listModels: async () => {
+        calls.push(fs.existsSync(presetPath) ? 'reload-after-preset' : 'reload-before-preset');
+        return [];
+      },
+      loadModel: async () => {
+        calls.push('load');
+        return { success: true, runningModels: [] };
+      },
+    }) as any;
 
   await manager.loadModel({
     model: 'Qwen3.5-0.8B-GGUF',
     options: { ctxSize: 4096 },
   });
 
-  expect(calls).toEqual([
-    'reload-before-preset',
-    'reload-after-preset',
-    'load',
-  ]);
+  expect(calls).toEqual(['reload-before-preset', 'reload-after-preset', 'load']);
 });
 
 test('loadModel applies the default context size through model presets instead of router startup args', async () => {
@@ -688,13 +780,14 @@ test('loadModel applies the default context size through model presets instead o
 
   const manager = new LlamaCppManager(() => ({ modelsDir, ctxSize: '16384' }));
   manager.getPresetPath = () => presetPath;
-  manager.client = async () => ({
-    listModels: async () => [],
-    loadModel: async (input: any) => {
-      expect(input.options?.ctxSize).toBe(16384);
-      return { success: true, runningModels: [] };
-    },
-  } as any);
+  manager.client = async () =>
+    ({
+      listModels: async () => [],
+      loadModel: async (input: any) => {
+        expect(input.options?.ctxSize).toBe(16384);
+        return { success: true, runningModels: [] };
+      },
+    }) as any;
 
   await manager.loadModel({
     model: 'Qwen3-0.6B',
@@ -711,38 +804,39 @@ test('deleteModel removes empty parent directories after deleting a GGUF file', 
   fs.writeFileSync(ggufPath, 'gguf');
 
   const storage = new Map<string, unknown>([['llamacpp_last_loaded_model', 'Qwen3.5-0.8B-GGUF']]);
-  const manager = new LlamaCppManager(
-    () => ({ modelsDir }),
-    undefined,
-    {
-      get: <T>(key: string) => storage.get(key) as T | undefined,
-      set: <T>(key: string, value: T) => {
-        storage.set(key, value);
-      },
-      delete: (key: string) => {
-        storage.delete(key);
-      },
+  const manager = new LlamaCppManager(() => ({ modelsDir }), undefined, {
+    get: <T>(key: string) => storage.get(key) as T | undefined,
+    set: <T>(key: string, value: T) => {
+      storage.set(key, value);
     },
-  );
-  manager.listLocalModels = async () => [{
-    name: 'Qwen3.5-0.8B-GGUF',
-    id: 'Qwen3.5-0.8B-GGUF',
-    model: 'Qwen3.5-0.8B-GGUF',
-    path: ggufPath,
-    source: 'modelscope',
-    status: 'unloaded',
-    details: { format: 'gguf' },
-  }];
-  manager.client = async () => ({
-    unloadModel: async () => undefined,
-  } as any);
+    delete: (key: string) => {
+      storage.delete(key);
+    },
+  });
+  manager.listLocalModels = async () => [
+    {
+      name: 'Qwen3.5-0.8B-GGUF',
+      id: 'Qwen3.5-0.8B-GGUF',
+      model: 'Qwen3.5-0.8B-GGUF',
+      path: ggufPath,
+      source: 'modelscope',
+      status: 'unloaded',
+      details: { format: 'gguf' },
+    },
+  ];
+  manager.client = async () =>
+    ({
+      unloadModel: async () => undefined,
+    }) as any;
 
   const result = await manager.deleteModel('Qwen3.5-0.8B-GGUF');
-  expect(result).toEqual(expect.objectContaining({
-    success: true,
-    deleted: true,
-    removedModelName: 'Qwen3.5-0.8B-GGUF',
-  }));
+  expect(result).toEqual(
+    expect.objectContaining({
+      success: true,
+      deleted: true,
+      removedModelName: 'Qwen3.5-0.8B-GGUF',
+    }),
+  );
   expect(fs.existsSync(ggufPath)).toBe(false);
   expect(fs.existsSync(repoDir)).toBe(false);
   expect(storage.has('llamacpp_last_loaded_model')).toBe(false);
@@ -750,19 +844,15 @@ test('deleteModel removes empty parent directories after deleting a GGUF file', 
 
 test('clearLastLoadedModel prevents a service restart from restoring the old model', () => {
   const storage = new Map<string, unknown>([['llamacpp_last_loaded_model', 'old-model']]);
-  const manager = new LlamaCppManager(
-    () => ({}),
-    undefined,
-    {
-      get: <T>(key: string) => storage.get(key) as T | undefined,
-      set: <T>(key: string, value: T) => {
-        storage.set(key, value);
-      },
-      delete: (key: string) => {
-        storage.delete(key);
-      },
+  const manager = new LlamaCppManager(() => ({}), undefined, {
+    get: <T>(key: string) => storage.get(key) as T | undefined,
+    set: <T>(key: string, value: T) => {
+      storage.set(key, value);
     },
-  );
+    delete: (key: string) => {
+      storage.delete(key);
+    },
+  });
 
   manager.clearPersistedLastLoadedModel();
 
@@ -779,14 +869,17 @@ test('installModel cleans already-downloaded files when a later stage is cancell
     global.fetch = async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/repo/files?')) {
-        return new Response(JSON.stringify({
-          Data: {
-            Files: [
-              { Path: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf' },
-              { Path: 'mmproj-F16.gguf' },
-            ],
-          },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            Data: {
+              Files: [
+                { Path: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf' },
+                { Path: 'mmproj-F16.gguf' },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       if (url.includes('/resolve/master/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')) {
         return new Response(new Uint8Array([1, 2, 3]), {
@@ -796,25 +889,38 @@ test('installModel cleans already-downloaded files when a later stage is cancell
       }
       const controllerSignal = init?.signal;
       await new Promise((_, reject) => {
-        controllerSignal?.addEventListener('abort', () => reject(new Error('Install cancelled')), { once: true });
+        controllerSignal?.addEventListener('abort', () => reject(new Error('Install cancelled')), {
+          once: true,
+        });
       });
       throw new Error('Install cancelled');
     };
 
     const controller = new AbortController();
-    const installPromise = manager.installModel({
-      modelId: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
-      filePath: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
-      mmprojFilePath: 'mmproj-F16.gguf',
-      displayName: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
-    }, undefined, { signal: controller.signal });
+    const installPromise = manager.installModel(
+      {
+        modelId: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+        filePath: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
+        mmprojFilePath: 'mmproj-F16.gguf',
+        displayName: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+      },
+      undefined,
+      { signal: controller.signal },
+    );
 
     controller.abort(new Error('Install cancelled'));
 
     await expect(installPromise).rejects.toThrow();
 
-    const repoDir = path.join(modelsDir, 'modelscope', 'unsloth', 'DeepSeek-R1-Distill-Qwen-1.5B-GGUF');
-    expect(fs.existsSync(path.join(repoDir, 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf'))).toBe(false);
+    const repoDir = path.join(
+      modelsDir,
+      'modelscope',
+      'unsloth',
+      'DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+    );
+    expect(fs.existsSync(path.join(repoDir, 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf'))).toBe(
+      false,
+    );
     expect(fs.existsSync(path.join(repoDir, 'mmproj-F16.gguf'))).toBe(false);
     expect(fs.existsSync(repoDir)).toBe(false);
   } finally {
@@ -889,28 +995,28 @@ test('installModel retries with repo file listing after HTTP 404 and refreshes m
       const url = String(input);
       if (fetchCount === 1) {
         expect(url).toContain('/repo/files?');
-        return new Response(JSON.stringify({
-          Data: {
-            Files: [
-              { Path: 'original.gguf' },
-              { Path: 'old-mmproj.gguf' },
-            ],
-          },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            Data: {
+              Files: [{ Path: 'original.gguf' }, { Path: 'old-mmproj.gguf' }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       if (fetchCount === 2) {
         expect(url).toContain('/resolve/master/original.gguf');
         return new Response('not found', { status: 404 });
       }
       if (url.includes('/repo/files?')) {
-        return new Response(JSON.stringify({
-          Data: {
-            Files: [
-              { Path: 'updated.gguf' },
-              { Path: 'mmproj-F16.gguf' },
-            ],
-          },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            Data: {
+              Files: [{ Path: 'updated.gguf' }, { Path: 'mmproj-F16.gguf' }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       if (url.includes('/resolve/master/updated.gguf')) {
         return new Response(new Uint8Array([1, 2, 3]), {
@@ -956,14 +1062,14 @@ test('installModel retries when only the mmproj file path changes after HTTP 404
       const url = String(input);
       if (fetchCount === 1) {
         expect(url).toContain('/repo/files?');
-        return new Response(JSON.stringify({
-          Data: {
-            Files: [
-              { Path: 'updated.gguf' },
-              { Path: 'old-mmproj.gguf' },
-            ],
-          },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            Data: {
+              Files: [{ Path: 'updated.gguf' }, { Path: 'old-mmproj.gguf' }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       if (url.includes('/resolve/master/updated.gguf')) {
         return new Response(new Uint8Array([1, 2, 3]), {
@@ -975,14 +1081,14 @@ test('installModel retries when only the mmproj file path changes after HTTP 404
         return new Response('not found', { status: 404 });
       }
       if (url.includes('/repo/files?')) {
-        return new Response(JSON.stringify({
-          Data: {
-            Files: [
-              { Path: 'updated.gguf' },
-              { Path: 'mmproj-F16.gguf' },
-            ],
-          },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            Data: {
+              Files: [{ Path: 'updated.gguf' }, { Path: 'mmproj-F16.gguf' }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       if (url.includes('/resolve/master/mmproj-F16.gguf')) {
         return new Response(new Uint8Array([4, 5, 6]), {
@@ -1020,14 +1126,14 @@ test('installModel retries when curated file casing is stale for Qwen3-8B-GGUF',
       fetchCount += 1;
       const url = String(input);
       if (url.includes('/repo/files?')) {
-        return new Response(JSON.stringify({
-          Data: {
-            Files: [
-              { Path: 'Qwen3-8B-Q4_K_M.gguf' },
-              { Path: 'Qwen3-8B-Q5_0.gguf' },
-            ],
-          },
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            Data: {
+              Files: [{ Path: 'Qwen3-8B-Q4_K_M.gguf' }, { Path: 'Qwen3-8B-Q5_0.gguf' }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       if (url.includes('/resolve/master/Qwen3-8B-Q4_K_M.gguf')) {
         return new Response(new Uint8Array([1, 2, 3]), {

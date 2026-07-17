@@ -18,10 +18,7 @@ export const IpcError = z.object({ success: z.literal(false), error: z.string().
 
 /** Generic IPC result — { success: true, ...data } | { success: false, error? } */
 export const IpcResult = <T extends z.ZodRawShape>(data: T) =>
-  z.union([
-    z.object({ success: z.literal(true), ...data }),
-    IpcError,
-  ]);
+  z.union([z.object({ success: z.literal(true), ...data }), IpcError]);
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
@@ -163,13 +160,15 @@ export const CoworkSessionStartSchema = {
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
   }),
   output: IpcResult({
-    session: z.object({
-      id: z.string(),
-      title: z.string(),
-      status: z.string(),
-      createdAt: z.number(),
-      updatedAt: z.number(),
-    }).passthrough(),
+    session: z
+      .object({
+        id: z.string(),
+        title: z.string(),
+        status: z.string(),
+        createdAt: z.number(),
+        updatedAt: z.number(),
+      })
+      .passthrough(),
     engineStatus: z.object({}).passthrough().optional(),
   }),
 };
@@ -217,12 +216,14 @@ export const CoworkSessionGetSchema = {
 };
 
 export const CoworkSessionListSchema = {
-  input: z.object({
-    limit: z.number().int().positive().optional(),
-    offset: z.number().int().min(0).optional(),
-    workspaceId: z.string().optional(),
-    agentId: z.string().optional(),
-  }).optional(),
+  input: z
+    .object({
+      limit: z.number().int().positive().optional(),
+      offset: z.number().int().min(0).optional(),
+      workspaceId: z.string().optional(),
+      agentId: z.string().optional(),
+    })
+    .optional(),
   output: IpcResult({
     sessions: z.array(z.object({}).passthrough()),
     hasMore: z.boolean().optional(),
@@ -242,7 +243,12 @@ export const CoworkSessionGetMessagesSchema = {
 
 export const CoworkSessionExportResultImageSchema = {
   input: z.object({
-    rect: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }),
+    rect: z.object({
+      x: z.number(),
+      y: z.number(),
+      width: z.number().positive(),
+      height: z.number().positive(),
+    }),
     defaultFileName: z.string().optional(),
   }),
   output: IpcResult({ path: z.string().optional(), canceled: z.boolean().optional() }),
@@ -250,7 +256,12 @@ export const CoworkSessionExportResultImageSchema = {
 
 export const CoworkSessionCaptureImageChunkSchema = {
   input: z.object({
-    rect: z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() }),
+    rect: z.object({
+      x: z.number(),
+      y: z.number(),
+      width: z.number().positive(),
+      height: z.number().positive(),
+    }),
   }),
   output: IpcResult({
     width: z.number().optional(),
@@ -365,24 +376,36 @@ export const CoworkBootstrapWriteSchema = {
 // ─── Dialog ─────────────────────────────────────────────────────────────────
 
 export const DialogSelectFileSchema = {
-  input: z.object({
-    title: z.string().optional(),
-    filters: z.array(z.object({
-      name: z.string(),
-      extensions: z.array(z.string()),
-    })).optional(),
-  }).optional(),
+  input: z
+    .object({
+      title: z.string().optional(),
+      filters: z
+        .array(
+          z.object({
+            name: z.string(),
+            extensions: z.array(z.string()),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
   output: z.string().nullable(),
 };
 
 export const DialogSelectFilesSchema = {
-  input: z.object({
-    title: z.string().optional(),
-    filters: z.array(z.object({
-      name: z.string(),
-      extensions: z.array(z.string()),
-    })).optional(),
-  }).optional(),
+  input: z
+    .object({
+      title: z.string().optional(),
+      filters: z
+        .array(
+          z.object({
+            name: z.string(),
+            extensions: z.array(z.string()),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
   output: z.array(z.string()).nullable(),
 };
 
@@ -486,7 +509,10 @@ export const LogFromRendererSchema = {
 // ─── IM ─────────────────────────────────────────────────────────────────────
 
 export const ImConfigSetSchema = {
-  input: z.object({ config: z.object({}).passthrough(), options: z.object({ syncGateway: z.boolean().optional() }).optional() }),
+  input: z.object({
+    config: z.object({}).passthrough(),
+    options: z.object({ syncGateway: z.boolean().optional() }).optional(),
+  }),
   output: z.void(),
 };
 
@@ -501,7 +527,10 @@ export const ImGatewayStopSchema = {
 };
 
 export const ImGatewayTestSchema = {
-  input: z.object({ platform: z.string().min(1), configOverride: z.object({}).passthrough().optional() }),
+  input: z.object({
+    platform: z.string().min(1),
+    configOverride: z.object({}).passthrough().optional(),
+  }),
   output: z.void(),
 };
 
@@ -629,14 +658,24 @@ export const GitHubCopilotTokenUpdatedSchema = {
 
 export const OpenAICodexOAuthStartSchema = {
   output: z.union([
-    z.object({ success: z.literal(true), email: z.string().nullable(), accountId: z.string().nullable(), expiresAt: z.number() }),
+    z.object({
+      success: z.literal(true),
+      email: z.string().nullable(),
+      accountId: z.string().nullable(),
+      expiresAt: z.number(),
+    }),
     z.object({ success: z.literal(false), error: z.string() }),
   ]),
 };
 
 export const OpenAICodexOAuthStatusSchema = {
   output: z.union([
-    z.object({ loggedIn: z.literal(true), email: z.string().nullable(), accountId: z.string().nullable(), expiresAt: z.number() }),
+    z.object({
+      loggedIn: z.literal(true),
+      email: z.string().nullable(),
+      accountId: z.string().nullable(),
+      expiresAt: z.number(),
+    }),
     z.object({ loggedIn: z.literal(false) }),
   ]),
 };
@@ -685,7 +724,9 @@ export const OpenClawEngineStatusSchema = {
 // ─── OpenClaw Session Policy ────────────────────────────────────────────────
 
 export const OpenClawSessionPolicyGetSchema = {
-  output: IpcResult({ config: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }).passthrough() }),
+  output: IpcResult({
+    config: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }).passthrough(),
+  }),
 };
 
 export const OpenClawSessionPolicySetSchema = {

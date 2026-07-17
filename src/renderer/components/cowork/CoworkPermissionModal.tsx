@@ -87,14 +87,16 @@ type QuestionItem = {
 };
 
 const looksPositiveConfirmOption = (label: string): boolean => {
-  return POSITIVE_CONFIRM_PATTERNS.some((pattern) => pattern.test(label));
+  return POSITIVE_CONFIRM_PATTERNS.some(pattern => pattern.test(label));
 };
 
 const looksNegativeConfirmOption = (label: string): boolean => {
-  return NEGATIVE_CONFIRM_PATTERNS.some((pattern) => pattern.test(label));
+  return NEGATIVE_CONFIRM_PATTERNS.some(pattern => pattern.test(label));
 };
 
-const resolveConfirmModeButtons = (question: QuestionItem): { primary: QuestionOption; secondary: QuestionOption } => {
+const resolveConfirmModeButtons = (
+  question: QuestionItem,
+): { primary: QuestionOption; secondary: QuestionOption } => {
   const [firstOption, secondOption] = question.options;
   if (!firstOption || !secondOption) {
     throw new Error('Confirm mode requires exactly two options.');
@@ -115,10 +117,7 @@ const resolveConfirmModeButtons = (question: QuestionItem): { primary: QuestionO
   return { primary: firstOption, secondary: secondOption };
 };
 
-const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
-  permission,
-  onRespond,
-}) => {
+const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({ permission, onRespond }) => {
   const toolInput = useMemo(() => permission.toolInput ?? {}, [permission.toolInput]);
 
   const questions = useMemo<QuestionItem[]>(() => {
@@ -128,23 +127,24 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
     if (!Array.isArray(rawQuestions)) return [];
 
     return rawQuestions
-      .map((question) => {
+      .map(question => {
         if (!question || typeof question !== 'object') return null;
         const record = question as Record<string, unknown>;
         const options = Array.isArray(record.options)
-          ? record.options
-              .map((option) => {
+          ? (record.options
+              .map(option => {
                 if (!option || typeof option !== 'object') return null;
                 const optionRecord = option as Record<string, unknown>;
                 if (typeof optionRecord.label !== 'string') return null;
                 return {
                   label: optionRecord.label,
-                  description: typeof optionRecord.description === 'string'
-                    ? optionRecord.description
-                    : undefined,
+                  description:
+                    typeof optionRecord.description === 'string'
+                      ? optionRecord.description
+                      : undefined,
                 } as QuestionOption;
               })
-              .filter(Boolean) as QuestionOption[]
+              .filter(Boolean) as QuestionOption[])
           : [];
 
         if (typeof record.question !== 'string' || options.length === 0) {
@@ -166,10 +166,11 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
   // Detect simple confirm mode: 1 question with exactly 2 options.
   // In this case, render a compact two-button dialog, but preserve the actual
   // option labels instead of assuming fixed allow/deny semantics.
-  const isConfirmMode = isQuestionTool
-    && questions.length === 1
-    && questions[0].options.length === 2
-    && !questions[0].multiSelect;
+  const isConfirmMode =
+    isQuestionTool &&
+    questions.length === 1 &&
+    questions[0].options.length === 2 &&
+    !questions[0].multiSelect;
 
   const confirmModeButtons = useMemo(() => {
     if (!isConfirmMode) return null;
@@ -233,13 +234,17 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
   };
 
   const { dangerLevel, dangerReasonText } = useMemo(() => {
-    const questionText = isConfirmMode ? questions[0]?.question ?? '' : '';
+    const questionText = isConfirmMode ? (questions[0]?.question ?? '') : '';
     const looksLikeDeleteQuestion = requestedCommand
       ? detectDangerLevelFromCommand(requestedCommand) !== 'safe'
-      : /\b(delete|remove|rm|unlink|rmdir|erase|del)\b/i.test(questionText) || /删除|移除/.test(questionText);
+      : /\b(delete|remove|rm|unlink|rmdir|erase|del)\b/i.test(questionText) ||
+        /删除|移除/.test(questionText);
 
     if (permission.toolName === 'AskUserQuestion' && looksLikeDeleteQuestion) {
-      return { dangerLevel: 'caution' as DangerLevel, dangerReasonText: i18nService.t('dangerReasonFileDelete') };
+      return {
+        dangerLevel: 'caution' as DangerLevel,
+        dangerReasonText: i18nService.t('dangerReasonFileDelete'),
+      };
     }
     if (permission.toolName !== 'Bash') {
       return { dangerLevel: 'safe' as DangerLevel, dangerReasonText: '' };
@@ -248,9 +253,11 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
     const command = String(input?.command ?? '');
 
     // Prefer adapter-provided level, fall back to local detection
-    const level = (typeof input?.dangerLevel === 'string' && ['safe', 'caution', 'destructive'].includes(input.dangerLevel))
-      ? input.dangerLevel as DangerLevel
-      : detectDangerLevelFromCommand(command);
+    const level =
+      typeof input?.dangerLevel === 'string' &&
+      ['safe', 'caution', 'destructive'].includes(input.dangerLevel)
+        ? (input.dangerLevel as DangerLevel)
+        : detectDangerLevelFromCommand(command);
 
     const reason = typeof input?.dangerReason === 'string' ? input.dangerReason : '';
     const i18nKey = DANGER_REASON_I18N_MAP[reason];
@@ -265,12 +272,12 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
     if (!question.multiSelect) return [rawValue];
     return rawValue
       .split('|||')
-      .map((value) => value.trim())
+      .map(value => value.trim())
       .filter(Boolean);
   };
 
   const handleSelectOption = (question: QuestionItem, optionLabel: string) => {
-    setAnswers((prev) => {
+    setAnswers(prev => {
       if (!question.multiSelect) {
         return { ...prev, [question.question]: optionLabel };
       }
@@ -279,8 +286,8 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
       const current = new Set(
         rawValue
           .split('|||')
-          .map((value) => value.trim())
-          .filter(Boolean)
+          .map(value => value.trim())
+          .filter(Boolean),
       );
       if (current.has(optionLabel)) {
         current.delete(optionLabel);
@@ -295,16 +302,19 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
     });
   };
 
-  const isComplete = isQuestionTool && !isConfirmMode
-    ? questions.every((question) => (answers[question.question] ?? '').trim())
-    : true;
+  const isComplete =
+    isQuestionTool && !isConfirmMode
+      ? questions.every(question => (answers[question.question] ?? '').trim())
+      : true;
 
-  const denyButtonLabel = isQuestionTool && !isConfirmMode
-    ? i18nService.t('coworkDenyRequest')
-    : i18nService.t('coworkDeny');
-  const approveButtonLabel = isQuestionTool && !isConfirmMode
-    ? i18nService.t('coworkConfirmSelection')
-    : i18nService.t('coworkApprove');
+  const denyButtonLabel =
+    isQuestionTool && !isConfirmMode
+      ? i18nService.t('coworkDenyRequest')
+      : i18nService.t('coworkDeny');
+  const approveButtonLabel =
+    isQuestionTool && !isConfirmMode
+      ? i18nService.t('coworkConfirmSelection')
+      : i18nService.t('coworkApprove');
 
   const handleConfirmModeSelect = (optionLabel: string) => {
     if (!isConfirmMode) return;
@@ -347,8 +357,12 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
       <div className="modal-content w-full max-w-lg mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
-          <div className={`p-2 rounded-full ${isQuestionTool && !isConfirmMode ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
-            <TriangleAlert className={`h-6 w-6 ${isQuestionTool && !isConfirmMode ? 'text-blue-600 dark:text-blue-500' : 'text-yellow-600 dark:text-yellow-500'}`} />
+          <div
+            className={`p-2 rounded-full ${isQuestionTool && !isConfirmMode ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}
+          >
+            <TriangleAlert
+              className={`h-6 w-6 ${isQuestionTool && !isConfirmMode ? 'text-blue-600 dark:text-blue-500' : 'text-yellow-600 dark:text-yellow-500'}`}
+            />
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-foreground">
@@ -372,9 +386,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
           {isConfirmMode ? (
             /* Simple confirm dialog — show question text + allow/deny buttons */
             <div className="px-3 py-2 rounded-lg bg-background">
-              <p className="text-sm text-foreground whitespace-pre-wrap">
-                {questions[0].question}
-              </p>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{questions[0].question}</p>
               {requestedCommand && (
                 <div className="mt-3">
                   <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -390,7 +402,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
             </div>
           ) : isQuestionTool ? (
             <>
-              {questions.map((question) => {
+              {questions.map(question => {
                 const selectedValues = getSelectedValues(question);
                 return (
                   <div
@@ -421,7 +433,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                     )}
                     {/* 选项 */}
                     <div className="space-y-2">
-                      {question.options.map((option) => {
+                      {question.options.map(option => {
                         const isSelected = selectedValues.includes(option.label);
                         return (
                           <Button
@@ -450,9 +462,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                   {i18nService.t('coworkToolName')}
                 </label>
                 <div className="px-3 py-2 rounded-lg bg-background">
-                  <code className="text-sm text-foreground">
-                    {permission.toolName}
-                  </code>
+                  <code className="text-sm text-foreground">{permission.toolName}</code>
                 </div>
               </div>
 
@@ -493,7 +503,9 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                 {i18nService.t('coworkCautionOperation')}
               </p>
               {dangerReasonText && (
-                <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-0.5">{dangerReasonText}</p>
+                <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-0.5">
+                  {dangerReasonText}
+                </p>
               )}
             </div>
           </div>
@@ -503,15 +515,20 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
           <Button
             variant="ghost"
-            onClick={isConfirmMode && confirmModeButtons ? () => handleConfirmModeSelect(confirmModeButtons.secondary.label) : handleDeny}
+            onClick={
+              isConfirmMode && confirmModeButtons
+                ? () => handleConfirmModeSelect(confirmModeButtons.secondary.label)
+                : handleDeny
+            }
           >
-            {isConfirmMode && confirmModeButtons ? confirmModeButtons.secondary.label : denyButtonLabel}
+            {isConfirmMode && confirmModeButtons
+              ? confirmModeButtons.secondary.label
+              : denyButtonLabel}
           </Button>
-          <Button
-            onClick={handleApprove}
-            disabled={!isComplete}
-          >
-            {isConfirmMode && confirmModeButtons ? confirmModeButtons.primary.label : approveButtonLabel}
+          <Button onClick={handleApprove} disabled={!isComplete}>
+            {isConfirmMode && confirmModeButtons
+              ? confirmModeButtons.primary.label
+              : approveButtonLabel}
           </Button>
         </div>
       </div>

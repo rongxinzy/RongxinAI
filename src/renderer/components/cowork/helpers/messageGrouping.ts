@@ -1,5 +1,5 @@
 import type { CoworkMessage } from '../../../types/cowork';
-import { getToolResultDisplay,hasText } from './toolUtils';
+import { getToolResultDisplay, hasText } from './toolUtils';
 
 // ── Types ──
 
@@ -9,9 +9,7 @@ export type ToolGroupItem = {
   toolResult?: CoworkMessage | null;
 };
 
-export type DisplayItem =
-  | { type: 'message'; message: CoworkMessage }
-  | ToolGroupItem;
+export type DisplayItem = { type: 'message'; message: CoworkMessage } | ToolGroupItem;
 
 export type AssistantTurnItem =
   | { type: 'assistant'; message: CoworkMessage }
@@ -48,7 +46,10 @@ export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
       const toolUseId = message.metadata?.toolUseId;
       if (typeof toolUseId === 'string' && groupsByToolUseId.has(toolUseId)) {
         const group = groupsByToolUseId.get(toolUseId);
-        if (group) { group.toolResult = message; matched = true; }
+        if (group) {
+          group.toolResult = message;
+          matched = true;
+        }
       } else if (pendingAdjacentGroup && !pendingAdjacentGroup.toolResult) {
         pendingAdjacentGroup.toolResult = message;
         matched = true;
@@ -123,7 +124,8 @@ export const buildConversationTurns = (items: DisplayItem[]): ConversationTurn[]
 
 export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
   if (hasText(message.content) || hasText(message.metadata?.error)) return true;
-  if (message.metadata?.isThinking) return hasText(message.content) || Boolean(message.metadata?.isStreaming);
+  if (message.metadata?.isThinking)
+    return hasText(message.content) || Boolean(message.metadata?.isStreaming);
   return false;
 };
 
@@ -135,12 +137,12 @@ export const isVisibleAssistantTurnItem = (item: AssistantTurnItem): boolean => 
   return true;
 };
 
-export const getVisibleAssistantItems = (assistantItems: AssistantTurnItem[]): AssistantTurnItem[] =>
-  assistantItems.filter(isVisibleAssistantTurnItem);
+export const getVisibleAssistantItems = (
+  assistantItems: AssistantTurnItem[],
+): AssistantTurnItem[] => assistantItems.filter(isVisibleAssistantTurnItem);
 
-export const hasRenderableAssistantContent = (turn: ConversationTurn): boolean => (
-  getVisibleAssistantItems(turn.assistantItems).length > 0
-);
+export const hasRenderableAssistantContent = (turn: ConversationTurn): boolean =>
+  getVisibleAssistantItems(turn.assistantItems).length > 0;
 
 export const getToolResultLineCount = (result: string): number => {
   if (!result) return 0;

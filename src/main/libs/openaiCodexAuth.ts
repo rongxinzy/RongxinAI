@@ -74,9 +74,7 @@ function base64UrlEncode(buf: Buffer): string {
 
 function generatePkce(): { verifier: string; challenge: string; state: string } {
   const verifier = base64UrlEncode(crypto.randomBytes(64));
-  const challenge = base64UrlEncode(
-    crypto.createHash('sha256').update(verifier).digest(),
-  );
+  const challenge = base64UrlEncode(crypto.createHash('sha256').update(verifier).digest());
   const state = base64UrlEncode(crypto.randomBytes(32));
   return { verifier, challenge, state };
 }
@@ -190,7 +188,7 @@ function writeAuthFile(tokens: {
 }
 
 function renderCallbackHtml(success: boolean, message: string): string {
-  const safeMessage = message.replace(/[<>&]/g, (c) =>
+  const safeMessage = message.replace(/[<>&]/g, c =>
     c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;',
   );
   const color = success ? '#16a34a' : '#dc2626';
@@ -208,7 +206,14 @@ function renderCallbackHtml(success: boolean, message: string): string {
 async function exchangeCodeForTokens(params: {
   code: string;
   verifier: string;
-}): Promise<{ accessToken: string; refreshToken: string; idToken?: string; accountId?: string; email?: string; expiresAt: number; }> {
+}): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  idToken?: string;
+  accountId?: string;
+  email?: string;
+  expiresAt: number;
+}> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code: params.code,
@@ -221,7 +226,7 @@ async function exchangeCodeForTokens(params: {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
+      Accept: 'application/json',
     },
     body: body.toString(),
   });
@@ -250,12 +255,12 @@ async function exchangeCodeForTokens(params: {
   const email = trimNonEmpty(claims?.email);
   const authClaim = (claims?.['https://api.openai.com/auth'] ?? {}) as Record<string, unknown>;
   const accountId =
-    trimNonEmpty(authClaim?.chatgpt_account_id) ??
-    trimNonEmpty(authClaim?.chatgpt_account_user_id);
+    trimNonEmpty(authClaim?.chatgpt_account_id) ?? trimNonEmpty(authClaim?.chatgpt_account_user_id);
 
-  const expiresAt = typeof data.expires_in === 'number' && data.expires_in > 0
-    ? Date.now() + data.expires_in * 1000
-    : 0;
+  const expiresAt =
+    typeof data.expires_in === 'number' && data.expires_in > 0
+      ? Date.now() + data.expires_in * 1000
+      : 0;
 
   return { accessToken: access, refreshToken: refresh, idToken, accountId, email, expiresAt };
 }
@@ -339,25 +344,23 @@ export function startOpenAICodexLogin(): Promise<CodexOAuthTokens> {
       // Respond first so the user's browser closes cleanly even if the token
       // exchange takes a moment.
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(
-        renderCallbackHtml(
-          true,
-          'You can now close this tab and return to ZhiYuanAgent.',
-        ),
-      );
+      res.end(renderCallbackHtml(true, 'You can now close this tab and return to ZhiYuanAgent.'));
 
       exchangeCodeForTokens({ code, verifier })
-        .then((tokens) => {
+        .then(tokens => {
           writeAuthFile({
             access: tokens.accessToken,
             refresh: tokens.refreshToken,
             idToken: tokens.idToken,
             accountId: tokens.accountId,
           });
-          console.log('[OpenAICodexAuth] login successful', tokens.email ? `(${tokens.email})` : '');
+          console.log(
+            '[OpenAICodexAuth] login successful',
+            tokens.email ? `(${tokens.email})` : '',
+          );
           finishWithTokens(tokens);
         })
-        .catch((err) => {
+        .catch(err => {
           finishWithError(err instanceof Error ? err : new Error(String(err)));
         });
     });
@@ -382,7 +385,7 @@ export function startOpenAICodexLogin(): Promise<CodexOAuthTokens> {
         finishWithError(new Error('ChatGPT login timed out'));
       }, CODEX_OAUTH_LOGIN_TIMEOUT_MS);
 
-      void shell.openExternal(authorizeUrl).catch((err) => {
+      void shell.openExternal(authorizeUrl).catch(err => {
         console.warn('[OpenAICodexAuth] failed to open browser:', err);
       });
 

@@ -49,10 +49,7 @@ test('buildManagedSessionKey emits canonical local session keys', () => {
     buildManagedSessionKey('abc-123'),
     `agent:${DEFAULT_MANAGED_AGENT_ID}:zhiyuan:abc-123`,
   );
-  assert.equal(
-    buildManagedSessionKey('abc-123', 'secondary'),
-    'agent:secondary:zhiyuan:abc-123',
-  );
+  assert.equal(buildManagedSessionKey('abc-123', 'secondary'), 'agent:secondary:zhiyuan:abc-123');
 });
 
 test('parseChannelSessionKey ignores managed local session keys', () => {

@@ -15,7 +15,14 @@ interface SkillsViewProps {
   readOnly?: boolean;
 }
 
-const SkillsView: React.FC<SkillsViewProps> = ({ isSidebarCollapsed, onToggleSidebar, onNewChat, onCreateSkillByChat, updateBadge, readOnly }) => {
+const SkillsView: React.FC<SkillsViewProps> = ({
+  isSidebarCollapsed,
+  onToggleSidebar,
+  onNewChat,
+  onCreateSkillByChat,
+  updateBadge,
+  readOnly,
+}) => {
   const isMac = window.electron.platform === 'darwin';
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
@@ -44,9 +51,7 @@ const SkillsView: React.FC<SkillsViewProps> = ({ isSidebarCollapsed, onToggleSid
               {updateBadge}
             </div>
           )}
-          <h1 className="text-lg font-semibold text-foreground">
-            {i18nService.t('skills')}
-          </h1>
+          <h1 className="text-lg font-semibold text-foreground">{i18nService.t('skills')}</h1>
         </div>
         <WindowTitleBar inline />
       </div>

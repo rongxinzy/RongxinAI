@@ -58,11 +58,11 @@ python "$SKILLS_ROOT/stock-analyzer/scripts/analyze.py" AAPL
 
 ### Parameters
 
-| Parameter | Description | Example | Default |
-|-----------|-------------|---------|---------|
-| `ticker` | Stock ticker symbol (required) | 601288.SS, AAPL | - |
-| `--period` | Analysis period | 1mo, 3mo, 6mo, 1y, 2y | 6mo |
-| `--output` | Output format | text, json | text |
+| Parameter  | Description                    | Example               | Default |
+| ---------- | ------------------------------ | --------------------- | ------- |
+| `ticker`   | Stock ticker symbol (required) | 601288.SS, AAPL       | -       |
+| `--period` | Analysis period                | 1mo, 3mo, 6mo, 1y, 2y | 6mo     |
+| `--output` | Output format                  | text, json            | text    |
 
 ## Stock Ticker Formats
 
@@ -93,6 +93,7 @@ When user requests stock analysis:
    - A-share: Shanghai = `.SS`, Shenzhen = `.SZ`
 
 2. **Execute analysis**
+
    ```bash
    export PYTHONIOENCODING=utf-8
    python "$SKILLS_ROOT/stock-analyzer/scripts/analyze.py" <ticker>

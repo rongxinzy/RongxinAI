@@ -42,6 +42,7 @@ npm run openclaw:runtime:host   # 当前平台
 ## 架构概览
 
 知远智能体 是一款面向本地优先 AI Agent 工作流的 Electron + React 桌面应用。核心领域包括：
+
 1. **Cowork 模式** - 以 OpenClaw 作为主要 Agent 运行时的 AI 辅助任务会话
 2. **llama.cpp 本地推理** - 本地模型服务管理、模型启动选项，以及与 OpenClaw 的本地模型集成
 3. **Skills 与 MCP** - 内置技能、远程技能市场以及 MCP 服务器配置
@@ -63,6 +64,7 @@ npm run openclaw:runtime:host   # 当前平台
 8. **退出条件：** 连续 30 天不使用（refreshToken 过期）→ 清除本地 token → 用户需重新登录
 
 **关键文件：**
+
 - Token 存储与请求：`src/renderer/services/api.ts`（`fetchWithAuth()`、token 管理）
 - 登录流程：`src/main/main.ts`（deep link callback 处理；legacy 协议名可能仍然存在）
 - 持久化：`src/main/sqliteStore.ts`（kv 表存储 `auth_tokens`）
@@ -70,6 +72,7 @@ npm run openclaw:runtime:host   # 当前平台
 ### 进程模型
 
 **主进程** (`src/main/main.ts`)：
+
 - 窗口生命周期管理
 - 通过 `better-sqlite3` 使用 SQLite 存储（`src/main/sqliteStore.ts`）
 - Agent 引擎路由（`src/main/libs/agentEngine/coworkEngineRouter.ts`）- 分发到 `openclawRuntimeAdapter.ts`（OpenClaw）
@@ -81,10 +84,12 @@ npm run openclaw:runtime:host   # 当前平台
 - 安全：启用上下文隔离，禁用 Node 集成，启用沙箱
 
 **预加载脚本** (`src/main/preload.ts`)：
+
 - 通过 `contextBridge` 暴露 `window.electron` API
 - 包含用于会话管理和流式事件的 `cowork` 命名空间
 
 **渲染进程** (`src/renderer/` 中的 React)：
+
 - 所有 UI 和业务逻辑
 - 仅通过 IPC 与主进程通信
 
@@ -146,15 +151,18 @@ SKILLs/                  # Cowork 会话的自定义技能定义
 Cowork 功能提供 AI 辅助编程会话：
 
 **执行模式** (`CoworkExecutionMode`)：
+
 - `auto` - 根据上下文自动选择
 - `local` - 直接在本地机器上运行工具
 
 **Agent 引擎**（通过 cowork 配置中的 `agentEngine` 配置）：
+
 - `openclaw` - OpenClaw 网关（`openclawRuntimeAdapter.ts`）；需要 bundled OpenClaw 运行时正在运行。引擎生命周期由 `OpenClawEngineManager` 管理，状态为：`not_installed → ready → starting → running | error`
 
 `CoworkEngineRouter` 向渲染进程暴露流式事件，与引擎无关。引擎特定 IPC：`openclaw:engine:*` 通道独立于 `cowork:*` 会话通道管理运行时生命周期。
 
 **记忆系统**：基于文件的持久记忆存储在 OpenClaw 工作目录中：
+
 - `MEMORY.md` - 持久事实、偏好和决策；每次会话开始时自动加载。
 - `memory/YYYY-MM-DD.md` - 近期上下文的每日笔记。
 - `USER.md` / `SOUL.md` - 会话启动时读取的用户画像和 Agent 个性文件。
@@ -162,6 +170,7 @@ Cowork 功能提供 AI 辅助编程会话：
 - 设置面板提供 `MEMORY.md` 条目的手动增删改 GUI。
 
 **流式事件**（从主进程到渲染进程的 IPC）：
+
 - `message` - 新消息添加到会话
 - `messageUpdate` - 现有消息的流式内容更新
 - `permissionRequest` - 工具需要用户批准
@@ -169,6 +178,7 @@ Cowork 功能提供 AI 辅助编程会话：
 - `error` - 会话遇到错误
 
 **关键 IPC 通道**：
+
 - `cowork:startSession`、`cowork:continueSession`、`cowork:stopSession`
 - `cowork:getSession`、`cowork:listSessions`、`cowork:deleteSession`
 - `cowork:respondToPermission`、`cowork:getConfig`、`cowork:setConfig`
@@ -189,6 +199,7 @@ Cowork 功能提供 AI 辅助编程会话：
 Artifacts 功能提供类似 Claude artifacts 的代码输出富预览：
 
 **支持类型**：
+
 - `html` - 在沙盒 iframe 中渲染的完整 HTML 页面
 - `svg` - 经 DOMPurify 消毒并带缩放控件的 SVG 图形
 - `mermaid` - 通过 Mermaid.js 渲染的流程图、时序图、类图
@@ -196,15 +207,18 @@ Artifacts 功能提供类似 Claude artifacts 的代码输出富预览：
 - `code` - 带行号的语法高亮代码
 
 **检测方法**：
+
 1. 显式标记：` ```artifact:html title="My Page" `
 2. 启发式检测：分析代码块语言和内容模式
 
 **UI 组件**：
+
 - 右侧面板（300-800px 可调整宽度）
 - 头部带类型图标、标题、复制/下载/关闭按钮
 - 消息中的 Artifact 徽章用于切换 artifact
 
 **安全**：
+
 - HTML：`sandbox="allow-scripts"`，无 `allow-same-origin`
 - SVG：DOMPurify 移除所有脚本内容
 - React：完全隔离的 iframe，无网络访问
@@ -257,7 +271,7 @@ export const SessionTarget = {
   Main: 'main',
   Isolated: 'isolated',
 } as const;
-export type SessionTarget = typeof SessionTarget[keyof typeof SessionTarget];
+export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 ```
 
 ### 规则
@@ -286,12 +300,12 @@ export type SessionTarget = typeof SessionTarget[keyof typeof SessionTarget];
 
 选择匹配事件**重要性**的级别：
 
-| 级别 | API | 何时使用 |
-|------|-----|---------|
-| Error | `console.error` | 需要调查的不可恢复失败 —— 捕获的异常、破坏的不变量、数据损坏 |
-| Warn | `console.warn` | 意外但可恢复的情况 —— 缺失的可选配置、回退行为、降级服务 |
-| Info | `console.log` | 值得保留在生产日志中的关键生命周期事件 —— 服务启动/停止、连接建立/丢失、会话创建/销毁、配置变更 |
-| Debug | `console.debug` | 仅在主动调试时有用的开发时细节 —— 中间状态、请求/响应 payload、循环迭代、同步游标 |
+| 级别  | API             | 何时使用                                                                                        |
+| ----- | --------------- | ----------------------------------------------------------------------------------------------- |
+| Error | `console.error` | 需要调查的不可恢复失败 —— 捕获的异常、破坏的不变量、数据损坏                                    |
+| Warn  | `console.warn`  | 意外但可恢复的情况 —— 缺失的可选配置、回退行为、降级服务                                        |
+| Info  | `console.log`   | 值得保留在生产日志中的关键生命周期事件 —— 服务启动/停止、连接建立/丢失、会话创建/销毁、配置变更 |
+| Debug | `console.debug` | 仅在主动调试时有用的开发时细节 —— 中间状态、请求/响应 payload、循环迭代、同步游标               |
 
 ### 消息格式
 
@@ -306,8 +320,18 @@ console.warn('[ChannelSync] session list returned unexpected type, skipping');
 console.error('[ChannelSync] polling failed:', error);
 
 // 差 —— 转储变量名和原始值
-console.log('[ChannelSync] pollChannelSessions: got', sessions.length, 'sessions, keys:', sessions.map(s => s?.key).join(', '));
-console.log('[Debug:syncChannelUserMessages] cursor:', cursor, 'history entries:', historyEntries.length);
+console.log(
+  '[ChannelSync] pollChannelSessions: got',
+  sessions.length,
+  'sessions, keys:',
+  sessions.map(s => s?.key).join(', '),
+);
+console.log(
+  '[Debug:syncChannelUserMessages] cursor:',
+  cursor,
+  'history entries:',
+  historyEntries.length,
+);
 ```
 
 ### 规则
@@ -323,6 +347,7 @@ console.log('[Debug:syncChannelUserMessages] cursor:', cursor, 'history entries:
 ### 提交前检查
 
 添加或修改日志语句时，确认：
+
 1. 热点循环或轮询回调中没有新的 `console.log` —— 改用 `console.debug`。
 2. 消息读起来像自然英语，而不是字符串化的代码。
 3. 错误/警告日志包含足够上下文，无需调试器即可诊断。
@@ -366,12 +391,14 @@ Optional footer: BREAKING CHANGE: ..., Closes #123, etc.
 **类型**：`feat`、`fix`、`refactor`、`chore`、`docs`、`test`、`perf`、`style`、`ci`、`build`、`revert`
 
 **规则**：
+
 - 主题行：小写、祈使语气、无尾句点、≤72 字符
 - 范围（可选）：受影响区域，例如 `feat(cowork):`、`fix(im):`
 - 正文和页脚必须使用英文 markdown
 - 破坏性变更：在 type/scope 后加 `!`（`feat!:`）**并且**添加 `BREAKING CHANGE:` 页脚
 
 **示例**：
+
 ```
 feat(cowork): add streaming progress indicator
 fix(sqlite): prevent duplicate session insert on retry

@@ -21,7 +21,9 @@
   if (!store) {
     const rootEl = document.getElementById('root');
     if (rootEl) {
-      const fiberKey = Object.keys(rootEl).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+      const fiberKey = Object.keys(rootEl).find(
+        k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'),
+      );
       if (fiberKey) {
         let fiber = rootEl[fiberKey];
         while (fiber) {
@@ -40,7 +42,9 @@
   if (!store) {
     const allEls = document.querySelectorAll('*');
     for (const el of allEls) {
-      const key = Object.keys(el).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+      const key = Object.keys(el).find(
+        k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'),
+      );
       if (!key) continue;
       let fiber = el[key];
       let depth = 0;
@@ -59,7 +63,9 @@
 
   if (!store) {
     console.error('Cannot find Redux store. Try running this in the renderer process DevTools.');
-    console.log('Tip: In Electron, use View > Toggle Developer Tools, or press Cmd+Option+I while the main window is focused.');
+    console.log(
+      'Tip: In Electron, use View > Toggle Developer Tools, or press Cmd+Option+I while the main window is focused.',
+    );
     return;
   }
 
@@ -81,15 +87,15 @@
     '这个方案不错！还有别的优化思路吗？',
     '还可以使用**矩阵快速幂**，将时间复杂度进一步降到 O(log n)：\n\n$$\\begin{pmatrix} F(n+1) \\\\ F(n) \\end{pmatrix} = \\begin{pmatrix} 1 & 1 \\\\ 1 & 0 \\end{pmatrix}^n \\begin{pmatrix} 1 \\\\ 0 \\end{pmatrix}$$\n\n不过对于大多数应用场景，O(n) 的方案已经足够了。',
     '帮我写一个 React 组件，显示一个可以拖拽排序的列表。',
-    '我来帮你实现。这里使用 `@dnd-kit/core` 库：\n\n```tsx\nimport { DndContext, closestCenter } from \'@dnd-kit/core\';\nimport { SortableContext, verticalListSortingStrategy } from \'@dnd-kit/sortable\';\n\nfunction SortableList({ items, onReorder }) {\n  return (\n    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>\n      <SortableContext items={items} strategy={verticalListSortingStrategy}>\n        {items.map(item => <SortableItem key={item.id} item={item} />)}\n      </SortableContext>\n    </DndContext>\n  );\n}\n```',
+    "我来帮你实现。这里使用 `@dnd-kit/core` 库：\n\n```tsx\nimport { DndContext, closestCenter } from '@dnd-kit/core';\nimport { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';\n\nfunction SortableList({ items, onReorder }) {\n  return (\n    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>\n      <SortableContext items={items} strategy={verticalListSortingStrategy}>\n        {items.map(item => <SortableItem key={item.id} item={item} />)}\n      </SortableContext>\n    </DndContext>\n  );\n}\n```",
     '谢谢！能帮我看看为什么 TypeScript 报错了吗？',
     '请把报错信息发给我看看。',
-    '```\nTS2345: Argument of type \'string\' is not assignable to parameter of type \'number\'.\n```',
+    "```\nTS2345: Argument of type 'string' is not assignable to parameter of type 'number'.\n```",
     '这是类型不匹配的错误。你传入了一个字符串，但函数期望的是数字类型。可以使用 `parseInt()` 或 `Number()` 进行转换。',
     '这个项目的目录结构能帮我梳理一下吗？',
     '好的，我来看一下当前项目结构...\n\n```\nsrc/\n├── main/          # Electron 主进程\n├── renderer/      # React 渲染进程\n│   ├── components/\n│   ├── services/\n│   ├── store/\n│   └── types/\n└── shared/        # 共享类型和工具\n```',
     '帮我写一个单元测试。',
-    '```typescript\nimport { describe, it, expect } from \'vitest\';\nimport { fibonacci } from \'./fibonacci\';\n\ndescribe(\'fibonacci\', () => {\n  it(\'should return 0 for n=0\', () => {\n    expect(fibonacci(0)).toBe(0);\n  });\n  it(\'should return 1 for n=1\', () => {\n    expect(fibonacci(1)).toBe(1);\n  });\n  it(\'should return 55 for n=10\', () => {\n    expect(fibonacci(10)).toBe(55);\n  });\n});\n```',
+    "```typescript\nimport { describe, it, expect } from 'vitest';\nimport { fibonacci } from './fibonacci';\n\ndescribe('fibonacci', () => {\n  it('should return 0 for n=0', () => {\n    expect(fibonacci(0)).toBe(0);\n  });\n  it('should return 1 for n=1', () => {\n    expect(fibonacci(1)).toBe(1);\n  });\n  it('should return 55 for n=10', () => {\n    expect(fibonacci(10)).toBe(55);\n  });\n});\n```",
     '运行结果全部通过了 ✅',
     '太好了！测试覆盖了边界情况和正常情况，代码质量有保障。',
     '还有什么需要优化的地方吗？',

@@ -43,11 +43,7 @@ import {
   validateBackendDevices,
 } from './llamacppBackendValidation';
 import { LlamaCppClient } from './llamacppClient';
-import {
-  isPathInside,
-  mergeLocalModels,
-  scanLocalGgufModels,
-} from './llamacppModelCatalog';
+import { isPathInside, mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
 import {
   installModelOnce,
   isModelDownloadNotFoundError,
@@ -105,7 +101,7 @@ export const LlamaCppManagerLifecycleEvent = {
 } as const;
 
 export type LlamaCppManagerLifecycleEvent =
-  typeof LlamaCppManagerLifecycleEvent[keyof typeof LlamaCppManagerLifecycleEvent];
+  (typeof LlamaCppManagerLifecycleEvent)[keyof typeof LlamaCppManagerLifecycleEvent];
 
 export type LlamaCppModelsUnloadedForQuitEvent = {
   modelNames: string[];
@@ -130,7 +126,8 @@ export class LlamaCppManager extends EventEmitter {
     storage?: LlamaCppManagerStorage,
   ) {
     super();
-    this.marketplaceService = marketplaceService ?? new MarketplaceService(() => this.getModelsDir());
+    this.marketplaceService =
+      marketplaceService ?? new MarketplaceService(() => this.getModelsDir());
     this.storage = storage;
   }
 
@@ -140,9 +137,8 @@ export class LlamaCppManager extends EventEmitter {
 
   getBaseUrl(): string {
     const config = this.getServiceConfig();
-    const host = config.host?.trim() === '0.0.0.0'
-      ? DEFAULT_HOST
-      : config.host?.trim() || DEFAULT_HOST;
+    const host =
+      config.host?.trim() === '0.0.0.0' ? DEFAULT_HOST : config.host?.trim() || DEFAULT_HOST;
     const port = config.port?.trim() || DEFAULT_PORT;
     return `http://${host}:${port}`;
   }
@@ -489,7 +485,11 @@ export class LlamaCppManager extends EventEmitter {
 
   async setBackendSelection(ref: LlamaCppBackendRef): Promise<LlamaCppRuntimeInstallResult> {
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
-    const installedExecutablePath = getLlamaCppBackendExecutablePath(runtimeRoot, ref, process.platform);
+    const installedExecutablePath = getLlamaCppBackendExecutablePath(
+      runtimeRoot,
+      ref,
+      process.platform,
+    );
     const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
     const hasNvidiaGpu = Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0);
     this.emit('install-progress', {
@@ -754,7 +754,11 @@ export class LlamaCppManager extends EventEmitter {
         runtimeRoot,
         status: this.status,
         stopCurrent: async () => {
-          if (this.process && this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
+          if (
+            this.process &&
+            this.executablePath &&
+            isPathInside(this.executablePath, runtimeRoot)
+          ) {
             await this.stop();
           }
         },
@@ -784,7 +788,11 @@ export class LlamaCppManager extends EventEmitter {
         ref,
         status: this.status,
         stopCurrent: async () => {
-          if (this.process && this.executablePath && isPathInside(this.executablePath, runtimeRoot)) {
+          if (
+            this.process &&
+            this.executablePath &&
+            isPathInside(this.executablePath, runtimeRoot)
+          ) {
             await this.stop();
           }
         },
@@ -802,7 +810,14 @@ export class LlamaCppManager extends EventEmitter {
         managedByApp: Boolean(this.process),
         error: message,
       });
-      return { success: false, deleted: false, runtimeRoot, backend: ref, status: this.status, error: message };
+      return {
+        success: false,
+        deleted: false,
+        runtimeRoot,
+        backend: ref,
+        status: this.status,
+        error: message,
+      };
     }
   }
 
@@ -884,14 +899,21 @@ export class LlamaCppManager extends EventEmitter {
     } catch (error) {
       console.warn('[LlamaCpp] failed to inspect running models before startup restore:', error);
     }
-    if (runningModels.some(model => model.name === modelName || model.model === modelName || model.id === modelName)) {
+    if (
+      runningModels.some(
+        model => model.name === modelName || model.model === modelName || model.id === modelName,
+      )
+    ) {
       return;
     }
     try {
       console.log(`[LlamaCpp] restoring last loaded model on startup: ${modelName}`);
       await this.loadModel({ model: modelName });
     } catch (error) {
-      console.warn(`[LlamaCpp] failed to restore last loaded model on startup: ${modelName}`, error);
+      console.warn(
+        `[LlamaCpp] failed to restore last loaded model on startup: ${modelName}`,
+        error,
+      );
     }
   }
 
@@ -946,9 +968,7 @@ export class LlamaCppManager extends EventEmitter {
     timeoutMs = LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS,
   ): Promise<LlamaCppRunningModel[]> {
     const client = await this.client();
-    const runningModels = await retryLlamaCppReadRequest(
-      () => client.runningModels(timeoutMs),
-    );
+    const runningModels = await retryLlamaCppReadRequest(() => client.runningModels(timeoutMs));
     if (this.needsThinkingToggleSupportRefresh(runningModels)) {
       this.refreshThinkingToggleSupport();
     }
@@ -985,9 +1005,7 @@ export class LlamaCppManager extends EventEmitter {
     });
   }
 
-  async deleteModel(
-    name: string,
-  ): Promise<{
+  async deleteModel(name: string): Promise<{
     success: boolean;
     deleted?: boolean;
     reason?: 'not-local-file' | 'not-app-managed';
@@ -1052,7 +1070,10 @@ export class LlamaCppManager extends EventEmitter {
         if (attempt > 0 || !isModelDownloadNotFoundError(error)) {
           throw error;
         }
-        const refreshed = await refreshInstallInputFromMarketplace(request, this.marketplaceService);
+        const refreshed = await refreshInstallInputFromMarketplace(
+          request,
+          this.marketplaceService,
+        );
         if (!refreshed || isSameInstallRequest(request, refreshed)) {
           throw error;
         }
@@ -1218,9 +1239,8 @@ export class LlamaCppManager extends EventEmitter {
       return configuredContextSize;
     }
 
-    const nvidiaSnapshot = process.platform === 'win32'
-      ? await getNvidiaSmiSnapshot().catch((): null => null)
-      : null;
+    const nvidiaSnapshot =
+      process.platform === 'win32' ? await getNvidiaSmiSnapshot().catch((): null => null) : null;
     const runtimeConfig = applyAutomaticLlamaCppServiceDefaults(this.getServiceConfig(), {
       nvidiaSnapshot,
     });
@@ -1243,9 +1263,7 @@ export class LlamaCppManager extends EventEmitter {
     }
   }
 
-  private async waitForStartupProcessExit(
-    child: ChildProcessWithoutNullStreams,
-  ): Promise<void> {
+  private async waitForStartupProcessExit(child: ChildProcessWithoutNullStreams): Promise<void> {
     if (child.exitCode !== null || child.signalCode !== null) return;
     await new Promise<void>(resolve => {
       const settle = () => {
@@ -1259,9 +1277,7 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   private formatStartupExitDetail(code: number | null, signal: NodeJS.Signals | null): string {
-    const exitCode = code === null
-      ? 'null'
-      : `${code} (0x${code.toString(16)})`;
+    const exitCode = code === null ? 'null' : `${code} (0x${code.toString(16)})`;
     return `exit code ${exitCode}, signal ${signal ?? 'null'}`;
   }
 
@@ -1274,9 +1290,7 @@ export class LlamaCppManager extends EventEmitter {
       }
       await new Promise(resolve => setTimeout(resolve, 250));
     }
-    const detail = this.startupStderr
-      ? ` (stderr: ${this.startupStderr.slice(0, 300)})`
-      : '';
+    const detail = this.startupStderr ? ` (stderr: ${this.startupStderr.slice(0, 300)})` : '';
     this.setStatus({
       status: 'error',
       executablePath: this.executablePath ?? undefined,
@@ -1319,8 +1333,7 @@ export class LlamaCppManager extends EventEmitter {
       if (modelName && runtimeContextLength) {
         this.runtimeContextLengthByModel.set(modelName, runtimeContextLength);
       }
-      const trainedContextLength =
-        model.trained_context_length ?? model.details?.context_length;
+      const trainedContextLength = model.trained_context_length ?? model.details?.context_length;
       return {
         ...model,
         context_length: trainedContextLength,
@@ -1386,9 +1399,10 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   private needsThinkingToggleSupportRefresh(runningModels: LlamaCppRunningModel[]): boolean {
-    return runningModels.some(model =>
-      model.supportsThinkingToggle === undefined
-      && this.getThinkingToggleSupport(model) === undefined,
+    return runningModels.some(
+      model =>
+        model.supportsThinkingToggle === undefined &&
+        this.getThinkingToggleSupport(model) === undefined,
     );
   }
 
@@ -1428,11 +1442,7 @@ function resolveImportedModelTargetPath(importDir: string, sourcePath: string): 
     attempt += 1;
   }
 }
-export {
-  isPathInside,
-  mergeLocalModels,
-  scanLocalGgufModels,
-} from './llamacppModelCatalog';
+export { isPathInside, mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
 export {
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,

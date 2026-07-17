@@ -22,22 +22,22 @@ import {
 } from '../components/icons/providers';
 
 const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
-  [ProviderName.OpenAI]:       <OpenAIIcon />,
-  [ProviderName.DeepSeek]:     <DeepSeekIcon />,
-  [ProviderName.Gemini]:       <GeminiIcon />,
-  [ProviderName.Anthropic]:    <AnthropicIcon />,
-  [ProviderName.Moonshot]:     <MoonshotIcon />,
-  [ProviderName.Zhipu]:        <ZhipuIcon />,
-  [ProviderName.Minimax]:      <MiniMaxIcon />,
-  [ProviderName.Qwen]:         <QwenIcon />,
-  [ProviderName.Xiaomi]:       <XiaomiIcon />,
-  [ProviderName.StepFun]:      <StepfunIcon />,
-  [ProviderName.Volcengine]:   <VolcengineIcon />,
-  [ProviderName.OpenRouter]:   <OpenRouterIcon />,
-  [ProviderName.Copilot]:      <GitHubCopilotIcon />,
-  [ProviderName.Ollama]:       <OllamaIcon />,
-  [ProviderName.LlamaCpp]:     <LlamaCppIcon />,
-  [ProviderName.Qianfan]:      <QianfanIcon />,
+  [ProviderName.OpenAI]: <OpenAIIcon />,
+  [ProviderName.DeepSeek]: <DeepSeekIcon />,
+  [ProviderName.Gemini]: <GeminiIcon />,
+  [ProviderName.Anthropic]: <AnthropicIcon />,
+  [ProviderName.Moonshot]: <MoonshotIcon />,
+  [ProviderName.Zhipu]: <ZhipuIcon />,
+  [ProviderName.Minimax]: <MiniMaxIcon />,
+  [ProviderName.Qwen]: <QwenIcon />,
+  [ProviderName.Xiaomi]: <XiaomiIcon />,
+  [ProviderName.StepFun]: <StepfunIcon />,
+  [ProviderName.Volcengine]: <VolcengineIcon />,
+  [ProviderName.OpenRouter]: <OpenRouterIcon />,
+  [ProviderName.Copilot]: <GitHubCopilotIcon />,
+  [ProviderName.Ollama]: <OllamaIcon />,
+  [ProviderName.LlamaCpp]: <LlamaCppIcon />,
+  [ProviderName.Qianfan]: <QianfanIcon />,
 };
 
 export function getProviderIcon(id: string): React.ReactNode {

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 
 import { OpenClawProviderId } from '../../../shared/providers';
 import type { RootState } from '../../store';
-import { type Model,selectAgentSelectedModel } from '../../store/slices/modelSlice';
+import { type Model, selectAgentSelectedModel } from '../../store/slices/modelSlice';
 import type { CoworkAgentEngine } from '../../types/cowork';
 import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
 
@@ -59,7 +59,8 @@ export function resolveAgentModelSelection({
 }: ResolveAgentModelSelectionInput): ResolveAgentModelSelectionResult {
   const normalizedSessionModel = sessionModel?.trim() ?? '';
   if (normalizedSessionModel) {
-    const explicitSessionModel = resolveOpenClawModelRef(normalizedSessionModel, availableModels) ?? null;
+    const explicitSessionModel =
+      resolveOpenClawModelRef(normalizedSessionModel, availableModels) ?? null;
     if (explicitSessionModel) {
       return {
         selectedModel: explicitSessionModel,

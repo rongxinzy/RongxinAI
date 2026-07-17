@@ -25,19 +25,17 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
       setI18nReady(true);
       return;
     }
-    skillService.fetchMarketplaceSkills({ forceRefresh: false })
+    skillService
+      .fetchMarketplaceSkills({ forceRefresh: false })
       .then(() => setI18nReady(true))
       .catch(() => setI18nReady(true));
   }, []);
 
-  const enabledSkills = useMemo(
-    () => skills.filter((s) => s.enabled),
-    [skills],
-  );
+  const enabledSkills = useMemo(() => skills.filter(s => s.enabled), [skills]);
 
   const filteredSkills = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return enabledSkills.filter((skill) => {
+    return enabledSkills.filter(skill => {
       if (!q) return true;
       const localizedDescription = shouldUseFallbackDescription
         ? skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)
@@ -48,7 +46,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
 
   const toggle = (skillId: string) => {
     if (selectedSkillIds.includes(skillId)) {
-      onChange(selectedSkillIds.filter((id) => id !== skillId));
+      onChange(selectedSkillIds.filter(id => id !== skillId));
     } else {
       onChange([...selectedSkillIds, skillId]);
     }
@@ -69,7 +67,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
           <Input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             placeholder={i18nService.t('agentSkillsSearch')}
             className="h-9 w-full border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus-visible:border-border focus-visible:bg-surface"
           />
@@ -85,7 +83,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {filteredSkills.map((skill) => {
+            {filteredSkills.map(skill => {
               const isSelected = selectedSkillIds.includes(skill.id);
               const description = shouldUseFallbackDescription
                 ? skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)
@@ -98,9 +96,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
                   variant="outline"
                   onClick={() => toggle(skill.id)}
                   className={`group relative flex min-h-[96px] items-start gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-raised/50 ${
-                    isSelected
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-surface'
+                    isSelected ? 'border-primary bg-primary/5' : 'border-border bg-surface'
                   }`}
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-raised">

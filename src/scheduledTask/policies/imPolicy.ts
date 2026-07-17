@@ -1,7 +1,20 @@
 import { buildManagedSessionKey } from '../../main/libs/openclawChannelSessionSync';
-import { BindingKind, DeliveryMode, OriginKind, RunBehavior,SessionTarget, WakeMode } from '../constants';
-import type { ExecutionBinding,TaskOrigin } from '../origin';
-import type { PolicyDelivery, PolicyTaskInput, PolicyTaskModel, TaskPolicy, WireBinding } from './types';
+import {
+  BindingKind,
+  DeliveryMode,
+  OriginKind,
+  RunBehavior,
+  SessionTarget,
+  WakeMode,
+} from '../constants';
+import type { ExecutionBinding, TaskOrigin } from '../origin';
+import type {
+  PolicyDelivery,
+  PolicyTaskInput,
+  PolicyTaskModel,
+  TaskPolicy,
+  WireBinding,
+} from './types';
 
 export class IMTaskPolicy implements TaskPolicy {
   readonly kind = OriginKind.IM;
@@ -18,9 +31,11 @@ export class IMTaskPolicy implements TaskPolicy {
   }
 
   normalizeDraft(draft: PolicyTaskModel): PolicyTaskModel {
-    if (draft.binding.kind === BindingKind.IMSession
-        && draft.delivery.mode === DeliveryMode.Announce
-        && draft.delivery.channel !== draft.binding.platform) {
+    if (
+      draft.binding.kind === BindingKind.IMSession &&
+      draft.delivery.mode === DeliveryMode.Announce &&
+      draft.delivery.channel !== draft.binding.platform
+    ) {
       return {
         ...draft,
         delivery: { ...draft.delivery, channel: draft.binding.platform },
@@ -40,7 +55,8 @@ export class IMTaskPolicy implements TaskPolicy {
         binding: {
           kind: BindingKind.IMSession,
           platform: newDelivery.channel,
-          conversationId: draft.binding.kind === BindingKind.IMSession ? draft.binding.conversationId : '',
+          conversationId:
+            draft.binding.kind === BindingKind.IMSession ? draft.binding.conversationId : '',
         },
       };
     }
@@ -49,7 +65,10 @@ export class IMTaskPolicy implements TaskPolicy {
 
   toWireBinding(binding: ExecutionBinding): WireBinding {
     if (binding.kind === BindingKind.IMSession && binding.sessionId) {
-      return { sessionTarget: SessionTarget.Main, sessionKey: buildManagedSessionKey(binding.sessionId) };
+      return {
+        sessionTarget: SessionTarget.Main,
+        sessionKey: buildManagedSessionKey(binding.sessionId),
+      };
     }
     return { sessionTarget: SessionTarget.Main, sessionKey: null };
   }

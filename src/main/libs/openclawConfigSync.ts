@@ -2156,7 +2156,8 @@ export class OpenClawConfigSync {
     availableProviders: Record<string, OpenClawProviderSelection['providerConfig']>,
   ): boolean {
     const shouldMigrateManagedModelRefs = !(
-      selection.providerId === OpenClawProviderId.Zhiyuan && selection.sessionModelId === selection.legacyModelId
+      selection.providerId === OpenClawProviderId.Zhiyuan &&
+      selection.sessionModelId === selection.legacyModelId
     );
     const fallbackTarget = parsePrimaryModelRef(selection.primaryModel) ?? {
       providerId: selection.providerId,
@@ -2353,8 +2354,7 @@ export class OpenClawConfigSync {
    */
   private syncAgentsMd(workspaceDir: string, coworkConfig: CoworkConfig): string | undefined {
     const MARKER = '<!-- ZhiYuanAgent managed: do not edit below this line -->';
-    const stripManagedMarkers = (value: string): string =>
-      value.replaceAll(MARKER, '');
+    const stripManagedMarkers = (value: string): string => value.replaceAll(MARKER, '');
 
     try {
       ensureDir(workspaceDir);
@@ -2395,9 +2395,7 @@ export class OpenClawConfigSync {
       // Extract user content (everything before the marker)
       const markerIdx = existingContent.indexOf(MARKER);
       const userContent =
-        markerIdx >= 0
-          ? existingContent.slice(0, markerIdx).trimEnd()
-          : existingContent.trimEnd();
+        markerIdx >= 0 ? existingContent.slice(0, markerIdx).trimEnd() : existingContent.trimEnd();
       const preservedUserContent = userContent || readBundledOpenClawAgentsTemplate();
 
       if (sections.length === 0) {

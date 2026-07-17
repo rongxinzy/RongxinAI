@@ -5,15 +5,27 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
 import { Textarea } from '@shared/components/ui/textarea';
 import { PlatformRegistry } from '@shared/platform';
-import { Eye, EyeOff, Signal, Trash2, X,XCircle } from 'lucide-react';
+import { Eye, EyeOff, Signal, Trash2, X, XCircle } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import type { DiscordInstanceConfig, DiscordInstanceStatus, DiscordOpenClawConfig, DiscordOpenClawGuildConfig, IMConnectivityTestResult } from '../../types/im';
+import type {
+  DiscordInstanceConfig,
+  DiscordInstanceStatus,
+  DiscordOpenClawConfig,
+  DiscordOpenClawGuildConfig,
+  IMConnectivityTestResult,
+} from '../../types/im';
 
 interface DiscordInstanceSettingsProps {
   instance: DiscordInstanceConfig;
@@ -67,7 +79,10 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
     }
   };
 
-  const handleGuildConfigChange = (guildId: string, update: Partial<DiscordOpenClawGuildConfig>) => {
+  const handleGuildConfigChange = (
+    guildId: string,
+    update: Partial<DiscordOpenClawGuildConfig>,
+  ) => {
     const currentGuild = instance.guilds[guildId] ?? {};
     const newGuilds = { ...instance.guilds, [guildId]: { ...currentGuild, ...update } };
     onConfigChange({ guilds: newGuilds });
@@ -97,11 +112,14 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
             <Input
               type="text"
               value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
+              onChange={e => setNameValue(e.target.value)}
               onBlur={handleNameBlur}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') handleNameBlur();
-                if (e.key === 'Escape') { setNameValue(instance.instanceName); setEditingName(false); }
+                if (e.key === 'Escape') {
+                  setNameValue(instance.instanceName);
+                  setEditingName(false);
+                }
               }}
               autoFocus
               className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent focus-visible:ring-0"
@@ -118,14 +136,14 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
         </div>
 
         {/* Status badge */}
-        <div className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-          instanceStatus?.connected
-            ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-            : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
-        }`}>
-          {instanceStatus?.connected
-            ? i18nService.t('connected')
-            : i18nService.t('disconnected')}
+        <div
+          className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
+            instanceStatus?.connected
+              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+              : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          {instanceStatus?.connected ? i18nService.t('connected') : i18nService.t('disconnected')}
         </div>
 
         {/* Enable toggle */}
@@ -133,7 +151,13 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
           checked={instance.enabled}
           onCheckedChange={onToggleEnabled}
           disabled={!instance.enabled && !instance.botToken}
-          title={instance.enabled ? i18nService.t('imDiscordDisableInstance') : (!instance.botToken ? i18nService.t('imInstanceFillCredentials') : i18nService.t('imDiscordEnableInstance'))}
+          title={
+            instance.enabled
+              ? i18nService.t('imDiscordDisableInstance')
+              : !instance.botToken
+                ? i18nService.t('imInstanceFillCredentials')
+                : i18nService.t('imDiscordEnableInstance')
+          }
         />
 
         {/* Delete button */}
@@ -165,9 +189,11 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
             variant="link"
             size="sm"
             onClick={() => {
-              window.electron.shell.openExternal(PlatformRegistry.guideUrl('discord')!).catch((err: unknown) => {
-                console.error('[IM] Failed to open guide URL:', err);
-              });
+              window.electron.shell
+                .openExternal(PlatformRegistry.guideUrl('discord')!)
+                .catch((err: unknown) => {
+                  console.error('[IM] Failed to open guide URL:', err);
+                });
             }}
             className="mt-2 h-auto p-0 text-xs font-medium underline underline-offset-2"
           >
@@ -178,14 +204,12 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
       {/* Bot Token */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-muted-foreground">
-          Bot Token
-        </label>
+        <label className="block text-xs font-medium text-muted-foreground">Bot Token</label>
         <div className="relative">
           <Input
             type={showSecrets['botToken'] ? 'text' : 'password'}
             value={instance.botToken}
-            onChange={(e) => onConfigChange({ botToken: e.target.value })}
+            onChange={e => onConfigChange({ botToken: e.target.value })}
             onBlur={() => void onSave()}
             className="pr-16"
             placeholder="MTIzNDU2Nzg5MDEyMzQ1Njc4OQ..."
@@ -197,7 +221,10 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={() => { onConfigChange({ botToken: '' }); void onSave({ botToken: '' }); }}
+                onClick={() => {
+                  onConfigChange({ botToken: '' });
+                  void onSave({ botToken: '' });
+                }}
                 title={i18nService.t('clear') || 'Clear'}
               >
                 <XCircle className="h-4 w-4" />
@@ -208,16 +235,22 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               variant="ghost"
               size="icon"
               className="h-6 w-6"
-              onClick={() => setShowSecrets(prev => ({ ...prev, 'botToken': !prev['botToken'] }))}
-              title={showSecrets['botToken'] ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
+              onClick={() => setShowSecrets(prev => ({ ...prev, botToken: !prev['botToken'] }))}
+              title={
+                showSecrets['botToken']
+                  ? i18nService.t('hide') || 'Hide'
+                  : i18nService.t('show') || 'Show'
+              }
             >
-              {showSecrets['botToken'] ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              {showSecrets['botToken'] ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {i18nService.t('imDiscordTokenHint')}
-        </p>
+        <p className="text-xs text-muted-foreground">{i18nService.t('imDiscordTokenHint')}</p>
       </div>
 
       {/* Advanced Settings (collapsible) */}
@@ -228,12 +261,10 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              DM Policy
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">DM Policy</label>
             <Select
               value={instance.dmPolicy}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 const update = { dmPolicy: value as DiscordOpenClawConfig['dmPolicy'] };
                 onConfigChange(update);
                 void onSave(update);
@@ -260,8 +291,8 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               <Input
                 type="text"
                 value={allowedUserIdInput}
-                onChange={(e) => setAllowedUserIdInput(e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => setAllowedUserIdInput(e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     const id = allowedUserIdInput.trim();
@@ -295,7 +326,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
             </div>
             {instance.allowFrom.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {instance.allowFrom.map((id) => (
+                {instance.allowFrom.map(id => (
                   <span
                     key={id}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-surface border-border-subtle border text-foreground"
@@ -307,7 +338,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                       size="icon"
                       className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
-                        const newIds = instance.allowFrom.filter((uid) => uid !== id);
+                        const newIds = instance.allowFrom.filter(uid => uid !== id);
                         onConfigChange({ allowFrom: newIds });
                         void onSave({ allowFrom: newIds });
                       }}
@@ -322,12 +353,10 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Group Policy
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">Group Policy</label>
             <Select
               value={instance.groupPolicy}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 const update = { groupPolicy: value as DiscordOpenClawConfig['groupPolicy'] };
                 onConfigChange(update);
                 void onSave(update);
@@ -354,8 +383,8 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                 <Input
                   type="text"
                   value={groupAllowFromInput}
-                  onChange={(e) => setGroupAllowFromInput(e.target.value)}
-                  onKeyDown={(e) => {
+                  onChange={e => setGroupAllowFromInput(e.target.value)}
+                  onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       const id = groupAllowFromInput.trim();
@@ -389,7 +418,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               </div>
               {instance.groupAllowFrom.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {instance.groupAllowFrom.map((id) => (
+                  {instance.groupAllowFrom.map(id => (
                     <span
                       key={id}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-surface border-border-subtle border text-foreground"
@@ -401,7 +430,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                         size="icon"
                         className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                         onClick={() => {
-                          const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
+                          const newIds = instance.groupAllowFrom.filter(gid => gid !== id);
                           onConfigChange({ groupAllowFrom: newIds });
                           void onSave({ groupAllowFrom: newIds });
                         }}
@@ -424,8 +453,8 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               <Input
                 type="text"
                 value={guildIdInput}
-                onChange={(e) => setGuildIdInput(e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => setGuildIdInput(e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     const id = guildIdInput.trim();
@@ -478,12 +507,12 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                     </div>
                     {/* requireMention toggle */}
                     <div className="flex items-center justify-between">
-                      <label className="text-xs text-muted-foreground">
-                        Require @mention
-                      </label>
+                      <label className="text-xs text-muted-foreground">Require @mention</label>
                       <Switch
                         checked={guildCfg.requireMention}
-                        onCheckedChange={(checked) => handleGuildConfigChange(guildId, { requireMention: Boolean(checked) })}
+                        onCheckedChange={checked =>
+                          handleGuildConfigChange(guildId, { requireMention: Boolean(checked) })
+                        }
                       />
                     </div>
                     {/* Guild-level systemPrompt */}
@@ -493,14 +522,21 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                       </label>
                       <Textarea
                         value={guildCfg.systemPrompt ?? ''}
-                        onChange={(e) => {
+                        onChange={e => {
                           const currentGuild = instance.guilds[guildId] ?? {};
-                          const newGuilds = { ...instance.guilds, [guildId]: { ...currentGuild, systemPrompt: e.target.value } };
+                          const newGuilds = {
+                            ...instance.guilds,
+                            [guildId]: { ...currentGuild, systemPrompt: e.target.value },
+                          };
                           onConfigChange({ guilds: newGuilds });
                         }}
                         onBlur={() => void onSave()}
                         className="min-h-[60px] resize-y text-xs"
-                        placeholder={language === 'zh' ? '该 Guild 专属系统提示词（可选）' : 'Custom system prompt for this guild (optional)'}
+                        placeholder={
+                          language === 'zh'
+                            ? '该 Guild 专属系统提示词（可选）'
+                            : 'Custom system prompt for this guild (optional)'
+                        }
                       />
                     </div>
                   </div>
@@ -511,12 +547,10 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Streaming */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Streaming
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">Streaming</label>
             <Select
               value={instance.streaming}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 const update = { streaming: value as DiscordOpenClawConfig['streaming'] };
                 onConfigChange(update);
                 void onSave(update);
@@ -536,13 +570,11 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Proxy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Proxy
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">Proxy</label>
             <Input
               type="text"
               value={instance.proxy}
-              onChange={(e) => onConfigChange({ proxy: e.target.value })}
+              onChange={e => onConfigChange({ proxy: e.target.value })}
               onBlur={() => void onSave()}
               placeholder="http://proxy:port"
             />
@@ -550,13 +582,11 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* History Limit */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              History Limit
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">History Limit</label>
             <Input
               type="number"
               value={instance.historyLimit}
-              onChange={(e) => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
+              onChange={e => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
               onBlur={() => void onSave()}
               min={1}
               max={200}
@@ -565,13 +595,11 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Media Max MB */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Media Max MB
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">Media Max MB</label>
             <Input
               type="number"
               value={instance.mediaMaxMb}
-              onChange={(e) => onConfigChange({ mediaMaxMb: parseInt(e.target.value) || 25 })}
+              onChange={e => onConfigChange({ mediaMaxMb: parseInt(e.target.value) || 25 })}
               onBlur={() => void onSave()}
               min={1}
               max={100}
@@ -580,12 +608,10 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
           {/* Debug */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">
-              Debug
-            </label>
+            <label className="text-xs font-medium text-muted-foreground">Debug</label>
             <Switch
               checked={instance.debug}
-              onCheckedChange={(checked) => {
+              onCheckedChange={checked => {
                 const update = { debug: Boolean(checked) };
                 onConfigChange(update);
                 void onSave(update);

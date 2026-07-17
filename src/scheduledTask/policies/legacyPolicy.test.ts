@@ -1,8 +1,12 @@
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
-BindingKind, DeliveryChannel,
-DeliveryMode,   OriginKind,   SessionTarget, WakeMode,
+  BindingKind,
+  DeliveryChannel,
+  DeliveryMode,
+  OriginKind,
+  SessionTarget,
+  WakeMode,
 } from '../constants';
 import { makeModel } from '../fixtures';
 import { LegacyTaskPolicy } from './legacyPolicy';
@@ -100,7 +104,10 @@ test('LegacyPolicy.toWireBinding: any binding -> always returns sessionTarget ma
   expect(wireIm.sessionTarget).toBe(SessionTarget.Main);
   expect(wireIm.sessionKey).toBe(null);
 
-  const wireSessionKey = policy.toWireBinding({ kind: BindingKind.SessionKey, sessionKey: 'custom:key' });
+  const wireSessionKey = policy.toWireBinding({
+    kind: BindingKind.SessionKey,
+    sessionKey: 'custom:key',
+  });
   expect(wireSessionKey.sessionTarget).toBe(SessionTarget.Main);
   expect(wireSessionKey.sessionKey).toBe(null);
 });

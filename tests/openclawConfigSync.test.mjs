@@ -16,7 +16,7 @@ Module._load = function patchedModuleLoad(request, parent, isMain) {
     return {
       app: {
         getAppPath: () => currentAppPath,
-        getPath: (name) => {
+        getPath: name => {
           if (name === 'home' || name === 'userData') {
             return currentHomeDir;
           }
@@ -31,7 +31,7 @@ Module._load = function patchedModuleLoad(request, parent, isMain) {
 const { setStoreGetter } = require('../dist-electron/main/libs/claudeSettings.js');
 const { OpenClawConfigSync } = require('../dist-electron/main/libs/openclawConfigSync.js');
 
-const setElectronPaths = (homeDir) => {
+const setElectronPaths = homeDir => {
   currentAppPath = process.cwd();
   currentHomeDir = homeDir;
 };
@@ -53,9 +53,7 @@ const createAppConfig = ({ codingPlanEnabled = false } = {}) => ({
       baseUrl: 'https://api.moonshot.cn/anthropic',
       apiFormat: 'anthropic',
       codingPlanEnabled,
-      models: [
-        { id: 'kimi-k2.5' },
-      ],
+      models: [{ id: 'kimi-k2.5' }],
     },
   },
 });
@@ -71,9 +69,7 @@ const createOpenAICompatAppConfig = () => ({
       apiKey: 'sk-test',
       baseUrl: 'https://api.example.com/v1',
       apiFormat: 'openai',
-      models: [
-        { id: 'kimi-k2.5' },
-      ],
+      models: [{ id: 'kimi-k2.5' }],
     },
   },
 });
@@ -102,24 +98,20 @@ const createSessionStore = () => ({
     execSecurity: 'full',
     skillsSnapshot: {
       prompt: '<skill><name>feishu-cron-reminder</name></skill>',
-      resolvedSkills: [
-        { name: 'feishu-cron-reminder' },
-      ],
+      resolvedSkills: [{ name: 'feishu-cron-reminder' }],
     },
   },
   'agent:main:feishu:dm:ou_123': {
     sessionId: 'session-feishu',
     skillsSnapshot: {
-      resolvedSkills: [
-        { name: 'qqbot-cron' },
-      ],
+      resolvedSkills: [{ name: 'qqbot-cron' }],
     },
   },
 });
 
 const createSync = (tmpDir, appConfig, options = {}) => {
   setStoreGetter(() => ({
-    get: (key) => (key === 'app_config' ? appConfig : null),
+    get: key => (key === 'app_config' ? appConfig : null),
   }));
 
   return new OpenClawConfigSync({
@@ -153,7 +145,7 @@ test.after(() => {
   Module._load = originalModuleLoad;
 });
 
-test('sync writes native moonshot provider config and migrates matching managed sessions', (t) => {
+test('sync writes native moonshot provider config and migrates matching managed sessions', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -184,7 +176,10 @@ test('sync writes native moonshot provider config and migrates matching managed 
   const sessionStore = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'sessions.json'), 'utf8'));
   assert.equal(sessionStore['agent:main:zhiyuan:current-session'].modelProvider, 'moonshot');
   assert.equal(sessionStore['agent:main:zhiyuan:current-session'].model, 'kimi-k2.5');
-  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.provider, 'moonshot');
+  assert.equal(
+    sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.provider,
+    'moonshot',
+  );
   assert.equal(sessionStore['agent:main:zhiyuan:old-claude-session'].modelProvider, 'moonshot');
   assert.equal(sessionStore['agent:main:zhiyuan:old-claude-session'].model, 'kimi-k2.5');
   assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'full');
@@ -193,7 +188,7 @@ test('sync writes native moonshot provider config and migrates matching managed 
   assert.equal('skillsSnapshot' in sessionStore['agent:main:feishu:dm:ou_123'], false);
 });
 
-test('sync maps moonshot coding plan config to the coding endpoint', (t) => {
+test('sync maps moonshot coding plan config to the coding endpoint', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-coding-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -220,15 +215,21 @@ test('sync maps moonshot coding plan config to the coding endpoint', (t) => {
   const sessionStore = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'sessions.json'), 'utf8'));
   assert.equal(sessionStore['agent:main:zhiyuan:current-session'].modelProvider, 'moonshot');
   assert.equal(sessionStore['agent:main:zhiyuan:current-session'].model, 'kimi-k2.5');
-  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.provider, 'moonshot');
-  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.model, 'kimi-k2.5');
+  assert.equal(
+    sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.provider,
+    'moonshot',
+  );
+  assert.equal(
+    sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.model,
+    'kimi-k2.5',
+  );
   assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'full');
   assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'full');
   assert.equal('skillsSnapshot' in sessionStore['agent:main:wecom:direct:wangning'], false);
   assert.equal('skillsSnapshot' in sessionStore['agent:main:feishu:dm:ou_123'], false);
 });
 
-test('sync migrates managed sessions to the configured openai-compatible provider and forces full exec for native channel sessions', (t) => {
+test('sync migrates managed sessions to the configured openai-compatible provider and forces full exec for native channel sessions', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-native-session-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -256,7 +257,7 @@ test('sync migrates managed sessions to the configured openai-compatible provide
   assert.equal('skillsSnapshot' in sessionStore['agent:main:feishu:dm:ou_123'], false);
 });
 
-test('sync writes scheduled-task policy into managed AGENTS.md for native channel sessions', (t) => {
+test('sync writes scheduled-task policy into managed AGENTS.md for native channel sessions', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-agents-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -272,7 +273,10 @@ test('sync writes scheduled-task policy into managed AGENTS.md for native channe
 
   assert.equal(result.ok, true);
 
-  const agentsMd = fs.readFileSync(path.join(tmpDir, 'state', 'workspace-main', 'AGENTS.md'), 'utf8');
+  const agentsMd = fs.readFileSync(
+    path.join(tmpDir, 'state', 'workspace-main', 'AGENTS.md'),
+    'utf8',
+  );
   assert.match(agentsMd, /# AGENTS\.md - Your Workspace/);
   assert.match(agentsMd, /## Every Session/);
   assert.match(agentsMd, /Read `SOUL\.md`/);
@@ -287,16 +291,22 @@ test('sync writes scheduled-task policy into managed AGENTS.md for native channe
   assert.match(agentsMd, /native `cron` tool/i);
   assert.match(agentsMd, /action: "add".*cron\.add/i);
   assert.match(agentsMd, /follow the native `cron` tool schema/i);
-  assert.match(agentsMd, /plugins provide session context and outbound delivery; they do not own scheduling logic/i);
+  assert.match(
+    agentsMd,
+    /plugins provide session context and outbound delivery; they do not own scheduling logic/i,
+  );
   assert.match(agentsMd, /ignore channel-specific reminder helpers or reminder skills/i);
   assert.match(agentsMd, /QQBOT_PAYLOAD/);
   assert.match(agentsMd, /QQBOT_CRON/);
-  assert.match(agentsMd, /do not use `sessions_spawn`, `subagents`, or ad-hoc background workflows as a substitute for `cron\.add`/i);
+  assert.match(
+    agentsMd,
+    /do not use `sessions_spawn`, `subagents`, or ad-hoc background workflows as a substitute for `cron\.add`/i,
+  );
   assert.match(agentsMd, /## System Prompt/);
   assert.match(agentsMd, /Always answer in Chinese\./);
 });
 
-test('sync preserves existing AGENTS.md content above the Zhiyuan managed marker', (t) => {
+test('sync preserves existing AGENTS.md content above the Zhiyuan managed marker', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-agents-preserve-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -322,7 +332,7 @@ test('sync preserves existing AGENTS.md content above the Zhiyuan managed marker
   assert.doesNotMatch(agentsMd, /^# AGENTS\.md - Your Workspace/m);
 });
 
-test('sync backfills the default OpenClaw AGENTS template when an old workspace only has Zhiyuan managed content', (t) => {
+test('sync backfills the default OpenClaw AGENTS template when an old workspace only has Zhiyuan managed content', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-agents-backfill-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -357,27 +367,29 @@ test('sync backfills the default OpenClaw AGENTS template when an old workspace 
   assert.doesNotMatch(agentsMd, /Old managed-only content\./);
 });
 
-test('sync disables legacy qqbot-cron skill so QQ reminders use native cron', (t) => {
+test('sync disables legacy qqbot-cron skill so QQ reminders use native cron', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-qq-skill-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
 
   const sync = createSync(tmpDir, createAppConfig(), {
-    qqInstances: [{
-      instanceId: 'default',
-      instanceName: 'Default',
-      enabled: true,
-      appId: 'qq-app-id',
-      appSecret: 'qq-app-secret',
-      dmPolicy: 'open',
-      allowFrom: [],
-      groupPolicy: 'open',
-      groupAllowFrom: [],
-      historyLimit: 50,
-      markdownSupport: true,
-      imageServerBaseUrl: '',
-      debug: false,
-    }],
+    qqInstances: [
+      {
+        instanceId: 'default',
+        instanceName: 'Default',
+        enabled: true,
+        appId: 'qq-app-id',
+        appSecret: 'qq-app-secret',
+        dmPolicy: 'open',
+        allowFrom: [],
+        groupPolicy: 'open',
+        groupAllowFrom: [],
+        historyLimit: 50,
+        markdownSupport: true,
+        imageServerBaseUrl: '',
+        debug: false,
+      },
+    ],
   });
   const result = sync.sync('test-qq-native-cron');
 
@@ -390,7 +402,7 @@ test('sync disables legacy qqbot-cron skill so QQ reminders use native cron', (t
   assert.equal(config.cron.enabled, true);
 });
 
-test('sync disables legacy reminder skills so native IM sessions use built-in cron', (t) => {
+test('sync disables legacy reminder skills so native IM sessions use built-in cron', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-reminder-skills-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -405,7 +417,7 @@ test('sync disables legacy reminder skills so native IM sessions use built-in cr
   assert.equal(config.skills.entries['feishu-cron-reminder'].enabled, false);
 });
 
-test('sync writes non-empty placeholder apiKey for providers that do not require auth (e.g. Ollama)', (t) => {
+test('sync writes non-empty placeholder apiKey for providers that do not require auth (e.g. Ollama)', t => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-empty-key-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -421,9 +433,7 @@ test('sync writes non-empty placeholder apiKey for providers that do not require
         apiKey: '',
         baseUrl: 'http://localhost:11434/v1',
         apiFormat: 'openai',
-        models: [
-          { id: 'llama3' },
-        ],
+        models: [{ id: 'llama3' }],
       },
     },
   };

@@ -39,10 +39,7 @@ async function checkGlobalAccess(timeout = 3000, useCache = true) {
   }
 
   // Test URLs (lightweight, reliable endpoints)
-  const testUrls = [
-    'https://www.cloudflare.com/cdn-cgi/trace',
-    'https://techcrunch.com/feed/'
-  ];
+  const testUrls = ['https://www.cloudflare.com/cdn-cgi/trace', 'https://techcrunch.com/feed/'];
 
   for (const url of testUrls) {
     try {
@@ -131,12 +128,10 @@ function filterSourcesByNetwork(allSources, forceRegion = null) {
    *   Promise<Array>: Filtered list of sources appropriate for current network
    */
 
-  return new Promise(async (resolve) => {
+  return new Promise(async resolve => {
     // Force region if specified (for testing)
     if (forceRegion === 'cn') {
-      const filtered = allSources.filter(
-        s => s.region === 'cn' && s.enabled !== false
-      );
+      const filtered = allSources.filter(s => s.region === 'cn' && s.enabled !== false);
       return resolve(filtered);
     } else if (forceRegion === 'global') {
       const filtered = allSources.filter(s => s.enabled !== false);
@@ -153,9 +148,7 @@ function filterSourcesByNetwork(allSources, forceRegion = null) {
         resolve(filtered);
       } else {
         // Network is restricted - use only China sources
-        const filtered = allSources.filter(
-          s => s.region === 'cn' && s.enabled !== false
-        );
+        const filtered = allSources.filter(s => s.region === 'cn' && s.enabled !== false);
         resolve(filtered);
       }
     } catch (error) {
@@ -168,5 +161,5 @@ function filterSourcesByNetwork(allSources, forceRegion = null) {
 
 module.exports = {
   checkGlobalAccess,
-  filterSourcesByNetwork
+  filterSourcesByNetwork,
 };

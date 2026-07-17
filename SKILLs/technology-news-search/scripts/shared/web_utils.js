@@ -12,12 +12,7 @@ const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Appl
 
 function makeRequest(urlStr, options = {}) {
   return new Promise((resolve, reject) => {
-    const {
-      timeout = 10000,
-      headers = {},
-      method = 'GET',
-      body = null
-    } = options;
+    const { timeout = 10000, headers = {}, method = 'GET', body = null } = options;
 
     const urlObj = new URL(urlStr);
     const isHttps = urlObj.protocol === 'https:';
@@ -25,9 +20,9 @@ function makeRequest(urlStr, options = {}) {
 
     const defaultHeaders = {
       'User-Agent': DEFAULT_USER_AGENT,
-      'Accept': '*/*',
+      Accept: '*/*',
       'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
-      ...headers
+      ...headers,
     };
 
     const requestOptions = {
@@ -35,13 +30,13 @@ function makeRequest(urlStr, options = {}) {
       path: urlObj.pathname + urlObj.search,
       method,
       headers: defaultHeaders,
-      timeout
+      timeout,
     };
 
-    const req = client.request(requestOptions, (res) => {
+    const req = client.request(requestOptions, res => {
       let data = '';
 
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         data += chunk;
       });
 
@@ -49,7 +44,7 @@ function makeRequest(urlStr, options = {}) {
         resolve({
           status: res.statusCode,
           data,
-          headers: res.headers
+          headers: res.headers,
         });
       });
     });
@@ -69,11 +64,7 @@ function makeRequest(urlStr, options = {}) {
 }
 
 async function fetchUrl(urlStr, options = {}) {
-  const {
-    timeout = 10000,
-    maxRetries = 3,
-    userAgent = null
-  } = options;
+  const { timeout = 10000, maxRetries = 3, userAgent = null } = options;
 
   const headers = userAgent ? { 'User-Agent': userAgent } : {};
 
@@ -81,7 +72,7 @@ async function fetchUrl(urlStr, options = {}) {
     try {
       const response = await makeRequest(urlStr, {
         timeout,
-        headers
+        headers,
       });
 
       if (response.status >= 400) {
@@ -137,5 +128,5 @@ async function fetchJson(urlStr, timeout = 10000) {
 module.exports = {
   fetchUrl,
   fetchJson,
-  makeRequest
+  makeRequest,
 };

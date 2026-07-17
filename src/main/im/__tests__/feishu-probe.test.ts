@@ -4,7 +4,14 @@
 import { describe, test } from 'vitest';
 
 import { runChannelProbeContract } from './channel-probe.contract';
-import { buildProbeResult, makeAuthCheckFail, makeAuthCheckPass, makeCheck, makeGatewayRunningCheck, makeInboundActivityCheck } from './helpers';
+import {
+  buildProbeResult,
+  makeAuthCheckFail,
+  makeAuthCheckPass,
+  makeCheck,
+  makeGatewayRunningCheck,
+  makeInboundActivityCheck,
+} from './helpers';
 
 describe('Channel probe contract: feishu', () => {
   test('missing_credentials path conforms to contract', () => {
@@ -15,7 +22,11 @@ describe('Channel probe contract: feishu', () => {
     runChannelProbeContract({
       platform: 'feishu',
       result: buildProbeResult('feishu', {
-        checks: [makeAuthCheckPass('cli_xxx'), makeGatewayRunningCheck(), makeInboundActivityCheck('pass')],
+        checks: [
+          makeAuthCheckPass('cli_xxx'),
+          makeGatewayRunningCheck(),
+          makeInboundActivityCheck('pass'),
+        ],
       }),
     });
   });
@@ -36,7 +47,12 @@ describe('Channel probe contract: feishu', () => {
       result: buildProbeResult('feishu', {
         checks: [
           makeAuthCheckPass('cli_xxx'),
-          makeCheck('feishu_event_subscription_required', 'warn', 'Event subscription is recommended.', 'Subscribe to message events in the Feishu console.'),
+          makeCheck(
+            'feishu_event_subscription_required',
+            'warn',
+            'Event subscription is recommended.',
+            'Subscribe to message events in the Feishu console.',
+          ),
           makeGatewayRunningCheck(),
         ],
         verdict: 'warn',

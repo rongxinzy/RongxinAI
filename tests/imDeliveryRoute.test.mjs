@@ -89,9 +89,12 @@ test('route lookup can match DingTalk channel session keys discovered outside th
 
 test('delivery route extraction ignores incomplete session rows and non-dingtalk channels', () => {
   assert.equal(extractOpenClawDeliveryRoute({ key: 'agent:main:zhiyuan:session-3' }), null);
-  assert.equal(buildDingTalkSendParamsFromRoute({
-    channel: 'telegram',
-    to: 'chat:123',
-    accountId: 'default',
-  }), null);
+  assert.equal(
+    buildDingTalkSendParamsFromRoute({
+      channel: 'telegram',
+      to: 'chat:123',
+      accountId: 'default',
+    }),
+    null,
+  );
 });

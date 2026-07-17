@@ -55,15 +55,24 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorContentFiltered: '内容未通过安全审核，请修改后重试。',
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
-    coworkLlamaCppModelNotRunning: '该本地推理模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
-    coworkLlamaCppContextWindowUnknown: '该本地推理模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
-    coworkLlamaCppContextWindowTooSmall: '该本地推理模型当前运行上下文过小（当前 {current}，Agent 引擎至少需要 {required}）。请调大 ctx-size 后重新加载模型。',
-    coworkLlamaCppTrainingContextTooSmall: '该本地推理模型的训练上下文上限只有 {trained}，低于Agent 引擎所需的至少 {required}，无法用于当前 agent / 定时任务能力。请改用更大上下文模型。',
-    coworkLlamaCppContextLimitReached: '该本地推理会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
-    llamacppUnloadVramRecoveryPending: '模型已从本地推理运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
-    llamacppUnloadConfirmationPending: '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
-    llamacppLaunchContextExceedsTrainingLimit: '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
-    llamacppLaunchContextClampedToTrainingLimit: '请求上下文 {requested} 已超过模型训练上限 {trained}，已按 {effective} 启动。',
+    coworkLlamaCppModelNotRunning:
+      '该本地推理模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
+    coworkLlamaCppContextWindowUnknown:
+      '该本地推理模型当前未报告实际可用上下文窗口。请先重新加载模型，确认运行上限已显示后再发送。',
+    coworkLlamaCppContextWindowTooSmall:
+      '该本地推理模型当前运行上下文过小（当前 {current}，Agent 引擎至少需要 {required}）。请调大 ctx-size 后重新加载模型。',
+    coworkLlamaCppTrainingContextTooSmall:
+      '该本地推理模型的训练上下文上限只有 {trained}，低于Agent 引擎所需的至少 {required}，无法用于当前 agent / 定时任务能力。请改用更大上下文模型。',
+    coworkLlamaCppContextLimitReached:
+      '该本地推理会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
+    llamacppUnloadVramRecoveryPending:
+      '模型已从本地推理运行列表移除，但显存仍可能在继续回收，请稍等片刻再观察。',
+    llamacppUnloadConfirmationPending:
+      '卸载请求已发出，但应用暂时还没确认该模型已完全从运行列表移除。请稍等几秒后再观察。',
+    llamacppLaunchContextExceedsTrainingLimit:
+      '该模型请求加载上下文 {requested} 已超过训练上限 {trained}，请调低 ctx-size 后再启动。',
+    llamacppLaunchContextClampedToTrainingLimit:
+      '请求上下文 {requested} 已超过模型训练上限 {trained}，已按 {effective} 启动。',
     llamacppLoadModelLimitReached: '模型数量达到上限，请卸载模型后重试。',
     llamacppLoadModelGpuNotFound: '未检测到可用 GPU，请检查显卡驱动或 CUDA 环境后重试。',
     llamacppLoadModelGpuProbeFailed: 'GPU 环境检测失败，请检查显卡驱动或 CUDA 环境后重试。',
@@ -76,15 +85,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppLoadModelStartupTimeout: '模型加载时间过长，请稍后重试或降低模型配置。',
     llamacppLoadModelUnknown: '模型加载失败，请稍后重试。',
     llamacppModelLoadInProgress: '已有模型正在加载，请等待完成后再试。',
-    llamacppServiceStartupPortInUse: '本地推理服务端口已被占用，请检查端口设置或关闭占用端口的程序后重试。',
+    llamacppServiceStartupPortInUse:
+      '本地推理服务端口已被占用，请检查端口设置或关闭占用端口的程序后重试。',
     llamacppServiceStartupProcessExited: '本地推理服务启动后异常退出，请稍后重试。',
     llamacppServiceStartupTimeout: '本地推理服务启动超时，请稍后重试。',
-    llamacppServiceStartupBackendUnavailable: '当前本地推理运行时后端不可用，请检查显卡驱动或运行时配置。',
-    llamacppServiceStartupRuntimeDamaged: '本地推理 runtime 不可用或可能已损坏，请重新安装应用后重试。',
+    llamacppServiceStartupBackendUnavailable:
+      '当前本地推理运行时后端不可用，请检查显卡驱动或运行时配置。',
+    llamacppServiceStartupRuntimeDamaged:
+      '本地推理 runtime 不可用或可能已损坏，请重新安装应用后重试。',
     llamacppServiceStartupUnknown: '本地推理服务启动失败，请稍后重试。',
     llamacppModelLaunchLogWindowTitle: '模型启动日志',
     localInferenceImportRuntimeDialogTitle: '选择本地推理 backend',
-    localInferenceImportRuntimeDialogMessage: '请选择本地推理 backend 主包压缩包（zip 或 tar.gz）；如果已经解压，请进入目录后选择其中任意文件。知远智能体 会校验平台和 backend 类型后导入。',
+    localInferenceImportRuntimeDialogMessage:
+      '请选择本地推理 backend 主包压缩包（zip 或 tar.gz）；如果已经解压，请进入目录后选择其中任意文件。知远智能体 会校验平台和 backend 类型后导入。',
     coworkErrorUnknown: '任务执行出错，请重试。如果问题持续出现，请检查模型配置。',
     imErrorPrefix: '处理消息时出错',
 
@@ -107,7 +120,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillErrNoSkillMd: '来源中未找到 SKILL.md',
     skillErrInvalidSource:
       '无效的技能来源。支持 owner/repo、仓库链接、npm 包名、ModelScope 技能链接或 GitHub tree/blob 链接。',
-    skillErrModelScopeInstallUnavailable: '此 ModelScope 技能未提供可安装的源码或压缩包链接，请在 ModelScope 页面查看安装说明。',
+    skillErrModelScopeInstallUnavailable:
+      '此 ModelScope 技能未提供可安装的源码或压缩包链接，请在 ModelScope 页面查看安装说明。',
     skillErrAlreadyInstalled: '技能 {name} 已安装。如需覆盖安装，请先删除旧版本后重试。',
 
     // Gateway startup phases
@@ -217,9 +231,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imWeixinAccountMissing: '尚未绑定微信账号，需要扫码登录。',
     imWeixinAccountMissingSuggestion: '请在微信设置中点击"扫码连接微信"完成账号绑定。',
     imWeixinGatewayNotRunning: 'Agent 引擎 Gateway 未启动，微信频道无法连接。',
-    imWeixinGatewayNotRunningSuggestion: '请先启动 AI 引擎（Agent 引擎），微信 Bot 才会连接微信服务器。',
+    imWeixinGatewayNotRunningSuggestion:
+      '请先启动 AI 引擎（Agent 引擎），微信 Bot 才会连接微信服务器。',
     imWeixinChannelProbeFailed: '无法确认微信频道状态。',
-    imWeixinChannelProbeFailedSuggestion: '请稍后重试。如果问题持续，尝试重启Agent 引擎 Gateway 或重新扫码绑定。',
+    imWeixinChannelProbeFailedSuggestion:
+      '请稍后重试。如果问题持续，尝试重启Agent 引擎 Gateway 或重新扫码绑定。',
     imWeixinChannelActive: '微信频道连接状态正常。',
     imWeixinGatewayProbeError: '微信频道探活失败：{error}',
     imChannelActive: '{channel} 频道连接状态正常。',
@@ -342,36 +358,60 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Content did not pass the safety review. Please modify and try again.',
     coworkErrorServerError: 'Server error occurred. Please try again later.',
     coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
-    coworkLlamaCppModelNotRunning: 'This local inference model is not running. Load it from Local Inference first or choose another model.',
-    coworkLlamaCppContextWindowUnknown: 'The running local inference model did not report an effective context window. Reload it from Local Inference before sending again.',
-    coworkLlamaCppContextWindowTooSmall: 'This local inference model is currently running with too small a context window ({current}); Agent engine requires at least {required}. Increase ctx-size and reload the model.',
-    coworkLlamaCppTrainingContextTooSmall: 'This local inference model was trained for only {trained} context tokens, below Agent engine\'s minimum requirement of {required}. Choose a larger-context model for agent and scheduled-task use.',
-    coworkLlamaCppContextLimitReached: 'This local inference session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
-    llamacppUnloadVramRecoveryPending: 'The model has been removed from the local inference running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
-    llamacppUnloadConfirmationPending: 'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
-    llamacppLaunchContextExceedsTrainingLimit: 'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
-    llamacppLaunchContextClampedToTrainingLimit: 'The requested context {requested} exceeds the model training limit {trained}. Started with {effective} instead.',
-    llamacppLoadModelLimitReached: 'The model limit has been reached. Unload a model and try again.',
-    llamacppLoadModelGpuNotFound: 'No available GPU was detected. Check your GPU driver or CUDA environment and try again.',
-    llamacppLoadModelGpuProbeFailed: 'GPU environment detection failed. Check your GPU driver or CUDA environment and try again.',
-    llamacppLoadModelVramInsufficient: 'Insufficient VRAM. Check available VRAM or unload models and try again.',
-    llamacppLoadModelSystemMemoryInsufficient: 'Insufficient system memory. Close other applications and try again.',
-    llamacppLoadModelContextTooLarge: 'The model context is too large. The system lowered the configuration but still could not load it.',
+    coworkLlamaCppModelNotRunning:
+      'This local inference model is not running. Load it from Local Inference first or choose another model.',
+    coworkLlamaCppContextWindowUnknown:
+      'The running local inference model did not report an effective context window. Reload it from Local Inference before sending again.',
+    coworkLlamaCppContextWindowTooSmall:
+      'This local inference model is currently running with too small a context window ({current}); Agent engine requires at least {required}. Increase ctx-size and reload the model.',
+    coworkLlamaCppTrainingContextTooSmall:
+      "This local inference model was trained for only {trained} context tokens, below Agent engine's minimum requirement of {required}. Choose a larger-context model for agent and scheduled-task use.",
+    coworkLlamaCppContextLimitReached:
+      'This local inference session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
+    llamacppUnloadVramRecoveryPending:
+      'The model has been removed from the local inference running list, but VRAM may still be reclaiming. Wait a moment before checking again.',
+    llamacppUnloadConfirmationPending:
+      'The unload request was sent, but the app has not yet confirmed that the model fully disappeared from the running list. Wait a few seconds and check again.',
+    llamacppLaunchContextExceedsTrainingLimit:
+      'The requested load context {requested} exceeds the model training limit {trained}. Lower ctx-size before loading the model.',
+    llamacppLaunchContextClampedToTrainingLimit:
+      'The requested context {requested} exceeds the model training limit {trained}. Started with {effective} instead.',
+    llamacppLoadModelLimitReached:
+      'The model limit has been reached. Unload a model and try again.',
+    llamacppLoadModelGpuNotFound:
+      'No available GPU was detected. Check your GPU driver or CUDA environment and try again.',
+    llamacppLoadModelGpuProbeFailed:
+      'GPU environment detection failed. Check your GPU driver or CUDA environment and try again.',
+    llamacppLoadModelVramInsufficient:
+      'Insufficient VRAM. Check available VRAM or unload models and try again.',
+    llamacppLoadModelSystemMemoryInsufficient:
+      'Insufficient system memory. Close other applications and try again.',
+    llamacppLoadModelContextTooLarge:
+      'The model context is too large. The system lowered the configuration but still could not load it.',
     llamacppLoadModelFileInvalid: 'The model file is invalid. Download or import the model again.',
     llamacppLoadModelNotFound: 'The model file was not found. Download or import the model again.',
-    llamacppLoadModelServiceUnavailable: 'The local inference service is unavailable. Please try again later.',
-    llamacppLoadModelStartupTimeout: 'Model loading took too long. Try again later or lower the model configuration.',
+    llamacppLoadModelServiceUnavailable:
+      'The local inference service is unavailable. Please try again later.',
+    llamacppLoadModelStartupTimeout:
+      'Model loading took too long. Try again later or lower the model configuration.',
     llamacppLoadModelUnknown: 'Model loading failed. Please try again later.',
     llamacppModelLoadInProgress: 'A model is already loading. Wait for it to finish and try again.',
-    llamacppServiceStartupPortInUse: 'The local inference service port is already in use. Check the port setting or close the conflicting process and try again.',
-    llamacppServiceStartupProcessExited: 'The local inference service exited during startup. Please try again later.',
-    llamacppServiceStartupTimeout: 'The local inference service startup timed out. Please try again later.',
-    llamacppServiceStartupBackendUnavailable: 'The selected local inference runtime backend is unavailable. Check the GPU driver or runtime configuration.',
-    llamacppServiceStartupRuntimeDamaged: 'The local inference runtime is unavailable or may be damaged. Reinstall the application and try again.',
-    llamacppServiceStartupUnknown: 'The local inference service failed to start. Please try again later.',
+    llamacppServiceStartupPortInUse:
+      'The local inference service port is already in use. Check the port setting or close the conflicting process and try again.',
+    llamacppServiceStartupProcessExited:
+      'The local inference service exited during startup. Please try again later.',
+    llamacppServiceStartupTimeout:
+      'The local inference service startup timed out. Please try again later.',
+    llamacppServiceStartupBackendUnavailable:
+      'The selected local inference runtime backend is unavailable. Check the GPU driver or runtime configuration.',
+    llamacppServiceStartupRuntimeDamaged:
+      'The local inference runtime is unavailable or may be damaged. Reinstall the application and try again.',
+    llamacppServiceStartupUnknown:
+      'The local inference service failed to start. Please try again later.',
     llamacppModelLaunchLogWindowTitle: 'Model startup logs',
     localInferenceImportRuntimeDialogTitle: 'Select local inference Backend',
-    localInferenceImportRuntimeDialogMessage: 'Select a local inference backend archive (zip or tar.gz). If it is already extracted, open that directory and choose any file inside it. ZhiYuan Agent will validate the platform and backend type before importing it.',
+    localInferenceImportRuntimeDialogMessage:
+      'Select a local inference backend archive (zip or tar.gz). If it is already extracted, open that directory and choose any file inside it. ZhiYuan Agent will validate the platform and backend type before importing it.',
     coworkErrorUnknown:
       'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
     imErrorPrefix: 'Error processing message',
@@ -379,10 +419,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imErrorAuthExpired:
       'AI assistant authentication expired. Please open the app to update your API key.',
     imErrorRateLimited: 'AI assistant is receiving too many requests. Please try again later.',
-    imErrorBudgetExceeded: 'AI assistant account balance insufficient. Please top up and try again.',
+    imErrorBudgetExceeded:
+      'AI assistant account balance insufficient. Please top up and try again.',
     imErrorEngineNotReady: 'AI engine is starting up. Please wait and try again.',
-    imErrorTransient: 'AI assistant temporarily unavailable ({error}). Automatically recovering, please try later.',
-    imErrorContentFiltered: 'Message content did not pass safety review. Please revise and try again.',
+    imErrorTransient:
+      'AI assistant temporarily unavailable ({error}). Automatically recovering, please try later.',
+    imErrorContentFiltered:
+      'Message content did not pass safety review. Please revise and try again.',
     imErrorInputTooLong: 'Message content too long. Please shorten and try again.',
     imErrorExecutionLimit: 'Task timed out or reached limit. Please simplify and try again.',
     imErrorUnknown: 'Error processing message: {error}. Please try again.',
@@ -396,8 +439,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillErrNoSkillMd: 'No SKILL.md found in source',
     skillErrInvalidSource:
       'Invalid skill source. Use owner/repo, repo URL, npm package spec, a ModelScope skill URL, or a GitHub tree/blob URL.',
-    skillErrModelScopeInstallUnavailable: 'This ModelScope skill does not provide an installable source or archive. Check its ModelScope page for installation instructions.',
-    skillErrAlreadyInstalled: 'Skill {name} is already installed. Remove the existing version and try again.',
+    skillErrModelScopeInstallUnavailable:
+      'This ModelScope skill does not provide an installable source or archive. Check its ModelScope page for installation instructions.',
+    skillErrAlreadyInstalled:
+      'Skill {name} is already installed. Remove the existing version and try again.',
 
     // Gateway startup phases
     gatewayStartupPrecompiling: 'Pre-compiling gateway bundle...',
@@ -525,16 +570,21 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'WeChat runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imWeixinConfigReadyOpenClaw: 'WeChat configuration is ready, running via Agent engine.',
     imWeixinAccountMissing: 'WeChat account is not bound. QR code scan is required.',
-    imWeixinAccountMissingSuggestion: 'Please use "Scan to Connect WeChat" in WeChat settings to bind your account.',
-    imWeixinGatewayNotRunning: 'Agent engine Gateway is not running. WeChat channel cannot connect.',
-    imWeixinGatewayNotRunningSuggestion: 'Please start the AI engine (Agent engine) first for the WeChat bot to connect.',
+    imWeixinAccountMissingSuggestion:
+      'Please use "Scan to Connect WeChat" in WeChat settings to bind your account.',
+    imWeixinGatewayNotRunning:
+      'Agent engine Gateway is not running. WeChat channel cannot connect.',
+    imWeixinGatewayNotRunningSuggestion:
+      'Please start the AI engine (Agent engine) first for the WeChat bot to connect.',
     imWeixinChannelProbeFailed: 'Unable to verify WeChat channel status.',
-    imWeixinChannelProbeFailedSuggestion: 'Please try again later. If the issue persists, restart Agent engine Gateway or re-scan the QR code.',
+    imWeixinChannelProbeFailedSuggestion:
+      'Please try again later. If the issue persists, restart Agent engine Gateway or re-scan the QR code.',
     imWeixinChannelActive: 'WeChat channel connection is active.',
     imWeixinGatewayProbeError: 'WeChat channel health check failed: {error}',
     imChannelActive: '{channel} channel connection is active.',
     imChannelNoSessions: '{channel} channel has no active sessions. The bot may not be connected.',
-    imChannelNoSessionsSuggestion: 'Please confirm the binding is correct and check the bot configuration.',
+    imChannelNoSessionsSuggestion:
+      'Please confirm the binding is correct and check the bot configuration.',
     imChannelProbeError: 'Channel health check failed: {error}',
     emailSettings: 'Email Settings',
     emailInstance: 'Email Account',
@@ -548,7 +598,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailApiKey: 'API Key',
     emailApiKeyPlaceholder: 'ck_live_xxxxxxxx',
     getApiKey: 'Get API Key',
-    apiKeyHint: 'Get the API Key from your email service configuration source or administrator, then paste it here.',
+    apiKeyHint:
+      'Get the API Key from your email service configuration source or administrator, then paste it here.',
     emailTransportMode: 'Transport Mode',
     emailTransportImap: 'IMAP/SMTP (Traditional)',
     emailTransportWs: 'WebSocket (Secure, no password required)',

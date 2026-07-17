@@ -16,7 +16,7 @@ describe('openclawHistory', () => {
     expect(
       extractGatewayMessageText({
         content: [{ type: 'text', text: 'hello world' }],
-      })
+      }),
     ).toBe('hello world');
   });
 
@@ -24,7 +24,7 @@ describe('openclawHistory', () => {
     expect(
       extractGatewayMessageText({
         content: [{ type: 'output_text', text: 'gemini output' }],
-      })
+      }),
     ).toBe('gemini output');
   });
 
@@ -38,7 +38,7 @@ describe('openclawHistory', () => {
             { text: 'second line' },
           ],
         },
-      })
+      }),
     ).toBe('first line\nsecond line');
   });
 
@@ -47,7 +47,7 @@ describe('openclawHistory', () => {
       extractGatewayHistoryEntry({
         role: 'assistant',
         content: [{ type: 'output_text', text: 'final answer' }],
-      })
+      }),
     ).toEqual({
       role: 'assistant',
       text: 'final answer',
@@ -60,7 +60,7 @@ describe('openclawHistory', () => {
         role: 'user',
         content: 'hello',
         createdAt: '2026-05-09T10:20:30.000Z',
-      })
+      }),
     ).toEqual({
       role: 'user',
       text: 'hello',
@@ -164,7 +164,7 @@ Current time: Sunday, March 15th, 2026 — 11:27 (Asia/Shanghai)`,
       isHeartbeatPromptText(`Read HEARTBEAT.md if it exists.
 When reading HEARTBEAT.md, use workspace file /tmp/HEARTBEAT.md.
 Do not infer or repeat old tasks from prior chats.
-If nothing needs attention, reply HEARTBEAT_OK.`)
+If nothing needs attention, reply HEARTBEAT_OK.`),
     ).toBe(true);
     expect(isHeartbeatPromptText('Please read README.md and reply OK.')).toBe(false);
   });

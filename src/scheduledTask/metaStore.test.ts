@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
-import { expect,test } from 'vitest';
+import { expect, test } from 'vitest';
 
-import { BindingKind,OriginKind } from './constants';
+import { BindingKind, OriginKind } from './constants';
 import { ScheduledTaskMetaStore } from './metaStore';
 
 function createMetaStore() {
@@ -20,7 +20,12 @@ test('metaStore: ensureTable is idempotent (no error on double init)', () => {
 test('metaStore: set + get roundtrip preserves origin and binding', () => {
   const store = createMetaStore();
   const origin = { kind: OriginKind.IM, platform: 'telegram', conversationId: 'chat-123' };
-  const binding = { kind: BindingKind.IMSession, platform: 'telegram', conversationId: 'chat-123', sessionId: 'sess-1' };
+  const binding = {
+    kind: BindingKind.IMSession,
+    platform: 'telegram',
+    conversationId: 'chat-123',
+    sessionId: 'sess-1',
+  };
 
   store.set('task-1', origin, binding);
   const meta = store.get('task-1');
@@ -75,8 +80,16 @@ test('metaStore: list on empty table returns empty array', () => {
 
 test('metaStore: origin/binding with special characters survives JSON roundtrip', () => {
   const store = createMetaStore();
-  const origin = { kind: OriginKind.IM, platform: 'dingtalk', conversationId: 'acct:user:"peer&1"' };
-  const binding = { kind: BindingKind.IMSession, platform: 'dingtalk', conversationId: 'acct:user:"peer&1"' };
+  const origin = {
+    kind: OriginKind.IM,
+    platform: 'dingtalk',
+    conversationId: 'acct:user:"peer&1"',
+  };
+  const binding = {
+    kind: BindingKind.IMSession,
+    platform: 'dingtalk',
+    conversationId: 'acct:user:"peer&1"',
+  };
 
   store.set('task-special', origin, binding);
   const meta = store.get('task-special');

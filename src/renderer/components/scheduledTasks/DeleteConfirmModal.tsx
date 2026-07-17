@@ -24,7 +24,12 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   onCancel,
 }) => {
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
+    <Dialog
+      open
+      onOpenChange={open => {
+        if (!open) onCancel();
+      }}
+    >
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <div className="flex flex-col items-center text-center">
@@ -38,18 +43,10 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </div>
         </DialogHeader>
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-          >
+          <Button type="button" variant="outline" onClick={onCancel}>
             {i18nService.t('cancel')}
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-          >
+          <Button type="button" variant="destructive" onClick={onConfirm}>
             {i18nService.t('scheduledTasksDelete')}
           </Button>
         </DialogFooter>

@@ -1,4 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@shared/components/ui/card';
 import { cn } from '@shared/lib/utils';
 import { CalendarClock, CloudSun, Lightbulb, Newspaper, TrendingUp } from 'lucide-react';
 import React from 'react';
@@ -85,14 +91,12 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
         <h2 className="text-base font-semibold text-foreground mb-1">
           {i18nService.t('taskTemplateSectionTitle')}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          {i18nService.t('taskTemplateSectionDesc')}
-        </p>
+        <p className="text-sm text-muted-foreground">{i18nService.t('taskTemplateSectionDesc')}</p>
       </div>
 
       {/* Template Cards Grid */}
       <div className="grid grid-cols-2 gap-3">
-        {TEMPLATES.map((tpl) => (
+        {TEMPLATES.map(tpl => (
           <Card
             key={tpl.id}
             className="cursor-pointer hover:shadow-md transition-all shadow-sm h-full"
@@ -114,7 +118,9 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
               >
                 <tpl.icon className="size-4.5" />
               </div>
-              <CardTitle>{i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0])}</CardTitle>
+              <CardTitle>
+                {i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0])}
+              </CardTitle>
               <CardDescription>
                 {i18nService.t(tpl.descKey as Parameters<typeof i18nService.t>[0])}
               </CardDescription>
@@ -138,9 +144,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
           <CardTitle className="text-muted-foreground">
             {i18nService.t('taskTemplateCustomName')}
           </CardTitle>
-          <CardDescription>
-            {i18nService.t('taskTemplateCustomDesc')}
-          </CardDescription>
+          <CardDescription>{i18nService.t('taskTemplateCustomDesc')}</CardDescription>
         </CardHeader>
       </Card>
     </div>

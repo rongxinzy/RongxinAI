@@ -1,4 +1,8 @@
-import { Reasoning, ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from '@shared/components/ai-elements/reasoning';
 import React from 'react';
 
 import type { CoworkMessage } from '../../../types/cowork';

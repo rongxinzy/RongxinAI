@@ -65,12 +65,12 @@ Evaluate:
 
 ### Step 4: Risk Classification
 
-| Risk Level | Examples | Action |
-|------------|----------|--------|
-| 🟢 LOW | Notes, weather, formatting | Basic review, install OK |
-| 🟡 MEDIUM | File ops, browser, APIs | Full code review required |
-| 🔴 HIGH | Credentials, trading, system | Human approval required |
-| ⛔ EXTREME | Security configs, root access | Do NOT install |
+| Risk Level | Examples                      | Action                    |
+| ---------- | ----------------------------- | ------------------------- |
+| 🟢 LOW     | Notes, weather, formatting    | Basic review, install OK  |
+| 🟡 MEDIUM  | File ops, browser, APIs       | Full code review required |
+| 🔴 HIGH    | Credentials, trading, system  | Human approval required   |
+| ⛔ EXTREME | Security configs, root access | Do NOT install            |
 
 ## Output Format
 
@@ -93,7 +93,7 @@ RED FLAGS: [None / List them]
 
 PERMISSIONS NEEDED:
 • Files: [list or "None"]
-• Network: [list or "None"]  
+• Network: [list or "None"]
 • Commands: [list or "None"]
 ───────────────────────────────────────
 RISK LEVEL: [🟢 LOW / 🟡 MEDIUM / 🔴 HIGH / ⛔ EXTREME]
@@ -107,6 +107,7 @@ NOTES: [Any observations]
 ## Quick Vet Commands
 
 For GitHub-hosted skills:
+
 ```bash
 # Check repo stats
 curl -s "https://api.github.com/repos/OWNER/REPO" | jq '{stars: .stargazers_count, forks: .forks_count, updated: .updated_at}'
@@ -135,4 +136,4 @@ curl -s "https://raw.githubusercontent.com/OWNER/REPO/main/skills/SKILL_NAME/SKI
 
 ---
 
-*Paranoia is a feature.* 🔒🦀
+_Paranoia is a feature._ 🔒🦀

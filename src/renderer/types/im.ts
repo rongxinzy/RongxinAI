@@ -395,13 +395,13 @@ export type IMMediaType = 'image' | 'video' | 'audio' | 'voice' | 'document' | '
 
 export interface IMMediaAttachment {
   type: IMMediaType;
-  localPath: string;          // 涓嬭浇鍚庣殑鏈湴璺緞
-  mimeType: string;           // MIME 绫诲瀷
-  fileName?: string;          // 鍘熷鏂囦欢鍚?
-  fileSize?: number;          // 鏂囦欢澶у皬锛堝瓧鑺傦級
-  width?: number;             // 鍥剧墖/瑙嗛瀹藉害
-  height?: number;            // 鍥剧墖/瑙嗛楂樺害
-  duration?: number;          // 闊宠棰戞椂闀匡紙绉掞級
+  localPath: string; // 涓嬭浇鍚庣殑鏈湴璺緞
+  mimeType: string; // MIME 绫诲瀷
+  fileName?: string; // 鍘熷鏂囦欢鍚?
+  fileSize?: number; // 鏂囦欢澶у皬锛堝瓧鑺傦級
+  width?: number; // 鍥剧墖/瑙嗛瀹藉害
+  height?: number; // 鍥剧墖/瑙嗛楂樺害
+  duration?: number; // 闊宠棰戞椂闀匡紙绉掞級
 }
 
 export interface IMMessage {
@@ -414,7 +414,7 @@ export interface IMMessage {
   chatType: 'direct' | 'group';
   timestamp: number;
   attachments?: IMMediaAttachment[];
-  mediaGroupId?: string;      // 濯掍綋缁?ID锛堢敤浜庡悎骞跺寮犲浘鐗囷級
+  mediaGroupId?: string; // 濯掍綋缁?ID锛堢敤浜庡悎骞跺寮犲浘鐗囷級
 }
 
 // ==================== IPC Result Types ====================
@@ -662,4 +662,3 @@ export const DEFAULT_IM_STATUS: IMGatewayStatus = {
     lastOutboundAt: null,
   },
 };
-

@@ -5,14 +5,25 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
 import { PlatformRegistry } from '@shared/platform';
-import { Eye, EyeOff, Signal, Trash2, X,XCircle } from 'lucide-react';
+import { Eye, EyeOff, Signal, Trash2, X, XCircle } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import type { IMConnectivityTestResult, QQInstanceConfig, QQInstanceStatus, QQOpenClawConfig } from '../../types/im';
+import type {
+  IMConnectivityTestResult,
+  QQInstanceConfig,
+  QQInstanceStatus,
+  QQOpenClawConfig,
+} from '../../types/im';
 
 interface QQInstanceSettingsProps {
   instance: QQInstanceConfig;
@@ -78,11 +89,14 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
             <Input
               type="text"
               value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
+              onChange={e => setNameValue(e.target.value)}
               onBlur={handleNameBlur}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') handleNameBlur();
-                if (e.key === 'Escape') { setNameValue(instance.instanceName); setEditingName(false); }
+                if (e.key === 'Escape') {
+                  setNameValue(instance.instanceName);
+                  setEditingName(false);
+                }
               }}
               autoFocus
               className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent focus-visible:ring-0"
@@ -99,14 +113,14 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
         </div>
 
         {/* Status badge */}
-        <div className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-          instanceStatus?.connected
-            ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-            : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
-        }`}>
-          {instanceStatus?.connected
-            ? i18nService.t('connected')
-            : i18nService.t('disconnected')}
+        <div
+          className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
+            instanceStatus?.connected
+              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+              : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          {instanceStatus?.connected ? i18nService.t('connected') : i18nService.t('disconnected')}
         </div>
 
         {/* Enable toggle */}
@@ -114,7 +128,13 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
           checked={instance.enabled}
           onCheckedChange={onToggleEnabled}
           disabled={!instance.enabled && !(instance.appId && instance.appSecret)}
-          title={instance.enabled ? i18nService.t('imQQDisableInstance') : (!(instance.appId && instance.appSecret) ? i18nService.t('imInstanceFillCredentials') : i18nService.t('imQQEnableInstance'))}
+          title={
+            instance.enabled
+              ? i18nService.t('imQQDisableInstance')
+              : !(instance.appId && instance.appSecret)
+                ? i18nService.t('imInstanceFillCredentials')
+                : i18nService.t('imQQEnableInstance')
+          }
         />
 
         {/* Delete button */}
@@ -144,9 +164,11 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
             variant="link"
             size="sm"
             onClick={() => {
-              window.electron.shell.openExternal(PlatformRegistry.guideUrl('qq')!).catch((err: unknown) => {
-                console.error('[IM] Failed to open guide URL:', err);
-              });
+              window.electron.shell
+                .openExternal(PlatformRegistry.guideUrl('qq')!)
+                .catch((err: unknown) => {
+                  console.error('[IM] Failed to open guide URL:', err);
+                });
             }}
             className="mt-2 h-auto p-0 text-xs font-medium underline underline-offset-2"
           >
@@ -164,7 +186,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
           <Input
             type="text"
             value={instance.appId}
-            onChange={(e) => onConfigChange({ appId: e.target.value })}
+            onChange={e => onConfigChange({ appId: e.target.value })}
             onBlur={() => void onSave()}
             className="pr-8"
             placeholder="102xxxxx"
@@ -176,7 +198,10 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={() => { onConfigChange({ appId: '' }); void onSave({ appId: '' }); }}
+                onClick={() => {
+                  onConfigChange({ appId: '' });
+                  void onSave({ appId: '' });
+                }}
                 title={i18nService.t('clear') || 'Clear'}
               >
                 <XCircle className="h-4 w-4" />
@@ -195,7 +220,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
           <Input
             type={showSecrets['appSecret'] ? 'text' : 'password'}
             value={instance.appSecret}
-            onChange={(e) => onConfigChange({ appSecret: e.target.value })}
+            onChange={e => onConfigChange({ appSecret: e.target.value })}
             onBlur={() => void onSave()}
             className="pr-16"
             placeholder="••••••••••••"
@@ -207,7 +232,10 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={() => { onConfigChange({ appSecret: '' }); void onSave({ appSecret: '' }); }}
+                onClick={() => {
+                  onConfigChange({ appSecret: '' });
+                  void onSave({ appSecret: '' });
+                }}
                 title={i18nService.t('clear') || 'Clear'}
               >
                 <XCircle className="h-4 w-4" />
@@ -218,16 +246,22 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
               variant="ghost"
               size="icon"
               className="h-6 w-6"
-              onClick={() => setShowSecrets(prev => ({ ...prev, 'appSecret': !prev['appSecret'] }))}
-              title={showSecrets['appSecret'] ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
+              onClick={() => setShowSecrets(prev => ({ ...prev, appSecret: !prev['appSecret'] }))}
+              title={
+                showSecrets['appSecret']
+                  ? i18nService.t('hide') || 'Hide'
+                  : i18nService.t('show') || 'Show'
+              }
             >
-              {showSecrets['appSecret'] ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              {showSecrets['appSecret'] ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {i18nService.t('imQQCredentialHint')}
-        </p>
+        <p className="text-xs text-muted-foreground">{i18nService.t('imQQCredentialHint')}</p>
       </div>
 
       {/* Advanced Settings (collapsible) */}
@@ -238,12 +272,10 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
         <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              DM Policy
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">DM Policy</label>
             <Select
               value={instance.dmPolicy}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 const update = { dmPolicy: value as QQOpenClawConfig['dmPolicy'] };
                 onConfigChange(update);
                 void onSave(update);
@@ -269,8 +301,8 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
               <Input
                 type="text"
                 value={allowedUserIdInput}
-                onChange={(e) => setAllowedUserIdInput(e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => setAllowedUserIdInput(e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     const id = allowedUserIdInput.trim();
@@ -304,7 +336,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
             </div>
             {instance.allowFrom.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {instance.allowFrom.map((id) => (
+                {instance.allowFrom.map(id => (
                   <span
                     key={id}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-surface border-border-subtle border text-foreground"
@@ -316,7 +348,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                       size="icon"
                       className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
-                        const newIds = instance.allowFrom.filter((uid) => uid !== id);
+                        const newIds = instance.allowFrom.filter(uid => uid !== id);
                         onConfigChange({ allowFrom: newIds });
                         void onSave({ allowFrom: newIds });
                       }}
@@ -331,12 +363,10 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* Group Policy */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Group Policy
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">Group Policy</label>
             <Select
               value={instance.groupPolicy}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 const update = { groupPolicy: value as QQOpenClawConfig['groupPolicy'] };
                 onConfigChange(update);
                 void onSave(update);
@@ -360,7 +390,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                 Group Allow From (Group IDs)
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {instance.groupAllowFrom.map((id) => (
+                {instance.groupAllowFrom.map(id => (
                   <span
                     key={id}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-surface border-border-subtle border text-foreground"
@@ -372,7 +402,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                       size="icon"
                       className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                       onClick={() => {
-                        const newIds = instance.groupAllowFrom.filter((gid) => gid !== id);
+                        const newIds = instance.groupAllowFrom.filter(gid => gid !== id);
                         onConfigChange({ groupAllowFrom: newIds });
                         void onSave({ groupAllowFrom: newIds });
                       }}
@@ -387,13 +417,11 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* History Limit */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              History Limit
-            </label>
+            <label className="block text-xs font-medium text-muted-foreground">History Limit</label>
             <Input
               type="number"
               value={instance.historyLimit}
-              onChange={(e) => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
+              onChange={e => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
               onBlur={() => void onSave()}
               min={1}
               max={200}
@@ -402,12 +430,10 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
           {/* Markdown Support */}
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">
-              Markdown Support
-            </label>
+            <label className="text-xs font-medium text-muted-foreground">Markdown Support</label>
             <Switch
               checked={instance.markdownSupport}
-              onCheckedChange={(checked) => {
+              onCheckedChange={checked => {
                 const update = { markdownSupport: Boolean(checked) };
                 onConfigChange(update);
                 void onSave(update);
@@ -423,13 +449,11 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
             <Input
               type="text"
               value={instance.imageServerBaseUrl}
-              onChange={(e) => onConfigChange({ imageServerBaseUrl: e.target.value })}
+              onChange={e => onConfigChange({ imageServerBaseUrl: e.target.value })}
               onBlur={() => void onSave()}
               placeholder="http://your-ip:18765"
             />
-            <p className="text-xs text-muted-foreground">
-              {i18nService.t('imQQImageServerHint')}
-            </p>
+            <p className="text-xs text-muted-foreground">{i18nService.t('imQQImageServerHint')}</p>
           </div>
         </div>
       </details>

@@ -9,11 +9,7 @@ interface ExpandAgentTasksRowProps {
   onClick: () => void;
 }
 
-const ExpandAgentTasksRow: React.FC<ExpandAgentTasksRowProps> = ({
-  isLoading,
-  label,
-  onClick,
-}) => {
+const ExpandAgentTasksRow: React.FC<ExpandAgentTasksRowProps> = ({ isLoading, label, onClick }) => {
   return (
     <Button
       type="button"

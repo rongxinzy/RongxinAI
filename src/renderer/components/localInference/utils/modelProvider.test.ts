@@ -13,10 +13,12 @@ function model(input: Partial<LlamaCppModel>): LlamaCppModel {
 
 test('local model provider favors GGUF family metadata', () => {
   expect(
-    resolveLocalModelProvider(model({
-      name: 'bartowski-DeepSeek-R1-Distill-Qwen-32B-GGUF',
-      details: { family: 'qwen' },
-    })),
+    resolveLocalModelProvider(
+      model({
+        name: 'bartowski-DeepSeek-R1-Distill-Qwen-32B-GGUF',
+        details: { family: 'qwen' },
+      }),
+    ),
   ).toBe(ProviderName.Qwen);
 });
 
@@ -28,28 +30,34 @@ test('local model provider ignores a community publisher prefix', () => {
 
 test('local model provider can identify a model from its GGUF file name', () => {
   expect(
-    resolveLocalModelProvider(model({
-      name: 'local-model',
-      path: 'D:\\models\\community\\Qwen3-32B-Q4_K_M.gguf',
-    })),
+    resolveLocalModelProvider(
+      model({
+        name: 'local-model',
+        path: 'D:\\models\\community\\Qwen3-32B-Q4_K_M.gguf',
+      }),
+    ),
   ).toBe(ProviderName.Qwen);
 });
 
 test('local model provider handles mixed case and GGUF file separators', () => {
   expect(
-    resolveLocalModelProvider(model({
-      name: 'local-model',
-      path: 'D:\\models\\QwEn3_32B.Q4_K_M.gguf',
-    })),
+    resolveLocalModelProvider(
+      model({
+        name: 'local-model',
+        path: 'D:\\models\\QwEn3_32B.Q4_K_M.gguf',
+      }),
+    ),
   ).toBe(ProviderName.Qwen);
 });
 
 test('local model provider prioritizes family metadata over a conflicting model name', () => {
   expect(
-    resolveLocalModelProvider(model({
-      name: 'deepseek-r1-distill-qwen-32b',
-      details: { family: 'Qwen2.5' },
-    })),
+    resolveLocalModelProvider(
+      model({
+        name: 'deepseek-r1-distill-qwen-32b',
+        details: { family: 'Qwen2.5' },
+      }),
+    ),
   ).toBe(ProviderName.Qwen);
 });
 

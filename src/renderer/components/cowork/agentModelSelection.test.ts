@@ -11,8 +11,18 @@ const models: Model[] = [
   { id: 'deepseek-v3.2', name: 'DeepSeek Server', providerKey: 'openai', isServerModel: true },
 ];
 
-const visionModel: Model = { id: 'qwen3.5-plus', name: 'Qwen3.5 Plus', providerKey: 'qwen', supportsImage: true };
-const nonVisionModel: Model = { id: 'glm-5.1', name: 'GLM 5.1', providerKey: 'zhipu', supportsImage: false };
+const visionModel: Model = {
+  id: 'qwen3.5-plus',
+  name: 'Qwen3.5 Plus',
+  providerKey: 'qwen',
+  supportsImage: true,
+};
+const nonVisionModel: Model = {
+  id: 'glm-5.1',
+  name: 'GLM 5.1',
+  providerKey: 'zhipu',
+  supportsImage: false,
+};
 const ineligibleLlamaCppModel: Model = {
   id: 'qwen-local',
   name: 'qwen-local',

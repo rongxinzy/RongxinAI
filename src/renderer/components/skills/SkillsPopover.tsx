@@ -39,12 +39,15 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
   // Filter enabled skills
   const filteredSkills = skills.filter(s => s.enabled);
 
-  const handleSelectSkill = useCallback((skillId: string) => {
-    const skill = skills.find(s => s.id === skillId);
-    if (skill) {
-      onSelectSkill(skill);
-    }
-  }, [skills, onSelectSkill]);
+  const handleSelectSkill = useCallback(
+    (skillId: string) => {
+      const skill = skills.find(s => s.id === skillId);
+      if (skill) {
+        onSelectSkill(skill);
+      }
+    },
+    [skills, onSelectSkill],
+  );
 
   const handleManageSkills = useCallback(() => {
     onManageSkills();
@@ -69,11 +72,9 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
             className="bg-transparent focus:ring-0"
           />
           <CommandList className="max-h-64">
-            <CommandEmpty>
-              {i18nService.t('noSkillsAvailable')}
-            </CommandEmpty>
+            <CommandEmpty>{i18nService.t('noSkillsAvailable')}</CommandEmpty>
             <CommandGroup>
-              {filteredSkills.map((skill) => {
+              {filteredSkills.map(skill => {
                 const isActive = activeSkillIds.includes(skill.id);
                 return (
                   <CommandItem
@@ -83,11 +84,11 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                     data-checked={isActive || undefined}
                     className="flex items-start gap-3 px-3 py-2.5"
                   >
-                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                      isActive
-                        ? 'bg-primary text-white'
-                        : 'bg-muted'
-                    }`}>
+                    <div
+                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                        isActive ? 'bg-primary text-white' : 'bg-muted'
+                      }`}
+                    >
                       {isActive ? (
                         <Check className="h-4 w-4" />
                       ) : (
@@ -96,11 +97,11 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium truncate ${
-                          isActive
-                            ? 'text-primary'
-                            : 'text-foreground'
-                        }`}>
+                        <span
+                          className={`text-sm font-medium truncate ${
+                            isActive ? 'text-primary' : 'text-foreground'
+                          }`}
+                        >
                           {skill.name}
                         </span>
                         {skill.isOfficial && (
@@ -110,7 +111,11 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}
+                        {skillService.getLocalizedSkillDescription(
+                          skill.id,
+                          skill.name,
+                          skill.description,
+                        )}
                       </p>
                     </div>
                   </CommandItem>
