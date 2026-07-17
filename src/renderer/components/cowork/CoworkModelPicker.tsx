@@ -22,18 +22,20 @@ export function CoworkModelPicker({
 }: CoworkModelPickerProps) {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger>
-        <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs hover:bg-black/3 dark:hover:bg-white/4 [&_span]:flex-none">
-          {selectedModel ? (
-            <>
-              <ModelSelectorLogo provider={selectedModel.providerKey || selectedModel.provider || 'openai'} />
-              <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
-            </>
-          ) : (
-            <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
-          )}
-        </span>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs hover:bg-black/3 dark:hover:bg-white/4 [&_span]:flex-none">
+            {selectedModel ? (
+              <>
+                <ModelSelectorLogo provider={selectedModel.providerKey || selectedModel.provider || 'openai'} />
+                <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
+              </>
+            ) : (
+              <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
+            )}
+          </span>
+        }
+      />
       <PopoverContent
         className="w-72 p-0 bg-background border ring-0 rounded-md!"
         side="top"

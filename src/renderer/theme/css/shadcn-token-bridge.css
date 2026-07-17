@@ -20,7 +20,7 @@
   --input: var(--lobster-input-border);
   --ring: var(--lobster-primary);
   --color-background: var(--lobster-background);
-  --color-muted-foreground: var(--lobster-text-muted);
+  --color-muted-foreground: var(--lobster-text-secondary);
   --radius: var(--lobster-radius);
   --radius-sm: calc(var(--lobster-radius) - 2px);
   --radius-md: var(--lobster-radius);
