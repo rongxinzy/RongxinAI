@@ -5,7 +5,6 @@ export interface ThemeMeta {
   name: string;
   description: string;
   appearance: 'light' | 'dark';
-  preview: string[];
 }
 
 /** A theme must provide a CSS value for every key in TOKEN_CONTRACT */

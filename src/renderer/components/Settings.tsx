@@ -655,7 +655,6 @@ const Settings: React.FC<SettingsProps> = ({
   // 状态
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
-  const [themeId, setThemeId] = useState<string>(themeService.getThemeId());
   const [language, setLanguage] = useState<LanguageType>('zh');
   const [autoLaunch, setAutoLaunchState] = useState(false);
   const [useSystemProxy, setUseSystemProxy] = useState(false);
@@ -686,7 +685,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [triageUseLocalModel, setTriageUseLocalModel] = useState(false);
   const [triageModelName, setTriageModelName] = useState('');
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
-  const initialThemeIdRef = useRef<string>(themeService.getThemeId());
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
   const didSaveRef = useRef(false);
 
@@ -1184,14 +1182,13 @@ const Settings: React.FC<SettingsProps> = ({
   }, [syncLlamaCppProviderFromConfig]);
 
   useEffect(() => {
-    const initialThemeId = initialThemeIdRef.current;
     const initialTheme = initialThemeRef.current;
     const initialLanguage = initialLanguageRef.current;
     return () => {
       if (didSaveRef.current) {
         return;
       }
-      themeService.restoreTheme(initialThemeId, initialTheme);
+      themeService.setTheme(initialTheme);
       i18nService.setLanguage(initialLanguage, { persist: false });
     };
   }, []);
@@ -2934,7 +2931,6 @@ const Settings: React.FC<SettingsProps> = ({
                 onClick={() => {
                   setTheme(mode);
                   themeService.setTheme(mode);
-                  setThemeId(themeService.getThemeId());
                 }}
                 className="flex flex-col items-center rounded-xl border-2 p-3 transition-colors cursor-pointer"
                 style={{
@@ -3038,62 +3034,6 @@ const Settings: React.FC<SettingsProps> = ({
           })}
         </div>
 
-        <h4 className="text-sm font-medium mb-3 mt-5" style={{ color: 'var(--zy-text-primary)' }}>
-          {i18nService.t('themeColor')}
-        </h4>
-        {(() => {
-          const allThemes = themeService.getAllThemes();
-          const classicThemes = allThemes.filter(
-            t => t.meta.id === 'classic-light' || t.meta.id === 'classic-dark',
-          );
-          const otherThemes = allThemes.filter(
-            t => t.meta.id !== 'classic-light' && t.meta.id !== 'classic-dark',
-          );
-          const renderTile = (t: import('../theme').ThemeDefinition) => {
-            const isSelected = themeId === t.meta.id;
-            const [bg, c1, c2, c3] = t.meta.preview;
-            return (
-              <button
-                key={t.meta.id}
-                type="button"
-                onClick={() => {
-                  themeService.setThemeById(t.meta.id);
-                  setThemeId(t.meta.id);
-                  setTheme(t.meta.appearance as 'light' | 'dark');
-                }}
-                className="flex flex-col items-center rounded-xl border-2 p-2 transition-colors cursor-pointer"
-                style={{
-                  borderColor: isSelected ? 'var(--zy-primary)' : 'var(--zy-border)',
-                  backgroundColor: isSelected ? 'var(--zy-primary-muted)' : undefined,
-                }}
-              >
-                <svg
-                  viewBox="0 0 80 48"
-                  className="w-full h-auto rounded-md mb-1.5 overflow-hidden"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect width="80" height="48" fill={bg} />
-                  <rect x="4" y="6" width="20" height="36" rx="3" fill={c1} opacity="0.7" />
-                  <rect x="28" y="6" width="48" height="36" rx="3" fill={c2} opacity="0.5" />
-                  <circle cx="52" cy="24" r="8" fill={c3} opacity="0.8" />
-                  <rect x="32" y="34" width="40" height="4" rx="2" fill={c1} opacity="0.6" />
-                </svg>
-                <span
-                  className="text-[10px] font-medium truncate w-full text-center"
-                  style={{ color: isSelected ? 'var(--zy-primary)' : 'var(--zy-text-primary)' }}
-                >
-                  {i18nService.t('theme-name-' + t.meta.id) || t.meta.name}
-                </span>
-              </button>
-            );
-          };
-          return (
-            <>
-              <div className="grid grid-cols-2 gap-3 mb-3">{classicThemes.map(renderTile)}</div>
-              <div className="grid grid-cols-4 gap-3">{otherThemes.map(renderTile)}</div>
-            </>
-          );
-        })()}
       </div>
     </div>
   );

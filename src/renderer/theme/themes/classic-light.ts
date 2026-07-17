@@ -7,7 +7,6 @@ export const classicLight: ThemeDefinition = {
     name: '经典浅色',
     description: '原生默认浅色主题，冷调灰白',
     appearance: 'light',
-    preview: ['#F8F9FB', '#3B82F6', '#60A5FA', '#6B7280'],
   },
   tokens: {
     ...SHARED_TOKENS,
