@@ -58,11 +58,11 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
         side="top"
         align="start"
         sideOffset={4}
-        className="w-72 !rounded-md !border-0 !bg-surface p-0 shadow-md !ring-0 !outline-none"
+        className="w-72 rounded-md! border-0! bg-surface! p-0 shadow-md ring-0! outline-none!"
       >
         <Command
           shouldFilter={false}
-          className="!rounded-md !bg-surface [&_[data-slot=input-group]]:!border-0 [&_[data-slot=input-group]]:!bg-transparent [&_[data-slot=input-group]]:!shadow-none [&_[data-slot=input-group]]:!ring-0"
+          className="rounded-md! bg-surface! **:data-[slot=input-group]:border-0! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none! **:data-[slot=input-group]:ring-0!"
         >
           <CommandInput
             placeholder={i18nService.t('searchSkills')}
@@ -83,7 +83,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                     data-checked={isActive || undefined}
                     className="flex items-start gap-3 px-3 py-2.5"
                   >
-                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                       isActive
                         ? 'bg-primary text-white'
                         : 'bg-muted'
@@ -104,7 +104,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                           {skill.name}
                         </span>
                         {skill.isOfficial && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary flex-shrink-0">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary shrink-0">
                             {i18nService.t('official')}
                           </span>
                         )}

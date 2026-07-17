@@ -313,7 +313,7 @@ import { Settings, Plus, Trash } from 'lucide-react';
 - Use TypeScript, functional React components, and Hooks; keep logic in `src/renderer/services/` when it is not UI-specific.
 - Match existing formatting: 2-space indentation, single quotes, and semicolons.
 - Naming: `PascalCase` for components (e.g., `Chat.tsx`), `camelCase` for functions/vars, and `*Slice.ts` for Redux slices.
-- Tailwind CSS is the primary styling approach; prefer utility classes over bespoke CSS.
+- Tailwind CSS v4 is the primary styling approach; prefer utility classes over bespoke CSS. Configuration is CSS-first via `@theme` in `src/renderer/index.css` (no `tailwind.config.js`).
 
 ### File Length Limit
 
@@ -495,23 +495,14 @@ These global skills complement, not replace, the conventions in this file.
 > }
 > ```
 >
-> **CRITICAL: Tailwind v3 vs v4 Variant Syntax**
+> **CRITICAL: Tailwind v4 Variant Syntax**
 >
-> This project uses **Tailwind v3.4**. shadcn components installed via CLI may use **Tailwind v4 shorthand syntax** that Tailwind v3 does not recognize, causing variant classes to silently fail — the class is written to the DOM but no CSS is generated.
+> This project uses **Tailwind v4** (upgraded from v3.4). v4 supports shorthand variant syntax natively:
 >
-> | Variant | Tailwind v4 (shorthand) | Tailwind v3.4 (full syntax) |
-> |---------|------------------------|---------------------------|
-> | `data-*` attribute | `data-active:bg-background` | `data-[active]:bg-background` |
-> | `data-*` with value | `data-checked:bg-primary` | `data-[checked]:bg-primary` |
-> | `data-*` boolean | `data-disabled:opacity-50` | `data-[disabled]:opacity-50` |
+> | Variant | Tailwind v4 (shorthand) |
+> |---------|------------------------|
+> | `data-*` attribute | `data-active:bg-background` |
+> | `data-*` with value | `data-checked:bg-primary` |
+> | `data-*` boolean | `data-disabled:opacity-50` |
 >
-> **How to detect**: Search the compiled CSS for the shorthand variant. If `data-active:bg-background` is in the component source but no matching rule in `dist/assets/index-*.css`, it hasn't been generated.
->
-> **How to fix**: In the shadcn component file (`src/shared/components/ui/<component>.tsx`), find-and-replace all shorthand `data-<attr>:` with full syntax `data-[<attr>]:`. For example:
->
-> ```diff
-> - data-active:bg-background data-active:text-foreground
-> + data-[active]:bg-background data-[active]:text-foreground
-> ```
->
-> **Affected components** (known): `tabs.tsx` — all `data-active:` variants, `data-horizontal:` on Tabs root.
+> **Note**: The full syntax `data-[active]:bg-background` also works in v4, but shorthand is preferred. The upgrade codemod automatically converted v3-style `data-[active]:` to v4-style `data-active:` in all component files.

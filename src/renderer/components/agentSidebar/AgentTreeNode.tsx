@@ -86,7 +86,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
 
   return (
     <div className="space-y-0.5">
-      <div className={`group sticky top-10 ${menuOpen ? 'z-50' : 'z-20'} -ml-[6px] h-7 w-[calc(100%+12px)] bg-surface-raised`}>
+      <div className={`group sticky top-10 ${menuOpen ? 'z-50' : 'z-20'} ml-[-6px] h-7 w-[calc(100%+12px)] bg-surface-raised`}>
         <Button
           variant="ghost"
           className="flex h-full w-full items-center justify-start text-left gap-2 rounded-md py-0 pl-3 pr-12 text-[14px] font-normal text-foreground"
@@ -140,15 +140,15 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
             <div className="min-w-0 max-w-full space-y-0.5">
               {agent.hasLoadError && agent.tasks.length === 0 && (
                 <Button variant="ghost" onClick={() => onRetryLoadTasks(agent.id)}
-                  className="-ml-[6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
+                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
               )}
               {agent.isLoadingTasks && agent.tasks.length === 0 && (
-                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
+                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('loading')}</div>
               )}
               {!agent.isLoadingTasks && !agent.hasLoadError && agent.tasks.length === 0 && (
-                <div className="-ml-[6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('myAgentSidebarNoTasks')}</div>
+                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">{i18nService.t('myAgentSidebarNoTasks')}</div>
               )}
               {agent.tasks.map((task) => (
                 <AgentTaskRow key={task.id} task={task} isBatchMode={isBatchMode} isSelected={selectedIds.has(task.id)}
@@ -159,7 +159,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
               ))}
               {agent.hasLoadError && agent.tasks.length > 0 && (
                 <Button variant="ghost" onClick={() => onRetryLoadTasks(agent.id)}
-                  className="-ml-[6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
+                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10">
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
               )}

@@ -2904,7 +2904,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             </p>
             <div className="space-y-3">
               <div className="flex items-start gap-3 rounded-xl border px-3 py-2 text-sm border-border">
-                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-green-500 shrink-0" />
                 <span>
                   <span className="block font-medium text-foreground">
                     Pi
@@ -2915,7 +2915,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </span>
               </div>
               <div className="flex items-start gap-3 rounded-xl border px-3 py-2 text-sm border-border">
-                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-blue-500 shrink-0" />
                 <span>
                   <span className="block font-medium text-foreground">
                     OpenClaw
@@ -3008,11 +3008,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       <div key={entry.id} className="px-3 py-3 text-xs hover:bg-surface-raised transition-colors">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-foreground break-words">
+                            <div className="font-medium text-foreground wrap-break-word">
                               {entry.text}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             <Button
                               type="button"
                               variant="outline"
@@ -3178,7 +3178,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             </div>
 
             {/* Provider Settings - Right Side */}
-            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
+            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable">
               {(() => {
                 const statusBadge = getProviderStatusBadge(
                   activeProvider,
@@ -3464,7 +3464,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <p className="text-xs text-red-600 dark:text-red-400 font-medium">
                             {i18nService.t('minimaxOAuthStatusError')}
                           </p>
-                          <p className="text-[11px] text-red-600/80 dark:text-red-400/80 break-words">
+                          <p className="text-[11px] text-red-600/80 dark:text-red-400/80 wrap-break-word">
                             {minimaxOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
@@ -3633,7 +3633,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           <p className="text-xs text-red-600 dark:text-red-400 font-medium">
                             {i18nService.t('openaiOAuthStatusError')}
                           </p>
-                          <p className="text-[11px] text-red-600/80 dark:text-red-400/80 break-words">
+                          <p className="text-[11px] text-red-600/80 dark:text-red-400/80 wrap-break-word">
                             {openaiOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
@@ -4546,7 +4546,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   };
 
   return (
-    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 !ring-0 bg-transparent">
+    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 ring-0! bg-transparent">
       <div
         className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content bg-surface shadow-modal border border-border"
         onClick={handleSettingsClick}
@@ -4681,7 +4681,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </span>
               </div>
 
-              <p className="mt-3 text-xs leading-5 text-foreground whitespace-pre-wrap break-words max-h-56 overflow-y-auto">
+              <p className="mt-3 text-xs leading-5 text-foreground whitespace-pre-wrap wrap-break-word max-h-56 overflow-y-auto">
                 {testResult.message}
               </p>
 

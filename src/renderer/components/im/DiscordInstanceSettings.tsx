@@ -118,7 +118,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
         </div>
 
         {/* Status badge */}
-        <div className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+        <div className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
           instanceStatus?.connected
             ? 'bg-green-500/15 text-green-600 dark:text-green-400'
             : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'

@@ -33,12 +33,13 @@ const copyPhotonWasmPlugin = () => ({
   },
 });
 
-export default defineConfig({
+export default defineConfig(async () => ({
   define: {
     // KaTeX ESM bundle references this compile-time constant.
     __VERSION__: JSON.stringify(katexVersion),
   },
   plugins: [
+    (await import('@tailwindcss/vite')).default(),
     react(),
     // CI build-renderer job 跳过 electron 构建（由 build-main job 单独负责）
     // 避免 renderer + main/preload 在同一进程内叠加 heap 导致 OOM
@@ -128,4 +129,4 @@ export default defineConfig({
     },
   },
   clearScreen: false,
-});
+}));

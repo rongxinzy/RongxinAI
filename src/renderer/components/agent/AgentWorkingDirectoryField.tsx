@@ -37,7 +37,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
               aria-label={i18nService.t('agentDefaultWorkingDirectory')}
               className="inline-flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg pl-2.5 pr-2"
             >
-              <Folder className="h-4 w-4 flex-shrink-0" />
+              <Folder className="h-4 w-4 shrink-0" />
               <span className={`truncate ${hasValue ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {truncatePath(value, 40)}
               </span>
@@ -51,7 +51,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
               aria-label={i18nService.t('clear')}
               title={i18nService.t('clear')}
               onClick={() => onChange('')}
-              className="h-full flex-shrink-0 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground"
+              className="h-full shrink-0 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -73,7 +73,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
             variant="outline"
             className="min-w-0 flex-1 flex items-center gap-2 justify-start px-3 py-2 h-auto text-sm font-normal"
           >
-            <Folder className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className={`flex-1 truncate text-left ${value.trim() ? '' : 'text-muted-foreground'}`}>
               {truncatePath(value)}
             </span>
@@ -86,7 +86,7 @@ const AgentWorkingDirectoryField: React.FC<AgentWorkingDirectoryFieldProps> = ({
             size="icon"
             aria-label={i18nService.t('clear')}
             onClick={() => onChange('')}
-            className="h-10 w-10 flex-shrink-0 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="h-10 w-10 shrink-0 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>

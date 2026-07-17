@@ -109,7 +109,7 @@ const EngineStartupOverlay: React.FC = () => {
       };
 
   const element = (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-[9999] flex justify-center">
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-9999 flex justify-center">
       <div className="pointer-events-auto mt-2 w-full max-w-sm animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
         <div className="flex items-start gap-3 px-4 py-3">
           <span

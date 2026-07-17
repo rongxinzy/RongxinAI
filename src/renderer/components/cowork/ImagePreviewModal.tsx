@@ -56,7 +56,7 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
       role="dialog"
       aria-modal="true"
       aria-label={label}
-      className="fixed inset-0 z-[10000] flex flex-col bg-neutral-950/70 backdrop-blur-sm"
+      className="fixed inset-0 z-10000 flex flex-col bg-neutral-950/70 backdrop-blur-sm"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
     >

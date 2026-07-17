@@ -92,7 +92,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
           onValueChange={setSearchQuery}
           placeholder={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
         />
-        <CommandList className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-2">
+        <CommandList className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2">
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
               <Spinner />
@@ -109,7 +109,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                     key={session.id}
                     value={session.title}
                     onSelect={() => void handleSelectSession(session)}
-                    className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                    className="hover:bg-black/3 dark:hover:bg-white/4"
                   >
                     {isRunning && <Spinner />}
                     <span className="min-w-0 flex-1 truncate">{session.title}</span>

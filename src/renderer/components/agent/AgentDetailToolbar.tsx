@@ -24,7 +24,7 @@ const AgentDetailToolbar: React.FC<AgentDetailToolbarProps> = ({
       className="flex h-8 min-w-0 items-center gap-1 rounded-lg bg-surface-raised/70 pl-2 text-foreground"
       title={i18nService.t('agentDefaultModel')}
     >
-      <Box className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+      <Box className="h-4 w-4 shrink-0 text-muted-foreground" />
       <ModelSelector
         dropdownDirection="up"
         value={model}

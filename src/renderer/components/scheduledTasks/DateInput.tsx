@@ -206,7 +206,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
         createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[9999] rounded-lg shadow-lg bg-surface border border-border p-3 select-none"
+            className="fixed z-9999 rounded-lg shadow-lg bg-surface border border-border p-3 select-none"
             style={{ top: pos.top, left: pos.left, minWidth: 240 }}
           >
             {/* Month/Year nav */}

@@ -224,7 +224,7 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
               {filePath}
             </span>
           )}
-          <span className="flex items-center gap-1.5 text-[10px] flex-shrink-0">
+          <span className="flex items-center gap-1.5 text-[10px] shrink-0">
             {stats.added > 0 && (
               <span className="text-green-600 dark:text-green-400 font-medium">+{stats.added}</span>
             )}
@@ -234,7 +234,7 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
           </span>
         </div>
         {/* View mode toggle */}
-        <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 rounded-md p-0.5 flex-shrink-0">
+        <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 rounded-md p-0.5 shrink-0">
           <Button variant={viewMode === 'unified' ? 'secondary' : 'ghost'} size="xs" onClick={() => setViewMode('unified')}>Unified</Button>
           <Button variant={viewMode === 'split' ? 'secondary' : 'ghost'} size="xs" onClick={() => setViewMode('split')}>Split</Button>
         </div>

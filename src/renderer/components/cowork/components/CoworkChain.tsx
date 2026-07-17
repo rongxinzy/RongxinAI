@@ -145,7 +145,7 @@ export const CoworkChain: React.FC<{
                   {hasText(display) && (
                     <div className="mt-1 px-3 py-2 rounded-lg bg-surface-raised max-h-64 overflow-y-auto">
                       <pre
-                        className={`text-xs whitespace-pre-wrap break-words font-mono ${
+                        className={`text-xs whitespace-pre-wrap wrap-break-word font-mono ${
                           isError ? "text-red-500" : "text-foreground"
                         }`}
                       >

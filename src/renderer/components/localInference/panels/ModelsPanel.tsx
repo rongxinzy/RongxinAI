@@ -308,8 +308,8 @@ function ModelCard({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-        'relative min-h-[8.5rem] cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
-        'w-full max-w-[22rem]',
+        'relative min-h-34 cursor-grab select-none gap-0 border border-border/70 bg-background/95 py-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+        'w-full max-w-88',
         'hover:border-border hover:shadow-[0_12px_32px_rgba(15,23,42,0.06)]',
         isRunning && 'border-primary/30 shadow-[0_12px_32px_rgba(59,130,246,0.08)]',
         (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
@@ -325,11 +325,11 @@ function ModelCard({
       {isRunning ? (
         <span
           aria-label={i18nService.t('localInferenceStatus_running')}
-          className="absolute right-3 top-3 size-2 rounded-full bg-[var(--lobster-success)] animate-pulse"
+          className="absolute right-3 top-3 size-2 rounded-full bg-(--lobster-success) animate-pulse"
         />
       ) : null}
       {loadingModel || unloading ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
           <Button
             type="button"
             disabled

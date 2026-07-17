@@ -16,7 +16,7 @@ const getSubscriptionBadge = (label: string) => {
 
   if (isPro) {
     return {
-      bg: 'bg-gradient-to-r from-amber-500 to-yellow-400',
+      bg: 'bg-linear-to-r from-amber-500 to-yellow-400',
       text: 'text-white',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
@@ -27,7 +27,7 @@ const getSubscriptionBadge = (label: string) => {
   }
   if (isAdvanced) {
     return {
-      bg: 'bg-gradient-to-r from-purple-500 to-violet-400',
+      bg: 'bg-linear-to-r from-purple-500 to-violet-400',
       text: 'text-white',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
@@ -38,7 +38,7 @@ const getSubscriptionBadge = (label: string) => {
   }
   if (isStandard) {
     return {
-      bg: 'bg-gradient-to-r from-blue-500 to-cyan-400',
+      bg: 'bg-linear-to-r from-blue-500 to-cyan-400',
       text: 'text-white',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
@@ -127,7 +127,7 @@ const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const hasCredits = creditItems.length > 0;
 
   return (
-    <div className="absolute bottom-full left-[-0.5rem] mb-1 w-[14.5rem] bg-surface rounded-xl shadow-popover border border-border overflow-hidden z-50 popover-enter">
+    <div className="absolute bottom-full -left-2 mb-1 w-58 bg-surface rounded-xl shadow-popover border border-border overflow-hidden z-50 popover-enter">
       {/* Account info */}
       <div className="px-4 py-3 border-b border-border">
         <div className="text-sm font-medium text-foreground truncate">
@@ -263,7 +263,7 @@ const LoginButton: React.FC = () => {
         type="button"
         variant="ghost"
         onClick={handleClick}
-        className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] cursor-pointer"
+        className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4 cursor-pointer"
       >
         {isLoggedIn ? (
           <>

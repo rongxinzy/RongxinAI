@@ -159,7 +159,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                       {findings.map((finding, idx) => (
                         <div key={`${finding.ruleId}-${idx}`} className="pl-6 text-xs">
                           <div className="flex items-start gap-1.5">
-                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${SEVERITY_DOTS[finding.severity] || SEVERITY_DOTS.warning}`} />
+                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${SEVERITY_DOTS[finding.severity] || SEVERITY_DOTS.warning}`} />
                             <div>
                               <p className="text-foreground">
                                 {i18nService.t(finding.description) || finding.description}

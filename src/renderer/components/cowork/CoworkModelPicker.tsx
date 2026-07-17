@@ -23,7 +23,7 @@ export function CoworkModelPicker({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger>
-        <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs hover:bg-black/[0.03] dark:hover:bg-white/[0.04] [&_span]:flex-none">
+        <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs hover:bg-black/3 dark:hover:bg-white/4 [&_span]:flex-none">
           {selectedModel ? (
             <>
               <ModelSelectorLogo provider={selectedModel.providerKey || selectedModel.provider || 'openai'} />
@@ -35,12 +35,12 @@ export function CoworkModelPicker({
         </span>
       </PopoverTrigger>
       <PopoverContent
-        className="w-72 p-0 bg-background border ring-0 !rounded-md"
+        className="w-72 p-0 bg-background border ring-0 rounded-md!"
         side="top"
         align="start"
         sideOffset={4}
       >
-        <Command className="bg-background !rounded-md [&_[data-slot=input-group]]:bg-transparent [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted-foreground">
+        <Command className="bg-background rounded-md! **:data-[slot=input-group]:bg-transparent **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground">
           <CommandInput placeholder={i18nService.t('searchModels')} />
           <CommandList>
             <CommandGroup heading={i18nService.t('serverModels')}>
@@ -48,7 +48,7 @@ export function CoworkModelPicker({
                 <CommandItem
                   key={model.id}
                   value={model.name}
-                  className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                  className="hover:bg-black/3 dark:hover:bg-white/4"
                   onSelect={() => {
                     onSelect(model);
                     onOpenChange(false);

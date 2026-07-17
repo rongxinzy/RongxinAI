@@ -280,7 +280,7 @@ const createMarkdownComponents = (
   onImageClick?: (image: { src: string; alt?: string | null }) => void,
 ) => ({
   p: ({ node: _node, className: _className, children, ...props }: any) => (
-    <p className="my-1 first:mt-0 last:mb-0 leading-[23px] text-foreground/90 break-words" {...props}>
+    <p className="my-1 first:mt-0 last:mb-0 leading-[23px] text-foreground/90 wrap-break-word" {...props}>
       {children}
     </p>
   ),
@@ -315,7 +315,7 @@ const createMarkdownComponents = (
     </ol>
   ),
   li: ({ node: _node, className: _className, children, ...props }: any) => (
-    <li className="my-0.5 leading-[23px] text-foreground/90 break-words" {...props}>
+    <li className="my-0.5 leading-[23px] text-foreground/90 wrap-break-word" {...props}>
       {children}
     </li>
   ),

@@ -859,7 +859,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex flex-col"
+      className="fixed inset-0 z-200 flex flex-col"
       style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -870,7 +870,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({ code, lang, i
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="bg-surface-raised px-4 py-2 flex items-center justify-between border-b border-border flex-shrink-0">
+        <div className="bg-surface-raised px-4 py-2 flex items-center justify-between border-b border-border shrink-0">
           <span className="font-mono text-xs text-muted-foreground opacity-70">{lang ?? 'code'}</span>
           <div className="flex items-center gap-0.5">
             <CodeBlockTooltip content={searchOpen ? t('codeBlockSearchClose') : t('codeBlockSearch')}>

@@ -646,7 +646,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <LocalInferenceTabSelector
