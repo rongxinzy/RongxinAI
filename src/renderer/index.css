@@ -1,4 +1,4 @@
-/* Theme system: CSS variable definitions for all 12 themes */
+/* Theme system: CSS variable definitions for the light/dark themes */
 @import './theme/css/themes.css';
 @import './theme/css/base.css';
 @import './theme/css/shadcn-token-bridge.css';
