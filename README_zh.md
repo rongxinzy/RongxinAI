@@ -14,7 +14,10 @@
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-brightgreen?style=for-the-badge" alt="Platform">
   <br>
   <img src="https://img.shields.io/badge/Electron-40-47848F?style=for-the-badge&logo=electron&logoColor=white" alt="Electron">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Vite-8%20(Rolldown)-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Bun-1.3-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun">
 </p>
 
 <p align="center">
@@ -50,35 +53,37 @@
 ### 环境要求
 
 - Node.js `>=24 <25`
-- npm
+- Bun `>=1.3`（包管理器；所有脚本也可用 `npm run` 等价执行）
 
 ### 本地开发
 
 ```bash
 git clone https://github.com/rongxinzy/RongxinAI.git RongxinAI
 cd RongxinAI
-npm install
-npm run electron:dev
+bun install
+bun run electron:dev
 ```
-### 开发环境下使用llama服务
-```bash
-# 安装llamacpp服务
-npm run llamacpp:runtime:download
-# 安装openclaw服务
-npm run electron:dev:openclaw
 
-npm run electron:dev
-```
 当前仓库名称仍然保留为 `RongxinAI`，以兼容现有代码与流程。
 
 默认 Vite 开发服务器地址为 `http://localhost:5175`。
 
+### 开发环境下使用 llama 服务
+
+```bash
+# 安装 llamacpp 服务
+bun run llamacpp:runtime:download
+# 安装 openclaw 服务
+bun run electron:dev:openclaw
+
+bun run electron:dev
+```
+
 ### 使用 OpenClaw 与 llama.cpp 开发
 
 ```bash
-npm run electron:dev:openclaw
+bun run electron:dev:openclaw
 ```
-
 
 该命令会确保固定版本的 OpenClaw runtime、准备当前主机所需的 llama.cpp runtime，并启动 Electron 开发应用。
 
@@ -93,18 +98,19 @@ npm run electron:dev:openclaw
 ## 构建与打包
 
 ```bash
-npm run build
-npm run lint
-npm test
-npm run compile:electron
+bun run build              # TypeScript 类型检查 + Vite 生产构建
+bun run lint               # oxlint 代码检查
+bun run format             # oxfmt 格式化（检查：bun run format:check）
+bun test                   # Vitest 单元测试
+bun run compile:electron   # 仅编译 Electron 主进程
 ```
 
 平台打包：
 
 ```bash
-npm run dist:mac
-npm run dist:win
-npm run dist:linux
+bun run dist:mac
+bun run dist:win
+bun run dist:linux
 ```
 
 桌面安装包会包含所需的 OpenClaw runtime。本地推理链路使用 llama.cpp，并通过项目脚本独立管理对应 runtime。
@@ -163,9 +169,10 @@ Cowork 是核心会话系统。用户任务从 Renderer 通过 IPC 发送到 Mai
 | 层 | 技术 |
 | --- | --- |
 | 桌面框架 | Electron 40 |
-| 前端 | React 18 + TypeScript |
-| 构建 | Vite 5 |
-| 样式 | Tailwind CSS |
+| 前端 | React 19 + TypeScript 7 |
+| 构建 | Vite 8（Rolldown） |
+| 样式 | Tailwind CSS 4 |
+| 工具链 | Bun（包管理器）、oxlint、oxfmt |
 | 状态管理 | Redux Toolkit |
 | Agent runtime | OpenClaw |
 | 本地模型 | llama.cpp |

@@ -14,7 +14,10 @@
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-brightgreen?style=for-the-badge" alt="Platform">
   <br>
   <img src="https://img.shields.io/badge/Electron-40-47848F?style=for-the-badge&logo=electron&logoColor=white" alt="Electron">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Vite-8%20(Rolldown)-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Bun-1.3-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun">
 </p>
 
 <p align="center">
@@ -50,15 +53,15 @@ LEO uses Electron with strict process isolation. The Renderer hosts the React UI
 ### Requirements
 
 - Node.js `>=24 <25`
-- npm
+- Bun `>=1.3` (package manager; `npm run` equivalents work for all scripts)
 
 ### Local Development
 
 ```bash
 git clone https://github.com/rongxinzy/RongxinAI.git RongxinAI
 cd RongxinAI
-npm install
-npm run electron:dev
+bun install
+bun run electron:dev
 ```
 
 The current repository name remains `RongxinAI` for compatibility.
@@ -68,7 +71,7 @@ The Vite dev server runs at `http://localhost:5175` by default.
 ### Develop With OpenClaw And llama.cpp
 
 ```bash
-npm run electron:dev:openclaw
+bun run electron:dev:openclaw
 ```
 
 This command ensures the pinned OpenClaw runtime, prepares the llama.cpp runtime for the current host, and starts the Electron development app.
@@ -84,18 +87,19 @@ Useful OpenClaw build variables:
 ## Build And Package
 
 ```bash
-npm run build
-npm run lint
-npm test
-npm run compile:electron
+bun run build              # TypeScript typecheck + Vite production build
+bun run lint               # oxlint
+bun run format             # oxfmt (check: bun run format:check)
+bun test                   # Vitest
+bun run compile:electron   # Electron main process only
 ```
 
 Platform packages:
 
 ```bash
-npm run dist:mac
-npm run dist:win
-npm run dist:linux
+bun run dist:mac
+bun run dist:win
+bun run dist:linux
 ```
 
 The packaged desktop app includes the required OpenClaw runtime. The local inference stack uses llama.cpp and manages its runtime separately through the app scripts.
@@ -152,9 +156,10 @@ Scheduled tasks can be created from natural language or through the GUI. When a 
 | Layer | Technology |
 | --- | --- |
 | Desktop | Electron 40 |
-| Frontend | React 18 + TypeScript |
-| Build | Vite 5 |
-| Styling | Tailwind CSS |
+| Frontend | React 19 + TypeScript 7 |
+| Build | Vite 8 (Rolldown) |
+| Styling | Tailwind CSS 4 |
+| Tooling | Bun (package manager), oxlint, oxfmt |
 | State | Redux Toolkit |
 | Agent runtime | OpenClaw |
 | Local models | llama.cpp |
