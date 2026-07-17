@@ -57,8 +57,9 @@ if (-not (Test-Path 'C:\nodejs\node.exe')) {
 Add-ToPath 'C:\nodejs'
 Add-ToPath 'C:\Program Files (x86)\NSIS'
 
-# 按 package-lock 安装项目依赖，并安装 pnpm 供 OpenClaw 构建步骤使用。
-npm ci
+# 按 bun.lock 安装项目依赖（包管理器已迁移到 Bun），并安装 pnpm 供 OpenClaw 构建步骤使用。
+npm install -g bun --registry https://registry.npmmirror.com
+bun install
 npm install -g pnpm --registry https://registry.npmmirror.com
 
 # CI 中 Vite 渲染构建需要超过默认 4GB 堆内存；在 npm run 之前设置确保生效。

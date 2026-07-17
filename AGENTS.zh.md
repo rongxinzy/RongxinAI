@@ -14,8 +14,11 @@ npm run electron:dev:openclaw
 # 构建生产包（TypeScript + Vite）
 npm run build
 
-# 使用 ESLint 进行代码检查
+# 使用 oxlint 进行代码检查（配置：.oxlintrc.json）
 npm run lint
+
+# 使用 oxfmt 格式化（配置：.oxfmtrc.json）
+npm run format
 
 # 运行单元测试（Vitest）
 npm test
@@ -32,7 +35,7 @@ npm run dist:linux      # Linux (.AppImage)
 npm run openclaw:runtime:host   # 当前平台
 ```
 
-**要求**：Node.js >=24 <25。Windows 构建需要 PortableGit（详见 README.md）。
+**要求**：Node.js >=24 <25，Bun >=1.3（包管理器；使用 `bun install` 代替 `npm install`，锁文件为 `bun.lock`）。Windows 构建需要 PortableGit（详见 README.md）。
 
 **OpenClaw 环境变量**：`OPENCLAW_SRC`（默认 `../openclaw`）、`OPENCLAW_FORCE_BUILD=1`（强制重建）、`OPENCLAW_SKIP_ENSURE=1`（跳过版本检出）。
 
