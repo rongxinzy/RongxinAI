@@ -586,14 +586,11 @@ select::-ms-expand {
   background-color: var(--zy-primary);
 }
 [data-slot='switch-thumb'] {
-  transition: transform 200ms ease !important;
+  transition: translate 200ms ease !important;
 }
-[data-slot='switch-thumb'][data-unchecked] {
-  transform: translateX(0);
-}
-[data-slot='switch-thumb'][data-checked] {
-  transform: translateX(calc(100% - 2px));
-}
+/* v4 component classes handle thumb positioning via translate-x-* utilities.
+   Do not override here — let items-center on the track handle vertical
+   centering, and component translate-x handle horizontal positioning. */
 
 /* Slider: zhiyuan theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
 [data-slot='slider-track'] {
