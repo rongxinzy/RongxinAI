@@ -1,20 +1,20 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "CommonJS",
+    "module": "NodeNext",
     "jsx": "react-jsx",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
+    "strict": false,
     "sourceMap": true,
-    "baseUrl": ".",
+    "rootDir": "./src",
     "outDir": "dist-electron",
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
     "paths": {
-      "@shared/*": ["src/shared/*"],
-      "*": ["node_modules/*"]
+      "@shared/*": ["./src/shared/*"]
     }
   },
   "include": ["src/main", "src/common", "src/shared"],

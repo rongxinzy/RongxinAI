@@ -81,7 +81,7 @@ build-renderer:
   variables:
     VITE_SKIP_ELECTRON: '1'
   script:
-    - npx tsc --noEmit
+    - node node_modules/typescript7/bin/tsc --noEmit
     - node --max-old-space-size=4096 node_modules/.bin/vite build --sourcemap false
     - test -f dist/index.html
   rules:
@@ -101,7 +101,7 @@ build-main:
     - job: lint
       optional: true
   script:
-    - npx --no-install tsc --project electron-tsconfig.json
+    - node node_modules/typescript7/bin/tsc --project electron-tsconfig.json
     - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
     - test -n "$(find dist-electron -name "main.js" -o -name "preload.js")"
   artifacts:

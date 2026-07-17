@@ -2343,7 +2343,7 @@ async function handleRequest(
       return;
     }
 
-    const { getCurrentCopilotToken, refreshCopilotTokenNow } = await import('./copilotTokenManager');
+    const { getCurrentCopilotToken, refreshCopilotTokenNow } = await import('./copilotTokenManager.js');
 
     let tokenState = getCurrentCopilotToken();
     if (!tokenState) {

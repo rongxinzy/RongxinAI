@@ -4839,7 +4839,7 @@ if (!gotTheLock) {
   ipcMain.handle('im:dingtalk:instance:add', async (_event, name: string) => {
     try {
       const instanceId = crypto.randomUUID();
-      const { DEFAULT_DINGTALK_OPENCLAW_CONFIG: defaults } = await import('./im/types');
+      const { DEFAULT_DINGTALK_OPENCLAW_CONFIG: defaults } = await import('./im/types.js');
       const instance = {
         ...defaults,
         instanceId,
@@ -4889,7 +4889,7 @@ if (!gotTheLock) {
   ipcMain.handle('im:qq:instance:add', async (_event, name: string) => {
     try {
       const instanceId = crypto.randomUUID();
-      const { DEFAULT_QQ_CONFIG: defaults } = await import('./im/types');
+      const { DEFAULT_QQ_CONFIG: defaults } = await import('./im/types.js');
       const instance = {
         ...defaults,
         instanceId,
@@ -4939,7 +4939,7 @@ if (!gotTheLock) {
   ipcMain.handle('im:feishu:instance:add', async (_event, name: string) => {
     try {
       const instanceId = crypto.randomUUID();
-      const { DEFAULT_FEISHU_OPENCLAW_CONFIG: defaults } = await import('./im/types');
+      const { DEFAULT_FEISHU_OPENCLAW_CONFIG: defaults } = await import('./im/types.js');
       const instance = {
         ...defaults,
         instanceId,
@@ -4989,7 +4989,7 @@ if (!gotTheLock) {
   ipcMain.handle('im:wecom:instance:add', async (_event, name: string) => {
     try {
       const instanceId = crypto.randomUUID();
-      const { DEFAULT_WECOM_CONFIG: defaults } = await import('./im/types');
+      const { DEFAULT_WECOM_CONFIG: defaults } = await import('./im/types.js');
       const instance = {
         ...defaults,
         instanceId,
@@ -5039,7 +5039,7 @@ if (!gotTheLock) {
   ipcMain.handle('im:telegram:instance:add', async (_event, name: string) => {
     try {
       const instanceId = crypto.randomUUID();
-      const { DEFAULT_TELEGRAM_OPENCLAW_CONFIG: defaults } = await import('./im/types');
+      const { DEFAULT_TELEGRAM_OPENCLAW_CONFIG: defaults } = await import('./im/types.js');
       const instance = {
         ...defaults,
         instanceId,
@@ -5089,7 +5089,7 @@ if (!gotTheLock) {
   ipcMain.handle('im:discord:instance:add', async (_event, name: string) => {
     try {
       const instanceId = crypto.randomUUID();
-      const { DEFAULT_DISCORD_OPENCLAW_CONFIG: defaults } = await import('./im/types');
+      const { DEFAULT_DISCORD_OPENCLAW_CONFIG: defaults } = await import('./im/types.js');
       const instance = {
         ...defaults,
         instanceId,
@@ -5187,7 +5187,7 @@ if (!gotTheLock) {
 
   // GitHub Copilot device code authentication handlers
   ipcMain.handle('github-copilot:request-device-code', async () => {
-    const { requestDeviceCode } = await import('./libs/githubCopilotAuth');
+    const { requestDeviceCode } = await import('./libs/githubCopilotAuth.js');
     try {
       const result = await requestDeviceCode();
       return {
@@ -5203,7 +5203,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('github-copilot:poll-for-token', async (_event, { deviceCode, interval, expiresIn }: { deviceCode: string; interval: number; expiresIn: number }) => {
-    const { pollForAccessToken, getCopilotToken, getGitHubUser } = await import('./libs/githubCopilotAuth');
+    const { pollForAccessToken, getCopilotToken, getGitHubUser } = await import('./libs/githubCopilotAuth.js');
     try {
       const githubAccessToken = await pollForAccessToken(deviceCode, interval, expiresIn);
       const githubUser = await getGitHubUser(githubAccessToken);
@@ -5219,7 +5219,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('github-copilot:cancel-polling', async () => {
-    const { cancelPolling } = await import('./libs/githubCopilotAuth');
+    const { cancelPolling } = await import('./libs/githubCopilotAuth.js');
     cancelPolling();
   });
 
@@ -5242,7 +5242,7 @@ if (!gotTheLock) {
   // and listens on http://127.0.0.1:1455/auth/callback for the redirect, then
   // writes <CODEX_HOME>/auth.json so the OpenClaw runtime can pick it up.
   ipcMain.handle('openai-codex-oauth:start', async () => {
-    const { startOpenAICodexLogin } = await import('./libs/openaiCodexAuth');
+    const { startOpenAICodexLogin } = await import('./libs/openaiCodexAuth.js');
     try {
       const tokens = await startOpenAICodexLogin();
       return {
@@ -5260,17 +5260,17 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('openai-codex-oauth:cancel', async () => {
-    const { cancelOpenAICodexLogin } = await import('./libs/openaiCodexAuth');
+    const { cancelOpenAICodexLogin } = await import('./libs/openaiCodexAuth.js');
     cancelOpenAICodexLogin();
   });
 
   ipcMain.handle('openai-codex-oauth:logout', async () => {
-    const { logoutOpenAICodex } = await import('./libs/openaiCodexAuth');
+    const { logoutOpenAICodex } = await import('./libs/openaiCodexAuth.js');
     logoutOpenAICodex();
   });
 
   ipcMain.handle('openai-codex-oauth:status', async () => {
-    const { readOpenAICodexAuthFile } = await import('./libs/openaiCodexAuth');
+    const { readOpenAICodexAuthFile } = await import('./libs/openaiCodexAuth.js');
     const tokens = readOpenAICodexAuthFile();
     if (!tokens) return { loggedIn: false as const };
     return {
@@ -6335,7 +6335,7 @@ if (!gotTheLock) {
     initCopilotTokenManager(getStore);
     const storedGithubToken = getStore().get('github_copilot_github_token') as string | undefined;
     if (storedGithubToken) {
-      import('./libs/githubCopilotAuth').then(({ getCopilotToken }) =>
+      import('./libs/githubCopilotAuth.js').then(({ getCopilotToken }) =>
         getCopilotToken(storedGithubToken).then(({ token, expiresAt, baseUrl }) => {
           setCopilotTokenState({ copilotToken: token, baseUrl, expiresAt, githubToken: storedGithubToken });
           console.log('[Main] restored Copilot token state from stored GitHub token');
@@ -6372,7 +6372,7 @@ if (!gotTheLock) {
 
     registerProxyTokenRefresher('github-copilot', async () => {
       try {
-        const { refreshCopilotTokenNow } = await import('./libs/copilotTokenManager');
+        const { refreshCopilotTokenNow } = await import('./libs/copilotTokenManager.js');
         const refreshed = await refreshCopilotTokenNow();
         return refreshed.copilotToken;
       } catch (err) {
