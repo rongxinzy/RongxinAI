@@ -1,9 +1,9 @@
+import { Button21st } from '../../../shared/components/ui/button-21st';
 import type {
   LlamaCppModel,
   LlamaCppModelPreferences,
   LlamaCppRunningModel,
 } from '../../../shared/llamacpp';
-import { Button21st } from '../../../shared/components/ui/button-21st';
 import { ModelsPanel } from '../../components/localInference/panels/ModelsPanel';
 import { i18nService } from '../../services/i18n';
 import {
