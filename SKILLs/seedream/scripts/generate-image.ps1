@@ -14,11 +14,11 @@ $EnvVars = @{}
 $nodePath = Get-Command node -ErrorAction SilentlyContinue
 if ($nodePath) {
     $NodeBin = $nodePath.Path
-} elseif ($env:LOBSTERAI_ELECTRON_PATH -and (Test-Path $env:LOBSTERAI_ELECTRON_PATH)) {
-    $NodeBin = $env:LOBSTERAI_ELECTRON_PATH
+} elseif ($env:ZHIYUAN_ELECTRON_PATH -and (Test-Path $env:ZHIYUAN_ELECTRON_PATH)) {
+    $NodeBin = $env:ZHIYUAN_ELECTRON_PATH
     $EnvVars["ELECTRON_RUN_AS_NODE"] = "1"
 } else {
-    Write-Output '{"success":false,"error":"未找到 Node.js 运行时。请安装 Node.js 或确保 LobsterAI Electron 可用。"}'
+    Write-Output '{"success":false,"error":"未找到 Node.js 运行时。请安装 Node.js 或确保知远智能体 Electron 可用。"}'
     exit 1
 }
 

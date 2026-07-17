@@ -6,9 +6,9 @@ import type { OpenClawPluginApi } from 'openclaw/plugin-sdk';
  *
  * Registers a structured tool that lets the model ask the user a question
  * with predefined options (single/multi select). The tool pauses execution
- * and waits for the user's response via an HTTP callback to LobsterAI.
+ * and waits for the user's response via an HTTP callback to ZhiYuanAgent.
  *
- * This enables delete-confirmation modals on the LobsterAI desktop app
+ * This enables delete-confirmation modals on the ZhiYuanAgent desktop app
  * without relying on OpenClaw's exec.approval mechanism.
  */
 
@@ -138,11 +138,11 @@ const plugin = {
     // Use a factory so the tool is only available for desktop (webchat) sessions.
     // IM channel sessions (qqbot, dingtalk, weixin, feishu, etc.) get null → tool hidden.
     api.registerTool((ctx) => {
-      // Only enable for LobsterAI desktop sessions (sessionKey starts with 'agent:main:lobsterai:').
+      // Only enable for ZhiYuanAgent desktop sessions (sessionKey starts with 'agent:main:zhiyuan:').
       // IM channel sessions (dingtalk, qqbot, weixin, feishu, wecom, etc.) should not have this tool
       // so the model executes delete commands directly without confirmation on IM.
       const sessionKey = ctx.sessionKey ?? '';
-      const isLocalDesktop = sessionKey.startsWith('agent:main:lobsterai:');
+      const isLocalDesktop = sessionKey.startsWith('agent:main:zhiyuan:');
       if (!isLocalDesktop) {
         return null;
       }

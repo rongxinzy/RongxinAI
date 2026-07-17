@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 // [1] Configuration
 // =============================================
 
-const CACHE_DIR = path.join(os.tmpdir(), 'lobsterai-film-cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'zhiyuan-film-cache');
 
 const DEFAULT_CONFIG = {
   preferredPan: ['quark', 'aliyun', 'baidu', 'uc'],
@@ -230,7 +230,7 @@ function buildSearchQueries(keyword, panTypes) {
  */
 function getWebSearchScriptPath() {
   const skillsRoot = process.env.SKILLS_ROOT
-    || process.env.LOBSTERAI_SKILLS_ROOT
+    || process.env.ZHIYUAN_SKILLS_ROOT
     || path.resolve(__dirname, '..', '..');
 
   const candidates = [

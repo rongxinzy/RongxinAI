@@ -25,16 +25,16 @@
 
   ; ── Capture total install start tick (persisted to file for cross-macro access) ──
   System::Call 'kernel32::GetTickCount()i .r9'
-  FileOpen $8 "$APPDATA\RongxinAI\install-start-tick.txt" w
+  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" w
   FileWrite $8 "$r9"
   FileClose $8
 
-  CreateDirectory "$APPDATA\RongxinAI"
+  CreateDirectory "$APPDATA\ZhiYuanAgent"
   ; Clear timing summary file for this install session
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" w
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" w
   FileClose $R9
 
-  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" w
+  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" w
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=custom-init-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
   FileClose $9
@@ -42,7 +42,7 @@
   ; ── Kill every process that might hold file handles in the install dir ──
   ;
   ; 1. 知远.exe — the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
-  ; 2. node.exe whose binary lives inside the 知远 or RongxinAI install tree
+  ; 2. node.exe whose binary lives inside the 知远 install tree
   ;    (Web Search bridge server, MCP servers spawned with detached:true)
   ;
   ; Stop-Process -Force is equivalent to taskkill /F — the processes have no
@@ -54,25 +54,25 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Stop-Process -Name RongxinAI -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
+    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
       $$procs = @();\
       $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process -Name RongxinAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" };\
+      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
+      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" };\
       if ($$procs.Count -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=process-stop-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
   DetailPrint "Stop processes: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Stop 知远 processes: $5 ms$\r$\n"
   FileClose $R9
 
@@ -85,7 +85,7 @@
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$dirs = @(\
       (Join-Path $$env:USERPROFILE \".openclaw\openclaw-weixin\accounts\"),\
-      (Join-Path $$env:APPDATA \"RongxinAI\openclaw\state\openclaw-weixin\accounts\")\
+      (Join-Path $$env:APPDATA \"ZhiYuanAgent\openclaw\state\openclaw-weixin\accounts\")\
     );\
     foreach ($$d in $$dirs) {\
       if (Test-Path $$d) {\
@@ -96,17 +96,17 @@
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=weixin-cleanup-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
   DetailPrint "Clear Weixin sessions: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Clear stale Weixin sessions: $5 ms$\r$\n"
   FileClose $R9
 
   ; ── Backup user-created skills to AppData before extraction overwrites them ──
-  ; Copy non-bundled skills to %APPDATA%\RongxinAI\skills-backup\ so they are
+  ; Copy non-bundled skills to %APPDATA%\ZhiYuanAgent\skills-backup\ so they are
   ; preserved when NSIS extracts the new version over the existing install.
   ; The backup is restored in customInstall after extraction completes.
   ;
@@ -116,7 +116,7 @@
   DetailPrint "[Installer] Backing up user-created skills"
   System::Call 'kernel32::GetTickCount()i .r7'
   ClearErrors
-  FileOpen $R0 "$APPDATA\RongxinAI\skill-migrate.log" w
+  FileOpen $R0 "$APPDATA\ZhiYuanAgent\skill-migrate.log" w
   IfErrors BackupLogOpenFailed
     !insertmacro GetTimestamp $8
     FileWrite $R0 "$8 phase=backup-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
@@ -127,7 +127,7 @@
 
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$src    = \"$INSTDIR\resources\SKILLs\";\
-    $$backup = \"$APPDATA\RongxinAI\skills-backup\";\
+    $$backup = \"$APPDATA\ZhiYuanAgent\skills-backup\";\
     $$config = \"$$src\skills.config.json\";\
     if (Test-Path $$backup) { Remove-Item -Path $$backup -Recurse -Force -ErrorAction SilentlyContinue };\
     if (Test-Path $$src) {\
@@ -155,12 +155,12 @@
     FileWrite $R0 "$8 phase=backup-output text=$1$\r$\n"
     FileClose $R0
   BackupSkipCloseLog:
-  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=skill-backup-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
   DetailPrint "Backup user skills: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Backup user skills: $5 ms$\r$\n"
   FileClose $R9
 
@@ -193,12 +193,12 @@
   SkipOldDirRemoval:
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $9 "$8 phase=old-install-cleanup-complete elapsed_ms=$5 renamed_path=$3 cleanup_mode=async$\r$\n"
   FileClose $9
   DetailPrint "Remove previous install: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Remove previous installation: $5 ms$\r$\n"
   FileClose $R9
 !macroend
@@ -206,10 +206,10 @@
 !macro customInstall
   ; ─── Install Timing Log ───
   ; Write timestamps to help diagnose slow installation phases.
-  ; Log file: %APPDATA%\RongxinAI\install-timing.log
+  ; Log file: %APPDATA%\ZhiYuanAgent\install-timing.log
 
-  CreateDirectory "$APPDATA\RongxinAI"
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  CreateDirectory "$APPDATA\ZhiYuanAgent"
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=nsis-extract-complete$\r$\n"
   FileClose $2
@@ -232,27 +232,27 @@
   CreateDirectory "$INSTDIR\resources\SKILLs"
   DetailPrint "[Installer] Preparing resource directories"
   DetailPrint "[Installer] Adding Windows Defender exclusions before extraction"
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\RongxinAI\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=defender-exclusion-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
   DetailPrint "Defender exclusions: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Defender exclusions: $5 ms$\r$\n"
   FileClose $R9
 
   ; ── Native tar extraction ──
   DetailPrint "[Installer] Extracting bundled resources (native tar)"
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-start tar=$INSTDIR\resources\win-resources.tar dest=$INSTDIR\resources$\r$\n"
   FileClose $2
@@ -265,7 +265,7 @@
 
   ; Diagnostic: log raw exit code with brackets to reveal trailing whitespace
   StrLen $4 $0
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-raw-exit exit_raw=[$0] exit_len=$4$\r$\n"
   FileClose $2
@@ -277,27 +277,27 @@
   IntCmp $0 0 TarExtractOK TarExtractNonZero TarExtractNonZero
 
   TarExtractProcessFailed:
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=process-start-failed$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start tar.exe (exit=$0). This may be caused by antivirus software or a heavily stripped Windows installation. See %APPDATA%\RongxinAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start tar.exe (exit=$0). This may be caused by antivirus software or a heavily stripped Windows installation. See %APPDATA%\ZhiYuanAgent\install-timing.log for details."
     Goto TarExtractOK
 
   TarExtractNonZero:
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=nonzero-exit$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed (exit code $0). See %APPDATA%\RongxinAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-timing.log for details."
   TarExtractOK:
 
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=tar-extract-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $2
   DetailPrint "Extract resources: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Extract bundled resources: $5 ms$\r$\n"
   FileClose $R9
   Delete "$INSTDIR\resources\win-resources.tar"
@@ -325,7 +325,7 @@
     IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendManifestMissing LlamaCppBackendInstallSkip
 
   LlamaCppBackendInstallSkip:
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=no-bundled-resources$\r$\n"
     FileClose $2
@@ -333,7 +333,7 @@
     Goto LlamaCppBackendInstallDone
 
   LlamaCppBackendManifestMissing:
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-manifest$\r$\n"
     FileClose $2
@@ -345,7 +345,7 @@
     IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallRun LlamaCppBackendHelperMissing
 
   LlamaCppBackendHelperMissing:
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-helper$\r$\n"
     FileClose $2
@@ -353,7 +353,7 @@
     Abort
 
   LlamaCppBackendInstallRun:
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=llamacpp-backend-install-start helper=$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs manifest=$INSTDIR\resources\llamacpp-backends\manifest.json local_signing_arg=$R8$\r$\n"
   FileClose $2
@@ -364,8 +364,8 @@
     $$helper = \"$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs\";\
     $$manifest = \"$INSTDIR\resources\llamacpp-backends\manifest.json\";\
     $$resources = \"$INSTDIR\resources\llamacpp-backends\";\
-    $$appData = \"$APPDATA\RongxinAI\";\
-    $$log = \"$APPDATA\RongxinAI\install-llamacpp.log\";\
+    $$appData = \"$APPDATA\ZhiYuanAgent\";\
+    $$log = \"$APPDATA\ZhiYuanAgent\install-llamacpp.log\";\
     if (-not (Test-Path $$electron)) { Write-Output \"missing:electron-runtime\"; exit 20 };\
     if (-not (Test-Path $$helper)) { Write-Output \"missing:llamacpp-helper\"; exit 21 };\
     if (-not (Test-Path $$manifest)) { Write-Output \"missing:llamacpp-manifest\"; exit 22 };\
@@ -376,12 +376,12 @@
   Pop $1
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=llamacpp-backend-install-complete exit=$0 elapsed_ms=$5 output=$1$\r$\n"
   FileClose $2
   DetailPrint "Install llama.cpp backend: $5 ms"
-  FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
   FileWrite $R9 "  Install llama.cpp backend: $5 ms$\r$\n"
   FileClose $R9
   StrCmp $0 "error" LlamaCppBackendInstallFailed
@@ -394,33 +394,33 @@
 
   LlamaCppBackendLocalSigningConfirmationRequired:
     StrCmp $R8 "--local-signing-confirmed" LlamaCppBackendLocalSigningFailed
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-confirmation-required exit=$0 output=$1$\r$\n"
     FileClose $2
-    MessageBox MB_OKCANCEL|MB_ICONQUESTION "The llama.cpp backend contains unsigned executable files. RongxinAI can create a local code-signing certificate and sign only the unsigned llama.cpp files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
+    MessageBox MB_OKCANCEL|MB_ICONQUESTION "The local inference backend contains unsigned executable files. ZhiYuan Agent can create a local code-signing certificate and sign only the unsigned inference files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
 
   LlamaCppBackendLocalSigningConfirmed:
     StrCpy $R8 "--local-signing-confirmed"
     Goto LlamaCppBackendInstallRun
 
   LlamaCppBackendLocalSigningCancelled:
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-cancelled$\r$\n"
     FileClose $2
     Abort
 
   LlamaCppBackendLocalSigningFailed:
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend local signing failed (exit code $0). See %APPDATA%\RongxinAI\install-llamacpp.log and %APPDATA%\RongxinAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend local signing failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-llamacpp.log and %APPDATA%\ZhiYuanAgent\install-timing.log for details."
     Abort
 
   LlamaCppBackendInstallNetworkFailed:
-    MessageBox MB_OK|MB_ICONSTOP "The llama.cpp backend download failed after automatic resume/retry. Please check your network, proxy, or firewall settings and run the installer again. See %APPDATA%\RongxinAI\install-llamacpp.log for details."
+    MessageBox MB_OK|MB_ICONSTOP "The llama.cpp backend download failed after automatic resume/retry. Please check your network, proxy, or firewall settings and run the installer again. See %APPDATA%\ZhiYuanAgent\install-llamacpp.log for details."
     Abort
 
   LlamaCppBackendInstallFailed:
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installation failed (exit code $0). See %APPDATA%\RongxinAI\install-llamacpp.log and %APPDATA%\RongxinAI\install-timing.log for details."
+    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installation failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-llamacpp.log and %APPDATA%\ZhiYuanAgent\install-timing.log for details."
     Abort
 
   LlamaCppBackendInstallDone:
@@ -440,16 +440,16 @@
   ; ── Restore user-created skills from AppData backup ──
   ; The backup was created in customInit before extraction began. Restore any
   ; skills not already present in the new install, then clean up the backup.
-  IfFileExists "$APPDATA\RongxinAI\skills-backup\*.*" 0 SkipSkillRestore
+  IfFileExists "$APPDATA\ZhiYuanAgent\skills-backup\*.*" 0 SkipSkillRestore
     DetailPrint "[Installer] Restoring user-created skills"
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=skill-restore-start$\r$\n"
     FileClose $2
     System::Call 'kernel32::GetTickCount()i .r7'
 
     nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-      $$backup    = \"$APPDATA\RongxinAI\skills-backup\";\
+      $$backup    = \"$APPDATA\ZhiYuanAgent\skills-backup\";\
       $$newSkills = \"$INSTDIR\resources\SKILLs\";\
       Get-ChildItem -Path $$backup -Directory | ForEach-Object {\
         $$target = Join-Path $$newSkills $$_.Name;\
@@ -462,19 +462,19 @@
     Pop $1
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $5 $6 - $7
-    FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=skill-restore-complete exit=$0 elapsed_ms=$5$\r$\n"
     FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
     FileClose $2
     DetailPrint "Restore user skills: $5 ms"
-    FileOpen $R9 "$APPDATA\RongxinAI\install-timing-summary.txt" a
+    FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
     FileWrite $R9 "  Restore user skills: $5 ms$\r$\n"
     FileClose $R9
   SkipSkillRestore:
 
   ; ── Total install time & summary MessageBox ──
-  FileOpen $2 "$APPDATA\RongxinAI\install-start-tick.txt" r
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
   IfErrors TotalTimeSkip
   FileRead $2 $R1
   FileClose $2
@@ -491,12 +491,12 @@
     IntOp $R4 $R4 / 10
     StrCpy $R3 "$R4.$R5 s"
   TotalTimeDone:
-  Delete "$APPDATA\RongxinAI\install-start-tick.txt"
-  Delete "$APPDATA\RongxinAI\install-timing-summary.txt"
+  Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"
+  Delete "$APPDATA\ZhiYuanAgent\install-timing-summary.txt"
   DetailPrint "Total: $R3"
   TotalTimeSkip:
 
-  FileOpen $2 "$APPDATA\RongxinAI\install-timing.log" a
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=install-complete total_ms=$R2$\r$\n"
   FileClose $2
@@ -512,13 +512,13 @@
   ; for the user to close.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Stop-Process -Name RongxinAI -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
+    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
       $$procs = @();\
       $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process -Name RongxinAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*RongxinAI*\" -or $$_.Path -like \"*知远*\" };\
+      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
+      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" };\
       if ($$procs.Count -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'
@@ -528,7 +528,7 @@
 !macro customUnInstall
   ; ─── Remove Windows Defender Exclusion on uninstall ───
   ; Clean up the exclusions we added during installation.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\RongxinAI\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
   Pop $0
   Pop $1
 !macroend

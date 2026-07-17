@@ -75,11 +75,11 @@ test('updateCurrentSessionModelOverride only patches the active session', () => 
     coworkReducer(undefined, addSession(session)),
     updateCurrentSessionModelOverride({
       sessionId: 'session-1',
-      modelOverride: 'lobsterai-server/qwen3.6-plus',
+      modelOverride: 'zhiyuan-server/qwen3.6-plus',
     }),
   );
 
-  expect(activeState.currentSession?.modelOverride).toBe('lobsterai-server/qwen3.6-plus');
+  expect(activeState.currentSession?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
   expect(activeState.currentSession?.updatedAt).toBe(1);
 
   const ignoredState = coworkReducer(
@@ -90,7 +90,7 @@ test('updateCurrentSessionModelOverride only patches the active session', () => 
     }),
   );
 
-  expect(ignoredState.currentSession?.modelOverride).toBe('lobsterai-server/qwen3.6-plus');
+  expect(ignoredState.currentSession?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
 });
 
 test('addSession preserves the agent id in session summaries', () => {

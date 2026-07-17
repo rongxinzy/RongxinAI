@@ -5,8 +5,8 @@
  * Features:
  * - Cross-platform execution for Windows packaging
  * - Optional strict mode via --required
- * - Offline archive support via LOBSTERAI_PORTABLE_UV_ARCHIVE
- * - Mirror URL override via LOBSTERAI_PORTABLE_UV_URL
+ * - Offline archive support via ZHIYUAN_PORTABLE_UV_ARCHIVE
+ * - Mirror URL override via ZHIYUAN_PORTABLE_UV_URL
  */
 
 'use strict';
@@ -19,7 +19,7 @@ const extractZip = require('extract-zip');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'uv-win');
-const UV_VERSION = process.env.LOBSTERAI_WINDOWS_UV_VERSION || '0.8.4';
+const UV_VERSION = process.env.ZHIYUAN_WINDOWS_UV_VERSION || '0.8.4';
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'uv-win-runtime.zip');
 
 function parseArgs(argv) {
@@ -62,14 +62,14 @@ function getWindowsUvAsset() {
   if (arch === 'ARM64') {
     return {
       archive: 'uv-aarch64-pc-windows-msvc.zip',
-      url: process.env.LOBSTERAI_PORTABLE_UV_URL
+      url: process.env.ZHIYUAN_PORTABLE_UV_URL
         || `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-aarch64-pc-windows-msvc.zip`,
     };
   }
 
   return {
     archive: 'uv-x86_64-pc-windows-msvc.zip',
-    url: process.env.LOBSTERAI_PORTABLE_UV_URL
+    url: process.env.ZHIYUAN_PORTABLE_UV_URL
       || `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-pc-windows-msvc.zip`,
   };
 }
@@ -144,12 +144,12 @@ async function downloadArchive(url, destination) {
 }
 
 async function resolveArchive(required) {
-  const envArchive = resolveInputPath(process.env.LOBSTERAI_PORTABLE_UV_ARCHIVE);
+  const envArchive = resolveInputPath(process.env.ZHIYUAN_PORTABLE_UV_ARCHIVE);
   if (envArchive) {
     if (!isNonEmptyFile(envArchive)) {
-      throw new Error(`LOBSTERAI_PORTABLE_UV_ARCHIVE points to an invalid file: ${envArchive}`);
+      throw new Error(`ZHIYUAN_PORTABLE_UV_ARCHIVE points to an invalid file: ${envArchive}`);
     }
-    console.log(`[setup-uv-runtime] Using local archive from LOBSTERAI_PORTABLE_UV_ARCHIVE: ${envArchive}`);
+    console.log(`[setup-uv-runtime] Using local archive from ZHIYUAN_PORTABLE_UV_ARCHIVE: ${envArchive}`);
     return { archivePath: envArchive, source: 'env-archive' };
   }
 
@@ -169,8 +169,8 @@ async function resolveArchive(required) {
     if (required) {
       throw new Error(
         'Unable to obtain portable uv runtime archive. '
-        + 'Set LOBSTERAI_PORTABLE_UV_ARCHIVE to a local offline package or '
-        + 'set LOBSTERAI_PORTABLE_UV_URL to a reachable mirror. '
+        + 'Set ZHIYUAN_PORTABLE_UV_ARCHIVE to a local offline package or '
+        + 'set ZHIYUAN_PORTABLE_UV_URL to a reachable mirror. '
         + `Original error: ${error instanceof Error ? error.message : String(error)}`
       );
     }
@@ -230,7 +230,7 @@ async function ensurePortableUvRuntime(options = {}) {
   const required = Boolean(options.required);
   const shouldRun = process.platform === 'win32'
     || required
-    || process.env.LOBSTERAI_SETUP_UV_RUNTIME_FORCE === '1';
+    || process.env.ZHIYUAN_SETUP_UV_RUNTIME_FORCE === '1';
 
   if (!shouldRun) {
     console.log('[setup-uv-runtime] Skip on non-Windows host (pass --required to force cross-platform preparation).');

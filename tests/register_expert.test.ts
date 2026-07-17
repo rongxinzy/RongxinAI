@@ -4,8 +4,8 @@ import * as path from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { getPiAgentsDir, parseExpertPackage } from '../SKILLs/rongxinai-expert-manager/scripts/register_expert';
-import { validateExpert } from '../SKILLs/rongxinai-expert-manager/scripts/validate_expert';
+import { getPiAgentsDir, parseExpertPackage } from '../SKILLs/zhiyuan-expert-manager/scripts/register_expert';
+import { validateExpert } from '../SKILLs/zhiyuan-expert-manager/scripts/validate_expert';
 
 function createMinimalExpertPackage(dir: string, overrides: Record<string, unknown> = {}) {
   const agentDir = path.join(dir, 'agents');
@@ -67,7 +67,7 @@ function createMinimalExpertPackage(dir: string, overrides: Record<string, unkno
 
 describe('parseExpertPackage', () => {
   test('parses a valid single-agent expert package', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-expert-test-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-test-'));
     try {
       createMinimalExpertPackage(tmpDir);
       const result = parseExpertPackage(tmpDir);
@@ -89,7 +89,7 @@ describe('parseExpertPackage', () => {
   });
 
   test('accepts Windows CRLF agent frontmatter', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-expert-crlf-test-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-crlf-test-'));
     try {
       createMinimalExpertPackage(tmpDir);
       const agentPath = path.join(tmpDir, 'agents', 'test-code-assistant.md');
@@ -104,11 +104,11 @@ describe('parseExpertPackage', () => {
   });
 
   test('copies bundled skills to userData SKILLs directory', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-expert-test-'));
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-userdata-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-test-'));
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-userdata-'));
     try {
       createMinimalExpertPackage(tmpDir);
-      parseExpertPackage(tmpDir, { dbPath: path.join(userDataDir, 'lobsterai.sqlite') });
+      parseExpertPackage(tmpDir, { dbPath: path.join(userDataDir, 'zhiyuan.sqlite') });
 
       const copiedSkillMd = path.join(userDataDir, 'SKILLs', 'hello-skill', 'SKILL.md');
       expect(fs.existsSync(copiedSkillMd)).toBe(true);
@@ -119,7 +119,7 @@ describe('parseExpertPackage', () => {
   });
 
   test('rejects package paths that escape the expert directory', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-expert-test-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-test-'));
     const outsidePath = path.join(path.dirname(tmpDir), 'outside-agent.md');
     try {
       createMinimalExpertPackage(tmpDir, {
@@ -135,8 +135,8 @@ describe('parseExpertPackage', () => {
   });
 
   test('syncs agent MDs to pi agents directory for subagent discovery', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-expert-test-'));
-    const piAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rongxinai-pi-agents-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-test-'));
+    const piAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-pi-agents-'));
     const originalEnv = process.env.PI_CODING_AGENT_DIR;
     try {
       // Point pi agents dir to isolated temp directory

@@ -14,7 +14,7 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 ### 唯一事实来源
 
-颜色只允许通过语义 token 使用，定义于 `src/renderer/theme/tokens/contract.ts`，运行时值为 CSS 变量 `--lobster-*`，Tailwind 工具类经 `src/renderer/theme/tailwind/plugin.cjs` 桥接。
+颜色只允许通过语义 token 使用，定义于 `src/renderer/theme/tokens/contract.ts`，运行时值为 CSS 变量 `--zy-*`，Tailwind 工具类经 `src/renderer/theme/tailwind/plugin.cjs` 桥接。
 
 **禁止：**
 
@@ -87,7 +87,7 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 ## 圆角
 
-基准值 `--lobster-radius` = **8px**，派生刻度（`shadcn-token-bridge.css`）：6 / 8 / 10 / 14px。
+基准值 `--zy-radius` = **8px**，派生刻度（`shadcn-token-bridge.css`）：6 / 8 / 10 / 14px。
 
 | 圆角 | 类名 | 用途 |
 |------|------|------|
@@ -191,7 +191,7 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 提交 UI 代码前逐项自查：
 
-- [ ] 没有直接写死的色值 / Tailwind 默认彩色刻度；全部走 `--lobster-*` token 或其桥接工具类
+- [ ] 没有直接写死的色值 / Tailwind 默认彩色刻度；全部走 `--zy-*` token 或其桥接工具类
 - [ ] 没有 `dark:` 前缀的单独配色（主题差异在 token 层解决）
 - [ ] 字号在五档之内，字重在 400/500/600 之内
 - [ ] 圆角、阴影只用本文件定义的刻度，无任意值

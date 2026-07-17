@@ -16,7 +16,7 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${LLAMACPP_SRC:-/Users/whz/Desktop/rongx/llama.cpp}"
 RUNTIME_DIR="${ROOT_DIR}/vendor/llamacpp-runtime/${TARGET_ID}"
-BUILD_DIR="${SRC_DIR}/build-rongxinai-${TARGET_ID}"
+BUILD_DIR="${SRC_DIR}/build-zhiyuan-${TARGET_ID}"
 
 if [[ ! -d "${SRC_DIR}" ]]; then
   echo "[build-llamacpp-runtime] llama.cpp source not found: ${SRC_DIR}" >&2

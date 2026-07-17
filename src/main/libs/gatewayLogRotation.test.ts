@@ -14,7 +14,7 @@ const tempDirs: string[] = [];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function makeTempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-gateway-log-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-gateway-log-'));
   tempDirs.push(dir);
   return dir;
 }

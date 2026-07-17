@@ -28,7 +28,7 @@ Workspace 表示用户选择的项目目录，是 Cowork 会话执行工具时�
 workspaceId = workspace-<sha256(normalizedPath)[0:24]>
 ```
 
-同一路径在不同会话中得到同一个 Workspace。任务容器目录 `.rongxinai-tasks` 会在归一化时去除，避免同一个项目被显示成多个 Workspace。
+同一路径在不同会话中得到同一个 Workspace。任务容器目录 `.zhiyuan-tasks` 会在归一化时去除，避免同一个项目被显示成多个 Workspace。
 
 ### Agent
 
@@ -307,7 +307,7 @@ npm test
 
 ### 12.4 联网搜索与 Playwright
 
-联网搜索优先使用 RongxinAI `web-search` skill。该 skill 通过 Playwright 控制隔离的本地 Chrome，默认无头搜索，受阻时回退到可见浏览器。已知 URL 优先使用 `web_fetch`，需要登录、表单或复杂动态交互时才使用 `browser`。
+联网搜索优先使用 知远智能体 `web-search` skill。该 skill 通过 Playwright 控制隔离的本地 Chrome，默认无头搜索，受阻时回退到可见浏览器。已知 URL 优先使用 `web_fetch`，需要登录、表单或复杂动态交互时才使用 `browser`。
 
 Windows 执行搜索脚本必须使用 Git Bash/PortableGit，不能直接使用没有 Linux 发行版的 `C:\Windows\System32\bash.exe`。Playwright CLI 操作遵循 `open -> snapshot -> 使用最新 ref -> 页面变化后重新 snapshot` 的流程。
 
@@ -340,7 +340,7 @@ Windows 执行搜索脚本必须使用 Git Bash/PortableGit，不能直接使用
 ### 12.8 产品名称与后端路径兼容
 
 - 设置“关于”、窗口标题、托盘菜单、安装包、可执行文件、安装器和系统应用注册名统一显示为“知远”。
-- `appId`、`rongxinai` 协议 scheme、SQLite 文件名和历史兼容标识保持不变，避免破坏已有安装、协议唤起和数据读取。
-- Windows、macOS 和 Linux 的打包配置只调整产品显示名；安装器仍兼容停止旧版 `RongxinAI.exe` 进程。
-- `%APPDATA%\\RongxinAI` 继续作为首选用户数据目录，OpenClaw 状态、SQLite、技能、模型、日志和更新文件不会迁移到“知远”目录。
-- 如果设备只有旧版 `%APPDATA%\\LobsterAI` 数据目录且没有 `RongxinAI` 目录，启动时仍沿用旧目录，保证历史数据可见。
+- `appId`、`zhiyuan` 协议 scheme、SQLite 文件名和历史兼容标识保持不变，避免破坏已有安装、协议唤起和数据读取。
+- Windows、macOS 和 Linux 的打包配置只调整产品显示名；安装器仍兼容停止旧版 `知远智能体.exe` 进程。
+- `%APPDATA%\\知远智能体` 继续作为首选用户数据目录，OpenClaw 状态、SQLite、技能、模型、日志和更新文件不会迁移到“知远”目录。
+- 旧版 `%APPDATA%\\LobsterAI` 数据目录不再做任何兼容：启动时不回退到旧目录、不迁移历史数据，旧数据就地废弃。

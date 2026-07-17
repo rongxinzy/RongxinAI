@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "A data analysis expert for statistics, visualization, and business intelligence.",
   "author": {
-    "name": "RongxinAI",
-    "email": "dev@rongxinai.com"
+    "name": "ZhiYuanAgent",
+    "email": "dev@zhiyuan.com"
   },
 
   "expertType": "agent",

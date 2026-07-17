@@ -58,7 +58,7 @@ test('resolveRawApiConfig forwards llama.cpp runtime metadata for the selected r
 
   const result = resolveRawApiConfig();
   expect(result.config).toEqual({
-    apiKey: 'sk-lobsterai-local',
+    apiKey: 'sk-zhiyuan-local',
     baseURL: 'http://127.0.0.1:8080/v1',
     model: 'qwen-local',
     apiType: 'openai',
@@ -127,7 +127,7 @@ test('resolveCurrentApiConfig still resolves a running llama.cpp model even when
 
   const result = resolveCurrentApiConfig();
   expect(result.config).toEqual({
-    apiKey: 'lobsterai-openai-compat',
+    apiKey: 'zhiyuan-openai-compat',
     baseURL: expect.stringContaining('/v1'),
     model: 'qwen-small-runtime',
     apiType: 'openai',
@@ -158,7 +158,7 @@ test('resolveRawApiConfigForModelRef resolves an explicit llama.cpp model ref', 
 
   const result = resolveRawApiConfigForModelRef('llamacpp/qwen-explicit');
   expect(result.config).toEqual({
-    apiKey: 'sk-lobsterai-local',
+    apiKey: 'sk-zhiyuan-local',
     baseURL: 'http://127.0.0.1:8080/v1',
     model: 'qwen-explicit',
     apiType: 'openai',

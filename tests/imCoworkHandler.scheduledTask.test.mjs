@@ -45,6 +45,10 @@ class FakeCoworkStore {
     return this.config;
   }
 
+  getAgent() {
+    return null;
+  }
+
   createSession(title, cwd, systemPrompt, executionMode) {
     const id = `session-${++this.sessionCounter}`;
     const session = {
@@ -178,7 +182,7 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
         id: 'job-1',
         name: params.request.taskName,
         agentId: 'main',
-        sessionKey: `agent:main:lobsterai:${params.sessionId}`,
+        sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
         payloadText: params.request.payloadText,
         scheduleAt: params.request.scheduleAt,
       };
@@ -233,7 +237,7 @@ test('async reminder turns on IM-created sessions relay back to the original IM 
       id: 'job-1',
       name: params.request.taskName,
       agentId: 'main',
-      sessionKey: `agent:main:lobsterai:${params.sessionId}`,
+      sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
       payloadText: params.request.payloadText,
       scheduleAt: params.request.scheduleAt,
     }),
@@ -245,6 +249,20 @@ test('async reminder turns on IM-created sessions relay back to the original IM 
 
   await handler.processMessage(createMessage());
   const [session] = [...coworkStore.sessions.values()];
+
+  // Simulate the scheduled reminder turn: the runtime reconciles the turn
+  // messages into the store (authoritative history) and streams them as events.
+  session.messages.length = 0;
+  coworkStore.addMessage(session.id, {
+    type: 'system',
+    content: '⏰ 提醒：喝水',
+    metadata: {},
+  });
+  coworkStore.addMessage(session.id, {
+    type: 'assistant',
+    content: '⏰ 该喝水啦！起身喝一杯水吧。',
+    metadata: {},
+  });
 
   runtime.emit('message', session.id, {
     id: 'system-1',

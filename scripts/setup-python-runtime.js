@@ -3,8 +3,8 @@
  * Prepare bundled Windows Python runtime under resources/python-win.
  *
  * This script mirrors setup-mingit.js behavior:
- * - Supports local offline archive via LOBSTERAI_PORTABLE_PYTHON_ARCHIVE
- * - Supports optional mirror URL via LOBSTERAI_PORTABLE_PYTHON_URL
+ * - Supports local offline archive via ZHIYUAN_PORTABLE_PYTHON_ARCHIVE
+ * - Supports optional mirror URL via ZHIYUAN_PORTABLE_PYTHON_URL
  * - Can run cross-platform for Windows packaging
  * - Bundles interpreter runtime only (no preinstalled skill dependencies)
  */
@@ -21,12 +21,12 @@ const extractZip = require('extract-zip');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'python-win');
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'python-win-runtime.zip');
-const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION = process.env.LOBSTERAI_WINDOWS_EMBED_PYTHON_VERSION || '3.11.9';
+const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION = process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_VERSION || '3.11.9';
 const DEFAULT_WINDOWS_EMBED_PYTHON_ZIP = `python-${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}-embed-amd64.zip`;
-const DEFAULT_WINDOWS_EMBED_PYTHON_URL = process.env.LOBSTERAI_WINDOWS_EMBED_PYTHON_URL
+const DEFAULT_WINDOWS_EMBED_PYTHON_URL = process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_URL
   || `https://www.python.org/ftp/python/${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}/${DEFAULT_WINDOWS_EMBED_PYTHON_ZIP}`;
-const DEFAULT_GET_PIP_URL = process.env.LOBSTERAI_WINDOWS_GET_PIP_URL || 'https://bootstrap.pypa.io/get-pip.py';
-const DEFAULT_PIP_PYZ_URL = process.env.LOBSTERAI_WINDOWS_PIP_PYZ_URL || 'https://bootstrap.pypa.io/pip/pip.pyz';
+const DEFAULT_GET_PIP_URL = process.env.ZHIYUAN_WINDOWS_GET_PIP_URL || 'https://bootstrap.pypa.io/get-pip.py';
+const DEFAULT_PIP_PYZ_URL = process.env.ZHIYUAN_WINDOWS_PIP_PYZ_URL || 'https://bootstrap.pypa.io/pip/pip.pyz';
 const DEFAULT_RUNTIME_URL = DEFAULT_WINDOWS_EMBED_PYTHON_URL;
 
 const REQUIRED_FILES = [
@@ -259,7 +259,7 @@ async function ensurePipPayload(rootDir, options = {}) {
       if (required) {
         throw new Error(
           'Unable to obtain pip runtime archive (pip.pyz). '
-          + 'Set LOBSTERAI_WINDOWS_PIP_PYZ_URL to a reachable mirror if needed. '
+          + 'Set ZHIYUAN_WINDOWS_PIP_PYZ_URL to a reachable mirror if needed. '
           + `Original error: ${error instanceof Error ? error.message : String(error)}`
         );
       }
@@ -373,12 +373,12 @@ async function downloadArchive(url, destination) {
 }
 
 async function resolveArchive(required) {
-  const envArchive = resolveInputPath(process.env.LOBSTERAI_PORTABLE_PYTHON_ARCHIVE);
+  const envArchive = resolveInputPath(process.env.ZHIYUAN_PORTABLE_PYTHON_ARCHIVE);
   if (envArchive) {
     if (!isNonEmptyFile(envArchive)) {
-      throw new Error(`LOBSTERAI_PORTABLE_PYTHON_ARCHIVE points to an invalid file: ${envArchive}`);
+      throw new Error(`ZHIYUAN_PORTABLE_PYTHON_ARCHIVE points to an invalid file: ${envArchive}`);
     }
-    console.log(`[setup-python-runtime] Using local archive from LOBSTERAI_PORTABLE_PYTHON_ARCHIVE: ${envArchive}`);
+    console.log(`[setup-python-runtime] Using local archive from ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${envArchive}`);
     return { archivePath: envArchive, source: 'env-archive' };
   }
 
@@ -387,8 +387,8 @@ async function resolveArchive(required) {
     return { archivePath: DEFAULT_ARCHIVE_PATH, source: 'cache' };
   }
 
-  const urlFromEnv = typeof process.env.LOBSTERAI_PORTABLE_PYTHON_URL === 'string'
-    ? process.env.LOBSTERAI_PORTABLE_PYTHON_URL.trim()
+  const urlFromEnv = typeof process.env.ZHIYUAN_PORTABLE_PYTHON_URL === 'string'
+    ? process.env.ZHIYUAN_PORTABLE_PYTHON_URL.trim()
     : '';
   const downloadUrl = urlFromEnv || DEFAULT_RUNTIME_URL;
 
@@ -396,8 +396,8 @@ async function resolveArchive(required) {
     if (required) {
       throw new Error(
         'Portable Python archive is not available. '
-        + 'Set LOBSTERAI_PORTABLE_PYTHON_ARCHIVE to a local package or '
-        + 'LOBSTERAI_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.'
+        + 'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or '
+        + 'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.'
       );
     }
     console.warn('[setup-python-runtime] Archive URL is not configured; skipping because --required is not set.');
@@ -414,8 +414,8 @@ async function resolveArchive(required) {
     if (required) {
       throw new Error(
         'Unable to obtain portable Python runtime archive. '
-        + 'Set LOBSTERAI_PORTABLE_PYTHON_ARCHIVE to a local offline package or '
-        + 'set LOBSTERAI_PORTABLE_PYTHON_URL to a reachable mirror. '
+        + 'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local offline package or '
+        + 'set ZHIYUAN_PORTABLE_PYTHON_URL to a reachable mirror. '
         + `Original error: ${error instanceof Error ? error.message : String(error)}`
       );
     }
@@ -591,7 +591,7 @@ async function ensurePortablePythonRuntime(options = {}) {
   const required = Boolean(options.required);
   const shouldRun = process.platform === 'win32'
     || required
-    || process.env.LOBSTERAI_SETUP_PYTHON_RUNTIME_FORCE === '1';
+    || process.env.ZHIYUAN_SETUP_PYTHON_RUNTIME_FORCE === '1';
 
   if (!shouldRun) {
     console.log('[setup-python-runtime] Skip on non-Windows host (pass --required to force cross-platform preparation).');
@@ -633,8 +633,8 @@ async function ensurePortablePythonRuntime(options = {}) {
   } else if (required) {
     throw new Error(
       'Portable Python archive is not available for non-Windows host. '
-      + 'Set LOBSTERAI_PORTABLE_PYTHON_ARCHIVE to a local package or '
-      + 'LOBSTERAI_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.'
+      + 'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or '
+      + 'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.'
     );
   } else {
     return { ok: true, skipped: true, pythonPath: null };

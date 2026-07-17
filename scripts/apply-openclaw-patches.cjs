@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Apply version-specific LobsterAI patches to the openclaw source tree.
+ * Apply version-specific ZhiYuanAgent patches to the openclaw source tree.
  *
  * Patches are organised in scripts/patches/<version>/ directories, where
  * <version> matches the "openclaw.version" field in package.json (e.g.
@@ -11,7 +11,7 @@
  *   node scripts/apply-openclaw-patches.cjs [openclaw-src-dir]
  *
  * If openclaw-src-dir is not specified, defaults to ../openclaw relative to
- * the LobsterAI project root.
+ * the ZhiYuanAgent project root.
  *
  * Safe to run multiple times — already-applied patches are skipped.
  */
@@ -63,7 +63,7 @@ if (patchFiles.length === 0) {
 console.log(`[apply-openclaw-patches] Applying patches for openclaw ${openclawVersion} (${patchFiles.length} file(s))`);
 
 // Reset openclaw source to a clean tag state before applying patches.
-// This removes stale patches left by a different LobsterAI branch that may have
+// This removes stale patches left by a different ZhiYuanAgent branch that may have
 // applied different patches for the same openclaw version.
 try {
   execFileSync('git', ['reset', 'HEAD', '.'], { cwd: openclawSrc, stdio: 'pipe' });
@@ -86,7 +86,7 @@ for (const patchFile of patchFiles) {
   const needsNormalize = raw.includes('\r');
   let patchPath = originalPatchPath;
   if (needsNormalize) {
-    patchPath = path.join(os.tmpdir(), `lobsterai-patch-${patchFile}`);
+    patchPath = path.join(os.tmpdir(), `zhiyuan-patch-${patchFile}`);
     fs.writeFileSync(patchPath, raw.replace(/\r/g, ''), 'utf8');
   }
 

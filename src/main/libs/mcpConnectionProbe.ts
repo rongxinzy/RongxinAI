@@ -123,7 +123,7 @@ export async function probeMcpConnection(data: McpServerFormData): Promise<McpCo
   }
 
   const client = new Client(
-    { name: 'rongxinai-mcp-connection-test', version: '1.0.0' },
+    { name: 'zhiyuan-mcp-connection-test', version: '1.0.0' },
     { capabilities: {} },
   );
 

@@ -72,7 +72,7 @@ test('integration: cowork task -> delivery change to webhook -> binding stays', 
 
 test('integration: infer -> persist -> reload uses stored meta (not re-infer)', () => {
   const metaStore = createMetaStore();
-  const wire = makeTask({ sessionKey: 'agent:main:lobsterai:sess-99' });
+  const wire = makeTask({ sessionKey: 'agent:main:zhiyuan:sess-99' });
 
   // 1. First load -- infer
   const model1 = mapper.fromWire(wire);

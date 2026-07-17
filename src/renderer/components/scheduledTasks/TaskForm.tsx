@@ -1154,7 +1154,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ mode, task, prefill, onCancel, onSa
               {i18nService.t('scheduledTasksFormPayloadTextAgent')}<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
             </label>
           </div>
-          <div className="rounded-lg border border-border bg-(--lobster-surface)">
+          <div className="rounded-lg border border-border bg-(--zy-surface)">
             <Textarea
               value={form.payloadText}
               onChange={event => updateForm({ payloadText: event.target.value })}

@@ -218,7 +218,7 @@ export const findThirdPartyExtensionsDir = (): string | null => {
  * gateway's bundled-channel metadata loader.  Two locations are cleaned:
  *
  * 1. `dist/extensions/{id}` — legacy overlay installs placed plugins here.
- * 2. `extensions/{id}` — prior versions of LobsterAI installed plugins here.
+ * 2. `extensions/{id}` — prior versions of ZhiYuanAgent installed plugins here.
  *    Because gateway-bundle.mjs runs from the package root (not dist/),
  *    `RUNNING_FROM_BUILT_ARTIFACT` is false and `resolveBundledPluginScanDir`
  *    falls back to `extensions/`.  Third-party plugins there fail the

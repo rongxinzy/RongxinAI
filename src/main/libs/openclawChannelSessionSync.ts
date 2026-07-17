@@ -2,7 +2,7 @@
  * OpenClaw Channel Session Sync
  *
  * Discovers and maps sessions created by OpenClaw channel extensions (e.g. Telegram)
- * to local Cowork sessions so that conversations are visible in the RongxinAI UI.
+ * to local Cowork sessions so that conversations are visible in the ZhiYuanAgent UI.
  */
 
 import { BrowserWindow } from 'electron';
@@ -13,7 +13,7 @@ import { t } from '../i18n';
 import type { IMStore } from '../im/imStore';
 import type { Platform } from '../im/types';
 
-const LOBSTERAI_SESSION_PREFIX = 'lobsterai:';
+const ZHIYUAN_SESSION_PREFIX = 'zhiyuan:';
 export const DEFAULT_MANAGED_AGENT_ID = 'main';
 
 export interface ManagedSessionKey {
@@ -27,7 +27,7 @@ export function buildManagedSessionKey(
 ): string {
   const normalizedSessionId = sessionId.trim();
   const normalizedAgentId = agentId.trim() || DEFAULT_MANAGED_AGENT_ID;
-  return `agent:${normalizedAgentId}:lobsterai:${normalizedSessionId}`;
+  return `agent:${normalizedAgentId}:zhiyuan:${normalizedSessionId}`;
 }
 
 export function parseManagedSessionKey(
@@ -36,8 +36,8 @@ export function parseManagedSessionKey(
   const raw = (sessionKey ?? '').trim();
   if (!raw) return null;
 
-  if (raw.startsWith(LOBSTERAI_SESSION_PREFIX)) {
-    const sessionId = raw.slice(LOBSTERAI_SESSION_PREFIX.length).trim();
+  if (raw.startsWith(ZHIYUAN_SESSION_PREFIX)) {
+    const sessionId = raw.slice(ZHIYUAN_SESSION_PREFIX.length).trim();
     return sessionId ? { agentId: null, sessionId } : null;
   }
 
@@ -46,7 +46,7 @@ export function parseManagedSessionKey(
   }
 
   const parts = raw.split(':');
-  if (parts.length < 4 || parts[0] !== 'agent' || parts[2] !== 'lobsterai') {
+  if (parts.length < 4 || parts[0] !== 'agent' || parts[2] !== 'zhiyuan') {
     return null;
   }
 
@@ -352,9 +352,9 @@ export class OpenClawChannelSessionSync {
    * Returns the local sessionId if the sessionKey belongs to a channel, or null if not.
    */
   resolveOrCreateSession(sessionKey: string): string | null {
-    // 1. Skip RongxinAI-originated sessions
+    // 1. Skip ZhiYuanAgent-originated sessions
     if (isManagedSessionKey(sessionKey)) {
-      console.log('[ChannelSessionSync] skipped: RongxinAI-originated session');
+      console.log('[ChannelSessionSync] skipped: ZhiYuanAgent-originated session');
       return null;
     }
 

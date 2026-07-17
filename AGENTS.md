@@ -41,7 +41,7 @@ npm run openclaw:runtime:host   # current platform
 
 ## Architecture Overview
 
-RongxinAI is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
+知远智能体 is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
 1. **Cowork Mode** - AI-assisted task sessions powered by OpenClaw as the primary agent runtime
 2. **llama.cpp Local Inference** - local model service management, model launch options, and local model integration with OpenClaw
 3. **Skills and MCP** - built-in skills, remote skill marketplace, and MCP server configuration
@@ -49,7 +49,7 @@ RongxinAI is an Electron + React desktop application for local-first AI Agent wo
 
 Uses strict process isolation with IPC communication.
 
-Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. LobsterAI, RongxinAI, LEO, and 李知远 are retired brand names — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Some legacy identifiers may still exist in runtime storage, protocol handlers, session keys, and historical migration paths; do not rename those in code unless the task explicitly includes a compatibility migration.
+Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. All pre-rebrand product names (including 知远智能体, LEO, and 李知远) are retired — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Legacy identifiers (the old storage name, the retired SQLite filename, the old app data directory, the retired protocol scheme, and legacy session keys) have been fully replaced with the new 知远智能体 (ZhiYuan Agent) identifiers under a scorched-earth policy: no data migration, no compatibility shims, no fallbacks; pre-rename user data is abandoned in place. New code must use the new identifiers only.
 
 ### Authentication Flow
 
@@ -216,7 +216,7 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - Cowork config stored in `cowork_config` table (workingDirectory, systemPrompt, executionMode, **agentEngine**)
 - Cowork sessions and messages stored in `cowork_sessions` and `cowork_messages` tables
 - Scheduled task metadata stored in `scheduled_task_meta` table (origin and binding info); task definitions are managed by OpenClaw
-- Database file: currently uses the configured app SQLite filename in the user data directory. Legacy installations may still use `lobsterai.sqlite`; do not change storage names without a migration plan.
+- Database file: `zhiyuan.sqlite` in the user data directory. Pre-rename database files are not migrated or read — old data is abandoned in place (scorched earth).
 - OpenClaw pinned version declared in `package.json` under `"openclaw": { "version": "...", "repo": "..." }`; update the version field and re-run to upgrade
 
 ### TypeScript Configuration
@@ -474,29 +474,29 @@ When using Claude Code with this repository, it reads `CLAUDE.md` (which points 
 
 - `shadcn/ui` — shadcn/ui component usage and styling rules.
 - `vercel/ai-elements` — AI Elements chat components.
-- `rongxinai-ui-adapter` — RongxinAI-specific constraints and lobster theme mapping.
+- `zhiyuan-ui-adapter` — 知远智能体-specific constraints and Zhiyuan theme mapping.
 
 These global skills complement, not replace, the conventions in this file.
 
 > **CRITICAL: Color Format Incompatibility**
 >
-> shadcn/ui components expect HSL color values in CSS variables (e.g., `--primary: 217 91% 60%`), and Tailwind generates classes like `bg-primary` as `hsl(var(--primary))`. However, RongxinAI's lobster theme stores colors as **hex values** (`--lobster-primary: #3B82F6`), and the bridge maps them one-to-one (`--primary: var(--lobster-primary)`).
+> shadcn/ui components expect HSL color values in CSS variables (e.g., `--primary: 217 91% 60%`), and Tailwind generates classes like `bg-primary` as `hsl(var(--primary))`. However, 知远智能体's Zhiyuan theme stores colors as **hex values** (`--zy-primary: #3B82F6`), and the bridge maps them one-to-one (`--primary: var(--zy-primary)`).
 >
 > This means `hsl(var(--primary))` → `hsl(#3B82F6)` → **invalid CSS** — the browser silently drops the declaration. Any shadcn component using `bg-primary`, `bg-input`, `bg-secondary`, `text-primary`, etc. may appear to have no color at all.
 >
 > **When debugging invisible component styles:**
 > 1. Open DevTools and check if the element has a `background-color` or `color` set to `hsl(...)` with a hex value inside — this is the root cause.
-> 2. Fix by writing a CSS rule that reads `var(--lobster-*)` directly without the `hsl()` wrapper.
+> 2. Fix by writing a CSS rule that reads `var(--zy-*)` directly without the `hsl()` wrapper.
 > 3. Do NOT add className overrides on the component — `className` is for layout only per the shadcn skill. Always fix color issues in the global CSS file (`src/renderer/index.css`).
 >
 > Example fix for Switch component:
 > ```css
 > /* index.css */
 > [data-slot="switch"][data-unchecked] {
->   background-color: var(--lobster-surface-raised);
+>   background-color: var(--zy-surface-raised);
 > }
 > [data-slot="switch"][data-checked] {
->   background-color: var(--lobster-primary);
+>   background-color: var(--zy-primary);
 > }
 > ```
 >

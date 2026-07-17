@@ -18,7 +18,7 @@ const FILE_EXTENSIONS = [
 
 // 正则表达式模式
 // Markdown 图片: ![alt](path) - 匹配本地路径
-// 支持: file:/// 协议, 常见系统路径, 以及 ~/.lobsterai 等用户目录路径
+// 支持: file:/// 协议, 常见系统路径, 以及 ~/.zhiyuan 等用户目录路径
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(((?:file:\/\/\/|\/(?:tmp|var|private|Users|home|root)|~\/|[A-Za-z]:)[^)]+)\)/g;
 
 // Markdown 链接: [text](path) - 匹配本地媒体文件路径

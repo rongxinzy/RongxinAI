@@ -18,7 +18,7 @@ const path = require('path');
 
 const { validateExpert } = require('./validate_expert');
 
-const DEFAULT_DB_FILENAME = 'lobsterai.sqlite';
+const DEFAULT_DB_FILENAME = 'zhiyuan.sqlite';
 
 const AGENT_SOURCE_EXPERT_PACKAGE = 'expert-package';
 const AGENT_SOURCE_EXPERT_PACKAGE_MEMBER = 'expert-package-member';
@@ -137,12 +137,12 @@ function makeUniqueAgentId(db, baseId) {
 }
 
 function getDefaultIcon() {
-  // Matches encodeAgentAvatarIcon({ svg: AgentAvatarSvg.Lobster })
-  return 'agent-avatar-svg:lobster';
+  // Matches encodeAgentAvatarIcon({ svg: AgentAvatarSvg.Zhiyuan })
+  return 'agent-avatar-svg:zhiyuan';
 }
 
 function pickIconByCategory(categoryId) {
-  // Heuristic mapping from category to SVG avatar; falls back to lobster.
+  // Heuristic mapping from category to SVG avatar; falls back to zhiyuan.
   const mapping = {
     '01-ProductDesign': 'artboard',
     '02-Engineering': 'code',
@@ -157,7 +157,7 @@ function pickIconByCategory(categoryId) {
     '11-SecurityCompliance': 'scales',
     '12-IndustryConsultant': 'books',
   };
-  const svg = mapping[categoryId] || 'lobster';
+  const svg = mapping[categoryId] || 'zhiyuan';
   return `agent-avatar-svg:${svg}`;
 }
 

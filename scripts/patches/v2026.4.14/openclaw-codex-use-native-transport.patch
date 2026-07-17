@@ -9,7 +9,7 @@ index c362ef57b7..069a5c49a0 100644
 -    case "openai-codex-responses":
        return createOpenAIResponsesTransportStreamFn();
 +    case "openai-codex-responses":
-+      // LobsterAI patch: ChatGPT Codex OAuth uses a provider-specific
++      // ZhiYuanAgent patch: ChatGPT Codex OAuth uses a provider-specific
 +      // payload/header contract implemented by pi-ai's native Codex provider.
 +      // The generic OpenAI Responses transport sends the public API schema,
 +      // which the ChatGPT Codex backend rejects with HTTP 400.

@@ -1,4 +1,4 @@
-const STYLE_ID = 'lobster-theme-styles';
+const STYLE_ID = 'zhiyuan-theme-styles';
 
 /** Inject a CSS string into the document head */
 export function injectStyles(css: string): void {

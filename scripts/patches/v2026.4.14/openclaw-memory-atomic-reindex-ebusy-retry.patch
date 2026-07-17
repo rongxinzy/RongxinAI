@@ -6,7 +6,7 @@ index 792023fbd6..fb5a4a6642 100644
  import { randomUUID } from "node:crypto";
  import fs from "node:fs/promises";
 
-+// LobsterAI patch: Windows EBUSY retry for atomic memory reindex (openclaw#64187).
++// ZhiYuanAgent patch: Windows EBUSY retry for atomic memory reindex (openclaw#64187).
 +// SQLite WAL-mode holds file locks that cause fs.rename() to fail with EBUSY on
 +// Windows.  Retry with exponential back-off and fall back to copy+unlink for
 +// EPERM/EEXIST, mirroring the pattern already used in src/cron/store.ts.

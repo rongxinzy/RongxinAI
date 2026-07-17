@@ -235,7 +235,7 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(config.agents.defaults.cwd).toBe(path.resolve(tmpDir));
   });
 
-  test('merges all server models into existing lobsterai provider and updates image input', async () => {
+  test('merges all server models into existing zhiyuan provider and updates image input', async () => {
     mockRuntimeState.proxyPort = 56646;
     mockRuntimeState.serverModels = [
       { modelId: 'qwen3.5-plus', supportsImage: true },
@@ -244,13 +244,13 @@ describe('OpenClawConfigSync runtime config output', () => {
     ];
     mockRuntimeState.rawApiConfig = {
       config: {
-        baseURL: 'https://api.lobsterai.local/proxy/v1',
+        baseURL: 'https://api.zhiyuan.local/proxy/v1',
         apiKey: 'access-token',
         model: 'qwen3.5-plus',
         apiType: 'openai',
       },
       providerMetadata: {
-        providerName: 'lobsterai-server',
+        providerName: 'zhiyuan-server',
         codingPlanEnabled: false,
         supportsImage: false,
         modelName: 'Qwen3.5 Plus',
@@ -298,7 +298,7 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(result.ok).toBe(true);
 
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    const provider = config.models.providers['lobsterai-server'];
+    const provider = config.models.providers['zhiyuan-server'];
     expect(provider.baseUrl).toBe('http://127.0.0.1:56646/v1');
     expect(provider.models).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -323,7 +323,7 @@ describe('OpenClawConfigSync runtime config output', () => {
       JSON.stringify({
         plugins: {
           load: {
-            paths: ['/Users/whz/Desktop/rongx/LobsterAI/vendor/openclaw-runtime/linux-x64/third-party-extensions'],
+            paths: ['/Users/whz/Desktop/rongx/ZhiYuanAgent/vendor/openclaw-runtime/linux-x64/third-party-extensions'],
             watch: true,
           },
           entries: {

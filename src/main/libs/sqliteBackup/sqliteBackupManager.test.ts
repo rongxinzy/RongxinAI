@@ -20,7 +20,7 @@ import {
 const tempDirs: string[] = [];
 
 const makeTempDir = (): string => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-sqlite-backup-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-sqlite-backup-'));
   tempDirs.push(dir);
   return dir;
 };
@@ -70,7 +70,7 @@ test('retainLatestSnapshots keeps only the newest successful snapshot', () => {
 });
 
 test('buildBackupPaths creates manifest snapshots and quarantine locations under userData', () => {
-  const userDataPath = '/tmp/lobsterai-user-data';
+  const userDataPath = '/tmp/zhiyuan-user-data';
   const paths = buildSqliteBackupPaths(userDataPath);
   expect(paths.backupDir).toContain(path.join('backups', 'sqlite'));
   expect(paths.snapshotsDir).toContain(path.join('backups', 'sqlite', 'snapshots'));

@@ -76,7 +76,7 @@ describe('llamacpp runtime installer planning', () => {
   });
 
   test('plans an in-app download for packaged Windows users when runtime is missing', () => {
-    const runtimeRoot = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming', 'RongxinAI', 'llamacpp-runtime');
+    const runtimeRoot = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming', 'ZhiYuanAgent', 'llamacpp-runtime');
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: 'win32',
       arch: 'x64',
@@ -99,7 +99,7 @@ describe('llamacpp runtime installer planning', () => {
   });
 
   test('plans the fixed CUDA 12 runtime when preferred target id is set', () => {
-    const runtimeRoot = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming', 'RongxinAI', 'llamacpp-runtime');
+    const runtimeRoot = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming', 'ZhiYuanAgent', 'llamacpp-runtime');
     const plan = createLlamaCppRuntimeInstallPlan({
       platform: 'win32',
       arch: 'x64',

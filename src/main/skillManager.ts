@@ -280,7 +280,7 @@ function buildSkillEnv(): Record<string, string | undefined> {
 
   // Expose Electron executable so skill scripts can run JS with ELECTRON_RUN_AS_NODE
   // even when system Node.js is not installed.
-  env.LOBSTERAI_ELECTRON_PATH = getElectronNodeRuntimePath();
+  env.ZHIYUAN_ELECTRON_PATH = getElectronNodeRuntimePath();
   appendPythonRuntimeToEnv(env);
 
   // Re-normalize after appendPythonRuntimeToEnv may have added a PATH key
@@ -837,15 +837,15 @@ const downloadGithubArchive = async (
     archiveUrlCandidates.push(
       {
         url: `https://github.com/${source.owner}/${source.repo}/archive/refs/heads/${encodedRef}.zip`,
-        headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+        headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
       },
       {
         url: `https://github.com/${source.owner}/${source.repo}/archive/refs/tags/${encodedRef}.zip`,
-        headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+        headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
       },
       {
         url: `https://github.com/${source.owner}/${source.repo}/archive/${encodedRef}.zip`,
-        headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+        headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
       }
     );
   }
@@ -854,7 +854,7 @@ const downloadGithubArchive = async (
     url: `https://api.github.com/repos/${source.owner}/${source.repo}/zipball${encodedRef ? `/${encodedRef}` : ''}`,
     headers: {
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'RongxinAI Skill Downloader',
+      'User-Agent': 'ZhiYuanAgent Skill Downloader',
       'X-GitHub-Api-Version': '2022-11-28',
     },
   });
@@ -1046,7 +1046,7 @@ const isRemoteZipUrl = (source: string): boolean => {
 const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string> => {
   const response = await session.defaultSession.fetch(zipUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'RongxinAI Skill Downloader' },
+    headers: { 'User-Agent': 'ZhiYuanAgent Skill Downloader' },
   });
 
   if (!response.ok) {
@@ -1645,7 +1645,7 @@ export class SkillManager {
         if (stat.isFile()) {
           if (isZipFile(localSource)) {
             console.log('[SkillManager] downloadSkill: detected local zip file');
-            const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
+            const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-zip-'));
             await extractZip(localSource, { dir: tempRoot });
             localSource = tempRoot;
             cleanupPath = tempRoot;
@@ -1660,12 +1660,12 @@ export class SkillManager {
         }
       } else if (isRemoteZipUrl(resolvedSource)) {
         console.log('[SkillManager] downloadSkill: detected remote zip URL');
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-zip-'));
         cleanupPath = tempRoot;
         localSource = await downloadZipUrl(resolvedSource, tempRoot);
       } else if (isNpmPackageSpec(resolvedSource)) {
         console.log(`[SkillManager] downloadSkill: detected npm package spec "${resolvedSource}"`);
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-npm-'));
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-npm-'));
         cleanupPath = tempRoot;
         localSource = await downloadNpmPackage(resolvedSource, tempRoot);
         console.log(`[SkillManager] downloadSkill: npm package extracted to ${localSource}`);
@@ -1674,7 +1674,7 @@ export class SkillManager {
         if (!normalized) {
           return { success: false, error: t('skillErrInvalidSource') };
         }
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-'));
+        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-'));
         cleanupPath = tempRoot;
         const repoName = normalizeFolderName(normalized.repoNameHint || deriveRepoName(normalized.repoUrl));
         const clonePath = path.join(tempRoot, repoName);
@@ -1869,7 +1869,7 @@ export class SkillManager {
       const root = this.ensureSkillsRoot();
 
       // Download new version (reuse downloadSkill's download logic)
-      const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-upgrade-'));
+      const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-upgrade-'));
       cleanupPath = tempRoot;
 
       let localSource: string;

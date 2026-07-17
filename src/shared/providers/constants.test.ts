@@ -12,7 +12,7 @@ describe('ProviderName constants', () => {
     expect(ProviderName.DeepSeek).toBe('deepseek');
     expect(ProviderName.LlamaCpp).toBe('llamacpp');
     expect(ProviderName.Custom).toBe('custom');
-    expect(ProviderName.LobsteraiServer).toBe('lobsterai-server');
+    expect(ProviderName.ZhiyuanServer).toBe('zhiyuan-server');
   });
 });
 
@@ -21,7 +21,7 @@ describe('ProviderRegistry', () => {
     const ids = ProviderRegistry.providerIds;
     expect(ids.length).toBe(16);
     expect(ids).not.toContain(ProviderName.Custom);
-    expect(ids).not.toContain(ProviderName.LobsteraiServer);
+    expect(ids).not.toContain(ProviderName.ZhiyuanServer);
   });
 
   test('get returns definition for known provider', () => {

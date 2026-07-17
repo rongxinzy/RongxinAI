@@ -14,7 +14,7 @@ import modelReducer, {
 const modelA: Model = { id: 'gpt-4o', name: 'GPT-4o', providerKey: 'openai' };
 const modelB: Model = { id: 'glm-5.1', name: 'GLM 5.1', providerKey: 'zhipu' };
 const modelC: Model = { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', providerKey: 'anthropic' };
-const serverModel: Model = { id: 'server-model', name: 'Server Model', providerKey: 'lobsterai-server', isServerModel: true };
+const serverModel: Model = { id: 'server-model', name: 'Server Model', providerKey: 'zhiyuan-server', isServerModel: true };
 
 function makeState(overrides?: Partial<ReturnType<typeof modelReducer>>) {
   const base = modelReducer(undefined, { type: 'init' });

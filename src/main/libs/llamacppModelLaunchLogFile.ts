@@ -363,11 +363,11 @@ function getLogModuleName(phase: LlamaCppModelLaunchLogEvent['phase']): string {
     case LlamaCppModelLaunchLogPhase.CheckingService:
     case LlamaCppModelLaunchLogPhase.StartingService:
     case LlamaCppModelLaunchLogPhase.ServiceReady:
-      return 'rongxinai.llamacpp.service';
+      return 'zhiyuan.llamacpp.service';
     case LlamaCppModelLaunchLogPhase.CheckingRuntime:
-      return 'rongxinai.llamacpp.runtime';
+      return 'zhiyuan.llamacpp.runtime';
     case LlamaCppModelLaunchLogPhase.Requested:
-      return 'rongxinai.llamacpp.launch';
+      return 'zhiyuan.llamacpp.launch';
     case LlamaCppModelLaunchLogPhase.PreparingModel:
     case LlamaCppModelLaunchLogPhase.LoadingModel:
     case LlamaCppModelLaunchLogPhase.WaitingReady:
@@ -375,7 +375,7 @@ function getLogModuleName(phase: LlamaCppModelLaunchLogEvent['phase']): string {
     case LlamaCppModelLaunchLogPhase.Retrying:
     case LlamaCppModelLaunchLogPhase.Succeeded:
     case LlamaCppModelLaunchLogPhase.Failed:
-      return 'rongxinai.llamacpp.model';
+      return 'zhiyuan.llamacpp.model';
   }
 }
 

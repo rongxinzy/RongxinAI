@@ -196,7 +196,7 @@ function packMultipleSources(sources, outputTar) {
     // ── Native tar.exe (Windows) ──
     // Strategy: create a temp staging directory with junctions pointing to
     // each source, then a single tar -cf pass with --exclude-from rules.
-    const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-tar-'));
+    const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-tar-'));
     const excludeFile = path.join(stagingDir, 'exclude.txt');
     const excludeCount = writeExcludeFile(excludeFile);
 

@@ -71,8 +71,8 @@ export async function downloadUpdate(
   const ext = path.extname(parsedUrl.pathname) || (process.platform === 'darwin' ? '.dmg' : '.exe');
   const updateDir = path.join(app.getPath('userData'), 'updates');
   const ts = Date.now();
-  const downloadPath = path.join(updateDir, `rongxinai-update-${source}-${ts}${ext}.download`);
-  const finalPath = path.join(updateDir, `rongxinai-update-${source}-${ts}${ext}`);
+  const downloadPath = path.join(updateDir, `zhiyuan-update-${source}-${ts}${ext}.download`);
+  const finalPath = path.join(updateDir, `zhiyuan-update-${source}-${ts}${ext}`);
 
   console.log(`[AppUpdate] Temp path: ${downloadPath}`);
   console.log(`[AppUpdate] Final path: ${finalPath}`);
@@ -375,9 +375,9 @@ async function installWindowsNsis(exePath: string): Promise<void> {
   // desktop shortcuts, start menu entries, "Run after finish", etc.
   const ts = Date.now();
   const tempDir = app.getPath('temp');
-  const logPath = path.join(tempDir, `rongxinai-update-${ts}.log`);
-  const scriptPath = path.join(tempDir, `rongxinai-update-${ts}.ps1`);
-  const vbsPath = path.join(tempDir, `rongxinai-update-${ts}.vbs`);
+  const logPath = path.join(tempDir, `zhiyuan-update-${ts}.log`);
+  const scriptPath = path.join(tempDir, `zhiyuan-update-${ts}.ps1`);
+  const vbsPath = path.join(tempDir, `zhiyuan-update-${ts}.vbs`);
 
   console.log(`[AppUpdate] Script log: ${logPath}`);
 

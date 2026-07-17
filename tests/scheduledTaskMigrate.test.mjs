@@ -30,68 +30,76 @@ import os from 'node:os';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
 const {
   migrateScheduledTasksToOpenclaw,
   migrateScheduledTaskRunsToOpenclaw,
-} = require('../dist-electron/scheduled-task/migrate.js');
-const { MigrationKey } = require('../dist-electron/scheduled-task/constants.js');
+} = require('../dist-electron/scheduledTask/migrate.js');
+const { MigrationKey } = require('../dist-electron/scheduledTask/constants.js');
 
 // ---- fake helpers -----------------------------------------------------------
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-migrate-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-migrate-test-'));
 }
 function cleanupDir(dir) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
 /**
- * Build a fake sql.js-style Database whose exec() returns canned results.
+ * Build a real in-memory better-sqlite3 Database with the legacy schema and
+ * the requested rows pre-inserted.
  *
  * `tables` is a Set of table names that "exist".
- * `rows` is keyed by a string prefix of the SQL query so we can distinguish
- * the table-check query from the data-select query.
  */
 function fakeDb({ tables = new Set(), taskRows = [], runRows = [], taskNameRows = [] } = {}) {
-  return {
-    exec(sql) {
-      // Table existence check
-      if (sql.includes("sqlite_master") && sql.includes("'scheduled_tasks'")) {
-        return tables.has('scheduled_tasks')
-          ? [{ columns: ['name'], values: [['scheduled_tasks']] }]
-          : [];
-      }
-      if (sql.includes("sqlite_master") && sql.includes("'scheduled_task_runs'")) {
-        return tables.has('scheduled_task_runs')
-          ? [{ columns: ['name'], values: [['scheduled_task_runs']] }]
-          : [];
-      }
-      // Legacy task rows
-      if (sql.includes('FROM scheduled_tasks') && !sql.includes('task_runs') && !sql.includes('sqlite_master')) {
-        if (taskRows.length === 0) return [];
-        const cols = ['id', 'name', 'description', 'enabled', 'schedule_json', 'prompt', 'notify_platforms_json'];
-        return [{
-          columns: cols,
-          values: taskRows.map((r) => cols.map((c) => r[c] ?? null)),
-        }];
-      }
-      // Task name rows (for run history migration)
-      if (sql.includes('SELECT id, name FROM scheduled_tasks')) {
-        if (taskNameRows.length === 0) return [];
-        return [{ columns: ['id', 'name'], values: taskNameRows.map((r) => [r.id, r.name]) }];
-      }
-      // Legacy run rows
-      if (sql.includes('FROM scheduled_task_runs')) {
-        if (runRows.length === 0) return [];
-        const cols = ['id', 'task_id', 'session_id', 'status', 'started_at', 'finished_at', 'duration_ms', 'error'];
-        return [{
-          columns: cols,
-          values: runRows.map((r) => cols.map((c) => r[c] ?? null)),
-        }];
-      }
-      return [];
-    },
-  };
+  const db = new Database(':memory:');
+
+  if (tables.has('scheduled_tasks')) {
+    db.prepare(
+      'CREATE TABLE scheduled_tasks (id TEXT PRIMARY KEY, name TEXT, description TEXT, enabled INTEGER, schedule_json TEXT, prompt TEXT, notify_platforms_json TEXT)',
+    ).run();
+    const insertTask = db.prepare(
+      'INSERT OR REPLACE INTO scheduled_tasks (id, name, description, enabled, schedule_json, prompt, notify_platforms_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    );
+    for (const row of taskRows) {
+      insertTask.run(
+        row.id ?? null,
+        row.name ?? null,
+        row.description ?? null,
+        row.enabled ?? null,
+        row.schedule_json ?? null,
+        row.prompt ?? null,
+        row.notify_platforms_json ?? null,
+      );
+    }
+    for (const row of taskNameRows) {
+      insertTask.run(row.id ?? null, row.name ?? null, null, null, null, null, null);
+    }
+  }
+
+  if (tables.has('scheduled_task_runs')) {
+    db.prepare(
+      'CREATE TABLE scheduled_task_runs (id TEXT PRIMARY KEY, task_id TEXT, session_id TEXT, status TEXT, started_at TEXT, finished_at TEXT, duration_ms INTEGER, error TEXT)',
+    ).run();
+    const insertRun = db.prepare(
+      'INSERT INTO scheduled_task_runs (id, task_id, session_id, status, started_at, finished_at, duration_ms, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    );
+    for (const row of runRows) {
+      insertRun.run(
+        row.id ?? null,
+        row.task_id ?? null,
+        row.session_id ?? null,
+        row.status ?? null,
+        row.started_at ?? null,
+        row.finished_at ?? null,
+        row.duration_ms ?? null,
+        row.error ?? null,
+      );
+    }
+  }
+
+  return db;
 }
 
 function makeKv(initial = {}) {

@@ -2420,7 +2420,7 @@ async function handleRequest(
   }
 
   // OpenClaw sends requests to /v1/chat/completions (OpenAI format) when using
-  // the lobster provider. Transparently proxy these requests to the upstream with
+  // the zhiyuan provider. Transparently proxy these requests to the upstream with
   // IDE headers injected (needed for GitHub Copilot).
   if (method === 'POST' && (url.pathname === '/v1/chat/completions' || url.pathname === '/chat/completions')) {
     if (!upstreamConfig) {
@@ -2549,9 +2549,9 @@ async function handleRequest(
   const upstreamAPIType = resolveUpstreamAPIType(upstreamConfig.provider);
   const openAIRequest = anthropicToOpenAI(parsedRequestBody);
 
-  // Inject session_id and user_message for lobsterai-server logging only.
+  // Inject session_id and user_message for zhiyuan-server logging only.
   // Strict providers (e.g. Gemini) reject unknown payload fields.
-  if (upstreamConfig.provider === 'lobsterai-server') {
+  if (upstreamConfig.provider === 'zhiyuan-server') {
     if (currentCoworkSessionId) {
       openAIRequest.session_id = currentCoworkSessionId;
     }

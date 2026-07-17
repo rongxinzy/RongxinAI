@@ -1125,7 +1125,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentNamePlaceholder: '项目名称',
     agentAvatarPickerTitle: '选择头像',
     agentAvatarPickerDone: '完成',
-    agentAvatarSvgLobster: '知远',
+    agentAvatarSvgZhiyuan: '知远',
     agentAvatarSvgCode: '代码',
     agentAvatarSvgRepair: '修理',
     agentAvatarSvgBriefcase: '公文包',
@@ -1405,7 +1405,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillAlreadyInstalled: '已安装',
 
     // Security scan
-    lobsterGuardEnabled: '安全防护中',
+    zhiyuanGuardEnabled: '安全防护中',
     securityScanTitle: '技能安全扫描',
     securityRisk_safe: '风险评估',
     securityRisk_low: '风险评估',
@@ -3363,7 +3363,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentNamePlaceholder: 'Project name',
     agentAvatarPickerTitle: 'Choose avatar',
     agentAvatarPickerDone: 'Done',
-    agentAvatarSvgLobster: 'ZY',
+    agentAvatarSvgZhiyuan: 'ZY',
     agentAvatarSvgCode: 'Code',
     agentAvatarSvgRepair: 'Repair',
     agentAvatarSvgBriefcase: 'Briefcase',
@@ -3657,7 +3657,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillAlreadyInstalled: 'Installed',
 
     // Security scan
-    lobsterGuardEnabled: 'Security Active',
+    zhiyuanGuardEnabled: 'Security Active',
     securityScanTitle: 'Skill Security Scan',
     securityRisk_safe: 'Risk Assessment',
     securityRisk_low: 'Risk Assessment',

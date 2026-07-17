@@ -254,7 +254,7 @@ export async function fetchModelScopeRepoFiles(
     response = await fetch(
       `https://www.modelscope.cn/api/v1/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/repo/files?${params.toString()}`,
       {
-        headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-installer' },
+        headers: { 'User-Agent': 'ZhiYuanAgent/modelscope-gguf-installer' },
       },
     );
   } catch {

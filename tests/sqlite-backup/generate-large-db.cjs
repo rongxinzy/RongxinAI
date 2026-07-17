@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 const DEFAULTS = {
-  db: path.resolve(process.cwd(), 'lobsterai.sqlite'),
+  db: path.resolve(process.cwd(), 'zhiyuan.sqlite'),
   sessions: 20,
   messagesPerSession: 5000,
   payloadKb: 8,
@@ -34,8 +34,8 @@ Options:
   --help                        Show this help
 
 Examples:
-  node tests/sqlite-backup/generate-large-db.cjs --db ~/tmp/lobsterai.sqlite
-  node tests/sqlite-backup/generate-large-db.cjs --db ./tmp/lobsterai.sqlite --sessions 50 --messages-per-session 10000 --payload-kb 16
+  node tests/sqlite-backup/generate-large-db.cjs --db ~/tmp/zhiyuan.sqlite
+  node tests/sqlite-backup/generate-large-db.cjs --db ./tmp/zhiyuan.sqlite --sessions 50 --messages-per-session 10000 --payload-kb 16
 `);
 }
 
@@ -127,7 +127,7 @@ function sqlString(value) {
 }
 
 function createPayloadBytes(targetBytes) {
-  const line = 'The quick brown lobster benchmarks SQLite backup throughput with wide message payloads.\n';
+  const line = 'The quick brown fox benchmarks SQLite backup throughput with wide message payloads.\n';
   return line.repeat(Math.max(1, Math.ceil(targetBytes / Buffer.byteLength(line))));
 }
 
@@ -210,7 +210,7 @@ function main() {
   const startTime = Date.now();
   const tempSqlPath = path.join(
     os.tmpdir(),
-    `lobsterai-sqlite-backup-seed-${process.pid}-${Date.now()}.sql`,
+    `zhiyuan-sqlite-backup-seed-${process.pid}-${Date.now()}.sql`,
   );
 
   let insertedMessages = 0;

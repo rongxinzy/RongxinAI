@@ -85,7 +85,7 @@ This is required before the automatic backup logic will run.
 If QA needs an automatic backup on every startup, set this environment variable:
 
 ```bash
-LOBSTERAI_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1
+ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1
 ```
 
 支持的 truthy 值：`1`、`true`。  
@@ -94,7 +94,7 @@ Supported truthy values: `1`, `true`.
 ### Example: run in dev mode with forced startup backup
 
 ```bash
-LOBSTERAI_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1 npm run electron:dev
+ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1 npm run electron:dev
 ```
 
 ### What this does
@@ -194,8 +194,8 @@ Suggested QA sequence:
    Run the seeding script to build a large database.
 3. 在应用中启用自动备份与恢复。  
    Enable auto backup and recovery in the app.
-4. 使用 `LOBSTERAI_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1` 启动应用。  
-   Launch the app with `LOBSTERAI_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1`.
+4. 使用 `ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1` 启动应用。  
+   Launch the app with `ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1`.
 5. 记录备份开始、进度、完成日志及耗时。  
    Record backup start, progress, completion logs, and duration.
 6. 删除备份文件，重新启动，确认会立即补备份。  

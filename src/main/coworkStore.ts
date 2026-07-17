@@ -21,7 +21,7 @@ import {
 
 // Default working directory for new users
 const getDefaultWorkingDirectory = (): string => {
-  return path.join(os.homedir(), 'rongxinai', 'project');
+  return path.join(os.homedir(), 'zhiyuan', 'project');
 };
 
 const DEFAULT_MEMORY_ENABLED = true;

@@ -169,7 +169,7 @@ if (tagCheck !== 0) {
 }
 
 // Discard any local modifications and untracked files (typically build artifacts
-// and files created by patches from a different LobsterAI branch) before checking
+// and files created by patches from a different ZhiYuanAgent branch) before checking
 // out the desired tag. Developers working on OpenClaw itself should use
 // OPENCLAW_SKIP_ENSURE=1 to prevent this.
 const hasLocalChanges = gitExitCode(['diff', '--quiet', 'HEAD'], { cwd: openclawSrc }) !== 0;

@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "A professional content creation expert for articles, copywriting, and creative writing.",
   "author": {
-    "name": "RongxinAI",
-    "email": "dev@rongxinai.com"
+    "name": "ZhiYuanAgent",
+    "email": "dev@zhiyuan.com"
   },
 
   "expertType": "agent",

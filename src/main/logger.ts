@@ -3,9 +3,9 @@
  * Intercepts console.* methods and writes to file + console simultaneously.
  *
  * Log file locations:
- *   macOS:   ~/Library/Logs/RongxinAI/main[-dev]-YYYY-MM-DD.log
- *   Windows: %USERPROFILE%\AppData\Roaming\RongxinAI\logs\main[-dev]-YYYY-MM-DD.log
- *   Linux:   ~/.config/RongxinAI/logs/main[-dev]-YYYY-MM-DD.log
+ *   macOS:   ~/Library/Logs/ZhiYuanAgent/main[-dev]-YYYY-MM-DD.log
+ *   Windows: %USERPROFILE%\AppData\Roaming\ZhiYuanAgent\logs\main[-dev]-YYYY-MM-DD.log
+ *   Linux:   ~/.config/ZhiYuanAgent/logs/main[-dev]-YYYY-MM-DD.log
  *
  * Production uses  "main-YYYY-MM-DD.log"
  * Development uses "main-dev-YYYY-MM-DD.log"  (app.isPackaged === false)
@@ -98,7 +98,7 @@ export function initLogger(): void {
   // Log startup marker
   const mode = app.isPackaged ? 'production' : 'development';
   log.info('='.repeat(60));
-  log.info(`RongxinAI started (${process.platform} ${process.arch}, ${mode})`);
+  log.info(`ZhiYuanAgent started (${process.platform} ${process.arch}, ${mode})`);
   log.info('='.repeat(60));
 }
 

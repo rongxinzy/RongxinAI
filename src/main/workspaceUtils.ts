@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 
-const TASK_WORKSPACE_CONTAINER_DIR = '.rongxinai-tasks';
+const TASK_WORKSPACE_CONTAINER_DIR = '.zhiyuan-tasks';
 
 export const normalizeWorkspacePath = (cwd: string): string => {
   const resolved = path.resolve(cwd.trim());

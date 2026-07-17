@@ -40,7 +40,7 @@ type UpdateApiResponse = {
   };
 };
 
-const APP_UPDATE_TEST_CURRENT_VERSION_ENV = 'LOBSTERAI_UPDATE_CURRENT_VERSION';
+const APP_UPDATE_TEST_CURRENT_VERSION_ENV = 'ZHIYUAN_UPDATE_CURRENT_VERSION';
 const APP_UPDATE_READY_FILE_KEY_PREFIX = 'app_update_ready_file';
 
 type StoredReadyFile = {
@@ -346,16 +346,16 @@ export class AppUpdateCoordinator {
   }
 
   private isCachedInstallerForSource(filename: string, source: AppUpdateSource | null): boolean {
-    if (!filename.startsWith('rongxinai-update-')) {
+    if (!filename.startsWith('zhiyuan-update-')) {
       return false;
     }
     if (source == null) {
       return true;
     }
-    if (filename.startsWith(`rongxinai-update-${source}-`)) {
+    if (filename.startsWith(`zhiyuan-update-${source}-`)) {
       return true;
     }
-    return /^rongxinai-update-\d+/.test(filename);
+    return /^zhiyuan-update-\d+/.test(filename);
   }
 
   private async pruneCachedInstallerFiles(

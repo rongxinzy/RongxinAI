@@ -193,10 +193,10 @@ const MANAGED_SKILL_ENTRY_OVERRIDES: Record<string, { enabled: boolean }> = {
   'feishu-cron-reminder': {
     enabled: false,
   },
-  // RongxinAI implements its own MCP integration. The bundled mcporter skill
+  // ZhiYuanAgent implements its own MCP integration. The bundled mcporter skill
   // tries to discover MCP servers via its own CLI, finds none, and produces
   // confusing "no MCP servers" output. Disable it so users are routed through
-  // RongxinAI's MCP layer instead.
+  // ZhiYuanAgent's MCP layer instead.
   mcporter: {
     enabled: false,
   },
@@ -212,7 +212,7 @@ const DISABLED_MANAGED_SKILL_NAMES = Object.entries(MANAGED_SKILL_ENTRY_OVERRIDE
  */
 const providerApiKeyEnvVar = (providerName: string): string => {
   const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `LOBSTER_APIKEY_${envName}`;
+  return `ZHIYUAN_APIKEY_${envName}`;
 };
 
 const MANAGED_WEB_SEARCH_POLICY_PROMPT = [
@@ -222,12 +222,12 @@ const MANAGED_WEB_SEARCH_POLICY_PROMPT = [
   '',
   'When you need live web information:',
   '- If you already have a specific URL, use `web_fetch`.',
-  '- If you need search discovery, prefer the RongxinAI `web-search` skill when local command execution is available. It searches headlessly first and only falls back to a visible browser when needed.',
+  '- If you need search discovery, prefer the ZhiYuanAgent `web-search` skill when local command execution is available. It searches headlessly first and only falls back to a visible browser when needed.',
   '- Use the built-in `browser` tool only for interactive browsing, login-gated pages, or complex dynamic pages that `web-search` cannot handle.',
   '- Native channel sessions may deny `exec`; in those sessions prefer `web_fetch` for known URLs or `browser` when discovery is unavoidable.',
   '- Exception: the `imap-smtp-email` skill must always use `exec` to run its scripts, even in native channel sessions. Do not skip it because of exec restrictions.',
   '',
-  'Do not claim you searched the web unless you actually used `browser`, `web_fetch`, or the RongxinAI `web-search` skill.',
+  'Do not claim you searched the web unless you actually used `browser`, `web_fetch`, or the ZhiYuanAgent `web-search` skill.',
 ].join('\n');
 
 const MANAGED_EXEC_SAFETY_PROMPT = [
@@ -257,9 +257,9 @@ const MANAGED_EXEC_SAFETY_PROMPT = [
  * embedding in AGENTS.md so the model knows where to create new skills.
  *
  * Example outputs:
- *   macOS:   ~/Library/Application Support/RongxinAI/SKILLs
- *   Windows: ~/AppData/Roaming/RongxinAI/SKILLs
- *   Linux:   ~/.config/RongxinAI/SKILLs
+ *   macOS:   ~/Library/Application Support/ZhiYuanAgent/SKILLs
+ *   Windows: ~/AppData/Roaming/ZhiYuanAgent/SKILLs
+ *   Linux:   ~/.config/ZhiYuanAgent/SKILLs
  */
 const resolveSkillCreationPath = (): string => {
   const skillsDir = path.join(app.getPath('userData'), 'SKILLs');
@@ -275,7 +275,7 @@ const buildManagedSkillCreationPrompt = (skillsDirPath: string): string =>
   [
     '## Skill Creation',
     '',
-    'When the user asks you to create a new skill, you MUST place it under the RongxinAI skills directory:',
+    'When the user asks you to create a new skill, you MUST place it under the ZhiYuanAgent skills directory:',
     '',
     `  ${skillsDirPath}/<skill-name>/SKILL.md`,
     '',
@@ -563,8 +563,8 @@ type ProviderDescriptor = {
 };
 
 const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
-  [ProviderName.LobsteraiServer]: {
-    providerId: OpenClawProviderId.LobsteraiServer,
+  [ProviderName.ZhiyuanServer]: {
+    providerId: OpenClawProviderId.ZhiyuanServer,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
     normalizeBaseUrl: url => {
       const proxyPort = getOpenClawTokenProxyPort();
@@ -572,7 +572,7 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     },
     resolveApiKey: () => {
       const proxyPort = getOpenClawTokenProxyPort();
-      return proxyPort ? '${LOBSTER_PROXY_TOKEN}' : `\${${providerApiKeyEnvVar('server')}}`;
+      return proxyPort ? '${ZHIYUAN_PROXY_TOKEN}' : `\${${providerApiKeyEnvVar('server')}}`;
     },
   },
 
@@ -680,19 +680,19 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
   },
 
   [ProviderName.Copilot]: {
-    providerId: OpenClawProviderId.LobsteraiCopilot,
+    providerId: OpenClawProviderId.ZhiyuanCopilot,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
     normalizeBaseUrl: stripChatCompletionsSuffix,
     resolveRuntimeBaseUrl: () => {
       const proxyBase = getCoworkOpenAICompatProxyBaseURL('local');
       return proxyBase ? `${proxyBase}/v1/copilot` : null;
     },
-    resolveApiKey: () => '${LOBSTER_PROXY_TOKEN}',
+    resolveApiKey: () => '${ZHIYUAN_PROXY_TOKEN}',
   },
 };
 
 const DEFAULT_DESCRIPTOR: ProviderDescriptor = {
-  providerId: OpenClawProviderId.Lobster,
+  providerId: OpenClawProviderId.Zhiyuan,
   resolveApi: ({ apiType, baseURL }) => mapApiTypeToOpenClawApi(apiType, undefined, baseURL),
   normalizeBaseUrl: stripChatCompletionsSuffix,
 };
@@ -716,7 +716,7 @@ const resolveDescriptor = (
   }
   return {
     ...DEFAULT_DESCRIPTOR,
-    providerId: providerName || OpenClawProviderId.Lobster,
+    providerId: providerName || OpenClawProviderId.Zhiyuan,
   };
 };
 
@@ -990,7 +990,7 @@ export class OpenClawConfigSync {
    * read against a "last known good" fingerprint.  One of the checks is
    * `hasConfigMeta` — if the previous good config had `meta` but the current
    * one doesn't, an anomaly is logged and the file content is persisted as a
-   * `.clobbered.<timestamp>` snapshot.  Because RongxinAI writes openclaw.json
+   * `.clobbered.<timestamp>` snapshot.  Because ZhiYuanAgent writes openclaw.json
    * directly (bypassing OpenClaw's own `writeConfigFile` which calls
    * `stampConfigVersion`), we need to stamp `meta` ourselves.
    */
@@ -1120,7 +1120,7 @@ export class OpenClawConfigSync {
       const proxyPort = getOpenClawTokenProxyPort();
       if (proxyPort) {
         const serverModels = getAllServerModelMetadata();
-        const providerId = OpenClawProviderId.LobsteraiServer;
+        const providerId = OpenClawProviderId.ZhiyuanServer;
 
         if (serverModels.length > 0 || !allProvidersMap[providerId]) {
           const firstServerModelId = serverModels[0]?.modelId || modelId;
@@ -1129,17 +1129,17 @@ export class OpenClawConfigSync {
             baseURL: `http://127.0.0.1:${proxyPort}/v1`,
             modelId: firstServerModelId,
             apiType: 'openai',
-            providerName: ProviderName.LobsteraiServer,
+            providerName: ProviderName.ZhiyuanServer,
             supportsImage: serverModels[0]?.supportsImage,
           });
-          const lobsteraiProviderConfig = allProvidersMap[providerId] ?? {
+          const zhiyuanProviderConfig = allProvidersMap[providerId] ?? {
             ...firstServerSel.providerConfig,
             models: [] as typeof firstServerSel.providerConfig.models,
           };
-          allProvidersMap[providerId] = lobsteraiProviderConfig;
+          allProvidersMap[providerId] = zhiyuanProviderConfig;
 
           if (serverModels.length === 0) {
-            upsertProviderModel(lobsteraiProviderConfig, firstServerSel.providerConfig.models[0]);
+            upsertProviderModel(zhiyuanProviderConfig, firstServerSel.providerConfig.models[0]);
           } else {
             for (const sm of serverModels) {
               const serverSel = buildProviderSelection({
@@ -1147,11 +1147,11 @@ export class OpenClawConfigSync {
                 baseURL: `http://127.0.0.1:${proxyPort}/v1`,
                 modelId: sm.modelId,
                 apiType: 'openai',
-                providerName: ProviderName.LobsteraiServer,
+                providerName: ProviderName.ZhiyuanServer,
                 supportsImage: sm.supportsImage,
                 modelName: sm.modelId,
               });
-              upsertProviderModel(lobsteraiProviderConfig, serverSel.providerConfig.models[0]);
+              upsertProviderModel(zhiyuanProviderConfig, serverSel.providerConfig.models[0]);
             }
           }
         }
@@ -1406,7 +1406,7 @@ export class OpenClawConfigSync {
           ...(hasQwenProvider && qwenPortalAuthPluginId
             ? { [qwenPortalAuthPluginId]: { enabled: true } }
             : {}),
-          // Disable acpx (ACP agent runtime) — RongxinAI does not use ACP and
+          // Disable acpx (ACP agent runtime) — ZhiYuanAgent does not use ACP and
           // the embedded probe adds ~11s to gateway startup while it waits for
           // a process that always fails.  See openclaw/openclaw#62588.
           acpx: { enabled: false },
@@ -1473,7 +1473,7 @@ export class OpenClawConfigSync {
         ...entries['mcp-bridge'],
         config: {
           callbackUrl: mcpBridgeCfg.callbackUrl,
-          secret: '${LOBSTER_MCP_BRIDGE_SECRET}',
+          secret: '${ZHIYUAN_MCP_BRIDGE_SECRET}',
           tools: mcpBridgeCfg.tools.map(normalizeMcpBridgeToolManifestEntry),
         },
       };
@@ -1487,7 +1487,7 @@ export class OpenClawConfigSync {
         enabled: true,
         config: {
           callbackUrl: mcpBridgeCfg.askUserCallbackUrl,
-          secret: '${LOBSTER_MCP_BRIDGE_SECRET}',
+          secret: '${ZHIYUAN_MCP_BRIDGE_SECRET}',
         },
       };
     }
@@ -1499,9 +1499,9 @@ export class OpenClawConfigSync {
       const accounts: Record<string, unknown> = {};
       for (let idx = 0; idx < enabledTelegramInstances.length; idx++) {
         const inst = enabledTelegramInstances[idx];
-        const tokenVar = idx === 0 ? 'LOBSTER_TG_BOT_TOKEN' : `LOBSTER_TG_BOT_TOKEN_${idx}`;
+        const tokenVar = idx === 0 ? 'ZHIYUAN_TG_BOT_TOKEN' : `ZHIYUAN_TG_BOT_TOKEN_${idx}`;
         const webhookSecretVar =
-          idx === 0 ? 'LOBSTER_TG_WEBHOOK_SECRET' : `LOBSTER_TG_WEBHOOK_SECRET_${idx}`;
+          idx === 0 ? 'ZHIYUAN_TG_WEBHOOK_SECRET' : `ZHIYUAN_TG_WEBHOOK_SECRET_${idx}`;
         const account: Record<string, unknown> = {
           enabled: true,
           name: inst.instanceName,
@@ -1553,7 +1553,7 @@ export class OpenClawConfigSync {
       const accounts: Record<string, unknown> = {};
       for (let idx = 0; idx < enabledDiscordInstances.length; idx++) {
         const inst = enabledDiscordInstances[idx];
-        const tokenVar = idx === 0 ? 'LOBSTER_DC_BOT_TOKEN' : `LOBSTER_DC_BOT_TOKEN_${idx}`;
+        const tokenVar = idx === 0 ? 'ZHIYUAN_DC_BOT_TOKEN' : `ZHIYUAN_DC_BOT_TOKEN_${idx}`;
         const account: Record<string, unknown> = {
           enabled: true,
           name: inst.instanceName,
@@ -1648,7 +1648,7 @@ export class OpenClawConfigSync {
       for (let idx = 0; idx < enabledFeishuInstances.length; idx++) {
         const inst = enabledFeishuInstances[idx];
         const secretVar =
-          idx === 0 ? 'LOBSTER_FEISHU_APP_SECRET' : `LOBSTER_FEISHU_APP_SECRET_${idx}`;
+          idx === 0 ? 'ZHIYUAN_FEISHU_APP_SECRET' : `ZHIYUAN_FEISHU_APP_SECRET_${idx}`;
         accounts[inst.instanceId.slice(0, 8)] = buildFeishuAccountConfig(inst, secretVar);
       }
 
@@ -1671,7 +1671,7 @@ export class OpenClawConfigSync {
         clientSecret: `\${${secretEnvVar}}`,
         // v3.5.x schema: dmPolicy/groupPolicy/allowFrom are valid; sessionTimeout/
         // separateSessionByConversation/groupSessionScope/sharedMemoryAcrossConversations/
-        // gatewayBaseUrl were LobsterAI-specific and are not in the plugin schema.
+        // gatewayBaseUrl were ZhiYuanAgent-specific and are not in the plugin schema.
         dmPolicy: inst.dmPolicy || 'open',
         allowFrom: (() => {
           const ids = inst.allowFrom?.length ? [...inst.allowFrom] : [];
@@ -1686,7 +1686,7 @@ export class OpenClawConfigSync {
       for (let idx = 0; idx < enabledDingTalkInstances.length; idx++) {
         const inst = enabledDingTalkInstances[idx];
         const secretVar =
-          idx === 0 ? 'LOBSTER_DINGTALK_CLIENT_SECRET' : `LOBSTER_DINGTALK_CLIENT_SECRET_${idx}`;
+          idx === 0 ? 'ZHIYUAN_DINGTALK_CLIENT_SECRET' : `ZHIYUAN_DINGTALK_CLIENT_SECRET_${idx}`;
         accounts[inst.instanceId.slice(0, 8)] = buildDingTalkAccountConfig(inst, secretVar);
       }
 
@@ -1730,7 +1730,7 @@ export class OpenClawConfigSync {
       for (let idx = 0; idx < enabledQQInstances.length; idx++) {
         const inst = enabledQQInstances[idx];
         const secretVar =
-          idx === 0 ? 'LOBSTER_QQ_CLIENT_SECRET' : `LOBSTER_QQ_CLIENT_SECRET_${idx}`;
+          idx === 0 ? 'ZHIYUAN_QQ_CLIENT_SECRET' : `ZHIYUAN_QQ_CLIENT_SECRET_${idx}`;
         accounts[inst.instanceId.slice(0, 8)] = buildQQAccountConfig(inst, secretVar);
       }
 
@@ -1746,7 +1746,7 @@ export class OpenClawConfigSync {
       const accounts: Record<string, unknown> = {};
       for (let idx = 0; idx < enabledWecomInstances.length; idx++) {
         const inst = enabledWecomInstances[idx];
-        const secretVar = idx === 0 ? 'LOBSTER_WECOM_SECRET' : `LOBSTER_WECOM_SECRET_${idx}`;
+        const secretVar = idx === 0 ? 'ZHIYUAN_WECOM_SECRET' : `ZHIYUAN_WECOM_SECRET_${idx}`;
         accounts[inst.instanceId.slice(0, 8)] = {
           enabled: true,
           name: inst.instanceName,
@@ -1997,26 +1997,20 @@ export class OpenClawConfigSync {
     const allApiKeys = resolveAllProviderApiKeys();
     for (const [envSuffix, apiKey] of Object.entries(allApiKeys)) {
       console.info(
-        `[OpenClawConfigSync] set secret env var LOBSTER_APIKEY_${envSuffix} for provider ${envSuffix}`,
+        `[OpenClawConfigSync] set secret env var ZHIYUAN_APIKEY_${envSuffix} for provider ${envSuffix}`,
       );
-      env[`LOBSTER_APIKEY_${envSuffix}`] = apiKey;
+      env[`ZHIYUAN_APIKEY_${envSuffix}`] = apiKey;
     }
-    // Legacy fallback: keep LOBSTER_PROVIDER_API_KEY set to a stable value so stale
-    // openclaw.json files with the old placeholder don't crash the gateway.
-    // Use the active provider's key if available, but ONLY for the first sync —
-    // after that, openclaw.json uses provider-specific placeholders and this var
-    // is never resolved. Use a fixed value to avoid secretEnvVarsChanged on switch.
-    env.LOBSTER_PROVIDER_API_KEY = 'legacy-unused';
 
-    env.LOBSTER_PROXY_TOKEN = getCoworkOpenAICompatProxyToken() || 'unconfigured';
+    env.ZHIYUAN_PROXY_TOKEN = getCoworkOpenAICompatProxyToken() || 'unconfigured';
 
     // MCP Bridge Secret — always set so stale openclaw.json with
-    // ${LOBSTER_MCP_BRIDGE_SECRET} placeholder doesn't crash the gateway.
+    // ${ZHIYUAN_MCP_BRIDGE_SECRET} placeholder doesn't crash the gateway.
     // Prefer getMcpBridgeSecret() which is available immediately (eagerly
     // generated at module load), over getMcpBridgeConfig() which requires
     // the full McpBridgeServer to be started.
     const mcpBridgeCfg = this.getMcpBridgeConfig?.();
-    env.LOBSTER_MCP_BRIDGE_SECRET =
+    env.ZHIYUAN_MCP_BRIDGE_SECRET =
       this.getMcpBridgeSecret?.() || mcpBridgeCfg?.secret || 'unconfigured';
 
     // Telegram — per-instance secrets (must match sync() indexing: enabled instances only)
@@ -2025,11 +2019,11 @@ export class OpenClawConfigSync {
     for (let idx = 0; idx < enabledTelegram.length; idx++) {
       const inst = enabledTelegram[idx];
       if (idx === 0) {
-        env.LOBSTER_TG_BOT_TOKEN = inst.botToken;
-        if (inst.webhookSecret) env.LOBSTER_TG_WEBHOOK_SECRET = inst.webhookSecret;
+        env.ZHIYUAN_TG_BOT_TOKEN = inst.botToken;
+        if (inst.webhookSecret) env.ZHIYUAN_TG_WEBHOOK_SECRET = inst.webhookSecret;
       } else {
-        env[`LOBSTER_TG_BOT_TOKEN_${idx}`] = inst.botToken;
-        if (inst.webhookSecret) env[`LOBSTER_TG_WEBHOOK_SECRET_${idx}`] = inst.webhookSecret;
+        env[`ZHIYUAN_TG_BOT_TOKEN_${idx}`] = inst.botToken;
+        if (inst.webhookSecret) env[`ZHIYUAN_TG_WEBHOOK_SECRET_${idx}`] = inst.webhookSecret;
       }
     }
 
@@ -2038,9 +2032,9 @@ export class OpenClawConfigSync {
     const enabledDiscord = dcInstances.filter(i => i.enabled && i.botToken);
     for (let idx = 0; idx < enabledDiscord.length; idx++) {
       if (idx === 0) {
-        env.LOBSTER_DC_BOT_TOKEN = enabledDiscord[idx].botToken;
+        env.ZHIYUAN_DC_BOT_TOKEN = enabledDiscord[idx].botToken;
       } else {
-        env[`LOBSTER_DC_BOT_TOKEN_${idx}`] = enabledDiscord[idx].botToken;
+        env[`ZHIYUAN_DC_BOT_TOKEN_${idx}`] = enabledDiscord[idx].botToken;
       }
     }
 
@@ -2049,9 +2043,9 @@ export class OpenClawConfigSync {
     const enabledFeishu = feishuInstances.filter(i => i.enabled && i.appSecret);
     for (let idx = 0; idx < enabledFeishu.length; idx++) {
       if (idx === 0) {
-        env.LOBSTER_FEISHU_APP_SECRET = enabledFeishu[idx].appSecret;
+        env.ZHIYUAN_FEISHU_APP_SECRET = enabledFeishu[idx].appSecret;
       } else {
-        env[`LOBSTER_FEISHU_APP_SECRET_${idx}`] = enabledFeishu[idx].appSecret;
+        env[`ZHIYUAN_FEISHU_APP_SECRET_${idx}`] = enabledFeishu[idx].appSecret;
       }
     }
 
@@ -2060,15 +2054,15 @@ export class OpenClawConfigSync {
     const enabledDingTalk = dingTalkInstances.filter(i => i.enabled && i.clientSecret);
     for (let idx = 0; idx < enabledDingTalk.length; idx++) {
       if (idx === 0) {
-        env.LOBSTER_DINGTALK_CLIENT_SECRET = enabledDingTalk[idx].clientSecret;
+        env.ZHIYUAN_DINGTALK_CLIENT_SECRET = enabledDingTalk[idx].clientSecret;
       } else {
-        env[`LOBSTER_DINGTALK_CLIENT_SECRET_${idx}`] = enabledDingTalk[idx].clientSecret;
+        env[`ZHIYUAN_DINGTALK_CLIENT_SECRET_${idx}`] = enabledDingTalk[idx].clientSecret;
       }
     }
     // Gateway token is shared (not per-instance)
     const gatewayToken = this.engineManager.getGatewayToken();
     if (gatewayToken) {
-      env.LOBSTER_DINGTALK_GW_TOKEN = gatewayToken;
+      env.ZHIYUAN_DINGTALK_GW_TOKEN = gatewayToken;
     }
 
     // QQ — per-instance secrets (must match sync() indexing: enabled instances only)
@@ -2076,9 +2070,9 @@ export class OpenClawConfigSync {
     const enabledQQ = qqInstances.filter(i => i.enabled && i.appSecret);
     for (let idx = 0; idx < enabledQQ.length; idx++) {
       if (idx === 0) {
-        env.LOBSTER_QQ_CLIENT_SECRET = enabledQQ[idx].appSecret;
+        env.ZHIYUAN_QQ_CLIENT_SECRET = enabledQQ[idx].appSecret;
       } else {
-        env[`LOBSTER_QQ_CLIENT_SECRET_${idx}`] = enabledQQ[idx].appSecret;
+        env[`ZHIYUAN_QQ_CLIENT_SECRET_${idx}`] = enabledQQ[idx].appSecret;
       }
     }
 
@@ -2087,9 +2081,9 @@ export class OpenClawConfigSync {
     const enabledWecom = wecomInstances.filter(i => i.enabled && i.secret);
     for (let idx = 0; idx < enabledWecom.length; idx++) {
       if (idx === 0) {
-        env.LOBSTER_WECOM_SECRET = enabledWecom[idx].secret;
+        env.ZHIYUAN_WECOM_SECRET = enabledWecom[idx].secret;
       } else {
-        env[`LOBSTER_WECOM_SECRET_${idx}`] = enabledWecom[idx].secret;
+        env[`ZHIYUAN_WECOM_SECRET_${idx}`] = enabledWecom[idx].secret;
       }
     }
 
@@ -2108,7 +2102,7 @@ export class OpenClawConfigSync {
   }
 
   /**
-   * Ensures exec-approvals.json under the RongxinAI-managed openclaw home has
+   * Ensures exec-approvals.json under the ZhiYuanAgent-managed openclaw home has
    * security=full + ask=off so the gateway never triggers approval-pending
    * for any command. The path must match the OPENCLAW_HOME env var passed to
    * the gateway process so both sides read/write the same file.
@@ -2162,7 +2156,7 @@ export class OpenClawConfigSync {
     availableProviders: Record<string, OpenClawProviderSelection['providerConfig']>,
   ): boolean {
     const shouldMigrateManagedModelRefs = !(
-      selection.providerId === 'lobster' && selection.sessionModelId === selection.legacyModelId
+      selection.providerId === OpenClawProviderId.Zhiyuan && selection.sessionModelId === selection.legacyModelId
     );
     const fallbackTarget = parsePrimaryModelRef(selection.primaryModel) ?? {
       providerId: selection.providerId,
@@ -2247,7 +2241,7 @@ export class OpenClawConfigSync {
           }
         }
 
-        if (!/^agent:[^:]+:lobsterai:/.test(sessionKey)) {
+        if (!/^agent:[^:]+:zhiyuan:/.test(sessionKey)) {
           continue;
         }
 
@@ -2310,13 +2304,13 @@ export class OpenClawConfigSync {
   }
 
   /**
-   * Resolve the RongxinAI SKILLs installation directory for OpenClaw's
+   * Resolve the ZhiYuanAgent SKILLs installation directory for OpenClaw's
    * `skills.load.extraDirs` configuration.
    *
    * Cross-platform paths (via Electron app.getPath('userData')):
-   *   macOS:   ~/Library/Application Support/RongxinAI/SKILLs
-   *   Windows: %APPDATA%/RongxinAI/SKILLs
-   *   Linux:   ~/.config/RongxinAI/SKILLs
+   *   macOS:   ~/Library/Application Support/ZhiYuanAgent/SKILLs
+   *   Windows: %APPDATA%/ZhiYuanAgent/SKILLs
+   *   Linux:   ~/.config/ZhiYuanAgent/SKILLs
    */
   private resolveSkillsExtraDirs(): string[] {
     const userDataSkillsDir = path.join(app.getPath('userData'), 'SKILLs');
@@ -2339,8 +2333,8 @@ export class OpenClawConfigSync {
   }
 
   /**
-   * Build per-skill `enabled` overrides from the RongxinAI SkillManager state,
-   * so that skills disabled in the RongxinAI UI are also hidden from OpenClaw.
+   * Build per-skill `enabled` overrides from the ZhiYuanAgent SkillManager state,
+   * so that skills disabled in the ZhiYuanAgent UI are also hidden from OpenClaw.
    */
   private buildSkillEntries(): Record<string, { enabled: boolean }> {
     const skills = this.getSkillsList?.() ?? [];
@@ -2355,13 +2349,12 @@ export class OpenClawConfigSync {
    * Sync AGENTS.md to the OpenClaw workspace directory.
    * Embeds the skills routing prompt and system prompt so that OpenClaw's
    * native channel connectors (DingTalk, Feishu, etc.) can discover and
-   * invoke RongxinAI skills.
+   * invoke ZhiYuanAgent skills.
    */
   private syncAgentsMd(workspaceDir: string, coworkConfig: CoworkConfig): string | undefined {
-    const MARKER = '<!-- RongxinAI managed: do not edit below this line -->';
-    const LEGACY_MARKER = '<!-- LobsterAI managed: do not edit below this line -->';
+    const MARKER = '<!-- ZhiYuanAgent managed: do not edit below this line -->';
     const stripManagedMarkers = (value: string): string =>
-      value.replaceAll(MARKER, '').replaceAll(LEGACY_MARKER, '');
+      value.replaceAll(MARKER, '');
 
     try {
       ensureDir(workspaceDir);
@@ -2401,18 +2394,16 @@ export class OpenClawConfigSync {
 
       // Extract user content (everything before the marker)
       const markerIdx = existingContent.indexOf(MARKER);
-      const legacyMarkerIdx = existingContent.indexOf(LEGACY_MARKER);
-      const managedMarkerIdx = markerIdx >= 0 ? markerIdx : legacyMarkerIdx;
       const userContent =
-        managedMarkerIdx >= 0
-          ? existingContent.slice(0, managedMarkerIdx).trimEnd()
+        markerIdx >= 0
+          ? existingContent.slice(0, markerIdx).trimEnd()
           : existingContent.trimEnd();
       const preservedUserContent = userContent || readBundledOpenClawAgentsTemplate();
 
       if (sections.length === 0) {
         // No managed content — remove the managed section if present,
         // but preserve user content.
-        if (managedMarkerIdx >= 0) {
+        if (markerIdx >= 0) {
           if (preservedUserContent) {
             const cleaned = preservedUserContent + '\n';
             if (existingContent !== cleaned) {
@@ -2684,7 +2675,7 @@ export class OpenClawConfigSync {
     // Build the config to write: start from the base minimal config, then
     // selectively preserve non-provider sections from the existing file.
     // Critically, we do NOT preserve existing.models — it may contain
-    // ${LOBSTER_APIKEY_X} placeholders for providers that are no longer
+    // ${ZHIYUAN_APIKEY_X} placeholders for providers that are no longer
     // configured, causing the gateway to fail to start because those env
     // vars are no longer injected.
     let mergedConfig: Record<string, unknown> = { ...baseMinimalConfig };
@@ -2692,7 +2683,7 @@ export class OpenClawConfigSync {
       try {
         const existing = JSON.parse(currentContent);
         // Preserve IM channel plugin entries — these reference their own env
-        // vars (${LOBSTER_TG_BOT_TOKEN} etc.) that are still injected when
+        // vars (${ZHIYUAN_TG_BOT_TOKEN} etc.) that are still injected when
         // the corresponding IM channels remain enabled.
         if (existing.plugins) {
           mergedConfig.plugins = existing.plugins;
@@ -2702,7 +2693,7 @@ export class OpenClawConfigSync {
           mergedConfig.gateway = existing.gateway;
         }
         // existing.models is intentionally NOT preserved — it references
-        // ${LOBSTER_APIKEY_*} env vars that may no longer be set.
+        // ${ZHIYUAN_APIKEY_*} env vars that may no longer be set.
       } catch {
         // Malformed JSON — overwrite with base minimal config.
       }

@@ -13,11 +13,11 @@ NODE_ENV_PREFIX=()
 
 if command -v node > /dev/null 2>&1; then
   NODE_BIN="node"
-elif [ -n "${LOBSTERAI_ELECTRON_PATH:-}" ] && [ -x "${LOBSTERAI_ELECTRON_PATH}" ]; then
-  NODE_BIN="$LOBSTERAI_ELECTRON_PATH"
+elif [ -n "${ZHIYUAN_ELECTRON_PATH:-}" ] && [ -x "${ZHIYUAN_ELECTRON_PATH}" ]; then
+  NODE_BIN="$ZHIYUAN_ELECTRON_PATH"
   NODE_ENV_PREFIX=("ELECTRON_RUN_AS_NODE=1")
 else
-  echo '{"success":false,"error":"未找到 Node.js 运行时。请安装 Node.js 或确保 LobsterAI Electron 可用。"}' >&2
+  echo '{"success":false,"error":"未找到 Node.js 运行时。请安装 Node.js 或确保知远智能体 Electron 可用。"}' >&2
   exit 1
 fi
 

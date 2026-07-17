@@ -20,7 +20,7 @@
 ### 任务二：shadcn/ui 全站组件迁移（续上周）
 
 **Settings 页 Switch/Toggle 修复（7.6-7.7）**
-- Switch 组件：绕过 `hsl(var(--primary))` 包装（lobster hex 值导致 `hsl(#3B82F6)` 无效 CSS），用 CSS 直设 track/thumb 颜色
+- Switch 组件：绕过 `hsl(var(--primary))` 包装（hex 色值导致 `hsl(#3B82F6)` 无效 CSS），用 CSS 直设 track/thumb 颜色
 - 供应商开关：Toggle 替代 Switch，去蓝选中态 → raised surface + 3D shadow
 - Modal 双重重影修复（移除 sm:max-w-sm 约束）
 - ring-foreground/10 → ring-border（hsl 修复）

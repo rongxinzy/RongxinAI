@@ -732,7 +732,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         <div className="flex items-center gap-1.5 mr-2 px-2.5 py-1">
           <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
           <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
-            {i18nService.t('lobsterGuardEnabled')}
+            {i18nService.t('zhiyuanGuardEnabled')}
           </span>
         </div>
         <WindowTitleBar inline />

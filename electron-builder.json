@@ -1,5 +1,5 @@
 {
-  "appId": "com.rongxinai.app",
+  "appId": "com.zhiyuanagent.app",
   "productName": "知远",
   "executableName": "知远",
   "directories": {
@@ -64,7 +64,7 @@
     {
       "name": "知远",
       "schemes": [
-        "rongxinai"
+        "zhiyuan"
       ]
     }
   ],

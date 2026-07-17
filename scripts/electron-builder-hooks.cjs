@@ -32,7 +32,7 @@ const LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES = [
 const DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR = 'C:\\Users\\Administrator\\Downloads';
 
 function resolveWindowsLlamaCppBackendDownloadDir(env = process.env) {
-  return env.RONGXINAI_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
+  return env.ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
     || env.WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
     || DEFAULT_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR;
 }
@@ -171,7 +171,7 @@ function resolveOpenClawRuntimeTargetId(context) {
 }
 
 function resolveWindowsLlamaCppBackendBundleMode(env = process.env) {
-  const raw = (env.RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE || env.WIN_LLAMACPP_BACKEND_BUNDLE || '').trim().toLowerCase();
+  const raw = (env.ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE || env.WIN_LLAMACPP_BACKEND_BUNDLE || '').trim().toLowerCase();
   if (!raw) return WindowsLlamaCppBackendBundleMode.Lite;
   if (raw === WindowsLlamaCppBackendBundleMode.Full) return WindowsLlamaCppBackendBundleMode.Full;
   if (raw === WindowsLlamaCppBackendBundleMode.None) return WindowsLlamaCppBackendBundleMode.None;

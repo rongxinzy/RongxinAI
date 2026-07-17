@@ -33,14 +33,14 @@ test('buildLlamaCppExecutableCandidates orders managed and explicit runtime path
     isPackaged: true,
     resourceRoot: 'C:/App/resources',
     appRoot: 'C:/App/resources/app.asar',
-    cwd: 'C:/work/RongxinAI',
-    userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime',
+    cwd: 'C:/work/ZhiYuanAgent',
+    userRuntimeRoot: 'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime',
     envPath: 'C:/custom/env/llama-server.exe',
   }).slice(0, 4)).toEqual([
     'C:/custom/env/llama-server.exe',
-    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/build/bin/llama-server.exe',
-    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/bin/llama-server.exe',
-    'C:/Users/tester/AppData/Roaming/RongxinAI/llamacpp-runtime/current/llama-server.exe',
+    'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime/current/build/bin/llama-server.exe',
+    'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime/current/bin/llama-server.exe',
+    'C:/Users/tester/AppData/Roaming/ZhiYuanAgent/llamacpp-runtime/current/llama-server.exe',
   ]);
 });
 
@@ -51,7 +51,7 @@ test('buildLlamaCppExecutableCandidates only includes dev vendor and system path
     resourceRoot: '/app/resources',
     appRoot: '/repo',
     cwd: '/repo',
-    userRuntimeRoot: '/Users/tester/Library/Application Support/RongxinAI/llamacpp-runtime',
+    userRuntimeRoot: '/Users/tester/Library/Application Support/ZhiYuanAgent/llamacpp-runtime',
   });
 
   expect(candidates).toEqual(expect.arrayContaining([
@@ -66,10 +66,10 @@ test('buildLlamaCppExecutableCandidates omits dev vendor and system paths in pac
   const candidates = buildLlamaCppExecutableCandidates({
     platform: 'darwin',
     isPackaged: true,
-    resourceRoot: '/Applications/RongxinAI.app/Contents/Resources',
-    appRoot: '/Applications/RongxinAI.app/Contents/Resources/app.asar',
+    resourceRoot: '/Applications/ZhiYuanAgent.app/Contents/Resources',
+    appRoot: '/Applications/ZhiYuanAgent.app/Contents/Resources/app.asar',
     cwd: '/repo',
-    userRuntimeRoot: '/Users/tester/Library/Application Support/RongxinAI/llamacpp-runtime',
+    userRuntimeRoot: '/Users/tester/Library/Application Support/ZhiYuanAgent/llamacpp-runtime',
   });
 
   expect(candidates).not.toContain('/repo/vendor/llamacpp-runtime/current/bin/llama-server');
@@ -78,12 +78,12 @@ test('buildLlamaCppExecutableCandidates omits dev vendor and system paths in pac
 
 test('isPathInside matches only paths inside the managed runtime root', () => {
   expect(isPathInside(
-    '/Users/tester/AppData/RongxinAI/llamacpp-runtime/current/bin/llama-server',
-    '/Users/tester/AppData/RongxinAI/llamacpp-runtime',
+    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime/current/bin/llama-server',
+    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime',
   )).toBe(true);
   expect(isPathInside(
-    '/Users/tester/AppData/RongxinAI/llamacpp-runtime-older/current/bin/llama-server',
-    '/Users/tester/AppData/RongxinAI/llamacpp-runtime',
+    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime-older/current/bin/llama-server',
+    '/Users/tester/AppData/ZhiYuanAgent/llamacpp-runtime',
   )).toBe(false);
 });
 
@@ -354,22 +354,22 @@ test('filterLlamaCppServiceConfigByRuntimeCapabilities drops unsupported and hid
 test('buildLlamaCppServeEnv prepends the resolved runtime bin directory to PATH on Windows', () => {
   expect(buildLlamaCppServeEnv(
     { PATH: 'C:\\Windows\\System32' },
-    'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
     'win32',
   )).toEqual({
-    PATH: 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+    PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
   });
 });
 
 test('buildLlamaCppServeEnv does not duplicate PATH entries on Windows', () => {
   expect(buildLlamaCppServeEnv(
     {
-      PATH: 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+      PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
     },
-    'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
     'win32',
   )).toEqual({
-    PATH: 'C:\\Users\\tester\\AppData\\Roaming\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+    PATH: 'C:\\Users\\tester\\AppData\\Roaming\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
   });
 });
 
@@ -434,7 +434,7 @@ test('resolveLlamaCppDeviceSelection falls back to the default visible-device be
 test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', async () => {
   const calls: Array<{ file: string; args: string[]; pathValue?: string }> = [];
   const result = await listLlamaCppRuntimeDevices({
-    executablePath: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    executablePath: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
     platform: 'win32',
     baseEnv: { PATH: 'C:\\Windows\\System32' },
     runner: async (file, args, options) => {
@@ -447,13 +447,13 @@ test('listLlamaCppRuntimeDevices executes --list-devices with runtime env', asyn
   });
 
   expect(calls).toEqual([{
-    file: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    file: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
     args: ['--list-devices'],
-    pathValue: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
+    pathValue: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin;C:\\Windows\\System32',
   }]);
   expect(result).toEqual({
     success: true,
-    executablePath: 'C:\\RongxinAI\\llamacpp-runtime\\current\\bin\\llama-server.exe',
+    executablePath: 'C:\\ZhiYuanAgent\\llamacpp-runtime\\current\\bin\\llama-server.exe',
     rawOutput: 'CUDA0: NVIDIA GeForce RTX 4090\n',
     devices: [{ id: 'CUDA0', name: 'NVIDIA GeForce RTX 4090', backend: 'cuda' }],
   });

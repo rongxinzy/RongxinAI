@@ -194,7 +194,7 @@ const AllRunsHistory: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={
-                      run.status === 'success' ? 'text-(--lobster-success)' :
+                      run.status === 'success' ? 'text-(--zy-success)' :
                       run.status === 'error' ? 'text-destructive' :
                       run.status === 'running' ? 'text-primary' :
                       'text-muted-foreground'

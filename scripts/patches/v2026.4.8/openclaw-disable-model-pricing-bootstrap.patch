@@ -4,7 +4,7 @@
        void cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
      }
 
-+    // LobsterAI patch: disable model-pricing bootstrap to avoid startup delays.
++    // ZhiYuanAgent patch: disable model-pricing bootstrap to avoid startup delays.
 +    // The gateway fetches https://openrouter.ai/api/v1/models on startup which
 +    // times out (15s) in regions with slow external API access, delaying the
 +    // WebSocket handshake.  See openclaw/openclaw#60116, openclaw/openclaw#59348.

@@ -6,7 +6,7 @@ index 2ecef96fe2..23afdfcb72 100644
  import fs from "node:fs";
  import { createRequire } from "node:module";
  import path from "node:path";
-+// LobsterAI patch: static import so esbuild can bundle facade-activation-check
++// ZhiYuanAgent patch: static import so esbuild can bundle facade-activation-check
 +// into gateway-bundle.mjs.  The original dynamic createRequire(import.meta.url)
 +// resolves relative to the bundle location, not the original module, and the
 +// built chunk has ESM dependencies on sibling chunks that don't exist outside
@@ -36,7 +36,7 @@ index 2ecef96fe2..23afdfcb72 100644
 -  return facadeActivationCheckRuntimeJiti;
 -}
 
-+// LobsterAI patch: use static import for facade-activation-check.runtime
++// ZhiYuanAgent patch: use static import for facade-activation-check.runtime
 +// to support esbuild bundling (see import statement at top of file).
  function loadFacadeActivationCheckRuntime(): FacadeActivationCheckRuntimeModule {
 -  if (facadeActivationCheckRuntimeModule) {

@@ -34,7 +34,7 @@ const {
 // ── test helpers ─────────────────────────────────────────────────────────────
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-pairing-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-pairing-test-'));
 }
 
 function cleanupDir(dir) {

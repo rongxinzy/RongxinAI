@@ -95,6 +95,6 @@ export function appendUvRuntimeToEnv(env: Record<string, string | undefined>): R
   if (!parts.some((entry) => entry.trim().toLowerCase().replace(/[\\/]+$/, '') === normalizedDir)) {
     env.PATH = [runtimeDir, ...parts.filter(Boolean)].join(';');
   }
-  env.LOBSTERAI_UV_ROOT = runtimeDir;
+  env.ZHIYUAN_UV_ROOT = runtimeDir;
   return env;
 }

@@ -13,8 +13,8 @@ export const LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS = 400;
 export const LOCAL_INFERENCE_MIN_SPEED_SAMPLE_SECONDS = 0.05;
 export const LOCAL_INFERENCE_MAX_SPEED_FOR_TINY_COMPLETION = 200;
 export const LOCAL_INFERENCE_MAX_SPEED_FOR_SMALL_COMPLETION = 2000;
-export const LOCAL_INFERENCE_SESSION_STORAGE_KEY = 'lobsterai:llamacpp-inference-session';
-export const LOCAL_INFERENCE_MODEL_ORDER_STORAGE_KEY = 'lobsterai:llamacpp-model-order';
+export const LOCAL_INFERENCE_SESSION_STORAGE_KEY = 'zhiyuan:llamacpp-inference-session';
+export const LOCAL_INFERENCE_MODEL_ORDER_STORAGE_KEY = 'zhiyuan:llamacpp-model-order';
 export const DIRECT_ANSWER_SYSTEM_HINT = [
   'Answer as quickly and directly as possible.',
   'Skip unnecessary drafts, long internal monologues, and unrelated exploration.',

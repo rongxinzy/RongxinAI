@@ -24,7 +24,7 @@ pnpm exec remotion add @remotion/google-fonts # If project uses pnpm
 ```
 
 ```tsx
-import { loadFont } from "@remotion/google-fonts/Lobster";
+import { loadFont } from "@remotion/google-fonts/Bangers";
 
 const { fontFamily } = loadFont();
 
@@ -49,7 +49,7 @@ const { fontFamily } = loadFont("normal", {
 Use `waitUntilDone()` if you need to know when the font is ready:
 
 ```tsx
-import { loadFont } from "@remotion/google-fonts/Lobster";
+import { loadFont } from "@remotion/google-fonts/Bangers";
 
 const { fontFamily, waitUntilDone } = loadFont();
 

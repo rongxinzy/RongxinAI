@@ -106,7 +106,7 @@ function balanceSources(articles, maxPerSource = 5) {
 
 function getWebSearchScriptPath() {
   const skillsRoot = process.env.SKILLS_ROOT
-    || process.env.LOBSTERAI_SKILLS_ROOT
+    || process.env.ZHIYUAN_SKILLS_ROOT
     || path.resolve(SCRIPT_DIR, '..', '..');
 
   const p = path.join(skillsRoot, 'web-search', 'scripts', 'search.sh');

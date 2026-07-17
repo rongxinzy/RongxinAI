@@ -85,7 +85,7 @@ const SelectionReason = {
 };
 
 const LLAMACPP_BACKEND_RESOURCES_DIR = 'llamacpp-backends';
-const RONGXINAI_APP_DATA_DIR = 'RongxinAI';
+const ZHIYUAN_APP_DATA_DIR = 'ZhiYuanAgent';
 const LLAMACPP_RUNTIME_DIR = 'llamacpp-runtime';
 const INSTALL_LOG_FILE = 'install-llamacpp.log';
 const MANIFEST_FILE = 'manifest.json';
@@ -96,7 +96,7 @@ const PREFERRED_CUDA_MAJOR = '12';
 const NETWORK_FAILURE_HINT = 'Please check network, proxy, or firewall settings.';
 
 const DownloadConfig = {
-  UserAgent: 'RongxinAI/llamacpp-nsis-helper',
+  UserAgent: 'ZhiYuanAgent/llamacpp-nsis-helper',
   ResumeOnIncompleteMaxRetry: 3,
   MaxRetries: 3,
   TotalRetryEvents: 6,
@@ -117,7 +117,7 @@ const PowerShellCommand = {
   Command: '-Command',
 };
 
-const LOCAL_SIGNING_CERT_SUBJECT = 'CN=RongxinAI Local llama.cpp Runtime Signing';
+const LOCAL_SIGNING_CERT_SUBJECT = 'CN=ZhiYuanAgent Local Inference Runtime Signing';
 const WINDOWS_SIGNABLE_FILE_EXTENSIONS = new Set(['.dll', '.exe']);
 
 function parseCliArgs(argv) {
@@ -171,8 +171,8 @@ function printUsage() {
     'Options:',
     '  --manifest <path>            Manifest path. Defaults to resources/llamacpp-backends/manifest.json.',
     '  --resources-dir <path>       Directory containing manifest.json and optional backend archives.',
-    '  --app-data-dir <path>        AppData root. Defaults to %APPDATA%/RongxinAI.',
-    '  --log-path <path>            Log file path. Defaults to %APPDATA%/RongxinAI/install-llamacpp.log.',
+    '  --app-data-dir <path>        AppData root. Defaults to %APPDATA%/ZhiYuanAgent.',
+    '  --log-path <path>            Log file path. Defaults to %APPDATA%/ZhiYuanAgent/install-llamacpp.log.',
     '  --platform <platform>        Runtime platform override for tests, for example win32.',
     '  --arch <arch>                Runtime arch override for tests, for example x64 or arm64.',
     '  --has-nvidia-gpu <true|false>  GPU override for tests.',
@@ -200,7 +200,7 @@ function resolveDefaultResourcesDir(scriptDir = __dirname, cwd = process.cwd()) 
 
 function resolveAppDataDir(env = process.env) {
   const appDataRoot = env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  return path.join(appDataRoot, RONGXINAI_APP_DATA_DIR);
+  return path.join(appDataRoot, ZHIYUAN_APP_DATA_DIR);
 }
 
 function resolveLogPath(appDataDir) {

@@ -365,7 +365,7 @@ const API_FORMAT_MAP: Record<string, 'anthropic' | 'openai'> = {
 /**
  * Reverse-map openclaw.json models.providers → app_config.providers.
  * Enterprise openclaw.json should use real provider names as keys
- * (e.g., 'deepseek', 'anthropic') instead of the generic 'lobster'.
+ * (e.g., 'deepseek', 'anthropic') instead of the generic 'zhiyuan'.
  */
 function syncModelConfig(configPath: string, store: SqliteStore): void {
   const openclawPath = path.join(configPath, 'openclaw.json');
@@ -396,7 +396,7 @@ function syncModelConfig(configPath: string, store: SqliteStore): void {
         supportsImage: Array.isArray(m.input) && m.input.includes('image'),
       }));
 
-      // Resolve apiKey: use plain text value, skip placeholders like ${LOBSTER_...}
+      // Resolve apiKey: use plain text value, skip placeholders like ${ZHIYUAN_...}
       const apiKey = typeof providerConfig.apiKey === 'string' && !providerConfig.apiKey.startsWith('${')
         ? providerConfig.apiKey
         : '';
@@ -772,7 +772,7 @@ function syncOpenClawAgentList(
     }
 
     if (syncedCount > 0) {
-      console.log(`[Enterprise] synced ${syncedCount} agent config(s) to Lobster agents`);
+      console.log(`[Enterprise] synced ${syncedCount} agent config(s) to Zhiyuan agents`);
     }
   } catch (error) {
     console.error('[Enterprise] failed to sync OpenClaw agents:', error);

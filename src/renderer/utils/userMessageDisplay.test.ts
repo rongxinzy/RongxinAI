@@ -4,8 +4,8 @@ import { parseUserMessageForDisplay } from './userMessageDisplay';
 
 // ─── Helpers ────────────────────────────────────────────────
 
-const WIN_INBOUND = String.raw`C:\Users\yangwn\AppData\Roaming\LobsterAI\openclaw\state\media\inbound`;
-const MAC_INBOUND = '/Users/yangwn/Library/Application Support/LobsterAI/openclaw/state/media/inbound';
+const WIN_INBOUND = String.raw`C:\Users\yangwn\AppData\Roaming\ZhiYuanAgent\openclaw\state\media\inbound`;
+const MAC_INBOUND = '/Users/yangwn/Library/Application Support/ZhiYuanAgent/openclaw/state/media/inbound';
 
 const fileImg = (dir: string, name: string) => `${dir}${dir.includes('\\') ? '\\' : '/'}${name}`;
 

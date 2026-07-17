@@ -195,7 +195,7 @@ function renderCallbackHtml(success: boolean, message: string): string {
   );
   const color = success ? '#16a34a' : '#dc2626';
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>RongxinAI · ChatGPT Login</title>
+<html lang="en"><head><meta charset="utf-8"><title>ZhiYuanAgent · ChatGPT Login</title>
 <style>
   body { font-family: -apple-system, system-ui, sans-serif; background: #0b0d10; color: #e5e7eb; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
   .card { background: #14171c; padding: 32px 40px; border-radius: 16px; border: 1px solid #262b33; max-width: 420px; }
@@ -342,7 +342,7 @@ export function startOpenAICodexLogin(): Promise<CodexOAuthTokens> {
       res.end(
         renderCallbackHtml(
           true,
-          'You can now close this tab and return to RongxinAI.',
+          'You can now close this tab and return to ZhiYuanAgent.',
         ),
       );
 

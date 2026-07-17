@@ -1,6 +1,6 @@
 # AGENTS.zh.md
 
-本文件为在 RongxinAI 仓库中工作的编码智能体提供指导。
+本文件为在 知远智能体 仓库中工作的编码智能体提供指导。
 
 ## 构建与开发命令
 
@@ -41,7 +41,7 @@ npm run openclaw:runtime:host   # 当前平台
 
 ## 架构概览
 
-RongxinAI 是一款面向本地优先 AI Agent 工作流的 Electron + React 桌面应用。核心领域包括：
+知远智能体 是一款面向本地优先 AI Agent 工作流的 Electron + React 桌面应用。核心领域包括：
 1. **Cowork 模式** - 以 OpenClaw 作为主要 Agent 运行时的 AI 辅助任务会话
 2. **llama.cpp 本地推理** - 本地模型服务管理、模型启动选项，以及与 OpenClaw 的本地模型集成
 3. **Skills 与 MCP** - 内置技能、远程技能市场以及 MCP 服务器配置
@@ -49,7 +49,7 @@ RongxinAI 是一款面向本地优先 AI Agent 工作流的 Electron + React 桌
 
 采用严格的进程隔离与 IPC 通信。
 
-面向用户的产品文档和 UI 文案必须使用「知远智能体」名称。LobsterAI、RongxinAI、LEO、李知远均为已停用品牌名，不得在品牌面重新引入。OpenClaw、pi、llama.cpp 属于内部实现细节：不得在品牌或用户可见文案中暴露，Agent 运行时与本地推理一律表述为全栈自研。运行时存储、协议处理器、会话键和历史迁移路径中可能仍存在一些遗留标识符；除非任务明确包含兼容性迁移，否则不要重命名这些代码。
+面向用户的产品文档和 UI 文案必须使用「知远智能体」名称。所有更名前的旧品牌名（包括 知远智能体、LEO、李知远）均已停用，不得在品牌面重新引入。OpenClaw、pi、llama.cpp 属于内部实现细节：不得在品牌或用户可见文案中暴露，Agent 运行时与本地推理一律表述为全栈自研。遗留标识符（旧存储名、旧 SQLite 文件名、旧应用数据目录、旧协议 scheme、旧会话键等）已按焦土政策统一替换为知远智能体 (ZhiYuan Agent) 新标识：不做数据迁移、不留兼容代码、不做旧值回退，旧用户数据就地废弃。新代码一律使用新标识。
 
 ### 认证流程
 
@@ -216,7 +216,7 @@ Artifacts 功能提供类似 Claude artifacts 的代码输出富预览：
 - Cowork 配置存储在 `cowork_config` 表（workingDirectory、systemPrompt、executionMode、**agentEngine**）
 - Cowork 会话和消息存储在 `cowork_sessions` 和 `cowork_messages` 表
 - 计划任务元数据存储在 `scheduled_task_meta` 表（origin 和 binding 信息）；任务定义由 OpenClaw 管理
-- 数据库文件：当前使用用户数据目录中配置的应用 SQLite 文件名。旧版本安装可能仍使用 `lobsterai.sqlite`；没有迁移计划不要更改存储名称。
+- 数据库文件：用户数据目录下的 `zhiyuan.sqlite`。更名前的旧数据库文件不做迁移、不读取，旧数据就地废弃（焦土政策）。
 - OpenClaw 固定版本声明在 `package.json` 的 `"openclaw": { "version": "...", "repo": "..." }` 下；升级时更新版本字段并重新运行。
 
 ### TypeScript 配置
@@ -393,6 +393,6 @@ chore: bump version to 2026.3.18
 
 - `shadcn/ui` — shadcn/ui 组件使用和样式规则。
 - `vercel/ai-elements` — AI Elements 聊天组件。
-- `rongxinai-ui-adapter` — RongxinAI 专用约束和 lobster 主题映射。
+- `zhiyuan-ui-adapter` — 知远智能体 专用约束和 Zhiyuan 主题映射。
 
 这些全局 skills 补充本文件中的约定，而不是替代。

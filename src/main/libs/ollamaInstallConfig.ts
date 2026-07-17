@@ -24,7 +24,7 @@ function splitEnvPaths(value?: string): string[] {
 }
 
 function readEnterpriseConfig(): Partial<OllamaInstallConfig> {
-  const configPath = path.join(os.homedir(), '.rongxinai', 'install.config.json');
+  const configPath = path.join(os.homedir(), '.zhiyuan', 'install.config.json');
   if (!fs.existsSync(configPath)) return {};
   try {
     return JSON.parse(fs.readFileSync(configPath, 'utf8')) as Partial<OllamaInstallConfig>;
@@ -36,21 +36,21 @@ function readEnterpriseConfig(): Partial<OllamaInstallConfig> {
 export function getOllamaInstallConfig(): OllamaInstallConfig {
   const downloadsDir = app.getPath('downloads');
   const enterpriseConfig = readEnterpriseConfig();
-  const envPresetPaths = splitEnvPaths(process.env.LOBSTERAI_OLLAMA_PRESET_PATH);
-  const envMirrorUrl = process.env.LOBSTERAI_OLLAMA_MIRROR_URL?.trim();
+  const envPresetPaths = splitEnvPaths(process.env.ZHIYUAN_OLLAMA_PRESET_PATH);
+  const envMirrorUrl = process.env.ZHIYUAN_OLLAMA_MIRROR_URL?.trim();
 
   const defaults: OllamaInstallConfig = {
     presetInstaller: {
       win32: [
-        'C:\\ProgramData\\RongxinAI\\installers',
+        'C:\\ProgramData\\ZhiYuanAgent\\installers',
         downloadsDir,
       ],
       darwin: [
-        '/Library/Application Support/RongxinAI/installers',
+        '/Library/Application Support/ZhiYuanAgent/installers',
         downloadsDir,
       ],
       linux: [
-        '/opt/rongxinai/installers',
+        '/opt/zhiyuan/installers',
         downloadsDir,
       ],
     },

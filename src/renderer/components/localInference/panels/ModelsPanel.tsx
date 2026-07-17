@@ -329,11 +329,11 @@ function ModelCard({
       {isRunning ? (
         <span
           aria-label={i18nService.t('localInferenceStatus_running')}
-          className="absolute right-3 top-3 size-2 rounded-full bg-(--lobster-success) animate-pulse"
+          className="absolute right-3 top-3 size-2 rounded-full bg-(--zy-success) animate-pulse"
         />
       ) : null}
       {loadingModel || unloading ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--lobster-background)_84%,transparent)] backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--zy-background)_84%,transparent)] backdrop-blur-[1px]">
           <Button21st
             type="button"
             isDisabled

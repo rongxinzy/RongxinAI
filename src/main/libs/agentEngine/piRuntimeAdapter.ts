@@ -532,11 +532,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const resourceLoader = new pi.DefaultResourceLoader({
       cwd,
       agentDir: pi.getAgentDir(),
-      // RongxinAI skills come exclusively from the app-managed SKILLs dirs —
+      // ZhiYuanAgent skills come exclusively from the app-managed SKILLs dirs —
       // never from the developer's global ~/.agents/skills (which would leak
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
       noSkills: true,
-      additionalSkillPaths: this.resolveRongxinAiSkillDirs(),
+      additionalSkillPaths: this.resolveZhiyuanSkillDirs(),
       skillsOverride: skillIds === undefined
         ? undefined
         : (base: { skills: Array<{ name?: string; id?: string }>; diagnostics: unknown[] }) => ({
@@ -558,7 +558,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    * (may exist from a previous packaged run). Production: userData/SKILLs only
    * (getSkillsRoot already resolves there).
    */
-  private resolveRongxinAiSkillDirs(): string[] {
+  private resolveZhiyuanSkillDirs(): string[] {
     const dirs: string[] = [];
     const push = (dir: string): void => {
       if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
@@ -973,7 +973,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    *
    * One proxy tool costs ~200 system-prompt tokens regardless of how many
    * MCP servers/tools are configured, vs N × ~200 tokens for per-tool
-   * registration. Uses RongxinAI's McpServerManager for tool execution
+   * registration. Uses ZhiYuanAgent's McpServerManager for tool execution
    * rather than creating duplicate MCP connections.
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
@@ -1336,7 +1336,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
 /**
  * Infer the Pi provider name from environment variables.
- * RongxinAI stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
+ * ZhiYuanAgent stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
  * Pi SDK looks up providers by name (deepseek, anthropic, openai, etc.).
  */
 const DEFAULT_PI_CONTEXT_WINDOW = 32768;

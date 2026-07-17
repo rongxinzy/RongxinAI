@@ -291,7 +291,7 @@ function shouldUseOpenAICodexOAuth(providerName: string, providerConfig: LocalPr
   return readOpenAICodexAuthFile() !== null;
 }
 
-function tryLobsteraiServerFallback(modelId?: string): MatchedProvider | null {
+function tryZhiyuanServerFallback(modelId?: string): MatchedProvider | null {
   const tokens = authTokensGetter?.();
   const serverBaseUrl = serverBaseUrlGetter?.();
   if (!tokens?.accessToken || !serverBaseUrl) return null;
@@ -299,9 +299,9 @@ function tryLobsteraiServerFallback(modelId?: string): MatchedProvider | null {
   if (!effectiveModelId) return null;
   const baseURL = `${serverBaseUrl}/api/proxy/v1`;
   const cachedMeta = serverModelMetadataCache.get(effectiveModelId);
-  console.log('[ClaudeSettings] lobsterai-server fallback activated:', { baseURL, modelId: effectiveModelId, supportsImage: cachedMeta?.supportsImage });
+  console.log('[ClaudeSettings] zhiyuan-server fallback activated:', { baseURL, modelId: effectiveModelId, supportsImage: cachedMeta?.supportsImage });
   return {
-    providerName: ProviderName.LobsteraiServer,
+    providerName: ProviderName.ZhiyuanServer,
     providerConfig: { enabled: true, apiKey: tokens.accessToken, baseUrl: baseURL, apiFormat: 'openai', models: buildServerFallbackModels(effectiveModelId) },
     modelId: effectiveModelId,
     apiFormat: 'openai',
@@ -327,7 +327,7 @@ function resolveMatchedProviderFromSelection(
     && (providerConfig as any).authType === 'oauth'
     && !(providerConfig as any).oauthAccessToken
   ) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: 'MiniMax OAuth mode selected but login not completed.' };
   }
@@ -342,7 +342,7 @@ function resolveMatchedProviderFromSelection(
   }
 
   if (!baseURL) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: `Provider ${providerName} is missing base URL.` };
   }
@@ -360,7 +360,7 @@ function resolveMatchedProviderFromSelection(
     && !hasApiKey
     && !hasOAuthCreds
   ) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return {
       matched: null,
@@ -370,7 +370,7 @@ function resolveMatchedProviderFromSelection(
 
   const matchedModel = normalizedProviderModels.find((m) => m.id === modelId);
   if (!matchedModel) {
-    const serverFallback = tryLobsteraiServerFallback(modelId);
+    const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
@@ -413,8 +413,8 @@ function resolveMatchedProviderForModelRef(
     return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
   }
 
-  if (providerName === ProviderName.LobsteraiServer) {
-    const serverMatch = tryLobsteraiServerFallback(modelId);
+  if (providerName === ProviderName.ZhiyuanServer) {
+    const serverMatch = tryZhiyuanServerFallback(modelId);
     if (serverMatch) return { matched: serverMatch };
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
@@ -451,7 +451,7 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
     providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
   }));
   const effectiveApiKey =
-    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
   return {
     config: {
       apiKey: effectiveApiKey,
@@ -503,7 +503,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   if (!modelId) {
     const fallback = resolveFallbackModel();
     if (!fallback) {
-      const serverFallback = tryLobsteraiServerFallback(configuredModelId);
+      const serverFallback = tryZhiyuanServerFallback(configuredModelId);
       if (serverFallback) return { matched: serverFallback };
       return { matched: null, error: 'No available model configured in enabled providers.' };
     }
@@ -513,9 +513,9 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   let providerEntry: [string, LocalProviderConfig] | undefined;
   const preferredProviderName = appConfig.model?.defaultModelProvider?.trim();
 
-  // Handle lobsterai-server provider: dynamically construct from auth tokens
-  if (preferredProviderName === ProviderName.LobsteraiServer) {
-    const serverMatch = tryLobsteraiServerFallback(modelId);
+  // Handle zhiyuan-server provider: dynamically construct from auth tokens
+  if (preferredProviderName === ProviderName.ZhiyuanServer) {
+    const serverMatch = tryZhiyuanServerFallback(modelId);
     if (serverMatch) {
       return { matched: serverMatch };
     }
@@ -550,7 +550,7 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
       modelId = fallback.modelId;
       providerEntry = [fallback.providerName, fallback.providerConfig];
     } else {
-      const serverFallback = tryLobsteraiServerFallback(modelId);
+      const serverFallback = tryZhiyuanServerFallback(modelId);
       if (serverFallback) return { matched: serverFallback };
       return { matched: null, error: `No enabled provider found for model: ${modelId}` };
     }
@@ -592,7 +592,7 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
   // placeholder so downstream components (OpenClaw gateway, compat proxy)
   // don't reject the request with "No API key found for provider".
   const effectiveApiKey = resolvedApiKey
-    || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+    || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
 
   if (matched.apiFormat === 'anthropic') {
     return {
@@ -639,7 +639,7 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
 
   return {
     config: {
-      apiKey: resolvedApiKey || 'lobsterai-openai-compat',
+      apiKey: resolvedApiKey || 'zhiyuan-openai-compat',
       baseURL: proxyBaseURL,
       model: matched.modelId,
       apiType: 'openai',
@@ -708,7 +708,7 @@ export function resolveRawApiConfig(): ApiConfigResolution {
   // leaves the key blank we supply a placeholder so the gateway doesn't reject
   // the request with "No API key found for provider".
   const effectiveApiKey = apiKey
-    || (!providerRequiresApiKey(matched.providerName) ? 'sk-lobsterai-local' : '');
+    || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
   return {
     config: {
       apiKey: effectiveApiKey,
@@ -755,10 +755,10 @@ export function resolveRawApiConfigForModelRef(modelRef: string): ApiConfigResol
 export function resolveAllProviderApiKeys(): Record<string, string> {
   const result: Record<string, string> = {};
 
-  // lobsterai-server token is now managed by the token proxy
+  // zhiyuan-server token is now managed by the token proxy
   // (openclawTokenProxy.ts) — no longer injected as an env var.
 
-    // lobsterai-server: uses auth accessToken
+    // zhiyuan-server: uses auth accessToken
     const tokens = authTokensGetter?.();
     const serverBaseUrl = serverBaseUrlGetter?.();
     if (tokens?.accessToken && serverBaseUrl) {
@@ -786,7 +786,7 @@ export function resolveAllProviderApiKeys(): Record<string, string> {
         continue;
       }
       const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-      result[envName] = apiKey || 'sk-lobsterai-local';
+      result[envName] = apiKey || 'sk-zhiyuan-local';
     }
 
     const D = gwDiagTs;
@@ -826,7 +826,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
   for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
     if (!isProviderEnabled(providerName, providerConfig)) continue;
-    if (providerName === ProviderName.LobsteraiServer) continue;
+    if (providerName === ProviderName.ZhiyuanServer) continue;
 
     // When minimax is in OAuth mode, use oauthAccessToken and oauthBaseUrl
     // (independent from the user's manually entered apiKey/baseUrl).
@@ -888,7 +888,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
     result.push({
       providerName,
       baseURL: effectiveBaseURL,
-      apiKey: apiKey || 'sk-lobsterai-local',
+      apiKey: apiKey || 'sk-zhiyuan-local',
       apiType: effectiveApiFormat === 'anthropic' ? 'anthropic' : 'openai',
       authType: providerConfig.authType,
       codingPlanEnabled: !!providerConfig.codingPlanEnabled,

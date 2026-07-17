@@ -347,7 +347,7 @@ async function fetchJsonWithTimeout(url: string, headers: Record<string, string>
   const timeout = setTimeout(() => controller.abort(), MARKETPLACE_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'RongxinAI/modelscope-gguf-marketplace', ...headers },
+      headers: { 'User-Agent': 'ZhiYuanAgent/modelscope-gguf-marketplace', ...headers },
       signal: controller.signal,
     });
     if (!response.ok) {

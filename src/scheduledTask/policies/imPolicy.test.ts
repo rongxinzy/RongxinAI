@@ -118,7 +118,7 @@ test('IMPolicy.toWireBinding: im_session with sessionId -> managed sessionKey', 
     sessionId: 'sess-1',
   });
   expect(result.sessionTarget).toBe(SessionTarget.Main);
-  expect(result.sessionKey).toBe('agent:main:lobsterai:sess-1');
+  expect(result.sessionKey).toBe('agent:main:zhiyuan:sess-1');
 });
 
 test('IMPolicy.toWireBinding: im_session without sessionId -> sessionKey null', () => {

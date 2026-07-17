@@ -21,7 +21,7 @@
 // ═══════════════════════════════════════════════════════
 
 // ─── Provider Name ──────────────────────────────────────────────────────
-// providerName identifies the LobsterAI internal provider (config key).
+// providerName identifies the ZhiYuanAgent internal provider (config key).
 export const ProviderName = {
   OpenAI: 'openai',
   Gemini: 'gemini',
@@ -39,7 +39,7 @@ export const ProviderName = {
   LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
   Custom: 'custom',
-  LobsteraiServer: 'lobsterai-server',
+  ZhiyuanServer: 'zhiyuan-server',
   Copilot: 'github-copilot',
 } as const;
 export type ProviderName = typeof ProviderName[keyof typeof ProviderName];
@@ -47,7 +47,7 @@ export type ProviderName = typeof ProviderName[keyof typeof ProviderName];
 // ─── OpenClaw Provider ID ───────────────────────────────────────────────
 // OpenClaw gateway provider identifiers. May differ from ProviderName.
 export const OpenClawProviderId = {
-  LobsteraiServer: 'lobsterai-server',
+  ZhiyuanServer: 'zhiyuan-server',
   Moonshot: 'moonshot',
   Google: 'google',
   Anthropic: 'anthropic',
@@ -63,10 +63,10 @@ export const OpenClawProviderId = {
   Xiaomi: 'xiaomi',
   OpenRouter: 'openrouter',
   Copilot: 'github-copilot',
-  LobsteraiCopilot: 'lobsterai-copilot',
+  ZhiyuanCopilot: 'zhiyuan-copilot',
   LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
-  Lobster: 'lobster',
+  Zhiyuan: 'zhiyuan',
 } as const;
 export type OpenClawProviderId = typeof OpenClawProviderId[keyof typeof OpenClawProviderId];
 
@@ -421,7 +421,7 @@ const PROVIDER_DEFINITIONS = [
   {
     id: ProviderName.Copilot,
     label: 'GitHub Copilot',
-    openClawProviderId: OpenClawProviderId.LobsteraiCopilot,
+    openClawProviderId: OpenClawProviderId.ZhiyuanCopilot,
     defaultBaseUrl: 'https://api.individual.githubcopilot.com',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -614,7 +614,7 @@ class ProviderRegistryImpl {
   }
 
   getOpenClawProviderId(providerName: string): string {
-    return this.idIndex.get(providerName)?.openClawProviderId ?? providerName ?? OpenClawProviderId.Lobster;
+    return this.idIndex.get(providerName)?.openClawProviderId ?? providerName ?? OpenClawProviderId.Zhiyuan;
   }
 
   getProviderModelSupportsImage(providerName: string, modelId: string): boolean | undefined {

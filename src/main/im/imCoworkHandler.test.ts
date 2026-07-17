@@ -173,7 +173,7 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
         id: 'job-1',
         name: (params.request as Record<string, unknown>).taskName,
         agentId: 'main',
-        sessionKey: `agent:main:lobsterai:${params.sessionId}`,
+        sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
         payloadText: (params.request as Record<string, unknown>).payloadText,
         scheduleAt: (params.request as Record<string, unknown>).scheduleAt,
       };
@@ -227,7 +227,7 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
       id: 'job-1',
       name: (params.request as Record<string, unknown>).taskName,
       agentId: 'main',
-      sessionKey: `agent:main:lobsterai:${params.sessionId}`,
+      sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
       payloadText: (params.request as Record<string, unknown>).payloadText,
       scheduleAt: (params.request as Record<string, unknown>).scheduleAt,
     }),

@@ -672,7 +672,7 @@ function main() {
     if (needsPatch) {
       // 1. Generate lightweight setup-entry.js (zero require() calls)
       const setupEntryContent = `"use strict";
-// Lightweight setup entry for deferred loading (patched by LobsterAI).
+// Lightweight setup entry for deferred loading (patched by ZhiYuanAgent).
 // Only static channel metadata — no heavy dependencies.
 // The full plugin (index.js) loads after the HTTP server starts listening.
 exports.plugin = {
@@ -742,14 +742,14 @@ exports.plugin = {
       const idx = mediaSrc.indexOf(target);
       if (idx !== -1) {
         const replacement = `fileName = decodeURIComponent(match[1].trim());
-                // Patched by LobsterAI: fix Latin-1 garbled UTF-8 filenames from Feishu API
+                // Patched by ZhiYuanAgent: fix Latin-1 garbled UTF-8 filenames from Feishu API
                 fileName = ${patchMarker}(fileName);`;
         mediaSrc = mediaSrc.slice(0, idx) + replacement + mediaSrc.slice(idx + target.length);
         // Insert the helper function before the downloadMessageResourceFeishu function
         const fnMarker = 'async function downloadMessageResourceFeishu(';
         const fnIdx = mediaSrc.indexOf(fnMarker);
         if (fnIdx !== -1) {
-          const helperFn = `// Patched by LobsterAI: detect and fix Latin-1 garbled UTF-8 filenames.
+          const helperFn = `// Patched by ZhiYuanAgent: detect and fix Latin-1 garbled UTF-8 filenames.
 // When Node.js parses HTTP headers as Latin-1, UTF-8 multibyte Chinese
 // characters get split into individual high bytes (e.g. U+6700 "最" encoded
 // as 0xE6 0x9C 0x80 in UTF-8 becomes "æ\\x9C\\x80" in Latin-1).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterAI Stock Explorer
+ZhiYuanAgent Stock Explorer
 Quick stock quotes, fundamentals, technical indicators via Yahoo Finance.
 
 Dependencies: pip install yfinance pandas rich plotille
@@ -211,7 +211,7 @@ def cmd_report(symbol, ticker, info, period):
 # ---------------------------------------------------------------------------
 
 def main():
-    ap = argparse.ArgumentParser(description="LobsterAI Stock Explorer")
+    ap = argparse.ArgumentParser(description="ZhiYuanAgent Stock Explorer")
     ap.add_argument("cmd", nargs="?", default="price",
                     choices=["price", "fundamentals", "history", "pro", "report"])
     ap.add_argument("symbol", help="股票代码")

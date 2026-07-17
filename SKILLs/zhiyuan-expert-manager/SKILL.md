@@ -1,5 +1,5 @@
 ---
-name: rongxinai-expert-manager
+name: zhiyuan-expert-manager
 description: |
   RongxinAI expert package lifecycle manager for the pi engine.
   Helps users create, validate, and register single agents or multi-agent teams

@@ -285,7 +285,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
     return (
       <Badge
         variant="outline"
-        className="border-[color-mix(in_srgb,var(--lobster-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-success)_12%,transparent)] text-(--lobster-success)"
+        className="border-[color-mix(in_srgb,var(--zy-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--zy-success)_12%,transparent)] text-(--zy-success)"
       >
         {i18nService.t('localInferenceModelLaunchSucceeded')}
       </Badge>
@@ -295,7 +295,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
     return (
       <Badge
         variant="outline"
-        className="border-[color-mix(in_srgb,var(--lobster-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--lobster-destructive)_12%,transparent)] text-(--lobster-destructive)"
+        className="border-[color-mix(in_srgb,var(--zy-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--zy-destructive)_12%,transparent)] text-(--zy-destructive)"
       >
         {i18nService.t('localInferenceModelLaunchFailed')}
       </Badge>
@@ -304,7 +304,7 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
   return (
     <Badge
       variant="outline"
-      className="border-[color-mix(in_srgb,var(--lobster-primary)_28%,transparent)] bg-(--lobster-primary-muted) text-(--lobster-primary)"
+      className="border-[color-mix(in_srgb,var(--zy-primary)_28%,transparent)] bg-(--zy-primary-muted) text-(--zy-primary)"
     >
       {i18nService.t('localInferenceModelLaunchStarting')}
     </Badge>

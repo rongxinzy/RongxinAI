@@ -16,11 +16,11 @@ import {
 describe('electron-builder Windows llama.cpp packaging hooks', () => {
   test('defaults Windows llama.cpp backend bundle mode to lite', () => {
     expect(resolveWindowsLlamaCppBackendBundleMode({})).toBe(WindowsLlamaCppBackendBundleMode.Lite);
-    expect(resolveWindowsLlamaCppBackendBundleMode({ RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE: 'full' }))
+    expect(resolveWindowsLlamaCppBackendBundleMode({ ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: 'full' }))
       .toBe(WindowsLlamaCppBackendBundleMode.Full);
     expect(resolveWindowsLlamaCppBackendBundleMode({ WIN_LLAMACPP_BACKEND_BUNDLE: 'none' }))
       .toBe(WindowsLlamaCppBackendBundleMode.None);
-    expect(() => resolveWindowsLlamaCppBackendBundleMode({ RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE: 'bad' }))
+    expect(() => resolveWindowsLlamaCppBackendBundleMode({ ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: 'bad' }))
       .toThrow(/Expected lite, full, or none/);
   });
 

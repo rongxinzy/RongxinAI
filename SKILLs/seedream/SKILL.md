@@ -9,7 +9,7 @@ version: 1.0.1
 
 使用火山引擎 Seedream 模型生成高质量 AI 图片，支持文本生成图片（T2I）、图片编辑（I2I）、多图融合、组图生成、联网搜索等多种创作模式。
 
-> ✨ **Node.js 版本**：此脚本使用 Node.js 实现，无需 Python 环境。通过入口脚本自动检测 Node.js 运行时（优先使用系统 node，回退到 RongxinAI 内置运行时），Windows 和 Mac 用户都可以开箱即用。
+> ✨ **Node.js 版本**：此脚本使用 Node.js 实现，无需 Python 环境。通过入口脚本自动检测 Node.js 运行时（优先使用系统 node，回退到 知远智能体 内置运行时），Windows 和 Mac 用户都可以开箱即用。
 
 ## 配置
 
@@ -66,9 +66,9 @@ $env:ARK_API_KEY="你的API密钥"
 [System.Environment]::SetEnvironmentVariable('ARK_API_KEY', '你的API密钥', 'User')
 ```
 
-**方式二：通过 RongxinAI 启动时注入**
+**方式二：通过 知远智能体 启动时注入**
 
-RongxinAI 会自动读取系统环境变量，确保在启动 RongxinAI 前已设置 `ARK_API_KEY`。
+知远智能体 会自动读取系统环境变量，确保在启动 知远智能体 前已设置 `ARK_API_KEY`。
 
 **如何获取 API Key：**
 1. 访问火山方舟控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/apikey
@@ -79,7 +79,7 @@ RongxinAI 会自动读取系统环境变量，确保在启动 RongxinAI 前已�
 
 **无需安装任何依赖！** 该脚本已兼容 Node.js 内置模块。
 
-RongxinAI 已包含 Node.js 运行时，所有必要的依赖已被自动打包。Windows 和 Mac 用户无需额外配置。
+知远智能体 已包含 Node.js 运行时，所有必要的依赖已被自动打包。Windows 和 Mac 用户无需额外配置。
 
 ## 工作流程
 
@@ -111,7 +111,7 @@ Seedream 图片生成采用**同步模式**，流程简单高效：
 
 ## 使用示例
 
-**路径说明**：下面的示例使用 `$SKILLS_ROOT` 环境变量来引用脚本路径。RongxinAI 会自动设置这个变量，指向实际的 SKILLs 目录位置，因此无需手动修改路径。
+**路径说明**：下面的示例使用 `$SKILLS_ROOT` 环境变量来引用脚本路径。知远智能体 会自动设置这个变量，指向实际的 SKILLs 目录位置，因此无需手动修改路径。
 
 ### 1. 文本生成图片（T2I）
 

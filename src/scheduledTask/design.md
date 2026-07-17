@@ -1,12 +1,12 @@
-# RongxinAI 定时任务系统设计文档
+# 知远智能体定时任务系统设计文档
 
 ## 总述
 
-RongxinAI 的定时任务系统是一套横跨 **Renderer(UI) -> Main Process(IPC/业务逻辑) -> OpenClaw Gateway(调度引擎)** 三层的端到端自动化执行框架。它允许用户通过 UI 界面、IM 聊天或 Cowork 会话创建定时任务，由 OpenClaw 的 Cron 引擎进行调度触发，并将执行结果通过 IM 通道或 Webhook 投递给用户。
+知远智能体的定时任务系统是一套横跨 **Renderer(UI) -> Main Process(IPC/业务逻辑) -> OpenClaw Gateway(调度引擎)** 三层的端到端自动化执行框架。它允许用户通过 UI 界面、IM 聊天或 Cowork 会话创建定时任务，由 OpenClaw 的 Cron 引擎进行调度触发，并将执行结果通过 IM 通道或 Webhook 投递给用户。
 
 **核心设计理念**：
 
-1. **OpenClaw 驱动** -- 所有定时任务的调度、执行、投递均由 OpenClaw Gateway 原生完成，RongxinAI 作为上层应用只负责任务的 CRUD 和 UI 展示，不接管消息投递逻辑
+1. **OpenClaw 驱动** -- 所有定时任务的调度、执行、投递均由 OpenClaw Gateway 原生完成，知远智能体作为上层应用只负责任务的 CRUD 和 UI 展示，不接管消息投递逻辑
 2. **策略模式(Policy Pattern)** -- 不同来源的任务(UI/IM/Cowork/Legacy)各自拥有独立的策略类，控制默认参数、绑定关系、只读字段等行为
 3. **来源推断(Origin Inference)** -- 通过 `sessionKey` 的格式反向推断任务来源和执行绑定，实现与旧数据的无缝兼容
 4. **流式轮询** -- 通过 15 秒间隔的轮询机制将 OpenClaw 的任务状态变化实时推送到 UI
@@ -308,7 +308,7 @@ type ExecutionBinding =
 flowchart TD
     A["输入: task.sessionKey"] --> B{sessionKey 存在?}
     B -->|No| G["origin: manual<br/>binding: new_session"]
-    B -->|Yes| C{是 managed key?<br/>agent:main:lobsterai:*}
+    B -->|Yes| C{是 managed key?<br/>agent:main:zhiyuan:*}
     C -->|Yes| D{delivery 指向 IM 通道?}
     D -->|Yes| E["origin: im<br/>binding: im_session"]
     D -->|No| F["origin: cowork<br/>binding: ui_session"]
@@ -321,7 +321,7 @@ flowchart TD
 
 | 格式 | 示例 | 含义 |
 |------|------|------|
-| `agent:main:lobsterai:{sessionId}` | `agent:main:lobsterai:abc123` | 托管会话（UI/Cowork 创建） |
+| `agent:main:zhiyuan:{sessionId}` | `agent:main:zhiyuan:abc123` | 托管会话（UI/Cowork 创建） |
 | `agent:{agentId}:{platform}:{subtype}:{conversationId}` | `agent:main:feishu:direct:ou_xxx` | IM 通道会话 |
 | `cron:{jobId}` | `cron:job-456` | 隔离的 Cron 会话 |
 
@@ -469,7 +469,7 @@ flowchart TD
 
 **为什么要剥离前缀？**
 
-RongxinAI 的 `imStore` 中存储的 `conversationId` 带有 IM 子类型前缀（如 `direct:ou_xxx` 表示飞书私聊，`group:oc_xxx` 表示飞书群聊）。但 OpenClaw 的飞书插件中 `normalizeFeishuTarget()` 不识别 `direct:` 前缀，会将 `direct:ou_xxx` 原样传递给飞书 API，导致 400 错误。因此在传递给 OpenClaw 之前需要剥离此前缀。
+知远智能体的 `imStore` 中存储的 `conversationId` 带有 IM 子类型前缀（如 `direct:ou_xxx` 表示飞书私聊，`group:oc_xxx` 表示飞书群聊）。但 OpenClaw 的飞书插件中 `normalizeFeishuTarget()` 不识别 `direct:` 前缀，会将 `direct:ou_xxx` 原样传递给飞书 API，导致 400 错误。因此在传递给 OpenClaw 之前需要剥离此前缀。
 
 ---
 
@@ -477,7 +477,7 @@ RongxinAI 的 `imStore` 中存储的 `conversationId` 带有 IM 子类型前缀�
 
 #### 8.1 职责
 
-`CronJobService` 是 RongxinAI 与 OpenClaw Gateway 之间的 **适配器层**，封装了所有 Cron RPC 调用。
+`CronJobService` 是 知远智能体与 OpenClaw Gateway 之间的 **适配器层**，封装了所有 Cron RPC 调用。
 
 ```mermaid
 classDiagram
@@ -552,7 +552,7 @@ sequenceDiagram
 
 #### 8.4 类型映射
 
-CronJobService 在 RongxinAI 前端类型和 OpenClaw Gateway 类型之间进行双向转换：
+CronJobService 在 知远智能体前端类型和 OpenClaw Gateway 类型之间进行双向转换：
 
 | 前端类型 | Gateway 类型 | 转换函数 |
 |---------|-------------|---------|
@@ -614,11 +614,11 @@ sequenceDiagram
 
 #### 10.1 SessionKey 格式
 
-OpenClaw 使用 `sessionKey` 来标识和管理会话。RongxinAI 当前保留 legacy `lobsterai` 段用于兼容旧会话，格式如下：
+OpenClaw 使用 `sessionKey` 来标识和管理会话。知远智能体会话 key 统一使用 `zhiyuan` 段，格式如下：
 
 | 类型 | 格式 | 示例 | 用途 |
 |------|------|------|------|
-| 托管会话 | `agent:{agentId}:lobsterai:{sessionId}` | `agent:main:lobsterai:abc123` | UI/Cowork 创建的会话 |
+| 托管会话 | `agent:{agentId}:zhiyuan:{sessionId}` | `agent:main:zhiyuan:abc123` | UI/Cowork 创建的会话 |
 | 通道会话 | `agent:{agentId}:{platform}:{subtype}:{conversationId}` | `agent:main:feishu:direct:ou_xxx` | IM 平台的会话 |
 | Cron 会话 | `cron:{jobId}` | `cron:job-456` | 隔离 Cron 任务的独立会话 |
 
@@ -837,11 +837,11 @@ sequenceDiagram
 
 ## 总结
 
-RongxinAI 的定时任务系统通过三层架构实现了完整的自动化执行能力：
+知远智能体的定时任务系统通过三层架构实现了完整的自动化执行能力：
 
 1. **前端层（Renderer）**：提供直观的 UI 界面用于任务的 CRUD 管理，通过 Redux + 轮询实现实时状态更新
 2. **业务层（Main Process）**：通过 IPC handler + CronJobService 封装业务逻辑，负责 IM delivery 的归一化处理和类型映射
-3. **引擎层（OpenClaw Gateway）**：承担所有调度、执行、投递的核心工作，确保 RongxinAI 不需要自行实现消息投递逻辑
+3. **引擎层（OpenClaw Gateway）**：承担所有调度、执行、投递的核心工作，确保 知远智能体不需要自行实现消息投递逻辑
 
 **关键设计决策：**
 
@@ -849,6 +849,6 @@ RongxinAI 的定时任务系统通过三层架构实现了完整的自动化执�
 |------|------|
 | 策略模式区分任务来源 | 不同来源的默认参数、绑定关系、只读字段各不相同，策略模式避免了大量 if-else |
 | 来源推断而非存储 | 通过 sessionKey 格式反推来源，无需修改 OpenClaw 的数据模型即可兼容旧数据 |
-| 前缀剥离而非修改 OpenClaw | RongxinAI 的 `imStore` 需要带前缀的 ID 做内部路由，但 OpenClaw 的 Feishu 插件不识别该前缀，因此在传递给 OpenClaw 前剥离 |
+| 前缀剥离而非修改 OpenClaw | 知远智能体的 `imStore` 需要带前缀的 ID 做内部路由，但 OpenClaw 的 Feishu 插件不识别该前缀，因此在传递给 OpenClaw 前剥离 |
 | 15 秒轮询而非 WebSocket | OpenClaw Gateway 不暴露实时事件流，轮询是最简单可靠的状态同步方式 |
 | `isolated` + `announce` 作为 IM 投递标准模式 | 隔离会话避免污染主聊天记录，announce 模式让 OpenClaw 原生处理消息投递，保持 OpenClaw 驱动的设计理念 |

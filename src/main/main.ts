@@ -19,7 +19,7 @@ import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
-import { APP_DATA_DIR_NAME, APP_NAME, LEGACY_APP_NAME } from './appConstants';
+import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { applyCoworkLanguagePrompt, type CoworkPromptLanguage } from './coworkLanguagePrompt';
 import { type CoworkExecutionMode, type CoworkMessageType, type CoworkSessionStatus,CoworkStore } from './coworkStore';
@@ -348,12 +348,6 @@ const validateSessionModelAvailability = (modelRef: string): { available: boolea
   return { available: true };
 };
 
-// Provider IDs that were renamed in past refactors. Any stored agent model ref
-// using an old ID is rewritten to the current ID on startup.
-const RENAMED_PROVIDER_IDS: Record<string, string> = {
-  'github-copilot': 'lobsterai-copilot',
-};
-
 const migrateAgentModelRefs = (): number => {
   const defaultModelRef = resolveDefaultAgentModelRef();
   if (!defaultModelRef) return 0;
@@ -363,20 +357,8 @@ const migrateAgentModelRefs = (): number => {
   let changed = 0;
 
   for (const agent of agents) {
-    let normalizedModel = agent.model.trim();
+    const normalizedModel = agent.model.trim();
     if (!normalizedModel) continue;
-
-    // Apply explicit provider rename map before qualification so that renamed
-    // provider IDs (e.g. 'github-copilot' → 'lobsterai-copilot') are corrected
-    // even though resolveQualifiedAgentModelRef treats any slash-ref as valid.
-    const slashIdx = normalizedModel.indexOf('/');
-    if (slashIdx > 0) {
-      const storedProviderId = normalizedModel.slice(0, slashIdx);
-      const renamedId = RENAMED_PROVIDER_IDS[storedProviderId];
-      if (renamedId) {
-        normalizedModel = `${renamedId}${normalizedModel.slice(slashIdx)}`;
-      }
-    }
 
     const qualification = resolveQualifiedAgentModelRef({
       agentModel: normalizedModel,
@@ -429,7 +411,7 @@ const resolveInlineAttachmentDir = (cwd?: string): string => {
       return path.join(resolved, '.cowork-temp', 'attachments', 'manual');
     }
   }
-  return path.join(app.getPath('temp'), 'rongxinai', 'attachments');
+  return path.join(app.getPath('temp'), 'zhiyuan', 'attachments');
 };
 
 const ensurePngFileName = (value: string): string => {
@@ -446,7 +428,7 @@ const buildLogExportFileName = (): string => {
   const now = new Date();
   const datePart = `${now.getFullYear()}${padTwoDigits(now.getMonth() + 1)}${padTwoDigits(now.getDate())}`;
   const timePart = `${padTwoDigits(now.getHours())}${padTwoDigits(now.getMinutes())}${padTwoDigits(now.getSeconds())}`;
-  return `rongxinai-logs-${datePart}-${timePart}.zip`;
+  return `zhiyuan-logs-${datePart}-${timePart}.zip`;
 };
 
 const OPENCLAW_DAILY_LOG_RETENTION_DAYS = 7;
@@ -629,13 +611,8 @@ const savePngWithDialog = async (
 
 const configureUserDataPath = (): void => {
   const appDataPath = app.getPath('appData');
-  const preferredUserDataPath = path.join(appDataPath, APP_DATA_DIR_NAME);
-  const legacyUserDataPath = path.join(appDataPath, LEGACY_APP_NAME);
+  const targetUserDataPath = path.join(appDataPath, APP_DATA_DIR_NAME);
   const currentUserDataPath = app.getPath('userData');
-  const targetUserDataPath =
-    fs.existsSync(legacyUserDataPath) && !fs.existsSync(preferredUserDataPath)
-      ? legacyUserDataPath
-      : preferredUserDataPath;
 
   if (currentUserDataPath !== targetUserDataPath) {
     app.setPath('userData', targetUserDataPath);
@@ -655,8 +632,8 @@ const enableVerboseLogging =
   process.env.ELECTRON_ENABLE_LOGGING === '1' ||
   process.env.ELECTRON_ENABLE_LOGGING === 'true';
 const disableGpu =
-  process.env.LOBSTERAI_DISABLE_GPU === '1' ||
-  process.env.LOBSTERAI_DISABLE_GPU === 'true' ||
+  process.env.ZHIYUAN_DISABLE_GPU === '1' ||
+  process.env.ZHIYUAN_DISABLE_GPU === 'true' ||
   process.env.ELECTRON_DISABLE_GPU === '1' ||
   process.env.ELECTRON_DISABLE_GPU === 'true';
 const reloadOnChildProcessGone =
@@ -875,7 +852,7 @@ let piRuntimeAdapter: PiRuntimeAdapter | null = null;
 const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
   if (!piRuntimeAdapter) {
     // Pi SDK resolves API keys from environment variables (ANTHROPIC_API_KEY etc.).
-    // Inject keys from RongxinAI's provider configuration before initializing Pi.
+    // Inject keys from ZhiYuanAgent's provider configuration before initializing Pi.
     const keys = resolveAllProviderApiKeys();
     const injected: string[] = [];
     for (const [suffix, value] of Object.entries(keys)) {
@@ -906,7 +883,7 @@ let mcpStore: McpStore | null = null;
 let mcpServerManager: McpServerManager | null = null;
 let mcpBridgeServer: McpBridgeServer | null = null;
 // Generated eagerly so the secret is available before the first syncOpenClawConfig
-// call — the gateway process inherits it via LOBSTER_MCP_BRIDGE_SECRET env var at
+// call — the gateway process inherits it via ZHIYUAN_MCP_BRIDGE_SECRET env var at
 // spawn time, avoiding a restart just to pick up the correct secret.
 let mcpBridgeSecret: string = require('crypto').randomUUID();
 let mcpBridgeStartPromise: Promise<McpBridgeConfig | null> | null = null;
@@ -1166,13 +1143,13 @@ const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
   return getCoworkStore().getConfig().workingDirectory.trim();
 };
 
-const isLobsteraiServerModelRef = (modelRef: string): boolean => {
+const isZhiyuanServerModelRef = (modelRef: string): boolean => {
   const normalized = modelRef.trim();
   if (!normalized) return false;
 
   const parsed = parsePrimaryModelRef(normalized);
   if (parsed) {
-    return parsed.providerId === ProviderName.LobsteraiServer;
+    return parsed.providerId === ProviderName.ZhiyuanServer;
   }
 
   return getAllServerModelMetadata().some((model) => model.modelId === normalized);
@@ -1182,16 +1159,16 @@ const shouldRefreshServerQuotaForSession = (sessionId: string): boolean => {
   const session = getCoworkStore().getSession(sessionId);
   const sessionModelRef = session?.modelOverride?.trim();
   if (sessionModelRef) {
-    return isLobsteraiServerModelRef(sessionModelRef);
+    return isZhiyuanServerModelRef(sessionModelRef);
   }
 
   const agentModelRef = session?.agentId ? getAgentManager().getAgent(session.agentId)?.model?.trim() : '';
   if (agentModelRef) {
-    return isLobsteraiServerModelRef(agentModelRef);
+    return isZhiyuanServerModelRef(agentModelRef);
   }
 
   const apiConfig = resolveCurrentApiConfig();
-  return apiConfig.providerMetadata?.providerName === ProviderName.LobsteraiServer;
+  return apiConfig.providerMetadata?.providerName === ProviderName.ZhiyuanServer;
 };
 
 const getOpenClawConfigSync = (): OpenClawConfigSync => {
@@ -2056,21 +2033,19 @@ const getIMGatewayManager = () => {
 
 function mergeCoworkSystemPrompt(
   systemPrompt?: string,
-  skipLeoIdentity = false,
+  skipZhiyuanIdentity = false,
 ): string | undefined {
-  const leoIdentity = [
-    'You are LEO.',
-    'The official Chinese product name is 李知远智能体, and the official English product name is LEO.',
-    '李知远智能体 / LEO is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
-    'Treat 李知远智能体 and LEO as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
-    'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是李知远智能体。" You may add "英文名是 LEO。". In English, say "I am LEO." You may add "My Chinese product name is 李知远智能体."',
-    'Do not present RongxinAI as the current product identity. If asked about RongxinAI, say only that it is a legacy name or compatibility identifier that may still appear in some technical paths, while the current product identity is 李知远智能体 / LEO.',
-    'Do not describe LobsterAI as the current product identity. If asked about LobsterAI, say only that it is a historical internal or compatibility identifier in some technical paths, while the current product identity is 李知远智能体 / LEO.',
+  const zhiyuanIdentity = [
+    'You are 知远智能体 (ZhiYuan Agent).',
+    'The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent.',
+    '知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+    'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
+    'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
     'Do not use any other product name, model name, runtime name, or preset role as your identity.',
     'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
   ].join('\n');
   const sections = [
-    skipLeoIdentity ? null : leoIdentity,
+    skipZhiyuanIdentity ? null : zhiyuanIdentity,
     buildScheduledTaskEnginePrompt(),
     systemPrompt?.trim() || '',
   ].filter(Boolean);
@@ -2314,13 +2289,13 @@ if (!gotTheLock) {
   app.quit();
 } else {
   // Register custom protocol for OAuth callback
-  app.setAsDefaultProtocolClient('rongxinai');
+  app.setAsDefaultProtocolClient('zhiyuan');
 
   // Buffer for deep link auth code received before renderer is ready
   let pendingAuthCode: string | null = null;
 
   /**
-   * Parse a rongxinai:// deep link and send (or buffer) the auth code.
+   * Parse a zhiyuan:// deep link and send (or buffer) the auth code.
    */
   const handleDeepLink = (url: string) => {
     try {
@@ -2349,7 +2324,7 @@ if (!gotTheLock) {
   const requireServerUrl = (): string | null => {
     const url = getServerApiBaseUrl();
     if (!url) {
-      console.warn('[Auth] Server API base URL not configured. Set LOBSTERAI_SERVER_API_BASE_URL.');
+      console.warn('[Auth] Server API base URL not configured. Set ZHIYUAN_SERVER_API_BASE_URL.');
     }
     return url || null;
   };
@@ -2371,7 +2346,7 @@ if (!gotTheLock) {
     console.debug('[Main] second-instance event', { commandLine, workingDirectory });
 
     // Check for deep link in command line args (Windows/Linux)
-    const deepLink = commandLine.find(arg => arg.startsWith('rongxinai://'));
+    const deepLink = commandLine.find(arg => arg.startsWith('zhiyuan://'));
     if (deepLink) {
       handleDeepLink(deepLink);
     }
@@ -2470,7 +2445,7 @@ if (!gotTheLock) {
           ...manager.getRecentGatewayLogEntries(),
           ...getRecentOpenClawDailyLogEntries(manager.getOpenClawDailyLogDir()),
           ...(process.platform === 'win32'
-            ? [{ archiveName: 'install-timing.log', filePath: path.join(app.getPath('appData'), LEGACY_APP_NAME, 'install-timing.log') }]
+            ? [{ archiveName: 'install-timing.log', filePath: path.join(app.getPath('appData'), APP_DATA_DIR_NAME, 'install-timing.log') }]
             : []),
         ],
       });
@@ -2669,7 +2644,7 @@ if (!gotTheLock) {
     try {
       const serverUrl = requireServerUrl();
       const baseUrl = loginUrl || (serverUrl ? `${serverUrl}/login` : '');
-      if (!baseUrl) return { success: false, error: 'Server not configured. Set LOBSTERAI_SERVER_API_BASE_URL.' };
+      if (!baseUrl) return { success: false, error: 'Server not configured. Set ZHIYUAN_SERVER_API_BASE_URL.' };
       const finalUrl = `${baseUrl}?source=electron`;
       await shell.openExternal(finalUrl);
       return { success: true };
@@ -2682,7 +2657,7 @@ if (!gotTheLock) {
   ipcMain.handle('auth:exchange', async (_event, { code }: { code: string }) => {
     try {
       const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return { success: false, error: 'Server not configured. Set LOBSTERAI_SERVER_API_BASE_URL.' };
+      if (!serverBaseUrl) return { success: false, error: 'Server not configured. Set ZHIYUAN_SERVER_API_BASE_URL.' };
       const resp = await net.fetch(`${serverBaseUrl}/api/auth/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3686,13 +3661,13 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('cowork:session:gatewaySessionId', async (_event, lobsterSessionId: string) => {
+  ipcMain.handle('cowork:session:gatewaySessionId', async (_event, zhiyuanSessionId: string) => {
     try {
       const stateDir = getOpenClawEngineManager().getStateDir();
       const sessionsPath = path.join(stateDir, 'agents', 'main', 'sessions', 'sessions.json');
       const raw = await fs.promises.readFile(sessionsPath, 'utf-8');
       const sessions = JSON.parse(raw);
-      const sessionKey = `agent:main:lobsterai:${lobsterSessionId}`;
+      const sessionKey = `agent:main:zhiyuan:${zhiyuanSessionId}`;
       const entry = sessions[sessionKey];
       return { success: true, gatewaySessionId: entry?.sessionId ?? null };
     } catch {
@@ -3890,8 +3865,8 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.ImportExpertPackage, async (_event, expertDir: string) => {
     try {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
-      const { parseExpertPackage } = require(path.join(bundledSkillsRoot, 'rongxinai-expert-manager', 'scripts', 'register_expert'));
-      const dbPath = path.join(app.getPath('userData'), 'lobsterai.sqlite');
+      const { parseExpertPackage } = require(path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'));
+      const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
       const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, { dbPath });
 
       const agentManager = getAgentManager();
@@ -3937,7 +3912,7 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.GetPresetExperts, async () => {
     try {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
-      const presetsDir = path.join(bundledSkillsRoot, 'rongxinai-expert-manager', 'presets');
+      const presetsDir = path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'presets');
       if (!fs.existsSync(presetsDir)) return { experts: [] };
 
       const entries = fs.readdirSync(presetsDir, { withFileTypes: true });
@@ -5494,7 +5469,7 @@ if (!gotTheLock) {
         const { execFile } = await import('child_process');
         const { promisify } = await import('util');
         const execFileAsync = promisify(execFile);
-        const tmpDir = path.join(app.getPath('temp'), 'rongxinai-thumbnails');
+        const tmpDir = path.join(app.getPath('temp'), 'zhiyuan-thumbnails');
         await fs.promises.mkdir(tmpDir, { recursive: true });
         const baseName = path.basename(resolvedPath);
         const outputFile = path.join(tmpDir, `${baseName}.png`);
@@ -5549,7 +5524,7 @@ if (!gotTheLock) {
 
   ipcMain.handle('shell:openHtmlInBrowser', async (_event, htmlContent: string) => {
     try {
-      const tmpDir = path.join(os.tmpdir(), 'rongxinai-preview');
+      const tmpDir = path.join(os.tmpdir(), 'zhiyuan-preview');
       fs.mkdirSync(tmpDir, { recursive: true });
       const tmpFile = path.join(tmpDir, `preview-${Date.now()}.html`);
       fs.writeFileSync(tmpFile, htmlContent, 'utf-8');
@@ -6211,7 +6186,7 @@ if (!gotTheLock) {
     // We don't trigger permission dialogs at startup to avoid annoying users
 
     // Ensure default working directory exists
-    const defaultProjectDir = path.join(os.homedir(), 'rongxinai', 'project');
+    const defaultProjectDir = path.join(os.homedir(), 'zhiyuan', 'project');
     if (!fs.existsSync(defaultProjectDir)) {
       fs.mkdirSync(defaultProjectDir, { recursive: true });
       console.log('Created default project directory:', defaultProjectDir);
@@ -6269,7 +6244,7 @@ if (!gotTheLock) {
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
       getStore,
     });
-    // Inject auth getters for lobsterai-server provider routing
+    // Inject auth getters for zhiyuan-server provider routing
     // The getter proactively triggers a background token refresh when the
     // accessToken is within 5 minutes of expiry, so that the SDK always
     // gets a fresh token without blocking.
@@ -6345,7 +6320,7 @@ if (!gotTheLock) {
       });
     }
 
-    registerProxyTokenRefresher('lobsterai-server', async () => {
+    registerProxyTokenRefresher('zhiyuan-server', async () => {
       const tokens = getAuthTokens();
       if (!tokens?.refreshToken) return null;
       const serverBaseUrl = requireServerUrl();
@@ -6382,7 +6357,7 @@ if (!gotTheLock) {
     });
 
     // Start the lightweight token proxy before OpenClaw config sync so that
-    // lobsterai-server provider can use the proxy URL in its config.
+    // zhiyuan-server provider can use the proxy URL in its config.
     profiler.mark('openClawTokenProxy');
     try {
       await startOpenClawTokenProxy({
@@ -6643,7 +6618,7 @@ if (!gotTheLock) {
 
     // Windows/Linux cold start: parse deep link from process.argv
     // Always buffer since renderer is not ready yet after createWindow()
-    const coldStartDeepLink = process.argv.find(arg => arg.startsWith('lobsterai://'));
+    const coldStartDeepLink = process.argv.find(arg => arg.startsWith('zhiyuan://'));
     if (coldStartDeepLink) {
       try {
         const parsed = new URL(coldStartDeepLink);

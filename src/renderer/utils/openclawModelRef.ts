@@ -6,7 +6,7 @@ type ModelRefInput = Pick<Model, 'id' | 'providerKey' | 'openClawProviderId' | '
 
 function resolveModelOpenClawProviderId(model: ModelRefInput): string {
   if (model.isServerModel) {
-    return OpenClawProviderId.LobsteraiServer;
+    return OpenClawProviderId.ZhiyuanServer;
   }
   return model.openClawProviderId || ProviderRegistry.getOpenClawProviderId(model.providerKey ?? '');
 }

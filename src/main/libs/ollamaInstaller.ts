@@ -144,7 +144,7 @@ export class OllamaInstaller {
         return;
       }
       if (installerPath.endsWith('.zip')) {
-        const extractDir = await mkdtemp(path.join(os.tmpdir(), 'lobsterai-ollama-'));
+        const extractDir = await mkdtemp(path.join(os.tmpdir(), 'zhiyuan-ollama-'));
         try {
           await execFileAsync('ditto', ['-x', '-k', installerPath, extractDir]);
           const appPath = await findOllamaApp(extractDir);

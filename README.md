@@ -58,8 +58,8 @@ ZhiYuan Agent uses Electron with strict process isolation. The Renderer hosts th
 ### Local Development
 
 ```bash
-git clone https://github.com/rongxinzy/RongxinAI.git RongxinAI
-cd RongxinAI
+git clone https://github.com/rongxinzy/RongxinAI.git 知远智能体
+cd 知远智能体
 bun install
 bun run electron:dev
 ```

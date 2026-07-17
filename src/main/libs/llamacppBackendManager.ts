@@ -124,7 +124,7 @@ function resolveBundledManifestUrl(): string {
 
 async function fetchManifestFromUrl(manifestUrl: string): Promise<LlamaCppBackendManifest> {
   const response = await fetch(manifestUrl, {
-    headers: { 'User-Agent': 'RongxinAI/llamacpp-backend-manager' },
+    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
   });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const parsed = await response.json() as LlamaCppBackendManifest | LlamaCppBackendRootManifest;
@@ -863,7 +863,7 @@ function validateBackendForMachine(
     return 'Vulkan backend will validate device availability after installation.';
   }
   if (entry.backend === 'win-x64-hip') {
-    return 'HIP backend requires a Windows x64 machine with AMD HIP/ROCm support. RongxinAI will validate device availability after installation.';
+    return 'HIP backend requires a Windows x64 machine with AMD HIP/ROCm support. ZhiYuanAgent will validate device availability after installation.';
   }
   if (entry.backend === 'win-arm64-opencl-adreno') {
     if (normalizePlatform(platform) !== 'win32' || normalizeArch(arch) !== 'arm64') {
@@ -1060,7 +1060,7 @@ async function downloadFileWithHelper(
 
   const downloader = new DownloaderHelper(url, outputDir, {
     fileName: path.basename(outputPath),
-    headers: { 'User-Agent': 'RongxinAI/llamacpp-backend-manager' },
+    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
     override: true,
     removeOnFail: false,
     resumeIfFileExists: true,

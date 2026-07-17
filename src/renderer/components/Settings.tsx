@@ -87,7 +87,7 @@ const CUSTOM_PROVIDER_KEYS = [
 ] as const;
 
 const providerKeys = [
-  ...Object.values(ProviderName).filter(id => id !== ProviderName.Custom && id !== ProviderName.LobsteraiServer),
+  ...Object.values(ProviderName).filter(id => id !== ProviderName.Custom && id !== ProviderName.ZhiyuanServer),
   ...CUSTOM_PROVIDER_KEYS,
 ] as const;
 
@@ -2575,7 +2575,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const renderAppearanceSettings = () => (
     <div className="space-y-8">
       <div>
-        <h4 className="text-sm font-medium mb-3" style={{ color: 'var(--lobster-text-primary)' }}>
+        <h4 className="text-sm font-medium mb-3" style={{ color: 'var(--zy-text-primary)' }}>
           {i18nService.t('appearance')}
         </h4>
 
@@ -2593,8 +2593,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 }}
                 className="flex flex-col items-center rounded-xl border-2 p-3 transition-colors cursor-pointer"
                 style={{
-                  borderColor: isSelected ? 'var(--lobster-primary)' : 'var(--lobster-border)',
-                  backgroundColor: isSelected ? 'var(--lobster-primary-muted)' : undefined,
+                  borderColor: isSelected ? 'var(--zy-primary)' : 'var(--zy-border)',
+                  backgroundColor: isSelected ? 'var(--zy-primary-muted)' : undefined,
                 }}
               >
                 <svg viewBox="0 0 120 80" className="w-full h-auto rounded-md mb-2 overflow-hidden" xmlns="http://www.w3.org/2000/svg">
@@ -2678,7 +2678,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     </>
                   )}
                 </svg>
-                <span className="text-xs font-medium" style={{ color: isSelected ? 'var(--lobster-primary)' : 'var(--lobster-text-primary)' }}>
+                <span className="text-xs font-medium" style={{ color: isSelected ? 'var(--zy-primary)' : 'var(--zy-text-primary)' }}>
                   {i18nService.t(mode)}
                 </span>
               </button>
@@ -2686,7 +2686,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           })}
         </div>
 
-        <h4 className="text-sm font-medium mb-3 mt-5" style={{ color: 'var(--lobster-text-primary)' }}>
+        <h4 className="text-sm font-medium mb-3 mt-5" style={{ color: 'var(--zy-text-primary)' }}>
           {i18nService.t('themeColor')}
         </h4>
         {(() => {
@@ -2707,8 +2707,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 }}
                 className="flex flex-col items-center rounded-xl border-2 p-2 transition-colors cursor-pointer"
                 style={{
-                  borderColor: isSelected ? 'var(--lobster-primary)' : 'var(--lobster-border)',
-                  backgroundColor: isSelected ? 'var(--lobster-primary-muted)' : undefined,
+                  borderColor: isSelected ? 'var(--zy-primary)' : 'var(--zy-border)',
+                  backgroundColor: isSelected ? 'var(--zy-primary-muted)' : undefined,
                 }}
               >
                 <svg viewBox="0 0 80 48" className="w-full h-auto rounded-md mb-1.5 overflow-hidden" xmlns="http://www.w3.org/2000/svg">
@@ -2718,7 +2718,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <circle cx="52" cy="24" r="8" fill={c3} opacity="0.8" />
                   <rect x="32" y="34" width="40" height="4" rx="2" fill={c1} opacity="0.6" />
                 </svg>
-                <span className="text-[10px] font-medium truncate w-full text-center" style={{ color: isSelected ? 'var(--lobster-primary)' : 'var(--lobster-text-primary)' }}>
+                <span className="text-[10px] font-medium truncate w-full text-center" style={{ color: isSelected ? 'var(--zy-primary)' : 'var(--zy-text-primary)' }}>
                   {i18nService.t('theme-name-' + t.meta.id) || t.meta.name}
                 </span>
               </button>

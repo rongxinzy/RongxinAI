@@ -63,7 +63,7 @@ export function ModelContextSettingsModal({
               {contextPresets.map((preset, index) => (
                 <span
                   key={preset}
-                  className="absolute h-3 w-0.5 -translate-x-1/2 bg-(--lobster-primary)"
+                  className="absolute h-3 w-0.5 -translate-x-1/2 bg-(--zy-primary)"
                   style={{ left: `${getContextPresetPosition(index, contextPresets.length)}%` }}
                 />
               ))}

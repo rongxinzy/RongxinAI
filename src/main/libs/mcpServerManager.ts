@@ -264,14 +264,14 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
 
     if (nodeCommandType) {
       const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
-      const npmBinDir = enhancedEnv.LOBSTERAI_NPM_BIN_DIR;
+      const npmBinDir = enhancedEnv.ZHIYUAN_NPM_BIN_DIR;
       const npxCliJs = npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '';
       const npmCliJs = npmBinDir ? path.join(npmBinDir, 'npm-cli.js') : '';
 
       const withElectronNodeEnv = (base: Record<string, string> | undefined): Record<string, string> => ({
         ...(base || {}),
         ELECTRON_RUN_AS_NODE: '1',
-        LOBSTERAI_ELECTRON_PATH: electronNodeRuntimePath,
+        ZHIYUAN_ELECTRON_PATH: electronNodeRuntimePath,
       });
 
       if (nodeCommandType === 'node') {
@@ -317,7 +317,7 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
       stdioEnv = {
         ...(stdioEnv || {}),
         ELECTRON_RUN_AS_NODE: '1',
-        LOBSTERAI_ELECTRON_PATH: electronNodeRuntimePath,
+        ZHIYUAN_ELECTRON_PATH: electronNodeRuntimePath,
       };
       log('INFO', `"${server.name}": rewrote macOS command → Electron helper`);
     }
@@ -454,7 +454,7 @@ export class McpServerManager {
     }
 
     const client = new Client(
-      { name: `lobsterai-mcp-bridge`, version: '1.0.0' },
+      { name: `zhiyuan-mcp-bridge`, version: '1.0.0' },
       { capabilities: {} },
     );
 

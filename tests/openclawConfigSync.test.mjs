@@ -79,21 +79,21 @@ const createOpenAICompatAppConfig = () => ({
 });
 
 const createSessionStore = () => ({
-  'agent:main:lobsterai:current-session': {
+  'agent:main:zhiyuan:current-session': {
     sessionId: 'session-current',
-    modelProvider: 'lobster',
+    modelProvider: 'zhiyuan',
     model: 'kimi-k2.5',
     systemPromptReport: {
-      provider: 'lobster',
+      provider: 'zhiyuan',
       model: 'kimi-k2.5',
     },
   },
-  'agent:main:lobsterai:old-claude-session': {
+  'agent:main:zhiyuan:old-claude-session': {
     sessionId: 'session-old-claude',
-    modelProvider: 'lobster',
+    modelProvider: 'zhiyuan',
     model: 'claude-sonnet-4-5-20250929',
     systemPromptReport: {
-      provider: 'lobster',
+      provider: 'zhiyuan',
       model: 'claude-sonnet-4-5-20250929',
     },
   },
@@ -126,8 +126,13 @@ const createSync = (tmpDir, appConfig, options = {}) => {
     engineManager: {
       getConfigPath: () => path.join(tmpDir, 'state', 'openclaw.json'),
       getStateDir: () => path.join(tmpDir, 'state'),
+      getBaseDir: () => tmpDir,
       getGatewayToken: () => null,
+      getStatus: () => ({ version: 'test' }),
+      getDesiredVersion: () => 'test',
     },
+    isEnterprise: () => false,
+    getWeixinConfig: () => null,
     getCoworkConfig: () => ({
       workingDirectory: options.workingDirectory ?? '',
       systemPrompt: options.systemPrompt ?? '',
@@ -168,8 +173,8 @@ test('sync writes native moonshot provider config and migrates matching managed 
   assert.equal(result.changed, true);
 
   const config = JSON.parse(fs.readFileSync(path.join(tmpDir, 'state', 'openclaw.json'), 'utf8'));
-  assert.equal(config.models.providers.moonshot.baseUrl, 'https://api.moonshot.cn/v1');
-  assert.equal(config.models.providers.moonshot.api, 'openai-completions');
+  assert.equal(config.models.providers.moonshot.baseUrl, 'https://api.moonshot.cn/anthropic');
+  assert.equal(config.models.providers.moonshot.api, 'anthropic-messages');
   assert.equal(config.agents.defaults.model.primary, 'moonshot/kimi-k2.5');
   assert.deepEqual(config.commands.ownerAllowFrom, ['gateway-client', '*']);
   assert.deepEqual(config.tools.deny, ['web_search']);
@@ -177,18 +182,18 @@ test('sync writes native moonshot provider config and migrates matching managed 
   assert.equal(config.browser.enabled, true);
 
   const sessionStore = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'sessions.json'), 'utf8'));
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].modelProvider, 'moonshot');
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].model, 'kimi-k2.5');
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].systemPromptReport.provider, 'moonshot');
-  assert.equal(sessionStore['agent:main:lobsterai:old-claude-session'].modelProvider, 'lobster');
-  assert.equal(sessionStore['agent:main:lobsterai:old-claude-session'].model, 'claude-sonnet-4-5-20250929');
-  assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'deny');
-  assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'deny');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].modelProvider, 'moonshot');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].model, 'kimi-k2.5');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.provider, 'moonshot');
+  assert.equal(sessionStore['agent:main:zhiyuan:old-claude-session'].modelProvider, 'moonshot');
+  assert.equal(sessionStore['agent:main:zhiyuan:old-claude-session'].model, 'kimi-k2.5');
+  assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'full');
+  assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'full');
   assert.equal('skillsSnapshot' in sessionStore['agent:main:wecom:direct:wangning'], false);
   assert.equal('skillsSnapshot' in sessionStore['agent:main:feishu:dm:ou_123'], false);
 });
 
-test('sync maps moonshot coding plan sessions to kimi-coding model refs', (t) => {
+test('sync maps moonshot coding plan config to the coding endpoint', (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-coding-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -207,23 +212,23 @@ test('sync maps moonshot coding plan sessions to kimi-coding model refs', (t) =>
   assert.equal(result.ok, true);
 
   const config = JSON.parse(fs.readFileSync(path.join(tmpDir, 'state', 'openclaw.json'), 'utf8'));
-  assert.equal(config.models.providers['kimi-coding'].baseUrl, 'https://api.kimi.com/coding');
-  assert.equal(config.models.providers['kimi-coding'].api, 'anthropic-messages');
-  assert.equal(config.agents.defaults.model.primary, 'kimi-coding/k2p5');
+  assert.equal(config.models.providers.moonshot.baseUrl, 'https://api.kimi.com/coding');
+  assert.equal(config.models.providers.moonshot.api, 'anthropic-messages');
+  assert.equal(config.agents.defaults.model.primary, 'moonshot/kimi-k2.5');
   assert.deepEqual(config.commands.ownerAllowFrom, ['gateway-client', '*']);
 
   const sessionStore = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'sessions.json'), 'utf8'));
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].modelProvider, 'kimi-coding');
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].model, 'k2p5');
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].systemPromptReport.provider, 'kimi-coding');
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].systemPromptReport.model, 'k2p5');
-  assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'deny');
-  assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'deny');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].modelProvider, 'moonshot');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].model, 'kimi-k2.5');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.provider, 'moonshot');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].systemPromptReport.model, 'kimi-k2.5');
+  assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'full');
+  assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'full');
   assert.equal('skillsSnapshot' in sessionStore['agent:main:wecom:direct:wangning'], false);
   assert.equal('skillsSnapshot' in sessionStore['agent:main:feishu:dm:ou_123'], false);
 });
 
-test('sync denies exec for native channel sessions even without provider migration', (t) => {
+test('sync migrates managed sessions to the configured openai-compatible provider and forces full exec for native channel sessions', (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-native-session-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
@@ -243,10 +248,10 @@ test('sync denies exec for native channel sessions even without provider migrati
   assert.equal(result.changed, true);
 
   const sessionStore = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'sessions.json'), 'utf8'));
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].modelProvider, 'lobster');
-  assert.equal(sessionStore['agent:main:lobsterai:current-session'].model, 'kimi-k2.5');
-  assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'deny');
-  assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'deny');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].modelProvider, 'openai');
+  assert.equal(sessionStore['agent:main:zhiyuan:current-session'].model, 'kimi-k2.5');
+  assert.equal(sessionStore['agent:main:wecom:direct:wangning'].execSecurity, 'full');
+  assert.equal(sessionStore['agent:main:feishu:dm:ou_123'].execSecurity, 'full');
   assert.equal('skillsSnapshot' in sessionStore['agent:main:wecom:direct:wangning'], false);
   assert.equal('skillsSnapshot' in sessionStore['agent:main:feishu:dm:ou_123'], false);
 });
@@ -267,7 +272,7 @@ test('sync writes scheduled-task policy into managed AGENTS.md for native channe
 
   assert.equal(result.ok, true);
 
-  const agentsMd = fs.readFileSync(path.join(workspaceDir, 'AGENTS.md'), 'utf8');
+  const agentsMd = fs.readFileSync(path.join(tmpDir, 'state', 'workspace-main', 'AGENTS.md'), 'utf8');
   assert.match(agentsMd, /# AGENTS\.md - Your Workspace/);
   assert.match(agentsMd, /## Every Session/);
   assert.match(agentsMd, /Read `SOUL\.md`/);
@@ -277,7 +282,7 @@ test('sync writes scheduled-task policy into managed AGENTS.md for native channe
   assert.match(agentsMd, /## Web Search/);
   assert.match(agentsMd, /Built-in `web_search` is disabled in this workspace\./);
   assert.match(agentsMd, /use `web_fetch`/);
-  assert.match(agentsMd, /use the built-in `browser` tool/);
+  assert.match(agentsMd, /Use the built-in `browser` tool/);
   assert.match(agentsMd, /Native channel sessions may deny `exec`/);
   assert.match(agentsMd, /native `cron` tool/i);
   assert.match(agentsMd, /action: "add".*cron\.add/i);
@@ -291,43 +296,43 @@ test('sync writes scheduled-task policy into managed AGENTS.md for native channe
   assert.match(agentsMd, /Always answer in Chinese\./);
 });
 
-test('sync preserves existing AGENTS.md content above the Lobster managed marker', (t) => {
+test('sync preserves existing AGENTS.md content above the Zhiyuan managed marker', (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-agents-preserve-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
 
-  const workspaceDir = path.join(tmpDir, 'workspace');
-  fs.mkdirSync(workspaceDir, { recursive: true });
+  const mainWorkspaceDir = path.join(tmpDir, 'state', 'workspace-main');
+  fs.mkdirSync(mainWorkspaceDir, { recursive: true });
   fs.writeFileSync(
-    path.join(workspaceDir, 'AGENTS.md'),
+    path.join(mainWorkspaceDir, 'AGENTS.md'),
     '# Custom Workspace Notes\n\nKeep this line.\n',
     'utf8',
   );
 
   const sync = createSync(tmpDir, createAppConfig(), {
-    workingDirectory: workspaceDir,
+    workingDirectory: path.join(tmpDir, 'workspace'),
   });
   const result = sync.sync('test-agents-preserve');
 
   assert.equal(result.ok, true);
 
-  const agentsMd = fs.readFileSync(path.join(workspaceDir, 'AGENTS.md'), 'utf8');
+  const agentsMd = fs.readFileSync(path.join(mainWorkspaceDir, 'AGENTS.md'), 'utf8');
   assert.match(agentsMd, /^# Custom Workspace Notes\n\nKeep this line\./);
-  assert.match(agentsMd, /<!-- LobsterAI managed: do not edit below this line -->/);
+  assert.match(agentsMd, /<!-- ZhiYuanAgent managed: do not edit below this line -->/);
   assert.doesNotMatch(agentsMd, /^# AGENTS\.md - Your Workspace/m);
 });
 
-test('sync backfills the default OpenClaw AGENTS template when an old workspace only has Lobster managed content', (t) => {
+test('sync backfills the default OpenClaw AGENTS template when an old workspace only has Zhiyuan managed content', (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-config-sync-agents-backfill-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   setElectronPaths(tmpDir);
 
-  const workspaceDir = path.join(tmpDir, 'workspace');
-  fs.mkdirSync(workspaceDir, { recursive: true });
+  const mainWorkspaceDir = path.join(tmpDir, 'state', 'workspace-main');
+  fs.mkdirSync(mainWorkspaceDir, { recursive: true });
   fs.writeFileSync(
-    path.join(workspaceDir, 'AGENTS.md'),
+    path.join(mainWorkspaceDir, 'AGENTS.md'),
     [
-      '<!-- LobsterAI managed: do not edit below this line -->',
+      '<!-- ZhiYuanAgent managed: do not edit below this line -->',
       '',
       '## System Prompt',
       '',
@@ -338,16 +343,16 @@ test('sync backfills the default OpenClaw AGENTS template when an old workspace 
   );
 
   const sync = createSync(tmpDir, createAppConfig(), {
-    workingDirectory: workspaceDir,
+    workingDirectory: path.join(tmpDir, 'workspace'),
   });
   const result = sync.sync('test-agents-backfill');
 
   assert.equal(result.ok, true);
 
-  const agentsMd = fs.readFileSync(path.join(workspaceDir, 'AGENTS.md'), 'utf8');
+  const agentsMd = fs.readFileSync(path.join(mainWorkspaceDir, 'AGENTS.md'), 'utf8');
   assert.match(agentsMd, /^# AGENTS\.md - Your Workspace/m);
   assert.match(agentsMd, /## Every Session/);
-  assert.match(agentsMd, /<!-- LobsterAI managed: do not edit below this line -->/);
+  assert.match(agentsMd, /<!-- ZhiYuanAgent managed: do not edit below this line -->/);
   assert.match(agentsMd, /## Scheduled Tasks/);
   assert.doesNotMatch(agentsMd, /Old managed-only content\./);
 });
@@ -430,8 +435,11 @@ test('sync writes non-empty placeholder apiKey for providers that do not require
   assert.equal(result.changed, true);
 
   const config = JSON.parse(fs.readFileSync(path.join(tmpDir, 'state', 'openclaw.json'), 'utf8'));
-  const providerConfig = config.models.providers.lobster;
-  assert.ok(providerConfig, 'lobster provider should exist in config');
+  const providerConfig = config.models.providers.ollama;
+  assert.ok(providerConfig, 'ollama provider should exist in config');
   assert.ok(providerConfig.apiKey, 'apiKey must be a non-empty string');
-  assert.equal(providerConfig.apiKey, 'sk-lobsterai-local');
+  assert.equal(providerConfig.apiKey, '${ZHIYUAN_APIKEY_OLLAMA}');
+
+  const env = sync.collectSecretEnvVars();
+  assert.equal(env.ZHIYUAN_APIKEY_OLLAMA, 'sk-zhiyuan-local');
 });
