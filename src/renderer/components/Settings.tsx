@@ -3517,7 +3517,9 @@ const Settings: React.FC<SettingsProps> = ({
                           if (!canToggleProvider) return;
                           toggleProviderEnabled(providerKey);
                         }}
-                        disabled={!canToggleProvider}
+                        className={
+                          !canToggleProvider ? 'pointer-events-none cursor-not-allowed' : ''
+                        }
                       />
                     </div>
                   </div>

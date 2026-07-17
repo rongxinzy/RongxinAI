@@ -10,7 +10,6 @@ import {
   MessageCircle,
   PanelLeft,
   Pencil,
-  Plug,
   Puzzle,
   Search,
   Trash2,
@@ -65,10 +64,8 @@ const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 const Sidebar: React.FC<SidebarProps> = ({
   onShowSettings,
   activeView,
-  onShowSkills,
   onShowCowork,
   onShowScheduledTasks,
-  onShowMcp,
   onShowLocalInference,
   onShowExpert,
   onNewChat,
@@ -457,42 +454,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <Puzzle className="h-4 w-4 shrink-0" />
                   {i18nService.t('expert')}
-                </Button>
-              </>
-            )}
-            {workMode === 'chat' && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setIsSearchOpen(false);
-                    onShowSkills();
-                  }}
-                  className={
-                    activeView === 'skills'
-                      ? activeSidebarNavItemClassName
-                      : sidebarNavItemClassName
-                  }
-                  aria-current={activeView === 'skills' ? 'page' : undefined}
-                >
-                  <Puzzle className="h-4 w-4 shrink-0" />
-                  {i18nService.t('skills')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setIsSearchOpen(false);
-                    onShowMcp();
-                  }}
-                  className={
-                    activeView === 'mcp' ? activeSidebarNavItemClassName : sidebarNavItemClassName
-                  }
-                  aria-current={activeView === 'mcp' ? 'page' : undefined}
-                >
-                  <Plug className="h-4 w-4 shrink-0" />
-                  {i18nService.t('mcpServers')}
                 </Button>
               </>
             )}
