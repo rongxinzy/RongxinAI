@@ -399,19 +399,11 @@ function getLogModuleName(phase: LlamaCppModelLaunchLogEvent['phase']): string {
     case LlamaCppModelLaunchLogPhase.CheckingService:
     case LlamaCppModelLaunchLogPhase.StartingService:
     case LlamaCppModelLaunchLogPhase.ServiceReady:
-<<<<<<< HEAD
-      return 'zhiyuan.llamacpp.service';
-    case LlamaCppModelLaunchLogPhase.CheckingRuntime:
-      return 'zhiyuan.llamacpp.runtime';
-    case LlamaCppModelLaunchLogPhase.Requested:
-      return 'zhiyuan.llamacpp.launch';
-=======
       return 'local_inference.service';
     case LlamaCppModelLaunchLogPhase.CheckingRuntime:
       return 'local_inference.runtime';
     case LlamaCppModelLaunchLogPhase.Requested:
       return 'local_inference.launch';
->>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
     case LlamaCppModelLaunchLogPhase.PreparingModel:
     case LlamaCppModelLaunchLogPhase.LoadingModel:
     case LlamaCppModelLaunchLogPhase.WaitingReady:
@@ -419,11 +411,7 @@ function getLogModuleName(phase: LlamaCppModelLaunchLogEvent['phase']): string {
     case LlamaCppModelLaunchLogPhase.Retrying:
     case LlamaCppModelLaunchLogPhase.Succeeded:
     case LlamaCppModelLaunchLogPhase.Failed:
-<<<<<<< HEAD
-      return 'zhiyuan.llamacpp.model';
-=======
       return 'local_inference.model';
->>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
   }
 }
 

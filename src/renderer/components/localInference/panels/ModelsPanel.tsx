@@ -80,15 +80,8 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
-<<<<<<< HEAD
-  renderLoadButton?: (
-    model: LlamaCppModel,
-    props: { disabled: boolean; onClick: () => void },
-  ) => React.ReactNode;
-=======
   onOpenLaunchLog?: (modelName: string) => void;
   renderLoadButton?: (model: LlamaCppModel, props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
->>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
   showRegisteredModelsTitle?: boolean;
 };
 
@@ -221,14 +214,8 @@ export function ModelsPanel({
                 onDragOver={event => event.preventDefault()}
                 onDrop={event => handleCardDrop(event, model.name)}
                 onDragEnd={() => setDraggedModelName(null)}
-<<<<<<< HEAD
-                renderLoadButton={
-                  renderLoadButton ? props => renderLoadButton(model, props) : undefined
-                }
-=======
                 renderLoadButton={renderLoadButton ? props => renderLoadButton(model, props) : undefined}
                 onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
->>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
               />
             ))}
           </div>
@@ -432,16 +419,12 @@ function ModelCard({
           ) : renderLoadButton ? (
             renderLoadButton({ disabled: buttonsDisabled, onClick: onLoadModel })
           ) : (
-<<<<<<< HEAD
-            <Button21st type="button" isDisabled={buttonsDisabled} onClick={onLoadModel}>
-=======
             <Button21st
               type="button"
               isDisabled={buttonsDisabled}
               data-local-inference-model-action-button="true"
               onClick={onLoadModel}
             >
->>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
               <Play data-icon="inline-start" />
               {i18nService.t('start')}
             </Button21st>
