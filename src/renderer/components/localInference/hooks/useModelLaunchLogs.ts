@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
 import { LlamaCppModelLaunchLogPhase } from '../../../../shared/llamacpp';
@@ -148,6 +148,13 @@ export function useModelLaunchLogs() {
     closePanel,
     clearLogs,
   };
+}
+
+export function shouldCloseLaunchLogPanelForModel(
+  state: Pick<ModelLaunchLogPanelState, 'modelName'>,
+  modelName: string,
+): boolean {
+  return state.modelName === modelName;
 }
 
 export function shouldAcceptLaunchLogEvent(

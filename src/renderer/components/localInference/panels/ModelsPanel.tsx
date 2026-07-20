@@ -13,7 +13,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Box, Play, Square } from 'lucide-react';
+import { Box, Play, Settings2, Square } from 'lucide-react';
 import { type ComponentType, type DragEvent, useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -93,6 +93,7 @@ type ModelCardProps = {
   loadingModel: boolean;
   unloading: boolean;
   onLoadModel: () => void;
+  onConfigureContext: () => void;
   onUnload: () => void;
   dragging: boolean;
   onDragStart: (event: DragEvent<HTMLDivElement>) => void;
@@ -118,7 +119,7 @@ export function ModelsPanel({
   onLoadModel,
   onUnload,
   onDelete,
-  onConfigureContext: _onConfigureContext,
+  onConfigureContext,
   onOpenLaunchLog,
   renderLoadButton,
   showRegisteredModelsTitle = true,
@@ -208,6 +209,7 @@ export function ModelsPanel({
                 loadingModel={loadingModelName === model.name}
                 unloading={unloadingModelName === model.name}
                 onLoadModel={() => onLoadModel(model)}
+                onConfigureContext={() => onConfigureContext(model)}
                 onUnload={() => onUnload(model.name)}
                 dragging={draggedModelName === model.name}
                 onDragStart={event => handleCardDragStart(event, model.name)}
@@ -270,6 +272,7 @@ function ModelCard({
   loadingModel,
   unloading,
   onLoadModel,
+  onConfigureContext,
   onUnload,
   dragging,
   onDragStart,
@@ -368,12 +371,24 @@ function ModelCard({
           </CardTitle>
         </div>
 
-        {modifiedDate ? (
-          <div className="col-start-1 row-start-2 flex items-center gap-1 text-xs leading-4 text-muted-foreground">
-            <img src={clockIconUrl} alt="" aria-hidden="true" className="size-3.5 shrink-0" />
-            <span>{modifiedDate}</span>
-          </div>
-        ) : null}
+        <div className="col-start-1 row-start-2 flex items-center gap-2">
+          {modifiedDate ? (
+            <div className="flex items-center gap-1 text-xs leading-4 text-muted-foreground">
+              <img src={clockIconUrl} alt="" aria-hidden="true" className="size-3.5 shrink-0" />
+              <span>{modifiedDate}</span>
+            </div>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={buttonsDisabled}
+            onClick={onConfigureContext}
+          >
+            <Settings2 data-icon="inline-start" />
+            {i18nService.t('localInferenceConfigureContext')}
+          </Button>
+        </div>
 
         <div className="col-start-1 row-start-3 flex min-w-0 flex-wrap items-center gap-1.5 pr-2">
           {hasDetailsTag ? (

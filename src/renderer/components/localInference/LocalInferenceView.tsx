@@ -29,7 +29,10 @@ import {
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
-import { useModelLaunchLogs } from './hooks/useModelLaunchLogs';
+import {
+  shouldCloseLaunchLogPanelForModel,
+  useModelLaunchLogs,
+} from './hooks/useModelLaunchLogs';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
@@ -510,7 +513,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
     const unloadStartedAtMs = Date.now();
     setUnloadingModelName(modelName);
-    launchLogs.closePanel();
+    if (shouldCloseLaunchLogPanelForModel(launchLogs.state, modelName)) {
+      launchLogs.closePanel();
+    }
     void runAction(async () => {
       try {
         const result = await window.electron.llamacpp.unloadModel(modelName);
@@ -561,33 +566,37 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     });
   };
 
+  const handleSaveModelsDir = useCallback(
+    (targetModelsDir = draftModelsDir) => {
+      void runAction(async () => {
+        const nextModelsDir = await window.electron.llamacpp.setModelsDir(targetModelsDir);
+        setModelsDir(nextModelsDir);
+        setDraftModelsDir(nextModelsDir);
+        await refreshLocalModels();
+        setRunningModels([]);
+        const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
+        if (marketplaceHasSearchedRef.current && params) {
+          await searchMarketplace(params);
+        }
+        showToast(
+          isRunning
+            ? i18nService.t('localInferenceLibrarySavedRestarted')
+            : i18nService.t('localInferenceLibrarySaved'),
+          LocalInferenceToastKind.Success,
+        );
+        setLibrarySettingsOpen(false);
+      });
+    },
+    [draftModelsDir, isRunning, refreshLocalModels, runAction, searchMarketplace, showToast],
+  );
+
   const handlePickModelsDir = useCallback(async () => {
     const result = await window.electron.dialog.selectDirectory();
     if (result.success && result.path) {
       setDraftModelsDir(result.path);
+      handleSaveModelsDir(result.path);
     }
-  }, []);
-
-  const handleSaveModelsDir = useCallback(() => {
-    void runAction(async () => {
-      const nextModelsDir = await window.electron.llamacpp.setModelsDir(draftModelsDir);
-      setModelsDir(nextModelsDir);
-      setDraftModelsDir(nextModelsDir);
-      await refreshLocalModels();
-      setRunningModels([]);
-      const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
-      if (marketplaceHasSearchedRef.current && params) {
-        await searchMarketplace(params);
-      }
-      showToast(
-        isRunning
-          ? i18nService.t('localInferenceLibrarySavedRestarted')
-          : i18nService.t('localInferenceLibrarySaved'),
-        LocalInferenceToastKind.Success,
-      );
-      setLibrarySettingsOpen(false);
-    });
-  }, [draftModelsDir, isRunning, refreshLocalModels, runAction, searchMarketplace, showToast]);
+  }, [handleSaveModelsDir]);
 
   const handleOpenModelsDir = useCallback(() => {
     if (!modelsDir.trim()) return;
@@ -744,7 +753,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onChangeModelsDir={setDraftModelsDir}
         onPickDirectory={handlePickModelsDir}
         onOpenDirectory={handleOpenModelsDir}
-        onSave={handleSaveModelsDir}
       />
       <LocalInferenceAccessSettingsDialog
         isOpen={accessSettingsOpen}

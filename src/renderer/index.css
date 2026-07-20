@@ -624,7 +624,7 @@ select::-ms-expand {
   overflow: visible;
   gap: 0;
   padding: 0;
-  border: 1px solid var(--lobster-border);
+  border: 1px solid var(--zy-border);
   border-radius: 9999px;
   background-color: var(--work-chat-track-bg);
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.10);
@@ -638,7 +638,7 @@ select::-ms-expand {
   width: calc(50% + 12px);
   height: calc(100% + 8px);
   border-radius: 9999px;
-  background-color: var(--lobster-background);
+  background-color: var(--zy-surface);
   box-shadow:
     0 4px 14px rgba(0,0,0,0.16),
     0 1px 3px rgba(0,0,0,0.06);
@@ -656,7 +656,7 @@ select::-ms-expand {
   border-radius: 9999px;
   background-color: transparent;
   padding-inline: 0;
-  color: var(--lobster-text-muted);
+  color: var(--zy-text-secondary);
   font-weight: 400;
   opacity: 0.5;
   box-shadow: none;
@@ -669,7 +669,7 @@ select::-ms-expand {
 }
 [data-local-inference-tabs] [data-slot="tabs-trigger"][data-active] {
   background-color: transparent;
-  color: var(--lobster-foreground);
+  color: var(--zy-foreground);
   font-weight: 600;
   opacity: 1;
   box-shadow: none;
@@ -719,25 +719,25 @@ select::-ms-expand {
   height: 22px;
   padding-top: 0;
   padding-bottom: 0;
-  border-color: var(--lobster-border);
-  background-color: var(--lobster-surface-raised);
-  color: var(--lobster-text-muted);
+  border-color: var(--zy-border);
+  background-color: var(--zy-surface-raised);
+  color: var(--zy-text-muted);
   line-height: 1;
 }
 [data-local-inference-launch-status="starting"] {
-  border-color: color-mix(in srgb, var(--lobster-primary) 32%, transparent);
-  background-color: color-mix(in srgb, var(--lobster-primary) 12%, var(--lobster-background));
-  color: var(--lobster-primary);
+  border-color: color-mix(in srgb, var(--zy-primary) 32%, transparent);
+  background-color: color-mix(in srgb, var(--zy-primary) 12%, var(--zy-background));
+  color: var(--zy-primary);
 }
 [data-local-inference-launch-status="succeeded"] {
-  border-color: color-mix(in srgb, var(--lobster-success) 32%, transparent);
-  background-color: color-mix(in srgb, var(--lobster-success) 12%, var(--lobster-background));
-  color: var(--lobster-success);
+  border-color: color-mix(in srgb, var(--zy-success) 32%, transparent);
+  background-color: color-mix(in srgb, var(--zy-success) 12%, var(--zy-background));
+  color: var(--zy-success);
 }
 [data-local-inference-launch-status="failed"] {
-  border-color: color-mix(in srgb, var(--lobster-destructive) 32%, transparent);
-  background-color: color-mix(in srgb, var(--lobster-destructive) 12%, var(--lobster-background));
-  color: var(--lobster-destructive);
+  border-color: color-mix(in srgb, var(--zy-destructive) 32%, transparent);
+  background-color: color-mix(in srgb, var(--zy-destructive) 12%, var(--zy-background));
+  color: var(--zy-destructive);
 }
 
 [data-slot="button"][data-local-inference-launch-close-button="true"] {
@@ -754,30 +754,29 @@ select::-ms-expand {
 }
 [data-slot="button"][data-local-inference-toolbar-button="true"] {
   height: 32px;
-  border-color: color-mix(in srgb, var(--lobster-border) 72%, transparent);
+  border-color: var(--zy-border);
   border-radius: 9999px;
-  background-color: color-mix(in srgb, var(--lobster-surface) 82%, var(--lobster-background));
-  color: color-mix(in srgb, var(--lobster-foreground) 78%, transparent);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  background-color: var(--zy-surface);
+  color: var(--zy-foreground);
+  box-shadow: none;
   font-weight: 500;
   transition:
     background-color 200ms ease,
     border-color 200ms ease,
     color 200ms ease,
-    box-shadow 200ms ease,
     transform 120ms ease;
 }
 [data-slot="button"][data-local-inference-toolbar-button="true"]:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--lobster-border) 88%, transparent);
-  background-color: var(--lobster-surface-raised);
-  color: var(--lobster-foreground);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  border-color: var(--zy-border);
+  background-color: var(--zy-surface-raised);
+  color: var(--zy-foreground);
+  box-shadow: none;
 }
 [data-slot="button"][data-local-inference-toolbar-button="true"] svg {
-  color: color-mix(in srgb, var(--lobster-foreground) 70%, transparent);
+  color: var(--zy-text-secondary);
 }
 [data-slot="button"][data-local-inference-toolbar-button="true"]:hover:not(:disabled) svg {
-  color: var(--lobster-foreground);
+  color: var(--zy-foreground);
 }
 [data-slot="button"][data-local-inference-unload-button="true"] {
   background-color: var(--lobster-destructive);
@@ -870,4 +869,68 @@ select::-ms-expand {
   width: var(--anchor-width) !important;
   max-height: var(--available-height) !important;
   transform-origin: var(--transform-origin) !important;
+}
+
+/* Local inference log viewer theme adapter */
+[data-local-inference-log-viewer] .react-lazylog {
+  background-color: var(--zy-surface) !important;
+  color: var(--zy-text-primary) !important;
+  font-family: 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace !important;
+  font-size: 12px !important;
+}
+
+[data-local-inference-log-viewer] .log-line {
+  color: var(--zy-text-primary);
+}
+
+[data-local-inference-log-viewer] .log-line:hover {
+  background-color: var(--zy-surface-raised);
+}
+
+[data-local-inference-log-viewer] .log-gutter {
+  border-right: 1px solid var(--zy-border-subtle);
+  background-color: var(--zy-surface) !important;
+}
+
+[data-local-inference-log-viewer] .log-number {
+  color: var(--zy-text-muted) !important;
+}
+
+[data-local-inference-log-viewer] .log-content {
+  color: inherit;
+}
+
+[data-local-inference-log-viewer] .log-highlight {
+  background-color: var(--zy-primary-muted) !important;
+  color: var(--zy-text-primary) !important;
+}
+
+/* Keep the local log title/actions in the same row as the log content. */
+[data-local-inference-log-viewer] {
+  position: relative;
+}
+
+[data-local-inference-log-viewer] .local-inference-log-toolbar {
+  display: flex;
+  flex: none;
+  height: 48px;
+  min-width: 0;
+  align-items: center;
+}
+
+[data-local-inference-log-viewer] .local-inference-log-toolbar input,
+[data-local-inference-log-viewer] .local-inference-log-toolbar button {
+  -webkit-app-region: no-drag;
+}
+
+[data-local-inference-log-viewer] .local-inference-log-toolbar h1,
+[data-local-inference-log-viewer] .local-inference-log-toolbar h2,
+[data-local-inference-log-viewer] .local-inference-log-toolbar p {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  [data-local-inference-log-viewer] .local-inference-log-toolbar p {
+    display: none;
+  }
 }

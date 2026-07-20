@@ -1,6 +1,6 @@
-﻿import { Badge } from '@shared/components/ui/badge';
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Terminal, TerminalContent } from '@shared/components/ai-elements/terminal';
+import { LocalInferenceLogViewer } from './LocalInferenceLogViewer';
 import { cn } from '@shared/lib/utils';
 import { Download, X } from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
@@ -16,7 +16,6 @@ import type { ModelLaunchLogPanelState } from '../hooks/useModelLaunchLogs';
 import { ModelLaunchLogPanelStatus } from '../hooks/useModelLaunchLogs';
 
 const MODEL_LAUNCH_LOG_SIDEBAR_TRANSITION_MS = 500;
-const MODEL_LAUNCH_LOG_SIDEBAR_DEFAULT_WIDTH = 384;
 const MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH = 300;
 const MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH = 720;
 const MODEL_LAUNCH_LOG_MAIN_CONTENT_MIN_WIDTH = 520;
@@ -43,10 +42,11 @@ export function ModelLaunchLogSidebar({
   const [isPresent, setIsPresent] = useState(state.visible);
   const [isEntered, setIsEntered] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(MODEL_LAUNCH_LOG_SIDEBAR_DEFAULT_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = useState(getMaxSidebarWidth);
 
   useEffect(() => {
     if (state.visible) {
+      setSidebarWidth(getMaxSidebarWidth());
       setIsPresent(true);
       const frame = window.requestAnimationFrame(() => {
         setIsEntered(true);
@@ -143,52 +143,19 @@ export function ModelLaunchLogSidebar({
           )}
           style={{ width: sidebarWidth }}
         >
-          <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <h2 className="truncate text-base font-semibold leading-6 text-foreground">
-                  {i18nService.t('localInferenceModelLaunchLogs')}
-                </h2>
-                <LaunchStatusBadge status={state.status} />
-              </div>
-              <p className="truncate text-xs text-muted-foreground">
-                {state.modelName
-                  ? i18nService.t('localInferenceModelLaunchLogsForModel').replace('{name}', state.modelName)
-                  : i18nService.t('localInferenceModelLaunchLogsWaiting')}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={i18nService.t('localInferenceModelLaunchLogsDownload')}
-                disabled={state.logs.length === 0}
-                onClick={handleDownloadLogs}
-              >
-                <Download />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={i18nService.t('close')}
-                data-local-inference-launch-close-button="true"
-                onClick={onClose}
-              >
-                <X />
-              </Button>
-            </div>
-          </header>
 
-          <div className="min-h-0 flex-1 p-2">
-            <Terminal
-              output={getTerminalOutput(state)}
-              isStreaming={state.status === ModelLaunchLogPanelStatus.Starting}
+          <div className="min-h-0 flex-1 overflow-hidden p-2">
+            <LocalInferenceLogViewer
+              toolbar={<ModelLaunchLogSidebarToolbar
+                state={state}
+                onDownloadLogs={handleDownloadLogs}
+                onClose={onClose}
+              />}
+              key={state.sessionId ?? state.modelName ?? 'local-inference-log'}
+              text={getLogOutput(state)}
               className="h-full rounded-none border-0"
-            >
-              <TerminalContent className="h-full max-h-none p-3 text-xs leading-5" />
-            </Terminal>
+            />
+
           </div>
         </div>
       ) : null}
@@ -196,6 +163,55 @@ export function ModelLaunchLogSidebar({
   );
 }
 
+function ModelLaunchLogSidebarToolbar({
+  state,
+  onDownloadLogs,
+  onClose,
+}: {
+  state: ModelLaunchLogPanelState;
+  onDownloadLogs: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <header className="draggable flex h-12 min-w-0 flex-1 items-center justify-between gap-3 border-b border-border px-4">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="truncate text-base font-semibold leading-6 text-foreground">
+            {i18nService.t('localInferenceModelLaunchLogs')}
+          </h2>
+          <LaunchStatusBadge status={state.status} />
+        </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {state.modelName
+            ? i18nService.t('localInferenceModelLaunchLogsForModel').replace('{name}', state.modelName)
+            : i18nService.t('localInferenceModelLaunchLogsWaiting')}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={i18nService.t('localInferenceModelLaunchLogsDownload')}
+          disabled={state.logs.length === 0}
+          onClick={onDownloadLogs}
+        >
+          <Download />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={i18nService.t('close')}
+          data-local-inference-launch-close-button="true"
+          onClick={onClose}
+        >
+          <X />
+        </Button>
+      </div>
+    </header>
+  );
+}
 function clampSidebarWidth(width: number): number {
   return Math.min(Math.max(width, MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH), getMaxSidebarWidth());
 }
@@ -236,7 +252,7 @@ function getLaunchStatusLabel(status: ModelLaunchLogPanelStatus): string {
   }
 }
 
-function getTerminalOutput(state: ModelLaunchLogPanelState): string {
+function getLogOutput(state: ModelLaunchLogPanelState): string {
   if (state.logs.length === 0) return i18nService.t('localInferenceModelLaunchLogsWaiting');
   return formatLaunchLogsAsText(state);
 }
