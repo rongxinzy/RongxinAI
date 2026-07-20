@@ -19,6 +19,7 @@ import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceA
 import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
+import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
   LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS,
@@ -28,6 +29,10 @@ import {
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
+import {
+  shouldCloseLaunchLogPanelForModel,
+  useModelLaunchLogs,
+} from './hooks/useModelLaunchLogs';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
@@ -114,6 +119,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   useI18nLanguage();
+  const launchLogs = useModelLaunchLogs();
   const marketplaceSearchRef = useRef<number>(0);
   const loadingModelNameRef = useRef<string | null>(null);
   const marketplaceQueryRef = useRef(marketplaceQuery);
@@ -479,6 +485,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     if (loadingModelNameRef.current) return;
     loadingModelNameRef.current = modelName;
     setLoadingModelName(modelName);
+    launchLogs.beginModelLaunch(modelName, { visible: false });
     void runAction(async () => {
       try {
         const input: LlamaCppModelLaunchInput = {
@@ -487,10 +494,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         };
         const result = await window.electron.llamacpp.loadModel(input);
         setRunningModels(result.runningModels);
+        launchLogs.markModelLaunchSucceeded();
         notifyLlamaCppRunningModelsChanged();
         if (result.warning) {
           showToast(result.warning, LocalInferenceToastKind.Info);
         }
+      } catch (loadError) {
+        launchLogs.markModelLaunchFailed();
+        throw loadError;
       } finally {
         loadingModelNameRef.current = null;
         setLoadingModelName(current => (current === modelName ? null : current));
@@ -502,6 +513,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
     const unloadStartedAtMs = Date.now();
     setUnloadingModelName(modelName);
+    if (shouldCloseLaunchLogPanelForModel(launchLogs.state, modelName)) {
+      launchLogs.closePanel();
+    }
     void runAction(async () => {
       try {
         const result = await window.electron.llamacpp.unloadModel(modelName);
@@ -552,33 +566,37 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     });
   };
 
+  const handleSaveModelsDir = useCallback(
+    (targetModelsDir = draftModelsDir) => {
+      void runAction(async () => {
+        const nextModelsDir = await window.electron.llamacpp.setModelsDir(targetModelsDir);
+        setModelsDir(nextModelsDir);
+        setDraftModelsDir(nextModelsDir);
+        await refreshLocalModels();
+        setRunningModels([]);
+        const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
+        if (marketplaceHasSearchedRef.current && params) {
+          await searchMarketplace(params);
+        }
+        showToast(
+          isRunning
+            ? i18nService.t('localInferenceLibrarySavedRestarted')
+            : i18nService.t('localInferenceLibrarySaved'),
+          LocalInferenceToastKind.Success,
+        );
+        setLibrarySettingsOpen(false);
+      });
+    },
+    [draftModelsDir, isRunning, refreshLocalModels, runAction, searchMarketplace, showToast],
+  );
+
   const handlePickModelsDir = useCallback(async () => {
     const result = await window.electron.dialog.selectDirectory();
     if (result.success && result.path) {
       setDraftModelsDir(result.path);
+      handleSaveModelsDir(result.path);
     }
-  }, []);
-
-  const handleSaveModelsDir = useCallback(() => {
-    void runAction(async () => {
-      const nextModelsDir = await window.electron.llamacpp.setModelsDir(draftModelsDir);
-      setModelsDir(nextModelsDir);
-      setDraftModelsDir(nextModelsDir);
-      await refreshLocalModels();
-      setRunningModels([]);
-      const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
-      if (marketplaceHasSearchedRef.current && params) {
-        await searchMarketplace(params);
-      }
-      showToast(
-        isRunning
-          ? i18nService.t('localInferenceLibrarySavedRestarted')
-          : i18nService.t('localInferenceLibrarySaved'),
-        LocalInferenceToastKind.Success,
-      );
-      setLibrarySettingsOpen(false);
-    });
-  }, [draftModelsDir, isRunning, refreshLocalModels, runAction, searchMarketplace, showToast]);
+  }, [handleSaveModelsDir]);
 
   const handleOpenModelsDir = useCallback(() => {
     if (!modelsDir.trim()) return;
@@ -642,22 +660,32 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           <LocalInferenceToastView toast={toast} onClose={dismissToast} />
         </div>
       )}
-
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable">
-        <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <LocalInferenceTabSelector activeTab={activeTab} onActiveTabChange={setActiveTab} />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
+          <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <LocalInferenceTabSelector
+              activeTab={activeTab}
+              onActiveTabChange={setActiveTab}
+            />
             <div className="flex flex-wrap items-center gap-2">
               {activeTab === 'models' ? (
                 <>
-                  <Button type="button" variant="outline" size="sm" onClick={openAccessSettings}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    data-local-inference-toolbar-button="true"
+                    onClick={openAccessSettings}
+                  >
                     <Globe data-icon="inline-start" />
                     {i18nService.t('localInferenceAccessSettings')}
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    data-local-inference-toolbar-button="true"
                     onClick={() => {
                       setDraftModelsDir(modelsDir);
                       setLibrarySettingsOpen(true);
@@ -688,6 +716,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 onConfigureContext={model => {
                   setContextModel(model);
                 }}
+                onOpenLaunchLog={launchLogs.openPanelForModel}
                 showRegisteredModelsTitle={false}
               />
             </>
@@ -707,7 +736,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onInstall={handleMarketplaceInstall}
             />
           )}
+          </div>
         </div>
+        <ModelLaunchLogSidebar
+          state={launchLogs.state}
+          onClose={launchLogs.closePanel}
+        />
       </div>
 
       <ModelLibrarySettingsModal
@@ -719,7 +753,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onChangeModelsDir={setDraftModelsDir}
         onPickDirectory={handlePickModelsDir}
         onOpenDirectory={handleOpenModelsDir}
-        onSave={handleSaveModelsDir}
       />
       <LocalInferenceAccessSettingsDialog
         isOpen={accessSettingsOpen}

@@ -1,6 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
-import { Card, CardContent } from '@shared/components/ui/card';
-import { ScrollArea } from '@shared/components/ui/scroll-area';
+import { LocalInferenceLogViewer } from '../components/LocalInferenceLogViewer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -40,7 +39,6 @@ export function ModelLaunchLogWindow() {
     loading: true,
     error: null,
   });
-  const endRef = useRef<HTMLDivElement | null>(null);
   const readVersionRef = useRef(0);
 
   useEffect(() => {
@@ -179,13 +177,6 @@ export function ModelLaunchLogWindow() {
     return () => unsubscribe();
   }, [readSessionLog, state.modelName, state.sessionId]);
 
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ block: 'end' });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [state.content, state.loading]);
-
   const windowTitle = i18nService.t('localInferenceModelLaunchLogWindowTitle');
   const pageTitle = state.modelName ?? windowTitle;
 
@@ -194,36 +185,45 @@ export function ModelLaunchLogWindow() {
   }, [windowTitle]);
 
   const body = getWindowLogBody(state);
+  const logOutput =
+    body ||
+    (state.loading
+      ? i18nService.t('localInferenceModelLaunchLogWindowWaiting')
+      : i18nService.t('localInferenceModelLaunchLogWindowEmpty'));
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="draggable flex h-12 shrink-0 items-center justify-between border-b px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <LogWindowAvatar compact />
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold">{pageTitle}</h1>
-          </div>
-        </div>
-        <LaunchWindowStatusBadge state={state} />
-      </header>
       <main className="flex min-h-0 flex-1 overflow-hidden p-4">
         <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-4">
-          <Card className="min-h-0 flex-1 gap-0 overflow-hidden border-slate-800 bg-slate-950 p-0 shadow-sm">
-            <CardContent className="min-h-0 flex-1 p-0">
-              <ScrollArea className="h-full min-h-0 bg-slate-950">
-                <pre className="min-h-full whitespace-pre-wrap wrap-break-word p-4 font-mono text-xs leading-5 text-slate-100 selection:bg-slate-700 selection:text-white">
-                  {body}
-                </pre>
-                <div ref={endRef} aria-hidden="true" />
-              </ScrollArea>
-            </CardContent>
-          </Card>
+          <LocalInferenceLogViewer
+            toolbar={<ModelLaunchLogWindowToolbar pageTitle={pageTitle} state={state} />}
+            key={state.sessionId ?? state.modelName ?? 'local-inference-log'}
+            text={logOutput} className="min-h-0 flex-1" />
         </div>
       </main>
     </div>
   );
 }
 
+function ModelLaunchLogWindowToolbar({
+  pageTitle,
+  state,
+}: {
+  pageTitle: string;
+  state: ModelLaunchLogWindowState;
+}) {
+  return (
+    <header className="draggable flex h-12 min-w-0 flex-1 items-center justify-between gap-3 border-b border-border px-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <LogWindowAvatar compact />
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-semibold">{pageTitle}</h1>
+        </div>
+      </div>
+      <LaunchWindowStatusBadge state={state} />
+    </header>
+  );
+}
 function LogWindowAvatar({ compact = false }: { compact?: boolean }) {
   const maskStyle = {
     WebkitMaskImage: `url("${logIconUrl}")`,

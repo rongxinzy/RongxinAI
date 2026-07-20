@@ -88,6 +88,7 @@ export function ModelLaunchLogPanel({
               variant="ghost"
               size="icon-sm"
               aria-label={i18nService.t('close')}
+              data-local-inference-launch-close-button="true"
               onClick={onClose}
             >
               <X />

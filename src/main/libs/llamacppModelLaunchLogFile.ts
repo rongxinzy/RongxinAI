@@ -15,6 +15,10 @@ const MODEL_LAUNCH_LOG_DIR_SEGMENTS = ['logs', 'llamacpp', 'model-launch'] as co
 const MODEL_LAUNCH_LOG_EXTENSION = '.txt';
 const MODEL_LAUNCH_LOG_SAFE_NAME_MAX_LENGTH = 80;
 const MODEL_LAUNCH_LOG_DETAIL_SEPARATOR = ' ';
+const LlamaCppProcessLogMessage = {
+  Stdout: 'llama-server stdout',
+  Stderr: 'llama-server stderr',
+} as const;
 const MODEL_LAUNCH_LOG_DISK_SESSION_ID_PREFIX = 'file:';
 const MODEL_LAUNCH_LOG_ERROR_MARKER = ' - ERROR - ';
 const MODEL_LAUNCH_LOG_LINE_BREAK_PATTERN = /\r?\n/;
@@ -275,10 +279,13 @@ function getLogModelKey(modelName: string): string {
 
 export function formatModelLaunchLogEvent(event: LlamaCppModelLaunchLogEvent): string {
   const date = normalizeIsoDate(event.createdAt);
-  const moduleName = getLogModuleName(event.phase);
+  const processOutputText = getProcessOutputText(event);
+  const moduleName = processOutputText
+    ? getProcessOutputLogModuleName(event.message)
+    : getLogModuleName(event.phase);
   const level = getLogLevelName(event.level);
-  const message = event.message?.trim() || getDefaultLogMessage(event.phase);
-  const detail = event.detail?.trim();
+  const message = processOutputText ?? event.message?.trim() ?? getDefaultLogMessage(event.phase);
+  const detail = processOutputText ? undefined : event.detail?.trim();
   const body = detail ? `${message}${MODEL_LAUNCH_LOG_DETAIL_SEPARATOR}${detail}` : message;
   return `${formatLogTimestamp(date)} - ${moduleName} - ${level} - ${body}\n`;
 }
@@ -363,16 +370,40 @@ function getLogLevelName(level: LlamaCppModelLaunchLogEvent['level']): string {
   }
 }
 
+function getProcessOutputText(event: LlamaCppModelLaunchLogEvent): string | null {
+  if (!isProcessOutputLogMessage(event.message)) return null;
+  const detail = event.detail?.trim();
+  if (!detail) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(detail);
+    if (!parsed || typeof parsed !== 'object') return detail;
+    const text = (parsed as Record<string, unknown>).text;
+    return typeof text === 'string' && text.trim() ? text.trim() : detail;
+  } catch {
+    return detail;
+  }
+}
+
+function isProcessOutputLogMessage(message: string | undefined): boolean {
+  return message === LlamaCppProcessLogMessage.Stdout || message === LlamaCppProcessLogMessage.Stderr;
+}
+
+function getProcessOutputLogModuleName(message: string | undefined): string {
+  if (message === LlamaCppProcessLogMessage.Stderr) return 'local_inference.server.stderr';
+  return 'local_inference.server.stdout';
+}
+
 function getLogModuleName(phase: LlamaCppModelLaunchLogEvent['phase']): string {
   switch (phase) {
     case LlamaCppModelLaunchLogPhase.CheckingService:
     case LlamaCppModelLaunchLogPhase.StartingService:
     case LlamaCppModelLaunchLogPhase.ServiceReady:
-      return 'zhiyuan.llamacpp.service';
+      return 'local_inference.service';
     case LlamaCppModelLaunchLogPhase.CheckingRuntime:
-      return 'zhiyuan.llamacpp.runtime';
+      return 'local_inference.runtime';
     case LlamaCppModelLaunchLogPhase.Requested:
-      return 'zhiyuan.llamacpp.launch';
+      return 'local_inference.launch';
     case LlamaCppModelLaunchLogPhase.PreparingModel:
     case LlamaCppModelLaunchLogPhase.LoadingModel:
     case LlamaCppModelLaunchLogPhase.WaitingReady:
@@ -380,7 +411,7 @@ function getLogModuleName(phase: LlamaCppModelLaunchLogEvent['phase']): string {
     case LlamaCppModelLaunchLogPhase.Retrying:
     case LlamaCppModelLaunchLogPhase.Succeeded:
     case LlamaCppModelLaunchLogPhase.Failed:
-      return 'zhiyuan.llamacpp.model';
+      return 'local_inference.model';
   }
 }
 
