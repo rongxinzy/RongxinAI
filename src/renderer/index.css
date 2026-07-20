@@ -586,6 +586,7 @@ select::-ms-expand {
   background-color: var(--zy-primary);
 }
 [data-slot='switch-thumb'] {
+  background-color: var(--zy-primary-foreground) !important;
   transition: translate 200ms ease !important;
 }
 /* v4 component classes handle thumb positioning via translate-x-* utilities.
