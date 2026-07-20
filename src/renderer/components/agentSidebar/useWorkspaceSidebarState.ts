@@ -105,8 +105,16 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
     };
   }, []);
 
+  const autoExpandInitializedRef = useRef(false);
+
   useEffect(() => {
-    if (expandedIds.length || !workspaces.length) return;
+    // Auto-expand the first workspace on initial mount only.
+    // After the user has manually collapsed all workspaces, do NOT
+    // re-expand — doing so causes a flicker / re-expand animation
+    // because toggleExpanded removes the last ID first, then this
+    // effect immediately re-adds it.
+    if (expandedIds.length || !workspaces.length || autoExpandInitializedRef.current) return;
+    autoExpandInitializedRef.current = true;
     setExpandedIds([workspaces[0].id]);
   }, [expandedIds.length, workspaces]);
 
