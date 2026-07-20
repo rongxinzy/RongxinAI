@@ -27,7 +27,11 @@ export function LocalInferenceTabSelector({
     >
       <TabsList>
         {tabOptions.map(tab => (
-          <TabsTrigger key={tab.value} value={tab.value}>
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            data-local-inference-tab={tab.value}
+          >
             {i18nService.t(tab.labelKey)}
           </TabsTrigger>
         ))}

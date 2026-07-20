@@ -98,10 +98,26 @@ type LlamaCppManagerStorage = {
 
 export const LlamaCppManagerLifecycleEvent = {
   ModelsUnloadedForQuit: 'models-unloaded-for-quit',
+  ProcessOutput: 'process-output',
 } as const;
 
 export type LlamaCppManagerLifecycleEvent =
   (typeof LlamaCppManagerLifecycleEvent)[keyof typeof LlamaCppManagerLifecycleEvent];
+
+export const LlamaCppProcessOutputStream = {
+  Stdout: 'stdout',
+  Stderr: 'stderr',
+} as const;
+
+export type LlamaCppProcessOutputStream =
+  typeof LlamaCppProcessOutputStream[keyof typeof LlamaCppProcessOutputStream];
+
+export type LlamaCppProcessOutputEvent = {
+  stream: LlamaCppProcessOutputStream;
+  text: string;
+  createdAt: string;
+  pid?: number;
+};
 
 export type LlamaCppModelsUnloadedForQuitEvent = {
   modelNames: string[];
@@ -133,6 +149,26 @@ export class LlamaCppManager extends EventEmitter {
 
   getStatus(): LlamaCppStatusSnapshot {
     return this.status;
+  }
+
+  private handleProcessOutput(stream: LlamaCppProcessOutputStream, chunk: Buffer): string {
+    const text = chunk.toString().trim();
+    if (!text) return '';
+
+    if (stream === LlamaCppProcessOutputStream.Stdout) {
+      console.debug(`[LlamaCpp] ${text}`);
+    } else {
+      console.warn(`[LlamaCpp] ${text}`);
+    }
+
+    this.emit(LlamaCppManagerLifecycleEvent.ProcessOutput, {
+      stream,
+      text,
+      createdAt: new Date().toISOString(),
+      ...(this.process?.pid ? { pid: this.process.pid } : {}),
+    } satisfies LlamaCppProcessOutputEvent);
+
+    return text;
   }
 
   getBaseUrl(): string {
@@ -249,10 +285,12 @@ export class LlamaCppManager extends EventEmitter {
     );
 
     this.startupStderr = '';
-    this.process.stdout.on('data', chunk => console.debug(`[LlamaCpp] ${chunk.toString().trim()}`));
+    this.process.stdout.on('data', chunk => {
+      this.handleProcessOutput(LlamaCppProcessOutputStream.Stdout, chunk);
+    });
     this.process.stderr.on('data', chunk => {
-      const text = chunk.toString().trim();
-      console.warn(`[LlamaCpp] ${text}`);
+      const text = this.handleProcessOutput(LlamaCppProcessOutputStream.Stderr, chunk);
+      if (!text) return;
       this.startupStderr += (this.startupStderr ? '\n' : '') + text;
     });
     this.process.on('exit', (code, signal) => {

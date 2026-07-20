@@ -80,10 +80,15 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
+<<<<<<< HEAD
   renderLoadButton?: (
     model: LlamaCppModel,
     props: { disabled: boolean; onClick: () => void },
   ) => React.ReactNode;
+=======
+  onOpenLaunchLog?: (modelName: string) => void;
+  renderLoadButton?: (model: LlamaCppModel, props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
+>>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
   showRegisteredModelsTitle?: boolean;
 };
 
@@ -102,6 +107,7 @@ type ModelCardProps = {
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   renderLoadButton?: (props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
+  onOpenLaunchLog: (modelName: string) => void;
 };
 
 type ModelCardEntry = {
@@ -120,6 +126,7 @@ export function ModelsPanel({
   onUnload,
   onDelete,
   onConfigureContext: _onConfigureContext,
+  onOpenLaunchLog,
   renderLoadButton,
   showRegisteredModelsTitle = true,
 }: ModelsPanelProps) {
@@ -214,9 +221,14 @@ export function ModelsPanel({
                 onDragOver={event => event.preventDefault()}
                 onDrop={event => handleCardDrop(event, model.name)}
                 onDragEnd={() => setDraggedModelName(null)}
+<<<<<<< HEAD
                 renderLoadButton={
                   renderLoadButton ? props => renderLoadButton(model, props) : undefined
                 }
+=======
+                renderLoadButton={renderLoadButton ? props => renderLoadButton(model, props) : undefined}
+                onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
+>>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
               />
             ))}
           </div>
@@ -278,6 +290,7 @@ function ModelCard({
   onDrop,
   onDragEnd,
   renderLoadButton,
+  onOpenLaunchLog,
 }: ModelCardProps) {
   const isRunning = Boolean(runningModel);
   const buttonsDisabled = loading || unloading;
@@ -294,7 +307,7 @@ function ModelCard({
   );
   const modifiedDate = model.modified_at ? formatModelCardDate(model.modified_at) : null;
   const handleOpenLaunchLog = () => {
-    void window.electron.llamacpp.openModelLaunchLogWindow({ modelName: model.name });
+    onOpenLaunchLog(model.name);
   };
 
   return (
@@ -308,7 +321,7 @@ function ModelCard({
       className={cn(
         'relative min-h-40 w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
         'hover:border-border hover:bg-muted/20 hover:shadow-md',
-        (loadingModel || unloading) && 'border-primary/30 bg-muted/30',
+        (loadingModel || unloading) && 'bg-muted/30',
         dragging && 'opacity-50',
       )}
     >
@@ -409,6 +422,7 @@ function ModelCard({
               type="button"
               variant="danger"
               isDisabled={buttonsDisabled}
+              data-local-inference-model-action-button="true"
               data-local-inference-unload-button="true"
               onClick={onUnload}
             >
@@ -418,7 +432,16 @@ function ModelCard({
           ) : renderLoadButton ? (
             renderLoadButton({ disabled: buttonsDisabled, onClick: onLoadModel })
           ) : (
+<<<<<<< HEAD
             <Button21st type="button" isDisabled={buttonsDisabled} onClick={onLoadModel}>
+=======
+            <Button21st
+              type="button"
+              isDisabled={buttonsDisabled}
+              data-local-inference-model-action-button="true"
+              onClick={onLoadModel}
+            >
+>>>>>>> 3bd06232 (feat(xiangmu): 在与dev做rebase前进行存储)
               <Play data-icon="inline-start" />
               {i18nService.t('start')}
             </Button21st>

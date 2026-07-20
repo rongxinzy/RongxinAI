@@ -24,6 +24,7 @@ import {
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppIpcChannel,
+  LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
@@ -35,11 +36,14 @@ import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
   LlamaCppManager,
   LlamaCppManagerLifecycleEvent,
+  LlamaCppProcessOutputStream,
+  type LlamaCppProcessOutputEvent,
   resolveLlamaCppDeviceSelection,
 } from '../libs/llamacppManager';
 import {
   createLlamaCppModelLaunchLogger,
   createLlamaCppServiceStartupLaunchLogger,
+  type LlamaCppModelLaunchLogReporter,
 } from '../libs/llamacppModelLaunchLog';
 import {
   classifyLlamaCppModelLoadError,
@@ -573,85 +577,97 @@ export function registerLlamaCppIpcHandlers(
         const store = options.getStore();
         const serviceConfig = getLlamaCppServiceConfig(store);
         const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(store, input);
-        launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingService);
-        const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
-          reason: LlamaCppServiceStartupReason.LoadModel,
-          logger: createLlamaCppServiceStartupLaunchLogger(launchLogger),
-        });
-        if (serviceStartupResult.success === false) {
-          launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, {
-            code: serviceStartupResult.code,
-            detail: serviceStartupResult.detail,
-          });
-          throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
-        }
-        launchLogger.info(LlamaCppModelLaunchLogPhase.ServiceReady, undefined, {
-          managedByApp: serviceStartupResult.serviceStatus.managedByApp,
-          pid: serviceStartupResult.serviceStatus.pid,
-        });
-
-        const runningModels = await manager.listRunningModels();
-        const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
-          modelsMax: serviceConfig.modelsMax,
-          runningModels,
-          targetModelName: modelName,
-        });
-        if (loadLimitViolation) {
-          launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, loadLimitViolation);
-          throw new Error(
-            t('llamacppLoadModelLimitReached')
-              .replace('{limit}', String(loadLimitViolation.limit))
-              .replace('{next}', String(loadLimitViolation.next)),
-          );
-        }
-
-        const localModels = await manager.listLocalModels();
-        const targetModel = localModels.find(
-          model => model.name === modelName || model.id === modelName || model.model === modelName,
+        let processOutputPhase: LlamaCppModelLaunchLogPhase = LlamaCppModelLaunchLogPhase.CheckingService;
+        const unsubscribeProcessOutput = subscribeToLlamaCppProcessOutput(
+          manager,
+          launchLogger.report,
+          () => processOutputPhase,
         );
-        launchLogger.info(LlamaCppModelLaunchLogPhase.PreparingModel, undefined, {
-          modelFound: Boolean(targetModel),
-          modelSizeBytes: targetModel?.size,
-          modelPath: targetModel?.path,
-        });
-        launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingRuntime);
-        const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((error): null => {
-          launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
-          return null;
-        });
-        const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((error): null => {
-          launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
-          return null;
-        });
 
         try {
-          const result = await loadLlamaCppModelThroughPipeline({
-            launchInput: { ...inputWithPreferences, model: modelName },
-            runtimeBackend:
-              serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
-            runtimeCapabilities,
-            nvidiaSnapshot,
+          launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingService);
+          processOutputPhase = LlamaCppModelLaunchLogPhase.StartingService;
+          const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
+            reason: LlamaCppServiceStartupReason.LoadModel,
+            logger: createLlamaCppServiceStartupLaunchLogger(launchLogger),
+          });
+          if (serviceStartupResult.success === false) {
+            launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, {
+              code: serviceStartupResult.code,
+              detail: serviceStartupResult.detail,
+            });
+            throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
+          }
+          launchLogger.info(LlamaCppModelLaunchLogPhase.ServiceReady, undefined, {
+            managedByApp: serviceStartupResult.serviceStatus.managedByApp,
+            pid: serviceStartupResult.serviceStatus.pid,
+          });
+          processOutputPhase = LlamaCppModelLaunchLogPhase.LoadingModel;
+
+          const runningModels = await manager.listRunningModels();
+          const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
+            modelsMax: serviceConfig.modelsMax,
+            runningModels,
+            targetModelName: modelName,
+          });
+          if (loadLimitViolation) {
+            launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, loadLimitViolation);
+            throw new Error(
+              t('llamacppLoadModelLimitReached')
+                .replace('{limit}', String(loadLimitViolation.limit))
+                .replace('{next}', String(loadLimitViolation.next)),
+            );
+          }
+
+          const localModels = await manager.listLocalModels();
+          const targetModel = localModels.find(
+            model => model.name === modelName || model.id === modelName || model.model === modelName,
+          );
+          launchLogger.info(LlamaCppModelLaunchLogPhase.PreparingModel, undefined, {
+            modelFound: Boolean(targetModel),
             modelSizeBytes: targetModel?.size,
-            onLog: launchLogger.report,
-            loadModel: async (
-              loadInput: LlamaCppModelLaunchInput,
-            ): Promise<LlamaCppModelLaunchResult> => manager.loadModel(loadInput),
-            listModels: (timeoutMs: number): Promise<LlamaCppModel[]> =>
-              manager.listRouterModels(timeoutMs),
-            listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
-            detectService: (): Promise<LlamaCppStatusSnapshot> => manager.detect(),
-            unloadModel: async unloadModelName => {
-              await (await manager.client()).unloadModel(unloadModelName);
-            },
+            modelPath: targetModel?.path,
           });
-          await refreshRunningModelBindings('llamacpp-model-loaded');
-          launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
-            runningModelCount: result.runningModels.length,
+          processOutputPhase = LlamaCppModelLaunchLogPhase.CheckingRuntime;
+          launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingRuntime);
+          const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((error): null => {
+            launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
+            return null;
           });
-          return result;
-        } catch (error) {
-          launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, error);
-          throw toUserFacingLlamaCppModelLoadError(error);
+          const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((error): null => {
+            launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
+            return null;
+          });
+
+          processOutputPhase = LlamaCppModelLaunchLogPhase.LoadingModel;
+          try {
+            const result = await loadLlamaCppModelThroughPipeline({
+              launchInput: { ...inputWithPreferences, model: modelName },
+              runtimeBackend: serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
+              runtimeCapabilities,
+              nvidiaSnapshot,
+              modelSizeBytes: targetModel?.size,
+              onLog: launchLogger.report,
+              loadModel: async (loadInput: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> =>
+                manager.loadModel(loadInput),
+              listModels: (timeoutMs: number): Promise<LlamaCppModel[]> => manager.listRouterModels(timeoutMs),
+              listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
+              detectService: (): Promise<LlamaCppStatusSnapshot> => manager.detect(),
+              unloadModel: async unloadModelName => {
+                await (await manager.client()).unloadModel(unloadModelName);
+              },
+            });
+            await refreshRunningModelBindings('llamacpp-model-loaded');
+            launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
+              runningModelCount: result.runningModels.length,
+            });
+            return result;
+          } catch (error) {
+            launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, error);
+            throw toUserFacingLlamaCppModelLoadError(error);
+          }
+        } finally {
+          unsubscribeProcessOutput();
         }
       },
       () => {
@@ -1157,6 +1173,30 @@ function normalizeGpuLayersStringWithDefault(
   if (!Number.isFinite(parsed)) return range.defaultValue;
   if (parsed < range.min || parsed > range.max) return range.defaultValue;
   return normalized;
+}
+
+function subscribeToLlamaCppProcessOutput(
+  manager: LlamaCppManager,
+  report: LlamaCppModelLaunchLogReporter,
+  getPhase: () => LlamaCppModelLaunchLogPhase,
+): () => void {
+  const handleProcessOutput = (event: LlamaCppProcessOutputEvent) => {
+    report({
+      level: event.stream === LlamaCppProcessOutputStream.Stderr
+        ? LlamaCppModelLaunchLogLevel.Warn
+        : LlamaCppModelLaunchLogLevel.Debug,
+      phase: getPhase(),
+      message: event.stream === LlamaCppProcessOutputStream.Stderr
+        ? 'llama-server stderr'
+        : 'llama-server stdout',
+      detail: event.text,
+    });
+  };
+
+  manager.on(LlamaCppManagerLifecycleEvent.ProcessOutput, handleProcessOutput);
+  return () => {
+    manager.off(LlamaCppManagerLifecycleEvent.ProcessOutput, handleProcessOutput);
+  };
 }
 
 function normalizeVisibleDevices(
