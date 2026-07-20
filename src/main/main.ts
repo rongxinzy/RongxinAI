@@ -112,7 +112,7 @@ import {
   startCoworkOpenAICompatProxy,
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
-import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
+import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
 import {
   getMcpMarketplaceUrl,
   getServerApiBaseUrl,
@@ -7346,6 +7346,15 @@ if (!gotTheLock) {
     profiler.mark('skillManager');
     const manager = getSkillManager();
     console.log('[Main] initApp: getSkillManager done');
+
+    // Inject SKILLS_ROOT into process.env so ALL subprocesses (Pi sessions,
+    // shell tools spawned by the agent, skill scripts, etc.) inherit it.
+    // Previously this was only set in OpenClaw's subprocess env and
+    // getEnhancedEnv(), leaving Pi runtime sessions without this variable.
+    const skillsRoot = getSkillsRoot().replace(/\\/g, '/');
+    process.env.SKILLS_ROOT = skillsRoot;
+    process.env.ZHIYUAN_SKILLS_ROOT = skillsRoot;
+    console.log('[Main] initApp: SKILLS_ROOT =', skillsRoot);
 
     // When skills change (install/enable/disable/delete), re-sync AGENTS.md
     // so OpenClaw's IM channel agents pick up the latest skill list.
