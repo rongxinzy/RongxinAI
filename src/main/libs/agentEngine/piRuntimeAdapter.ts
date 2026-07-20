@@ -113,7 +113,7 @@ interface PiModules {
   DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
   getAgentDir: () => string;
   getModel: (provider: string, modelId: string) => unknown;
-  AuthStorage: {
+  AuthStorage?: {
     inMemory: () => PiAuthStorage;
   };
   completeSimple: (
@@ -1493,6 +1493,12 @@ function resolvePiAuthStorage(
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
   if (!config?.apiKey || !providerMetadata?.providerName) {
+    return existingAuthStorage ?? null;
+  }
+
+  // Guard: pi.AuthStorage may be undefined if the pi-coding-agent package's
+  // exports changed at runtime (e.g. bundler tree-shaking or version mismatch).
+  if (!pi.AuthStorage) {
     return existingAuthStorage ?? null;
   }
 
