@@ -133,6 +133,7 @@ import {
   validateStoredMcpServerConfig,
 } from './libs/mcpCommandValidation';
 import { probeMcpConnection } from './libs/mcpConnectionProbe';
+import type { McpToolManifestEntry } from './libs/mcpServerManager';
 import { McpServerManager } from './libs/mcpServerManager';
 import { fetchModelScopeSkillMarketplace } from './libs/modelscopeSkillMarketplace';
 import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
@@ -964,6 +965,7 @@ let mcpBridgeServer: McpBridgeServer | null = null;
 // spawn time, avoiding a restart just to pick up the correct secret.
 let mcpBridgeSecret: string = require('crypto').randomUUID();
 let mcpBridgeStartPromise: Promise<McpBridgeConfig | null> | null = null;
+let mcpInitPromise: Promise<McpToolManifestEntry[]> | null = null;
 let imGatewayManager: IMGatewayManager | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
@@ -1854,6 +1856,53 @@ const getMcpStore = () => {
 };
 
 /**
+ * Initialize MCP servers and discover tools.
+ *
+ * Safe to call from any context (Pi init, OpenClaw bootstrap, etc.) —
+ * deduplicates concurrent calls via a promise lock and skips if the
+ * McpServerManager is already running.
+ *
+ * Returns the tool manifest (may be empty if no MCP servers are configured).
+ */
+const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
+  if (mcpInitPromise) return mcpInitPromise;
+
+  mcpInitPromise = (async (): Promise<McpToolManifestEntry[]> => {
+    try {
+      const enabledServers = getMcpStore().getEnabledServers();
+      if (enabledServers.length === 0) {
+        console.log('[McpInit] No MCP servers configured, skipping');
+        return [];
+      }
+
+      if (!mcpServerManager) {
+        mcpServerManager = new McpServerManager();
+      }
+
+      // If already running (e.g. initMcpServers called before startMcpBridge),
+      // reuse the existing connections instead of restarting.
+      if (mcpServerManager.isRunning) {
+        const count = mcpServerManager.toolManifest.length;
+        console.log(`[McpInit] MCP already running, reusing ${count} tools`);
+        return mcpServerManager.toolManifest;
+      }
+
+      console.log(`[McpInit] Starting ${enabledServers.length} MCP servers...`);
+      const tools = await mcpServerManager.startServers(enabledServers);
+      console.log(`[McpInit] MCP servers started: ${tools.length} tools discovered`);
+      return tools;
+    } catch (err) {
+      console.error('[McpInit] Failed to start MCP servers:', err);
+      return [];
+    }
+  })().finally(() => {
+    mcpInitPromise = null;
+  });
+
+  return mcpInitPromise;
+};
+
+/**
  * Start the MCP Bridge: server manager + HTTP callback.
  * Called during OpenClaw bootstrap before config sync.
  * Returns the bridge config to be written into openclaw.json.
@@ -1870,21 +1919,10 @@ const startMcpBridge = (): Promise<McpBridgeConfig | null> => {
     try {
       console.log('[McpBridge] startMcpBridge called');
 
-      // Discover MCP tools (may be empty if no servers configured)
-      const enabledServers = getMcpStore().getEnabledServers();
-      console.log(
-        `[McpBridge] enabledServers: ${enabledServers.length} (${enabledServers.map(s => s.name).join(', ')})`,
-      );
-
-      let tools: Awaited<ReturnType<McpServerManager['startServers']>> = [];
-      if (enabledServers.length > 0) {
-        if (!mcpServerManager) {
-          mcpServerManager = new McpServerManager();
-        }
-        console.log('[McpBridge] starting MCP servers...');
-        tools = await mcpServerManager.startServers(enabledServers);
-        console.log(`[McpBridge] tools discovered: ${tools.length}`);
-      }
+      // initMcpServers may have already been called during app init.
+      // It deduplicates internally — if MCP is already running, it returns
+      // the cached toolManifest without restarting servers.
+      const tools = await initMcpServers();
 
       // Always start HTTP callback server (serves both MCP Bridge and AskUserQuestion)
       if (!mcpServerManager) {
@@ -7267,6 +7305,15 @@ if (!gotTheLock) {
       }
     }
     profiler.measure('enterpriseConfigSync');
+
+    // Start MCP servers early so Pi sessions have access to MCP tools.
+    // Previously this was deferred to ensureOpenClawRunningForCowork (OpenClaw
+    // path), leaving Pi sessions without MCP tools until the async bootstrap
+    // completed — or indefinitely if OpenClaw was never started.
+    // initMcpServers is concurrency-safe: it deduplicates via a promise lock
+    // and skips startServers() if the McpServerManager is already running.
+    const mcpTools = await initMcpServers();
+    console.log(`[Main] initApp: MCP init done, ${mcpTools.length} tools available`);
 
     bindCoworkRuntimeForwarder();
     bindOpenClawStatusForwarder();
