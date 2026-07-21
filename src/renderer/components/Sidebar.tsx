@@ -454,7 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
             onScroll={handleAgentScroll}
           >
-            {workMode !== WorkMode.Chat && (
+            <div className={cn(workMode === WorkMode.Chat && 'hidden')}>
               <MyAgentSidebarTree
                 isBatchMode={isBatchMode}
                 selectedIds={selectedIds}
@@ -462,10 +462,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onShowCowork={onShowCowork}
                 onToggleSelection={handleToggleSelection}
                 onEnterBatchMode={handleEnterBatchMode}
-                onVisibleSessionsChange={handleVisibleSessionsChange}
-                workMode={workMode}
+                onVisibleSessionsChange={
+                  workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
+                }
+                workMode={WorkMode.Work}
               />
-            )}
+            </div>
             {workMode === WorkMode.Chat && (
               <>
                 <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
