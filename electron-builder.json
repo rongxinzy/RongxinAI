@@ -224,12 +224,7 @@
           "!**/__tests__/**"
         ]
       }
-    ],
-    "desktop": {
-      "Name": "知远",
-      "Comment": "AI-assisted coding and productivity tool",
-      "Terminal": "false"
-    }
+    ]
   },
   "nsis": {
     "oneClick": false,
