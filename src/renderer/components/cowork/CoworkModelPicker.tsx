@@ -32,6 +32,7 @@ export function CoworkModelPicker({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger
+        nativeButton={false}
         render={
           <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 py-1 text-xs hover:bg-black/3 dark:hover:bg-white/4 [&_span]:flex-none">
             {selectedModel ? (

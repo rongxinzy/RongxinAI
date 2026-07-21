@@ -2,6 +2,21 @@
 
 RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和修改的 UI 代码必须遵守。与 `AGENTS.md` 的组件库规则配套使用。
 
+## 技能参考
+
+涉及 UI 实现时，**必须参考以下技能**（通过 `/` 或 Skill 工具加载，优先级从高到低）：
+
+1. **`shadcn`** — shadcn/ui 组件用法、样式规则、表单、组合、图标。项目中 shadcn 组件安装于 `@shared/components/ui/*`。
+2. **`ai-elements`** — Vercel AI Elements 的 AI 原生组件（`Message`、`PromptInput`、`ModelSelector`、`Conversation`、`Suggestion`、`Reasoning`、`Sources` 等）。安装于 `@shared/components/ai-elements/*`。
+3. **`rongxinai-ui-adapter`** — 本项目适配层：文件位置约定、i18n（`t()` 包裹所有用户可见文本）、常量（`as const` 对象定义判别值）、lobster theme 映射表、页面级组件选择矩阵、以及 `--zy-*` ↔ shadcn 语义 token 的对应关系。
+
+**使用规则：**
+
+- 任何新增 UI 组件，首先查上述技能是否有现成的 shadcn / ai-elements 组件可用，**禁止自造轮子**。
+- 组合现有组件时遵循 shadcn 技能的样式范式（`FieldGroup` + `Field` 而不用 `space-y-*`；Button 的 `variant`/`size` 枚举等）。
+- 所有面向用户的文本通过 `t('key')` 走 i18n，键同时补充 `zh` / `en` 两套。
+- 状态判别、IPC 通道、模式选择器等字符串常量必须定义为 `as const`，禁止裸字符串字面量。
+
 ## 设计方向
 
 以 **Kimi、Codex 这一代 AI 产品的质感**为基准：中性、克制、内容优先。
@@ -12,9 +27,18 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 ## 色彩
 
-### 唯一事实来源
+### 事实来源（过渡期双真源）
 
-颜色只允许通过语义 token 使用，定义于 `src/renderer/theme/tokens/contract.ts`，运行时值为 CSS 变量 `--zy-*`，Tailwind 工具类经 `src/renderer/theme/tailwind/plugin.cjs` 桥接。
+颜色只允许通过语义 token 使用。当前存在**两层变量，值同步**：
+
+1. **shadcn 语义层** —— `src/renderer/theme/css/shadcn-token-bridge.css`
+   `:root` / `.dark`（并挂 `[data-theme]` 别名）直写 oklch。这是与标准 shadcn 语义表逐值一致的真源，含 `--sidebar-primary` 暗色蓝、`--chart-1..5`、`--radius: 0.625rem`。
+2. **项目兼容层** —— `src/renderer/theme/css/themes.css` 的 `--zy-*`（oklch）
+   供仍使用 `var(--zy-*)` / `bg-surface` 等的存量组件消费；`tokens/contract.ts`、`themes/classic-light.ts`、`themes/classic-dark.ts` 与之同步。
+
+Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: var(--zy-background)` 等映射到 `--zy-*`，shadcn 语义名（`card`、`popover`、`secondary`、`muted` 等）映射到 bridge 的 `var(--语义名)`。组件可通过 `bg-background` / `bg-card` / `text-muted-foreground` 等 utility 消费，也可直接用 `var(--zy-*)`。
+
+> **过渡说明**：两层构成双真源。彻底单层需将存量组件的 `var(--zy-*)` / `bg-surface` 全部迁到 shadcn 语义名，留待后续重构。新建组件**应优先使用 shadcn 语义 utility**（`bg-card`、`text-muted-foreground` 等），减少对 `--zy-*` 的新增依赖。
 
 **禁止：**
 
@@ -42,7 +66,7 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 1. **强调色唯一。** 一个屏幕内，`primary` 只出现在一个主要动作和少数激活态上。禁止用强调色给普通图标、普通文本"提色"。
 2. **状态色不装饰。** 红/绿/黄只表达危险、成功、警告。
 3. **层级公式：** 背景每浮起一层（background → surface → surface-raised → overlay），明暗差异缩小一档；不要跳档制造高反差色块。
-4. 明暗主题共用同一套 token 名，组件代码不得出现 `dark:` 前缀的单独配色——差异必须在 token 层解决。个别结构性例外（如纯黑遮罩）允许保留。
+4. 明暗主题共用同一套 token 名，组件代码不得出现 `dark:` 前缀的单独配色——差异必须在 token 层解决。个别结构性例外（如纯黑遮罩 `bg-black/40`、nav 悬浮的透明度叠加 `hover:bg-black/3 dark:hover:bg-white/4`）允许保留。
 
 ## 字体
 
@@ -87,15 +111,14 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 ## 圆角
 
-基准值 `--zy-radius` = **8px**，派生刻度（`shadcn-token-bridge.css`）：6 / 8 / 10 / 14px。
+基准值 `--zy-radius` = **10px**（0.625rem），同步于 `shadcn-token-bridge.css` 的 `--radius: 0.625rem`。派生刻度：
 
-| 圆角 | 类名                        | 用途                                            |
-| ---- | --------------------------- | ----------------------------------------------- |
-| 6px  | `rounded-sm`                | 小元素：badge、行内代码块、小图标按钮           |
-| 8px  | `rounded-md` / `rounded-lg` | **默认。** 按钮、输入框、下拉项、开关轨道内元素 |
-| 10px | `rounded-xl`                | 卡片、面板、代码块容器                          |
-| 14px | `rounded-2xl`               | 对话框、大型弹层                                |
-| 全圆 | `rounded-full`              | 头像、分段控件滑块、胶囊形元素                  |
+| 圆角    | 类名                        | 用途                                                        |
+| ------- | --------------------------- | ----------------------------------------------------------- |
+| 8px     | `rounded-sm` / `rounded-md` | 按钮、输入框、下拉项、badge、行内代码块、小图标按钮         |
+| 10px    | `rounded-lg`                | **默认。** 卡片、面板、导航项、侧边栏分组                   |
+| 14px    | `rounded-xl`                | 对话框、大型弹层、代码块容器                                |
+| 全圆    | `rounded-full`              | 头像、分段控件滑块、胶囊形元素                              |
 
 规则：
 
@@ -105,16 +128,17 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 ## 阴影
 
-只允许 `tailwind.config.js` 中定义的六级命名阴影，**禁止手写 `shadow-[...]` 任意值**：
+定义于 `index.css` `@theme` 块中，将 Tailwind 内置 `--shadow-sm/md/lg/xl/2xl` 以字面值映射到项目档位（保证 v4 `@theme` 下确定生效，无 var 链），并额外提供 `--shadow-inset` 用于内嵌态。**禁止手写 `shadow-[...]` 任意值**：
 
 | 级别                 | 类名                               | 用途 |
 | -------------------- | ---------------------------------- | ---- |
-| `shadow-subtle`      | 极轻的浮起感：开关滑块、小控件     |
-| `shadow-card`        | 卡片默认                           |
-| `shadow-elevated`    | hover 浮起、sticky 栏              |
-| `shadow-popover`     | 下拉、tooltip、popover             |
-| `shadow-modal`       | 对话框、sheet                      |
-| `shadow-glow-accent` | 仅用于极个别品牌点缀，一页至多一处 |
+| `shadow-sm`          | 极轻的浮起感                       | 默认、hint |
+| `shadow-md`          | 卡片级                             | 卡片、控制柄滑块 |
+| `shadow-lg`          | 悬浮级                             | hover 浮起、sticky 栏 |
+| `shadow-xl`          | 弹层级                             | 对话框、modal |
+| `shadow-2xl`         | 最远浮层                           | popover、tooltip |
+| `shadow-inset`       | 内嵌凹陷                           | switch 轨道、work/chat 轨道、分段控件轨道 |
+| `shadow-glow-accent` | 品牌光晕                           | 仅用于脉冲指示点、loading 标记，一页至多一处 |
 
 规则：
 
@@ -163,17 +187,17 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 - 时长：**150–250ms**，统一 `ease-out`（或 `transitionTimingFunction.smooth`）。超过 300ms 的动画需要理由。
 - 可动属性只有 `opacity` 和 `transform`；禁止动画化 width/height/top/left（布局抖动）。结构性位移（如侧边栏宽度）沿用已有的受控例外。
-- 入场动画用 `tailwind.config.js` 已有的：`animate-fade-in` / `fade-in-up` / `fade-in-down` / `scale-in` / `message-in`。不新增 keyframes，除非现有组合确实无法表达。
+- 入场动画用 `index.css` `@theme` 中已有的：`animate-fade-in` / `fade-in-up` / `fade-in-down` / `scale-in` / `message-in`。不新增 keyframes，除非现有组合确实无法表达。
 - 必须遵守 `prefers-reduced-motion`（全局 CSS 已处理，新增自定义动画时验证）。
 
 ## 组件范式范例：分段切换控件
 
 侧边栏顶部的「工作 / 对话」模式切换（`src/renderer/components/Sidebar.tsx`，样式见 `index.css` 中 `[data-mode="work-chat"]` 段）是本项目的**控件质感基准**，新做开关、分段控件、Tab 切换时参照它：
 
-1. **全宽胶囊轨道**：轨道用 `surface-raised` 级别的中性色 + 1px 边框 + 极轻内阴影，与背景分得开但不抢眼。
-2. **滑动玻璃滑块**：全圆角滑块带 `shadow-subtle` 级投影，200ms ease 滑动，方向感清晰。
+1. **全宽胶囊轨道**：轨道用中性灰 `rgb(237, 237, 236)` + 1px 边框 + `shadow-inset`，与背景分得开但不抢眼。
+2. **滑动玻璃滑块**：全圆角滑块宽度超出轨道 2px、带 `shadow-md` 级投影，200ms ease 滑动，方向感清晰。
 3. **状态用文字表达，不用色块**：选中侧 `font-semibold text-foreground`，未选侧 `font-normal text-muted-foreground opacity-50`；不靠强调色染色。
-4. **图标 + 文字成对出现**：图标 `size-3.5`，文字 `text-sm`，间距 `gap-1`。
+4. **纯文本，无图标**：两侧各一个 `text-sm` 标签居中定位在轨道 25%/75% 位置。
 5. **整行可点**：点击目标是整个控件区域，不只是滑块。
 
 这套语言推广到所有开关/切换类组件：中性的轨道、明确的滑动反馈、文字层级表达选中态、200ms 内的动效。
@@ -192,7 +216,7 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 提交 UI 代码前逐项自查：
 
 - [ ] 没有直接写死的色值 / Tailwind 默认彩色刻度；全部走 `--zy-*` token 或其桥接工具类
-- [ ] 没有 `dark:` 前缀的单独配色（主题差异在 token 层解决）
+- [ ] 没有 `dark:` 前缀的单独配色（主题差异在 token 层解决；结构性例外如透明度叠加 `hover:bg-black/3 dark:hover:bg-white/4`、模态遮罩等允许）
 - [ ] 字号在五档之内，字重在 400/500/600 之内
 - [ ] 圆角、阴影只用本文件定义的刻度，无任意值
 - [ ] 边框 1px，颜色用 token

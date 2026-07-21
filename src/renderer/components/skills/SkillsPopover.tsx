@@ -56,7 +56,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={children as React.ReactElement} />
+      <PopoverTrigger nativeButton={false} render={children as React.ReactElement} />
       <PopoverContent
         side="top"
         align="start"

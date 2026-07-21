@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index e223ce1..91b9ab3 100644
+index 7cdf28a..936b65c 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -1042,6 +1042,9 @@ export class AgentSession {
+@@ -1113,6 +1113,9 @@ export class AgentSession {
          if (typeof content === "string") {
              text = content;
          }
@@ -12,7 +12,7 @@ index e223ce1..91b9ab3 100644
          else {
              const textParts = [];
              images = [];
-@@ -2521,12 +2524,14 @@ export class AgentSession {
+@@ -2621,12 +2624,14 @@ export class AgentSession {
                  return false;
              const msg = m;
              // Skip aborted messages with no content
@@ -29,10 +29,10 @@ index e223ce1..91b9ab3 100644
          for (const content of lastAssistant.content) {
              if (content.type === "text") {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-index 32aaeb5..52b89df 100644
+index b570dc5..c6808be 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-@@ -162,6 +162,9 @@ function estimateTextAndImageContentChars(content) {
+@@ -147,6 +147,9 @@ function estimateTextAndImageContentChars(content) {
      if (typeof content === "string") {
          return content.length;
      }
@@ -42,7 +42,7 @@ index 32aaeb5..52b89df 100644
      let chars = 0;
      for (const block of content) {
          if (block.type === "text" && block.text) {
-@@ -186,6 +189,7 @@ export function estimateTokens(message) {
+@@ -171,6 +174,7 @@ export function estimateTokens(message) {
          }
          case "assistant": {
              const assistant = message;

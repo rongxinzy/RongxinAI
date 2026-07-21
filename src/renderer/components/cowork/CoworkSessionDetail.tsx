@@ -5,7 +5,7 @@ import {
 } from '@shared/components/ai-elements/conversation';
 import { Button } from '@shared/components/ui/button';
 import { Download, Folder, Image as ImageIcon, PanelLeft, Pencil } from 'lucide-react';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -295,11 +295,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const nextMaxWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, availablePanelWidth));
     const proportionalMinWidth = Math.floor(contentWidth * ARTIFACT_PANEL_MIN_WIDTH_RATIO);
     const nextMinWidth = Math.min(nextMaxWidth, Math.max(MIN_PANEL_WIDTH, proportionalMinWidth));
-    setArtifactPanelMinWidth(nextMinWidth);
-    setArtifactPanelMaxWidth(nextMaxWidth);
+    setArtifactPanelMinWidth(prev => (prev === nextMinWidth ? prev : nextMinWidth));
+    setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
   }, []);
 
-  useLayoutEffect(() => {
+  // ResizeObserver must run in useEffect (async), NOT useLayoutEffect:
+  // useLayoutEffect flushes state updates synchronously — when the observed
+  // container resizes as a result of our own setState, the observer fires
+  // again before paint, forming a sync setState → DOM → observer → setState
+  // cycle that exhausts React's nested update limit.
+  useEffect(() => {
     updateArtifactPanelMaxWidth();
     const container = contentRowRef.current;
 
