@@ -91,7 +91,7 @@ export const UserBubble: React.FC<{
         )}
 
         <div
-          className={`flex items-center gap-2 mt-1 text-[11px] text-zinc-400 dark:text-zinc-500 select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`flex items-center gap-2 mt-1 text-[11px] text-muted-foreground select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           aria-hidden={!isHovered}
         >
           {messageSkills.length > 0 && (

@@ -261,7 +261,7 @@ const getProviderStatusBadge = (
       }
     : {
         labelKey: 'providerStatusOff',
-        className: 'bg-red-500/20 text-red-600 dark:text-red-400',
+                className: 'bg-destructive/20 text-destructive',
       };
 };
 const normalizeBaseUrl = (baseUrl: string): string =>
@@ -2945,38 +2945,38 @@ const Settings: React.FC<SettingsProps> = ({
                 >
                   {mode === 'light' && (
                     <>
-                      <rect width="120" height="80" fill="#F8F9FB" />
-                      <rect x="0" y="0" width="30" height="80" fill="#EBEDF0" />
-                      <rect x="4" y="8" width="22" height="4" rx="2" fill="#C8CBD0" />
-                      <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#D5D7DB" />
-                      <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#D5D7DB" />
-                      <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#D5D7DB" />
-                      <rect x="36" y="8" width="78" height="64" rx="4" fill="#FFFFFF" />
-                      <rect x="42" y="16" width="50" height="4" rx="2" fill="#D5D7DB" />
-                      <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#E2E4E7" />
-                      <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#E2E4E7" />
-                      <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#E2E4E7" />
-                      <rect x="42" y="46" width="40" height="4" rx="2" fill="#D5D7DB" />
-                      <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#E2E4E7" />
-                      <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#E2E4E7" />
+                      <rect width="120" height="80" fill="#ffffff" />
+                      <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
+                      <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
+                      <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#d4d4d8" />
+                      <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#d4d4d8" />
+                      <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#d4d4d8" />
+                      <rect x="36" y="8" width="78" height="64" rx="4" fill="#ffffff" />
+                      <rect x="42" y="16" width="50" height="4" rx="2" fill="#d4d4d8" />
+                      <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#e5e5e5" />
+                      <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#e5e5e5" />
+                      <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
+                      <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
+                      <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
+                      <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#e5e5e5" />
                     </>
                   )}
                   {mode === 'dark' && (
                     <>
-                      <rect width="120" height="80" fill="#0F1117" />
-                      <rect x="0" y="0" width="30" height="80" fill="#151820" />
-                      <rect x="4" y="8" width="22" height="4" rx="2" fill="#3A3F4B" />
-                      <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#2A2F3A" />
-                      <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#2A2F3A" />
-                      <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#2A2F3A" />
-                      <rect x="36" y="8" width="78" height="64" rx="4" fill="#1A1D27" />
-                      <rect x="42" y="16" width="50" height="4" rx="2" fill="#3A3F4B" />
-                      <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#252930" />
-                      <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#252930" />
-                      <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#252930" />
-                      <rect x="42" y="46" width="40" height="4" rx="2" fill="#3A3F4B" />
-                      <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#252930" />
-                      <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#252930" />
+                      <rect width="120" height="80" fill="#1a1d23" />
+                      <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
+                      <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
+                      <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="36" y="8" width="78" height="64" rx="4" fill="#2d2d2d" />
+                      <rect x="42" y="16" width="50" height="4" rx="2" fill="#52525b" />
+                      <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
+                      <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
+                      <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#3f3f46" />
                     </>
                   )}
                   {mode === 'system' && (
@@ -2990,36 +2990,36 @@ const Settings: React.FC<SettingsProps> = ({
                         </clipPath>
                       </defs>
                       <g clipPath="url(#left-half)">
-                        <rect width="120" height="80" fill="#F8F9FB" />
-                        <rect x="0" y="0" width="30" height="80" fill="#EBEDF0" />
-                        <rect x="4" y="8" width="22" height="4" rx="2" fill="#C8CBD0" />
-                        <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#D5D7DB" />
-                        <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#D5D7DB" />
-                        <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#D5D7DB" />
-                        <rect x="36" y="8" width="78" height="64" rx="4" fill="#FFFFFF" />
-                        <rect x="42" y="16" width="50" height="4" rx="2" fill="#D5D7DB" />
-                        <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#E2E4E7" />
-                        <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#E2E4E7" />
-                        <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#E2E4E7" />
-                        <rect x="42" y="46" width="40" height="4" rx="2" fill="#D5D7DB" />
-                        <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#E2E4E7" />
+                        <rect width="120" height="80" fill="#ffffff" />
+                        <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
+                        <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
+                        <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#d4d4d8" />
+                        <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#d4d4d8" />
+                        <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#d4d4d8" />
+                        <rect x="36" y="8" width="78" height="64" rx="4" fill="#ffffff" />
+                        <rect x="42" y="16" width="50" height="4" rx="2" fill="#d4d4d8" />
+                        <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#e5e5e5" />
+                        <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#e5e5e5" />
+                        <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
+                        <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
+                        <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
                       </g>
                       <g clipPath="url(#right-half)">
-                        <rect width="120" height="80" fill="#0F1117" />
-                        <rect x="0" y="0" width="30" height="80" fill="#151820" />
-                        <rect x="4" y="8" width="22" height="4" rx="2" fill="#3A3F4B" />
-                        <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#2A2F3A" />
-                        <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#2A2F3A" />
-                        <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#2A2F3A" />
-                        <rect x="36" y="8" width="78" height="64" rx="4" fill="#1A1D27" />
-                        <rect x="42" y="16" width="50" height="4" rx="2" fill="#3A3F4B" />
-                        <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#252930" />
-                        <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#252930" />
-                        <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#252930" />
-                        <rect x="42" y="46" width="40" height="4" rx="2" fill="#3A3F4B" />
-                        <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#252930" />
+                        <rect width="120" height="80" fill="#1a1d23" />
+                        <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
+                        <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
+                        <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#3f3f46" />
+                        <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#3f3f46" />
+                        <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#3f3f46" />
+                        <rect x="36" y="8" width="78" height="64" rx="4" fill="#2d2d2d" />
+                        <rect x="42" y="16" width="50" height="4" rx="2" fill="#52525b" />
+                        <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#3f3f46" />
+                        <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#3f3f46" />
+                        <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
+                        <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
+                        <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
                       </g>
-                      <line x1="60" y1="0" x2="60" y2="80" stroke="#888" strokeWidth="0.5" />
+                      <line x1="60" y1="0" x2="60" y2="80" stroke="#71717a" strokeWidth="0.5" />
                     </>
                   )}
                 </svg>
@@ -3701,7 +3701,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleMiniMaxOAuthLogout}
-                              className="h-auto px-2.5 py-1 text-[11px] border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
+                              className="h-auto px-2.5 py-1 text-[11px] border-destructive/30 text-destructive hover:bg-destructive/10"
                             >
                               {i18nService.t('minimaxOAuthLogout')}
                             </Button>
@@ -3810,7 +3810,7 @@ const Settings: React.FC<SettingsProps> = ({
                       {/* Error */}
                       {minimaxOAuthPhase.kind === 'error' && (
                         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
-                          <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                          <p className="text-xs text-destructive font-medium">
                             {i18nService.t('minimaxOAuthStatusError')}
                           </p>
                           <p className="text-[11px] text-red-600/80 dark:text-red-400/80 wrap-break-word">
@@ -3937,7 +3937,7 @@ const Settings: React.FC<SettingsProps> = ({
                               onClick={() => {
                                 void handleOpenAIOAuthLogout();
                               }}
-                              className="h-auto px-2.5 py-1 text-[11px] border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
+                              className="h-auto px-2.5 py-1 text-[11px] border-destructive/30 text-destructive hover:bg-destructive/10"
                             >
                               {i18nService.t('openaiOAuthLogout')}
                             </Button>
@@ -3999,7 +3999,7 @@ const Settings: React.FC<SettingsProps> = ({
                       {/* Error */}
                       {openaiOAuthPhase.kind === 'error' && (
                         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 space-y-2">
-                          <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                          <p className="text-xs text-destructive font-medium">
                             {i18nService.t('openaiOAuthStatusError')}
                           </p>
                           <p className="text-[11px] text-red-600/80 dark:text-red-400/80 wrap-break-word">
@@ -5058,8 +5058,7 @@ const Settings: React.FC<SettingsProps> = ({
         return (
           <div className="flex min-h-full flex-col items-center pt-6 pb-3">
             {/* Logo & App Name */}
-            <img src="logo.png" alt="知远" className="w-16 h-16 mb-3 select-none" />
-            <h3 className="text-lg font-semibold text-foreground">知远</h3>
+            <img src="logo.png" alt="知远" className="h-16 w-auto mb-3 select-none" />
             <span className="text-xs text-muted-foreground mt-1">v{appVersion}</span>
             <span className="text-xs text-muted-foreground mt-0.5">开放源码，汇聚智慧</span>
 
@@ -5238,7 +5237,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </span>
                 <span className="text-[11px]">•</span>
                 <span
-                  className={`inline-flex items-center gap-1 ${testResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                  className={`inline-flex items-center gap-1 ${testResult.success ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}
                 >
                   {testResult.success ? (
                     <CheckCircle className="h-4 w-4" />
@@ -5336,7 +5335,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
 
               {modelFormError && (
-                <p className="mb-3 text-xs text-red-600 dark:text-red-400">{modelFormError}</p>
+                <p className="mb-3 text-xs text-destructive">{modelFormError}</p>
               )}
 
               <div className="space-y-3">

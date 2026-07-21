@@ -107,8 +107,8 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         isBatchMode ? 'pl-4' : 'pl-[38px]'
       } pr-2.5 text-[14px] font-normal transition-colors ${
         task.isSelected
-          ? 'bg-black/6 text-foreground dark:bg-white/[0.07]'
-          : 'text-foreground/80 hover:bg-black/3 hover:text-foreground dark:hover:bg-white/4'
+          ? 'bg-black/3 text-foreground dark:bg-white/4'
+          : 'text-muted-foreground hover:bg-black/3 hover:text-foreground dark:hover:bg-white/4'
       }`}
       onClick={handleRowClick}
       onMouseMove={() => setSuppressPinHover(false)}
@@ -171,7 +171,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
           )}
           {task.indicator === AgentSidebarIndicator.CompletedUnread && (
             <span
-              className="h-[7px] w-[7px] shrink-0 rounded-full bg-blue-500 transition-opacity group-hover:opacity-0"
+              className="h-[7px] w-[7px] shrink-0 rounded-full bg-ring transition-opacity group-hover:opacity-0"
               title={indicatorLabel}
             />
           )}

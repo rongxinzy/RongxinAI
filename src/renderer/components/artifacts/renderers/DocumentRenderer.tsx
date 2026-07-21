@@ -186,16 +186,16 @@ const DocxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   }
 
   return (
-    <div ref={wrapperRef} className="h-full overflow-auto p-6 bg-[#f5f5f5]">
+    <div ref={wrapperRef} className="h-full overflow-auto p-6 bg-muted">
       <div ref={containerRef} className="docx-container mx-auto" />
       <style>{`
         .docx-container .docx-preview-wrapper {
           background: transparent !important;
         }
         .docx-container section.docx-preview {
-          background: white !important;
-          color: #000;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+          background: var(--card) !important;
+          color: var(--foreground);
+          box-shadow: var(--shadow-card);
           margin: 0 auto 16px !important;
           border-radius: 2px;
           padding: 60px 50px !important;
@@ -359,10 +359,10 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const totalWidth = COL_WIDTH * colCount;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white text-[#383a42]">
+    <div className="h-full flex flex-col overflow-hidden bg-card text-foreground">
       {/* Sheet tabs */}
       {sheets.length > 1 && (
-        <div className="flex items-center gap-1 px-2 py-1 border-b border-[#e0e0e0] shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1 px-2 py-1 border-b border-border shrink-0 overflow-x-auto">
           {sheets.map((sheet, i) => (
             <Button
               key={i}
@@ -371,8 +371,8 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
               onClick={() => setActiveSheet(i)}
               className={`px-2 py-0.5 text-xs rounded whitespace-nowrap transition-colors h-auto ${
                 i === activeSheet
-                  ? 'bg-[#217346]/10 text-[#217346] font-medium hover:bg-[#217346]/10 hover:text-[#217346]'
-                  : 'text-[#666] hover:text-[#383a42] hover:bg-[#f0f2f5]'
+                  ? 'bg-accent text-accent-foreground font-medium hover:bg-accent hover:text-accent-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
               {sheet.name}
@@ -387,7 +387,7 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
           {/* Header */}
           {headerRow && (
             <div
-              className="flex sticky top-0 z-10 border-b border-[#e0e0e0] bg-[#f0f2f5]"
+              className="flex sticky top-0 z-10 border-b border-border bg-muted"
               style={{ height: HEADER_HEIGHT }}
             >
               {headerRow.map((cell, i) => {
@@ -396,7 +396,7 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
                 return (
                   <div
                     key={i}
-                    className="px-3 flex items-center text-xs font-medium text-[#383a42] border-r border-[#e0e0e0] last:border-r-0 truncate"
+                    className="px-3 flex items-center text-xs font-medium text-foreground border-r border-border last:border-r-0 truncate"
                     style={{
                       width: COL_WIDTH * span,
                       minWidth: COL_WIDTH * span,
@@ -419,7 +419,7 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
       </div>
 
       {/* Row count */}
-      <div className="px-3 py-1 text-xs text-[#999] border-t border-[#e0e0e0] shrink-0">
+      <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border shrink-0">
         {currentSheet.rows.length.toLocaleString()} {t('artifactRowCount')}
       </div>
     </div>
@@ -445,7 +445,7 @@ const VirtualRows: React.FC<{
         return (
           <div
             key={virtualRow.index}
-            className={`flex items-center border-b border-[#e0e0e0]/50 text-xs ${virtualRow.index % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'}`}
+            className={`flex items-center border-b border-border/50 text-xs ${virtualRow.index % 2 === 0 ? 'bg-card' : 'bg-muted/30'}`}
             style={{
               position: 'absolute',
               top: 0,
@@ -459,7 +459,7 @@ const VirtualRows: React.FC<{
               return (
                 <div
                   key={ci}
-                  className="px-3 flex items-center border-r border-[#e0e0e0]/30 last:border-r-0 truncate h-full"
+                  className="px-3 flex items-center border-r border-border/30 last:border-r-0 truncate h-full"
                   style={{
                     width: colWidth * span,
                     minWidth: colWidth * span,
@@ -572,8 +572,8 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[#f5f5f5]">
-      <div className="px-3 py-1.5 text-xs text-[#999] border-b border-[#e0e0e0] shrink-0">
+    <div className="h-full flex flex-col overflow-hidden bg-muted">
+      <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0">
         {pageCount} {t('artifactPdfPageCount')}
       </div>
       <div ref={containerRef} className="flex-1 overflow-auto p-6">
@@ -747,9 +747,9 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
             iframeDoc.open();
             iframeDoc.write(`<!DOCTYPE html><html><head><style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { background: #f3f4f6; padding: 16px; overflow-y: auto; }
+              body { background: var(--muted); padding: 16px; overflow-y: auto; }
               .pptx-preview-wrapper { background: transparent !important; width: 100% !important; max-width: 100% !important; height: auto !important; overflow: visible !important; }
-              .pptx-preview-wrapper > div { margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); border-radius: 4px; overflow: hidden; }
+              .pptx-preview-wrapper > div { margin-bottom: 16px; box-shadow: var(--shadow-card); border-radius: 4px; overflow: hidden; }
               .pptx-preview-wrapper > div:last-child { margin-bottom: 0; }
               canvas { width: 100% !important; height: auto !important; display: block; }
             </style></head><body>${renderedHtml}</body></html>`);
@@ -906,7 +906,7 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
       <div className="px-3 py-1.5 text-xs text-muted border-b border-border shrink-0">
         {t('artifactSlideCount').replace('{count}', String(slideHtmls.length))}
       </div>
-      <div className="flex-1 overflow-auto p-4 space-y-4 bg-[#f3f4f6]">
+      <div className="flex-1 overflow-auto p-4 space-y-4 bg-muted">
         {slideHtmls.map((html, i) => (
           <div key={i} className="shadow-lg rounded overflow-hidden">
             <iframe

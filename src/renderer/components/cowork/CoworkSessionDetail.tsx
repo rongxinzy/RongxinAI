@@ -1370,8 +1370,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               createPortal(
                 <div
                   className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
-              max-w-[240px] shadow-[0_2px_12px_rgba(0,0,0,0.12)]
-              border dark:shadow-[0_2px_12px_rgba(0,0,0,0.4)]
+              max-w-[240px] shadow-elevated
+              border
               ${
                 railTooltip.isUser
                   ? 'rounded-[12px_12px_4px_12px] bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'

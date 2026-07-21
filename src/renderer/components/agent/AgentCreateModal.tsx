@@ -687,7 +687,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
           isOpen={isOpen}
           onClose={handleClose}
           overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/10 dark:bg-black/50"
-          className="w-[calc(100vw-56px)] max-w-[854px]! h-[88vh] max-h-[720px] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.16)] bg-surface ring-0 p-0 gap-0 flex flex-col overflow-hidden"
+          className="w-[calc(100vw-56px)] max-w-[854px]! h-[88vh] max-h-[720px] rounded-xl shadow-modal bg-surface ring-0 p-0 gap-0 flex flex-col overflow-hidden"
         >
           {content}
         </Modal>
@@ -732,7 +732,7 @@ const AgentTemplatePickerModal: React.FC<{
       isOpen
       onClose={onClose}
       overlayClassName="fixed inset-0 z-60 flex items-center justify-center bg-black/10 dark:bg-black/50"
-      className="w-[calc(100vw-56px)] max-w-[760px] max-h-[82vh] rounded-xl border border-border/80 bg-surface shadow-[0_12px_40px_rgba(0,0,0,0.16)] overflow-hidden flex flex-col"
+      className="w-[calc(100vw-56px)] max-w-[760px] max-h-[82vh] rounded-xl border border-border/80 bg-surface shadow-modal overflow-hidden flex flex-col"
     >
       <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">
         <h2 className="text-lg font-semibold text-foreground">

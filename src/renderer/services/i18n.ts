@@ -761,7 +761,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     chatNoSessionsHint: '在输入框中开始你的第一次对话',
     chatErrorMessage: '请求失败: {error}',
     newChat: '新建对话',
-    search: '搜索任务',
+    search: '搜索',
     openSettings: '打开设置',
     restartApp: '重新启动',
     sendMessageShortcut: '发送消息',
@@ -818,7 +818,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     noProjects: '暂无项目',
     confirmDelete: '确认删除',
     confirmDeleteMessage: '确定要删除这个对话吗？此操作不可撤销。',
-    searchChats: '搜索对话',
+    searchChats: '搜索',
     searchConversations: '搜索任务...',
     searchChatConversations: '搜索对话...',
     searchRecentTasks: '近期任务',
@@ -1903,8 +1903,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skipMissedJobsDescription: '启动时跳过离线期间未触发的定时任务，不补充执行（保存后生效）',
 
     // 定时任务
-    scheduledTasks: '定时任务',
-    scheduledTasksTitle: '定时任务',
+    scheduledTasks: '自动化',
+    scheduledTasksTitle: '自动化',
     scheduledTasksNewTask: '新建任务',
     taskTemplateSectionTitle: '快速创建定时任务',
     taskTemplateSectionDesc: '选择一个预设模板快速上手，或从零开始自定义配置',
@@ -4325,8 +4325,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Skip jobs that were missed while the app was offline (applies after Save)',
 
     // Scheduled Tasks
-    scheduledTasks: 'Scheduled Tasks',
-    scheduledTasksTitle: 'Scheduled Tasks',
+    scheduledTasks: 'Automation',
+    scheduledTasksTitle: 'Automation',
     scheduledTasksNewTask: 'New Task',
     taskTemplateSectionTitle: 'Quick Setup',
     taskTemplateSectionDesc: 'Choose a preset template to get started, or build from scratch',
