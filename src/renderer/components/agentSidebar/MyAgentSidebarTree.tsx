@@ -13,6 +13,7 @@ import WorkspaceTreeNode from './WorkspaceTreeNode';
 interface MyAgentSidebarTreeProps {
   isBatchMode: boolean;
   selectedIds: Set<string>;
+  recentlyDeletedSessionIds: string[];
   onShowCowork: () => void;
   onToggleSelection: (sessionId: string) => void;
   onEnterBatchMode: (sessionId: string) => void;
@@ -23,6 +24,7 @@ interface MyAgentSidebarTreeProps {
 const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   isBatchMode,
   selectedIds,
+  recentlyDeletedSessionIds,
   onShowCowork,
   onToggleSelection,
   onEnterBatchMode,
@@ -49,6 +51,12 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
       ...scheduledWorkspaceNodes.flatMap(workspace => workspace.tasks.map(task => task.id)),
     ]);
   }, [onVisibleSessionsChange, scheduledWorkspaceNodes, workspaceNodes]);
+
+  useEffect(() => {
+    for (const sessionId of recentlyDeletedSessionIds) {
+      removeTaskPreview(sessionId);
+    }
+  }, [recentlyDeletedSessionIds, removeTaskPreview]);
 
   const handleSelectTask = async (task: AgentSidebarTaskNode) => {
     if (task.workspaceId) await workspaceService.selectWorkspace(task.workspaceId);

@@ -4,15 +4,7 @@ import { Checkbox } from '@shared/components/ui/checkbox';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { Cpu, Settings, TriangleAlert } from 'lucide-react';
-import {
-  Clock,
-  MessageCircle,
-  PanelLeft,
-  Pencil,
-  Puzzle,
-  Search,
-  Trash2,
-} from 'lucide-react';
+import { Clock, MessageCircle, PanelLeft, Pencil, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -28,6 +20,7 @@ import {
 } from '../store/selectors/coworkSelectors';
 import type { CoworkSessionSummary } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
+import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import Modal from './common/Modal';
@@ -80,6 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [recentlyDeletedSessionIds, setRecentlyDeletedSessionIds] = useState<string[]>([]);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
@@ -91,6 +85,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleWorkModeChange = useCallback((checked: boolean) => {
     const mode = checked ? 'chat' : 'work';
     setWorkMode(mode);
+    setIsBatchMode(false);
+    setSelectedIds(new Set());
+    setShowBatchDeleteConfirm(false);
     void configService.updateConfig({ workMode: mode });
   }, []);
 
@@ -207,29 +204,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   const handleToggleSelection = useCallback((sessionId: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(sessionId)) {
-        next.delete(sessionId);
-      } else {
-        next.add(sessionId);
-      }
-      return next;
-    });
+    setSelectedIds(prev => toggleBatchSelection(prev, sessionId));
   }, []);
 
   const handleVisibleSessionsChange = useCallback((ids: string[]) => {
     allVisibleSessionIdsRef.current = ids;
   }, []);
 
+  useEffect(() => {
+    if (workMode !== 'chat') return;
+    handleVisibleSessionsChange(chatTaskNodes.map(task => task.id));
+  }, [chatTaskNodes, handleVisibleSessionsChange, workMode]);
+
   const handleSelectAll = useCallback(() => {
     const allIds = allVisibleSessionIdsRef.current;
-    setSelectedIds(prev => {
-      if (prev.size === allIds.length && allIds.length > 0) {
-        return new Set();
-      }
-      return new Set(allIds);
-    });
+    setSelectedIds(prev => toggleVisibleBatchSelection(prev, allIds));
   }, []);
 
   const handleBatchDeleteClick = useCallback(() => {
@@ -240,7 +229,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleBatchDelete = useCallback(async () => {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    await coworkService.deleteSessions(ids);
+    const deleted = await coworkService.deleteSessions(ids);
+    if (!deleted) return;
+    setRecentlyDeletedSessionIds(ids);
     handleExitBatchMode();
   }, [selectedIds, handleExitBatchMode]);
 
@@ -462,17 +453,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
             onScroll={handleAgentScroll}
           >
-            <div className={workMode !== 'chat' ? '' : 'hidden'}>
+            {workMode !== 'chat' && (
               <MyAgentSidebarTree
                 isBatchMode={isBatchMode}
                 selectedIds={selectedIds}
+                recentlyDeletedSessionIds={recentlyDeletedSessionIds}
                 onShowCowork={onShowCowork}
                 onToggleSelection={handleToggleSelection}
                 onEnterBatchMode={handleEnterBatchMode}
                 onVisibleSessionsChange={handleVisibleSessionsChange}
                 workMode={workMode}
               />
-            </div>
+            )}
             {workMode === 'chat' && (
               <>
                 <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
@@ -491,7 +483,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-0.5 **:[[role=treeitem]]:pl-3!">
+                  <div className="space-y-0.5">
                     {chatTaskNodes.map(task => (
                       <AgentTaskRow
                         key={task.id}
