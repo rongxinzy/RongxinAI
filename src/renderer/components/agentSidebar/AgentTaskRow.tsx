@@ -105,8 +105,8 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
     <div
       className={`group relative ml-[-6px] flex h-[30px] w-[calc(100%+12px)] cursor-pointer items-center gap-2 rounded-md ${
         isBatchMode ? 'pl-4' : 'pl-[38px]'
-      } pr-2.5 text-[14px] font-normal transition-colors ${
-        task.isSelected
+      } ${!isBatchMode && !isRenaming ? 'pr-8' : 'pr-2.5'} text-[14px] font-normal transition-colors ${
+        isSelected
           ? 'bg-black/3 text-foreground dark:bg-white/4'
           : 'text-muted-foreground hover:bg-black/3 hover:text-foreground dark:hover:bg-white/4'
       }`}
@@ -115,7 +115,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
       onMouseLeave={() => setSuppressPinHover(false)}
       role="treeitem"
       aria-level={2}
-      aria-selected={task.isSelected}
+      aria-selected={isSelected}
     >
       {!isBatchMode && !isRenaming && (
         <Button

@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { Checkbox } from '@shared/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
 import {
   DropdownMenu,
@@ -215,22 +216,20 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         onSelect();
       }}
       className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-150 ${
-                isActive ? 'bg-black/4 dark:bg-white/5' : 'hover:bg-black/4 dark:hover:bg-white/5'
+        isSelected || isActive
+          ? 'bg-black/4 dark:bg-white/5'
+          : 'hover:bg-black/4 dark:hover:bg-white/5'
       }`}
     >
       {/* Content area */}
-      <div className="flex items-start">
+      <div className={`flex items-start ${!isBatchMode && !isRenaming ? 'pr-8' : ''}`}>
         {isBatchMode && (
           <div className="flex items-center mr-2 mt-0.5 shrink-0">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isSelected}
-              onChange={e => {
-                e.stopPropagation();
-                onToggleSelection();
-              }}
+              onCheckedChange={() => onToggleSelection()}
               onClick={e => e.stopPropagation()}
-              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
+              className="h-4 w-4 rounded cursor-pointer"
             />
           </div>
         )}
