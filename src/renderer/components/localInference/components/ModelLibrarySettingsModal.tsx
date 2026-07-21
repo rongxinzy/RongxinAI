@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
-import { Label } from '@shared/components/ui/label';
 import { FolderOpen, FolderUp, Settings2 } from 'lucide-react';
 
 import { i18nService } from '../../../services/i18n';
@@ -57,9 +56,6 @@ export function ModelLibrarySettingsModal({
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="llamacpp-model-library-directory">
-              {i18nService.t('localInferenceLibraryDirectory')}
-            </Label>
             <Input
               id="llamacpp-model-library-directory"
               value={draftModelsDir}

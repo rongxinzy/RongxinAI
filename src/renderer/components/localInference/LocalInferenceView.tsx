@@ -341,9 +341,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const {
     accessSettingsOpen,
     draftAllowLanAccess,
-    currentHost,
-    currentPort,
+    draftPort,
     exampleModelName,
+    setDraftPort,
     refreshServiceConfig,
     openAccessSettings,
     closeAccessSettings,
@@ -759,10 +759,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         saving={loading}
         allowLanAccess={draftAllowLanAccess}
         willRestartOnSave={isRunning}
-        currentHost={currentHost}
-        port={currentPort}
+        port={draftPort}
         exampleModelName={exampleModelName}
         onAllowLanAccessChange={setDraftAllowLanAccess}
+        onPortChange={setDraftPort}
         onClose={closeAccessSettings}
         onSave={saveAccessSettings}
       />
