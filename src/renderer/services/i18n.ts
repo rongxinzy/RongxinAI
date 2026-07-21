@@ -121,7 +121,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceAccessListenAddress: '监听地址：{host}',
     localInferenceAccessEndpoint: 'OpenAI 兼容入口：{endpoint}',
     localInferenceAccessRestartOnSaveTitle: '保存时会自动重启服务',
-    localInferenceAccessRestartRequiredTitle: '修改后需重启服务才能生效',
+    localInferenceAccessRestartRequiredTitle: '保存修改后会关闭当前服务',
     localInferenceAccessRequestExample: '请求示例',
     localInferenceAccessRequestExampleHint:
       '统一走一个服务端口，通过请求体里的 model 字段区分模型。',

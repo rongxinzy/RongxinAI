@@ -127,8 +127,8 @@ model: "${modelName}"`}
         </div>
 
         <DialogFooter className="items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-2 text-xs leading-5 text-muted-foreground">
-            <RefreshCw className="mt-0.5 size-3.5 shrink-0" />
+          <div className="flex min-w-0 items-center gap-2 text-xs leading-5 text-muted-foreground">
+            <RefreshCw className="size-3.5 shrink-0" />
             <div className="min-w-0">
               <span className="font-medium text-foreground">
                 {willRestartOnSave
