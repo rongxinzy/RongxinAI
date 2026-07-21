@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
 import { LlamaCppModelLaunchLogPhase } from '../../../../shared/llamacpp';
@@ -51,7 +51,7 @@ export function useModelLaunchLogs() {
 
       return {
         ...current,
-        visible: failed ? true : current.visible || !userClosedCurrentLaunchRef.current,
+        visible: current.visible,
         collapsed: failed ? false : current.collapsed,
         status: nextStatus,
         sessionId: current.sessionId ?? event.sessionId,
@@ -68,10 +68,14 @@ export function useModelLaunchLogs() {
     };
   }, [appendEvent]);
 
-  const beginModelLaunch = useCallback((modelName: string) => {
+  const beginModelLaunch = useCallback((
+    modelName: string,
+    options: { visible?: boolean } = {},
+  ) => {
+    const { visible = false } = options;
     userClosedCurrentLaunchRef.current = false;
     setState({
-      visible: true,
+      visible,
       collapsed: false,
       status: ModelLaunchLogPanelStatus.Starting,
       sessionId: null,
@@ -93,10 +97,32 @@ export function useModelLaunchLogs() {
   const markModelLaunchFailed = useCallback(() => {
     setState(current => ({
       ...current,
-      visible: true,
+      visible: current.visible,
       collapsed: false,
       status: ModelLaunchLogPanelStatus.Failed,
     }));
+  }, []);
+
+  const openPanelForModel = useCallback((modelName: string) => {
+    userClosedCurrentLaunchRef.current = false;
+    setState(current => {
+      if (current.modelName === modelName || !current.modelName) {
+        return {
+          ...current,
+          visible: true,
+          collapsed: false,
+          modelName,
+        };
+      }
+      return {
+        visible: true,
+        collapsed: false,
+        status: ModelLaunchLogPanelStatus.Idle,
+        sessionId: null,
+        modelName,
+        logs: [],
+      };
+    });
   }, []);
 
   const setCollapsed = useCallback((collapsed: boolean) => {
@@ -115,12 +141,20 @@ export function useModelLaunchLogs() {
   return {
     state,
     beginModelLaunch,
+    openPanelForModel,
     markModelLaunchSucceeded,
     markModelLaunchFailed,
     setCollapsed,
     closePanel,
     clearLogs,
   };
+}
+
+export function shouldCloseLaunchLogPanelForModel(
+  state: Pick<ModelLaunchLogPanelState, 'modelName'>,
+  modelName: string,
+): boolean {
+  return state.modelName === modelName;
 }
 
 export function shouldAcceptLaunchLogEvent(
