@@ -366,7 +366,29 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let thinkingContent = '';
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
+        let persistTimer: ReturnType<typeof setTimeout> | null = null;
+        const persistChatSnapshot = (force = false) => {
+          const persist = () => {
+            persistTimer = null;
+            const snapshot = store.getState().cowork.currentSession;
+            if (snapshot?.id === tempSessionId) {
+              void coworkService
+                .saveChatSession(snapshot)
+                .catch(error => console.error('[CoworkView] Failed to persist chat session:', error));
+            }
+          };
+          if (force) {
+            if (persistTimer) clearTimeout(persistTimer);
+            persist();
+          } else if (!persistTimer) {
+            persistTimer = setTimeout(persist, 250);
+          }
+        };
         try {
+          const created = await coworkService.saveChatSession(tempSession);
+          if (!created.success) {
+            throw new Error(created.error || 'Failed to create chat session');
+          }
           const transport = new ChatChatTransport({
             modelId: directChatModelId,
             localThinkingEnabled,
@@ -399,6 +421,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     }),
                   );
                   assistantMessageAdded = true;
+                  persistChatSnapshot();
                 }
                 break;
               case 'text-delta':
@@ -426,6 +449,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   });
                   flushContentBuffer();
                 }
+                persistChatSnapshot();
                 break;
               case 'reasoning-start':
                 if (!thinkingMessageAdded) {
@@ -442,6 +466,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     }),
                   );
                   thinkingMessageAdded = true;
+                  persistChatSnapshot();
                 }
                 break;
               case 'reasoning-delta':
@@ -469,6 +494,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   });
                   flushContentBuffer();
                 }
+                persistChatSnapshot();
                 break;
               case 'error':
                 throw new Error(chunk.errorText);
@@ -476,6 +502,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
           if (isPendingStartCancelled()) {
             dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'idle' }));
+            persistChatSnapshot(true);
             dispatch(setStreaming(false));
             return;
           }
@@ -516,9 +543,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
           dispatch(addSession(savedSession));
           // Persist chat session to SQLite via IPC
-          coworkService
-            .saveChatSession(savedSession)
-            .catch(err => console.error('[CoworkView] Failed to persist chat session:', err));
+          persistChatSnapshot(true);
         } catch (error) {
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
           dispatch(
@@ -534,7 +559,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               },
             }),
           );
+          persistChatSnapshot(true);
         } finally {
+          if (persistTimer) clearTimeout(persistTimer);
           dispatch(setStreaming(false));
           isStartingRef.current = false;
         }
@@ -633,6 +660,24 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const thinkingMsgId = `msg-${Date.now()}-thinking`;
       let assistantMessageAdded = false;
       let thinkingMessageAdded = false;
+      let persistTimer: ReturnType<typeof setTimeout> | null = null;
+      const persistChatSnapshot = (force = false) => {
+        const persist = () => {
+          persistTimer = null;
+          const snapshot = store.getState().cowork.currentSession;
+          if (snapshot?.id === currentSession.id) {
+            void coworkService
+              .saveChatSession(snapshot)
+              .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
+          }
+        };
+        if (force) {
+          if (persistTimer) clearTimeout(persistTimer);
+          persist();
+        } else if (!persistTimer) {
+          persistTimer = setTimeout(persist, 250);
+        }
+      };
       try {
         // Add user message to session first
         const userMsgId = `msg-${Date.now()}`;
@@ -647,6 +692,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             },
           }),
         );
+        const initialSnapshot = store.getState().cowork.currentSession;
+        if (initialSnapshot?.id === currentSession.id) {
+          await coworkService.saveChatSession(initialSnapshot);
+        }
 
         dispatch(setStreaming(true));
         const transport = new ChatChatTransport({
@@ -694,6 +743,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   }),
                 );
                 assistantMessageAdded = true;
+                persistChatSnapshot();
               }
               break;
             case 'text-delta':
@@ -721,6 +771,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 });
                 flushContentBuffer();
               }
+              persistChatSnapshot();
               break;
             case 'reasoning-start':
               if (!thinkingMessageAdded) {
@@ -737,6 +788,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   }),
                 );
                 thinkingMessageAdded = true;
+                persistChatSnapshot();
               }
               break;
             case 'reasoning-delta':
@@ -764,6 +816,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 });
                 flushContentBuffer();
               }
+              persistChatSnapshot();
               break;
             case 'error':
               throw new Error(chunk.errorText);
@@ -792,12 +845,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
         // Persist updated session (with new messages) to SQLite
-        const updatedSession = store.getState().cowork.currentSession;
-        if (updatedSession) {
-          coworkService
-            .saveChatSession(updatedSession)
-            .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
-        }
+        persistChatSnapshot(true);
       } catch (error) {
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
         dispatch(
@@ -814,7 +862,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }),
         );
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
+        persistChatSnapshot(true);
       } finally {
+        if (persistTimer) clearTimeout(persistTimer);
         dispatch(setStreaming(false));
         isContinuingRef.current = false;
       }
