@@ -3,9 +3,8 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
-import { Cog, Cpu, TriangleAlert } from 'lucide-react';
+import { Cpu, Settings, TriangleAlert } from 'lucide-react';
 import {
-  Briefcase,
   Clock,
   MessageCircle,
   PanelLeft,
@@ -57,8 +56,8 @@ const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
-  'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4';
-const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-black/6 hover:bg-black/6 dark:bg-white/[0.07] dark:hover:bg-white/[0.07]`;
+  'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4';
+const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-black/3 dark:bg-white/4`;
 const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -326,7 +325,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="pt-3 pb-3">
           <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
             <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-              <span className="text-sm font-bold text-muted-foreground select-none">知远</span>
+              <img src="logo.png" alt="知远" className="h-5 w-auto select-none" />
               {updateBadge}
             </div>
             <Button
@@ -340,7 +339,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <PanelLeft className="h-4 w-4" />
             </Button>
           </div>
-          <div className="mt-[5px] space-y-0.5 px-3">
+          <div className="mt-[5px] space-y-0.5 px-3 pb-3">
             <div
               className="relative h-7 w-full cursor-pointer"
               onClick={() => handleWorkModeChange(workMode !== 'chat')}
@@ -359,7 +358,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 style={{ left: '25%', transform: 'translate(-50%, -50%)' }}
               >
-                <Briefcase className="size-3.5" />
                 <span className="text-sm">{i18nService.t('workMode')}</span>
               </span>
               <span
@@ -371,7 +369,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 style={{ left: '75%', transform: 'translate(-50%, -50%)' }}
               >
-                <MessageCircle className="size-3.5" />
                 <span className="text-sm">{i18nService.t('chatMode')}</span>
               </span>
             </div>
@@ -597,7 +594,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         ) : (
-          <div className="space-y-1 px-3 pb-1 pt-1">
+          <div className="space-y-1 px-3 pb-3 pt-1">
             <div className="flex items-center gap-1">
               {!hideLogin && (
                 <div className="flex-1 min-w-0">
@@ -608,10 +605,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 variant="ghost"
                 onClick={() => onShowSettings()}
-                className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
+                className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
                 aria-label={i18nService.t('settings')}
               >
-                <Cog className="h-4 w-4 shrink-0" />
+                <Settings className="h-4 w-4 shrink-0" />
                 {i18nService.t('settings')}
               </Button>
             </div>

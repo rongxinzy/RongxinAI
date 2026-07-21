@@ -68,6 +68,9 @@ export const TOKEN_CONTRACT = {
   'gray-10': '--zy-gray-10',
   'gray-11': '--zy-gray-11',
 
+  // ── Focus ring ──
+  ring: '--zy-ring',
+
   // ── Radius ──
   radius: '--zy-radius',
 } as const;

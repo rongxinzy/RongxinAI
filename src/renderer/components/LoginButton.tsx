@@ -298,7 +298,7 @@ const LoginButton: React.FC = () => {
         type="button"
         variant="ghost"
         onClick={handleClick}
-        className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-foreground/80 transition-colors hover:bg-black/3 dark:hover:bg-white/4 cursor-pointer"
+        className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 cursor-pointer"
       >
         {isLoggedIn ? (
           <>

@@ -90,6 +90,15 @@
   --shadow-modal: 0 8px 30px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-popover: 0 4px 20px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
   --shadow-glow-accent: 0 0 20px var(--zy-primary-muted);
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  /* Map Tailwind's built-in shadow scale onto project shadow tiers
+     (literal values, no var chain — guaranteed to resolve in v4 @theme) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-2xl: 0 4px 20px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
 
   /* Animations */
   --animate-fade-in: fade-in 0.2s ease-out;
@@ -580,7 +589,7 @@ select::-ms-expand {
 }
 [data-slot='switch'][data-unchecked] {
   background-color: var(--zy-surface-raised);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-inset);
 }
 [data-slot='switch'][data-checked] {
   background-color: var(--zy-primary);
@@ -623,14 +632,14 @@ select::-ms-expand {
 [data-local-inference-tabs] [data-slot='tabs-trigger'][data-active] {
   background-color: var(--zy-primary);
   color: var(--zy-primary-foreground);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+  box-shadow: var(--shadow-card);
 }
 
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
    via the Tailwind plugin which uses var(--zy-*) directly. */
 [data-slot='dialog-content'] {
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  box-shadow: var(--shadow-modal);
 }
 [data-slot='dialog-footer'] {
   background-color: var(--zy-surface);
@@ -685,7 +694,7 @@ select::-ms-expand {
 }
 /* Work/Chat toggle — track color token (darker than sidebar bg-surface-raised #F0F1F4) */
 :root {
-  --work-chat-track-bg: #e5e7eb;
+  --work-chat-track-bg: rgb(237, 237, 236);
 }
 .dark {
   --work-chat-track-bg: #2d3039;
@@ -695,7 +704,7 @@ select::-ms-expand {
 [data-mode='work-chat'][data-slot='switch'][data-unchecked],
 [data-mode='work-chat'][data-slot='switch'][data-checked] {
   background-color: var(--work-chat-track-bg) !important;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: var(--shadow-inset) !important;
   border-color: var(--zy-border) !important;
   position: relative !important;
 }
@@ -705,24 +714,22 @@ select::-ms-expand {
 }
 /* Thumb: glass, centered at 25%/75%, crosses track center */
 [data-mode='work-chat'] [data-slot='switch-thumb'] {
-  width: calc(50% + 12px) !important;
-  height: calc(100% + 8px) !important;
+  width: calc(50% + 4px) !important;
+  height: calc(100% + 4px) !important;
   border-radius: 9999px !important;
-  box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.16),
-    0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: var(--shadow-card) !important;
   position: absolute !important;
   transition: left 200ms ease !important;
 }
 [data-mode='work-chat'] [data-slot='switch-thumb'][data-unchecked] {
-  left: -6px;
-  top: -4px;
+  left: -2px;
+  top: -2px;
   transform: none;
   translate: none !important;
 }
 [data-mode='work-chat'] [data-slot='switch-thumb'][data-checked] {
-  left: calc(50% - 6px);
-  top: -4px;
+  left: calc(50% - 2px);
+  top: -2px;
   transform: none;
   translate: none !important;
 }

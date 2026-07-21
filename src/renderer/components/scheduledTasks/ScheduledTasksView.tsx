@@ -190,17 +190,17 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         className="flex-1 min-h-0 flex flex-col"
       >
         <div className="max-w-2xl mx-auto w-full px-4 mt-3">
-          <TabsList className="shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)]">
-            <TabsTrigger value="create" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+          <TabsList className="shadow-inset">
+            <TabsTrigger value="create" className="data-active:shadow-elevated">
               <Plus />
               {i18nService.t('scheduledTasksNewTask')}
             </TabsTrigger>
-            <TabsTrigger value="tasks" className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+            <TabsTrigger value="tasks" className="data-active:shadow-elevated">
               {i18nService.t('scheduledTasksTabTasks')}
             </TabsTrigger>
             <TabsTrigger
               value="history"
-              className="data-active:shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+              className="data-active:shadow-elevated"
             >
               {i18nService.t('scheduledTasksTabHistory')}
             </TabsTrigger>

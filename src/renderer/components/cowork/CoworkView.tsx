@@ -1030,19 +1030,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         <div className="relative max-w-5xl w-full min-w-[320px] mx-auto px-4 pt-[15vh] pb-8 space-y-10">
           {/* Welcome Section - staggered entrance animation */}
           <div className="text-center space-y-5">
-            <img src="logo.png" alt="logo" className="w-16 h-16 mx-auto animate-fade-in-up" />
-            <h2
-              className="text-3xl font-bold tracking-tight text-foreground animate-fade-in-up"
-              style={{ animationDelay: '60ms', animationFillMode: 'both' }}
-            >
-              {i18nService.t('coworkWelcome')}
-            </h2>
-            <p
-              className="text-sm text-muted-foreground max-w-md mx-auto animate-fade-in-up"
-              style={{ animationDelay: '120ms', animationFillMode: 'both' }}
-            >
-              {i18nService.t('coworkDescription')}
-            </p>
+            <img src="logo.png" alt="logo" className="h-16 w-auto mx-auto animate-fade-in-up" />
+            {workMode === 'work' && (
+              <p
+                className="text-sm text-muted-foreground max-w-md mx-auto animate-fade-in-up"
+                style={{ animationDelay: '120ms', animationFillMode: 'both' }}
+              >
+                全面链接本地文件，让生活和工作更智能
+              </p>
+            )}
           </div>
 
           {/* Prompt Input Area - Large version with folder selector */}
