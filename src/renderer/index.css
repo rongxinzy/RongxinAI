@@ -356,11 +356,6 @@ blockquote {
   margin: 1em 0;
 }
 
-.chat-message {
-  content-visibility: auto;
-  contain-intrinsic-size: 500px;
-}
-
 :root {
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB',

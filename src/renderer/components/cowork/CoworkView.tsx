@@ -61,6 +61,30 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   updateBadge,
 }) => {
   const dispatch = useDispatch();
+
+  // ── RAF-batch content buffer ──
+  // Chat-mode text-delta/reasoning-delta dispatches are throttled
+  // through a Map keyed by messageId. Each key always holds the
+  // latest content for that message; a single rAF flushes all keys
+  // at most once per frame. This prevents flooding Redux on fast
+  // streams (which caused Maximum update depth exceeded crashes).
+  const contentBuffer = useRef(new Map<
+    string,
+    { sessionId: string; messageId: string; content: string; metadata?: Record<string, unknown> }
+  >()).current;
+  const contentRafRef = useRef<number | null>(null);
+  const flushContentBuffer = React.useCallback(() => {
+    // Already scheduled — latest content for each messageId is already buffered.
+    if (contentRafRef.current !== null) return;
+    contentRafRef.current = requestAnimationFrame(() => {
+      contentRafRef.current = null;
+      const snapshot = Array.from(contentBuffer.values());
+      contentBuffer.clear();
+      for (const u of snapshot) {
+        dispatch(updateMessageContent(u));
+      }
+    });
+  }, [dispatch, contentBuffer]);
   const isMac = window.electron.platform === 'darwin';
   const [isInitialized, setIsInitialized] = useState(false);
   const [openClawStatus, setOpenClawStatus] = useState<OpenClawEngineStatus | null>(null);
@@ -394,14 +418,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   );
                   assistantMessageAdded = true;
                 } else {
-                  dispatch(
-                    updateMessageContent({
-                      sessionId: tempSessionId,
-                      messageId: assistantMsgId,
-                      content: assistantContent,
-                      metadata: { isStreaming: true, isFinal: false },
-                    }),
-                  );
+                  contentBuffer.set(assistantMsgId, {
+                    sessionId: tempSessionId,
+                    messageId: assistantMsgId,
+                    content: assistantContent,
+                    metadata: { isStreaming: true, isFinal: false },
+                  });
+                  flushContentBuffer();
                 }
                 break;
               case 'reasoning-start':
@@ -438,14 +461,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   );
                   thinkingMessageAdded = true;
                 } else {
-                  dispatch(
-                    updateMessageContent({
-                      sessionId: tempSessionId,
-                      messageId: thinkingMsgId,
-                      content: thinkingContent,
-                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                    }),
-                  );
+                  contentBuffer.set(thinkingMsgId, {
+                    sessionId: tempSessionId,
+                    messageId: thinkingMsgId,
+                    content: thinkingContent,
+                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                  });
+                  flushContentBuffer();
                 }
                 break;
               case 'error':
@@ -691,14 +713,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 );
                 assistantMessageAdded = true;
               } else {
-                dispatch(
-                  updateMessageContent({
-                    sessionId: currentSession.id,
-                    messageId: assistantMsgId,
-                    content: assistantContent,
-                    metadata: { isStreaming: true, isFinal: false },
-                  }),
-                );
+                contentBuffer.set(assistantMsgId, {
+                  sessionId: currentSession.id,
+                  messageId: assistantMsgId,
+                  content: assistantContent,
+                  metadata: { isStreaming: true, isFinal: false },
+                });
+                flushContentBuffer();
               }
               break;
             case 'reasoning-start':
@@ -735,14 +756,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 );
                 thinkingMessageAdded = true;
               } else {
-                dispatch(
-                  updateMessageContent({
-                    sessionId: currentSession.id,
-                    messageId: thinkingMsgId,
-                    content: thinkingContent,
-                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                  }),
-                );
+                contentBuffer.set(thinkingMsgId, {
+                  sessionId: currentSession.id,
+                  messageId: thinkingMsgId,
+                  content: thinkingContent,
+                  metadata: { isStreaming: true, isFinal: false, isThinking: true },
+                });
+                flushContentBuffer();
               }
               break;
             case 'error':
