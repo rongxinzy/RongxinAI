@@ -35,6 +35,9 @@ type LlamaCppRouterModel = {
   status?: {
     value?: string;
     args?: string[];
+    n_ctx?: number;
+    n_ctx_seq?: number;
+    kv_unified?: boolean;
     failed?: boolean;
   };
   meta?: {
@@ -251,8 +254,7 @@ function toLlamaCppModel(
   const statusValue = model.status?.failed ? LlamaCppModelStatus.Error : model.status?.value;
   const status = isLlamaCppModelStatus(statusValue) ? statusValue : LlamaCppModelStatus.Unloaded;
   const trainedContextLength = model.meta?.n_ctx_train;
-  const runtimeContextLength =
-    parseRuntimeContextLength(model.status?.args) ?? fallbackRuntimeContextLength;
+  const runtimeContextLength = resolveRuntimeContextLength(model.status, fallbackRuntimeContextLength);
   return {
     name,
     id: name,
@@ -274,6 +276,24 @@ function toLlamaCppModel(
       context_length: trainedContextLength,
     },
   };
+}
+
+function normalizeRuntimeContextLength(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function resolveRuntimeContextLength(
+  status: LlamaCppRouterModel['status'],
+  fallbackRuntimeContextLength?: number,
+): number | undefined {
+  const totalContextLength = normalizeRuntimeContextLength(status?.n_ctx);
+  const slotContextLength = normalizeRuntimeContextLength(status?.n_ctx_seq);
+  const args = status?.args ?? [];
+  const unifiedKv = status?.kv_unified !== false && !args.includes('--no-kv-unified');
+
+  return unifiedKv
+    ? totalContextLength ?? slotContextLength ?? parseRuntimeContextLength(args) ?? fallbackRuntimeContextLength
+    : slotContextLength ?? totalContextLength ?? parseRuntimeContextLength(args) ?? fallbackRuntimeContextLength;
 }
 
 function parseRuntimeContextLength(args: string[] | undefined): number | undefined {

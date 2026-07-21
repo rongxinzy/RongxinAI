@@ -62,6 +62,8 @@ export function buildLlamaServerArgs(
     args.push(config.cachePrompt ? '--cache-prompt' : '--no-cache-prompt');
   }
   appendArg(args, '--parallel', config.parallel);
+  if (config.kvUnified === true) args.push('--kv-unified');
+  if (config.kvUnified === false) args.push('--no-kv-unified');
   appendArg(args, '--batch-size', config.batchSize);
   appendArg(args, '--ubatch-size', config.ubatchSize);
   appendArg(args, '--gpu-layers', config.gpuLayers);
@@ -115,6 +117,7 @@ export function filterLlamaCppServiceConfigByRuntimeCapabilities(
   clearWhenUnsupported('timeout', LlamaCppServiceConfigFieldKey.Timeout);
   clearWhenUnsupported('threadsHttp', LlamaCppServiceConfigFieldKey.ThreadsHttp);
   clearWhenUnsupported('parallel', LlamaCppServiceConfigFieldKey.Parallel);
+  clearWhenUnsupported('kvUnified', LlamaCppServiceConfigFieldKey.KvUnified);
   clearWhenUnsupported('cachePrompt', LlamaCppServiceConfigFieldKey.CachePrompt);
   clearWhenUnsupported('cacheReuse', LlamaCppServiceConfigFieldKey.CacheReuse);
   clearWhenUnsupported('cacheRam', LlamaCppServiceConfigFieldKey.CacheRam);
@@ -320,6 +323,8 @@ export function buildLlamaCppServiceConfigFieldSupport(input: {
     [LlamaCppServiceConfigFieldKey.Timeout]: unknownHelpSupport || hasFlag('--timeout'),
     [LlamaCppServiceConfigFieldKey.ThreadsHttp]: unknownHelpSupport || hasFlag('--threads-http'),
     [LlamaCppServiceConfigFieldKey.Parallel]: unknownHelpSupport || hasFlag('--parallel'),
+    [LlamaCppServiceConfigFieldKey.KvUnified]:
+      unknownHelpSupport || hasFlag('--kv-unified', '--no-kv-unified'),
     [LlamaCppServiceConfigFieldKey.CachePrompt]:
       unknownHelpSupport || hasFlag('--cache-prompt', '--no-cache-prompt'),
     [LlamaCppServiceConfigFieldKey.CacheReuse]: unknownHelpSupport || hasFlag('--cache-reuse'),

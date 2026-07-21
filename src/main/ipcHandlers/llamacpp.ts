@@ -85,7 +85,7 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   cacheReuse: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheReuse ?? '256',
   cacheRam: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheRam ?? '8192',
   ctxSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ctxSize ?? '4096',
-  parallel: DEFAULT_LLAMACPP_SERVICE_CONFIG.parallel ?? '1',
+  parallel: DEFAULT_LLAMACPP_SERVICE_CONFIG.parallel ?? '2',
   batchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.batchSize ?? '512',
   ubatchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ubatchSize ?? '512',
   gpuLayers: DEFAULT_LLAMACPP_SERVICE_CONFIG.gpuLayers ?? 'auto',
@@ -800,6 +800,13 @@ export function getLlamaCppModelPreferences(store: SqliteStore): LlamaCppModelPr
 
 function migrateLegacyLlamaCppConfig(store: SqliteStore): void {
   migrateLegacyServiceConfig(store);
+  enforceLlamaCppParallelTwo(store);
+}
+
+export function enforceLlamaCppParallelTwo(store: SqliteStore): void {
+  const existing = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY);
+  if (!existing || existing.parallel === '2') return;
+  store.set(LLAMACPP_SERVICE_CONFIG_KEY, { ...existing, parallel: '2' });
 }
 
 function migrateLegacyServiceConfig(store: SqliteStore): void {
@@ -1059,6 +1066,7 @@ export function sanitizeLlamaCppServiceConfig(
   if (checkpointEveryNt) next.checkpointEveryNt = checkpointEveryNt;
   if (ctxSize) next.ctxSize = ctxSize;
   if (parallel) next.parallel = parallel;
+  if (typeof config?.kvUnified === 'boolean') next.kvUnified = config.kvUnified;
   if (batchSize) next.batchSize = batchSize;
   if (ubatchSize) next.ubatchSize = ubatchSize;
   if (gpuLayers) next.gpuLayers = gpuLayers;
