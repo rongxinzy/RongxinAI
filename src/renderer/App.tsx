@@ -42,6 +42,8 @@ import {
 import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
+import { WorkMode } from './store/workMode/constants';
+import { setWorkMode } from './store/workMode/workModeSlice';
 import type { CoworkPermissionResult } from './types/cowork';
 
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
@@ -154,6 +156,7 @@ const App: React.FC = () => {
         mark('authService.init done');
 
         const config = await configService.getConfig();
+        dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
         const apiConfig: ApiConfig = {
           apiKey: config.api.key,
           baseUrl: config.api.baseUrl,

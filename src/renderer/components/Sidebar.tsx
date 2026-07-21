@@ -6,7 +6,7 @@ import { cn } from '@shared/lib/utils';
 import { Cpu, Settings, TriangleAlert } from 'lucide-react';
 import { Clock, MessageCircle, PanelLeft, Pencil, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { agentService } from '../services/agent';
 import { configService } from '../services/config';
@@ -18,6 +18,9 @@ import {
   selectCurrentSessionId,
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
+import { selectWorkMode } from '../store/selectors/workModeSelectors';
+import { WorkMode } from '../store/workMode/constants';
+import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
@@ -66,10 +69,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   updateBadge,
   hideLogin,
 }) => {
+  const dispatch = useDispatch();
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const allSessions = useSelector(selectCoworkSessions);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const unreadSessionIds = useSelector(selectUnreadSessionIds);
+  const workMode = useSelector(selectWorkMode);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -78,32 +83,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [agentScrollEdges, setAgentScrollEdges] = useState({ top: false, bottom: false });
-  const [workMode, setWorkMode] = useState<'work' | 'chat'>(
-    () => configService.getConfig().workMode ?? 'work',
-  );
-
   const handleWorkModeChange = useCallback((checked: boolean) => {
-    const mode = checked ? 'chat' : 'work';
-    setWorkMode(mode);
+    const mode = checked ? WorkMode.Chat : WorkMode.Work;
+    dispatch(setWorkMode(mode));
     setIsBatchMode(false);
     setSelectedIds(new Set());
     setShowBatchDeleteConfirm(false);
     void configService.updateConfig({ workMode: mode });
-  }, []);
+  }, [dispatch]);
 
   // Filter sessions by workMode — chat sessions only visible in chat mode
   const sessions = React.useMemo(
     () =>
-      workMode === 'chat'
-        ? allSessions.filter(s => s.mode === 'chat')
-        : allSessions.filter(s => s.mode !== 'chat'),
+      workMode === WorkMode.Chat
+        ? allSessions.filter(s => s.mode === WorkMode.Chat)
+        : allSessions.filter(s => s.mode !== WorkMode.Chat),
     [allSessions, workMode],
   );
 
   // Chat mode: map sessions to AgentSidebarTaskNode for AgentTaskRow rendering
   const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
   const chatTaskNodes = React.useMemo(() => {
-    if (workMode !== 'chat') return [];
+    if (workMode !== WorkMode.Chat) return [];
     const sorted = sortAgentSidebarTasks(sessions);
     return sorted.map(s => toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet));
   }, [workMode, sessions, currentSessionId, unreadSessionIdSet]);
@@ -212,7 +213,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   useEffect(() => {
-    if (workMode !== 'chat') return;
+    if (workMode !== WorkMode.Chat) return;
     handleVisibleSessionsChange(chatTaskNodes.map(task => task.id));
   }, [chatTaskNodes, handleVisibleSessionsChange, workMode]);
 
@@ -333,17 +334,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="mt-[5px] space-y-0.5 px-3 pb-3">
             <div
               className="relative h-7 w-full cursor-pointer"
-              onClick={() => handleWorkModeChange(workMode !== 'chat')}
+              onClick={() => handleWorkModeChange(workMode !== WorkMode.Chat)}
             >
               <Switch
-                checked={workMode === 'chat'}
+                checked={workMode === WorkMode.Chat}
                 onCheckedChange={handleWorkModeChange}
                 data-mode="work-chat"
               />
               <span
                 className={cn(
                   'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
-                  workMode === 'work'
+                  workMode === WorkMode.Work
                     ? 'font-semibold text-foreground'
                     : 'font-normal text-muted-foreground opacity-50',
                 )}
@@ -354,7 +355,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span
                 className={cn(
                   'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
-                  workMode === 'chat'
+                  workMode === WorkMode.Chat
                     ? 'font-semibold text-foreground'
                     : 'font-normal text-muted-foreground opacity-50',
                 )}
@@ -371,10 +372,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className={sidebarNavItemClassName}
               >
                 <Pencil className={sidebarCreateIconClassName} />
-                {workMode === 'chat' ? i18nService.t('newChat') : '新建任务'}
+                {workMode === WorkMode.Chat ? i18nService.t('newChat') : '新建任务'}
               </Button>
             </div>
-            {workMode !== 'chat' && (
+            {workMode !== WorkMode.Chat && (
               <Button
                 type="button"
                 variant="ghost"
@@ -403,9 +404,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               className={sidebarNavItemClassName}
             >
               <Search className="h-4 w-4 shrink-0" />
-              {i18nService.t(workMode === 'chat' ? 'searchChats' : 'search')}
+              {i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
             </Button>
-            {workMode !== 'chat' && (
+            {workMode !== WorkMode.Chat && (
               <Button
                 type="button"
                 variant="ghost"
@@ -424,7 +425,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {i18nService.t('scheduledTasks')}
               </Button>
             )}
-            {workMode !== 'chat' && (
+            {workMode !== WorkMode.Chat && (
               <>
                 <Button
                   type="button"
@@ -453,7 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
             onScroll={handleAgentScroll}
           >
-            {workMode !== 'chat' && (
+            {workMode !== WorkMode.Chat && (
               <MyAgentSidebarTree
                 isBatchMode={isBatchMode}
                 selectedIds={selectedIds}
@@ -465,7 +466,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 workMode={workMode}
               />
             )}
-            {workMode === 'chat' && (
+            {workMode === WorkMode.Chat && (
               <>
                 <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
                   <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">

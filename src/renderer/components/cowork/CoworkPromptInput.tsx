@@ -23,6 +23,7 @@ import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { selectDraftPrompts } from '../../store/selectors/coworkSelectors';
+import { selectWorkMode } from '../../store/selectors/workModeSelectors';
 import {
   addDraftAttachment,
   clearDraftAttachments,
@@ -37,6 +38,7 @@ import {
   setSelectedModel,
 } from '../../store/slices/modelSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
+import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
@@ -198,6 +200,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       (state: RootState) => state.model.defaultSelectedModel,
     );
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
+    const workMode = useSelector(selectWorkMode);
     const persistedExpertIds = useMemo(
       () => currentSession?.experts?.map(expert => expert.expertId) ?? [],
       [currentSession?.experts],
@@ -238,6 +241,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const dragDepthRef = useRef(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const modelPatchRequestIdRef = useRef(0);
+    const workModeRef = useRef(workMode);
+    workModeRef.current = workMode;
 
     // 暴露方法给父组件
     React.useImperativeHandle(ref, () => ({
@@ -375,33 +380,29 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       persistedExpertIds,
     ]);
 
-    useEffect(() => {
-      const loadSkills = async () => {
-        const loadedSkills = await skillService.loadSkills();
-        const workMode = configService.getConfig().workMode ?? 'work';
-        dispatch(
-          setSkills(
-            workMode === 'chat' ? loadedSkills.filter(s => CHAT_SKILL_IDS.has(s.id)) : loadedSkills,
-          ),
-        );
-      };
-      loadSkills();
+    const syncSkills = useCallback(async () => {
+      const loadedSkills = await skillService.loadSkills();
+      dispatch(
+        setSkills(
+          workModeRef.current === WorkMode.Chat
+            ? loadedSkills.filter(skill => CHAT_SKILL_IDS.has(skill.id))
+            : loadedSkills,
+        ),
+      );
     }, [dispatch]);
 
     useEffect(() => {
-      const unsubscribe = skillService.onSkillsChanged(async () => {
-        const loadedSkills = await skillService.loadSkills();
-        const workMode = configService.getConfig().workMode ?? 'work';
-        dispatch(
-          setSkills(
-            workMode === 'chat' ? loadedSkills.filter(s => CHAT_SKILL_IDS.has(s.id)) : loadedSkills,
-          ),
-        );
+      void syncSkills();
+    }, [syncSkills, workMode]);
+
+    useEffect(() => {
+      const unsubscribe = skillService.onSkillsChanged(() => {
+        void syncSkills();
       });
       return () => {
         unsubscribe();
       };
-    }, [dispatch]);
+    }, [syncSkills]);
 
     // Auto-resize textarea
     useEffect(() => {
