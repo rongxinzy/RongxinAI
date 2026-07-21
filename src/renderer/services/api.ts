@@ -6,6 +6,11 @@ import {
   buildLocalThinkingRequestParams,
   type DirectChatRequestOptions,
 } from './localThinkingRequest';
+import {
+  LOCAL_INFERENCE_SLOT_RETRY_DELAYS_MS,
+  shouldRetryLocalInferenceSlot,
+  waitForLocalInferenceSlot,
+} from './localInferenceSlotRetry';
 
 export interface ApiConfig {
   apiKey: string;
@@ -432,6 +437,35 @@ class ApiService {
         options,
       );
     } catch (error) {
+      if (
+        provider === ProviderName.LlamaCpp &&
+        error instanceof ApiError &&
+        shouldRetryLocalInferenceSlot(error)
+      ) {
+        let lastError = error;
+        for (const delayMs of LOCAL_INFERENCE_SLOT_RETRY_DELAYS_MS) {
+          await waitForLocalInferenceSlot(delayMs);
+          try {
+            return await this.chatWithOpenAICompatible(
+              userMessage,
+              onProgress,
+              history,
+              selectedModel.id,
+              effectiveConfig,
+              supportsImages,
+              provider,
+              options,
+            );
+          } catch (retryError) {
+            if (!(retryError instanceof ApiError) || !shouldRetryLocalInferenceSlot(retryError)) {
+              throw retryError;
+            }
+            lastError = retryError;
+          }
+        }
+        throw lastError;
+      }
+
       // Auto-retry once for GitHub Copilot auth errors (401 / token expired)
       if (
         provider === 'github-copilot' &&

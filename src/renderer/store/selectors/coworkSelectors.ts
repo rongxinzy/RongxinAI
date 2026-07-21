@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 
+import { CoworkSessionStatusValue } from '../../types/cowork';
 import type { RootState } from '../index';
 
 // --- Primitive (identity) selectors ---
@@ -9,7 +10,8 @@ import type { RootState } from '../index';
 export const selectCoworkSessions = (state: RootState) => state.cowork.sessions;
 export const selectCurrentSessionId = (state: RootState) => state.cowork.currentSessionId;
 export const selectCurrentSession = (state: RootState) => state.cowork.currentSession;
-export const selectIsStreaming = (state: RootState) => state.cowork.isStreaming;
+export const selectIsStreaming = (state: RootState) =>
+  state.cowork.currentSession?.status === CoworkSessionStatusValue.Running;
 export const selectIsCoworkActive = (state: RootState) => state.cowork.isCoworkActive;
 export const selectRemoteManaged = (state: RootState) => state.cowork.remoteManaged;
 export const selectCoworkConfig = (state: RootState) => state.cowork.config;
