@@ -57,20 +57,30 @@ if (-not (Test-Path 'C:\nodejs\node.exe')) {
 Add-ToPath 'C:\nodejs'
 Add-ToPath 'C:\Program Files (x86)\NSIS'
 
-# 按 bun.lock 安装项目依赖（包管理器已迁移到 Bun），并安装 pnpm 供 OpenClaw 构建步骤使用。
-npm install -g bun --registry https://registry.npmmirror.com
+# 优先复用宿主机上已安装的全局工具（bun、pnpm），缺失时才安装。
+$globalNpmPrefix = (& npm prefix -g).Trim()
+if ($globalNpmPrefix) {
+  Add-ToPath $globalNpmPrefix
+}
+if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+  Write-Host 'bun not found in PATH, installing...'
+  npm install -g bun --registry https://registry.npmmirror.com
+  # npm -g 安装后重新刷新 PATH，确保刚装的 bun 可被解析。
+  $globalNpmPrefix = (& npm prefix -g).Trim()
+  if ($globalNpmPrefix) {
+    Add-ToPath $globalNpmPrefix
+  }
+}
 bun install
-npm install -g pnpm --registry https://registry.npmmirror.com
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+  npm install -g pnpm --registry https://registry.npmmirror.com
+}
 
 # CI 中 Vite 渲染构建需要超过默认 4GB 堆内存；在 npm run 之前设置确保生效。
 $env:NODE_OPTIONS = '--max-old-space-size=6144'
 Write-Host "NODE_OPTIONS set to $env:NODE_OPTIONS"
 
 pnpm config set registry https://registry.npmmirror.com
-$globalNpmPrefix = (& npm prefix -g).Trim()
-if ($globalNpmPrefix) {
-  Add-ToPath $globalNpmPrefix
-}
 
 $preinstalledPython = 'C:\ci-cache\python-embed'
 $pythonDir = 'resources\python-win'
