@@ -7,8 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { Separator } from '@shared/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { ArrowLeft, PanelLeft, Pencil, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -198,17 +196,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             <TabsTrigger value="tasks" className="data-active:shadow-elevated">
               {i18nService.t('scheduledTasksTabTasks')}
             </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="data-active:shadow-elevated"
-            >
+            <TabsTrigger value="history" className="data-active:shadow-elevated">
               {i18nService.t('scheduledTasksTabHistory')}
             </TabsTrigger>
           </TabsList>
-        </div>
-
-        <div className="max-w-2xl mx-auto w-full px-4">
-          <Separator />
         </div>
 
         <TabsContent value="create" className="flex-1 min-h-0 overflow-y-auto">
@@ -261,9 +252,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
         <TabsContent value="history" className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-2xl mx-auto w-full px-4">
-            <ScrollArea className="h-[500px] rounded-lg border border-border bg-card p-4">
-              <AllRunsHistory />
-            </ScrollArea>
+            <AllRunsHistory />
           </div>
         </TabsContent>
       </Tabs>

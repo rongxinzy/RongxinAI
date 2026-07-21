@@ -1,6 +1,6 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Card } from '@shared/components/ui/card';
+import { Card, CardContent, CardTitle } from '@shared/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,14 +8,6 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@shared/components/ui/table';
 import { cn } from '@shared/lib/utils';
 import { Clock, EllipsisVertical } from 'lucide-react';
 import React from 'react';
@@ -50,105 +42,96 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
   const statusLabel = i18nService.t(getStatusLabelKey(displayStatus));
+  const nextRunLabel =
+    task.enabled && task.state.nextRunAtMs !== null
+      ? formatNextRunRelative(task.state.nextRunAtMs)
+      : null;
 
   return (
-    <TableRow
-      className="cursor-pointer hover:bg-muted"
+    <Card
+      className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3 ring-0 transition-colors hover:bg-muted"
       onClick={() => dispatch(selectTask(task.id))}
     >
-      <TableCell className="max-w-[180px] min-w-0">
-        <div
+      <CardContent className="flex min-w-0 flex-1 items-center gap-3 p-0">
+        <CardTitle
           className={cn(
-            'text-sm truncate',
+            'min-w-0 flex-1 truncate',
             task.enabled ? 'text-foreground' : 'text-muted-foreground',
           )}
         >
           {task.name}
-        </div>
-        {task.description && (
-          <div className="text-xs truncate text-muted-foreground">{task.description}</div>
-        )}
-      </TableCell>
+        </CardTitle>
 
-      <TableCell>
-        <div className="text-sm truncate text-muted-foreground">
-          {formatScheduleLabel(task.schedule)}
+        <div className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <span>{formatScheduleLabel(task.schedule)}</span>
+          {nextRunLabel && <span className="text-xs text-muted-foreground/60">{nextRunLabel}</span>}
         </div>
-        {task.enabled && task.state.nextRunAtMs !== null && (
-          <div className="text-xs truncate text-muted-foreground/60 mt-0.5">
-            {formatNextRunRelative(task.state.nextRunAtMs)}
-          </div>
-        )}
-      </TableCell>
 
-      <TableCell className="w-28" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between gap-2">
-          <Badge
-            variant="outline"
-            className={
-              displayStatus
-                ? statusTextClass[displayStatus] || 'text-muted-foreground'
-                : 'text-muted-foreground'
-            }
-          >
-            {statusLabel}
-          </Badge>
-          <Switch
-            checked={task.enabled}
-            onCheckedChange={(checked: boolean) => {
-              void scheduledTaskService.toggleTask(task.id, checked);
-            }}
-          />
-        </div>
-      </TableCell>
+        <Badge
+          className={
+            displayStatus
+              ? statusTextClass[displayStatus] || 'text-muted-foreground'
+              : 'text-muted-foreground'
+          }
+          variant="outline"
+        >
+          {statusLabel}
+        </Badge>
 
-      <TableCell className="w-10 text-center">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="ghost" size="icon" />}
-            onClick={(e: React.MouseEvent) => e.stopPropagation()}
-          >
-            <EllipsisVertical />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-card">
-            {task.state.runningAtMs ? (
-              <DropdownMenuItem disabled>
-                {i18nService.t('scheduledTasksStatusRunning')}
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                className="text-muted-foreground"
-                onClick={(e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  void scheduledTaskService.runManually(task.id);
-                }}
-              >
-                {i18nService.t('scheduledTasksRun')}
-              </DropdownMenuItem>
-            )}
+        <Switch
+          checked={task.enabled}
+          onClick={e => e.stopPropagation()}
+          onCheckedChange={(checked: boolean) => {
+            void scheduledTaskService.toggleTask(task.id, checked);
+          }}
+        />
+      </CardContent>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon" className="shrink-0" />}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          <EllipsisVertical />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="bg-card">
+          {task.state.runningAtMs ? (
+            <DropdownMenuItem disabled>
+              {i18nService.t('scheduledTasksStatusRunning')}
+            </DropdownMenuItem>
+          ) : (
             <DropdownMenuItem
               className="text-muted-foreground"
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
-                dispatch(selectTask(task.id));
-                dispatch(setViewMode('edit'));
+                void scheduledTaskService.runManually(task.id);
               }}
             >
-              {i18nService.t('scheduledTasksEdit')}
+              {i18nService.t('scheduledTasksRun')}
             </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                onRequestDelete(task.id, task.name);
-              }}
-            >
-              {i18nService.t('scheduledTasksDelete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </TableCell>
-    </TableRow>
+          )}
+          <DropdownMenuItem
+            className="text-muted-foreground"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              dispatch(selectTask(task.id));
+              dispatch(setViewMode('edit'));
+            }}
+          >
+            {i18nService.t('scheduledTasksEdit')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onRequestDelete(task.id, task.name);
+            }}
+          >
+            {i18nService.t('scheduledTasksDelete')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </Card>
   );
 };
 
@@ -185,31 +168,11 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   }
 
   return (
-    <Card className="bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-muted-foreground">
-              {i18nService.t('scheduledTasksListColTitle')}
-            </TableHead>
-            <TableHead className="text-muted-foreground">
-              {i18nService.t('scheduledTasksListColSchedule')}
-            </TableHead>
-            <TableHead className="text-muted-foreground w-28">
-              {i18nService.t('scheduledTasksListColStatus')}
-            </TableHead>
-            <TableHead className="text-muted-foreground w-10">
-              {i18nService.t('scheduledTasksListColMore')}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tasks.map(task => (
-            <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+    <div className="flex flex-col gap-3">
+      {tasks.map(task => (
+        <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
+      ))}
+    </div>
   );
 };
 

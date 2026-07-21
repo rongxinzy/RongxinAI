@@ -10,7 +10,7 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { setViewMode } from '../../store/slices/scheduledTaskSlice';
-import TaskRunHistory from './TaskRunHistory';
+import AllRunsHistory from './AllRunsHistory';
 import {
   formatDateTime,
   formatDeliveryLabel,
@@ -27,7 +27,6 @@ interface TaskDetailProps {
 
 const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
   const dispatch = useDispatch();
-  const runs = useSelector((state: RootState) => state.scheduledTask.runs[task.id] ?? []);
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const [preflight, setPreflight] = useState<{
     hasChannel: boolean;
@@ -35,10 +34,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
     lastDeliveryErrors?: string[] | null;
     consecutiveErrors?: number;
   } | null>(null);
-
-  useEffect(() => {
-    void scheduledTaskService.loadRuns(task.id);
-  }, [task.id]);
 
   useEffect(() => {
     void scheduledTaskService.preflight(task.id).then(setPreflight);
@@ -196,9 +191,9 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
         )}
       </div>
 
-      <div className={sectionClass}>
+      <div className="flex flex-col gap-3">
         <h3 className={sectionTitleClass}>{i18nService.t('scheduledTasksRunHistory')}</h3>
-        <TaskRunHistory taskId={task.id} runs={runs} taskPrompt={promptText} />
+        <AllRunsHistory task={task} />
       </div>
     </div>
   );
