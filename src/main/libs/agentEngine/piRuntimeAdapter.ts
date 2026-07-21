@@ -89,7 +89,7 @@ interface ActivePiSession {
   sessionId: string;
   piSession: PiSession;
   abortController: AbortController;
-  authStorage: PiAuthStorage | null;
+  modelRuntime: PiModelRuntime | null;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
   /** Message id for the visible answer (text) bubble of the current turn. */
@@ -113,8 +113,8 @@ interface PiModules {
   DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
   getAgentDir: () => string;
   getModel: (provider: string, modelId: string) => unknown;
-  AuthStorage?: {
-    inMemory: () => PiAuthStorage;
+  ModelRuntime: {
+    create(): Promise<PiModelRuntime>;
   };
   completeSimple: (
     model: unknown,
@@ -127,13 +127,19 @@ interface PiResourceLoader {
   reload(): Promise<void>;
 }
 
-interface PiAuthStorage {
-  setRuntimeApiKey(provider: string, apiKey: string): void;
+interface PiModelRuntime {
+  registerProvider(provider: string, config: Record<string, unknown>): void;
+  setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
+  getModel(provider: string, modelId: string): unknown;
+  completeSimple?(
+    model: unknown,
+    context: { messages: Array<{ role: string; content: string }> },
+  ): Promise<{ content: Array<{ text: string }> }>;
 }
 
 type PiResolvedModel = {
   model: Record<string, unknown>;
-  authStorage: PiAuthStorage | null;
+  modelRuntime: PiModelRuntime | null;
   requestOptions?: {
     apiKey?: string;
   };
@@ -154,7 +160,7 @@ async function getPiModules(): Promise<PiModules> {
         DefaultResourceLoader:
           codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
         getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
-        AuthStorage: codingAgent.AuthStorage as PiModules['AuthStorage'],
+        ModelRuntime: codingAgent.ModelRuntime as PiModules['ModelRuntime'],
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
         completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
@@ -306,10 +312,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       sessionOptions.resourceLoader = resourceLoader;
 
       // Resolve model early — needed by both MCP proxy and subagent tool
-      const resolvedModel = resolvePiModel(pi, options.modelOverride);
+      const resolvedModel = await resolvePiModel(pi, options.modelOverride);
       sessionOptions.model = resolvedModel.model;
-      if (resolvedModel.authStorage) {
-        sessionOptions.authStorage = resolvedModel.authStorage;
+      if (resolvedModel.modelRuntime) {
+        sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
 
       // Build custom tools: MCP proxy + optional subagent for Team Leads
@@ -369,7 +375,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         sessionId,
         piSession: session,
         abortController,
-        authStorage: resolvedModel.authStorage,
+        modelRuntime: resolvedModel.modelRuntime,
         requestedSystemPrompt: options.systemPrompt?.trim() || '',
         assistantMessageId: null,
         thinkingMessageId: null,
@@ -486,10 +492,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     try {
       const pi = await getPiModules();
-      const resolvedModel = resolvePiModel(pi, patch.model, active.authStorage);
-      if (resolvedModel.authStorage) {
-        active.authStorage = resolvedModel.authStorage;
-      }
+      const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime);
+      active.modelRuntime = resolvedModel.modelRuntime;
       const model = resolvedModel.model;
       await active.piSession.setModel(model);
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
@@ -602,12 +606,16 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    */
   async chatDirect(prompt: string, modelId?: string): Promise<string> {
     const pi = await getPiModules();
-    const resolvedModel = resolvePiModel(pi, modelId);
-    const result = await pi.completeSimple(
-      resolvedModel.model,
-      { messages: [{ role: 'user', content: prompt }] },
-      resolvedModel.requestOptions,
-    );
+    const resolvedModel = await resolvePiModel(pi, modelId);
+    const result = resolvedModel.modelRuntime?.completeSimple
+      ? await resolvedModel.modelRuntime.completeSimple(resolvedModel.model, {
+          messages: [{ role: 'user', content: prompt }],
+        })
+      : await pi.completeSimple(
+          resolvedModel.model,
+          { messages: [{ role: 'user', content: prompt }] },
+          resolvedModel.requestOptions,
+        );
     return result.content
       .filter((c): c is { text: string } => 'text' in c)
       .map(c => c.text)
@@ -1243,7 +1251,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    */
   private buildSubagentTool(
     presetId: string,
-    resolvedModel: { model: Record<string, unknown>; authStorage: PiAuthStorage | null },
+    resolvedModel: { model: Record<string, unknown>; modelRuntime: PiModelRuntime | null },
     workspaceRoot?: string,
   ): Record<string, unknown> | null {
     const piAgentsDir = this.getPiAgentsDir();
@@ -1264,7 +1272,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     if (availableAgents.length === 0) return null;
 
     const agentList = availableAgents.map(a => `  - ${a.id}`).join('\n');
-    const { model, authStorage } = resolvedModel;
+    const { model, modelRuntime } = resolvedModel;
 
     return {
       name: 'subagent',
@@ -1350,8 +1358,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             subOptions.cwd as string,
             systemPrompt,
           );
-          if (authStorage) {
-            subOptions.authStorage = authStorage;
+          if (modelRuntime) {
+            subOptions.modelRuntime = modelRuntime;
           }
 
           const { session } = await pi.createAgentSession(subOptions);
@@ -1439,6 +1447,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
  */
 const DEFAULT_PI_CONTEXT_WINDOW = 32768;
 const DEFAULT_PI_MAX_TOKENS = 4096;
+const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
 
 const PI_BUILTIN_PROVIDER_ID = {
   [ProviderName.OpenAI]: 'openai',
@@ -1485,27 +1494,28 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
   };
 }
 
-function resolvePiAuthStorage(
+async function resolvePiLocalModelRuntime(
   pi: PiModules,
   resolution: ApiConfigResolution,
-  existingAuthStorage?: PiAuthStorage | null,
-): PiAuthStorage | null {
+  existingModelRuntime?: PiModelRuntime | null,
+): Promise<PiModelRuntime | null> {
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
-  if (!config?.apiKey || !providerMetadata?.providerName) {
-    return existingAuthStorage ?? null;
+  if (!config || !providerMetadata || !isLocalProviderName(providerMetadata.providerName)) {
+    return null;
   }
 
-  // Guard: pi.AuthStorage may be undefined if the pi-coding-agent package's
-  // exports changed at runtime (e.g. bundler tree-shaking or version mismatch).
-  if (!pi.AuthStorage) {
-    return existingAuthStorage ?? null;
-  }
-
-  const authStorage = existingAuthStorage ?? pi.AuthStorage.inMemory();
-  const piProviderId = resolvePiBuiltinProviderId(providerMetadata.providerName);
-  authStorage.setRuntimeApiKey(piProviderId ?? providerMetadata.providerName, config.apiKey);
-  return authStorage;
+  const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
+  const model = buildPiCustomModel(resolution);
+  const providerId = providerMetadata.providerName;
+  modelRuntime.registerProvider(providerId, {
+    name: providerId,
+    baseUrl: config.baseURL,
+    api: model.api,
+    models: [model],
+  });
+  await modelRuntime.setRuntimeApiKey(providerId, config.apiKey?.trim() || PI_LOCAL_API_KEY);
+  return modelRuntime;
 }
 
 function buildPiBuiltinModel(
@@ -1533,11 +1543,11 @@ function buildPiBuiltinModel(
   }
 }
 
-function resolvePiModel(
+async function resolvePiModel(
   pi: PiModules,
   modelRef?: string,
-  existingAuthStorage?: PiAuthStorage | null,
-): PiResolvedModel {
+  existingModelRuntime?: PiModelRuntime | null,
+): Promise<PiResolvedModel> {
   const normalizedModelRef = modelRef?.trim() || '';
   const resolution = normalizedModelRef
     ? resolveRawApiConfigForModelRef(normalizedModelRef)
@@ -1548,10 +1558,20 @@ function resolvePiModel(
   }
 
   const builtinModel = buildPiBuiltinModel(pi, resolution);
+  const modelRuntime = await resolvePiLocalModelRuntime(pi, resolution, existingModelRuntime);
+  const customModel = buildPiCustomModel(resolution);
+  const localModel = modelRuntime?.getModel(
+    resolution.providerMetadata.providerName,
+    resolution.config.model,
+  );
 
   return {
-    model: builtinModel ?? buildPiCustomModel(resolution),
-    authStorage: resolvePiAuthStorage(pi, resolution, existingAuthStorage),
+    model:
+      builtinModel ??
+      (localModel && typeof localModel === 'object'
+        ? (localModel as Record<string, unknown>)
+        : customModel),
+    modelRuntime,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
 }
