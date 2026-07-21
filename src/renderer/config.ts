@@ -1,5 +1,7 @@
 import { type ProviderConfig, ProviderRegistry } from '@shared/providers';
 
+import { WorkMode, type WorkMode as WorkModeValue } from './store/workMode/constants';
+
 // 配置类型定义
 export interface AppConfig {
   // API 配置
@@ -33,8 +35,8 @@ export interface AppConfig {
     port: number;
     isDevelopment: boolean;
   };
-  // 工作模式 ('work' | 'chat')
-  workMode?: 'work' | 'chat';
+  // 工作模式
+  workMode?: WorkModeValue;
   // 快捷键配置
   shortcuts?: {
     newChat: string;
@@ -77,7 +79,7 @@ export const defaultConfig: AppConfig = {
   providers: buildDefaultProviders(),
   theme: 'system',
   language: 'zh',
-  workMode: 'work',
+  workMode: WorkMode.Work,
   useSystemProxy: false,
   sqliteAutoBackupEnabled: false,
   app: {

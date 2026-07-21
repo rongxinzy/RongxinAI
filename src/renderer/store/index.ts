@@ -11,6 +11,7 @@ import quickActionReducer from './slices/quickActionSlice';
 import scheduledTaskReducer from './slices/scheduledTaskSlice';
 import skillReducer from './slices/skillSlice';
 import workspaceReducer from './slices/workspaceSlice';
+import workModeReducer from './workMode/workModeSlice';
 
 export const store = configureStore({
   reducer: {
@@ -25,6 +26,7 @@ export const store = configureStore({
     auth: authReducer,
     artifact: artifactReducer,
     workspace: workspaceReducer,
+    workMode: workModeReducer,
   },
 });
 

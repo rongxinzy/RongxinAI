@@ -7,7 +7,6 @@ import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
-import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
@@ -18,6 +17,7 @@ import {
   selectCurrentSession,
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
+import { selectWorkMode } from '../../store/selectors/workModeSelectors';
 import {
   addMessage,
   addSession,
@@ -29,6 +29,7 @@ import {
 } from '../../store/slices/coworkSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
+import { WorkMode } from '../../store/workMode/constants';
 import type {
   CoworkImageAttachment,
   CoworkSession,
@@ -77,18 +78,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   // Ref for CoworkPromptInput
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
 
-  const [workMode, setWorkMode] = useState<'work' | 'chat'>(
-    () => configService.getConfig().workMode ?? 'work',
-  );
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
-  useEffect(() => {
-    const handler = () => setWorkMode(configService.getConfig().workMode ?? 'work');
-    window.addEventListener('config-updated', handler);
-    return () => window.removeEventListener('config-updated', handler);
-  }, []);
-
   const currentSession = useSelector(selectCurrentSession);
+  const workMode = useSelector(selectWorkMode);
   const directChatModelId = useSelector((state: RootState) => state.model.defaultSelectedModel.id);
 
   // Clear session when workMode changes and current session mode doesn't match.
@@ -97,7 +90,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   useEffect(() => {
     if (prevWorkModeRef.current !== workMode) {
       prevWorkModeRef.current = workMode;
-      const sessionMode = currentSession?.mode || 'work';
+      const sessionMode = currentSession?.mode || WorkMode.Work;
       if (sessionMode !== workMode) {
         dispatch(clearCurrentSession());
       }
@@ -330,7 +323,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       // Chat sessions use the temporary session as their UI identity
       // until the direct model stream finishes. Add it to the sidebar now so
       // the user's message is visible in history immediately after submit.
-      if (workMode === 'chat') {
+      if (workMode === WorkMode.Chat) {
         dispatch(addSession(tempSession));
       } else {
         // Work sessions are added after the backend creates their real session.
@@ -342,7 +335,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       dispatch(clearSelection());
 
       // Chat mode: direct LLM via apiService, skip PI/OpenClaw
-      if (workMode === 'chat') {
+      if (workMode === WorkMode.Chat) {
         const assistantMsgId = `msg-${now}-assistant`;
         const thinkingMsgId = `msg-${now}-thinking`;
         let assistantContent = '';
@@ -612,7 +605,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     if (isContinuingRef.current) return;
 
     // Chat mode: direct LLM via apiService
-    if (workMode === 'chat') {
+    if (workMode === WorkMode.Chat) {
       isContinuingRef.current = true;
       const assistantMsgId = `msg-${Date.now()}-assistant`;
       const thinkingMsgId = `msg-${Date.now()}-thinking`;
@@ -835,7 +828,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleStopSession = async () => {
     if (!currentSession) return;
-    if (workMode === 'chat') {
+    if (workMode === WorkMode.Chat) {
       dispatch(setStreaming(false));
       return;
     }
@@ -1008,7 +1001,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onNewChat={onNewChat}
           updateBadge={updateBadge}
           workMode={workMode}
-          isDirectChat={workMode === 'chat'}
+          isDirectChat={workMode === WorkMode.Chat}
           localThinkingEnabled={localThinkingEnabled}
           onLocalThinkingEnabledChange={setLocalThinkingEnabled}
         />
@@ -1031,7 +1024,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           {/* Welcome Section - staggered entrance animation */}
           <div className="text-center space-y-5">
             <img src="logo.png" alt="logo" className="h-16 w-auto mx-auto animate-fade-in-up" />
-            {workMode === 'work' && (
+            {workMode === WorkMode.Work && (
               <p
                 className="text-sm text-muted-foreground max-w-md mx-auto animate-fade-in-up"
                 style={{ animationDelay: '120ms', animationFillMode: 'both' }}
@@ -1054,7 +1047,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 isStreaming={isStreaming}
                 disabled={false}
                 placeholder={
-                  workMode === 'chat'
+                  workMode === WorkMode.Chat
                     ? i18nService.t('chatPlaceholder')
                     : i18nService.t('coworkPlaceholder')
                 }
@@ -1064,10 +1057,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   const workspace = await workspaceService.ensureWorkspace(dir);
                   if (workspace) await workspaceService.selectWorkspace(workspace.id);
                 }}
-                showFolderSelector={workMode !== 'chat'}
+                showFolderSelector={workMode !== WorkMode.Chat}
                 showModelSelector
-                isDirectChat={workMode === 'chat'}
-                showLocalThinkingToggle={workMode === 'chat'}
+                isDirectChat={workMode === WorkMode.Chat}
+                showLocalThinkingToggle={workMode === WorkMode.Chat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}
