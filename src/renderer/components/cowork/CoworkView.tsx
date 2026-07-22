@@ -361,7 +361,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let thinkingContent = '';
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
-        let isThinkingOpen = false;
         let thinkingDurationMs: number | undefined;
         const thinkingLifecycle = new ThinkingMessageLifecycle(
           tempSessionId,
@@ -453,7 +452,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             if (!chunk) continue;
             switch (chunk.type) {
               case 'text-start':
-                if (isThinkingOpen) break;
                 if (!assistantMessageAdded) {
                   dispatch(
                     addMessage({
@@ -473,7 +471,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 break;
               case 'text-delta':
                 assistantContent += chunk.delta;
-                if (isThinkingOpen) break;
+                thinkingDurationMs = thinkingLifecycle.completeBeforeAnswer(
+                  thinkingContent,
+                  thinkingMessageAdded,
+                );
                 if (!assistantMessageAdded) {
                   dispatch(
                     addMessage({
@@ -499,7 +500,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 persistChatSnapshot();
                 break;
               case 'reasoning-start':
-                isThinkingOpen = true;
                 thinkingLifecycle.start();
                 if (!thinkingMessageAdded) {
                   dispatch(
@@ -545,7 +545,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }
                 break;
               case 'reasoning-end':
-                isThinkingOpen = false;
                 thinkingDurationMs = thinkingLifecycle.complete({
                   content: thinkingContent,
                   messageExists: thinkingMessageAdded,
@@ -748,7 +747,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       let thinkingContent = '';
       let assistantMessageAdded = false;
       let thinkingMessageAdded = false;
-      let isThinkingOpen = false;
       let thinkingDurationMs: number | undefined;
       const thinkingLifecycle = new ThinkingMessageLifecycle(
         currentSession.id,
@@ -877,7 +875,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           if (!chunk) continue;
           switch (chunk.type) {
             case 'text-start':
-              if (isThinkingOpen) break;
               if (!assistantMessageAdded) {
                 dispatch(
                   addMessage({
@@ -897,7 +894,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               break;
             case 'text-delta':
               assistantContent += chunk.delta;
-              if (isThinkingOpen) break;
+              thinkingDurationMs = thinkingLifecycle.completeBeforeAnswer(
+                thinkingContent,
+                thinkingMessageAdded,
+              );
               if (!assistantMessageAdded) {
                 dispatch(
                   addMessage({
@@ -923,7 +923,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               persistChatSnapshot();
               break;
             case 'reasoning-start':
-              isThinkingOpen = true;
               thinkingLifecycle.start();
               if (!thinkingMessageAdded) {
                 dispatch(
@@ -969,7 +968,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               }
               break;
             case 'reasoning-end':
-              isThinkingOpen = false;
               thinkingDurationMs = thinkingLifecycle.complete({
                 content: thinkingContent,
                 messageExists: thinkingMessageAdded,
@@ -1025,9 +1023,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             status: finalStatus,
           }),
         );
-        await coworkService.saveChatSession(
-          buildChatSnapshot(finalStatus),
-        );
+        await coworkService.saveChatSession(buildChatSnapshot(finalStatus));
       } catch (error) {
         thinkingDurationMs = thinkingLifecycle.complete({
           content: thinkingContent,

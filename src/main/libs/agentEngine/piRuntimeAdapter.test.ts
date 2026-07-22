@@ -662,12 +662,21 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('should wait for thinking_end before streaming the answer', async () => {
-      const messages: Array<{ id: string; type: string; metadata?: Record<string, unknown> }> = [];
+    it('should stream the answer when text starts without a thinking_end event', async () => {
+      const messages: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
       adapter.on('message', (_sid, msg) => messages.push(msg as never));
-      const updates: Array<{ messageId: string; metadata?: Record<string, unknown> }> = [];
-      adapter.on('messageUpdate', (_sid, messageId, _content, metadata) =>
-        updates.push({ messageId, metadata }),
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
       );
 
       await adapter.startSession('test', 'Think before answering');
@@ -682,35 +691,24 @@ describe('PiRuntimeAdapter', () => {
       });
       listener!({
         type: 'message_update',
+        assistantMessageEvent: { type: 'thinking_delta', delta: 'Still inspecting' },
         message: {
           role: 'assistant',
           content: [
-            { type: 'thinking', thinking: 'Inspecting context' },
+            { type: 'thinking', thinking: 'Inspecting context further' },
             { type: 'text', text: 'Visible answer' },
           ],
         },
       });
 
-      expect(
-        messages.some(message => message.type === 'assistant' && message.metadata?.isThinking !== true),
-      ).toBe(false);
-
-      listener!({
-        type: 'message_update',
-        assistantMessageEvent: { type: 'thinking_end' },
-        message: {
-          role: 'assistant',
-          content: [
-            { type: 'thinking', thinking: 'Inspecting context' },
-            { type: 'text', text: 'Visible answer' },
-          ],
-        },
-      });
-
-      expect(
-        messages.some(message => message.type === 'assistant' && message.metadata?.isThinking !== true),
-      ).toBe(true);
       const thinkingMessage = messages.find(message => message.metadata?.isThinking === true);
+      const answerMessage = messages.find(
+        message => message.type === 'assistant' && message.metadata?.isThinking !== true,
+      );
+      expect(answerMessage).toMatchObject({
+        content: 'Visible answer',
+        metadata: { isStreaming: true, isFinal: false },
+      });
       expect(
         updates.some(
           update =>
