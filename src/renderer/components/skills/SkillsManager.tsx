@@ -1,9 +1,12 @@
 import { Button } from '@shared/components/ui/button';
 import { Card, CardContent } from '@shared/components/ui/card';
+import { DialogTitle } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
+import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Separator } from '@shared/components/ui/separator';
 import { Switch } from '@shared/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { cn } from '@shared/lib/utils';
 import {
   CheckCircle,
   Download,
@@ -35,26 +38,27 @@ import SkillSecurityReport from './SkillSecurityReport';
 type SkillTab = 'installed' | 'marketplace';
 type DirectImportSource = 'zip' | 'folder' | 'remote';
 
-const MARKETPLACE_MIN_PAGE_SIZE = 8;
+const MARKETPLACE_MIN_PAGE_SIZE = 1;
 const MARKETPLACE_MAX_PAGE_SIZE = 40;
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 20;
 const MARKETPLACE_PAGE_WINDOW = 2;
 
 type MarketplacePageItem = number | 'ellipsis-left' | 'ellipsis-right';
 
+const getMarketplaceColumnCount = () => {
+  if (typeof window === 'undefined') return 1;
+
+  if (window.innerWidth >= 1280) return 3;
+  if (window.innerWidth >= 768) return 2;
+  return 1;
+};
+
 const estimateMarketplacePageSize = () => {
   if (typeof window === 'undefined') {
     return MARKETPLACE_DEFAULT_PAGE_SIZE;
   }
 
-  const columns =
-    window.innerWidth >= 1536
-      ? 4
-      : window.innerWidth >= 1280
-        ? 3
-        : window.innerWidth >= 768
-          ? 2
-          : 1;
+  const columns = getMarketplaceColumnCount();
   const availableHeight = Math.max(280, window.innerHeight - 320);
   const rows = Math.max(2, Math.floor(availableHeight / 132));
   const pageSize = columns * rows;
@@ -124,6 +128,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
   const addSkillMenuRef = useRef<HTMLDivElement>(null);
   const addSkillButtonRef = useRef<HTMLButtonElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const marketplaceContentRef = useRef<HTMLDivElement>(null);
 
   const refreshMarketplace = useCallback(async (forceRefresh = false) => {
     setIsLoadingMarketplace(true);
@@ -318,6 +323,20 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
       setMarketplacePage(marketplacePageCount);
     }
   }, [marketplacePage, marketplacePageCount]);
+
+  useEffect(() => {
+    if (activeTab !== 'marketplace' || isLoadingMarketplace) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const content = marketplaceContentRef.current;
+      if (!content || content.scrollHeight <= content.clientHeight) return;
+
+      const columns = getMarketplaceColumnCount();
+      setMarketplacePageSize(current => Math.max(MARKETPLACE_MIN_PAGE_SIZE, current - columns));
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, isLoadingMarketplace, marketplacePageSize, visibleMarketplaceSkills.length]);
 
   const formatSkillDate = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -671,8 +690,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           </Tabs>
         </CardContent>
         <Separator />
-        <CardContent className="min-h-0 flex-1 overflow-y-auto p-3">
-          <div>
+        <CardContent className="min-h-0 flex-1 p-0">
+          <div
+            ref={marketplaceContentRef}
+            className={cn(
+              'h-full min-h-0 p-3',
+              activeTab === 'marketplace' ? 'overflow-hidden' : 'overflow-y-auto',
+            )}
+          >
             {activeTab === 'installed' && (
               <>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -763,7 +788,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 </div>
               ) : (
                 <>
-                  <div className="mb-1 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mb-1 flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-medium text-foreground">
                         {i18nService.t('skillMarketplaceFeaturedTitle')}
@@ -930,17 +955,17 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           <Modal
             onClose={() => setSelectedMarketplaceSkill(null)}
             overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6"
+            className="flex max-h-[calc(100dvh-3rem)] w-full max-w-md flex-col gap-0 rounded-xl border border-border bg-surface p-0 shadow-xl sm:max-w-md"
           >
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex shrink-0 items-start justify-between px-6 pt-6">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center shrink-0">
                   <Puzzle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-base font-semibold text-foreground truncate">
+                  <DialogTitle className="truncate text-base font-semibold text-foreground">
                     {selectedMarketplaceSkill.name}
-                  </div>
+                  </DialogTitle>
                 </div>
               </div>
               <Button
@@ -954,78 +979,86 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-4">
-              {resolveLocalizedText(selectedMarketplaceSkill.description)}
-            </p>
+            <ScrollArea className="min-h-0 flex-1 px-6">
+              <div className="flex min-w-0 flex-col gap-4 py-4">
+                <p className="break-words text-sm text-muted-foreground">
+                  {resolveLocalizedText(selectedMarketplaceSkill.description)}
+                </p>
 
-            <div className="space-y-2 mb-5">
-              {selectedMarketplaceSkill.version && (
-                <div className="flex items-center text-xs">
-                  <span className="w-16 shrink-0 text-muted-foreground">
-                    {i18nService.t('skillDetailVersion')}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
-                    v{selectedMarketplaceSkill.version}
-                  </span>
-                </div>
-              )}
-              {selectedMarketplaceSkill.source?.from && (
-                <div className="flex items-center text-xs">
-                  <span className="w-16 shrink-0 text-muted-foreground">
-                    {i18nService.t('skillDetailSource')}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
-                    {selectedMarketplaceSkill.source.from}
-                  </span>
-                  {selectedMarketplaceSkill.source.author && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
-                      {selectedMarketplaceSkill.source.author}
-                    </span>
+                <div className="flex flex-col gap-2">
+                  {selectedMarketplaceSkill.version && (
+                    <div className="flex min-w-0 items-center gap-2 text-xs">
+                      <span className="w-16 shrink-0 text-muted-foreground">
+                        {i18nService.t('skillDetailVersion')}
+                      </span>
+                      <span className="min-w-0 break-words rounded bg-surface-raised px-1.5 py-0.5 font-medium text-foreground">
+                        v{selectedMarketplaceSkill.version}
+                      </span>
+                    </div>
+                  )}
+                  {selectedMarketplaceSkill.source?.from && (
+                    <div className="flex min-w-0 items-start gap-2 text-xs">
+                      <span className="w-16 shrink-0 pt-0.5 text-muted-foreground">
+                        {i18nService.t('skillDetailSource')}
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                        <span className="break-words rounded bg-surface-raised px-1.5 py-0.5 font-medium text-foreground">
+                          {selectedMarketplaceSkill.source.from}
+                        </span>
+                        {selectedMarketplaceSkill.source.author && (
+                          <span className="break-words rounded bg-surface-raised px-1.5 py-0.5 font-medium text-foreground">
+                            {selectedMarketplaceSkill.source.author}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {selectedMarketplaceSkill.source?.url && (
+                    <div className="flex min-w-0 items-start gap-2 text-xs">
+                      <span className="w-16 shrink-0 pt-0.5 text-muted-foreground">URL</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto min-w-0 flex-1 justify-start break-all whitespace-normal px-0 text-left text-primary hover:underline"
+                        onClick={e => {
+                          e.stopPropagation();
+                          window.electron.shell.openExternal(selectedMarketplaceSkill.source.url);
+                        }}
+                      >
+                        {selectedMarketplaceSkill.source.url}
+                      </Button>
+                    </div>
                   )}
                 </div>
-              )}
-              {selectedMarketplaceSkill.source?.url && (
-                <div className="flex items-start text-xs">
-                  <span className="w-16 shrink-0 text-muted-foreground pt-0.5">URL</span>
+              </div>
+            </ScrollArea>
+
+            <div className="shrink-0 border-t border-border px-6 pb-6 pt-4">
+              {(() => {
+                const status = getSkillInstallStatus(selectedMarketplaceSkill);
+                if (status === 'installed') {
+                  return (
+                    <div className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 text-sm font-medium">
+                      <CheckCircle className="h-4 w-4" />
+                      {i18nService.t('skillAlreadyInstalled')}
+                    </div>
+                  );
+                }
+                return !readOnly && selectedMarketplaceSkill.installSource ? (
                   <Button
                     type="button"
-                    variant="link"
-                    className="text-primary hover:underline break-all text-left px-0 h-auto"
-                    onClick={e => {
-                      e.stopPropagation();
-                      window.electron.shell.openExternal(selectedMarketplaceSkill.source.url);
-                    }}
+                    onClick={() => handleInstallMarketplaceSkill(selectedMarketplaceSkill)}
+                    disabled={installingSkillId !== null}
+                    className="w-full py-2.5 rounded-xl text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
-                    {selectedMarketplaceSkill.source.url}
+                    <Download className="h-4 w-4" />
+                    {installingSkillId === selectedMarketplaceSkill.id
+                      ? i18nService.t('skillInstalling')
+                      : i18nService.t('skillInstall')}
                   </Button>
-                </div>
-              )}
+                ) : null;
+              })()}
             </div>
-
-            {(() => {
-              const status = getSkillInstallStatus(selectedMarketplaceSkill);
-              if (status === 'installed') {
-                return (
-                  <div className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 text-sm font-medium">
-                    <CheckCircle className="h-4 w-4" />
-                    {i18nService.t('skillAlreadyInstalled')}
-                  </div>
-                );
-              }
-              return !readOnly && selectedMarketplaceSkill.installSource ? (
-                <Button
-                  type="button"
-                  onClick={() => handleInstallMarketplaceSkill(selectedMarketplaceSkill)}
-                  disabled={installingSkillId !== null}
-                  className="w-full py-2.5 rounded-xl text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                >
-                  <Download className="h-4 w-4" />
-                  {installingSkillId === selectedMarketplaceSkill.id
-                    ? i18nService.t('skillInstalling')
-                    : i18nService.t('skillInstall')}
-                </Button>
-              ) : null;
-            })()}
           </Modal>,
           document.body,
         )}
@@ -1035,17 +1068,17 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
           <Modal
             onClose={() => setSelectedSkill(null)}
             overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6"
+            className="flex max-h-[calc(100dvh-3rem)] w-full max-w-md flex-col gap-0 rounded-xl border border-border bg-surface p-0 shadow-xl sm:max-w-md"
           >
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex shrink-0 items-start justify-between px-6 pt-6">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-background flex items-center justify-center shrink-0">
                   <Puzzle className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-base font-semibold text-foreground truncate">
+                  <DialogTitle className="truncate text-base font-semibold text-foreground">
                     {selectedSkill.name}
-                  </div>
+                  </DialogTitle>
                 </div>
               </div>
               <Button
@@ -1059,71 +1092,79 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
               </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-4">
-              {skillService.getLocalizedSkillDescription(
-                selectedSkill.id,
-                selectedSkill.name,
-                selectedSkill.description,
-              )}
-            </p>
+            <ScrollArea className="min-h-0 flex-1 px-6">
+              <div className="flex min-w-0 flex-col gap-4 py-4">
+                <p className="break-words text-sm text-muted-foreground">
+                  {skillService.getLocalizedSkillDescription(
+                    selectedSkill.id,
+                    selectedSkill.name,
+                    selectedSkill.description,
+                  )}
+                </p>
 
-            <div className="space-y-2 mb-5">
-              {(() => {
-                const mp = marketplaceSkills.find(m => m.id === selectedSkill.id);
-                return (
-                  <>
-                    {selectedSkill.isOfficial && (
-                      <div className="flex items-center text-xs">
-                        <span className="w-16 shrink-0 text-muted-foreground">
-                          {i18nService.t('skillDetailSource')}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-primary-muted text-primary font-medium">
-                          {i18nService.t('official')}
-                        </span>
-                        {mp?.source?.author && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
-                            {mp.source.author}
-                          </span>
+                <div className="flex flex-col gap-2">
+                  {(() => {
+                    const mp = marketplaceSkills.find(m => m.id === selectedSkill.id);
+                    return (
+                      <>
+                        {selectedSkill.isOfficial && (
+                          <div className="flex min-w-0 items-start gap-2 text-xs">
+                            <span className="w-16 shrink-0 pt-0.5 text-muted-foreground">
+                              {i18nService.t('skillDetailSource')}
+                            </span>
+                            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                              <span className="rounded bg-primary-muted px-1.5 py-0.5 font-medium text-primary">
+                                {i18nService.t('official')}
+                              </span>
+                              {mp?.source?.author && (
+                                <span className="break-words rounded bg-surface-raised px-1.5 py-0.5 font-medium text-foreground">
+                                  {mp.source.author}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    )}
-                    {!selectedSkill.isOfficial && mp?.source?.from && (
-                      <div className="flex items-center text-xs">
-                        <span className="w-16 shrink-0 text-muted-foreground">
-                          {i18nService.t('skillDetailSource')}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
-                          {mp.source.from}
-                        </span>
-                        {mp.source.author && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-surface-raised text-foreground font-medium">
-                            {mp.source.author}
-                          </span>
+                        {!selectedSkill.isOfficial && mp?.source?.from && (
+                          <div className="flex min-w-0 items-start gap-2 text-xs">
+                            <span className="w-16 shrink-0 pt-0.5 text-muted-foreground">
+                              {i18nService.t('skillDetailSource')}
+                            </span>
+                            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                              <span className="break-words rounded bg-surface-raised px-1.5 py-0.5 font-medium text-foreground">
+                                {mp.source.from}
+                              </span>
+                              {mp.source.author && (
+                                <span className="break-words rounded bg-surface-raised px-1.5 py-0.5 font-medium text-foreground">
+                                  {mp.source.author}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    )}
-                    {mp?.source?.url && (
-                      <div className="flex items-start text-xs">
-                        <span className="w-16 shrink-0 text-muted-foreground pt-0.5">URL</span>
-                        <Button
-                          type="button"
-                          variant="link"
-                          className="text-primary hover:underline break-all text-left px-0 h-auto"
-                          onClick={e => {
-                            e.stopPropagation();
-                            window.electron.shell.openExternal(mp.source.url);
-                          }}
-                        >
-                          {mp.source.url}
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
+                        {mp?.source?.url && (
+                          <div className="flex min-w-0 items-start gap-2 text-xs">
+                            <span className="w-16 shrink-0 pt-0.5 text-muted-foreground">URL</span>
+                            <Button
+                              type="button"
+                              variant="link"
+                              className="h-auto min-w-0 flex-1 justify-start break-all whitespace-normal px-0 text-left text-primary hover:underline"
+                              onClick={e => {
+                                e.stopPropagation();
+                                window.electron.shell.openExternal(mp.source.url);
+                              }}
+                            >
+                              {mp.source.url}
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </ScrollArea>
 
-            <div className="flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between border-t border-border px-6 pb-6 pt-4">
               {!readOnly && !selectedSkill.isBuiltIn ? (
                 <Button
                   type="button"
