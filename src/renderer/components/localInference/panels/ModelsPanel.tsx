@@ -66,8 +66,28 @@ const modelProviderIconMap = {
 } satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
 const MODEL_CARD_MAX_VISIBLE_TAGS = 6;
-const modelCardTagClassName =
-  'h-7 rounded-md bg-background px-2.5 py-0 text-xs font-normal text-muted-foreground shadow-none';
+const ModelCardTagKind = {
+  Neutral: 'neutral',
+  Violet: 'violet',
+  Green: 'green',
+} as const;
+
+type ModelCardTagKind = (typeof ModelCardTagKind)[keyof typeof ModelCardTagKind];
+
+type ModelCardTag = {
+  label: string;
+  kind: ModelCardTagKind;
+};
+
+const modelCardTagBaseClassName = 'h-7 rounded-md px-2.5 py-0 text-xs font-normal shadow-none';
+const modelCardTagColorClassNames: Record<ModelCardTagKind, string> = {
+  [ModelCardTagKind.Neutral]:
+    'border-[var(--zy-model-tag-neutral-border)] bg-[var(--zy-model-tag-neutral-background)] text-[var(--zy-model-tag-neutral-foreground)]',
+  [ModelCardTagKind.Violet]:
+    'border-[var(--zy-model-tag-violet-border)] bg-[var(--zy-model-tag-violet-background)] text-[var(--zy-model-tag-violet-foreground)]',
+  [ModelCardTagKind.Green]:
+    'border-[var(--zy-model-tag-green-border)] bg-[var(--zy-model-tag-green-background)] text-[var(--zy-model-tag-green-foreground)]',
+};
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -314,7 +334,7 @@ function ModelCard({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={cn(
-        'relative min-h-40 w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+        'relative w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
         'hover:border-border hover:bg-muted/20 hover:shadow-md',
         (loadingModel || unloading) && 'bg-muted/30',
         dragging && 'opacity-50',
@@ -333,8 +353,8 @@ function ModelCard({
             type="button"
             isDisabled
             size="default"
-            variant="secondary"
-            data-local-inference-secondary-action-button="true"
+            variant={unloading ? 'closing' : 'loading'}
+            data-local-inference-unload-button={unloading ? 'true' : undefined}
           >
             <Spinner
               aria-label={i18nService.t(
@@ -353,8 +373,7 @@ function ModelCard({
             <Button21st
               type="button"
               size="default"
-              variant="secondary"
-              data-local-inference-secondary-action-button="true"
+              variant="primary"
               onClick={handleOpenLaunchLog}
             >
               <LogButtonIcon />
@@ -364,7 +383,7 @@ function ModelCard({
         </div>
       ) : null}
 
-      <CardHeader className="grid min-h-40 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_1fr_auto] gap-x-4 gap-y-3 p-4">
+      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_auto] gap-x-3 gap-y-2 p-3">
         <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-3">
           <span
             aria-hidden="true"
@@ -390,7 +409,6 @@ function ModelCard({
             size="sm"
             disabled={buttonsDisabled}
             onClick={onConfigureContext}
-            data-local-inference-secondary-action-button="true"
           >
             <Settings2 data-icon="inline-start" />
             {i18nService.t('localInferenceConfigureContext')}
@@ -404,7 +422,13 @@ function ModelCard({
                 delay={200}
                 closeDelay={100}
                 render={
-                  <Badge variant="outline" className={cn(modelCardTagClassName, 'cursor-default')}>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      getModelCardTagClassName(ModelCardTagKind.Neutral),
+                      'cursor-default',
+                    )}
+                  >
                     {i18nService.t('localInferenceDetails')}
                   </Badge>
                 }
@@ -419,20 +443,20 @@ function ModelCard({
             </HoverCard>
           ) : null}
           {visibleTags.map(tag => (
-            <Badge key={tag} variant="outline" className={modelCardTagClassName}>
-              {tag}
+            <Badge key={tag.label} variant="outline" className={getModelCardTagClassName(tag.kind)}>
+              {tag.label}
             </Badge>
           ))}
         </div>
 
-        <CardAction className="col-start-2 row-span-1 row-start-3 mt-2 self-start justify-self-end">
+        <CardAction className="col-start-2 row-span-1 row-start-3 self-center justify-self-end">
           {isRunning ? (
             <Button21st
               type="button"
-              variant="secondary"
+              variant="danger"
               isDisabled={buttonsDisabled}
               data-local-inference-model-action-button="true"
-              data-local-inference-secondary-action-button="true"
+              data-local-inference-unload-button="true"
               onClick={onUnload}
             >
               <Square data-icon="inline-start" />
@@ -475,7 +499,7 @@ function MetadataRow({ label, value }: { label: string; value: string }) {
       <div className={cn('pt-0.5 text-[11px] font-medium leading-4', localInferenceMutedTextClass)}>
         {label}
       </div>
-      <div className="min-w-0 text-[13px] font-medium leading-5 text-muted-foreground">
+      <div className="min-w-0 text-[13px] font-medium leading-5 text-foreground">
         <span className="block break-all">{value}</span>
       </div>
     </div>
@@ -512,16 +536,30 @@ function getModelCardTags(
   model: LlamaCppModel,
   contextValue?: number,
   quantization?: string,
-): string[] {
+): ModelCardTag[] {
   return dedupeModelTags([
-    formatModelFamilyTag(model.details?.family),
-    formatModelTagValue(model.details?.parameter_size),
-    formatModelTagValue(quantization),
-    formatModelFormatTag(model.details?.format),
-    contextValue
-      ? `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`
-      : null,
+    createModelCardTag(formatModelFamilyTag(model.details?.family), ModelCardTagKind.Neutral),
+    createModelCardTag(
+      formatModelTagValue(model.details?.parameter_size),
+      ModelCardTagKind.Neutral,
+    ),
+    createModelCardTag(formatModelTagValue(quantization), ModelCardTagKind.Violet),
+    createModelCardTag(formatModelFormatTag(model.details?.format), ModelCardTagKind.Green),
+    createModelCardTag(
+      contextValue
+        ? `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`
+        : null,
+      ModelCardTagKind.Violet,
+    ),
   ]);
+}
+
+function getModelCardTagClassName(kind: ModelCardTagKind): string {
+  return cn(modelCardTagBaseClassName, modelCardTagColorClassNames[kind]);
+}
+
+function createModelCardTag(label: string | null, kind: ModelCardTagKind): ModelCardTag | null {
+  return label ? { label, kind } : null;
 }
 
 function formatModelFamilyTag(value?: string): string | null {
@@ -543,11 +581,11 @@ function formatModelTagValue(value?: string): string | null {
   return normalized || null;
 }
 
-function dedupeModelTags(values: Array<string | null>): string[] {
+function dedupeModelTags(values: Array<ModelCardTag | null>): ModelCardTag[] {
   const seen = new Set<string>();
-  return values.filter((value): value is string => {
+  return values.filter((value): value is ModelCardTag => {
     if (!value) return false;
-    const key = value.toLocaleLowerCase();
+    const key = value.label.toLocaleLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

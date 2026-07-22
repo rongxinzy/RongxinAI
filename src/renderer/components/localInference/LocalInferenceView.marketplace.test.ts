@@ -11,10 +11,10 @@ test('marketplace page size is fixed across viewport sizes', async () => {
   expect(typeof getMarketplacePageSize).toBe('function');
   if (!getMarketplacePageSize) return;
 
-  expect(getMarketplacePageSize()).toBe(6);
+  expect(getMarketplacePageSize()).toBe(8);
 });
 
-test('marketplace search params load directly up to the app and openapi caps', async () => {
+test('marketplace search params load recommended models for an empty query and use the app cap for a search', async () => {
   const module = await import('./LocalInferenceView');
   const buildMarketplaceSearchParams = (
     module as {
@@ -30,7 +30,7 @@ test('marketplace search params load directly up to the app and openapi caps', a
 
   expect(buildMarketplaceSearchParams({ query: ' qwen ' })).toEqual({
     query: 'qwen',
-    limit: 3000,
+    limit: 300,
   });
 
   expect(
@@ -40,11 +40,11 @@ test('marketplace search params load directly up to the app and openapi caps', a
     }),
   ).toEqual({
     query: 'qwen',
-    limit: 3000,
+    limit: 300,
     pageNumber: 4,
   });
 
-  expect(buildMarketplaceSearchParams({ query: '' })).toBeNull();
+  expect(buildMarketplaceSearchParams({ query: '' })).toEqual({ limit: 20 });
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
 });
 
