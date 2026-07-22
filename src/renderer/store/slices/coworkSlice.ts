@@ -160,14 +160,6 @@ const coworkSlice = createSlice({
           }
         }
 
-        // When switching to a different session, reset streaming and
-        // remote-managed flags inherited from the previous session.
-        const isSameSession = state.currentSession?.id === session.id;
-        if (!isSameSession) {
-          state.isStreaming = false;
-          state.remoteManaged = false;
-        }
-
         // Ensure pagination fields are always present (guard against stale IPC data).
         // If the in-memory session is still streaming, preserve its messages.
         // The DB snapshot may be stale (messages not yet persisted). Replacing
@@ -184,8 +176,6 @@ const coworkSlice = createSlice({
         };
       } else {
         state.currentSession = null;
-        state.isStreaming = false;
-        state.remoteManaged = false;
       }
       if (action.payload) {
         state.currentSessionId = action.payload.id;
@@ -222,21 +212,13 @@ const coworkSlice = createSlice({
       } else {
         state.sessions.unshift(summary);
       }
-      // Only overwrite currentSession if this session is already the active one,
-      // or if no session is currently active. Prevents a late-arriving addSession
-      // from hijacking the UI after the user has switched to a different conversation.
-      const sameSession =
-        state.currentSessionId === action.payload.id ||
-        (state.currentSession?.id != null && state.currentSession.id === action.payload.id);
-      if (sameSession || state.currentSessionId === null) {
-        state.currentSession = {
-          ...action.payload,
-          messagesOffset: action.payload.messagesOffset ?? 0,
-          totalMessages: action.payload.totalMessages ?? action.payload.messages.length,
-        };
-        state.currentSessionId = action.payload.id;
-        markSessionRead(state, action.payload.id);
-      }
+      state.currentSession = {
+        ...action.payload,
+        messagesOffset: action.payload.messagesOffset ?? 0,
+        totalMessages: action.payload.totalMessages ?? action.payload.messages.length,
+      };
+      state.currentSessionId = action.payload.id;
+      markSessionRead(state, action.payload.id);
     },
 
     updateSessionStatus(

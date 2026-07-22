@@ -104,23 +104,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
-  // Track AbortController for chat-mode streaming so we can cancel in-flight
-  // LLM calls when the user switches sessions or stops the response.
-  const chatAbortRef = useRef<AbortController | null>(null);
-
-  const cancelChatStream = React.useCallback(() => {
-    if (chatAbortRef.current) {
-      chatAbortRef.current.abort();
-      chatAbortRef.current = null;
-    }
-    // Cancel any pending RAF-batched content from a previous stream
-    if (contentRafRef.current !== null) {
-      cancelAnimationFrame(contentRafRef.current);
-      contentRafRef.current = null;
-    }
-    contentBuffer.clear();
-  }, [contentBuffer]);
-
   const currentSession = useSelector(selectCurrentSession);
   const workMode = useSelector(selectWorkMode);
   const directChatModelId = useSelector((state: RootState) => state.model.defaultSelectedModel.id);
@@ -241,13 +224,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       setOpenClawStatus(status);
     });
 
-    // Listen for session-switch events from the Sidebar to abort in-flight
-    // chat-mode streams before the new session load overwrites currentSession.
-    const handleCancelChatStream = () => {
-      cancelChatStream();
-    };
-    window.addEventListener('cowork:cancel-chat-stream', handleCancelChatStream);
-
     // Subscribe to language changes to reload quick actions
     const unsubscribe = quickActionService.subscribe(async () => {
       try {
@@ -261,7 +237,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     return () => {
       unsubscribe();
       unsubscribeOpenClawStatus();
-      window.removeEventListener('cowork:cancel-chat-stream', handleCancelChatStream);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
@@ -392,9 +367,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
         try {
-          // Wire up AbortController so the stream can be cancelled on session switch.
-          const abortController = new AbortController();
-          chatAbortRef.current = abortController;
           const transport = new ChatChatTransport({
             modelId: directChatModelId,
             localThinkingEnabled,
@@ -404,7 +376,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             chatId: tempSessionId,
             messageId: undefined,
             messages: [{ id: `msg-${now}`, role: 'user', parts: [{ type: 'text', text: prompt }] }],
-            abortSignal: abortController.signal,
+            abortSignal: undefined,
           });
           const reader = stream.getReader();
           while (true) {
@@ -565,8 +537,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         } finally {
           dispatch(setStreaming(false));
           isStartingRef.current = false;
-          chatAbortRef.current = null;
         }
+        return;
       }
 
       // Work mode: use coworkService (PI/OpenClaw engines)
@@ -677,9 +649,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         );
 
         dispatch(setStreaming(true));
-        // Wire up AbortController so the stream can be cancelled on session switch.
-        const abortController = new AbortController();
-        chatAbortRef.current = abortController;
         const transport = new ChatChatTransport({
           modelId: directChatModelId,
           localThinkingEnabled,
@@ -700,7 +669,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               role: 'user' as const,
               parts: [{ type: 'text' as const, text: prompt }],
             }),
-          abortSignal: abortController.signal,
+          abortSignal: undefined,
         });
         const reader = stream.getReader();
         let assistantContent = '';
@@ -822,17 +791,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           );
         }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'completed' }));
-        // Persist updated session (with new messages) to SQLite.
-        // Only save when we are still viewing the same session — if the user
-        // switched away the stream was aborted and messages would be stale.
-        const isAborted = abortController.signal.aborted;
-        if (!isAborted) {
-          const updatedSession = store.getState().cowork.currentSession;
-          if (updatedSession && updatedSession.id === currentSession.id) {
-            coworkService
-              .saveChatSession(updatedSession)
-              .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
-          }
+        // Persist updated session (with new messages) to SQLite
+        const updatedSession = store.getState().cowork.currentSession;
+        if (updatedSession) {
+          coworkService
+            .saveChatSession(updatedSession)
+            .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
         }
       } catch (error) {
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
@@ -853,8 +817,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       } finally {
         dispatch(setStreaming(false));
         isContinuingRef.current = false;
-        chatAbortRef.current = null;
       }
+      return;
     }
 
     // Work mode: use coworkService
@@ -885,8 +849,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const handleStopSession = async () => {
     if (!currentSession) return;
     if (workMode === WorkMode.Chat) {
-      // Cancel the in-flight LLM stream rather than just clearing the Redux flag.
-      cancelChatStream();
       dispatch(setStreaming(false));
       return;
     }
