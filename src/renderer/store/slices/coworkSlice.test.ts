@@ -4,9 +4,12 @@ import { CoworkSessionStatusValue } from '../../types/cowork';
 import coworkReducer, {
   addMessage,
   addSession,
+  clearCurrentSessionForWorkspaceChange,
+  clearLoadingSessionId,
   setConfig,
   setCurrentSession,
   setCurrentSessionId,
+  setLoadingSessionId,
   setSessions,
   updateCurrentSessionModelOverride,
   updateSessionStatus,
@@ -123,6 +126,36 @@ test('setCurrentSession preserves the agent id when inserting a summary', () => 
   );
 
   expect(state.sessions[0].agentId).toBe('agent-3');
+});
+
+test('clearing an earlier session load keeps the latest session loading', () => {
+  const loadingLatestSession = coworkReducer(
+    coworkReducer(undefined, setLoadingSessionId('session-1')),
+    setLoadingSessionId('session-2'),
+  );
+
+  const afterEarlierLoadCompletes = coworkReducer(
+    loadingLatestSession,
+    clearLoadingSessionId('session-1'),
+  );
+
+  expect(afterEarlierLoadCompletes.loadingSessionId).toBe('session-2');
+  expect(
+    coworkReducer(afterEarlierLoadCompletes, clearLoadingSessionId('session-2')).loadingSessionId,
+  ).toBeNull();
+});
+
+test('workspace changes preserve a pending target session load', () => {
+  const state = coworkReducer(
+    coworkReducer(undefined, addSession(makeSession())),
+    setLoadingSessionId('session-2'),
+  );
+
+  const clearedState = coworkReducer(state, clearCurrentSessionForWorkspaceChange());
+
+  expect(clearedState.currentSession).toBeNull();
+  expect(clearedState.currentSessionId).toBeNull();
+  expect(clearedState.loadingSessionId).toBe('session-2');
 });
 
 test('updateSessionStatus marks completed inactive sessions unread', () => {

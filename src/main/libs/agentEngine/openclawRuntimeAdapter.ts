@@ -3285,7 +3285,11 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     return (this.latestTurnTokenBySession.get(sessionId) ?? 0) === turnToken;
   }
 
-  private reuseFinalAssistantMessage(sessionId: string, content: string): string | null {
+  private reuseFinalAssistantMessage(
+    sessionId: string,
+    content: string,
+    markAsFinalAnswer = true,
+  ): string | null {
     const normalizedContent = content.trim();
     if (!normalizedContent) {
       return null;
@@ -3308,7 +3312,13 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           metadata: {
             isStreaming: false,
             isFinal: true,
+            ...(markAsFinalAnswer && { isFinalAnswer: true }),
           },
+        });
+        this.emit('messageUpdate', sessionId, msg.id, content, {
+          isStreaming: false,
+          isFinal: true,
+          ...(markAsFinalAnswer && { isFinalAnswer: true }),
         });
         return msg.id;
       }
@@ -4104,6 +4114,17 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const previousText = turn.currentText;
     const previousSegmentText = turn.currentAssistantSegmentText;
     const finalText = this.resolveFinalTurnText(turn, payload.message);
+    const messageRecord = isRecord(payload.message) ? payload.message : null;
+    const stopReason =
+      payload.stopReason ??
+      (messageRecord && typeof messageRecord.stopReason === 'string'
+        ? messageRecord.stopReason
+        : undefined);
+    const errorMessageFromMessage =
+      messageRecord && typeof messageRecord.errorMessage === 'string'
+        ? messageRecord.errorMessage
+        : undefined;
+    const stoppedByError = stopReason === 'error';
     console.debug(
       '[OpenClawRuntime] handleChatFinal:',
       `sessionId=${sessionId}`,
@@ -4165,12 +4186,21 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           metadata: {
             isStreaming: false,
             isFinal: true,
+            ...(!stoppedByError && { isFinalAnswer: true }),
           },
         });
-        this.emit('messageUpdate', sessionId, turn.assistantMessageId, persistedSegmentText);
+        this.emit('messageUpdate', sessionId, turn.assistantMessageId, persistedSegmentText, {
+          isStreaming: false,
+          isFinal: true,
+          ...(!stoppedByError && { isFinalAnswer: true }),
+        });
       }
     } else if (finalSegmentText) {
-      const reusedMessageId = this.reuseFinalAssistantMessage(sessionId, finalSegmentText);
+      const reusedMessageId = this.reuseFinalAssistantMessage(
+        sessionId,
+        finalSegmentText,
+        !stoppedByError,
+      );
       if (reusedMessageId) {
         turn.assistantMessageId = reusedMessageId;
       } else {
@@ -4187,6 +4217,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
             metadata: {
               isStreaming: false,
               isFinal: true,
+              ...(!stoppedByError && { isFinalAnswer: true }),
             },
           },
           msgTimestamp,
@@ -4205,18 +4236,6 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       await this.syncFinalAssistantWithHistory(sessionId, turn);
     }
 
-    const messageRecord = isRecord(payload.message) ? payload.message : null;
-
-    const stopReason =
-      payload.stopReason ??
-      (messageRecord && typeof messageRecord.stopReason === 'string'
-        ? messageRecord.stopReason
-        : undefined);
-    const errorMessageFromMessage =
-      messageRecord && typeof messageRecord.errorMessage === 'string'
-        ? messageRecord.errorMessage
-        : undefined;
-    const stoppedByError = stopReason === 'error';
     if (stoppedByError) {
       const errorMessage =
         payload.errorMessage?.trim() || errorMessageFromMessage?.trim() || 'OpenClaw run failed';
@@ -4476,6 +4495,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       const usageMetadata: Record<string, unknown> = {
         isStreaming: false,
         isFinal: true,
+        isFinalAnswer: true,
         ...(inputTokens != null || outputTokens != null || cacheReadTokens != null
           ? {
               usage: {
@@ -4543,6 +4563,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const usageMetadata: Record<string, unknown> = {
       isStreaming: false,
       isFinal: true,
+      isFinalAnswer: true,
       ...(inputTokens != null || outputTokens != null || cacheReadTokens != null
         ? {
             usage: {
@@ -5227,6 +5248,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           metadata: {
             isStreaming: false,
             isFinal: true,
+            isFinalAnswer: true,
           },
         });
         turn.assistantMessageId = assistantMessage.id;
@@ -5242,7 +5264,18 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       if (canonicalSegmentText === currentText) {
         // Content matches but renderer may not have received the last throttled update.
         // Force-emit so the UI shows the final text.
-        this.emit('messageUpdate', sessionId, turn.assistantMessageId, canonicalSegmentText);
+        this.store.updateMessage(sessionId, turn.assistantMessageId, {
+          metadata: {
+            isStreaming: false,
+            isFinal: true,
+            isFinalAnswer: true,
+          },
+        });
+        this.emit('messageUpdate', sessionId, turn.assistantMessageId, canonicalSegmentText, {
+          isStreaming: false,
+          isFinal: true,
+          isFinalAnswer: true,
+        });
         return;
       }
 
@@ -5257,9 +5290,14 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         metadata: {
           isStreaming: false,
           isFinal: true,
+          isFinalAnswer: true,
         },
       });
-      this.emit('messageUpdate', sessionId, turn.assistantMessageId, canonicalSegmentText);
+      this.emit('messageUpdate', sessionId, turn.assistantMessageId, canonicalSegmentText, {
+        isStreaming: false,
+        isFinal: true,
+        isFinalAnswer: true,
+      });
     } catch (error) {
       console.warn('[OpenClawRuntime] chat.history sync after final failed:', error);
     }

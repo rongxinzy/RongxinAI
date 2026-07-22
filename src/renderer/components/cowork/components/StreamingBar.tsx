@@ -1,8 +1,5 @@
 import React from 'react';
 
-import { i18nService } from '../../../services/i18n';
-import type { CoworkMessage } from '../../../types/cowork';
-
 export const TypingDots: React.FC = () => (
   <div className="flex items-center space-x-1.5 py-1">
     <div
@@ -41,40 +38,11 @@ export const ArtifactPanelIcon: React.FC<React.SVGProps<SVGSVGElement> & { open?
   );
 };
 
-/** Bottom status bar showing current tool execution progress. */
-export const StreamingBar: React.FC<{ messages: CoworkMessage[] }> = ({ messages }) => {
-  const getStatusText = (): string => {
-    const toolUseIds = new Set<string>();
-    const toolResultIds = new Set<string>();
-    for (const msg of messages) {
-      const id = msg.metadata?.toolUseId;
-      if (typeof id === 'string') {
-        if (msg.type === 'tool_result') toolResultIds.add(id);
-        if (msg.type === 'tool_use') toolUseIds.add(id);
-      }
-    }
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.type === 'tool_use') {
-        const id = msg.metadata?.toolUseId;
-        if (typeof id === 'string' && !toolResultIds.has(id)) {
-          const toolName =
-            typeof msg.metadata?.toolName === 'string' ? msg.metadata.toolName : null;
-          if (toolName) return `${i18nService.t('coworkToolRunning')} ${toolName}...`;
-        }
-      }
-    }
-    return `${i18nService.t('coworkToolRunning')}`;
-  };
-
-  return (
-    <div className="shrink-0 animate-fade-in px-4">
-      <div className="max-w-5xl min-w-[320px] mx-auto">
-        <div className="streaming-bar" />
-        <div className="py-1">
-          <span className="text-xs text-muted-foreground">{getStatusText()}</span>
-        </div>
-      </div>
+/** Bottom activity indicator. The execution group owns the readable status text. */
+export const StreamingBar: React.FC = () => (
+  <div className="shrink-0 animate-fade-in px-4 py-1">
+    <div className="max-w-5xl min-w-[320px] mx-auto">
+      <div className="streaming-bar" />
     </div>
-  );
-};
+  </div>
+);

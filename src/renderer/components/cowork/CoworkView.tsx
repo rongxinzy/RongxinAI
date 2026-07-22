@@ -4,18 +4,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
+import { ThinkingDurationTracker } from '../../../common/thinkingDuration';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
+import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
 import { workspaceService } from '../../services/workspace';
 import { RootState, store } from '../../store';
 import {
   selectCoworkConfig,
   selectCurrentSession,
   selectIsStreaming,
+  selectLoadingSessionId,
 } from '../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../store/selectors/workModeSelectors';
 import {
@@ -41,7 +44,7 @@ import type { SettingsOpenOptions } from '../Settings';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
-import CoworkSessionDetail from './CoworkSessionDetail';
+import CoworkSessionViewport from './CoworkSessionViewport';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -62,29 +65,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 }) => {
   const dispatch = useDispatch();
 
-  // ── RAF-batch content buffer ──
-  // Chat-mode text-delta/reasoning-delta dispatches are throttled
-  // through a Map keyed by messageId. Each key always holds the
-  // latest content for that message; a single rAF flushes all keys
-  // at most once per frame. This prevents flooding Redux on fast
-  // streams (which caused Maximum update depth exceeded crashes).
-  const contentBuffer = useRef(new Map<
-    string,
-    { sessionId: string; messageId: string; content: string; metadata?: Record<string, unknown> }
-  >()).current;
-  const contentRafRef = useRef<number | null>(null);
-  const flushContentBuffer = React.useCallback(() => {
-    // Already scheduled — latest content for each messageId is already buffered.
-    if (contentRafRef.current !== null) return;
-    contentRafRef.current = requestAnimationFrame(() => {
-      contentRafRef.current = null;
-      const snapshot = Array.from(contentBuffer.values());
-      contentBuffer.clear();
-      for (const u of snapshot) {
-        dispatch(updateMessageContent(u));
-      }
+  const contentBatcherRef = useRef<RafMessageUpdateBatcher | null>(null);
+  if (!contentBatcherRef.current) {
+    contentBatcherRef.current = new RafMessageUpdateBatcher(update => {
+      dispatch(updateMessageContent(update));
     });
-  }, [dispatch, contentBuffer]);
+  }
+  const contentBatcher = contentBatcherRef.current;
+
+  useEffect(() => () => contentBatcher.dispose(), [contentBatcher]);
   const isMac = window.electron.platform === 'darwin';
   const [isInitialized, setIsInitialized] = useState(false);
   const [openClawStatus, setOpenClawStatus] = useState<OpenClawEngineStatus | null>(null);
@@ -107,6 +96,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
   const currentSession = useSelector(selectCurrentSession);
+  const loadingSessionId = useSelector(selectLoadingSessionId);
   const workMode = useSelector(selectWorkMode);
   const directChatModelId = useSelector((state: RootState) => state.model.defaultSelectedModel.id);
 
@@ -370,9 +360,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let thinkingContent = '';
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
+        let isThinkingOpen = false;
+        let thinkingDurationMs: number | undefined;
+        const thinkingDurationTracker = new ThinkingDurationTracker();
         let persistTimer: ReturnType<typeof setTimeout> | null = null;
         const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
           const isStreamActive = status === CoworkSessionStatusValue.Running;
+          const isCompleted = status === CoworkSessionStatusValue.Completed;
           const messages = [
             ...tempSession.messages,
             ...(thinkingContent
@@ -386,6 +380,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                       isStreaming: isStreamActive,
                       isFinal: !isStreamActive,
                       isThinking: true,
+                      ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
                     },
                   },
                 ]
@@ -397,7 +392,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     type: 'assistant' as const,
                     content: assistantContent,
                     timestamp: Date.now(),
-                    metadata: { isStreaming: isStreamActive, isFinal: !isStreamActive },
+                    metadata: {
+                      isStreaming: isStreamActive,
+                      isFinal: !isStreamActive,
+                      ...(isCompleted && { isFinalAnswer: true }),
+                    },
                   },
                 ]
               : []),
@@ -447,6 +446,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             if (!chunk) continue;
             switch (chunk.type) {
               case 'text-start':
+                if (isThinkingOpen) break;
                 if (!assistantMessageAdded) {
                   dispatch(
                     addMessage({
@@ -466,6 +466,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 break;
               case 'text-delta':
                 assistantContent += chunk.delta;
+                if (isThinkingOpen) break;
                 if (!assistantMessageAdded) {
                   dispatch(
                     addMessage({
@@ -481,17 +482,18 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   );
                   assistantMessageAdded = true;
                 } else {
-                  contentBuffer.set(assistantMsgId, {
+                  contentBatcher.enqueue({
                     sessionId: tempSessionId,
                     messageId: assistantMsgId,
                     content: assistantContent,
                     metadata: { isStreaming: true, isFinal: false },
                   });
-                  flushContentBuffer();
                 }
                 persistChatSnapshot();
                 break;
               case 'reasoning-start':
+                isThinkingOpen = true;
+                thinkingDurationTracker.start();
                 if (!thinkingMessageAdded) {
                   dispatch(
                     addMessage({
@@ -510,6 +512,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }
                 break;
               case 'reasoning-delta':
+                thinkingDurationTracker.start();
                 thinkingContent += chunk.delta;
                 if (!thinkingMessageAdded) {
                   dispatch(
@@ -526,13 +529,31 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   );
                   thinkingMessageAdded = true;
                 } else {
-                  contentBuffer.set(thinkingMsgId, {
+                  contentBatcher.enqueue({
                     sessionId: tempSessionId,
                     messageId: thinkingMsgId,
                     content: thinkingContent,
                     metadata: { isStreaming: true, isFinal: false, isThinking: true },
                   });
-                  flushContentBuffer();
+                }
+                break;
+              case 'reasoning-end':
+                isThinkingOpen = false;
+                thinkingDurationTracker.finish();
+                if (assistantContent && !assistantMessageAdded) {
+                  dispatch(
+                    addMessage({
+                      sessionId: tempSessionId,
+                      message: {
+                        id: assistantMsgId,
+                        type: 'assistant',
+                        content: assistantContent,
+                        timestamp: Date.now(),
+                        metadata: { isStreaming: true, isFinal: false },
+                      },
+                    }),
+                  );
+                  assistantMessageAdded = true;
                 }
                 persistChatSnapshot();
                 break;
@@ -541,6 +562,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             }
           }
           if (abortController.signal.aborted || isPendingStartCancelled()) {
+            contentBatcher.discard(tempSessionId, assistantMsgId);
+            contentBatcher.discard(tempSessionId, thinkingMsgId);
+            thinkingDurationMs = thinkingMessageAdded
+              ? thinkingDurationTracker.finish()
+              : undefined;
             if (assistantMessageAdded) {
               dispatch(
                 updateMessageContent({
@@ -557,7 +583,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   sessionId: tempSessionId,
                   messageId: thinkingMsgId,
                   content: thinkingContent,
-                  metadata: { isStreaming: false, isFinal: true, isThinking: true },
+                metadata: {
+                  isStreaming: false,
+                  isFinal: true,
+                  isThinking: true,
+                  ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
+                },
                 }),
               );
             }
@@ -566,13 +597,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             await coworkService.saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Idle));
             return;
           }
-          // Cancel any pending buffered update so it doesn't overwrite final metadata
-          if (contentRafRef.current !== null) {
-            cancelAnimationFrame(contentRafRef.current);
-            contentRafRef.current = null;
-          }
-          contentBuffer.delete(assistantMsgId);
-          contentBuffer.delete(thinkingMsgId);
+          contentBatcher.discard(tempSessionId, assistantMsgId);
+          contentBatcher.discard(tempSessionId, thinkingMsgId);
+          thinkingDurationMs = thinkingMessageAdded
+            ? thinkingDurationTracker.finish()
+            : undefined;
           // Finalize message metadata to prevent streaming replay on reload
           if (assistantMessageAdded) {
             dispatch(
@@ -580,7 +609,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 sessionId: tempSessionId,
                 messageId: assistantMsgId,
                 content: assistantContent,
-                metadata: { isStreaming: false, isFinal: true },
+                metadata: { isStreaming: false, isFinal: true, isFinalAnswer: true },
               }),
             );
           }
@@ -590,7 +619,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 sessionId: tempSessionId,
                 messageId: thinkingMsgId,
                 content: thinkingContent,
-                metadata: { isStreaming: false, isFinal: true, isThinking: true },
+                  metadata: {
+                    isStreaming: false,
+                    isFinal: true,
+                    isThinking: true,
+                    ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
+                  },
               }),
             );
           }
@@ -730,9 +764,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       let thinkingContent = '';
       let assistantMessageAdded = false;
       let thinkingMessageAdded = false;
+      let isThinkingOpen = false;
+      let thinkingDurationMs: number | undefined;
+      const thinkingDurationTracker = new ThinkingDurationTracker();
       let persistTimer: ReturnType<typeof setTimeout> | null = null;
       const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
         const isStreamActive = status === CoworkSessionStatusValue.Running;
+        const isCompleted = status === CoworkSessionStatusValue.Completed;
         const messages = [
           ...currentSession.messages,
           userMessage,
@@ -747,6 +785,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     isStreaming: isStreamActive,
                     isFinal: !isStreamActive,
                     isThinking: true,
+                    ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
                   },
                 },
               ]
@@ -758,7 +797,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   type: 'assistant' as const,
                   content: assistantContent,
                   timestamp: Date.now(),
-                  metadata: { isStreaming: isStreamActive, isFinal: !isStreamActive },
+                  metadata: {
+                    isStreaming: isStreamActive,
+                    isFinal: !isStreamActive,
+                    ...(isCompleted && { isFinalAnswer: true }),
+                  },
                 },
               ]
             : []),
@@ -844,6 +887,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           if (!chunk) continue;
           switch (chunk.type) {
             case 'text-start':
+              if (isThinkingOpen) break;
               if (!assistantMessageAdded) {
                 dispatch(
                   addMessage({
@@ -863,6 +907,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               break;
             case 'text-delta':
               assistantContent += chunk.delta;
+              if (isThinkingOpen) break;
               if (!assistantMessageAdded) {
                 dispatch(
                   addMessage({
@@ -878,17 +923,18 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 );
                 assistantMessageAdded = true;
               } else {
-                contentBuffer.set(assistantMsgId, {
+                contentBatcher.enqueue({
                   sessionId: currentSession.id,
                   messageId: assistantMsgId,
                   content: assistantContent,
                   metadata: { isStreaming: true, isFinal: false },
                 });
-                flushContentBuffer();
               }
               persistChatSnapshot();
               break;
             case 'reasoning-start':
+              isThinkingOpen = true;
+              thinkingDurationTracker.start();
               if (!thinkingMessageAdded) {
                 dispatch(
                   addMessage({
@@ -907,6 +953,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               }
               break;
             case 'reasoning-delta':
+              thinkingDurationTracker.start();
               thinkingContent += chunk.delta;
               if (!thinkingMessageAdded) {
                 dispatch(
@@ -923,13 +970,31 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 );
                 thinkingMessageAdded = true;
               } else {
-                contentBuffer.set(thinkingMsgId, {
+                contentBatcher.enqueue({
                   sessionId: currentSession.id,
                   messageId: thinkingMsgId,
                   content: thinkingContent,
                   metadata: { isStreaming: true, isFinal: false, isThinking: true },
                 });
-                flushContentBuffer();
+              }
+              break;
+            case 'reasoning-end':
+              isThinkingOpen = false;
+              thinkingDurationTracker.finish();
+              if (assistantContent && !assistantMessageAdded) {
+                dispatch(
+                  addMessage({
+                    sessionId: currentSession.id,
+                    message: {
+                      id: assistantMsgId,
+                      type: 'assistant',
+                      content: assistantContent,
+                      timestamp: Date.now(),
+                      metadata: { isStreaming: true, isFinal: false },
+                    },
+                  }),
+                );
+                assistantMessageAdded = true;
               }
               persistChatSnapshot();
               break;
@@ -937,13 +1002,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               throw new Error(chunk.errorText);
           }
         }
-        // Cancel any pending buffered update so it doesn't overwrite final metadata
-        if (contentRafRef.current !== null) {
-          cancelAnimationFrame(contentRafRef.current);
-          contentRafRef.current = null;
-        }
-        contentBuffer.delete(assistantMsgId);
-        contentBuffer.delete(thinkingMsgId);
+        contentBatcher.discard(currentSession.id, assistantMsgId);
+        contentBatcher.discard(currentSession.id, thinkingMsgId);
+        thinkingDurationMs = thinkingMessageAdded
+          ? thinkingDurationTracker.finish()
+          : undefined;
+        const finalStatus = abortController.signal.aborted
+          ? CoworkSessionStatusValue.Idle
+          : CoworkSessionStatusValue.Completed;
         // Finalize message metadata to prevent streaming replay on reload
         if (assistantMessageAdded) {
           dispatch(
@@ -951,7 +1017,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               sessionId: currentSession.id,
               messageId: assistantMsgId,
               content: assistantContent,
-              metadata: { isStreaming: false, isFinal: true },
+              metadata: {
+                isStreaming: false,
+                isFinal: true,
+                ...(finalStatus === CoworkSessionStatusValue.Completed && { isFinalAnswer: true }),
+              },
             }),
           );
         }
@@ -961,7 +1031,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               sessionId: currentSession.id,
               messageId: thinkingMsgId,
               content: thinkingContent,
-              metadata: { isStreaming: false, isFinal: true, isThinking: true },
+              metadata: {
+                isStreaming: false,
+                isFinal: true,
+                isThinking: true,
+                ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
+              },
             }),
           );
         }
@@ -969,17 +1044,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         dispatch(
           updateSessionStatus({
             sessionId: currentSession.id,
-            status: abortController.signal.aborted
-              ? CoworkSessionStatusValue.Idle
-              : CoworkSessionStatusValue.Completed,
+            status: finalStatus,
           }),
         );
         await coworkService.saveChatSession(
-          buildChatSnapshot(
-            abortController.signal.aborted
-              ? CoworkSessionStatusValue.Idle
-              : CoworkSessionStatusValue.Completed,
-          ),
+          buildChatSnapshot(finalStatus),
         );
       } catch (error) {
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
@@ -1200,12 +1269,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       </div>
     ) : null;
 
-  // When there's a current session, show the session detail view
-  if (currentSession) {
+  const displayedSessionId = currentSession?.id ?? loadingSessionId;
+
+  if (displayedSessionId) {
     return (
       <div className="flex-1 flex flex-col h-full">
         {engineStatusBanner}
-        <CoworkSessionDetail
+        <CoworkSessionViewport
+          sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
           onContinue={handleContinueSession}
           onStop={handleStopSession}

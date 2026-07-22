@@ -24,6 +24,7 @@ interface CoworkState {
   hasMoreSessions: boolean;
   currentSessionId: string | null;
   currentSession: CoworkSession | null;
+  loadingSessionId: string | null;
   draftPrompts: Record<string, string>;
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
@@ -43,6 +44,7 @@ const initialState: CoworkState = {
   hasMoreSessions: false,
   currentSessionId: null,
   currentSession: null,
+  loadingSessionId: null,
   draftPrompts: {},
   draftAttachments: {},
   unreadSessionIds: [],
@@ -154,6 +156,16 @@ const coworkSlice = createSlice({
     setCurrentSessionId(state, action: PayloadAction<string | null>) {
       state.currentSessionId = action.payload;
       markSessionRead(state, action.payload);
+    },
+
+    setLoadingSessionId(state, action: PayloadAction<string>) {
+      state.loadingSessionId = action.payload;
+    },
+
+    clearLoadingSessionId(state, action: PayloadAction<string>) {
+      if (state.loadingSessionId === action.payload) {
+        state.loadingSessionId = null;
+      }
     },
 
     setCurrentSession(state, action: PayloadAction<CoworkSession | null>) {
@@ -466,6 +478,13 @@ const coworkSlice = createSlice({
     clearCurrentSession(state) {
       state.currentSessionId = null;
       state.currentSession = null;
+      state.loadingSessionId = null;
+      state.remoteManaged = false;
+    },
+
+    clearCurrentSessionForWorkspaceChange(state) {
+      state.currentSessionId = null;
+      state.currentSession = null;
       state.remoteManaged = false;
     },
 
@@ -503,6 +522,8 @@ export const {
   setHasMoreSessions,
   appendSessions,
   setCurrentSessionId,
+  setLoadingSessionId,
+  clearLoadingSessionId,
   setCurrentSession,
   setDraftPrompt,
   setDraftAttachments,
@@ -519,6 +540,7 @@ export const {
   updateSessionPinned,
   updateSessionTitle,
   updateCurrentSessionModelOverride,
+  clearCurrentSessionForWorkspaceChange,
   enqueuePendingPermission,
   dequeuePendingPermission,
   clearPendingPermissions,
