@@ -101,8 +101,6 @@ interface ActivePiSession {
   answerText: string;
   /** Latest full snapshot of thinking text for the current turn. */
   thinkingText: string;
-  /** Answer snapshot held until the active thinking segment completes. */
-  pendingAnswerText: string;
   thinkingLifecycle: PiThinkingLifecycle;
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
@@ -388,7 +386,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         thinkingMessageId: null,
         answerText: '',
         thinkingText: '',
-        pendingAnswerText: '',
         thinkingLifecycle: new PiThinkingLifecycle(),
         lastCompletedAnswerMessageId: null,
         lastCompletedAnswerText: '',
@@ -660,7 +657,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         active.thinkingMessageId = null;
         active.answerText = '';
         active.thinkingText = '';
-        active.pendingAnswerText = '';
         active.thinkingLifecycle.reset();
         active.lastCompletedAnswerMessageId = null;
         active.lastCompletedAnswerText = '';
@@ -690,16 +686,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           this.finalizeActiveThinking(sessionId, active);
         }
         if (text && text !== active.answerText) {
+          this.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
-          if (active.thinkingLifecycle.isSegmentOpen) {
-            active.pendingAnswerText = text;
-          } else {
-            this.streamInto(sessionId, active, 'answer', text);
-          }
-        }
-        if (!active.thinkingLifecycle.isSegmentOpen && active.pendingAnswerText) {
-          this.streamInto(sessionId, active, 'answer', active.pendingAnswerText);
-          active.pendingAnswerText = '';
+          this.streamInto(sessionId, active, 'answer', text);
         }
         break;
       }
@@ -763,7 +752,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           active.thinkingMessageId = null;
           active.answerText = '';
           active.thinkingText = '';
-          active.pendingAnswerText = '';
         }
         break;
       }
@@ -923,8 +911,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.clearPendingMessageUpdate(messageId);
     this.clearPendingStoreUpdate(messageId);
-    const thinkingDurationMs =
-      kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
+    const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
     const metadata =
       kind === 'thinking'
         ? {

@@ -53,6 +53,14 @@ export class ThinkingMessageLifecycle {
     return this.measuredDurationMs;
   }
 
+  completeBeforeAnswer(
+    content: string,
+    messageExists: boolean,
+    nowMs?: number,
+  ): number | undefined {
+    return this.complete({ content, messageExists, nowMs });
+  }
+
   get isComplete(): boolean {
     return this.completed;
   }
