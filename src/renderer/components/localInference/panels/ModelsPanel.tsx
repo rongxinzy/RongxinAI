@@ -67,7 +67,7 @@ const modelProviderIconMap = {
 
 const MODEL_CARD_MAX_VISIBLE_TAGS = 6;
 const modelCardTagClassName =
-  'h-7 rounded-md bg-background px-2.5 py-0 text-xs font-normal shadow-none';
+  'h-7 rounded-md bg-background px-2.5 py-0 text-xs font-normal text-muted-foreground shadow-none';
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -81,7 +81,10 @@ type ModelsPanelProps = {
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
   onOpenLaunchLog?: (modelName: string) => void;
-  renderLoadButton?: (model: LlamaCppModel, props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
+  renderLoadButton?: (
+    model: LlamaCppModel,
+    props: { disabled: boolean; onClick: () => void },
+  ) => React.ReactNode;
   showRegisteredModelsTitle?: boolean;
 };
 
@@ -216,7 +219,9 @@ export function ModelsPanel({
                 onDragOver={event => event.preventDefault()}
                 onDrop={event => handleCardDrop(event, model.name)}
                 onDragEnd={() => setDraggedModelName(null)}
-                renderLoadButton={renderLoadButton ? props => renderLoadButton(model, props) : undefined}
+                renderLoadButton={
+                  renderLoadButton ? props => renderLoadButton(model, props) : undefined
+                }
                 onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
               />
             ))}
@@ -328,8 +333,8 @@ function ModelCard({
             type="button"
             isDisabled
             size="default"
-            variant={unloading ? 'closing' : 'loading'}
-            data-local-inference-unload-button={unloading ? 'true' : undefined}
+            variant="secondary"
+            data-local-inference-secondary-action-button="true"
           >
             <Spinner
               aria-label={i18nService.t(
@@ -348,7 +353,8 @@ function ModelCard({
             <Button21st
               type="button"
               size="default"
-              variant="primary"
+              variant="secondary"
+              data-local-inference-secondary-action-button="true"
               onClick={handleOpenLaunchLog}
             >
               <LogButtonIcon />
@@ -384,6 +390,7 @@ function ModelCard({
             size="sm"
             disabled={buttonsDisabled}
             onClick={onConfigureContext}
+            data-local-inference-secondary-action-button="true"
           >
             <Settings2 data-icon="inline-start" />
             {i18nService.t('localInferenceConfigureContext')}
@@ -422,10 +429,10 @@ function ModelCard({
           {isRunning ? (
             <Button21st
               type="button"
-              variant="danger"
+              variant="secondary"
               isDisabled={buttonsDisabled}
               data-local-inference-model-action-button="true"
-              data-local-inference-unload-button="true"
+              data-local-inference-secondary-action-button="true"
               onClick={onUnload}
             >
               <Square data-icon="inline-start" />
@@ -468,7 +475,7 @@ function MetadataRow({ label, value }: { label: string; value: string }) {
       <div className={cn('pt-0.5 text-[11px] font-medium leading-4', localInferenceMutedTextClass)}>
         {label}
       </div>
-      <div className="min-w-0 text-[13px] font-medium leading-5 text-foreground">
+      <div className="min-w-0 text-[13px] font-medium leading-5 text-muted-foreground">
         <span className="block break-all">{value}</span>
       </div>
     </div>
