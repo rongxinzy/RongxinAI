@@ -140,6 +140,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     const agentId = session.agentId?.trim() || AgentId.Main;
 
+    // Notify CoworkView to abort any in-flight chat-mode stream before
+    // switching to the new session. This prevents the previous stream from
+    // racing with the new session load and overwriting currentSession.
+    window.dispatchEvent(new CustomEvent('cowork:cancel-chat-stream'));
+
     // Chat sessions are not scoped to agents — skip loadSessions
     // to avoid replacing the full sessions list with a filtered subset.
     if (session.mode !== 'chat') {
