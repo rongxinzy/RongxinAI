@@ -1,14 +1,35 @@
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
-import type { MarketplaceModel, MarketplaceSearchParams } from '../../../../shared/marketplace';
+import {
+  MarketplaceCapability,
+  type MarketplaceModel,
+  type MarketplaceSearchParams,
+} from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
-import { MARKETPLACE_PAGE_SIZE, MARKETPLACE_SEARCH_MAX_MODEL_COUNT } from '../constants';
+import {
+  MARKETPLACE_INITIAL_MODEL_COUNT,
+  MARKETPLACE_PAGE_SIZE,
+  MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
+} from '../constants';
 import type { InstallProgressState } from '../types';
+
+export const MARKETPLACE_GGUF_FORMAT = 'GGUF';
+
+const MARKETPLACE_CAPABILITY_ORDER = [
+  MarketplaceCapability.Chat,
+  MarketplaceCapability.Reasoning,
+  MarketplaceCapability.Code,
+  MarketplaceCapability.Vision,
+  MarketplaceCapability.Embedding,
+] as const;
 
 export function buildMarketplaceSearchParams(input: {
   query: string;
   pageNumber?: number;
 }): MarketplaceSearchParams | null {
   const query = input.query.trim();
+  if (!query) {
+    return { limit: MARKETPLACE_INITIAL_MODEL_COUNT };
+  }
   if (!isMarketplaceSearchQuery(query)) return null;
   return {
     query,
@@ -47,18 +68,51 @@ export function getMarketplaceInstallProgress(
 
 export function capabilityLabel(capability: MarketplaceModel['capability']): string {
   switch (capability) {
-    case 'reasoning':
+    case MarketplaceCapability.Reasoning:
       return i18nService.t('marketplaceFilterTaskReasoning');
-    case 'code':
+    case MarketplaceCapability.Code:
       return i18nService.t('marketplaceFilterTaskCode');
-    case 'embedding':
+    case MarketplaceCapability.Embedding:
       return i18nService.t('marketplaceFilterTaskEmbedding');
-    case 'vision':
+    case MarketplaceCapability.Vision:
       return i18nService.t('marketplaceFilterTaskVision');
-    case 'chat':
+    case MarketplaceCapability.Chat:
     default:
       return i18nService.t('marketplaceFilterTaskChat');
   }
+}
+
+export function getMarketplaceDisplayName(repoId: string): string {
+  const repositoryName = repoId.trim().split('/').at(-1) ?? '';
+  return repositoryName.replace(/(?:[-_. ]?gguf)+$/i, '') || repositoryName;
+}
+
+export function getMarketplacePublisher(repoId: string): string | null {
+  const segments = repoId.trim().split('/');
+  return segments.length > 1 && segments[0] ? segments[0] : null;
+}
+
+export function getMarketplaceCapabilityTags(
+  model: MarketplaceModel,
+): MarketplaceModel['capability'][] {
+  const capabilities = new Set<MarketplaceModel['capability']>([
+    model.capability,
+    ...model.tags.filter(isMarketplaceCapability),
+  ]);
+  return MARKETPLACE_CAPABILITY_ORDER.filter(capability => capabilities.has(capability));
+}
+
+export function getMarketplaceRecommendedQuantization(recommendedTag: string): string | null {
+  const normalized = recommendedTag.trim();
+  return normalized && normalized.toLocaleUpperCase() !== MARKETPLACE_GGUF_FORMAT
+    ? normalized
+    : null;
+}
+
+function isMarketplaceCapability(value: string): value is MarketplaceModel['capability'] {
+  return Object.values(MarketplaceCapability).includes(
+    value.trim().toLocaleLowerCase() as MarketplaceModel['capability'],
+  );
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
