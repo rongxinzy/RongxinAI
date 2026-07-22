@@ -620,63 +620,6 @@ select::-ms-expand {
   display: none;
 }
 
-/* Local inference tabs mirror the Work/Chat capsule switch. */
-[data-local-inference-tabs] [data-slot="tabs-list"] {
-  position: relative;
-  width: 184px;
-  height: 28px;
-  overflow: visible;
-  gap: 0;
-  padding: 0;
-  border: 1px solid var(--zy-border);
-  border-radius: 9999px;
-  background-color: var(--work-chat-track-bg);
-  box-shadow: var(--shadow-inset);
-}
-[data-local-inference-tabs] [data-slot="tabs-list"]::before {
-  content: '';
-  position: absolute;
-  z-index: 1;
-  left: -6px;
-  top: -4px;
-  width: calc(50% + 12px);
-  height: calc(100% + 8px);
-  border-radius: 9999px;
-  background-color: var(--zy-surface);
-  box-shadow: var(--shadow-card);
-  pointer-events: none;
-  transition: left 200ms ease;
-}
-[data-local-inference-tabs] [data-slot="tabs-list"]:has([data-local-inference-tab="marketplace"][data-active])::before {
-  left: calc(50% - 6px);
-}
-[data-local-inference-tabs] [data-slot="tabs-trigger"] {
-  z-index: 2;
-  height: 100%;
-  flex: 1 0 0;
-  border: 0;
-  border-radius: 9999px;
-  background-color: transparent;
-  padding-inline: 0;
-  color: var(--zy-text-secondary);
-  font-weight: 400;
-  opacity: 0.5;
-  box-shadow: none;
-  transition:
-    color 200ms ease,
-    opacity 200ms ease;
-}
-[data-local-inference-tabs] [data-slot="tabs-trigger"]::after {
-  display: none;
-}
-[data-local-inference-tabs] [data-slot="tabs-trigger"][data-active] {
-  background-color: transparent;
-  color: var(--zy-foreground);
-  font-weight: 600;
-  opacity: 1;
-  box-shadow: none;
-}
-
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
    via the Tailwind plugin which uses var(--zy-*) directly. */
@@ -707,12 +650,12 @@ select::-ms-expand {
 [data-slot='button'].text-destructive {
   color: var(--zy-destructive);
 }
-[data-local-inference-model-action-button="true"] {
+[data-local-inference-model-action-button='true'] {
   transition-property: background-color, border-color, box-shadow, filter, transform;
   transition-duration: 200ms, 200ms, 200ms, 200ms, 120ms;
   transition-timing-function: ease-out;
 }
-[data-local-inference-model-action-button="true"]:active:not(:disabled) {
+[data-local-inference-model-action-button='true']:active:not(:disabled) {
   transform: translateY(1px);
 }
 
@@ -726,40 +669,40 @@ select::-ms-expand {
   color: var(--zy-text-muted);
   line-height: 1;
 }
-[data-local-inference-launch-status="starting"] {
+[data-local-inference-launch-status='starting'] {
   border-color: color-mix(in srgb, var(--zy-primary) 32%, transparent);
   background-color: color-mix(in srgb, var(--zy-primary) 12%, var(--zy-background));
   color: var(--zy-primary);
 }
-[data-local-inference-launch-status="succeeded"] {
+[data-local-inference-launch-status='succeeded'] {
   border-color: color-mix(in srgb, var(--zy-success) 32%, transparent);
   background-color: color-mix(in srgb, var(--zy-success) 12%, var(--zy-background));
   color: var(--zy-success);
 }
-[data-local-inference-launch-status="failed"] {
+[data-local-inference-launch-status='failed'] {
   border-color: color-mix(in srgb, var(--zy-destructive) 32%, transparent);
   background-color: color-mix(in srgb, var(--zy-destructive) 12%, var(--zy-background));
   color: var(--zy-destructive);
 }
 
-[data-slot="button"][data-local-inference-launch-close-button="true"] {
+[data-slot='button'][data-local-inference-launch-close-button='true'] {
   transition:
     background-color 200ms ease,
     color 200ms ease;
 }
-[data-slot="button"][data-local-inference-launch-close-button="true"]:hover:not(:disabled) {
+[data-slot='button'][data-local-inference-launch-close-button='true']:hover:not(:disabled) {
   background-color: var(--lobster-destructive);
   color: var(--lobster-destructive-foreground);
 }
-[data-slot="button"][data-local-inference-launch-close-button="true"]:hover:not(:disabled) svg {
+[data-slot='button'][data-local-inference-launch-close-button='true']:hover:not(:disabled) svg {
   color: var(--lobster-destructive-foreground);
 }
-[data-slot="button"][data-local-inference-toolbar-button="true"] {
+[data-slot='button'][data-local-inference-toolbar-button='true'] {
   height: 32px;
   border-color: var(--zy-border);
   border-radius: 9999px;
   background-color: var(--zy-surface);
-  color: var(--zy-foreground);
+  color: var(--zy-text-secondary);
   box-shadow: none;
   font-weight: 500;
   transition:
@@ -768,19 +711,25 @@ select::-ms-expand {
     color 200ms ease,
     transform 120ms ease;
 }
-[data-slot="button"][data-local-inference-toolbar-button="true"]:hover:not(:disabled) {
+[data-slot='button'][data-local-inference-toolbar-button='true']:hover:not(:disabled) {
   border-color: var(--zy-border);
   background-color: var(--zy-surface-raised);
-  color: var(--zy-foreground);
+  color: var(--zy-text-secondary);
   box-shadow: none;
 }
-[data-slot="button"][data-local-inference-toolbar-button="true"] svg {
+[data-slot='button'][data-local-inference-toolbar-button='true'] svg {
   color: var(--zy-text-secondary);
 }
-[data-slot="button"][data-local-inference-toolbar-button="true"]:hover:not(:disabled) svg {
-  color: var(--zy-foreground);
+[data-slot='button'][data-local-inference-toolbar-button='true']:hover:not(:disabled) svg {
+  color: var(--zy-text-secondary);
 }
-[data-slot="button"][data-local-inference-unload-button="true"] {
+[data-local-inference-secondary-action-button='true'],
+[data-local-inference-secondary-action-button='true']:hover:not(:disabled),
+[data-local-inference-secondary-action-button='true'] svg,
+[data-local-inference-secondary-action-button='true']:hover:not(:disabled) svg {
+  color: var(--zy-text-secondary);
+}
+[data-slot='button'][data-local-inference-unload-button='true'] {
   background-color: var(--lobster-destructive);
   border-color: var(--lobster-destructive);
   color: var(--lobster-destructive-foreground);
