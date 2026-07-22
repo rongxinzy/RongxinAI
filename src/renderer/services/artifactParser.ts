@@ -38,7 +38,23 @@ const EXTENSION_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
   '.mmd': 'mermaid',
   '.jsx': 'code',
   '.tsx': 'code',
+  '.js': 'code',
+  '.mjs': 'code',
+  '.cjs': 'code',
+  '.ts': 'code',
+  '.mts': 'code',
+  '.cts': 'code',
   '.css': 'code',
+  '.scss': 'code',
+  '.less': 'code',
+  '.json': 'code',
+  '.yaml': 'code',
+  '.yml': 'code',
+  '.xml': 'code',
+  '.py': 'code',
+  '.java': 'code',
+  '.go': 'code',
+  '.rs': 'code',
   '.md': 'markdown',
   '.txt': 'text',
   '.log': 'text',
@@ -122,7 +138,7 @@ export function stripFileLinksFromText(text: string): string {
 }
 
 const BARE_FILE_PATH_RE =
-  /(?:^|[\s"'`(])(\/?(?:[^\s"'`()\[\]]+\/)*[^\s"'`()\[\]]+\.(?:docx|xlsx|pptx|pdf|md|txt|log|csv))(?:[\s"'`)]|$)/gm;
+  /(?:^|[\s"'`(])(\/?(?:[^\s"'`()\[\]]+\/)*[^\s"'`()\[\]]+\.(?:html?|svg|png|jpe?g|gif|webp|mermaid|mmd|jsx|tsx|js|mjs|cjs|ts|mts|cts|css|scss|less|json|yaml|yml|xml|py|java|go|rs|docx|xlsx|pptx|pdf|md|txt|log|csv|tsv|xls))(?:[\s"'`)]|$)/gm;
 
 export function parseFilePathsFromText(
   messageContent: string,
@@ -357,31 +373,6 @@ export function detectArtifactsFromMessages(
         }
       }
 
-      const contentWithoutFileLinks = stripFileLinksFromText(msg.content);
-      const pathArtifacts = parseFilePathsFromText(contentWithoutFileLinks, msg.id, sessionId);
-      for (const pa of pathArtifacts) {
-        const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
-        if (pa.filePath && !seenFilePaths.has(normalized)) {
-          seenFilePaths.add(normalized);
-          detected.push({ artifact: pa, needsFileLoad: true });
-        }
-      }
-    }
-
-    if (msg.type === 'tool_result' && msg.content) {
-      const pathArtifacts = parseFilePathsFromText(
-        msg.content,
-        msg.id,
-        sessionId,
-        'artifact-toolresult',
-      );
-      for (const pa of pathArtifacts) {
-        const normalized = pa.filePath ? normalizeFilePathForDedup(pa.filePath) : '';
-        if (pa.filePath && !seenFilePaths.has(normalized)) {
-          seenFilePaths.add(normalized);
-          detected.push({ artifact: pa, needsFileLoad: true });
-        }
-      }
     }
   }
 

@@ -226,9 +226,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const service = new ArtifactDetectionService(
       detected => {
         for (const { artifact } of detected) {
-          if (!artifact.filePath) {
-            dispatch(addArtifact({ sessionId, artifact }));
-          }
+          // Keep path-backed artifacts visible while their file contents load.
+          // Renderers can use filePath directly when the read is unavailable.
+          dispatch(addArtifact({ sessionId, artifact }));
         }
       },
       artifact => {
@@ -330,8 +330,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     service.processMessages(currentSession.messages, sessionId, currentSession.cwd).catch(err => {
       console.error('[ArtifactDetection] failed:', err);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- uses messagesLength as stable proxy for currentSession.messages
-  }, [sessionId, messagesLength, isStreaming]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- message count and updatedAt cover message additions and content updates
+  }, [sessionId, messagesLength, currentSession?.updatedAt, isStreaming]);
 
   // Intercept clicks on artifact-compatible file links → open in panel
   useEffect(() => {
