@@ -11,6 +11,7 @@ import {
   shouldRetryLocalInferenceSlot,
   waitForLocalInferenceSlot,
 } from './localInferenceSlotRetry';
+import { StreamRequestRegistry } from './streamRequestRegistry';
 
 export interface ApiConfig {
   apiKey: string;
@@ -35,25 +36,23 @@ const generateRequestId = () => `req_${Date.now()}_${Math.random().toString(36).
 
 class ApiService {
   private config: ApiConfig | null = null;
-  private currentRequestId: string | null = null;
-  private cleanupFunctions: (() => void)[] = [];
+  private readonly streamRequests = new StreamRequestRegistry();
 
   setConfig(config: ApiConfig) {
     this.config = config;
   }
 
-  cancelOngoingRequest() {
-    if (this.currentRequestId) {
-      window.electron.api.cancelStream(this.currentRequestId);
+  cancelOngoingRequest(requestId?: string) {
+    const targetRequestId = requestId ?? this.streamRequests.getLatestRequestId();
+    if (targetRequestId) {
+      window.electron.api.cancelStream(targetRequestId);
       return true;
     }
     return false;
   }
 
-  private cleanup() {
-    this.cleanupFunctions.forEach(fn => fn());
-    this.cleanupFunctions = [];
-    this.currentRequestId = null;
+  private cleanup(requestId: string | null) {
+    this.streamRequests.cleanup(requestId);
   }
 
   private normalizeApiFormat(apiFormat: unknown): 'anthropic' | 'openai' | 'gemini' {
@@ -356,6 +355,7 @@ class ApiService {
     onProgress?: (content: string, reasoning?: string) => void,
     history: ChatMessagePayload[] = [],
     options: DirectChatRequestOptions = {},
+    streamRequestId?: string,
   ): Promise<{ content: string; reasoning?: string }> {
     if (!this.config) {
       throw new ApiError(
@@ -411,6 +411,7 @@ class ApiService {
         selectedModel.id,
         effectiveConfig,
         supportsImages,
+        streamRequestId,
       );
     }
 
@@ -422,6 +423,7 @@ class ApiService {
         selectedModel.id,
         effectiveConfig,
         supportsImages,
+        streamRequestId,
       );
     }
 
@@ -435,6 +437,7 @@ class ApiService {
         supportsImages,
         provider,
         options,
+        streamRequestId,
       );
     } catch (error) {
       if (
@@ -455,6 +458,7 @@ class ApiService {
               supportsImages,
               provider,
               options,
+              streamRequestId,
             );
           } catch (retryError) {
             if (!(retryError instanceof ApiError) || !shouldRetryLocalInferenceSlot(retryError)) {
@@ -491,6 +495,7 @@ class ApiService {
               supportsImages,
               provider,
               options,
+              streamRequestId,
             );
           }
         } catch (refreshError) {
@@ -512,14 +517,13 @@ class ApiService {
     modelId: string = 'claude-3-5-sonnet-20241022',
     config: ApiConfig = this.config!,
     supportsImages: boolean = false,
+    streamRequestId?: string,
   ): Promise<{ content: string; reasoning?: string }> {
     let fullContent = '';
     let fullReasoning = '';
 
     try {
-      this.cancelOngoingRequest();
-      const requestId = generateRequestId();
-      this.currentRequestId = requestId;
+      const requestId = streamRequestId ?? generateRequestId();
 
       // Anthropic 需要将 history 中的 system 消息分离出来
       const systemMessages = history.filter(m => m.role === 'system');
@@ -610,8 +614,8 @@ class ApiService {
         });
 
         const removeDoneListener = window.electron.api.onStreamDone(requestId, () => {
-          this.cleanup();
-          if (!fullContent) {
+          this.cleanup(requestId);
+          if (!fullContent && !fullReasoning) {
             reject(new ApiError('No content received from the API. Please try again.'));
           } else {
             resolve({ content: fullContent, reasoning: fullReasoning || undefined });
@@ -619,25 +623,25 @@ class ApiService {
         });
 
         const removeErrorListener = window.electron.api.onStreamError(requestId, error => {
-          this.cleanup();
+          this.cleanup(requestId);
           reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
 
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
           aborted = true;
-          this.cleanup();
+          this.cleanup(requestId);
           resolve({
             content: fullContent || 'Response was stopped.',
             reasoning: fullReasoning || undefined,
           });
         });
 
-        this.cleanupFunctions = [
+        this.streamRequests.register(requestId, [
           removeDataListener,
           removeDoneListener,
           removeErrorListener,
           removeAbortListener,
-        ];
+        ]);
 
         // 发起流式请求
         console.log(
@@ -657,7 +661,7 @@ class ApiService {
           })
           .then(response => {
             if (!response.ok && !aborted) {
-              this.cleanup();
+              this.cleanup(requestId);
               let errorMessage = 'API request failed';
               if (response.error) {
                 try {
@@ -674,13 +678,12 @@ class ApiService {
           })
           .catch(error => {
             if (!aborted) {
-              this.cleanup();
+              this.cleanup(requestId);
               reject(new ApiError(error.message || 'Network error'));
             }
           });
       });
     } catch (error) {
-      this.cleanup();
       if (error instanceof ApiError) {
         throw error;
       }
@@ -696,14 +699,13 @@ class ApiService {
     modelId: string = 'gemini-3-pro-preview',
     config: ApiConfig = this.config!,
     supportsImages: boolean = false,
+    streamRequestId?: string,
   ): Promise<{ content: string; reasoning?: string }> {
     let fullContent = '';
     let fullReasoning = '';
 
     try {
-      this.cancelOngoingRequest();
-      const requestId = generateRequestId();
-      this.currentRequestId = requestId;
+      const requestId = streamRequestId ?? generateRequestId();
 
       const systemMessages = history.filter(m => m.role === 'system');
       const nonSystemMessages = history.filter(m => m.role !== 'system');
@@ -797,8 +799,8 @@ class ApiService {
         });
 
         const removeDoneListener = window.electron.api.onStreamDone(requestId, () => {
-          this.cleanup();
-          if (!fullContent) {
+          this.cleanup(requestId);
+          if (!fullContent && !fullReasoning) {
             reject(new ApiError('No content received from the API. Please try again.'));
           } else {
             resolve({ content: fullContent, reasoning: fullReasoning || undefined });
@@ -806,25 +808,25 @@ class ApiService {
         });
 
         const removeErrorListener = window.electron.api.onStreamError(requestId, error => {
-          this.cleanup();
+          this.cleanup(requestId);
           reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
 
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
           aborted = true;
-          this.cleanup();
+          this.cleanup(requestId);
           resolve({
             content: fullContent || 'Response was stopped.',
             reasoning: fullReasoning || undefined,
           });
         });
 
-        this.cleanupFunctions = [
+        this.streamRequests.register(requestId, [
           removeDataListener,
           removeDoneListener,
           removeErrorListener,
           removeAbortListener,
-        ];
+        ]);
 
         console.log(
           `[api-chat] Gemini request: baseUrl=${config.baseUrl}, finalUrl=${requestUrl}, model=${modelId}`,
@@ -842,7 +844,7 @@ class ApiService {
           })
           .then(response => {
             if (!response.ok && !aborted) {
-              this.cleanup();
+              this.cleanup(requestId);
               let errorMessage = 'API request failed';
               if (response.error) {
                 try {
@@ -859,13 +861,12 @@ class ApiService {
           })
           .catch(error => {
             if (!aborted) {
-              this.cleanup();
+              this.cleanup(requestId);
               reject(new ApiError(error.message || 'Network error'));
             }
           });
       });
     } catch (error) {
-      this.cleanup();
       if (error instanceof ApiError) {
         throw error;
       }
@@ -883,14 +884,13 @@ class ApiService {
     supportsImages: boolean = false,
     provider: string = 'openai',
     options: DirectChatRequestOptions = {},
+    streamRequestId?: string,
   ): Promise<{ content: string; reasoning?: string }> {
     let fullContent = '';
     let fullReasoning = '';
 
     try {
-      this.cancelOngoingRequest();
-      const requestId = generateRequestId();
-      this.currentRequestId = requestId;
+      const requestId = streamRequestId ?? generateRequestId();
       const useResponsesApi = this.shouldUseOpenAIResponsesApi(provider);
 
       const userMessage: ChatMessagePayload = {
@@ -1003,8 +1003,8 @@ class ApiService {
         });
 
         const removeDoneListener = window.electron.api.onStreamDone(requestId, () => {
-          this.cleanup();
-          if (!fullContent) {
+          this.cleanup(requestId);
+          if (!fullContent && !fullReasoning) {
             reject(new ApiError('No content received from the API. Please try again.'));
           } else {
             resolve({ content: fullContent, reasoning: fullReasoning || undefined });
@@ -1012,25 +1012,25 @@ class ApiService {
         });
 
         const removeErrorListener = window.electron.api.onStreamError(requestId, error => {
-          this.cleanup();
+          this.cleanup(requestId);
           reject(new ApiError(typeof error === 'string' ? error : error.message));
         });
 
         const removeAbortListener = window.electron.api.onStreamAbort(requestId, () => {
           aborted = true;
-          this.cleanup();
+          this.cleanup(requestId);
           resolve({
             content: fullContent || 'Response was stopped.',
             reasoning: fullReasoning || undefined,
           });
         });
 
-        this.cleanupFunctions = [
+        this.streamRequests.register(requestId, [
           removeDataListener,
           removeDoneListener,
           removeErrorListener,
           removeAbortListener,
-        ];
+        ]);
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -1085,7 +1085,7 @@ class ApiService {
           })
           .then(response => {
             if (!response.ok && !aborted) {
-              this.cleanup();
+              this.cleanup(requestId);
               let errorMessage = 'API request failed';
               if (response.error) {
                 try {
@@ -1102,13 +1102,12 @@ class ApiService {
           })
           .catch(error => {
             if (!aborted) {
-              this.cleanup();
+              this.cleanup(requestId);
               reject(new ApiError(error.message || 'Network error'));
             }
           });
       });
     } catch (error) {
-      this.cleanup();
       if (error instanceof ApiError) {
         throw error;
       }
