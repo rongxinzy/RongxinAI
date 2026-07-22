@@ -30,6 +30,15 @@ export const TOKEN_CONTRACT = {
   'chat-user-foreground': '--zy-chat-user-foreground',
   'chat-bot': '--zy-chat-bot',
   'chat-bot-foreground': '--zy-chat-bot-foreground',
+  'model-tag-neutral-background': '--zy-model-tag-neutral-background',
+  'model-tag-neutral-foreground': '--zy-model-tag-neutral-foreground',
+  'model-tag-neutral-border': '--zy-model-tag-neutral-border',
+  'model-tag-violet-background': '--zy-model-tag-violet-background',
+  'model-tag-violet-foreground': '--zy-model-tag-violet-foreground',
+  'model-tag-violet-border': '--zy-model-tag-violet-border',
+  'model-tag-green-background': '--zy-model-tag-green-background',
+  'model-tag-green-foreground': '--zy-model-tag-green-foreground',
+  'model-tag-green-border': '--zy-model-tag-green-border',
 
   // ── Text hierarchy ──
   'text-primary': '--zy-text-primary',
