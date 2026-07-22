@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   normalizeFilePathForDedup,
+  detectArtifactsFromMessages,
   parseFileLinksFromMessage,
   parseFilePathsFromText,
   parseToolArtifact,
@@ -97,5 +98,74 @@ describe('parseToolArtifact', () => {
     expect(normalizeFilePathForDedup(toolPath)).toBe(
       normalizeFilePathForDedup(linkArtifacts[0].filePath!),
     );
+  });
+});
+
+describe('detectArtifactsFromMessages', () => {
+  test('does not treat directory listing output as artifacts', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'tool-result-1',
+          type: 'tool_result',
+          content: 'README.md\nsrc/notes.txt\npackage.json',
+          timestamp: Date.now(),
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(0);
+  });
+
+  test('detects code blocks as previewable code artifacts', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-1',
+          type: 'assistant',
+          content: '```tsx\nexport const App = () => <main />;\n```',
+          timestamp: Date.now(),
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.type).toBe('code');
+    expect(artifacts[0].needsFileLoad).toBe(false);
+  });
+
+  test('keeps explicit write-tool outputs as artifacts', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'tool-use-1',
+          type: 'tool_use',
+          content: 'Using tool: Write',
+          timestamp: Date.now(),
+          metadata: {
+            toolName: 'Write',
+            toolUseId: 'call-1',
+            toolInput: {
+              file_path: 'D:/workspace/output.ts',
+              content: 'export const value = 1;',
+            },
+          },
+        },
+        {
+          id: 'tool-result-1',
+          type: 'tool_result',
+          content: 'OK',
+          timestamp: Date.now(),
+          metadata: { toolUseId: 'call-1' },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.filePath).toBe('D:/workspace/output.ts');
+    expect(artifacts[0].needsFileLoad).toBe(true);
   });
 });

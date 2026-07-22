@@ -13,6 +13,7 @@ export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([
   'svg',
   'mermaid',
   'image',
+  'code',
   'markdown',
   'text',
   'document',
