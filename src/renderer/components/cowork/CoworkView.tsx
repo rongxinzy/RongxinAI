@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
-import { ThinkingDurationTracker } from '../../../common/thinkingDuration';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
@@ -12,6 +11,7 @@ import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
 import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
+import { ThinkingMessageLifecycle } from '../../services/thinkingMessageLifecycle';
 import { workspaceService } from '../../services/workspace';
 import { RootState, store } from '../../store';
 import {
@@ -362,11 +362,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let thinkingMessageAdded = false;
         let isThinkingOpen = false;
         let thinkingDurationMs: number | undefined;
-        const thinkingDurationTracker = new ThinkingDurationTracker();
+        const thinkingLifecycle = new ThinkingMessageLifecycle(
+          tempSessionId,
+          thinkingMsgId,
+          contentBatcher,
+          update => dispatch(updateMessageContent(update)),
+        );
         let persistTimer: ReturnType<typeof setTimeout> | null = null;
         const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
           const isStreamActive = status === CoworkSessionStatusValue.Running;
           const isCompleted = status === CoworkSessionStatusValue.Completed;
+          const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
           const messages = [
             ...tempSession.messages,
             ...(thinkingContent
@@ -377,8 +383,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     content: thinkingContent,
                     timestamp: Date.now(),
                     metadata: {
-                      isStreaming: isStreamActive,
-                      isFinal: !isStreamActive,
+                      isStreaming: isThinkingActive,
+                      isFinal: !isThinkingActive,
                       isThinking: true,
                       ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
                     },
@@ -493,7 +499,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 break;
               case 'reasoning-start':
                 isThinkingOpen = true;
-                thinkingDurationTracker.start();
+                thinkingLifecycle.start();
                 if (!thinkingMessageAdded) {
                   dispatch(
                     addMessage({
@@ -512,7 +518,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }
                 break;
               case 'reasoning-delta':
-                thinkingDurationTracker.start();
+                thinkingLifecycle.start();
                 thinkingContent += chunk.delta;
                 if (!thinkingMessageAdded) {
                   dispatch(
@@ -539,7 +545,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 break;
               case 'reasoning-end':
                 isThinkingOpen = false;
-                thinkingDurationTracker.finish();
+                thinkingDurationMs = thinkingLifecycle.complete({
+                  content: thinkingContent,
+                  messageExists: thinkingMessageAdded,
+                });
                 if (assistantContent && !assistantMessageAdded) {
                   dispatch(
                     addMessage({
@@ -563,10 +572,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
           if (abortController.signal.aborted || isPendingStartCancelled()) {
             contentBatcher.discard(tempSessionId, assistantMsgId);
-            contentBatcher.discard(tempSessionId, thinkingMsgId);
-            thinkingDurationMs = thinkingMessageAdded
-              ? thinkingDurationTracker.finish()
-              : undefined;
+            thinkingDurationMs = thinkingLifecycle.complete({
+              content: thinkingContent,
+              messageExists: thinkingMessageAdded,
+            });
             if (assistantMessageAdded) {
               dispatch(
                 updateMessageContent({
@@ -577,31 +586,16 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }),
               );
             }
-            if (thinkingMessageAdded) {
-              dispatch(
-                updateMessageContent({
-                  sessionId: tempSessionId,
-                  messageId: thinkingMsgId,
-                  content: thinkingContent,
-                metadata: {
-                  isStreaming: false,
-                  isFinal: true,
-                  isThinking: true,
-                  ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-                },
-                }),
-              );
-            }
             dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'idle' }));
             if (persistTimer) clearTimeout(persistTimer);
             await coworkService.saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Idle));
             return;
           }
           contentBatcher.discard(tempSessionId, assistantMsgId);
-          contentBatcher.discard(tempSessionId, thinkingMsgId);
-          thinkingDurationMs = thinkingMessageAdded
-            ? thinkingDurationTracker.finish()
-            : undefined;
+          thinkingDurationMs = thinkingLifecycle.complete({
+            content: thinkingContent,
+            messageExists: thinkingMessageAdded,
+          });
           // Finalize message metadata to prevent streaming replay on reload
           if (assistantMessageAdded) {
             dispatch(
@@ -613,21 +607,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               }),
             );
           }
-          if (thinkingMessageAdded) {
-            dispatch(
-              updateMessageContent({
-                sessionId: tempSessionId,
-                messageId: thinkingMsgId,
-                content: thinkingContent,
-                  metadata: {
-                    isStreaming: false,
-                    isFinal: true,
-                    isThinking: true,
-                    ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-                  },
-              }),
-            );
-          }
           if (persistTimer) clearTimeout(persistTimer);
           const savedSession = buildChatSnapshot(CoworkSessionStatusValue.Completed);
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
@@ -636,6 +615,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
           await coworkService.saveChatSession(savedSession);
         } catch (error) {
+          thinkingDurationMs = thinkingLifecycle.complete({
+            content: thinkingContent,
+            messageExists: thinkingMessageAdded,
+          });
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
           dispatch(
             addMessage({
@@ -766,11 +749,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       let thinkingMessageAdded = false;
       let isThinkingOpen = false;
       let thinkingDurationMs: number | undefined;
-      const thinkingDurationTracker = new ThinkingDurationTracker();
+      const thinkingLifecycle = new ThinkingMessageLifecycle(
+        currentSession.id,
+        thinkingMsgId,
+        contentBatcher,
+        update => dispatch(updateMessageContent(update)),
+      );
       let persistTimer: ReturnType<typeof setTimeout> | null = null;
       const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
         const isStreamActive = status === CoworkSessionStatusValue.Running;
         const isCompleted = status === CoworkSessionStatusValue.Completed;
+        const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
         const messages = [
           ...currentSession.messages,
           userMessage,
@@ -782,8 +771,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   content: thinkingContent,
                   timestamp: Date.now(),
                   metadata: {
-                    isStreaming: isStreamActive,
-                    isFinal: !isStreamActive,
+                    isStreaming: isThinkingActive,
+                    isFinal: !isThinkingActive,
                     isThinking: true,
                     ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
                   },
@@ -934,7 +923,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               break;
             case 'reasoning-start':
               isThinkingOpen = true;
-              thinkingDurationTracker.start();
+              thinkingLifecycle.start();
               if (!thinkingMessageAdded) {
                 dispatch(
                   addMessage({
@@ -953,7 +942,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               }
               break;
             case 'reasoning-delta':
-              thinkingDurationTracker.start();
+              thinkingLifecycle.start();
               thinkingContent += chunk.delta;
               if (!thinkingMessageAdded) {
                 dispatch(
@@ -980,7 +969,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               break;
             case 'reasoning-end':
               isThinkingOpen = false;
-              thinkingDurationTracker.finish();
+              thinkingDurationMs = thinkingLifecycle.complete({
+                content: thinkingContent,
+                messageExists: thinkingMessageAdded,
+              });
               if (assistantContent && !assistantMessageAdded) {
                 dispatch(
                   addMessage({
@@ -1003,10 +995,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
         }
         contentBatcher.discard(currentSession.id, assistantMsgId);
-        contentBatcher.discard(currentSession.id, thinkingMsgId);
-        thinkingDurationMs = thinkingMessageAdded
-          ? thinkingDurationTracker.finish()
-          : undefined;
+        thinkingDurationMs = thinkingLifecycle.complete({
+          content: thinkingContent,
+          messageExists: thinkingMessageAdded,
+        });
         const finalStatus = abortController.signal.aborted
           ? CoworkSessionStatusValue.Idle
           : CoworkSessionStatusValue.Completed;
@@ -1025,21 +1017,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             }),
           );
         }
-        if (thinkingMessageAdded) {
-          dispatch(
-            updateMessageContent({
-              sessionId: currentSession.id,
-              messageId: thinkingMsgId,
-              content: thinkingContent,
-              metadata: {
-                isStreaming: false,
-                isFinal: true,
-                isThinking: true,
-                ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-              },
-            }),
-          );
-        }
         if (persistTimer) clearTimeout(persistTimer);
         dispatch(
           updateSessionStatus({
@@ -1051,6 +1028,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           buildChatSnapshot(finalStatus),
         );
       } catch (error) {
+        thinkingDurationMs = thinkingLifecycle.complete({
+          content: thinkingContent,
+          messageExists: thinkingMessageAdded,
+        });
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
         dispatch(
           addMessage({

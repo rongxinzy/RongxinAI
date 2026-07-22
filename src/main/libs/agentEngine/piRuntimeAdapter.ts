@@ -23,7 +23,6 @@ import path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
-import { ThinkingDurationTracker } from '../../../common/thinkingDuration';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { isLocalProviderName, ProviderName } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
@@ -35,6 +34,7 @@ import {
 } from '../claudeSettings';
 import { getSkillsRoot } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
+import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -101,11 +101,9 @@ interface ActivePiSession {
   answerText: string;
   /** Latest full snapshot of thinking text for the current turn. */
   thinkingText: string;
-  /** Whether the runtime has started a thinking segment that has not ended yet. */
-  isThinkingSegmentOpen: boolean;
   /** Answer snapshot held until the active thinking segment completes. */
   pendingAnswerText: string;
-  thinkingDurationTracker: ThinkingDurationTracker;
+  thinkingLifecycle: PiThinkingLifecycle;
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
@@ -390,9 +388,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         thinkingMessageId: null,
         answerText: '',
         thinkingText: '',
-        isThinkingSegmentOpen: false,
         pendingAnswerText: '',
-        thinkingDurationTracker: new ThinkingDurationTracker(),
+        thinkingLifecycle: new PiThinkingLifecycle(),
         lastCompletedAnswerMessageId: null,
         lastCompletedAnswerText: '',
         confirmationMode: options.confirmationMode || 'modal',
@@ -474,7 +471,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     active.thinkingText = '';
     active.assistantMessageId = null;
     active.thinkingMessageId = null;
-    active.thinkingDurationTracker.reset();
+    active.thinkingLifecycle.reset();
     active.lastCompletedAnswerMessageId = null;
     active.lastCompletedAnswerText = '';
     active.toolResultMessageIdByCallId.clear();
@@ -522,6 +519,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   stopSession(sessionId: string): void {
     const active = this.activeSessions.get(sessionId);
     if (!active) return;
+
+    this.finalizeActiveThinking(sessionId, active);
 
     // Only abort the current turn — keep the session alive in activeSessions
     // so continueSession can find it and preserve conversation history.
@@ -661,9 +660,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         active.thinkingMessageId = null;
         active.answerText = '';
         active.thinkingText = '';
-        active.isThinkingSegmentOpen = false;
         active.pendingAnswerText = '';
-        active.thinkingDurationTracker.reset();
+        active.thinkingLifecycle.reset();
         active.lastCompletedAnswerMessageId = null;
         active.lastCompletedAnswerText = '';
         break;
@@ -679,28 +677,27 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         const segmentEventType = event.assistantMessageEvent?.type;
         const thinkingEnded = segmentEventType === 'thinking_end';
         if (segmentEventType === 'thinking_delta') {
-          active.isThinkingSegmentOpen = true;
-          active.thinkingDurationTracker.start();
+          active.thinkingLifecycle.start();
         } else if (thinkingEnded) {
-          active.isThinkingSegmentOpen = false;
+          active.thinkingLifecycle.finish();
         }
         if (thinking && thinking !== active.thinkingText) {
           active.thinkingText = thinking;
-          if (!thinkingEnded) active.isThinkingSegmentOpen = true;
+          if (!thinkingEnded) active.thinkingLifecycle.start();
           this.streamInto(sessionId, active, 'thinking', thinking);
         }
         if (thinkingEnded) {
-          active.thinkingDurationTracker.finish();
+          this.finalizeActiveThinking(sessionId, active);
         }
         if (text && text !== active.answerText) {
           active.answerText = text;
-          if (active.isThinkingSegmentOpen) {
+          if (active.thinkingLifecycle.isSegmentOpen) {
             active.pendingAnswerText = text;
           } else {
             this.streamInto(sessionId, active, 'answer', text);
           }
         }
-        if (!active.isThinkingSegmentOpen && active.pendingAnswerText) {
+        if (!active.thinkingLifecycle.isSegmentOpen && active.pendingAnswerText) {
           this.streamInto(sessionId, active, 'answer', active.pendingAnswerText);
           active.pendingAnswerText = '';
         }
@@ -710,6 +707,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       case 'message_end': {
         if (event.message?.role === 'assistant') {
           if (event.message.stopReason === 'error') {
+            const { thinking } = extractStreamingSnapshot(event.message);
+            if (thinking && thinking !== active.thinkingText) {
+              active.thinkingText = thinking;
+              active.thinkingLifecycle.markContentStreaming();
+            }
+            this.finalizeActiveThinking(sessionId, active);
             const errMsg = event.message.errorMessage || 'Pi agent error';
             const errDetail = event.message.content
               ? typeof event.message.content === 'string'
@@ -741,8 +744,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
           // Finalize thinking bubble (if any) on its own id.
           if (finalThinking.trim()) {
+            if (finalThinking !== active.thinkingText) {
+              active.thinkingLifecycle.markContentStreaming();
+            }
             active.thinkingText = finalThinking;
-            this.finalizeMessage(sessionId, active, 'thinking', finalThinking);
+            this.finalizeActiveThinking(sessionId, active);
           }
           // Finalize the answer bubble on its own id.
           if (finalAnswer.trim()) {
@@ -757,7 +763,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           active.thinkingMessageId = null;
           active.answerText = '';
           active.thinkingText = '';
-          active.isThinkingSegmentOpen = false;
           active.pendingAnswerText = '';
         }
         break;
@@ -823,6 +828,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         break;
 
       case 'agent_end':
+        this.finalizeActiveThinking(sessionId, active);
         this.markFinalAnswer(sessionId, active);
         // Persist completed status to SQLite so the session shows as "completed"
         // after switching away and back (mirrors OpenClaw adapter pattern).
@@ -877,7 +883,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           : { isStreaming: true, isFinal: false },
     };
     if (kind === 'thinking') {
-      active.thinkingDurationTracker.start(seed.timestamp);
+      active.thinkingLifecycle.start(seed.timestamp);
     }
     const created = this.store ? this.store.addMessage(sessionId, seed) : seed;
     if (kind === 'thinking') active.thinkingMessageId = created.id;
@@ -898,6 +904,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       kind === 'thinking'
         ? { isStreaming: true, isFinal: false, isThinking: true }
         : { isStreaming: true, isFinal: false };
+    if (kind === 'thinking') {
+      active.thinkingLifecycle.markContentStreaming();
+    }
     // Throttle the synchronous SQLite write separately from the IPC emit so a
     // fast Pi stream doesn't block the main-process event loop every frame.
     this.throttledStoreUpdate(sessionId, messageId, content, metadata);
@@ -915,7 +924,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     this.clearPendingMessageUpdate(messageId);
     this.clearPendingStoreUpdate(messageId);
     const thinkingDurationMs =
-      kind === 'thinking' ? active.thinkingDurationTracker.finish() : undefined;
+      kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
     const metadata =
       kind === 'thinking'
         ? {
@@ -929,6 +938,14 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       this.store.updateMessage(sessionId, messageId, { content, metadata });
     }
     this.emit('messageUpdate', sessionId, messageId, content, metadata);
+    if (kind === 'thinking') {
+      active.thinkingLifecycle.markMessageFinalized();
+    }
+  }
+
+  private finalizeActiveThinking(sessionId: string, active: ActivePiSession): void {
+    if (!active.thinkingText.trim() || active.thinkingLifecycle.isMessageFinalized) return;
+    this.finalizeMessage(sessionId, active, 'thinking', active.thinkingText);
   }
 
   private markFinalAnswer(sessionId: string, active: ActivePiSession): void {
