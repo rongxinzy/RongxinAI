@@ -2,10 +2,10 @@ export const AppWindowStoreKey = {
   State: 'app_window_state',
 } as const;
 
-export const DEFAULT_APP_WINDOW_WIDTH = 1024;
-export const DEFAULT_APP_WINDOW_HEIGHT = 680;
-export const MIN_APP_WINDOW_WIDTH = 800;
-export const MIN_APP_WINDOW_HEIGHT = 600;
+export const DEFAULT_APP_WINDOW_WIDTH = 1200;
+export const DEFAULT_APP_WINDOW_HEIGHT = 800;
+export const MIN_APP_WINDOW_WIDTH = 1024;
+export const MIN_APP_WINDOW_HEIGHT = 740;
 
 const DEFAULT_WINDOW_SCREEN_MARGIN = 24;
 

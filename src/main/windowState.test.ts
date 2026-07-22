@@ -15,8 +15,8 @@ test('resolveInitialAppWindowState uses the image-like default size on large dis
   ]);
 
   expect(state).toEqual({
-    x: 768,
-    y: 380,
+    x: 680,
+    y: 320,
     width: DEFAULT_APP_WINDOW_WIDTH,
     height: DEFAULT_APP_WINDOW_HEIGHT,
     isMaximized: false,
@@ -26,10 +26,10 @@ test('resolveInitialAppWindowState uses the image-like default size on large dis
 test('resolveInitialAppWindowState scales the default size to fit smaller displays', () => {
   const state = resolveInitialAppWindowState(undefined, [{ x: 0, y: 0, width: 1000, height: 650 }]);
 
-  expect(state.width).toBe(907);
-  expect(state.height).toBe(602);
-  expect(state.x).toBe(47);
-  expect(state.y).toBe(24);
+  expect(state.width).toBe(1024);
+  expect(state.height).toBe(740);
+  expect(state.x).toBe(-12);
+  expect(state.y).toBe(-45);
 });
 
 test('resolveInitialAppWindowState restores stored bounds on their matching display', () => {
@@ -70,12 +70,22 @@ test('normalizeAppWindowState rejects invalid stored values', () => {
   expect(normalizeAppWindowState(null)).toBeUndefined();
 });
 
-test('normalizeAppWindowState rounds and keeps minimum-sized values for later fitting', () => {
-  expect(normalizeAppWindowState({ x: 1.4, y: 2.6, width: 799.5, height: 599.5 })).toEqual({
+test('normalizeAppWindowState rounds stored values before later fitting', () => {
+  expect(normalizeAppWindowState({ x: 1.4, y: 2.6, width: 1023.5, height: 739.5 })).toEqual({
     x: 1,
     y: 3,
     width: MIN_APP_WINDOW_WIDTH,
     height: MIN_APP_WINDOW_HEIGHT,
     isMaximized: false,
   });
+});
+
+test('resolveInitialAppWindowState raises older saved bounds to the minimum size', () => {
+  const state = resolveInitialAppWindowState(
+    { x: 10, y: 20, width: 960, height: 640 },
+    [{ x: 0, y: 0, width: 1920, height: 1080 }],
+  );
+
+  expect(state.width).toBe(MIN_APP_WINDOW_WIDTH);
+  expect(state.height).toBe(MIN_APP_WINDOW_HEIGHT);
 });
