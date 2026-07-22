@@ -8,7 +8,8 @@
     "filePath": "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf",
     "detailUrl": "https://www.modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF",
     "parameterCount": 7000000000,
-    "downloads": 610790
+    "downloads": 639771,
+    "featuredRank": 11
   },
   {
     "name": "unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
@@ -19,7 +20,8 @@
     "filePath": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
     "detailUrl": "https://www.modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
     "parameterCount": 1500000000,
-    "downloads": 476318
+    "downloads": 506661,
+    "featuredRank": 1
   },
   {
     "name": "Qwen/Qwen3-8B-GGUF",
@@ -30,7 +32,8 @@
     "filePath": "qwen3-8b-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen3-8B-GGUF",
     "parameterCount": 8000000000,
-    "downloads": 243610
+    "downloads": 276604,
+    "featuredRank": 15
   },
   {
     "name": "Qwen/QwQ-32B-GGUF",
@@ -52,7 +55,8 @@
     "filePath": "qwen2.5-3b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen2.5-3B-Instruct-GGUF",
     "parameterCount": 3000000000,
-    "downloads": 215696
+    "downloads": 223000,
+    "featuredRank": 5
   },
   {
     "name": "Qwen/Qwen3-14B-GGUF",
@@ -63,7 +67,8 @@
     "filePath": "qwen3-14b-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen3-14B-GGUF",
     "parameterCount": 14000000000,
-    "downloads": 118860
+    "downloads": 118860,
+    "featuredRank": 20
   },
   {
     "name": "unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF",
@@ -85,7 +90,8 @@
     "filePath": "qwen2.5-7b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen2.5-7B-Instruct-GGUF",
     "parameterCount": 7000000000,
-    "downloads": 63458
+    "downloads": 63458,
+    "featuredRank": 12
   },
   {
     "name": "unsloth/DeepSeek-R1-Distill-Qwen-32B-GGUF",
@@ -151,7 +157,8 @@
     "filePath": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen2.5-1.5B-Instruct-GGUF",
     "parameterCount": 1500000000,
-    "downloads": 18875
+    "downloads": 18875,
+    "featuredRank": 2
   },
   {
     "name": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
@@ -162,7 +169,8 @@
     "filePath": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
     "parameterCount": 7000000000,
-    "downloads": 14632
+    "downloads": 14632,
+    "featuredRank": 13
   },
   {
     "name": "Qwen/Qwen3-4B-GGUF",
@@ -173,7 +181,8 @@
     "filePath": "qwen3-4b-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen3-4B-GGUF",
     "parameterCount": 4000000000,
-    "downloads": 12380
+    "downloads": 18688,
+    "featuredRank": 9
   },
   {
     "name": "Qwen/Qwen3-235B-A22B-GGUF",
@@ -228,7 +237,8 @@
     "filePath": "meta-llama-3-8b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/LLM-Research/Meta-Llama-3-8B-Instruct-GGUF",
     "parameterCount": 8000000000,
-    "downloads": 4446
+    "downloads": 4446,
+    "featuredRank": 16
   },
   {
     "name": "lmstudio-community/Qwen2.5-VL-3B-Instruct-GGUF",
@@ -239,7 +249,8 @@
     "filePath": "qwen2.5-vl-3b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/lmstudio-community/Qwen2.5-VL-3B-Instruct-GGUF",
     "parameterCount": 3000000000,
-    "downloads": 4454
+    "downloads": 4454,
+    "featuredRank": 7
   },
   {
     "name": "Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF",
@@ -261,7 +272,8 @@
     "filePath": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
     "parameterCount": 1500000000,
-    "downloads": 2668
+    "downloads": 2668,
+    "featuredRank": 4
   },
   {
     "name": "okwinds/DeepSeek-V3-GGUF-V3-LOT",
@@ -371,7 +383,8 @@
     "filePath": "qwen3.2-1.5b-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen3.2-1.5B-GGUF",
     "parameterCount": 1500000000,
-    "downloads": 3200
+    "downloads": 3200,
+    "featuredRank": 3
   },
   {
     "name": "Qwen/Qwen3.2-3B-GGUF",
@@ -382,7 +395,8 @@
     "filePath": "qwen3.2-3b-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen3.2-3B-GGUF",
     "parameterCount": 3000000000,
-    "downloads": 2800
+    "downloads": 2800,
+    "featuredRank": 6
   },
   {
     "name": "Qwen/Qwen2.5-7B-Instruct-Qwenizer-GGUF",
@@ -437,7 +451,8 @@
     "filePath": "llama-3.2-3b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/bartowski/Llama-3.2-3B-Instruct-GGUF",
     "parameterCount": 3000000000,
-    "downloads": 1500
+    "downloads": 1500,
+    "featuredRank": 8
   },
   {
     "name": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
@@ -470,7 +485,8 @@
     "filePath": "mistral-nemo-12b-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/bartowski/Mistral-Nemo-Instruct-2407-GGUF",
     "parameterCount": 12000000000,
-    "downloads": 1600
+    "downloads": 1600,
+    "featuredRank": 19
   },
   {
     "name": "bartowski/gemma-2-9b-it-GGUF",
@@ -481,7 +497,8 @@
     "filePath": "gemma-2-9b-it-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/bartowski/gemma-2-9b-it-GGUF",
     "parameterCount": 9000000000,
-    "downloads": 2200
+    "downloads": 2200,
+    "featuredRank": 18
   },
   {
     "name": "bartowski/Phi-3-mini-4k-instruct-GGUF",
@@ -492,7 +509,8 @@
     "filePath": "phi-3-mini-4k-instruct-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/bartowski/Phi-3-mini-4k-instruct-GGUF",
     "parameterCount": 3800000000,
-    "downloads": 1400
+    "downloads": 1400,
+    "featuredRank": 10
   },
   {
     "name": "bartowski/Phi-3-medium-4k-instruct-GGUF",
@@ -547,7 +565,8 @@
     "filePath": "qwen3.2-7b-q4_k_m.gguf",
     "detailUrl": "https://www.modelscope.cn/models/Qwen/Qwen3.2-7B-GGUF",
     "parameterCount": 7000000000,
-    "downloads": 5000
+    "downloads": 5000,
+    "featuredRank": 14
   },
   {
     "name": "unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF",
@@ -558,7 +577,8 @@
     "filePath": "DeepSeek-R1-Distill-Llama-8B-Q4_K_M.gguf",
     "detailUrl": "https://www.modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF",
     "parameterCount": 8000000000,
-    "downloads": 8500
+    "downloads": 8500,
+    "featuredRank": 17
   },
   {
     "name": "nomic-ai/nomic-embed-text-v2-moe-GGUF",
