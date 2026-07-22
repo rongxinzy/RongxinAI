@@ -665,6 +665,10 @@ describe('PiRuntimeAdapter', () => {
     it('should wait for thinking_end before streaming the answer', async () => {
       const messages: Array<{ id: string; type: string; metadata?: Record<string, unknown> }> = [];
       adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      const updates: Array<{ messageId: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, _content, metadata) =>
+        updates.push({ messageId, metadata }),
+      );
 
       await adapter.startSession('test', 'Think before answering');
       listener!({ type: 'turn_start' });
@@ -706,6 +710,15 @@ describe('PiRuntimeAdapter', () => {
       expect(
         messages.some(message => message.type === 'assistant' && message.metadata?.isThinking !== true),
       ).toBe(true);
+      const thinkingMessage = messages.find(message => message.metadata?.isThinking === true);
+      expect(
+        updates.some(
+          update =>
+            update.messageId === thinkingMessage?.id &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
     });
 
     it('should not turn a thinking-only message into an answer', async () => {
@@ -733,6 +746,78 @@ describe('PiRuntimeAdapter', () => {
       const assistantMessages = messages.filter(message => message.type === 'assistant');
       expect(assistantMessages).toHaveLength(1);
       expect(assistantMessages[0].metadata?.isThinking).toBe(true);
+    });
+
+    it('should finalize active thinking when the user stops the turn', async () => {
+      const messages: Array<{ id: string; metadata?: Record<string, unknown> }> = [];
+      const updates: Array<{ messageId: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, message) => messages.push(message as never));
+      adapter.on('messageUpdate', (_sid, messageId, _content, metadata) =>
+        updates.push({ messageId, metadata }),
+      );
+
+      await adapter.startSession('test', 'Stop after thinking');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'thinking_delta', delta: 'Inspecting' },
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Inspecting' }],
+        },
+      });
+
+      adapter.stopSession('test');
+
+      const thinkingMessage = messages.find(message => message.metadata?.isThinking === true);
+      expect(
+        updates.some(
+          update =>
+            update.messageId === thinkingMessage?.id &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
+    });
+
+    it('should finalize active thinking when the assistant ends with an error', async () => {
+      const messages: Array<{ id: string; metadata?: Record<string, unknown> }> = [];
+      const updates: Array<{ messageId: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, message) => messages.push(message as never));
+      adapter.on('messageUpdate', (_sid, messageId, _content, metadata) =>
+        updates.push({ messageId, metadata }),
+      );
+      adapter.on('error', () => undefined);
+
+      await adapter.startSession('test', 'Fail after thinking');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'thinking_delta', delta: 'Inspecting' },
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Inspecting' }],
+        },
+      });
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Inspecting before failure' }],
+          stopReason: 'error',
+          errorMessage: 'Model failed',
+        },
+      });
+
+      const thinkingMessage = messages.find(message => message.metadata?.isThinking === true);
+      expect(
+        updates.some(
+          update =>
+            update.messageId === thinkingMessage?.id &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
     });
 
     it('should not lose intermediate updates during a fast stream (no burst-freeze)', async () => {
