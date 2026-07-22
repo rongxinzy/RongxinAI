@@ -9,6 +9,7 @@ import type { RootState } from '../index';
 export const selectCoworkSessions = (state: RootState) => state.cowork.sessions;
 export const selectCurrentSessionId = (state: RootState) => state.cowork.currentSessionId;
 export const selectCurrentSession = (state: RootState) => state.cowork.currentSession;
+export const selectLoadingSessionId = (state: RootState) => state.cowork.loadingSessionId;
 export const selectIsStreaming = (state: RootState) => {
   const session = state.cowork.currentSession;
   if (!session) return false;

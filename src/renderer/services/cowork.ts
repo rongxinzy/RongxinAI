@@ -46,6 +46,7 @@ import type {
   OpenClawSessionPolicyConfig,
 } from '../types/cowork';
 import { i18nService } from './i18n';
+import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
 
 const classifyError = (error: string | CoworkError): string => {
@@ -151,33 +152,16 @@ class CoworkService {
     });
     this.streamListenerCleanups.push(messageCleanup);
 
-    // Message update listener (for streaming content updates)
-    // Batch dispatches with requestAnimationFrame to collapse multiple IPC
-    // messages into a single React render per frame for smooth streaming.
-    let rafId: number | null = null;
-    let pendingUpdate: {
-      sessionId: string;
-      messageId: string;
-      content: string;
-      metadata?: Record<string, unknown>;
-    } | null = null;
+    // Keep the latest update per message for the next frame. Thinking and answer
+    // messages can be finalized back-to-back, so a single pending slot loses one.
+    const updateBatcher = new RafMessageUpdateBatcher(update => {
+      store.dispatch(updateMessageContent(update));
+    });
     const messageUpdateCleanup = cowork.onStreamMessageUpdate(update => {
-      pendingUpdate = update;
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
-          if (pendingUpdate) {
-            store.dispatch(updateMessageContent(pendingUpdate));
-            pendingUpdate = null;
-          }
-        });
-      }
+      updateBatcher.enqueue(update);
     });
     const messageUpdateRafCleanup = () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
+      updateBatcher.dispose();
       messageUpdateCleanup();
     };
     this.streamListenerCleanups.push(messageUpdateRafCleanup);
@@ -673,7 +657,10 @@ class CoworkService {
         return result.session;
       }
       if (result.session.workspaceId) {
-        await workspaceService.selectWorkspace(result.session.workspaceId);
+        const preserveSessionLoading = store.getState().cowork.loadingSessionId === sessionId;
+        await workspaceService.selectWorkspace(result.session.workspaceId, {
+          preserveSessionLoading,
+        });
       }
       if (result.session.agentId) {
         store.dispatch(setCurrentAgentId(result.session.agentId));

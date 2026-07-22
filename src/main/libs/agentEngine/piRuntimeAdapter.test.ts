@@ -544,6 +544,29 @@ describe('PiRuntimeAdapter', () => {
       expect(updates.some(c => c.includes('HelHello') || c.includes('HelloHello'))).toBe(false);
     });
 
+    it('should mark an answer as final only after the agent run ends', async () => {
+      const updates: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('messageUpdate', (_sid, _id, content, metadata) =>
+        updates.push({ content, metadata }),
+      );
+
+      await adapter.startSession('test', 'Hi');
+      driveAssistantTurn('Intermediate or final answer');
+
+      expect(updates.some(update => update.metadata?.isFinalAnswer === true)).toBe(false);
+
+      listener!({ type: 'agent_end' });
+
+      expect(updates[updates.length - 1]).toEqual({
+        content: 'Intermediate or final answer',
+        metadata: {
+          isStreaming: false,
+          isFinal: true,
+          isFinalAnswer: true,
+        },
+      });
+    });
+
     it('should render thinking as a separate isThinking message, not as the answer', async () => {
       const messages: Array<{ id: string; metadata?: Record<string, unknown> }> = [];
       adapter.on('message', (_sid, msg) => messages.push(msg as never));
@@ -592,6 +615,124 @@ describe('PiRuntimeAdapter', () => {
       const thinkingFinal = updates.filter(u => u.messageId === thinkingMsg!.id).pop();
       expect(thinkingFinal?.metadata?.isThinking).toBe(true);
       expect(thinkingFinal?.metadata?.isFinal).toBe(true);
+    });
+
+    it('should persist runtime-measured duration for each thinking message', async () => {
+      vi.useFakeTimers();
+      try {
+        const updates: Array<{ metadata?: Record<string, unknown> }> = [];
+        adapter.on('messageUpdate', (_sid, _messageId, _content, metadata) =>
+          updates.push({ metadata }),
+        );
+
+        await adapter.startSession('test', 'Measure thinking');
+        listener!({ type: 'turn_start' });
+        listener!({
+          type: 'message_update',
+          assistantMessageEvent: { type: 'thinking_delta', delta: 'Inspecting' },
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'Inspecting' }],
+          },
+        });
+        vi.advanceTimersByTime(2400);
+        listener!({
+          type: 'message_update',
+          assistantMessageEvent: { type: 'thinking_end' },
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'Inspecting' }],
+          },
+        });
+        listener!({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'Inspecting' }],
+            stopReason: 'stop',
+          },
+        });
+
+        const finalThinkingUpdate = updates.find(
+          update => update.metadata?.isThinking === true && update.metadata?.isFinal === true,
+        );
+        expect(finalThinkingUpdate?.metadata?.thinkingDurationMs).toBe(2400);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should wait for thinking_end before streaming the answer', async () => {
+      const messages: Array<{ id: string; type: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+
+      await adapter.startSession('test', 'Think before answering');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'thinking_delta', delta: 'Inspecting context' },
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Inspecting context' }],
+        },
+      });
+      listener!({
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'Inspecting context' },
+            { type: 'text', text: 'Visible answer' },
+          ],
+        },
+      });
+
+      expect(
+        messages.some(message => message.type === 'assistant' && message.metadata?.isThinking !== true),
+      ).toBe(false);
+
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'thinking_end' },
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'Inspecting context' },
+            { type: 'text', text: 'Visible answer' },
+          ],
+        },
+      });
+
+      expect(
+        messages.some(message => message.type === 'assistant' && message.metadata?.isThinking !== true),
+      ).toBe(true);
+    });
+
+    it('should not turn a thinking-only message into an answer', async () => {
+      const messages: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+
+      await adapter.startSession('test', 'Think before using a tool');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'I need to inspect the files first.' }],
+        },
+      });
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'I need to inspect the files first.' }],
+          stopReason: 'stop',
+        },
+      });
+
+      const assistantMessages = messages.filter(message => message.type === 'assistant');
+      expect(assistantMessages).toHaveLength(1);
+      expect(assistantMessages[0].metadata?.isThinking).toBe(true);
     });
 
     it('should not lose intermediate updates during a fast stream (no burst-freeze)', async () => {

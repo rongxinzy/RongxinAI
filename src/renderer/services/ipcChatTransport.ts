@@ -355,7 +355,7 @@ type ToolCallState = {
   inputChunks: string[];
 };
 
-class SseChunkParser {
+export class SseChunkParser {
   private apiFormat: 'anthropic' | 'openai' | 'gemini';
 
   // Track active output blocks by id
@@ -381,6 +381,8 @@ class SseChunkParser {
     if (this.finished) return [];
     const chunks: UIMessageChunk[] = [];
 
+    this.closeReasoning(chunks);
+
     // Flush any pending tool call
     if (this.activeToolCall) {
       chunks.push({
@@ -395,6 +397,12 @@ class SseChunkParser {
     return chunks;
   }
 
+  private closeReasoning(chunks: UIMessageChunk[]): void {
+    if (!this.activeReasoningId) return;
+    chunks.push({ type: 'reasoning-end', id: this.activeReasoningId });
+    this.activeReasoningId = null;
+  }
+
   // -- OpenAI / OpenAI-compatible ------------------------------------
 
   private feedOpenAI(parsed: unknown): UIMessageChunk[] {
@@ -405,6 +413,7 @@ class SseChunkParser {
     const eventType = (parsed as { type?: string }).type;
     const deltaText = (parsed as { delta?: string }).delta;
     if (typeof deltaText === 'string' && deltaText && eventType === 'response.output_text.delta') {
+      this.closeReasoning(chunks);
       if (!this.activeTextId) {
         this.activeTextId = generateId();
         chunks.push({ type: 'text-start', id: this.activeTextId });
@@ -429,15 +438,6 @@ class SseChunkParser {
     const finishReason = choice.finish_reason as string | null | undefined;
 
     if (delta) {
-      // Text delta
-      if (typeof delta.content === 'string' && delta.content) {
-        if (!this.activeTextId) {
-          this.activeTextId = generateId();
-          chunks.push({ type: 'text-start', id: this.activeTextId });
-        }
-        chunks.push({ type: 'text-delta', id: this.activeTextId, delta: delta.content });
-      }
-
       // Reasoning
       if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
         if (!this.activeReasoningId) {
@@ -450,6 +450,16 @@ class SseChunkParser {
           id: this.activeReasoningId,
           delta: delta.reasoning_content,
         });
+      }
+
+      // Text delta. An output text event closes the preceding reasoning segment.
+      if (typeof delta.content === 'string' && delta.content) {
+        this.closeReasoning(chunks);
+        if (!this.activeTextId) {
+          this.activeTextId = generateId();
+          chunks.push({ type: 'text-start', id: this.activeTextId });
+        }
+        chunks.push({ type: 'text-delta', id: this.activeTextId, delta: delta.content });
       }
 
       // Tool calls
@@ -538,6 +548,7 @@ class SseChunkParser {
         parsed as { content_block?: { type?: string; id?: string; name?: string; text?: string } }
       ).content_block;
       if (cb?.type === 'text') {
+        this.closeReasoning(chunks);
         this.activeTextId = cb.id || generateId();
         chunks.push({ type: 'text-start', id: this.activeTextId });
       } else if (cb?.type === 'thinking') {
@@ -545,6 +556,7 @@ class SseChunkParser {
         this.startedReasoningIds.add(this.activeReasoningId);
         chunks.push({ type: 'reasoning-start', id: this.activeReasoningId });
       } else if (cb?.type === 'tool_use') {
+        this.closeReasoning(chunks);
         this.activeToolCall = {
           id: cb.id || generateId(),
           name: cb.name || 'unknown',
@@ -562,6 +574,7 @@ class SseChunkParser {
         }
       ).delta;
       if (deltaObj?.type === 'text_delta' && typeof deltaObj.text === 'string') {
+        this.closeReasoning(chunks);
         if (!this.activeTextId) {
           this.activeTextId = generateId();
           chunks.push({ type: 'text-start', id: this.activeTextId });
@@ -587,6 +600,7 @@ class SseChunkParser {
 
     // Content block stop
     if (sseType === 'content_block_stop') {
+      this.closeReasoning(chunks);
       if (this.activeToolCall) {
         const rawInput = this.activeToolCall.inputChunks.join('');
         let parsedInput: unknown = rawInput;
@@ -656,6 +670,7 @@ class SseChunkParser {
     for (const part of parts) {
       // Text
       if (typeof part.text === 'string' && !part.thought) {
+        this.closeReasoning(chunks);
         if (!this.activeTextId) {
           this.activeTextId = generateId();
           chunks.push({ type: 'text-start', id: this.activeTextId });

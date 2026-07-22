@@ -1,10 +1,13 @@
 import { Button } from '@shared/components/ui/button';
 import { FolderPlus } from 'lucide-react';
 import React, { useEffect } from 'react';
+import { flushSync } from 'react-dom';
+import { useDispatch } from 'react-redux';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { workspaceService } from '../../services/workspace';
+import { clearLoadingSessionId, setLoadingSessionId } from '../../store/slices/coworkSlice';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
@@ -31,6 +34,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   onVisibleSessionsChange,
   workMode = 'work',
 }) => {
+  const dispatch = useDispatch();
   const {
     workspaceNodes,
     scheduledWorkspaceNodes,
@@ -59,9 +63,18 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   }, [recentlyDeletedSessionIds, removeTaskPreview]);
 
   const handleSelectTask = async (task: AgentSidebarTaskNode) => {
-    if (task.workspaceId) await workspaceService.selectWorkspace(task.workspaceId);
-    onShowCowork();
-    await coworkService.loadSession(task.id);
+    flushSync(() => {
+      dispatch(setLoadingSessionId(task.id));
+    });
+    try {
+      if (task.workspaceId) {
+        await workspaceService.selectWorkspace(task.workspaceId, { preserveSessionLoading: true });
+      }
+      onShowCowork();
+      await coworkService.loadSession(task.id);
+    } finally {
+      dispatch(clearLoadingSessionId(task.id));
+    }
   };
 
   const handleCreateTask = async (workspace: WorkspaceSidebarNode) => {

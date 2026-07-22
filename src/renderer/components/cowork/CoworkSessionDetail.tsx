@@ -74,6 +74,7 @@ import {
   toAbsolutePathFromCwd,
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
+import { useInitialConversationPosition } from './hooks/useInitialConversationPosition';
 import { TodoQueue } from './TodoQueue';
 
 interface CoworkSessionDetailProps {
@@ -860,6 +861,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     messageCount: messagesLength,
     rootRef: detailRootRef,
   });
+  useInitialConversationPosition({ sessionId, rootRef: detailRootRef });
 
   // Cache turn-level DOM elements (data-turn-index, always in DOM even for lazy turns)
   useEffect(() => {
@@ -932,7 +934,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             resolveLocalFilePath={resolveLocalFilePath}
             showTypingIndicator
             showCopyButtons={!isStreaming}
-            turnStreaming={isStreaming}
           />
         </div>
       );
@@ -995,7 +996,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 mapDisplayText={mapDisplayText}
                 showTypingIndicator={showTypingIndicator}
                 showCopyButtons={!isStreaming || !isLastTurn}
-                turnStreaming={isStreaming && isLastTurn}
               />
             </div>
           )}
@@ -1142,7 +1142,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           style={{ minWidth: COWORK_DETAIL_MIN_WIDTH }}
         >
           <div className="relative flex-1 min-h-0">
-            <Conversation className="h-full">
+            <Conversation className="h-full" initial="instant">
               <ConversationContent
                 className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
                 scrollClassName="cowork-conversation-scroll"
@@ -1409,7 +1409,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           </div>
 
           {/* Streaming Activity Bar */}
-          {isStreaming && <StreamingBar messages={currentSession.messages} />}
+          {isStreaming && <StreamingBar />}
 
           {/* Input Area */}
           <div className="px-4 pb-4 shrink-0">

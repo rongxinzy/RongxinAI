@@ -1,10 +1,10 @@
-import { Message, MessageContent, MessageResponse } from '@shared/components/ai-elements/message';
+import { Message, MessageContent } from '@shared/components/ai-elements/message';
 import React, { useState } from 'react';
 
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
-import { useSmoothStreaming } from '../../../utils/useSmoothStreaming';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { CopyButton } from './CopyButton';
+import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -23,7 +23,6 @@ export const AssistantBubble: React.FC<{
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
   const isStreaming = Boolean(message.metadata?.isStreaming);
-  const displayedContent = useSmoothStreaming(rawContent, isStreaming);
   const modelLabel = getMessageModelLabel(turnMetadata);
 
   return (
@@ -34,7 +33,7 @@ export const AssistantBubble: React.FC<{
     >
       <Message from="assistant">
         <MessageContent>
-          <MessageResponse>{displayedContent}</MessageResponse>
+          <StreamingMarkdownResponse content={rawContent} isStreaming={isStreaming} />
         </MessageContent>
       </Message>
       {modelLabel && (

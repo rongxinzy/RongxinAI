@@ -10,7 +10,7 @@ import {
 } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Brain, Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
-import React, { useState } from 'react';
+import React from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
@@ -19,10 +19,20 @@ import { i18nService } from '../../../services/i18n';
 import type { Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import { ArtifactPreviewCard } from '../../artifacts';
+import {
+  ExecutionStatusKind,
+  getCompletedExecutionSummaryText,
+  getCurrentExecutionStatus,
+  getExecutionStatusText,
+  getExecutionSummary,
+  getFinalAnswerIndex,
+} from '../helpers/executionStatus';
 import type { ConversationTurn } from '../helpers/messageGrouping';
 import { getToolResultLineCount, getVisibleAssistantItems } from '../helpers/messageGrouping';
+import { getThinkingPresentation } from '../helpers/thinkingPresentation';
 import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
+import { ExecutionSummary } from './ExecutionSummary';
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
 
@@ -33,7 +43,6 @@ export const TurnBlock: React.FC<{
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
-  turnStreaming?: boolean;
 }> = ({
   turn,
   artifacts,
@@ -41,7 +50,6 @@ export const TurnBlock: React.FC<{
   mapDisplayText,
   showTypingIndicator = false,
   showCopyButtons = true,
-  turnStreaming = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
@@ -124,14 +132,16 @@ export const TurnBlock: React.FC<{
     item: (typeof visibleAssistantItems)[0],
     _idx: number,
     isFinalAnswer: boolean,
-    streamingOverride?: boolean,
+    forceComplete = false,
     mutedExecution = false,
   ) => {
     // ── Thinking: collapsed Reasoning block with shimmer ──
     if (item.type === 'assistant' && item.message.metadata?.isThinking) {
       const meta = item.message.metadata;
-      const isStreaming = streamingOverride ?? (Boolean(meta?.isStreaming) && !meta?.isFinal);
-      const isComplete = Boolean(meta?.isFinal) || streamingOverride === false;
+      const { durationSeconds, isComplete, isStreaming } = getThinkingPresentation(
+        meta,
+        forceComplete,
+      );
       const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
         <Reasoning
@@ -140,6 +150,7 @@ export const TurnBlock: React.FC<{
           isStreaming={isStreaming}
           defaultOpen={true}
           autoClose={false}
+          duration={durationSeconds}
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
@@ -197,59 +208,19 @@ export const TurnBlock: React.FC<{
     return null;
   };
 
-  // Group consecutive execution items so they can be collapsed before the
-  // final answer. Once the answer starts, these groups are flattened again.
+  // Keep user-facing answers visible while grouping execution-only events.
   const groups = (() => {
     const result: Array<{
-      summary: string;
       items: typeof visibleAssistantItems;
       streaming: boolean;
-      streamingType: 'thinking' | 'tool' | null;
+      status: ReturnType<typeof getCurrentExecutionStatus>;
     }> = [];
     let currentItems: typeof visibleAssistantItems = [];
 
-    const flush = (followedByAnswer = false) => {
+    const flush = () => {
       if (currentItems.length === 0) return;
-      // An answer after thinking means thinking is definitely done, regardless of metadata.
-      const hasStreaming = currentItems.some(item => {
-        if (item.type === 'assistant') {
-          const meta = item.message.metadata;
-          if (followedByAnswer) return false; // answer appeared → thinking is done
-          return Boolean(meta?.isStreaming) && !meta?.isFinal;
-        }
-        if (item.type === 'tool_group') return !item.group.toolResult;
-        return false;
-      });
-      const streamingItem = hasStreaming
-        ? (() => {
-            for (let i = currentItems.length - 1; i >= 0; i--) {
-              const it = currentItems[i];
-              if (it.type === 'assistant') {
-                const m = it.message.metadata;
-                if (followedByAnswer) continue; // answer appeared → thinking done
-                if (Boolean(m?.isStreaming) && !m?.isFinal) return it;
-              }
-              if (it.type === 'tool_group' && !it.group.toolResult) return it;
-            }
-            return null;
-          })()
-        : null;
-      let summary: string;
-      let streamingType: 'thinking' | 'tool' | null = null;
-      if (hasStreaming && streamingItem) {
-        if (streamingItem.type === 'assistant') {
-          summary = '思考中…';
-          streamingType = 'thinking';
-        } else if (streamingItem.type === 'tool_group') {
-          summary = getToolSummary(streamingItem.group.toolUse.metadata?.toolName as string);
-          streamingType = 'tool';
-        } else {
-          summary = '执行中…';
-        }
-      } else {
-        summary = `执行步骤（${currentItems.length} 步）`;
-      }
-      result.push({ summary, items: [...currentItems], streaming: hasStreaming, streamingType });
+      const status = getCurrentExecutionStatus(currentItems);
+      result.push({ items: [...currentItems], streaming: Boolean(status), status });
       currentItems = [];
     };
 
@@ -262,12 +233,11 @@ export const TurnBlock: React.FC<{
         item.type === 'system';
 
       if (isAnswer) {
-        flush(true); // answer follows → thinking before it is done
+        flush();
         result.push({
-          summary: '',
           items: [item],
           streaming: Boolean(item.message.metadata?.isStreaming),
-          streamingType: null,
+          status: null,
         });
       } else if (isStep) {
         currentItems.push(item);
@@ -282,15 +252,6 @@ export const TurnBlock: React.FC<{
       ? index
       : lastIndex;
   }, -1);
-  const finalAnswerGroup = lastAnswerGroupIndex >= 0 ? groups[lastAnswerGroupIndex] : null;
-  const finalAnswerItem = finalAnswerGroup?.items[0];
-  const finalAnswerStarted = Boolean(
-    !turnStreaming &&
-    lastAnswerGroupIndex === groups.length - 1 &&
-    finalAnswerItem?.type === 'assistant' &&
-    !finalAnswerItem.message.metadata?.isThinking &&
-    hasText(finalAnswerItem.message.content),
-  );
   const isEmptyAnswerGroup = (group: (typeof groups)[number]) => {
     const firstItem = group.items[0];
     return (
@@ -299,23 +260,34 @@ export const TurnBlock: React.FC<{
       !hasText(firstItem.message.content)
     );
   };
-  const intermediateGroups = finalAnswerStarted
-    ? groups.filter((_, index) => index !== lastAnswerGroupIndex)
-    : groups.filter(group => !isEmptyAnswerGroup(group));
-  const [intermediateOpen, setIntermediateOpen] = useState(false);
+  const visibleGroups = groups.filter(group => !isEmptyAnswerGroup(group));
+  const executionSummary = getExecutionSummary(visibleAssistantItems);
+  const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems);
+  const finalAnswerStarted =
+    finalAnswerIndex === visibleAssistantItems.length - 1 &&
+    lastAnswerGroupIndex >= 0 &&
+    lastAnswerGroupIndex === groups.length - 1 &&
+    !isEmptyAnswerGroup(groups[lastAnswerGroupIndex]);
+  const previousGroups = finalAnswerStarted ? groups.slice(0, lastAnswerGroupIndex) : [];
+  const finalAnswerGroup = finalAnswerStarted ? groups[lastAnswerGroupIndex] : null;
+  const previousItems = previousGroups.flatMap(group => group.items);
 
-  const renderExecutionGroup = (group: (typeof groups)[number], groupKey: string) => {
+  const renderExecutionGroup = (
+    group: (typeof groups)[number],
+    groupKey: string,
+    isFinalAnswer: boolean,
+  ) => {
     const firstItem = group.items[0];
     const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
     if (isAnswerItem) {
-      return renderItem(firstItem, 0, false);
+      return renderItem(firstItem, 0, isFinalAnswer);
     }
 
     const isStreaming = group.streaming;
     const headerIcon = isStreaming
-      ? group.streamingType === 'thinking'
+      ? group.status?.kind === ExecutionStatusKind.Thinking
         ? Brain
-        : group.streamingType === 'tool'
+        : group.status?.kind === ExecutionStatusKind.Tool
           ? Wrench
           : SparklesIcon
       : SparklesIcon;
@@ -323,45 +295,39 @@ export const TurnBlock: React.FC<{
       <ChainOfThought key={groupKey} defaultOpen={false}>
         <ChainOfThoughtHeader icon={headerIcon}>
           {isStreaming ? (
-            <span className="animate-pulse">{group.summary}</span>
+            <Shimmer duration={1}>{getExecutionStatusText(group.status!)}</Shimmer>
           ) : (
-            i18nService.t('coworkExecutionSteps')
+            getCompletedExecutionSummaryText(getExecutionSummary(group.items))
           )}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
-          {group.items.map((item, idx) => renderItem(item, idx, false, isStreaming, true))}
+          {group.items.map((item, idx) => renderItem(item, idx, false, false, true))}
         </ChainOfThoughtContent>
       </ChainOfThought>
     );
   };
-  const intermediateItems = intermediateGroups.flatMap(group => group.items);
-
   return (
     <div className="px-4 py-2">
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
-            {finalAnswerStarted && intermediateGroups.length > 0 && (
-              <ChainOfThought open={intermediateOpen} onOpenChange={setIntermediateOpen}>
-                <ChainOfThoughtHeader icon={SparklesIcon}>
-                  {i18nService.t('coworkIntermediateProcess')}
-                </ChainOfThoughtHeader>
-                <ChainOfThoughtContent>
-                  {intermediateItems.map((item, index) => {
-                    const isAnswer =
-                      item.type === 'assistant' && !item.message.metadata?.isThinking;
-                    return renderItem(item, index, false, false, !isAnswer);
-                  })}
-                </ChainOfThoughtContent>
-              </ChainOfThought>
+            {finalAnswerStarted && previousItems.length > 0 && (
+              <ExecutionSummary summary={executionSummary}>
+                {previousItems.map((item, index) => {
+                  const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
+                  return renderItem(item, index, false, true, !isAnswer);
+                })}
+              </ExecutionSummary>
             )}
-            {finalAnswerStarted &&
-              finalAnswerGroup &&
-              renderItem(finalAnswerGroup.items[0], lastAnswerGroupIndex, true)}
-            {!finalAnswerStarted &&
-              intermediateGroups.map((group, index) =>
-                renderExecutionGroup(group, `streaming-${index}`),
-              )}
+            {finalAnswerStarted && finalAnswerGroup
+              ? renderExecutionGroup(finalAnswerGroup, 'final-answer', true)
+              : visibleGroups.map((group, index) =>
+                  renderExecutionGroup(
+                    group,
+                    `turn-group-${index}`,
+                    index === lastAnswerGroupIndex,
+                  ),
+                )}
             {showTypingIndicator && <TypingDots />}
             {artifacts && artifacts.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -375,27 +341,4 @@ export const TurnBlock: React.FC<{
       </div>
     </div>
   );
-
-  function getToolSummary(toolName?: string): string {
-    switch (toolName) {
-      case 'bash':
-        return '正在执行命令…';
-      case 'read':
-        return '正在读取文件…';
-      case 'write':
-        return '正在写入文件…';
-      case 'edit':
-        return '正在编辑文件…';
-      case 'grep':
-        return '正在搜索…';
-      case 'find':
-        return '正在查找文件…';
-      case 'ls':
-        return '正在列出目录…';
-      case 'mcp':
-        return '正在调用工具…';
-      default:
-        return toolName ? `正在执行 ${toolName}…` : '执行中…';
-    }
-  }
 };

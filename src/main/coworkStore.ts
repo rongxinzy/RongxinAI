@@ -373,8 +373,12 @@ export interface CoworkMessageMetadata {
   isError?: boolean;
   isStreaming?: boolean;
   isFinal?: boolean;
+  /** True only for the user-facing final answer of a completed turn. */
+  isFinalAnswer?: boolean;
   /** True when this assistant message holds reasoning/thinking content (rendered as a ThinkingBlock). */
   isThinking?: boolean;
+  /** Runtime-measured duration for this thinking message. */
+  thinkingDurationMs?: number;
   skillIds?: string[];
   usage?: {
     inputTokens?: number;

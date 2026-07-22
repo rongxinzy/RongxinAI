@@ -1,7 +1,10 @@
 import type { Workspace } from '../../shared/workspace';
 import { WorkspaceDefault } from '../../shared/workspace';
 import { store } from '../store';
-import { clearCurrentSession } from '../store/slices/coworkSlice';
+import {
+  clearCurrentSession,
+  clearCurrentSessionForWorkspaceChange,
+} from '../store/slices/coworkSlice';
 import {
   setCurrentWorkspaceId,
   setWorkspaceLoading,
@@ -10,6 +13,10 @@ import {
 import { localStore } from './store';
 
 const CURRENT_WORKSPACE_KEY = 'workspace.currentId';
+
+type SelectWorkspaceOptions = {
+  preserveSessionLoading?: boolean;
+};
 
 type LegacyCompatibleCoworkApi = {
   listWorkspaces?: () => Promise<{ success: boolean; workspaces?: Workspace[] }>;
@@ -114,11 +121,16 @@ class WorkspaceService {
     return next[next.length - 1];
   }
 
-  async selectWorkspace(workspaceId: string): Promise<void> {
+  async selectWorkspace(
+    workspaceId: string,
+    { preserveSessionLoading = false }: SelectWorkspaceOptions = {},
+  ): Promise<void> {
     if (!store.getState().workspace.workspaces.some(workspace => workspace.id === workspaceId))
       return;
     if (store.getState().workspace.currentWorkspaceId !== workspaceId) {
-      store.dispatch(clearCurrentSession());
+      store.dispatch(
+        preserveSessionLoading ? clearCurrentSessionForWorkspaceChange() : clearCurrentSession(),
+      );
     }
     store.dispatch(setCurrentWorkspaceId(workspaceId));
     await localStore.setItem(CURRENT_WORKSPACE_KEY, workspaceId);

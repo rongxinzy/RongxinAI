@@ -6,6 +6,7 @@ import { cn } from '@shared/lib/utils';
 import { Cpu, Settings, TriangleAlert } from 'lucide-react';
 import { Clock, MessageCircle, PanelLeft, Pencil, Puzzle, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { agentService } from '../services/agent';
@@ -19,6 +20,7 @@ import {
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../store/selectors/workModeSelectors';
+import { clearLoadingSessionId, setLoadingSessionId } from '../store/slices/coworkSlice';
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
@@ -139,17 +141,24 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelectSession = async (session: CoworkSessionSummary) => {
     const agentId = session.agentId?.trim() || AgentId.Main;
+    flushSync(() => {
+      dispatch(setLoadingSessionId(session.id));
+    });
 
     // Chat sessions are not scoped to agents — skip loadSessions
     // to avoid replacing the full sessions list with a filtered subset.
-    if (session.mode !== 'chat') {
-      if (agentId !== currentAgentId) {
-        agentService.switchAgent(agentId);
-        await coworkService.loadSessions(agentId);
+    try {
+      if (session.mode !== 'chat') {
+        if (agentId !== currentAgentId) {
+          agentService.switchAgent(agentId);
+          await coworkService.loadSessions(agentId);
+        }
       }
+      onShowCowork();
+      await coworkService.loadSession(session.id);
+    } finally {
+      dispatch(clearLoadingSessionId(session.id));
     }
-    onShowCowork();
-    await coworkService.loadSession(session.id);
   };
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {

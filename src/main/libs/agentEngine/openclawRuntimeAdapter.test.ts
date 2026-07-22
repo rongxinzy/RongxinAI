@@ -185,6 +185,7 @@ function createRunTurnAdapter(
     cachedModel?: string;
     holdFirstModelPatch?: boolean;
     sessionCwd?: string;
+    finalStopReason?: string;
   } = {},
 ) {
   const session = {
@@ -293,7 +294,11 @@ function createRunTurnAdapter(
               state: 'final',
               runId,
               sessionKey,
-              message: { role: 'assistant', content: 'Done' },
+              message: {
+                role: 'assistant',
+                content: 'Done',
+                ...(options.finalStopReason && { stopReason: options.finalStopReason }),
+              },
             },
             1,
           );
@@ -315,6 +320,7 @@ function createRunTurnAdapter(
 
   return {
     adapter,
+    session,
     requests,
     releaseFirstModelPatch: () => firstModelPatchRelease?.(),
     firstModelPatchStarted,
@@ -339,6 +345,31 @@ test('continueSession patches a session override before chat.send even when the 
     key: 'agent:main:zhiyuan:session-1',
     model,
   });
+});
+
+test('continueSession marks only the completed turn answer as final', async () => {
+  const { adapter, session } = createRunTurnAdapter();
+
+  await adapter.continueSession('session-1', 'hello');
+
+  const answer = session.messages.find(message => message.type === 'assistant');
+  expect(answer?.metadata).toMatchObject({
+    isStreaming: false,
+    isFinal: true,
+    isFinalAnswer: true,
+  });
+});
+
+test('continueSession does not mark text from an errored turn as final', async () => {
+  const { adapter, session } = createRunTurnAdapter({ finalStopReason: 'error' });
+
+  await expect(adapter.continueSession('session-1', 'hello')).rejects.toThrow(
+    'OpenClaw run failed',
+  );
+
+  const answer = session.messages.find(message => message.type === 'assistant');
+  expect(answer?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
+  expect(answer?.metadata).not.toHaveProperty('isFinalAnswer');
 });
 
 test('continueSession waits for an in-flight model patch before chat.send', async () => {
