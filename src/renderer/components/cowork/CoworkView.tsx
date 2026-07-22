@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { cn } from '@shared/lib/utils';
 import { PanelLeft, Pencil, ShieldCheck } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -1285,23 +1286,24 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto min-h-0 relative">
-        <div className="relative max-w-5xl w-full min-w-[320px] mx-auto px-4 pt-[15vh] pb-8 space-y-10">
+        <div className="relative mx-auto flex min-h-full w-full max-w-5xl min-w-[320px] flex-col items-center justify-center gap-10 px-4 py-8">
           {/* Welcome Section - staggered entrance animation */}
-          <div className="text-center space-y-5">
+          <div className="flex min-h-28 flex-col items-center justify-center gap-5 text-center">
             <img src="logo.png" alt="logo" className="h-16 w-auto mx-auto animate-fade-in-up" />
-            {workMode === WorkMode.Work && (
-              <p
-                className="text-sm text-muted-foreground max-w-md mx-auto animate-fade-in-up"
-                style={{ animationDelay: '120ms', animationFillMode: 'both' }}
-              >
-                全面链接本地文件，让生活和工作更智能
-              </p>
-            )}
+            <p
+              className={cn(
+                'min-h-5 max-w-md px-2 text-sm text-muted-foreground animate-fade-in-up',
+                workMode === WorkMode.Chat && 'invisible',
+              )}
+              style={{ animationDelay: '120ms', animationFillMode: 'both' }}
+            >
+              {i18nService.t('coworkHomeSubtitle')}
+            </p>
           </div>
 
           {/* Prompt Input Area - Large version with folder selector */}
           <div
-            className="max-w-3xl mx-auto w-full space-y-3 animate-fade-in-up"
+            className="mx-auto flex w-full max-w-3xl flex-col gap-3 animate-fade-in-up"
             style={{ animationDelay: '200ms', animationFillMode: 'both' }}
           >
             <div className="rounded-2xl">
@@ -1335,7 +1337,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
           {/* Quick Actions */}
           <div
-            className="max-w-3xl mx-auto w-full space-y-4 animate-fade-in-up"
+            className="mx-auto flex w-full max-w-3xl flex-col gap-4 animate-fade-in-up"
             style={{ animationDelay: '300ms', animationFillMode: 'both' }}
           >
             {selectedAction ? (
