@@ -1,7 +1,10 @@
 import { Button } from '@shared/components/ui/button';
+import { Card, CardContent } from '@shared/components/ui/card';
 import { Input } from '@shared/components/ui/input';
+import { Separator } from '@shared/components/ui/separator';
 import { Switch } from '@shared/components/ui/switch';
-import { Pencil, Plug, Search, Trash2, XCircle } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { Pencil, Plus, Plug, Search, Trash2, XCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -376,18 +379,8 @@ const McpManager: React.FC = () => {
 
   const customCount = useMemo(() => servers.filter(s => !s.isBuiltIn).length, [servers]);
 
-  const tabClass = (tab: McpTab) =>
-    `px-4 py-2 text-sm font-medium transition-colors relative ${
-      activeTab === tab ? 'text-foreground' : 'text-muted-foreground hover:hover:text-foreground'
-    }`;
-
-  const tabIndicatorClass = (tab: McpTab) =>
-    `absolute bottom-0 left-0 right-0 h-0.5 rounded-full transition-colors ${
-      activeTab === tab ? 'bg-primary' : 'bg-transparent'
-    }`;
-
   return (
-    <div className="relative space-y-4">
+    <div className="relative flex h-full min-h-0 flex-col gap-4">
       {/* Sync overlay — blocks ALL interaction (including sidebar) while MCP bridge is refreshing */}
       {bridgeSyncing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
@@ -447,109 +440,107 @@ const McpManager: React.FC = () => {
         </div>
       )}
 
-      {/* Sticky toolbar: Description + Search + Tabs + Category pills */}
-      <div className="sticky top-0 z-10 bg-claude-bg dark:bg-claude-darkBg pb-4 space-y-4 shadow-sm">
-        {/* Description */}
-        <p className="text-sm text-muted-foreground">{i18nService.t('mcpDescription')}</p>
+      <Card
+        size="sm"
+        className="flex-1 min-h-0 gap-0 overflow-visible rounded-lg border border-border bg-card p-0 ring-0"
+      >
+        {/* Toolbar */}
+        <CardContent className="flex shrink-0 flex-col gap-3 p-3">
+            <p className="text-sm text-muted-foreground">{i18nService.t('mcpDescription')}</p>
 
-        {/* Search */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder={i18nService.t('searchMcpServers')}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 rounded-xl bg-surface text-foreground placeholder-secondary border border-border"
-            />
-            {searchQuery && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-primary"
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
+            {/* Search */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={i18nService.t('searchMcpServers')}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8"
+                />
+                {searchQuery && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-primary"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
 
-        {/* Tabs */}
-        <div className="flex items-center border-b border-border">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab('installed')}
-            className={tabClass('installed')}
-          >
-            {i18nService.t('mcpInstalled')}
-            {servers.length > 0 && (
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
-                {servers.length}
-              </span>
-            )}
-            <div className={tabIndicatorClass('installed')} />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab('marketplace')}
-            className={tabClass('marketplace')}
-          >
-            {i18nService.t('mcpMarketplace')}
-            {marketplaceCount > 0 && (
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
-                {marketplaceCount}
-              </span>
-            )}
-            <div className={tabIndicatorClass('marketplace')} />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab('custom')}
-            className={tabClass('custom')}
-          >
-            {i18nService.t('mcpCustom')}
-            {customCount > 0 && (
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-surface-raised">
-                {customCount}
-              </span>
-            )}
-            <div className={tabIndicatorClass('custom')} />
-          </Button>
-        </div>
+            <Tabs value={activeTab} onValueChange={value => setActiveTab(value as McpTab)}>
+              <TabsList className="shadow-inset">
+                <TabsTrigger value="installed" className="data-active:shadow-elevated">
+                  {i18nService.t('mcpInstalled')}
+                  {servers.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">
+                      {servers.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="marketplace" className="data-active:shadow-elevated">
+                  {i18nService.t('mcpMarketplace')}
+                  {marketplaceCount > 0 && (
+                    <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">
+                      {marketplaceCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="custom" className="data-active:shadow-elevated">
+                  {i18nService.t('mcpCustom')}
+                  {customCount > 0 && (
+                    <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">
+                      {customCount}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-        {/* Category filter pills (Marketplace only) */}
-        {activeTab === 'marketplace' && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {dynamicCategories.map(cat => (
-              <Button
-                key={cat.id}
-                type="button"
-                variant={activeCategory === cat.id ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveCategory(cat.id)}
-                className="h-7 px-2.5 text-xs"
-              >
-                {(i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) ||
-                  i18nService.t(cat.key)}
-              </Button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div>
+            {/* Category filter pills (Marketplace only) */}
+            {activeTab === 'marketplace' && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {dynamicCategories.map(cat => (
+                  <Button
+                    key={cat.id}
+                    type="button"
+                    variant={activeCategory === cat.id ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActiveCategory(cat.id)}
+                    className="h-7 px-2.5 text-xs"
+                  >
+                    {(i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) ||
+                      i18nService.t(cat.key)}
+                  </Button>
+                ))}
+              </div>
+            )}
+        </CardContent>
+        <Separator />
+        <CardContent className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div>
         {/* ── Tab: Installed ──────────────────────────────── */}
         {activeTab === 'installed' && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filteredInstalled.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
-                {i18nService.t('mcpNoInstalledServers')}
+              <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-6 text-center">
+                <Plug className="size-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {i18nService.t('mcpNoInstalledServers')}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveTab('marketplace')}
+                >
+                  {i18nService.t('mcpMarketplace')}
+                </Button>
               </div>
             ) : (
               filteredInstalled.map(server => {
@@ -558,11 +549,11 @@ const McpManager: React.FC = () => {
                 return (
                   <div
                     key={server.id}
-                    className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
+                    className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
                           <Plug className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <span className="text-sm font-medium text-foreground truncate">
@@ -602,7 +593,7 @@ const McpManager: React.FC = () => {
                       className="text-xs text-muted-foreground mb-2"
                     />
 
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
+                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                       <span
                         className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
                       >
@@ -644,7 +635,7 @@ const McpManager: React.FC = () => {
         {/* ── Tab: Marketplace ────────────────────────────── */}
         {activeTab === 'marketplace' && (
           <div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {filteredMarketplace.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
                   {i18nService.t('noMcpServersAvailable')}
@@ -653,11 +644,11 @@ const McpManager: React.FC = () => {
                 filteredMarketplace.map(entry => (
                   <div
                     key={entry.id}
-                    className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
+                    className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
                           <Plug className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <span className="text-sm font-medium text-foreground truncate">
@@ -686,7 +677,7 @@ const McpManager: React.FC = () => {
                       className="text-xs text-muted-foreground mb-2"
                     />
 
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
+                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                       <span
                         className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[entry.transportType] || ''}`}
                       >
@@ -715,91 +706,103 @@ const McpManager: React.FC = () => {
 
         {/* ── Tab: Custom ─────────────────────────────────── */}
         {activeTab === 'custom' && (
-          <div className="space-y-6">
-            {/* Custom servers grid (add button + server cards) */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {/* Add custom server card */}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleOpenCreateForm}
-                className="rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary dark:hover:border-primary dark:hover:text-primary h-auto min-h-[120px]"
-              >
-                + {i18nService.t('addMcpServer')}
-              </Button>
-              {filteredCustom.map(server => (
-                <div
-                  key={server.id}
-                  className="rounded-xl border border-border bg-surface p-3 transition-colors hover:border-primary"
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filteredCustom.length === 0 ? (
+              <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-6 text-center">
+                <Plug className="size-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{i18nService.t('mcpCustom')}</p>
+                <Button type="button" size="sm" onClick={handleOpenCreateForm}>
+                  <Plus data-icon="inline-start" />
+                  {i18nService.t('addMcpServer')}
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenCreateForm}
+                  className="h-auto min-h-32 border-dashed text-muted-foreground"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center shrink-0">
-                        <Plug className="h-4 w-4 text-muted-foreground" />
+                  <Plus data-icon="inline-start" />
+                  {i18nService.t('addMcpServer')}
+                </Button>
+                {filteredCustom.map(server => (
+                  <div
+                    key={server.id}
+                    className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                          <Plug className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {server.name}
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-foreground truncate">
-                        {server.name}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEditForm(server)}
+                          className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
+                          title={i18nService.t('editMcpServer')}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRequestDelete(server)}
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                          title={i18nService.t('deleteMcpServer')}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Switch
+                          checked={server.enabled}
+                          onCheckedChange={() => handleToggleEnabled(server.id)}
+                        />
+                      </div>
+                    </div>
+
+                    <ClampedText
+                      text={server.description || getTransportSummary(server)}
+                      className="text-xs text-muted-foreground mb-2"
+                    />
+
+                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
+                      >
+                        {server.transportType}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenEditForm(server)}
-                        className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
-                        title={i18nService.t('editMcpServer')}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRequestDelete(server)}
-                        className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
-                        title={i18nService.t('deleteMcpServer')}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Switch
-                        checked={server.enabled}
-                        onCheckedChange={() => handleToggleEnabled(server.id)}
-                      />
-                    </div>
-                  </div>
-
-                  <ClampedText
-                    text={server.description || getTransportSummary(server)}
-                    className="text-xs text-muted-foreground mb-2"
-                  />
-
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground min-w-0">
-                    <span
-                      className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
-                    >
-                      {server.transportType}
-                    </span>
-                    {server.transportType === 'stdio' && server.command && (
-                      <>
-                        <span className="shrink-0">·</span>
-                        <span className="truncate min-w-0">{server.command}</span>
-                      </>
-                    )}
-                    {(server.transportType === 'sse' || server.transportType === 'http') &&
-                      server.url && (
+                      {server.transportType === 'stdio' && server.command && (
                         <>
                           <span className="shrink-0">·</span>
-                          <span className="truncate min-w-0">{server.url}</span>
+                          <span className="truncate min-w-0">{server.command}</span>
                         </>
                       )}
+                      {(server.transportType === 'sse' || server.transportType === 'http') &&
+                        server.url && (
+                          <>
+                            <span className="shrink-0">·</span>
+                            <span className="truncate min-w-0">{server.url}</span>
+                          </>
+                        )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </>
+            )}
           </div>
         )}
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Delete confirmation modal */}
       {pendingDelete && (

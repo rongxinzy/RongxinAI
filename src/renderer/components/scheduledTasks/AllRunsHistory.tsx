@@ -1,6 +1,7 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { ButtonGroup } from '@shared/components/ui/button-group';
+import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
 import {
   Table,
@@ -14,7 +15,13 @@ import { Clock, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import type { RunFilter, ScheduledTaskRunWithName } from '../../../scheduledTask/types';
+import type {
+  RunFilter,
+  ScheduledTask,
+  ScheduledTaskRun,
+  ScheduledTaskRunWithName,
+} from '../../../scheduledTask/types';
+import { cn } from '@shared/lib/utils';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
@@ -43,29 +50,66 @@ function applyClientFilter(
 }
 
 const EMPTY_FILTER: RunFilter = {};
+const EMPTY_TASK_RUNS: ScheduledTaskRun[] = [];
 
-const AllRunsHistory: React.FC = () => {
+interface AllRunsHistoryProps {
+  task?: ScheduledTask;
+}
+
+const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task }) => {
   const allRuns = useSelector((state: RootState) => state.scheduledTask.allRuns);
   const allRunsHasMore = useSelector((state: RootState) => state.scheduledTask.allRunsHasMore);
+  const taskRuns = useSelector((state: RootState) =>
+    task ? (state.scheduledTask.runs[task.id] ?? EMPTY_TASK_RUNS) : EMPTY_TASK_RUNS,
+  );
+  const taskRunsHasMore = useSelector((state: RootState) =>
+    task ? (state.scheduledTask.runsHasMore[task.id] ?? false) : false,
+  );
   const [viewingRun, setViewingRun] = useState<ScheduledTaskRunWithName | null>(null);
   const [viewingError, setViewingError] = useState<ScheduledTaskRunWithName | null>(null);
   const [filter, setFilter] = useState<RunFilter>(EMPTY_FILTER);
+  const taskId = task?.id;
+  const taskPayload = task
+    ? task.payload.kind === 'systemEvent'
+      ? task.payload.text
+      : task.payload.message
+    : undefined;
+
+  const runs = useMemo<ScheduledTaskRunWithName[]>(
+    () =>
+      task
+        ? taskRuns.map(run => ({
+            ...run,
+            taskName: task.name,
+            taskPayload,
+          }))
+        : allRuns,
+    [allRuns, task, taskPayload, taskRuns],
+  );
+  const hasMore = task ? taskRunsHasMore : allRunsHasMore;
 
   const hasActiveFilter = Boolean(filter.startDate || filter.endDate || filter.status);
 
   const displayedRuns = useMemo(
-    () => (hasActiveFilter ? applyClientFilter(allRuns, filter) : allRuns),
-    [allRuns, filter, hasActiveFilter],
+    () => (hasActiveFilter ? applyClientFilter(runs, filter) : runs),
+    [filter, hasActiveFilter, runs],
   );
 
-  const loadInitial = useCallback((f: RunFilter) => {
-    scheduledTaskService.loadAllRuns(50, 0, f);
-  }, []);
+  const loadInitial = useCallback(
+    (f: RunFilter) => {
+      if (taskId) {
+        void scheduledTaskService.loadRuns(taskId, 50, 0, f);
+        return;
+      }
+      void scheduledTaskService.loadAllRuns(50, 0, f);
+    },
+    [taskId],
+  );
 
   useEffect(() => {
-    loadInitial(filter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setFilter(EMPTY_FILTER);
+    loadInitial(EMPTY_FILTER);
+  }, [loadInitial]);
 
   const handleFilterChange = (newFilter: RunFilter) => {
     setFilter(newFilter);
@@ -77,7 +121,11 @@ const AllRunsHistory: React.FC = () => {
   };
 
   const handleLoadMore = () => {
-    scheduledTaskService.loadAllRuns(50, allRuns.length, filter);
+    if (taskId) {
+      void scheduledTaskService.loadRuns(taskId, 50, runs.length, filter);
+      return;
+    }
+    void scheduledTaskService.loadAllRuns(50, runs.length, filter);
   };
 
   const handleRowClick = (run: ScheduledTaskRunWithName) => {
@@ -91,162 +139,167 @@ const AllRunsHistory: React.FC = () => {
   const isEmpty = displayedRuns.length === 0;
 
   return (
-    <div>
-      {/* Filter area */}
-      <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <ButtonGroup>
-          {(['success', 'error', 'skipped', 'running'] as const).map(s => (
-            <Button
-              key={s}
-              variant="outline"
-              size="sm"
-              className={
-                filter.status === s
-                  ? 'bg-secondary text-foreground'
-                  : 'bg-card text-muted-foreground'
-              }
-              onClick={() =>
-                handleFilterChange({
-                  ...filter,
-                  status: filter.status === s ? undefined : s,
-                })
-              }
-            >
-              {i18nService.t(statusLabelKeys[s])}
-            </Button>
-          ))}
-        </ButtonGroup>
+    <ScrollArea className="h-[500px] rounded-lg border border-border bg-card p-4">
+      <div>
+        {/* Filter area */}
+        <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <ButtonGroup>
+            {(['success', 'error', 'skipped', 'running'] as const).map(s => (
+              <Button
+                key={s}
+                variant="outline"
+                size="sm"
+                className={
+                  filter.status === s
+                    ? 'bg-secondary text-foreground'
+                    : 'bg-card text-muted-foreground'
+                }
+                onClick={() =>
+                  handleFilterChange({
+                    ...filter,
+                    status: filter.status === s ? undefined : s,
+                  })
+                }
+              >
+                {i18nService.t(statusLabelKeys[s])}
+              </Button>
+            ))}
+          </ButtonGroup>
 
-        <div className="flex items-center gap-1.5 ml-auto">
-          <DateInput
-            value={filter.startDate ?? ''}
-            max={filter.endDate}
-            onChange={v => handleFilterChange({ ...filter, startDate: v || undefined })}
-            placeholder={i18nService.t('scheduledTasksFilterStartDate')}
-          />
-          <span className="text-xs text-muted-foreground">–</span>
-          <DateInput
-            value={filter.endDate ?? ''}
-            min={filter.startDate}
-            onChange={v => handleFilterChange({ ...filter, endDate: v || undefined })}
-            placeholder={i18nService.t('scheduledTasksFilterEndDate')}
-          />
-          {hasActiveFilter && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleClearFilter}
-              className="size-6"
-              title={i18nService.t('scheduledTasksFilterClear')}
-            >
-              <X className="size-3" />
-            </Button>
-          )}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <DateInput
+              value={filter.startDate ?? ''}
+              max={filter.endDate}
+              onChange={v => handleFilterChange({ ...filter, startDate: v || undefined })}
+              placeholder={i18nService.t('scheduledTasksFilterStartDate')}
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <DateInput
+              value={filter.endDate ?? ''}
+              min={filter.startDate}
+              onChange={v => handleFilterChange({ ...filter, endDate: v || undefined })}
+              placeholder={i18nService.t('scheduledTasksFilterEndDate')}
+            />
+            {hasActiveFilter && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleClearFilter}
+                className="size-6"
+                title={i18nService.t('scheduledTasksFilterClear')}
+              >
+                <X className="size-3" />
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Empty state */}
-      {isEmpty && (
-        <div className="flex flex-col items-center justify-center py-16 px-6">
-          <Clock className="size-12 text-muted-foreground/40 mb-4" />
-          <p className="text-sm font-medium text-muted-foreground">
-            {hasActiveFilter
-              ? i18nService.t('scheduledTasksFilterNoResults')
-              : i18nService.t('scheduledTasksHistoryEmpty')}
-          </p>
-        </div>
-      )}
+        {/* Empty state */}
+        {isEmpty && (
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <Clock className="size-12 text-muted-foreground/40 mb-4" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {hasActiveFilter
+                ? i18nService.t('scheduledTasksFilterNoResults')
+                : i18nService.t('scheduledTasksHistoryEmpty')}
+            </p>
+          </div>
+        )}
 
-      {/* Run rows */}
-      {!isEmpty && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-muted-foreground">
-                {i18nService.t('scheduledTasksHistoryColTitle')}
-              </TableHead>
-              <TableHead className="text-muted-foreground">
-                {i18nService.t('scheduledTasksHistoryColTime')}
-              </TableHead>
-              <TableHead className="text-muted-foreground w-24">
-                {i18nService.t('scheduledTasksHistoryColStatus')}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayedRuns.map(run => {
-              const hasSession = run.sessionId || run.sessionKey;
-              const isClickable = hasSession || (run.status === 'error' && run.error);
-              return (
-                <TableRow
-                  key={run.id}
-                  className={isClickable ? 'cursor-pointer hover:bg-muted' : 'hover:bg-muted'}
-                  onClick={() => handleRowClick(run)}
-                >
-                  <TableCell className="max-w-[180px] min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-foreground truncate">{run.taskName}</span>
-                      {run.status === 'running' && <Spinner className="size-3 text-blue-500" />}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {formatDateTime(new Date(run.startedAt))}
-                    </span>
-                    {run.durationMs !== null && (
-                      <span className="ml-1.5 text-xs text-muted-foreground/70">
-                        ({formatDuration(run.durationMs)})
+        {/* Run rows */}
+        {!isEmpty && (
+          <Table className="table-fixed">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-1/3 text-muted-foreground">
+                  {i18nService.t('scheduledTasksHistoryColTitle')}
+                </TableHead>
+                <TableHead className="w-1/3 text-muted-foreground">
+                  {i18nService.t('scheduledTasksHistoryColTime')}
+                </TableHead>
+                <TableHead className="w-1/3 text-right text-muted-foreground">
+                  <span className="ml-auto block w-14 text-center">
+                    {i18nService.t('scheduledTasksHistoryColStatus')}
+                  </span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {displayedRuns.map(run => {
+                const hasSession = run.sessionId || run.sessionKey;
+                const isClickable = hasSession || (run.status === 'error' && run.error);
+                return (
+                  <TableRow
+                    key={run.id}
+                    className={isClickable ? 'cursor-pointer hover:bg-muted' : 'hover:bg-muted'}
+                    onClick={() => handleRowClick(run)}
+                  >
+                    <TableCell className="w-1/3 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm text-foreground truncate">{run.taskName}</span>
+                        {run.status === 'running' && <Spinner className="size-3 text-blue-500" />}
+                      </div>
+                    </TableCell>
+                    <TableCell className="w-1/3">
+                      <span className="text-sm text-muted-foreground">
+                        {formatDateTime(new Date(run.startedAt))}
                       </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        run.status === 'success'
-                          ? 'text-(--zy-success)'
-                          : run.status === 'error'
-                            ? 'text-destructive'
-                            : run.status === 'running'
-                              ? 'text-primary'
-                              : 'text-muted-foreground'
-                      }
-                    >
-                      {i18nService.t(statusLabelKeys[run.status] || '')}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
+                      {run.durationMs !== null && (
+                        <span className="ml-1.5 text-xs text-muted-foreground/70">
+                          ({formatDuration(run.durationMs)})
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="w-1/3 text-right">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'w-14 justify-center',
+                          run.status === 'success'
+                            ? 'text-(--zy-success)'
+                            : run.status === 'error'
+                              ? 'text-destructive'
+                              : run.status === 'running'
+                                ? 'text-primary'
+                                : 'text-muted-foreground',
+                        )}
+                      >
+                        {i18nService.t(statusLabelKeys[run.status] || '')}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
 
-      {allRunsHasMore && (
-        <Button type="button" variant="ghost" onClick={handleLoadMore} className="w-full py-3">
-          {i18nService.t('scheduledTasksLoadMore')}
-        </Button>
-      )}
+        {hasMore && (
+          <Button type="button" variant="ghost" onClick={handleLoadMore} className="w-full py-3">
+            {i18nService.t('scheduledTasksLoadMore')}
+          </Button>
+        )}
 
-      {viewingRun && (
-        <RunSessionModal
-          sessionId={viewingRun.sessionId}
-          sessionKey={viewingRun.sessionKey}
-          onClose={() => setViewingRun(null)}
-        />
-      )}
+        {viewingRun && (
+          <RunSessionModal
+            sessionId={viewingRun.sessionId}
+            sessionKey={viewingRun.sessionKey}
+            onClose={() => setViewingRun(null)}
+          />
+        )}
 
-      {viewingError && (
-        <FailureDetailModal
-          inputCommand={viewingError.taskPayload || viewingError.taskName}
-          error={viewingError.error || ''}
-          taskName={viewingError.taskName}
-          runTime={formatDateTime(new Date(viewingError.startedAt))}
-          onClose={() => setViewingError(null)}
-        />
-      )}
-    </div>
+        {viewingError && (
+          <FailureDetailModal
+            inputCommand={viewingError.taskPayload || viewingError.taskName}
+            error={viewingError.error || ''}
+            taskName={viewingError.taskName}
+            runTime={formatDateTime(new Date(viewingError.startedAt))}
+            onClose={() => setViewingError(null)}
+          />
+        )}
+      </div>
+    </ScrollArea>
   );
 };
 
