@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import { CoworkSessionStatusValue } from '../../types/cowork';
 import coworkReducer, {
+  addMessage,
   addSession,
   setConfig,
   setCurrentSession,
@@ -179,4 +180,58 @@ test('updateSessionStatus does not mark the active completed session unread', ()
   );
 
   expect(completedState.unreadSessionIds).toEqual([]);
+});
+
+test('updateSessionStatus marks the active session as streaming while it is running', () => {
+  const state = coworkReducer(undefined, addSession(makeSession()));
+
+  const runningState = coworkReducer(
+    state,
+    updateSessionStatus({
+      sessionId: 'session-1',
+      status: CoworkSessionStatusValue.Running,
+    }),
+  );
+
+  expect(runningState.currentSession?.status).toBe(CoworkSessionStatusValue.Running);
+  expect(runningState.streamingSessionIds).toEqual(['session-1']);
+});
+
+test('a stale completed snapshot does not clear a tracked live session stream', () => {
+  const runningState = coworkReducer(
+    coworkReducer(undefined, addSession(makeSession())),
+    updateSessionStatus({ sessionId: 'session-1', status: CoworkSessionStatusValue.Running }),
+  );
+
+  const reloadedState = coworkReducer(
+    runningState,
+    setCurrentSession(makeSession({ status: CoworkSessionStatusValue.Completed })),
+  );
+
+  expect(reloadedState.streamingSessionIds).toEqual(['session-1']);
+  expect(reloadedState.currentSession?.status).toBe(CoworkSessionStatusValue.Running);
+});
+
+test('keeps streaming messages when another session is selected', () => {
+  const sessionOne = makeSession({ id: 'session-1', status: CoworkSessionStatusValue.Running });
+  const sessionTwo = makeSession({ id: 'session-2' });
+  const streamingState = coworkReducer(undefined, addSession(sessionOne));
+  const switchedState = coworkReducer(streamingState, setCurrentSession(sessionTwo));
+  const updatedState = coworkReducer(
+    switchedState,
+    addMessage({
+      sessionId: 'session-1',
+      message: {
+        id: 'assistant-1',
+        type: 'assistant',
+        content: 'still streaming',
+        timestamp: 2,
+      },
+    }),
+  );
+
+  const restoredState = coworkReducer(updatedState, setCurrentSession(sessionOne));
+
+  expect(restoredState.currentSession?.messages).toHaveLength(1);
+  expect(restoredState.currentSession?.messages[0]?.content).toBe('still streaming');
 });

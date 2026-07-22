@@ -118,8 +118,10 @@ export const {
   clearSessionArtifacts,
 } = artifactSlice.actions;
 
+export const EMPTY_ARTIFACTS: Artifact[] = [];
+
 export const selectSessionArtifacts = (state: RootState, sessionId: string): Artifact[] =>
-  state.artifact.artifactsBySession[sessionId] ?? [];
+  state.artifact.artifactsBySession[sessionId] ?? EMPTY_ARTIFACTS;
 
 export const selectSelectedArtifact = (state: RootState): Artifact | null => {
   const id = state.artifact.selectedArtifactId;

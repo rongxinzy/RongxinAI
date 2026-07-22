@@ -25,7 +25,6 @@ import {
   setHasMoreSessions,
   setRemoteManaged,
   setSessions,
-  setStreaming,
   updateMessageContent,
   updateSessionPinned,
   updateSessionStatus,
@@ -417,8 +416,6 @@ class CoworkService {
       return { session: null, error: 'Cowork API not available' };
     }
 
-    store.dispatch(setStreaming(true));
-
     const result = await cowork.startSession({
       ...options,
       workspaceId: workspaceService.isWorkspaceApiAvailable()
@@ -427,12 +424,6 @@ class CoworkService {
     });
     if (result.success && result.session) {
       store.dispatch(addSession(result.session));
-      // Only clear streaming for terminal statuses, not transitional 'idle'.
-      // 'idle' means the session was created but the agent hasn't started yet;
-      // streaming will be cleared by the complete/error stream events.
-      if (result.session.status === 'completed' || result.session.status === 'error') {
-        store.dispatch(setStreaming(false));
-      }
       return { session: result.session };
     }
 
@@ -449,7 +440,6 @@ class CoworkService {
       window.dispatchEvent(new CustomEvent('app:showToast', { detail: errorContent }));
     }
 
-    store.dispatch(setStreaming(false));
     console.error('Failed to start session:', result.error);
     return { session: null, error: result.error };
   }
@@ -461,7 +451,6 @@ class CoworkService {
       return false;
     }
 
-    store.dispatch(setStreaming(true));
     store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'running' }));
 
     const result = await cowork.continueSession({
@@ -473,7 +462,6 @@ class CoworkService {
       imageAttachments: options.imageAttachments,
     });
     if (!result.success) {
-      store.dispatch(setStreaming(false));
       if (result.engineStatus) {
         this.notifyOpenClawStatus(result.engineStatus);
       }
@@ -527,7 +515,6 @@ class CoworkService {
 
     const result = await cowork.stopSession(sessionId);
     if (result.success) {
-      store.dispatch(setStreaming(false));
       store.dispatch(updateSessionStatus({ sessionId, status: 'idle' }));
       return true;
     }
@@ -697,10 +684,6 @@ class CoworkService {
       // loadSession can be called reactively (onSessionsChanged) while a task
       // is still executing; the backend may report a transitional 'idle' status
       // that would prematurely hide the stop button.
-      if (result.session.status === 'running') {
-        store.dispatch(setStreaming(true));
-      }
-
       // Restore skill selection from session record
       if (result.session.activeSkillIds?.length) {
         store.dispatch(setActiveSkillIds(result.session.activeSkillIds));
@@ -758,7 +741,6 @@ class CoworkService {
       const currentSessionId = store.getState().cowork.currentSessionId;
       if (currentSessionId === sessionId) {
         store.dispatch(setCurrentSession(result.session));
-        store.dispatch(setStreaming(result.session.status === 'running'));
       }
       return result.session;
     }
@@ -793,7 +775,6 @@ class CoworkService {
       store.dispatch(setConfig({ ...currentConfig, ...config }));
       if (engineChanged) {
         store.dispatch(clearPendingPermissions());
-        store.dispatch(setStreaming(false));
       }
       return true;
     }

@@ -7,7 +7,6 @@ type CoworkDeleteStateShape = {
   unreadSessionIds: string[];
   currentSessionId: string | null;
   currentSession: SessionLike | null;
-  isStreaming: boolean;
 };
 
 export const removeSessionFromState = (state: CoworkDeleteStateShape, sessionId: string): void => {
@@ -17,7 +16,6 @@ export const removeSessionFromState = (state: CoworkDeleteStateShape, sessionId:
   if (state.currentSessionId === sessionId) {
     state.currentSessionId = null;
     state.currentSession = null;
-    state.isStreaming = false;
   }
 };
 
@@ -32,6 +30,5 @@ export const removeSessionsFromState = (
   if (state.currentSessionId && sessionIdSet.has(state.currentSessionId)) {
     state.currentSessionId = null;
     state.currentSession = null;
-    state.isStreaming = false;
   }
 };
