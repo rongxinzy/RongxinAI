@@ -79,6 +79,7 @@ export const LlamaCppServiceConfigFieldKey = {
   Timeout: 'timeout',
   ThreadsHttp: 'threadsHttp',
   Parallel: 'parallel',
+  KvUnified: 'kvUnified',
   CachePrompt: 'cachePrompt',
   CacheReuse: 'cacheReuse',
   CacheRam: 'cacheRam',

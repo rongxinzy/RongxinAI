@@ -28,8 +28,11 @@ interface CoworkState {
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
   unreadSessionIds: string[];
+  /** Session-scoped streaming state survives stale SQLite reloads during a live stream. */
+  streamingSessionIds: string[];
+  /** Live message snapshots for active streams, including sessions not currently open. */
+  streamingSessions: Record<string, CoworkSession>;
   isCoworkActive: boolean;
-  isStreaming: boolean;
   remoteManaged: boolean;
   pendingPermissions: CoworkPermissionRequest[];
   config: CoworkConfig;
@@ -43,8 +46,9 @@ const initialState: CoworkState = {
   draftPrompts: {},
   draftAttachments: {},
   unreadSessionIds: [],
+  streamingSessionIds: [],
+  streamingSessions: {},
   isCoworkActive: false,
-  isStreaming: false,
   remoteManaged: false,
   pendingPermissions: [],
   config: {
@@ -80,6 +84,27 @@ const markSessionUnread = (state: CoworkState, sessionId: string) => {
   if (state.currentSessionId === sessionId) return;
   if (state.unreadSessionIds.includes(sessionId)) return;
   state.unreadSessionIds.push(sessionId);
+};
+
+const setSessionStreaming = (state: CoworkState, sessionId: string, streaming: boolean) => {
+  const isTracked = state.streamingSessionIds.includes(sessionId);
+  if (streaming && !isTracked) {
+    state.streamingSessionIds.push(sessionId);
+  } else if (!streaming && isTracked) {
+    state.streamingSessionIds = state.streamingSessionIds.filter(id => id !== sessionId);
+  }
+  if (!streaming) {
+    delete state.streamingSessions[sessionId];
+  }
+};
+
+const cacheStreamingSession = (state: CoworkState, session: CoworkSession) => {
+  if (session.status !== CoworkSessionStatusValue.Running) return;
+  setSessionStreaming(state, session.id, true);
+  state.streamingSessions[session.id] = {
+    ...session,
+    messages: [...session.messages],
+  };
 };
 
 const toSessionSummary = (session: CoworkSession): CoworkSessionSummary => ({
@@ -138,7 +163,11 @@ const coworkSlice = createSlice({
         // Guard: skip store mutation if session data is identical to current.
         // Prevents unnecessary React re-renders when loadSession is called
         // but the backend returns unchanged data.
-        if (state.currentSession && state.currentSession.id === session.id) {
+        if (
+          !state.streamingSessions[session.id] &&
+          state.currentSession &&
+          state.currentSession.id === session.id
+        ) {
           const prev = state.currentSession;
           const prevMsgs = prev.messages;
           const newMsgs = session.messages;
@@ -165,20 +194,21 @@ const coworkSlice = createSlice({
         // The DB snapshot may be stale (messages not yet persisted). Replacing
         // messages would cause streaming content and user messages to vanish
         // when switching sessions and coming back.
-        const preserveMessages =
-          state.currentSession?.status === 'running' && state.currentSession.id === session.id;
+        const liveSession = state.streamingSessions[session.id];
+        const effectiveSession = liveSession ?? session;
 
         state.currentSession = {
-          ...session,
-          messages: preserveMessages ? state.currentSession!.messages : session.messages,
-          messagesOffset: session.messagesOffset ?? 0,
-          totalMessages: session.totalMessages ?? session.messages.length,
+          ...effectiveSession,
+          messages: [...effectiveSession.messages],
+          messagesOffset: effectiveSession.messagesOffset ?? 0,
+          totalMessages: effectiveSession.totalMessages ?? effectiveSession.messages.length,
         };
       } else {
         state.currentSession = null;
       }
       if (action.payload) {
         state.currentSessionId = action.payload.id;
+        cacheStreamingSession(state, state.currentSession!);
         if (!action.payload.id.startsWith('temp-')) {
           const summary = toSessionSummary(action.payload);
           const sessionIndex = state.sessions.findIndex(s => s.id === summary.id);
@@ -218,6 +248,7 @@ const coworkSlice = createSlice({
         totalMessages: action.payload.totalMessages ?? action.payload.messages.length,
       };
       state.currentSessionId = action.payload.id;
+      cacheStreamingSession(state, state.currentSession);
       markSessionRead(state, action.payload.id);
     },
 
@@ -226,6 +257,7 @@ const coworkSlice = createSlice({
       action: PayloadAction<{ sessionId: string; status: CoworkSessionStatus }>,
     ) {
       const { sessionId, status } = action.payload;
+      setSessionStreaming(state, sessionId, status === CoworkSessionStatusValue.Running);
 
       // Update in sessions list
       const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
@@ -238,8 +270,9 @@ const coworkSlice = createSlice({
       if (state.currentSession?.id === sessionId) {
         state.currentSession.status = status;
         state.currentSession.updatedAt = Date.now();
-        // Streaming state is tied to the currently opened session only
-        state.isStreaming = status === CoworkSessionStatusValue.Running;
+        if (status === CoworkSessionStatusValue.Running) {
+          cacheStreamingSession(state, state.currentSession);
+        }
       }
 
       if (status === CoworkSessionStatusValue.Completed) {
@@ -249,14 +282,28 @@ const coworkSlice = createSlice({
 
     deleteSession(state, action: PayloadAction<string>) {
       removeSessionFromState(state, action.payload);
+      setSessionStreaming(state, action.payload, false);
     },
 
     deleteSessions(state, action: PayloadAction<string[]>) {
       removeSessionsFromState(state, action.payload);
+      for (const sessionId of action.payload) {
+        setSessionStreaming(state, sessionId, false);
+      }
     },
 
     addMessage(state, action: PayloadAction<{ sessionId: string; message: CoworkMessage }>) {
       const { sessionId, message } = action.payload;
+
+      const streamingSession = state.streamingSessions[sessionId];
+      if (streamingSession) {
+        const exists = streamingSession.messages.some(item => item.id === message.id);
+        if (!exists) {
+          streamingSession.messages.push(message);
+          streamingSession.updatedAt = message.timestamp;
+          streamingSession.totalMessages += 1;
+        }
+      }
 
       if (state.currentSession?.id === sessionId) {
         const exists = state.currentSession.messages.some(item => item.id === message.id);
@@ -302,6 +349,21 @@ const coworkSlice = createSlice({
       const { sessionId, messageId, content, metadata } = action.payload;
       const updatedAt = Date.now();
 
+      const streamingSession = state.streamingSessions[sessionId];
+      if (streamingSession) {
+        const messageIndex = streamingSession.messages.findIndex(m => m.id === messageId);
+        if (messageIndex !== -1) {
+          streamingSession.messages[messageIndex].content = content;
+          if (metadata) {
+            streamingSession.messages[messageIndex].metadata = {
+              ...streamingSession.messages[messageIndex].metadata,
+              ...metadata,
+            };
+          }
+          streamingSession.updatedAt = updatedAt;
+        }
+      }
+
       if (state.currentSession?.id === sessionId) {
         const messageIndex = state.currentSession.messages.findIndex(m => m.id === messageId);
         if (messageIndex !== -1) {
@@ -322,10 +384,6 @@ const coworkSlice = createSlice({
       }
 
       markSessionUnread(state, sessionId);
-    },
-
-    setStreaming(state, action: PayloadAction<boolean>) {
-      state.isStreaming = action.payload;
     },
 
     setRemoteManaged(state, action: PayloadAction<boolean>) {
@@ -408,7 +466,6 @@ const coworkSlice = createSlice({
     clearCurrentSession(state) {
       state.currentSessionId = null;
       state.currentSession = null;
-      state.isStreaming = false;
       state.remoteManaged = false;
     },
 
@@ -458,7 +515,6 @@ export const {
   addMessage,
   prependMessages,
   updateMessageContent,
-  setStreaming,
   setRemoteManaged,
   updateSessionPinned,
   updateSessionTitle,

@@ -20,10 +20,16 @@ declare module '@earendil-works/pi-coding-agent' {
 
   export function getAgentDir(): string;
 
-  export const AuthStorage: {
-    inMemory(): {
-      setRuntimeApiKey(provider: string, apiKey: string): void;
-    };
+  export const ModelRuntime: {
+    create(): Promise<{
+      registerProvider(provider: string, config: Record<string, unknown>): void;
+      setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
+      getModel(provider: string, modelId: string): unknown;
+      completeSimple(
+        model: unknown,
+        context: { messages: Array<{ role: string; content: string }> },
+      ): Promise<{ content: Array<{ text: string }> }>;
+    }>;
   };
   export function createAgentSession(options?: Record<string, unknown>): Promise<{
     session: {

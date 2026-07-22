@@ -49,6 +49,74 @@ describe('LlamaCppClient', () => {
     );
   });
 
+  test('uses the router reported slot context instead of the total launch context', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          data: [
+            {
+              id: 'qwen3:8b',
+              status: {
+                value: 'loaded',
+                n_ctx: 65536,
+                n_ctx_seq: 32768,
+                kv_unified: false,
+                args: ['--ctx-size', '65536', '--no-kv-unified'],
+              },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const client = new LlamaCppClient();
+
+    await expect(client.listModels()).resolves.toEqual([
+      expect.objectContaining({ runtime_context_length: 32768 }),
+    ]);
+  });
+
+  test('uses the shared total context when unified KV is enabled', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          data: [
+            {
+              id: 'qwen3:8b',
+              status: { value: 'loaded', n_ctx: 65536, n_ctx_seq: 32768, kv_unified: true },
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(new LlamaCppClient().listModels()).resolves.toEqual([
+      expect.objectContaining({ runtime_context_length: 65536 }),
+    ]);
+  });
+
+  test('defaults to the shared total context when b9244 omits unified KV metadata', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          data: [
+            {
+              id: 'qwen3:8b',
+              status: { value: 'loaded', n_ctx: 65536, n_ctx_seq: 32768 },
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(new LlamaCppClient().listModels()).resolves.toEqual([
+      expect.objectContaining({ runtime_context_length: 65536 }),
+    ]);
+  });
+
   test('lists model snapshots without forcing router preset reload', async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({

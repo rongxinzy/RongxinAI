@@ -24,9 +24,12 @@ const hoisted = vi.hoisted(() => {
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
     mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
     mockGetModel: vi.fn((provider: string, modelId: string) => ({ provider, id: modelId })),
-    mockAuthStorage: {
-      setRuntimeApiKey: vi.fn(),
+    mockModelRuntime: {
+      registerProvider: vi.fn(),
+      setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
+      getModel: vi.fn(),
     },
+    mockModelRuntimeCreate: vi.fn(),
     mockResolveRawApiConfig: vi.fn(() => ({
       config: {
         apiKey: 'sk-test',
@@ -96,15 +99,16 @@ const mockSession = hoisted.mockSession;
 const mockCreateAgentSession = hoisted.mockCreateAgentSession;
 const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
 const mockGetModel = hoisted.mockGetModel;
-const mockAuthStorage = hoisted.mockAuthStorage;
+const mockModelRuntime = hoisted.mockModelRuntime;
+const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
   DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
   getAgentDir: hoisted.mockGetAgentDir,
-  AuthStorage: {
-    inMemory: vi.fn(() => hoisted.mockAuthStorage),
+  ModelRuntime: {
+    create: hoisted.mockModelRuntimeCreate,
   },
 }));
 
@@ -125,6 +129,7 @@ describe('PiRuntimeAdapter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
     adapter = new PiRuntimeAdapter();
   });
 
@@ -178,7 +183,19 @@ describe('PiRuntimeAdapter', () => {
         }),
       );
       expect(mockGetModel).not.toHaveBeenCalled();
-      expect(mockAuthStorage.setRuntimeApiKey).toHaveBeenCalledWith('llamacpp', 'sk-test');
+      expect(mockModelRuntimeCreate).toHaveBeenCalledOnce();
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'llamacpp',
+        expect.objectContaining({
+          baseUrl: 'http://127.0.0.1:11434/v1',
+          api: 'openai-completions',
+          models: [expect.objectContaining({ id: 'qwen-local' })],
+        }),
+      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('llamacpp', 'sk-test');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({ modelRuntime: mockModelRuntime }),
+      );
     });
 
     it('should keep supported remote models on the Pi built-in path', async () => {
@@ -194,7 +211,8 @@ describe('PiRuntimeAdapter', () => {
           }),
         }),
       );
-      expect(mockAuthStorage.setRuntimeApiKey).toHaveBeenCalledWith('openai', 'sk-openai');
+      expect(mockModelRuntimeCreate).not.toHaveBeenCalled();
+      expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('modelRuntime');
     });
 
     it('should make session active after start', async () => {

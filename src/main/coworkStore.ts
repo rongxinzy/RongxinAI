@@ -1285,6 +1285,44 @@ export class CoworkStore {
     };
   }
 
+  upsertMessage(sessionId: string, message: CoworkMessage): CoworkMessage {
+    const now = Date.now();
+    const existing = this.db
+      .prepare('SELECT sequence FROM cowork_messages WHERE id = ? AND session_id = ?')
+      .get(message.id, sessionId) as { sequence: number } | undefined;
+    const sequence =
+      existing?.sequence ??
+      ((this.db
+        .prepare(
+          'SELECT COALESCE(MAX(sequence), 0) + 1 as next_seq FROM cowork_messages WHERE session_id = ?',
+        )
+        .get(sessionId) as { next_seq: number } | undefined)?.next_seq ??
+        1);
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO cowork_messages (id, session_id, type, content, metadata, created_at, sequence)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          type = excluded.type,
+          content = excluded.content,
+          metadata = excluded.metadata
+      `,
+      )
+      .run(
+        message.id,
+        sessionId,
+        message.type,
+        message.content,
+        message.metadata ? JSON.stringify(message.metadata) : null,
+        message.timestamp,
+        sequence,
+      );
+    this.db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
+    return message;
+  }
+
   /**
    * Insert a message before an existing message (by shifting sequences).
    * Used for channel-originated sessions where user messages need to appear

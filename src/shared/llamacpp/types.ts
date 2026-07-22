@@ -286,6 +286,7 @@ export type LlamaCppServiceConfig = {
   checkpointEveryNt?: string;
   ctxSize?: string;
   parallel?: string;
+  kvUnified?: boolean;
   batchSize?: string;
   ubatchSize?: string;
   gpuLayers?: string;

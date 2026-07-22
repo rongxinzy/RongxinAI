@@ -56,12 +56,14 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         history.push({ role: msg.role, content: extractText(msg) });
       }
     }
+    const requestId = generateId();
 
     return new ReadableStream<UIMessageChunk>({
       start(controller) {
         let closed = false;
         let textId: string | null = null;
         let reasoningId: string | null = null;
+        let reasoningClosed = false;
         let lastContent = '';
         let lastReasoning = '';
 
@@ -72,14 +74,37 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         const close = (error?: string) => {
           if (closed) return;
           closed = true;
-          if (textId) enqueue({ type: 'text-end', id: textId });
-          if (reasoningId) enqueue({ type: 'reasoning-end', id: reasoningId });
-          enqueue({
+          // Enqueue the terminal chunks directly; helper enqueue() skips when
+          // closed is true, which would suppress these required end markers.
+          if (textId) controller.enqueue({ type: 'text-end', id: textId });
+          if (reasoningId) controller.enqueue({ type: 'reasoning-end', id: reasoningId });
+          controller.enqueue({
             type: 'finish',
             finishReason: error ? ('error' as const) : ('stop' as const),
           });
           controller.close();
         };
+
+        const emitReasoningEnd = () => {
+          if (reasoningId) {
+            enqueue({ type: 'reasoning-end', id: reasoningId });
+            reasoningId = null;
+            reasoningClosed = true;
+          }
+        };
+
+        const emitTextEnd = () => {
+          if (textId) {
+            enqueue({ type: 'text-end', id: textId });
+            textId = null;
+            lastContent = '';
+          }
+        };
+
+        if (abortSignal?.aborted) {
+          close('aborted');
+          return;
+        }
 
         void apiService
           .chat(
@@ -89,36 +114,52 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
                 close('aborted');
                 return;
               }
-              // apiService sends accumulated full content — diff to get deltas
-              if (reasoning) {
-                const delta = reasoning.startsWith(lastReasoning)
-                  ? reasoning.slice(lastReasoning.length)
-                  : reasoning;
-                lastReasoning = reasoning;
-                if (delta) {
-                  if (!reasoningId) {
-                    reasoningId = generateId();
-                    enqueue({ type: 'reasoning-start', id: reasoningId });
-                  }
-                  enqueue({ type: 'reasoning-delta', id: reasoningId, delta });
+
+              const fullContent = content ?? '';
+              const fullReasoning = reasoning ?? '';
+
+              // Compute deltas independently so a reasoning-to-answer transition
+              // (where fullReasoning is non-empty but no longer growing) still
+              // emits the new answer text. Prior code gated content emission on
+              // `!reasoning`, which suppressed the answer after any reasoning.
+              const reasoningDelta = fullReasoning.startsWith(lastReasoning)
+                ? fullReasoning.slice(lastReasoning.length)
+                : fullReasoning;
+              const contentDelta = fullContent.startsWith(lastContent)
+                ? fullContent.slice(lastContent.length)
+                : fullContent;
+
+              if (reasoningDelta && !reasoningClosed) {
+                // Once answer text starts, close the reasoning block first.
+                if (contentDelta && !textId) {
+                  emitReasoningEnd();
                 }
+                if (!reasoningId) {
+                  reasoningId = generateId();
+                  enqueue({ type: 'reasoning-start', id: reasoningId });
+                }
+                enqueue({ type: 'reasoning-delta', id: reasoningId, delta: reasoningDelta });
+                lastReasoning = fullReasoning;
+              } else if (fullReasoning.length < lastReasoning.length && !reasoningClosed) {
+                // Guard against non-monotonic resets.
+                emitReasoningEnd();
               }
-              if (content) {
-                const delta = content.startsWith(lastContent)
-                  ? content.slice(lastContent.length)
-                  : content;
-                lastContent = content;
-                if (delta) {
-                  if (!textId) {
-                    textId = generateId();
-                    enqueue({ type: 'text-start', id: textId });
-                  }
-                  enqueue({ type: 'text-delta', id: textId, delta });
+
+              if (contentDelta) {
+                if (!textId) {
+                  emitReasoningEnd();
+                  textId = generateId();
+                  enqueue({ type: 'text-start', id: textId });
                 }
+                enqueue({ type: 'text-delta', id: textId, delta: contentDelta });
+                lastContent = fullContent;
+              } else if (fullContent.length < lastContent.length) {
+                emitTextEnd();
               }
             },
             history,
             directChatOptions,
+            requestId,
           )
           .then(() => {
             close();
@@ -129,6 +170,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
           });
 
         abortSignal?.addEventListener('abort', () => {
+          apiService.cancelOngoingRequest(requestId);
           close('aborted');
         });
       },

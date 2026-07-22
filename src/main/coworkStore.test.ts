@@ -360,6 +360,34 @@ test('updateMessage refreshes the session updated time', () => {
   expect(session?.messages[0]?.content).toBe('final');
 });
 
+test('upsertMessage preserves the caller message id and replaces streaming content', () => {
+  const sid = 'sess-upsert-message';
+  insertSession(sid);
+
+  store.upsertMessage(sid, {
+    id: 'chat-assistant-1',
+    type: 'assistant',
+    content: 'draft',
+    timestamp: 1000,
+    metadata: { isStreaming: true, isFinal: false },
+  });
+  store.upsertMessage(sid, {
+    id: 'chat-assistant-1',
+    type: 'assistant',
+    content: 'final',
+    timestamp: 1000,
+    metadata: { isStreaming: false, isFinal: true },
+  });
+
+  expect(store.getSession(sid)?.messages).toEqual([
+    expect.objectContaining({
+      id: 'chat-assistant-1',
+      content: 'final',
+      metadata: { isStreaming: false, isFinal: true },
+    }),
+  ]);
+});
+
 test('updateSession refreshes the session updated time by default', () => {
   const sid = 'sess-update-session-time';
   insertSession(sid);

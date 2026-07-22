@@ -3983,16 +3983,14 @@ if (!gotTheLock) {
         if (existing) {
           // Session already exists — update status and sync new messages
           coworkStore.updateSession(session.id, { status: session.status as CoworkSessionStatus });
-          const existingMessages = existing.messages ?? [];
-          const existingIds = new Set(existingMessages.map((m: { id: string }) => m.id));
           for (const msg of session.messages || []) {
-            if (!existingIds.has(msg.id)) {
-              coworkStore.addMessage(session.id, {
-                type: msg.type as CoworkMessageType,
-                content: msg.content,
-                metadata: msg.metadata,
-              });
-            }
+            coworkStore.upsertMessage(session.id, {
+              id: msg.id,
+              type: msg.type as CoworkMessageType,
+              content: msg.content,
+              timestamp: msg.timestamp,
+              metadata: msg.metadata,
+            });
           }
           const updated = coworkStore.getSession(session.id);
           return { success: true, session: updated };
@@ -4011,9 +4009,11 @@ if (!gotTheLock) {
         );
         // Save messages
         for (const msg of session.messages || []) {
-          coworkStore.addMessage(newSession.id, {
+          coworkStore.upsertMessage(newSession.id, {
+            id: msg.id,
             type: msg.type as CoworkMessageType,
             content: msg.content,
+            timestamp: msg.timestamp,
             metadata: msg.metadata,
           });
         }

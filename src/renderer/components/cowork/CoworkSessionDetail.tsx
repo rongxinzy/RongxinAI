@@ -28,6 +28,7 @@ import {
   closePanel,
   MAX_PANEL_WIDTH,
   MIN_PANEL_WIDTH,
+  EMPTY_ARTIFACTS,
   selectArtifact,
   selectIsPanelOpen,
   selectPanelWidth,
@@ -74,9 +75,6 @@ import {
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { TodoQueue } from './TodoQueue';
-
-// Stable empty array reference to avoid unnecessary re-renders from useSelector
-const EMPTY_ARTIFACTS: Artifact[] = [];
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;

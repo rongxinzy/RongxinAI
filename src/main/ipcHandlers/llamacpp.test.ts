@@ -1,8 +1,9 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { ProviderName } from '../../shared/providers/constants';
 import {
+  enforceLlamaCppParallelTwo,
   getLlamaCppLoadedModelLimitViolation,
   getLlamaCppServiceConfig,
   getRequiredVramRecoveryMiB,
@@ -13,6 +14,22 @@ import {
   shouldSyncOpenClawForRunningModelRefresh,
   waitForLlamaCppModelUnloadConfirmation,
 } from './llamacpp';
+
+test('enforceLlamaCppParallelTwo updates an existing saved service config without changing ctxSize', () => {
+  const set = vi.fn();
+  const store = {
+    get: () => ({ ctxSize: '65536', parallel: '1', threadsHttp: '12' }),
+    set,
+  } as unknown as Parameters<typeof enforceLlamaCppParallelTwo>[0];
+
+  enforceLlamaCppParallelTwo(store);
+
+  expect(set).toHaveBeenCalledWith('llamacpp_service_config', {
+    ctxSize: '65536',
+    parallel: '2',
+    threadsHttp: '12',
+  });
+});
 
 test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malformed structured numbers', () => {
   expect(
@@ -46,7 +63,7 @@ test('sanitizeLlamaCppServiceConfig keeps valid fields and falls back for malfor
     modelsMax: '2',
     modelsAutoload: false,
     ctxSize: '8192',
-    parallel: '1',
+    parallel: '2',
     gpuLayers: 'all',
     threads: '8',
     batchSize: '256',
@@ -75,7 +92,8 @@ test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while k
     threadsHttp: '4',
     cacheReuse: '256',
     cacheRam: '8192',
-    parallel: '1',
+    parallel: '2',
+    kvUnified: true,
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
@@ -136,7 +154,7 @@ test('sanitizeLlamaCppServiceConfig maps malformed structured numeric strings to
     cacheReuse: '256',
     cacheRam: '8192',
     ctxSize: '4096',
-    parallel: '1',
+    parallel: '2',
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
@@ -170,7 +188,7 @@ test('sanitizeLlamaCppServiceConfig maps out-of-range numeric values to explicit
     cacheReuse: '256',
     cacheRam: '8192',
     ctxSize: '4096',
-    parallel: '1',
+    parallel: '2',
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
@@ -269,7 +287,8 @@ test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not 
     threadsHttp: '4',
     cacheReuse: '256',
     cacheRam: '8192',
-    parallel: '1',
+    parallel: '2',
+    kvUnified: true,
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
