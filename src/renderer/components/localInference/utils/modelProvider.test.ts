@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { LlamaCppModel } from '../../../../shared/llamacpp';
 import { ProviderName } from '../../../../shared/providers';
-import { resolveLocalModelProvider } from './modelProvider';
+import { resolveLocalModelProvider, resolveModelProviderName } from './modelProvider';
 
 function model(input: Partial<LlamaCppModel>): LlamaCppModel {
   return {
@@ -63,4 +63,12 @@ test('local model provider prioritizes family metadata over a conflicting model 
 
 test('local model provider leaves unsupported model families unbranded', () => {
   expect(resolveLocalModelProvider(model({ name: 'Meta-Llama-3.1-8B-Instruct' }))).toBeNull();
+});
+
+test('model provider identifies marketplace display names', () => {
+  expect(resolveModelProviderName('Qwen2.5-0.5B-Instruct')).toBe(ProviderName.Qwen);
+});
+
+test('model provider does not mistake GPTQ quantization for an OpenAI model', () => {
+  expect(resolveModelProviderName('Llama-3.1-8B-GPTQ')).toBeNull();
 });

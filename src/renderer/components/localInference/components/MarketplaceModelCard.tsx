@@ -7,8 +7,23 @@ import { Download, ExternalLink, X } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
+import { ProviderName } from '../../../../shared/providers';
 import { i18nService } from '../../../services/i18n';
-import { CustomProviderIcon, DeepSeekIcon, QwenIcon, ZhipuIcon } from '../../icons/providers';
+import {
+  AnthropicIcon,
+  CustomProviderIcon,
+  DeepSeekIcon,
+  GeminiIcon,
+  MiniMaxIcon,
+  MoonshotIcon,
+  OpenAIIcon,
+  QianfanIcon,
+  QwenIcon,
+  StepfunIcon,
+  VolcengineIcon,
+  XiaomiIcon,
+  ZhipuIcon,
+} from '../../icons/providers';
 import { localInferenceMutedTextClass } from '../constants';
 import type { InstallProgressState } from '../types';
 import {
@@ -21,16 +36,26 @@ import {
   MARKETPLACE_GGUF_FORMAT,
   openExternalUrl,
 } from '../utils/marketplace';
+import { resolveModelProviderName, type LocalModelProvider } from '../utils/modelProvider';
 import { formatPullProgress } from '../utils/progress';
 import { InstallProgressBar } from './Common';
 
 const marketplaceCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal shadow-none';
 
-const marketplacePublisherIcons: Record<string, ComponentType<{ className?: string }>> = {
-  deepseek: DeepSeekIcon,
-  qwen: QwenIcon,
-  zhipuai: ZhipuIcon,
-};
+const marketplaceModelIcons = {
+  [ProviderName.Anthropic]: AnthropicIcon,
+  [ProviderName.DeepSeek]: DeepSeekIcon,
+  [ProviderName.Gemini]: GeminiIcon,
+  [ProviderName.Minimax]: MiniMaxIcon,
+  [ProviderName.Moonshot]: MoonshotIcon,
+  [ProviderName.OpenAI]: OpenAIIcon,
+  [ProviderName.Qianfan]: QianfanIcon,
+  [ProviderName.Qwen]: QwenIcon,
+  [ProviderName.StepFun]: StepfunIcon,
+  [ProviderName.Volcengine]: VolcengineIcon,
+  [ProviderName.Xiaomi]: XiaomiIcon,
+  [ProviderName.Zhipu]: ZhipuIcon,
+} satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
 export function MarketplaceModelCard({
   model,
@@ -48,9 +73,9 @@ export function MarketplaceModelCard({
   const progress = getMarketplaceInstallProgress(installProgress, model);
   const capabilities = getMarketplaceCapabilityTags(model);
   const publisher = getMarketplacePublisher(model.repoId);
-  const PublisherIcon = publisher
-    ? (marketplacePublisherIcons[publisher.toLocaleLowerCase()] ?? CustomProviderIcon)
-    : CustomProviderIcon;
+  const displayName = getMarketplaceDisplayName(model.repoId);
+  const modelProvider = resolveModelProviderName(displayName);
+  const ModelIcon = modelProvider ? marketplaceModelIcons[modelProvider] : CustomProviderIcon;
   const details = [
     { label: i18nService.t('marketplaceModelSizeLabel'), value: model.sizes[0]?.trim() || null },
     {
@@ -67,12 +92,14 @@ export function MarketplaceModelCard({
     >
       <CardHeader className="relative grid flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_1fr] gap-x-4 gap-y-1 p-4">
         <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
-          <PublisherIcon
+          <span
             aria-hidden="true"
-            className={`size-4 shrink-0 ${localInferenceMutedTextClass}`}
-          />
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+          >
+            <ModelIcon className="size-5" />
+          </span>
           <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
-            {getMarketplaceDisplayName(model.repoId)}
+            {displayName}
           </CardTitle>
         </div>
 
