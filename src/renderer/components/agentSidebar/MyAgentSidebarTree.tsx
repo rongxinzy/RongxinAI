@@ -7,7 +7,12 @@ import { useDispatch } from 'react-redux';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { workspaceService } from '../../services/workspace';
-import { clearLoadingSessionId, setLoadingSessionId } from '../../store/slices/coworkSlice';
+import { store } from '../../store';
+import {
+  clearLoadingSessionId,
+  setCurrentSession,
+  setLoadingSessionId,
+} from '../../store/slices/coworkSlice';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
@@ -70,6 +75,14 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
       if (task.workspaceId) {
         await workspaceService.selectWorkspace(task.workspaceId, { preserveSessionLoading: true });
       }
+
+      // Restore the live streaming snapshot immediately so the stream stays
+      // visible when switching back to a running session across workspaces.
+      const streamingSnapshot = store.getState().cowork.streamingSessions[task.id];
+      if (streamingSnapshot) {
+        dispatch(setCurrentSession(streamingSnapshot));
+      }
+
       onShowCowork();
       await coworkService.loadSession(task.id);
     } finally {

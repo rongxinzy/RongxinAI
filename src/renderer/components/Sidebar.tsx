@@ -13,14 +13,14 @@ import { agentService } from '../services/agent';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
-import { RootState } from '../store';
+import { RootState, store } from '../store';
 import {
   selectCoworkSessions,
   selectCurrentSessionId,
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../store/selectors/workModeSelectors';
-import { clearLoadingSessionId, setLoadingSessionId } from '../store/slices/coworkSlice';
+import { clearLoadingSessionId, setCurrentSession, setLoadingSessionId } from '../store/slices/coworkSlice';
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
@@ -144,6 +144,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     flushSync(() => {
       dispatch(setLoadingSessionId(session.id));
     });
+
+    // If the target session is already streaming in the background, restore its
+    // live snapshot immediately so the user sees the active stream without
+    // waiting for the DB round-trip.
+    const streamingSnapshot = store.getState().cowork.streamingSessions[session.id];
+    if (streamingSnapshot) {
+      dispatch(setCurrentSession(streamingSnapshot));
+    }
 
     // Chat sessions are not scoped to agents — skip loadSessions
     // to avoid replacing the full sessions list with a filtered subset.
