@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Card, CardContent, CardTitle } from '@shared/components/ui/card';
@@ -8,8 +9,9 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
+import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Clock, EllipsisVertical } from 'lucide-react';
+import { CircleAlert, Clock, EllipsisVertical, RefreshCw } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -144,16 +146,32 @@ interface TaskListProps {
 const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const loading = useSelector((state: RootState) => state.scheduledTask.loading);
+  const listError = useSelector((state: RootState) => state.scheduledTask.listError);
 
-  if (loading) {
+  if (loading && tasks.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-muted-foreground">{i18nService.t('loading')}</div>
+      <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+        <Spinner />
+        <span>{i18nService.t('loading')}</span>
       </div>
     );
   }
 
-  if (tasks.length === 0) {
+  const loadErrorAlert = listError ? (
+    <Alert variant="destructive">
+      <CircleAlert />
+      <AlertTitle>{i18nService.t('scheduledTasksLoadFailed')}</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-2">
+        <span>{listError}</span>
+        <Button variant="outline" size="sm" onClick={() => void scheduledTaskService.loadTasks()}>
+          <RefreshCw data-icon="inline-start" />
+          {i18nService.t('tryAgain')}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  ) : null;
+
+  if (tasks.length === 0 && !listError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6">
         <Clock className="size-12 text-muted-foreground/40 mb-4" />
@@ -169,6 +187,7 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
 
   return (
     <div className="flex flex-col gap-3">
+      {loadErrorAlert}
       {tasks.map(task => (
         <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
       ))}

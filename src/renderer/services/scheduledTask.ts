@@ -16,6 +16,7 @@ import {
   removeTask,
   setAllRuns,
   setError,
+  setListError,
   setLoading,
   setRuns,
   setTasks,
@@ -54,9 +55,11 @@ function checkTasksForAnomalies(tasks: ScheduledTask[]): void {
   showToast(msg);
 }
 
-class ScheduledTaskService {
+export class ScheduledTaskService {
   private cleanupFns: (() => void)[] = [];
   private initialized = false;
+  private loadTasksPromise: Promise<void> | null = null;
+  private reloadTasksAfterCurrent = false;
 
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -93,24 +96,48 @@ class ScheduledTaskService {
 
     // Listen for full refresh events (e.g., after first poll or migration)
     const cleanupRefresh = api.onRefresh(() => {
-      this.loadTasks();
+      void this.loadTasks({ revalidate: true });
     });
     this.cleanupFns.push(cleanupRefresh);
   }
 
-  async loadTasks(): Promise<void> {
+  loadTasks(options: { revalidate?: boolean } = {}): Promise<void> {
+    if (this.loadTasksPromise) {
+      if (options.revalidate) {
+        this.reloadTasksAfterCurrent = true;
+      }
+      return this.loadTasksPromise;
+    }
+
+    const loadPromise = this.performLoadTasks();
+    this.loadTasksPromise = loadPromise;
+    void loadPromise.finally(() => {
+      if (this.loadTasksPromise !== loadPromise) return;
+      this.loadTasksPromise = null;
+      if (this.reloadTasksAfterCurrent) {
+        this.reloadTasksAfterCurrent = false;
+        void this.loadTasks();
+      }
+    });
+    return loadPromise;
+  }
+
+  private async performLoadTasks(): Promise<void> {
     const api = window.electron?.scheduledTasks;
     if (!api) return;
 
     store.dispatch(setLoading(true));
+    store.dispatch(setListError(null));
     try {
       const result = await api.list();
       if (result.success && result.tasks) {
         checkTasksForAnomalies(result.tasks);
         store.dispatch(setTasks(result.tasks));
+      } else {
+        store.dispatch(setListError(i18nService.t('scheduledTasksLoadFailedHint')));
       }
-    } catch (err: unknown) {
-      store.dispatch(setError(err instanceof Error ? err.message : String(err)));
+    } catch {
+      store.dispatch(setListError(i18nService.t('scheduledTasksLoadFailedHint')));
     } finally {
       store.dispatch(setLoading(false));
     }

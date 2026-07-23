@@ -1,7 +1,68 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
-import { DeliveryMode, GatewayStatus, TaskStatus } from './constants';
-import { mapGatewayJob, mapGatewayRun, mapGatewayTaskState } from './cronJobService';
+const electronMocks = vi.hoisted(() => ({
+  getAllWindows: vi.fn((): unknown[] => []),
+}));
+
+vi.mock('electron', () => ({
+  BrowserWindow: {
+    getAllWindows: electronMocks.getAllWindows,
+  },
+}));
+
+import { DeliveryMode, GatewayStatus, IpcChannel, TaskStatus } from './constants';
+import {
+  CronJobService,
+  mapGatewayJob,
+  mapGatewayRun,
+  mapGatewayTaskState,
+} from './cronJobService';
+
+test('listJobs establishes the gateway client when it is not connected yet', async () => {
+  const request = vi.fn();
+  const gatewayClient = {
+    request: async <T = Record<string, unknown>>(
+      method: string,
+      params?: unknown,
+      opts?: { expectFinal?: boolean },
+    ): Promise<T> => {
+      request(method, params, opts);
+      return { jobs: [] } as T;
+    },
+  };
+  let currentClient: typeof gatewayClient | null = null;
+  const ensureGatewayReady = vi.fn(async () => {
+    currentClient = gatewayClient;
+  });
+  const service = new CronJobService({
+    getGatewayClient: () => currentClient,
+    ensureGatewayReady,
+  });
+
+  await expect(service.listJobs()).resolves.toEqual([]);
+  expect(ensureGatewayReady).toHaveBeenCalledOnce();
+  expect(request).toHaveBeenCalledOnce();
+  expect(request.mock.calls[0]?.[1]).toEqual({ includeDisabled: true, limit: 200 });
+});
+
+test('gateway reconnection emits a full task-list refresh', () => {
+  const send = vi.fn();
+  electronMocks.getAllWindows.mockReturnValue([
+    {
+      isDestroyed: () => false,
+      webContents: { send },
+    },
+  ]);
+  const service = new CronJobService({
+    getGatewayClient: () => null,
+    ensureGatewayReady: async () => {},
+  });
+
+  service.handleGatewayConnected();
+
+  expect(send).toHaveBeenCalledWith(IpcChannel.Refresh);
+  electronMocks.getAllWindows.mockReturnValue([]);
+});
 
 describe('mapGatewayRun', () => {
   const baseEntry = {
