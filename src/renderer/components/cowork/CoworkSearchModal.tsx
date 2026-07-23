@@ -111,7 +111,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
       }}
       title={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
       description={i18nService.t(workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks')}
-      className="ring-0 bg-background"
+      className="bg-background"
     >
       <Command shouldFilter={false} className="bg-background">
         <CommandInput

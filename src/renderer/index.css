@@ -4,6 +4,7 @@
 @import './theme/css/shadcn-token-bridge.css';
 
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 @plugin '@tailwindcss/typography';
 
