@@ -32,6 +32,7 @@ export type MarketplaceModel = {
   installed: boolean;
   installedPath?: string;
   isFeatured?: boolean;
+  featuredRank?: number;
 };
 
 export type MarketplaceSearchParams = {

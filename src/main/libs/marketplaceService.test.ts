@@ -47,6 +47,54 @@ test('MarketplaceService searchLocal defaults to returning at most 100 models', 
   expect(result.length).toBeLessThanOrEqual(100);
 });
 
+test('MarketplaceService returns the fixed compact recommendations without an online request', async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => 'test-token',
+  });
+  const result = await service.search({ limit: 20 });
+
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(result.models).toHaveLength(20);
+  expect(result.models[0]?.repoId).toBe('unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF');
+  expect(result.models.every(model => (model.parameterCount ?? 0) >= 1_500_000_000)).toBe(true);
+  expect(result.models.every(model => (model.parameterCount ?? Infinity) <= 14_000_000_000)).toBe(
+    true,
+  );
+});
+
+test('MarketplaceService browses online models for an explicit empty-query request', async () => {
+  const fetchMock = vi.fn(async () => {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          models: [
+            {
+              id: 'owner/browse-all-GGUF',
+              display_name: 'browse-all-GGUF',
+              downloads: 100,
+              tags: ['library:gguf'],
+            },
+          ],
+        },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => 'test-token',
+  });
+  const result = await service.search({ featuredOnly: false, limit: 20 });
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.models.some(model => model.repoId === 'owner/browse-all-GGUF')).toBe(true);
+});
+
 test('MarketplaceService merges online and curated results without duplicates', async () => {
   const module = await import('./marketplaceService');
   const mergeMarketplaceModels = (
@@ -252,6 +300,7 @@ test('MarketplaceService keeps OpenAPI models tagged as GGUF even when repo id o
   const result = await service.search({ query: '0.8', limit: 5 });
 
   expect(result.models.some(model => model.repoId === 'unsloth/Qwen3.6-27B-MTP')).toBe(true);
+  expect(result.models[0]?.description).toBe('');
 });
 
 test('MarketplaceService fetches multiple OpenAPI pages when early pages have too few GGUF records', async () => {
@@ -293,6 +342,83 @@ test('MarketplaceService fetches multiple OpenAPI pages when early pages have to
 
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(result.models.some(model => model.repoId === 'owner/page-two-GGUF')).toBe(true);
+});
+
+test('MarketplaceService rotates tokens for consecutive OpenAPI pages', async () => {
+  const tokens = ['first-token', 'second-token'];
+  let tokenIndex = 0;
+  const fetchMock = vi.fn(async (url: string) => {
+    const page = new URL(url).searchParams.get('page_number');
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          models:
+            page === '1'
+              ? [
+                  {
+                    id: 'owner/not-gguf',
+                    display_name: 'not-gguf',
+                    downloads: 100,
+                    tags: ['library:pytorch'],
+                  },
+                ]
+              : [
+                  {
+                    id: 'owner/second-page-GGUF',
+                    display_name: 'second-page-GGUF',
+                    downloads: 90,
+                    tags: ['library:gguf'],
+                  },
+                ],
+        },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => tokens[tokenIndex++ % tokens.length],
+    getModelScopeTokenCount: () => tokens.length,
+  });
+  await service.search({ query: '0.8', limit: 60 });
+
+  expect(
+    fetchMock.mock.calls.map(
+      ([, init]) => (init?.headers as Record<string, string> | undefined)?.Authorization,
+    ),
+  ).toEqual(['Bearer first-token', 'Bearer second-token']);
+});
+
+test('MarketplaceService caches successful OpenAPI searches briefly', async () => {
+  const fetchMock = vi.fn(async () => {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          models: [
+            {
+              id: 'owner/cached-GGUF',
+              display_name: 'cached-GGUF',
+              downloads: 100,
+              tags: ['library:gguf'],
+            },
+          ],
+        },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => 'test-token',
+  });
+  await service.search({ query: 'cached', limit: 5 });
+  await service.search({ query: 'cached', limit: 5 });
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
 test('MarketplaceService can request enough OpenAPI pages for large GGUF result sets', async () => {
@@ -512,7 +638,7 @@ test('MarketplaceService treats empty OpenAPI search results as an empty result,
   expect(result.warning).toBeUndefined();
 });
 
-test('MarketplaceService retries OpenAPI rate limits with the next token', async () => {
+test('MarketplaceService retries rate limits before rotating to the next token', async () => {
   const tokens = ['first-token', 'second-token'];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (!url.includes('/openapi/v1/models')) {
@@ -544,16 +670,41 @@ test('MarketplaceService retries OpenAPI rate limits with the next token', async
 
   const service = new MarketplaceService(() => createTempDir(), {
     getModelScopeToken: () => tokens.shift() ?? 'second-token',
+    getModelScopeTokenCount: () => 2,
   });
-  const result = await service.search({ query: 'qwen', limit: 5 });
+  await service.search({ query: 'qwen', limit: 20 });
 
-  expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(result.models.some(model => model.repoId === 'owner/retried-GGUF')).toBe(true);
+  expect(fetchMock).toHaveBeenCalledTimes(4);
   expect(
     fetchMock.mock.calls.map(
       ([, init]) => (init?.headers as Record<string, string> | undefined)?.Authorization,
     ),
-  ).toEqual(['Bearer first-token', 'Bearer second-token']);
+  ).toEqual([
+    'Bearer first-token',
+    'Bearer first-token',
+    'Bearer first-token',
+    'Bearer second-token',
+  ]);
+});
+
+test('MarketplaceService retries a single token after an OpenAPI rate limit', async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url.includes('/openapi/v1/models')) {
+      return new Response('rate limited', { status: 429 });
+    }
+    return new Response(JSON.stringify({ Data: { Models: [] } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const service = new MarketplaceService(() => createTempDir(), {
+    getModelScopeToken: () => 'only-token',
+  });
+  await service.search({ query: 'qwen', limit: 5 });
+
+  expect(fetchMock).toHaveBeenCalledTimes(4);
 });
 
 test('MarketplaceService falls back to curated models when online search sources fail', async () => {
@@ -579,7 +730,7 @@ test('MarketplaceService falls back to curated models when online search sources
   expect(fetchMock).toHaveBeenCalledTimes(4);
   expect(result.models.length).toBeGreaterThan(0);
   expect(result.warning).toContain('HTTP 503');
-  expect(result.models.some(model => model.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF')).toBe(true);
+  expect(result.models.every(model => model.isFeatured)).toBe(true);
 });
 
 test('MarketplaceService falls back to legacy search when ModelScope OpenAPI authentication fails', async () => {
@@ -612,7 +763,7 @@ test('MarketplaceService falls back to legacy search when ModelScope OpenAPI aut
   });
   const result = await service.search({ query: 'qwen2.5', limit: 5 });
 
-  expect(fetchMock).toHaveBeenCalledTimes(4); // 3 OpenAPI attempts + 1 legacy fallback
+  expect(fetchMock).toHaveBeenCalledTimes(2); // 1 OpenAPI attempt + 1 legacy fallback
   expect(result.models.some(model => model.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF')).toBe(true);
 });
 

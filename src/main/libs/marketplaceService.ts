@@ -8,9 +8,15 @@ import {
   type MarketplaceSearchResult,
 } from '../../shared/marketplace';
 import curatedModels from '../resources/modelscope-gguf-curated-models.json';
+import {
+  resolveMarketplaceParameterCount,
+  resolveParameterCount,
+  sortMarketplaceModels,
+} from './marketplaceModelOrder';
 
 type MarketplaceServiceOptions = {
   getModelScopeToken?: () => string | null;
+  getModelScopeTokenCount?: () => number;
 };
 
 type OnlineSearchResult = {
@@ -31,6 +37,7 @@ type CuratedModelEntry = {
   downloads?: number;
   detailUrl?: string;
   parameterCount?: number;
+  featuredRank?: number;
 };
 
 type MarketplaceIndexRecord = {
@@ -58,26 +65,40 @@ const MARKETPLACE_SOURCE = 'modelscope-gguf' as const;
 const DEFAULT_LIMIT = 120;
 const LOCAL_LIMIT = 100;
 const MARKETPLACE_TIMEOUT_MS = 8000;
-const MODEL_SCOPE_OPENAPI_RATE_LIMIT_RETRIES = 2;
 const MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT = 2;
+const MODEL_SCOPE_RATE_LIMIT_RETRY_COUNT = 2;
+const MARKETPLACE_ONLINE_SEARCH_CACHE_MS = 120_000;
 const MODEL_SCOPE_OPENAPI_PAGE_SIZE = 50;
 const MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT = 60;
 const MODEL_SCOPE_OPENAPI_MODELS_URL = 'https://modelscope.cn/openapi/v1/models';
 const MODEL_SCOPE_SEARCH_API_URL = 'https://www.modelscope.cn/api/v1/models';
 
 export class MarketplaceService {
+  private readonly onlineSearchCache = new Map<
+    string,
+    { expiresAt: number; result: OnlineSearchResult }
+  >();
+
   constructor(
     private readonly getModelsDir: () => string = () => '',
     private readonly options: MarketplaceServiceOptions = {},
   ) {}
 
-  setTokenGetter(getToken: () => string | null): void {
+  setTokenGetter(getToken: () => string | null, getTokenCount?: () => number): void {
     this.options.getModelScopeToken = getToken;
+    if (getTokenCount) {
+      this.options.getModelScopeTokenCount = getTokenCount;
+    }
   }
 
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
+    if (!params.query?.trim() && params.featuredOnly !== false) {
+      const models = this.searchLocal(params);
+      return { models, totalCount: models.length };
+    }
+
     try {
-      const online = await this.searchOnline(params);
+      const online = await this.searchOnlineWithCache(params);
       const models = sortMarketplaceModels(
         annotateInstalledModels(online.models, scanInstalledModels(this.getModelsDir())),
         params,
@@ -176,12 +197,24 @@ export class MarketplaceService {
     throw new Error('ModelScope legacy search returned no GGUF repositories');
   }
 
+  private async searchOnlineWithCache(
+    params: MarketplaceSearchParams,
+  ): Promise<OnlineSearchResult> {
+    const cacheKey = JSON.stringify(params);
+    const cached = this.onlineSearchCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+    const result = await this.searchOnline(params);
+    this.onlineSearchCache.set(cacheKey, {
+      result,
+      expiresAt: Date.now() + MARKETPLACE_ONLINE_SEARCH_CACHE_MS,
+    });
+    return result;
+  }
+
   private async fetchModelScopeOpenApi(
     params: MarketplaceSearchParams,
   ): Promise<OnlineSearchResult> {
-    const token = this.options.getModelScopeToken?.();
-    if (!token) throw new Error('ModelScope OpenAPI token is not configured');
-
     const startPage = Math.max(1, params.pageNumber ?? 1);
     if (startPage > MODEL_SCOPE_OPENAPI_MAX_PAGE_COUNT) {
       return { models: [], reachedLimit: true };
@@ -199,12 +232,14 @@ export class MarketplaceService {
         try {
           payload = await this.fetchModelScopeOpenApiPage(
             buildModelScopeOpenApiModelsUrl(params.query?.trim() ?? '', page),
-            token,
           );
           break;
         } catch (error) {
           pageError = error;
-          if (models.length === 0 && retry === MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT) {
+          if (
+            isTokenFailure(error) ||
+            (models.length === 0 && retry === MODEL_SCOPE_OPENAPI_PAGE_RETRY_COUNT)
+          ) {
             throw error;
           }
         }
@@ -240,21 +275,29 @@ export class MarketplaceService {
     };
   }
 
-  private async fetchModelScopeOpenApiPage(url: string, initialToken: string): Promise<unknown> {
-    let token = initialToken;
+  private async fetchModelScopeOpenApiPage(url: string): Promise<unknown> {
+    const getToken = this.options.getModelScopeToken;
+    const tokenCount = Math.max(1, this.options.getModelScopeTokenCount?.() ?? 1);
     let lastError: unknown;
-    for (let attempt = 0; attempt <= MODEL_SCOPE_OPENAPI_RATE_LIMIT_RETRIES; attempt += 1) {
-      try {
-        return await fetchJsonWithTimeout(url, { Authorization: `Bearer ${token}` });
-      } catch (error) {
-        lastError = error;
-        if (!isRateLimitError(error)) throw error;
-        const nextToken = this.options.getModelScopeToken?.();
-        if (!nextToken || nextToken === token) break;
-        token = nextToken;
+    const attemptedTokens = new Set<string>();
+
+    for (let tokenAttempt = 0; tokenAttempt < tokenCount; tokenAttempt += 1) {
+      const token = getToken?.();
+      if (!token || attemptedTokens.has(token)) break;
+      attemptedTokens.add(token);
+
+      for (let retry = 0; retry <= MODEL_SCOPE_RATE_LIMIT_RETRY_COUNT; retry += 1) {
+        try {
+          return await fetchJsonWithTimeout(url, { Authorization: `Bearer ${token}` });
+        } catch (error) {
+          lastError = error;
+          if (!isRateLimited(error) || retry === MODEL_SCOPE_RATE_LIMIT_RETRY_COUNT) break;
+        }
       }
+
+      if (!shouldRotateToken(lastError)) break;
     }
-    throw lastError;
+    throw lastError ?? new Error('ModelScope OpenAPI token is not configured');
   }
 
   private async fetchModelScopeSearchApi(
@@ -294,6 +337,7 @@ function toMarketplaceModel(
     parameterCount: entry.parameterCount,
     installed: false,
     isFeatured: options.isFeatured,
+    featuredRank: entry.featuredRank,
   };
 }
 
@@ -309,7 +353,7 @@ function toMarketplaceModelFromRecord(record: MarketplaceIndexRecord): Marketpla
     id: repoId,
     repoId,
     name: repoId,
-    description: record.description?.trim() || `${repoId} GGUF repository on ModelScope.`,
+    description: record.description?.trim() ?? '',
     tags,
     sizes,
     recommendedTag: resolveRecommendedTag(record.filePath),
@@ -488,11 +532,9 @@ function mergeMarketplaceModel(
     installed: next.installed || existing.installed,
     installedPath: next.installedPath ?? existing.installedPath,
     isFeatured: next.isFeatured || existing.isFeatured,
+    featuredRank: next.featuredRank ?? existing.featuredRank,
     capability: preferCapability(next.capability, existing.capability),
-    description:
-      next.description !== `${next.repoId} GGUF repository on ModelScope.`
-        ? next.description
-        : existing.description,
+    description: next.description || existing.description,
   };
 }
 
@@ -590,16 +632,6 @@ function inferSizesFromRepoId(repoId: string): string[] {
   return match ? [`${match[1]}B`] : [];
 }
 
-function resolveParameterCount(sizes: string[]): number | undefined {
-  for (const size of sizes) {
-    const match = size.trim().match(/^(\d+(?:\.\d+)?)\s*B$/i);
-    if (!match) continue;
-    const count = Number(match[1]);
-    if (Number.isFinite(count)) return count * 1_000_000_000;
-  }
-  return undefined;
-}
-
 function resolvePrimaryCapability(tags: string[]): MarketplaceModel['capability'] {
   const normalized = tags.map(tag => tag.toLowerCase());
   if (normalized.includes(MarketplaceCapability.Reasoning)) return MarketplaceCapability.Reasoning;
@@ -649,46 +681,6 @@ function filterMarketplaceModels(
     .filter(model => matchesSizeFilter(model, params.size));
 }
 
-function sortMarketplaceModels(
-  models: MarketplaceModel[],
-  params: MarketplaceSearchParams,
-): MarketplaceModel[] {
-  const emptyQuery = !params.query?.trim();
-  return [...models].sort((a, b) => {
-    if (emptyQuery && a.isFeatured !== b.isFeatured) {
-      return a.isFeatured ? -1 : 1;
-    }
-    if (a.installed !== b.installed) {
-      return a.installed ? -1 : 1;
-    }
-    const capabilityDiff = capabilityScore(b.capability) - capabilityScore(a.capability);
-    if (capabilityDiff !== 0 && params.task === 'reasoning') {
-      return capabilityDiff;
-    }
-    const downloadsDiff = (b.downloads ?? 0) - (a.downloads ?? 0);
-    if (downloadsDiff !== 0) return downloadsDiff;
-    const paramsDiff = (b.parameterCount ?? 0) - (a.parameterCount ?? 0);
-    if (paramsDiff !== 0 && emptyQuery) return paramsDiff;
-    return a.repoId.localeCompare(b.repoId);
-  });
-}
-
-function capabilityScore(capability: MarketplaceModel['capability']): number {
-  switch (capability) {
-    case MarketplaceCapability.Reasoning:
-      return 5;
-    case MarketplaceCapability.Code:
-      return 4;
-    case MarketplaceCapability.Vision:
-      return 3;
-    case MarketplaceCapability.Embedding:
-      return 2;
-    case MarketplaceCapability.Chat:
-    default:
-      return 1;
-  }
-}
-
 function matchesQuery(model: MarketplaceModel, query?: string): boolean {
   if (!query?.trim()) return true;
   const q = query.toLowerCase();
@@ -731,7 +723,7 @@ function matchesSizeFilter(
   size?: MarketplaceSearchParams['size'],
 ): boolean {
   if (!size || size === 'all') return true;
-  const count = resolveParamCount(model);
+  const count = resolveMarketplaceParameterCount(model);
   if (count === null) return true;
   const billions = count / 1_000_000_000;
   switch (size) {
@@ -746,13 +738,6 @@ function matchesSizeFilter(
     default:
       return true;
   }
-}
-
-function resolveParamCount(model: MarketplaceModel): number | null {
-  if (typeof model.parameterCount === 'number' && Number.isFinite(model.parameterCount)) {
-    return model.parameterCount;
-  }
-  return resolveParameterCount(model.sizes) ?? null;
 }
 
 function unique<T>(items: T[]): T[] {
@@ -774,8 +759,16 @@ function toMarketplaceWarning(error: unknown): string {
   return raw;
 }
 
-function isRateLimitError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes('HTTP 429');
+function isTokenFailure(error: unknown): boolean {
+  return error instanceof Error && /\bHTTP (401|403|429)\b/.test(error.message);
+}
+
+function isRateLimited(error: unknown): boolean {
+  return error instanceof Error && /\bHTTP 429\b/.test(error.message);
+}
+
+function shouldRotateToken(error: unknown): boolean {
+  return error instanceof Error && /\bHTTP (401|429)\b/.test(error.message);
 }
 
 function extractRecords(payload: unknown): Record<string, unknown>[] {

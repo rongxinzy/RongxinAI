@@ -1,20 +1,26 @@
 import { expect, test } from 'vitest';
 
-test('marketplace page size is fixed across viewport sizes', async () => {
+test('marketplace page size adapts to the viewport height', async () => {
   const module = await import('./LocalInferenceView');
   const getMarketplacePageSize = (
     module as {
-      __test__getMarketplacePageSize?: () => number;
+      __test__getMarketplacePageSize?: (viewportHeight?: number, viewportWidth?: number) => number;
     }
   ).__test__getMarketplacePageSize;
 
   expect(typeof getMarketplacePageSize).toBe('function');
   if (!getMarketplacePageSize) return;
 
-  expect(getMarketplacePageSize()).toBe(6);
+  expect(getMarketplacePageSize(740, 1024)).toBe(6);
+  expect(getMarketplacePageSize(740, 1536)).toBe(8);
+  expect(getMarketplacePageSize(820, 1280)).toBe(8);
+  expect(getMarketplacePageSize(900, 1536)).toBe(16);
+  expect(getMarketplacePageSize(959, 1536)).toBe(16);
+  expect(getMarketplacePageSize(960, 1536)).toBe(24);
+  expect(getMarketplacePageSize(1152, 2048)).toBe(24);
 });
 
-test('marketplace search params load directly up to the app and openapi caps', async () => {
+test('marketplace search params load recommended models for an empty query and use the app cap for a search', async () => {
   const module = await import('./LocalInferenceView');
   const buildMarketplaceSearchParams = (
     module as {
@@ -30,7 +36,7 @@ test('marketplace search params load directly up to the app and openapi caps', a
 
   expect(buildMarketplaceSearchParams({ query: ' qwen ' })).toEqual({
     query: 'qwen',
-    limit: 3000,
+    limit: 300,
   });
 
   expect(
@@ -40,11 +46,11 @@ test('marketplace search params load directly up to the app and openapi caps', a
     }),
   ).toEqual({
     query: 'qwen',
-    limit: 3000,
+    limit: 300,
     pageNumber: 4,
   });
 
-  expect(buildMarketplaceSearchParams({ query: '' })).toBeNull();
+  expect(buildMarketplaceSearchParams({ query: '' })).toEqual({ limit: 24 });
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
 });
 

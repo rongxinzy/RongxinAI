@@ -1,5 +1,4 @@
-import { Slider } from '@shared/components/ui/slider';
-import { cn } from '@shared/lib/utils';
+import { Progress } from '@shared/components/ui/progress';
 import { CheckCircle, Info, Server, TriangleAlert, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -93,25 +92,10 @@ export function InstallProgressBar({
 }) {
   const percent = progressBarPercent(progress);
   return (
-    <div
+    <Progress
       aria-label={i18nService.t('marketplaceInstallPulling')}
-      aria-valuemax={100}
-      aria-valuemin={0}
-      aria-valuenow={percent}
       className={className}
-      role="progressbar"
-    >
-      <Slider
-        aria-hidden="true"
-        className={cn('pointer-events-none')}
-        data-download-progress
-        disabled
-        max={100}
-        min={0}
-        step={1}
-        tabIndex={-1}
-        value={percent}
-      />
-    </div>
+      value={percent}
+    />
   );
 }

@@ -29,10 +29,8 @@ import {
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
-import {
-  shouldCloseLaunchLogPanelForModel,
-  useModelLaunchLogs,
-} from './hooks/useModelLaunchLogs';
+import { useMarketplaceRecommendations } from './hooks/useMarketplaceRecommendations';
+import { shouldCloseLaunchLogPanelForModel, useModelLaunchLogs } from './hooks/useModelLaunchLogs';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
@@ -115,9 +113,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceModels, setMarketplaceModels] = useState<MarketplaceModel[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
-  const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
+  const [marketplaceToken, setMarketplaceToken] = useState<string | null>(null);
   useI18nLanguage();
   const launchLogs = useModelLaunchLogs();
   const marketplaceSearchRef = useRef<number>(0);
@@ -135,6 +133,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       ),
     [localModels],
   );
+
+  useEffect(() => {
+    void window.electron.marketplace
+      .getToken()
+      .then(setMarketplaceToken)
+      .catch(() => setMarketplaceToken(null));
+  }, []);
 
   const dismissToast = useCallback(() => {
     if (toastTimerRef.current) {
@@ -197,7 +202,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (id === marketplaceSearchRef.current) {
         setMarketplaceModels(result.models);
         setMarketplaceError(result.warning ?? null);
-        setMarketplaceTotalCount(result.totalCount ?? null);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
@@ -366,6 +370,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   useEffect(() => {
     marketplaceHasSearchedRef.current = marketplaceHasSearched;
   }, [marketplaceHasSearched]);
+
+  useMarketplaceRecommendations({
+    activeTab,
+    hasSearched: marketplaceHasSearched,
+    query: marketplaceQuery,
+    onHasSearchedChange: setMarketplaceHasSearched,
+    onSearch: searchMarketplace,
+  });
 
   const sessionSaveTimerRef = useRef<number | null>(null);
   useEffect(() => {
@@ -662,86 +674,81 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       )}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
-          <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
+          <div className="w-full space-y-4 px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <LocalInferenceTabSelector
-              activeTab={activeTab}
-              onActiveTabChange={setActiveTab}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              {activeTab === 'models' ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    data-local-inference-toolbar-button="true"
-                    onClick={openAccessSettings}
-                  >
-                    <Globe data-icon="inline-start" />
-                    {i18nService.t('localInferenceAccessSettings')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    data-local-inference-toolbar-button="true"
-                    onClick={() => {
-                      setDraftModelsDir(modelsDir);
-                      setLibrarySettingsOpen(true);
-                    }}
-                  >
-                    <Settings2 data-icon="inline-start" />
-                    {i18nService.t('localInferenceLibrarySettings')}
-                  </Button>
-                </>
-              ) : null}
+              <LocalInferenceTabSelector activeTab={activeTab} onActiveTabChange={setActiveTab} />
+              <div className="flex flex-wrap items-center gap-2">
+                {activeTab === 'models' ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      data-local-inference-toolbar-button="true"
+                      onClick={openAccessSettings}
+                    >
+                      <Globe data-icon="inline-start" />
+                      {i18nService.t('localInferenceAccessSettings')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      data-local-inference-toolbar-button="true"
+                      onClick={() => {
+                        setDraftModelsDir(modelsDir);
+                        setLibrarySettingsOpen(true);
+                      }}
+                    >
+                      <Settings2 data-icon="inline-start" />
+                      {i18nService.t('localInferenceLibrarySettings')}
+                    </Button>
+                  </>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          {activeTab === 'models' ? (
-            <>
-              <ModelsPanel
+            {activeTab === 'models' ? (
+              <>
+                <ModelsPanel
+                  loading={loading}
+                  loadingModelName={loadingModelName}
+                  unloadingModelName={unloadingModelName}
+                  localModels={localModels}
+                  runningModels={runningModels}
+                  modelPreferences={modelPreferences}
+                  onLoadModel={model => {
+                    handleLoadModel(model);
+                  }}
+                  onUnload={handleUnload}
+                  onDelete={handleDelete}
+                  onConfigureContext={model => {
+                    setContextModel(model);
+                  }}
+                  onOpenLaunchLog={launchLogs.openPanelForModel}
+                  showRegisteredModelsTitle={false}
+                />
+              </>
+            ) : (
+              <MarketplacePanel
                 loading={loading}
-                loadingModelName={loadingModelName}
-                unloadingModelName={unloadingModelName}
-                localModels={localModels}
-                runningModels={runningModels}
-                modelPreferences={modelPreferences}
-                onLoadModel={model => {
-                  handleLoadModel(model);
-                }}
-                onUnload={handleUnload}
-                onDelete={handleDelete}
-                onConfigureContext={model => {
-                  setContextModel(model);
-                }}
-                onOpenLaunchLog={launchLogs.openPanelForModel}
-                showRegisteredModelsTitle={false}
+                models={marketplaceModels}
+                hasSearched={marketplaceHasSearched}
+                marketplaceLoading={marketplaceLoading}
+                marketplaceError={marketplaceError}
+                query={marketplaceQuery}
+                installedModelPathMap={installedModelPathMap}
+                installProgress={pullProgress}
+                savedToken={marketplaceToken}
+                onTokenSaved={setMarketplaceToken}
+                onQueryChange={setMarketplaceQuery}
+                onSearch={handleMarketplaceSearch}
+                onInstall={handleMarketplaceInstall}
               />
-            </>
-          ) : (
-            <MarketplacePanel
-              loading={loading}
-              models={marketplaceModels}
-              hasSearched={marketplaceHasSearched}
-              marketplaceLoading={marketplaceLoading}
-              marketplaceError={marketplaceError}
-              marketplaceTotalCount={marketplaceTotalCount}
-              query={marketplaceQuery}
-              installedModelPathMap={installedModelPathMap}
-              installProgress={pullProgress}
-              onQueryChange={setMarketplaceQuery}
-              onSearch={handleMarketplaceSearch}
-              onInstall={handleMarketplaceInstall}
-            />
-          )}
+            )}
           </div>
         </div>
-        <ModelLaunchLogSidebar
-          state={launchLogs.state}
-          onClose={launchLogs.closePanel}
-        />
+        <ModelLaunchLogSidebar state={launchLogs.state} onClose={launchLogs.closePanel} />
       </div>
 
       <ModelLibrarySettingsModal
@@ -836,7 +843,8 @@ function resolveLlamaCppServiceAction(
   }
 }
 
-export const __test__getMarketplacePageSize = () => getMarketplacePageSize();
+export const __test__getMarketplacePageSize = (viewportHeight?: number, viewportWidth?: number) =>
+  getMarketplacePageSize(viewportHeight, viewportWidth);
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);

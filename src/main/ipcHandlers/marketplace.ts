@@ -27,6 +27,7 @@ export function registerMarketplaceIpcHandlers(options: {
   );
   const service = new MarketplaceService(options.getModelsDir, {
     getModelScopeToken: tokenPool.nextToken,
+    getModelScopeTokenCount: tokenPool.size,
   });
 
   ipcMain.handle(MarketplaceIpcChannel.Search, async (_event, params) => {
@@ -54,7 +55,7 @@ export function registerMarketplaceIpcHandlers(options: {
       tokenPool = createModelScopeTokenPool({ extraTokens: [trimmed, ...existingTokens] });
     }
     // Update the service's token getter to use the new pool.
-    service.setTokenGetter(tokenPool.nextToken);
+    service.setTokenGetter(tokenPool.nextToken, tokenPool.size);
     console.log(
       `[Marketplace] user token ${trimmed ? 'updated' : 'cleared'}, pool size=${tokenPool.size()}`,
     );
