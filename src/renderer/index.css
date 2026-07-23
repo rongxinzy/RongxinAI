@@ -612,13 +612,13 @@ select::-ms-expand {
   box-shadow: 0 0 0 2px var(--zy-primary-muted);
 }
 
-/* Download progress uses Slider for consistent geometry, without an interactive thumb. */
-[data-slot='slider'][data-download-progress] [data-slot='slider-indicator'] {
-  background-color: var(--zy-success);
+[data-slot='progress-track'] {
+  background-color: var(--zy-surface-raised);
 }
-[data-slot='slider'][data-download-progress] [data-slot='slider-thumb'] {
-  display: none;
+[data-slot='progress-indicator'] {
+  background-color: var(--zy-primary);
 }
+
 
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)

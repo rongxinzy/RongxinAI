@@ -298,7 +298,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceTitle: '模型市场',
     marketplaceDescription: '输入关键词后搜索并安装 GGUF 模型',
     marketplaceSearch: '搜索',
-    marketplaceBrowseAll: '浏览全部',
     marketplaceSearchPlaceholder: '搜索模型，如 qwen3、deepseek-r1...',
     marketplaceSearchHint: '搜索会直接请求 ModelScope OpenAPI，并固定按 GGUF 框架过滤。',
     marketplaceInstall: '安装',
@@ -2621,7 +2620,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceTitle: 'Model Marketplace',
     marketplaceDescription: 'Search and install GGUF models by keyword',
     marketplaceSearch: 'Search',
-    marketplaceBrowseAll: 'Browse All',
     marketplaceSearchPlaceholder: 'Search models, e.g. qwen3, deepseek-r1...',
     marketplaceSearchHint:
       'Search calls ModelScope OpenAPI directly with a fixed GGUF library filter.',
@@ -3566,8 +3564,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkWelcome: 'Start Collaborating',
     coworkDescription: 'A 24/7 personal assistant agent that gets work done for you',
     coworkIntermediateProcess: 'Task completed',
-    coworkExecutionCompletedSummary:
-      'Completed {thinking} reasoning steps and {tools} tool calls',
+    coworkExecutionCompletedSummary: 'Completed {thinking} reasoning steps and {tools} tool calls',
     coworkExecutionCompletedThinkingSummary: 'Completed {thinking} reasoning steps',
     coworkExecutionCompletedToolsSummary: 'Completed {tools} tool calls',
     coworkExecutionThinking: 'Thinking',
