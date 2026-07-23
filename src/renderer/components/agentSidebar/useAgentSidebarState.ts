@@ -7,6 +7,7 @@ import { RootState } from '../../store';
 import {
   selectCoworkSessions,
   selectCurrentSessionId,
+  selectStreamingSessionIds,
   selectUnreadSessionIds,
 } from '../../store/selectors/coworkSelectors';
 import type { CoworkSessionSummary } from '../../types/cowork';
@@ -64,13 +65,27 @@ export const deriveAgentSidebarIndicator = (
   return AgentSidebarIndicator.None;
 };
 
-export const sortAgentSidebarTasks = (tasks: CoworkSessionSummary[]): CoworkSessionSummary[] => {
+export const sortAgentSidebarTasks = (
+  tasks: CoworkSessionSummary[],
+  streamingSessionIds?: string[],
+): CoworkSessionSummary[] => {
+  const streamingSet =
+    streamingSessionIds && streamingSessionIds.length > 0
+      ? new Set(streamingSessionIds)
+      : null;
   return [...tasks].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     if (a.pinned && b.pinned) {
       const aPinOrder = a.pinOrder ?? a.updatedAt ?? a.createdAt;
       const bPinOrder = b.pinOrder ?? b.updatedAt ?? b.createdAt;
       if (aPinOrder !== bPinOrder) return aPinOrder - bPinOrder;
+    }
+    // When two sessions are both actively streaming, sort by creation time
+    // (stable) instead of updatedAt (which keeps changing). Without this,
+    // concurrent streaming sessions continuously swap positions as each
+    // turn completes, making the sidebar unusable.
+    if (streamingSet && streamingSet.has(a.id) && streamingSet.has(b.id)) {
+      return b.createdAt - a.createdAt;
     }
     const aUpdatedAt = a.updatedAt || a.createdAt;
     const bUpdatedAt = b.updatedAt || b.createdAt;
@@ -126,6 +141,7 @@ export const useAgentSidebarState = (options?: UseAgentSidebarStateOptions) => {
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const currentSessionId = useSelector(selectCurrentSessionId);
+  const streamingSessionIds = useSelector(selectStreamingSessionIds);
   const allSessions = useSelector(selectCoworkSessions);
   // Filter sessions by workMode — existing sessions (no mode) default to work
   const sessions =
@@ -498,7 +514,7 @@ export const useAgentSidebarState = (options?: UseAgentSidebarStateOptions) => {
       const taskPreviews = rawTaskPreviews.filter(s =>
         workMode === 'chat' ? s.mode === 'chat' : s.mode !== 'chat',
       );
-      const sortedTaskPreviews = sortAgentSidebarTasks(taskPreviews);
+      const sortedTaskPreviews = sortAgentSidebarTasks(taskPreviews, streamingSessionIds);
       const isTaskListExpanded = expandedTaskListAgentIdSet.has(agent.id);
       const hasMoreLoadedTasks = sortedTaskPreviews.length > AgentSidebarPageSize.Preview;
       const canExpandTasks =
@@ -530,6 +546,7 @@ export const useAgentSidebarState = (options?: UseAgentSidebarStateOptions) => {
     hasMoreTasksByAgentId,
     loadingAgentIdSet,
     sortedEnabledAgents,
+    streamingSessionIds,
     taskPreviewsByAgentId,
     unreadSessionIdSet,
     workMode,

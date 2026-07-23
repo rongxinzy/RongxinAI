@@ -57,6 +57,27 @@ test('sortAgentSidebarTasks keeps unpinned tasks ordered by last update time', (
   ]);
 });
 
+test('sortAgentSidebarTasks orders two concurrent streaming sessions by creation time', () => {
+  const sessions = [
+    makeSession('running-a', 100, 500, CoworkSessionStatusValue.Running),
+    makeSession('running-b', 200, 400, CoworkSessionStatusValue.Running),
+  ];
+  const sorted = sortAgentSidebarTasks(sessions, ['running-a', 'running-b']);
+
+  expect(sorted.map(s => s.id)).toEqual(['running-b', 'running-a']);
+});
+
+test('sortAgentSidebarTasks ignores streaming hint when only one session is streaming', () => {
+  const sessions = [
+    makeSession('completed', 100, 300, CoworkSessionStatusValue.Completed),
+    makeSession('running-a', 100, 500, CoworkSessionStatusValue.Running),
+  ];
+  const sorted = sortAgentSidebarTasks(sessions, ['running-a']);
+
+  // Single streaming session: falls through to normal updatedAt sort
+  expect(sorted.map(s => s.id)).toEqual(['running-a', 'completed']);
+});
+
 test('sortAgentSidebarTasks keeps pinned tasks in first-pinned-first order', () => {
   const sorted = sortAgentSidebarTasks([
     makeSession('newer-unpinned', 100, 400),
