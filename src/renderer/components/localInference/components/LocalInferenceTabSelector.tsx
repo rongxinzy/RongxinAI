@@ -24,7 +24,7 @@ export function LocalInferenceTabSelector({
       className="gap-0"
       onValueChange={value => onActiveTabChange(value as LocalInferenceTab)}
     >
-      <TabsList className="shadow-inset">
+      <TabsList className="shadow-inset" data-local-inference-tab-selector>
         {tabOptions.map(tab => (
           <TabsTrigger key={tab.value} value={tab.value} className="data-active:shadow-elevated">
             {i18nService.t(tab.labelKey)}

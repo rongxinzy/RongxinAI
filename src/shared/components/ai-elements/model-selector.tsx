@@ -149,7 +149,7 @@ export const ModelSelectorLogo = ({ provider, className, ...props }: ModelSelect
   <img
     {...props}
     alt={`${provider} logo`}
-    className={cn('size-3 dark:invert', className)}
+    className={cn('size-3 shrink-0 dark:invert', className)}
     height={12}
     src={`https://models.dev/logos/${provider}.svg`}
     width={12}
@@ -171,5 +171,5 @@ export const ModelSelectorLogoGroup = ({ className, ...props }: ModelSelectorLog
 export type ModelSelectorNameProps = ComponentProps<'span'>;
 
 export const ModelSelectorName = ({ className, ...props }: ModelSelectorNameProps) => (
-  <span className={cn('flex-1 truncate text-left', className)} {...props} />
+  <span className={cn('min-w-0 flex-1 truncate text-left', className)} {...props} />
 );
