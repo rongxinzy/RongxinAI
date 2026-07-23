@@ -17,6 +17,7 @@ import { RootState, store } from '../store';
 import {
   selectCoworkSessions,
   selectCurrentSessionId,
+  selectStreamingSessionIds,
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../store/selectors/workModeSelectors';
@@ -75,6 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const dispatch = useDispatch();
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const allSessions = useSelector(selectCoworkSessions);
+  const streamingSessionIds = useSelector(selectStreamingSessionIds);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const unreadSessionIds = useSelector(selectUnreadSessionIds);
   const workMode = useSelector(selectWorkMode);
@@ -108,9 +110,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
   const chatTaskNodes = React.useMemo(() => {
     if (workMode !== WorkMode.Chat) return [];
-    const sorted = sortAgentSidebarTasks(sessions);
+    const sorted = sortAgentSidebarTasks(sessions, streamingSessionIds);
     return sorted.map(s => toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet));
-  }, [workMode, sessions, currentSessionId, unreadSessionIdSet]);
+  }, [workMode, sessions, currentSessionId, unreadSessionIdSet, streamingSessionIds]);
 
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
