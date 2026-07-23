@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { Spinner } from '@shared/components/ui/spinner';
 import { ArrowLeft, PanelLeft, Pencil, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -16,6 +17,7 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
+import { useGatewayReady } from '../cowork/useGatewayReady';
 import WindowTitleBar from '../window/WindowTitleBar';
 import AllRunsHistory from './AllRunsHistory';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -45,6 +47,8 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const selectedTaskId = useSelector((state: RootState) => state.scheduledTask.selectedTaskId);
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const selectedTask = selectedTaskId ? (tasks.find(t => t.id === selectedTaskId) ?? null) : null;
+  const gatewayReady = useGatewayReady();
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
   const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
   const isFormDirtyRef = useRef(false);
@@ -78,8 +82,26 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   }, []);
 
   useEffect(() => {
-    scheduledTaskService.loadTasks();
-  }, []);
+    if (!gatewayReady) {
+      setInitialDataLoaded(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadTasks = scheduledTaskService.isInitialized
+      ? scheduledTaskService.loadTasks()
+      : scheduledTaskService.init();
+
+    void loadTasks.finally(() => {
+      if (!cancelled) {
+        setInitialDataLoaded(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gatewayReady]);
 
   const switchToTab = useCallback(
     (tab: TabType) => {
@@ -146,6 +168,17 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   // Show back arrow when viewing task detail or editing within tasks tab
   const showBack =
     activeTab === 'tasks' && (viewMode === 'detail' || viewMode === 'edit') && selectedTaskId;
+
+  if (!gatewayReady || !initialDataLoaded) {
+    return (
+      <div className="flex h-full items-center justify-center bg-background">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner />
+          <span>{i18nService.t('scheduledTasksLoading')}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

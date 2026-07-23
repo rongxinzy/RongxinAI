@@ -5,6 +5,7 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
+import { Spinner } from '@shared/components/ui/spinner';
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ import {
 } from '../../types/im';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
+import { useGatewayReady } from '../cowork/useGatewayReady';
 import DingTalkInstanceSettings from './DingTalkInstanceSettings';
 import DiscordInstanceSettings from './DiscordInstanceSettings';
 import FeishuInstanceSettings from './FeishuInstanceSettings';
@@ -104,6 +106,7 @@ const checkLevelColorClass: Record<IMConnectivityCheck['level'], string> = {
 const IMSettings: React.FC = () => {
   const dispatch = useDispatch();
   const { config, status, isLoading } = useSelector((state: RootState) => state.im);
+  const gatewayReady = useGatewayReady();
   const [activePlatform, setActivePlatform] = useState<Platform>('weixin');
   const [activeQQInstanceId, setActiveQQInstanceId] = useState<string | null>(null);
   const [qqExpanded, setQqExpanded] = useState(false);
@@ -159,6 +162,8 @@ const IMSettings: React.FC = () => {
 
   // Auto-run connectivity tests for all enabled platforms on mount
   useEffect(() => {
+    if (!configLoaded) return;
+
     const imPlatforms: Platform[] = [
       'weixin',
       'dingtalk',
@@ -190,7 +195,7 @@ const IMSettings: React.FC = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [configLoaded]);
 
   // Cleanup feishu QR timers on unmount
   useEffect(() => {
@@ -322,6 +327,11 @@ const IMSettings: React.FC = () => {
 
   // Initialize IM service and subscribe status updates
   useEffect(() => {
+    if (!gatewayReady) {
+      setConfigLoaded(false);
+      return;
+    }
+
     let cancelled = false;
     void imService.init().then(() => {
       if (!cancelled) {
@@ -333,7 +343,7 @@ const IMSettings: React.FC = () => {
       setConfigLoaded(false);
       imService.destroy();
     };
-  }, []);
+  }, [gatewayReady]);
   // Handle DingTalk multi-instance config
   const dingtalkMultiConfig = config.dingtalk;
 
@@ -925,6 +935,17 @@ const IMSettings: React.FC = () => {
       )}
     </div>
   );
+
+  if (!gatewayReady || !configLoaded) {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner />
+          <span>{i18nService.t('imLoadingBots')}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full gap-4">

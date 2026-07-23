@@ -61,6 +61,10 @@ export class ScheduledTaskService {
   private loadTasksPromise: Promise<void> | null = null;
   private reloadTasksAfterCurrent = false;
 
+  get isInitialized(): boolean {
+    return this.initialized;
+  }
+
   async init(): Promise<void> {
     if (this.initialized) return;
     this.initialized = true;

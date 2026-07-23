@@ -169,6 +169,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 - **宽度一律 1px**（`border`，不显式写 `border-1`）。唯一允许 2px+ 的地方是 focus ring 和个别进度条。
 - 颜色只用 token：常规 `border-border`，更弱的分隔 `border-border-subtle`，输入框 `border-input`。
 - hover 不改变边框宽度（避免布局抖动），只改颜色或背景。
+- **所有浮层必须有边框。** Popover、Dropdown、Select、HoverCard 与 Dialog 使用 `border border-border`，不得以 `ring` 模拟边框或用 `border-0` 移除；二级子菜单同样保留边框，可按动效规则即时展开。
 
 ## 透明度
 

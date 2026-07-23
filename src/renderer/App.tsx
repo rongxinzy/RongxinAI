@@ -8,7 +8,6 @@ import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate
 import { CoworkView } from './components/cowork';
 import CoworkPermissionModal from './components/cowork/CoworkPermissionModal';
 import CoworkQuestionWizard from './components/cowork/CoworkQuestionWizard';
-import EngineStartupOverlay from './components/cowork/EngineStartupOverlay';
 import ExpertView from './components/expert/ExpertView';
 import { LocalInferenceView } from './components/localInference';
 import { McpView } from './components/mcp';
@@ -31,7 +30,6 @@ import {
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
-import { scheduledTaskService } from './services/scheduledTask';
 import { matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { RootState, store } from './store';
@@ -181,11 +179,6 @@ const App: React.FC = () => {
         setIsInitialized(true);
         mark('shell ready');
 
-        void waitWithTimeout(scheduledTaskService.init(), 5000, 'scheduledTaskService.init').catch(
-          error => {
-            console.error('[App] initializeApp: scheduledTaskService.init failed:', error);
-          },
-        );
       } catch (error) {
         const elapsed = Math.round(performance.now() - t0);
         const msg = error instanceof Error ? error.message : String(error);
@@ -749,7 +742,6 @@ const App: React.FC = () => {
             className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
           >
             <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
-              <EngineStartupOverlay />
               {hasMountedLocalInference && (
                 <div
                   className={

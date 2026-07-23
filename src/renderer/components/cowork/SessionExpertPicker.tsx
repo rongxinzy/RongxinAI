@@ -79,7 +79,7 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
           side="top"
           align="start"
           sideOffset={4}
-          className="w-80 rounded-md! border-0! bg-surface! p-0 shadow-md ring-0! outline-none!"
+          className="w-80 rounded-md! bg-surface! p-0 shadow-md ring-0! outline-none!"
         >
           <Command className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none!">
             <CommandInput
