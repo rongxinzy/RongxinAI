@@ -13,17 +13,18 @@ import { agentService } from '../services/agent';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
-import { RootState } from '../store';
+import { RootState, store } from '../store';
 import {
   selectCoworkSessions,
   selectCurrentSessionId,
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../store/selectors/workModeSelectors';
-import { clearLoadingSessionId, setLoadingSessionId } from '../store/slices/coworkSlice';
+import { clearLoadingSessionId, setCurrentSession, setLoadingSessionId } from '../store/slices/coworkSlice';
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
+import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
@@ -144,6 +145,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     flushSync(() => {
       dispatch(setLoadingSessionId(session.id));
     });
+
+    // If the target session is actively streaming in the background, restore its
+    // live snapshot immediately so the user sees the active stream without
+    // waiting for the DB round-trip. Only do this when the sidebar summary still
+    // reports a running status, so a stale snapshot cannot override a completed
+    // session after the renderer reloads.
+    const streamingSnapshot = store.getState().cowork.streamingSessions[session.id];
+    if (streamingSnapshot && session.status === CoworkSessionStatusValue.Running) {
+      dispatch(setCurrentSession(streamingSnapshot));
+    }
 
     // Chat sessions are not scoped to agents — skip loadSessions
     // to avoid replacing the full sessions list with a filtered subset.

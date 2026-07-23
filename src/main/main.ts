@@ -4030,7 +4030,9 @@ if (!gotTheLock) {
 
   ipcMain.handle('cowork:session:delete', async (_event, sessionId: string) => {
     try {
-      getPiRuntimeAdapter().stopSession(sessionId);
+      // Purge runtime state first so late events cannot write to the session
+      // after the DB row is removed.
+      getPiRuntimeAdapter().onSessionDeleted(sessionId);
       const coworkStoreInstance = getCoworkStore();
       coworkStoreInstance.deleteSession(sessionId);
       // Clean up IM session mapping so that new channel messages
@@ -4039,13 +4041,6 @@ if (!gotTheLock) {
         getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
       } catch {
         // IM store may not be initialised yet; safe to ignore.
-      }
-      // Notify runtime to purge in-memory caches for this session
-      // so that channel messages can create a fresh session.
-      try {
-        getPiRuntimeAdapter().onSessionDeleted(sessionId);
-      } catch {
-        // Router may not be initialised yet; safe to ignore.
       }
       return { success: true };
     } catch (error) {
@@ -4059,22 +4054,18 @@ if (!gotTheLock) {
   ipcMain.handle('cowork:session:deleteBatch', async (_event, sessionIds: string[]) => {
     try {
       const runtime = getPiRuntimeAdapter();
-      sessionIds.forEach(sessionId => {
-        runtime.stopSession(sessionId);
-      });
+      // Purge runtime state before deleting DB rows so late events cannot
+      // recreate or write to sessions that are being removed.
+      for (const sessionId of sessionIds) {
+        runtime.onSessionDeleted(sessionId);
+      }
       const coworkStoreInstance = getCoworkStore();
       coworkStoreInstance.deleteSessions(sessionIds);
-      const router = getPiRuntimeAdapter();
       for (const sessionId of sessionIds) {
         try {
           getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
         } catch {
           // IM store may not be initialised yet; safe to ignore.
-        }
-        try {
-          router.onSessionDeleted(sessionId);
-        } catch {
-          // Router may not be initialised yet; safe to ignore.
         }
       }
       return { success: true };
