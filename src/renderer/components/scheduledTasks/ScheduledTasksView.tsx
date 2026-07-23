@@ -12,7 +12,7 @@ import { Separator } from '@shared/components/ui/separator';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -49,8 +49,6 @@ const SCHEDULED_TASK_TAB_ORDER: TabType[] = [
   SCHEDULED_TASK_TAB.Tasks,
   SCHEDULED_TASK_TAB.History,
 ];
-const SCHEDULED_TASK_TAB_INDICATOR_ID = 'scheduled-tasks-tab-indicator';
-
 const tabContentVariants = {
   enter: (direction: number) => ({
     opacity: 0,
@@ -85,8 +83,8 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
   const activeIndex = SCHEDULED_TASK_TAB_ORDER.indexOf(activeTab);
   const tabLayer = isActive ? 20 : activeIndex === 0 ? 3 - index : index + 1;
   const isThirdLayer = activeIndex === 0 ? index === 2 : activeIndex === 2 ? index === 0 : false;
-  const tabScale = isThirdLayer ? 0.86 : 1;
-  const transformOrigin = index === 0 ? 'right bottom' : 'left bottom';
+  const tabHeight = isActive ? 40 : isThirdLayer ? 27.5 : 32;
+  const tabWidth = isThirdLayer ? '86%' : '100%';
 
   return (
     <TabsTrigger
@@ -94,42 +92,42 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
       style={{ zIndex: isActive ? 30 : tabLayer, boxShadow: isActive ? 'none' : undefined }}
       className={cn(
         'group relative h-10 min-w-0 flex-1 rounded-t-lg rounded-b-none border-0 bg-transparent px-0 py-0 text-sm font-medium text-muted-foreground transition-colors duration-200 ease-out hover:text-foreground',
-        'data-active:z-10 data-active:border-b-0 data-active:bg-transparent data-active:font-semibold data-active:text-foreground data-active:shadow-none data-active:after:opacity-0 data-active:hover:bg-transparent dark:data-active:bg-transparent',
-        !isActive && 'after:inset-x-0 after:bottom-0 after:h-px after:bg-border after:opacity-100',
-        index > 0 && '-ml-2',
+        'data-active:z-10 data-active:border-b-0 data-active:bg-transparent data-active:font-semibold data-active:text-foreground data-active:shadow-none data-active:hover:bg-transparent dark:data-active:bg-transparent',
+        'after:inset-x-0 after:bottom-0 after:z-10 after:h-px after:bg-border after:opacity-100',
+        index > 0 && '-ml-4',
       )}
     >
-      {!isActive && (
-        <motion.span
-          key="inactive-background"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-t-lg bg-secondary"
-          animate={{ scale: tabScale }}
-          style={{ transformOrigin }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' }}
-          aria-hidden="true"
-        />
-      )}
-      {isActive && (
-        <motion.span
-          key="active-indicator"
-          layoutId={SCHEDULED_TASK_TAB_INDICATOR_ID}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-10 rounded-t-lg border border-b-0 border-border bg-card"
-          transition={
-            prefersReducedMotion
-              ? { duration: 0 }
-              : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }
-          }
-          aria-hidden="true"
-        />
-      )}
       <motion.span
+        key="inactive-background"
         className={cn(
-          'relative z-30 inline-flex min-w-0 items-center justify-center gap-1.5 truncate',
-          'absolute inset-x-0 bottom-0 h-8',
-          isActive && 'h-10',
+          'pointer-events-none absolute bottom-0 rounded-t-lg border border-b-0 border-border transition-colors duration-200',
+          isActive ? 'z-20 bg-card' : 'bg-secondary',
         )}
-        animate={{ scale: isActive ? 1 : 0.88 }}
-        transition={{ duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' }}
+        animate={{ height: tabHeight, width: tabWidth }}
+        style={{ left: index === 0 ? 'auto' : 0, right: index === 0 ? 0 : 'auto' }}
+        transition={{
+          height: prefersReducedMotion
+            ? { duration: 0 }
+            : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 },
+          width: { duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' },
+        }}
+        aria-hidden="true"
+      />
+      <motion.span
+        className="absolute bottom-0 z-30 inline-flex min-w-0 items-center justify-center gap-1.5 truncate"
+        animate={{
+          height: isActive ? 40 : 32,
+          scale: isActive ? 1 : 0.88,
+          width: tabWidth,
+        }}
+        style={{ left: index === 0 ? 'auto' : 0, right: index === 0 ? 0 : 'auto' }}
+        transition={{
+          height: prefersReducedMotion
+            ? { duration: 0 }
+            : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 },
+          scale: { duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' },
+          width: { duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' },
+        }}
       >
         {label}
       </motion.span>
@@ -336,31 +334,29 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 pt-3 pb-4">
           <div className="relative flex shrink-0 items-end">
             <Separator className="w-auto min-w-0 flex-1" />
-            <LayoutGroup id="scheduled-task-tabs">
-              <TabsList className="relative flex h-10 w-72 max-w-full items-end gap-0 rounded-none bg-transparent p-0 shadow-none">
-                <ScheduledTaskTabTrigger
-                  value={SCHEDULED_TASK_TAB.Create}
-                  activeTab={activeTab}
-                  index={0}
-                  label={i18nService.t('scheduledTasksNewTab')}
-                  prefersReducedMotion={prefersReducedMotion}
-                />
-                <ScheduledTaskTabTrigger
-                  value={SCHEDULED_TASK_TAB.Tasks}
-                  activeTab={activeTab}
-                  index={1}
-                  label={i18nService.t('scheduledTasksTabTasks')}
-                  prefersReducedMotion={prefersReducedMotion}
-                />
-                <ScheduledTaskTabTrigger
-                  value={SCHEDULED_TASK_TAB.History}
-                  activeTab={activeTab}
-                  index={2}
-                  label={i18nService.t('scheduledTasksTabHistory')}
-                  prefersReducedMotion={prefersReducedMotion}
-                />
-              </TabsList>
-            </LayoutGroup>
+            <TabsList className="relative flex h-10 w-72 max-w-full items-end gap-0 rounded-none bg-transparent p-0 shadow-none">
+              <ScheduledTaskTabTrigger
+                value={SCHEDULED_TASK_TAB.Create}
+                activeTab={activeTab}
+                index={0}
+                label={i18nService.t('scheduledTasksNewTab')}
+                prefersReducedMotion={prefersReducedMotion}
+              />
+              <ScheduledTaskTabTrigger
+                value={SCHEDULED_TASK_TAB.Tasks}
+                activeTab={activeTab}
+                index={1}
+                label={i18nService.t('scheduledTasksTabTasks')}
+                prefersReducedMotion={prefersReducedMotion}
+              />
+              <ScheduledTaskTabTrigger
+                value={SCHEDULED_TASK_TAB.History}
+                activeTab={activeTab}
+                index={2}
+                label={i18nService.t('scheduledTasksTabHistory')}
+                prefersReducedMotion={prefersReducedMotion}
+              />
+            </TabsList>
             <Separator className="w-auto min-w-0 flex-1" />
           </div>
 
