@@ -941,6 +941,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     selectModel: '选择模型',
     searchModels: '搜索模型...',
     serverModels: '可选模型',
+    modelSelectorNone: '无',
+    modelSelectorNoMatches: '无匹配模型',
 
     // 错误提示
     errorOccurred: '发生错误',
@@ -1489,6 +1491,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillImportSuccess: '技能已添加',
     official: '官方',
     noSkillsAvailable: '暂无可用技能',
+    noMatchingSkills: '未找到匹配技能',
     skillsDescription: '为您的智能体提供预封装且可重复的最佳实践与工具',
     skillInstalled: '已安装',
     skillMarketplace: '技能市场',
@@ -3320,6 +3323,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     selectModel: 'Select model',
     searchModels: 'Search models...',
     serverModels: 'Available models',
+    modelSelectorNone: 'None',
+    modelSelectorNoMatches: 'No matching models',
 
     // Error Messages
     errorOccurred: 'An error occurred',
@@ -3904,6 +3909,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillImportSuccess: 'Skill added',
     official: 'Official',
     noSkillsAvailable: 'No skills available',
+    noMatchingSkills: 'No matching skills',
     skillsDescription: 'Pre-packaged best practices and tools for your AI agent',
     skillInstalled: 'Installed',
     skillMarketplace: 'Marketplace',

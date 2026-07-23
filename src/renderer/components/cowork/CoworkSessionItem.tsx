@@ -261,7 +261,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                   }
                 }}
                 onBlur={handleRenameBlur}
-                className="flex-1 min-w-0 rounded-lg border border-border bg-background px-2 py-1 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className="flex-1 min-w-0 rounded-lg border border-input bg-background px-2 py-1 text-sm font-medium text-foreground transition-colors outline-none hover:ring-1 hover:ring-ring/40 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40"
               />
             ) : (
               <h3 className="text-sm font-medium text-foreground truncate">{session.title}</h3>

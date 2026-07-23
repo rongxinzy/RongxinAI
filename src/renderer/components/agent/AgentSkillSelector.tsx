@@ -69,7 +69,7 @@ const AgentSkillSelector: React.FC<AgentSkillSelectorProps> = ({ selectedSkillId
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={i18nService.t('agentSkillsSearch')}
-            className="h-9 w-full border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus-visible:border-border focus-visible:bg-surface"
+            className="h-9 w-full border-border-subtle bg-surface-raised/30 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus-visible:bg-surface"
           />
         </div>
       </div>

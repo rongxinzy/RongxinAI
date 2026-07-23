@@ -33,7 +33,7 @@ const ActiveSkillBadge: React.FC = () => {
       {activeSkills.map(skill => (
         <div
           key={skill.id}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-primary"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-transparent"
         >
           <Puzzle className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-medium text-primary max-w-[80px] truncate">
@@ -44,10 +44,10 @@ const ActiveSkillBadge: React.FC = () => {
             variant="ghost"
             size="icon-xs"
             onClick={e => handleRemoveSkill(e, skill.id)}
-            className="rounded hover:bg-primary-muted transition-colors"
+            className="ml-0.5 size-auto rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
             title={i18nService.t('clearSkill')}
           >
-            <X className="h-2.5 w-2.5 text-primary" />
+            <X className="size-3 text-primary" />
           </Button>
         </div>
       ))}

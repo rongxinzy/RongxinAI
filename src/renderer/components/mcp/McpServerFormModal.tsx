@@ -402,11 +402,8 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                       value={row.value}
                       onChange={e => handleUpdateEnvRow(index, 'value', e.target.value)}
                       placeholder={row.required ? `${row.key} *` : i18nService.t('mcpHeaderValue')}
-                      className={
-                        envErrors[index]
-                          ? kvInputClass + ' border-red-500 focus-visible:ring-red-500'
-                          : kvInputClass
-                      }
+                      aria-invalid={Boolean(envErrors[index])}
+                      className={kvInputClass}
                       autoFocus={isRegistry && index === 0 && !!row.required}
                     />
                     {!row.required && (

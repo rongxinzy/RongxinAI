@@ -1085,7 +1085,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         <PromptInput
           multiple
           className={cn(
-            'shadow-elevated rounded-2xl transition-shadow focus-within:ring-2 focus-within:ring-ring/40 **:data-[slot=input-group]:rounded-2xl **:data-[slot=input-group]:has-focus-visible:border-input **:data-[slot=input-group]:has-focus-visible:ring-0',
+            'shadow-elevated rounded-2xl transition-shadow **:data-[slot=input-group]:rounded-2xl',
             isDraggingFiles && 'ring-2 ring-primary',
           )}
           onDragEnter={handleDragEnter}
@@ -1130,7 +1130,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     align="start"
                   >
                     <PromptInputButton
-                      className={`gap-1.5 hover:bg-black/3 dark:hover:bg-white/4 ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                      className={`gap-1.5 hover:bg-surface-raised ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
                     >
                       <Folder className="h-4 w-4 shrink-0" />
                       <span className="max-w-[150px] truncate text-xs">
@@ -1169,7 +1169,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 <PromptInputButton
                   onClick={handleAddFile}
                   disabled={disabled || isStreaming || isAddingFile}
-                  className="hover:bg-black/3 dark:hover:bg-white/4"
+                  className="hover:bg-surface-raised"
                 >
                   <Paperclip className="h-4 w-4" />
                 </PromptInputButton>

@@ -55,7 +55,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 浮起表面 | `surface-raised`                              | hover 态、次级填充、开关轨道                           |
 | 覆盖层   | `surface-overlay`                             | 弹层、下拉、浮窗                                       |
 | 主文本   | `text-primary` / `foreground`                 | 正文、标题                                             |
-| 次文本   | `text-secondary`                              | 辅助说明、时间戳、占位符                               |
+| 次文本   | `text-secondary` / `text-muted-foreground`    | 辅助说明、时间戳、占位符、搜索无匹配结果及紧凑空态     |
 | 弱文本   | `text-muted`                                  | 禁用态、最次要信息                                     |
 | 边框     | `border` / `border-subtle`                    | 分隔线、控件描边                                       |
 | 强调     | `primary` / `primary-hover` / `primary-muted` | 唯一的品牌强调色，用于主按钮、激活态、链接、focus ring |
@@ -67,6 +67,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 2. **状态色不装饰。** 红/绿/黄只表达危险、成功、警告。
 3. **层级公式：** 背景每浮起一层（background → surface → surface-raised → overlay），明暗差异缩小一档；不要跳档制造高反差色块。
 4. 明暗主题共用同一套 token 名，组件代码不得出现 `dark:` 前缀的单独配色——差异必须在 token 层解决。个别结构性例外（如纯黑遮罩 `bg-black/40`、nav 悬浮的透明度叠加 `hover:bg-black/3 dark:hover:bg-white/4`）允许保留。
+5. **搜索空结果使用次文本。** 关键词无匹配、无可选项等紧凑空态使用 `text-sm text-muted-foreground`，不使用主文本、状态色或额外边框；完整空状态页面再按空状态组件规范处理。
 
 ## 字体
 

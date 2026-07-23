@@ -1279,7 +1279,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat 
                 value={skillDownloadSource}
                 onChange={e => setSkillDownloadSource(e.target.value)}
                 placeholder={i18nService.t('remoteSkillImportPlaceholder')}
-                className="w-full px-3 py-2.5 text-sm rounded-xl bg-background text-foreground placeholder-secondary border border-border focus-visible:ring-2 focus-visible:ring-primary"
+                className="w-full px-3 py-2.5 text-sm rounded-xl bg-background text-foreground placeholder-secondary border border-border"
               />
               <p className="text-xs text-muted-foreground">
                 {i18nService.t('remoteSkillImportExamples')}
