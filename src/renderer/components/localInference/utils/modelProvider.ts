@@ -28,7 +28,10 @@ const MODEL_PROVIDER_MATCHERS: readonly ModelProviderMatcher[] = [
   { provider: ProviderName.Zhipu, pattern: /(?:chat)?glm|zhipu/i },
   { provider: ProviderName.Gemini, pattern: /(?:gemini|gemma|paligemma)/i },
   { provider: ProviderName.Anthropic, pattern: /claude/i },
-  { provider: ProviderName.OpenAI, pattern: /(?:openai|chatgpt|gpt|codex)/i },
+  {
+    provider: ProviderName.OpenAI,
+    pattern: /(?:openai|chatgpt|codex)|(?:^|[^a-z0-9])gpt(?=$|[-._\s])/i,
+  },
   { provider: ProviderName.Moonshot, pattern: /(?:moonshot|kimi)/i },
   { provider: ProviderName.Minimax, pattern: /minimax/i },
   { provider: ProviderName.Qianfan, pattern: /(?:ernie|baidu)/i },
@@ -39,10 +42,14 @@ const MODEL_PROVIDER_MATCHERS: readonly ModelProviderMatcher[] = [
 
 export function resolveLocalModelProvider(model: LlamaCppModel): LocalModelProvider | null {
   for (const candidate of getModelProviderCandidates(model)) {
-    const match = MODEL_PROVIDER_MATCHERS.find(({ pattern }) => pattern.test(candidate));
-    if (match) return match.provider;
+    const provider = resolveModelProviderName(candidate);
+    if (provider) return provider;
   }
   return null;
+}
+
+export function resolveModelProviderName(modelName: string): LocalModelProvider | null {
+  return MODEL_PROVIDER_MATCHERS.find(({ pattern }) => pattern.test(modelName.trim()))?.provider ?? null;
 }
 
 function getModelProviderCandidates(model: LlamaCppModel): string[] {
