@@ -12,6 +12,8 @@ export interface CronJobServiceDeps {
   getOpenClawRuntimeAdapter: () => {
     getGatewayClient: () => GatewayClientLike | null;
     ensureReady: () => Promise<void>;
+    onGatewayDisconnect: (callback: (reason: string) => void) => () => void;
+    onGatewayReconnect: (callback: () => void) => () => void;
   } | null;
 }
 
@@ -35,10 +37,13 @@ export function getCronJobService(): CronJobService {
         'OpenClaw runtime adapter not initialized. CronJobService requires OpenClaw.',
       );
     }
-    cronJobService = new CronJobService({
+    const service = new CronJobService({
       getGatewayClient: () => adapter.getGatewayClient(),
       ensureGatewayReady: () => adapter.ensureReady(),
     });
+    adapter.onGatewayDisconnect(() => service.handleGatewayDisconnected());
+    adapter.onGatewayReconnect(() => service.handleGatewayConnected());
+    cronJobService = service;
   }
   return cronJobService;
 }

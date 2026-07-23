@@ -742,11 +742,26 @@ export class CronJobService {
       clearInterval(this.pollingTimer);
       this.pollingTimer = null;
     }
+    this.clearPollingSnapshot();
+    this.firstPollDone = false;
+  }
+
+  handleGatewayDisconnected(): void {
+    this.clearPollingSnapshot();
+    this.firstPollDone = false;
+  }
+
+  handleGatewayConnected(): void {
+    this.clearPollingSnapshot();
+    this.firstPollDone = true;
+    this.emitFullRefresh();
+  }
+
+  private clearPollingSnapshot(): void {
     this.lastKnownStates.clear();
     this.lastKnownRunAtMs.clear();
     this.jobNameCache.clear();
     this.runningJobIds.clear();
-    this.firstPollDone = false;
   }
 
   private async pollOnce(): Promise<void> {

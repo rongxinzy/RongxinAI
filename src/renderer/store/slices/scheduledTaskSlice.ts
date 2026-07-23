@@ -17,6 +17,7 @@ interface ScheduledTaskState {
   allRuns: ScheduledTaskRunWithName[];
   allRunsHasMore: boolean;
   loading: boolean;
+  listError: string | null;
   error: string | null;
 }
 
@@ -29,6 +30,7 @@ const initialState: ScheduledTaskState = {
   allRuns: [],
   allRunsHasMore: false,
   loading: false,
+  listError: null,
   error: null,
 };
 
@@ -39,12 +41,16 @@ const scheduledTaskSlice = createSlice({
     setLoading(state, action: PayloadAction<boolean>) {
       state.loading = action.payload;
     },
+    setListError(state, action: PayloadAction<string | null>) {
+      state.listError = action.payload;
+    },
     setError(state, action: PayloadAction<string | null>) {
       state.error = action.payload;
     },
     setTasks(state, action: PayloadAction<ScheduledTask[]>) {
       state.tasks = action.payload;
       state.loading = false;
+      state.listError = null;
     },
     addTask(state, action: PayloadAction<ScheduledTask>) {
       state.tasks.unshift(action.payload);
@@ -139,6 +145,7 @@ const scheduledTaskSlice = createSlice({
 
 export const {
   setLoading,
+  setListError,
   setError,
   setTasks,
   addTask,

@@ -1946,6 +1946,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskTemplateCustomDesc: '从零开始配置任务名称、执行计划、提示词和通知方式',
     scheduledTasksEmptyState: '暂无定时任务',
     scheduledTasksEmptyHint: '创建定时任务，让 AI 按计划自动执行',
+    scheduledTasksLoadFailed: '任务列表加载失败',
+    scheduledTasksLoadFailedHint: '请稍后重试；如果问题持续，请重启应用',
     scheduledTasksListColTitle: '标题',
     scheduledTasksListColSchedule: '计划于',
     scheduledTasksListColStatus: '状态',
@@ -4383,6 +4385,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskTemplateCustomDesc: 'Configure task name, schedule, prompt, and notification from scratch',
     scheduledTasksEmptyState: 'No scheduled tasks',
     scheduledTasksEmptyHint: 'Create scheduled tasks to automate AI execution on a schedule',
+    scheduledTasksLoadFailed: 'Failed to load scheduled tasks',
+    scheduledTasksLoadFailedHint:
+      'Try again in a moment. If the problem persists, restart the app.',
     scheduledTasksListColTitle: 'Title',
     scheduledTasksListColSchedule: 'Scheduled For',
     scheduledTasksListColStatus: 'Status',
