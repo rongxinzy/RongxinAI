@@ -44,7 +44,7 @@ export function CoworkModelPicker({
                 <ModelProviderIcon
                   provider={selectedModel.providerKey || selectedModel.provider || 'openai'}
                 />
-                <ModelSelectorName title={selectedModel.name}>{selectedModel.name}</ModelSelectorName>
+                <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
               </>
             ) : (
               <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
@@ -73,7 +73,7 @@ export function CoworkModelPicker({
                   }}
                 >
                   <ModelProviderIcon provider={model.providerKey || model.provider || 'openai'} />
-                  <ModelSelectorName title={model.name}>{model.name}</ModelSelectorName>
+                  <ModelSelectorName>{model.name}</ModelSelectorName>
                 </CommandItem>
               ))}
             </CommandGroup>
