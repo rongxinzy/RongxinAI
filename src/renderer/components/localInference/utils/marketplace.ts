@@ -6,8 +6,15 @@ import {
 } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
 import {
+  MARKETPLACE_EXTRA_TALL_PAGE_SIZE,
+  MARKETPLACE_EXTRA_TALL_PAGE_SIZE_HEIGHT_BREAKPOINT,
   MARKETPLACE_INITIAL_MODEL_COUNT,
+  MARKETPLACE_MIN_PAGE_SIZE,
   MARKETPLACE_PAGE_SIZE,
+  MARKETPLACE_PAGE_SIZE_HEIGHT_BREAKPOINT,
+  MARKETPLACE_WIDE_PAGE_SIZE,
+  MARKETPLACE_WIDE_PAGE_SIZE_HEIGHT_BREAKPOINT,
+  MARKETPLACE_WIDE_VIEWPORT_WIDTH_BREAKPOINT,
   MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
 } from '../constants';
 import type { InstallProgressState } from '../types';
@@ -133,6 +140,26 @@ export function formatDownloadCount(downloads?: number): string {
   return i18nService.t('marketplaceDownloads').replace('{count}', value);
 }
 
-export function getMarketplacePageSize(): number {
-  return MARKETPLACE_PAGE_SIZE;
+export function getMarketplacePageSize(
+  viewportHeight = globalThis.innerHeight,
+  viewportWidth = globalThis.innerWidth,
+): number {
+  if (
+    viewportWidth >= MARKETPLACE_WIDE_VIEWPORT_WIDTH_BREAKPOINT &&
+    viewportHeight >= MARKETPLACE_EXTRA_TALL_PAGE_SIZE_HEIGHT_BREAKPOINT
+  ) {
+    return MARKETPLACE_EXTRA_TALL_PAGE_SIZE;
+  }
+  if (
+    viewportWidth >= MARKETPLACE_WIDE_VIEWPORT_WIDTH_BREAKPOINT &&
+    viewportHeight >= MARKETPLACE_WIDE_PAGE_SIZE_HEIGHT_BREAKPOINT
+  ) {
+    return MARKETPLACE_WIDE_PAGE_SIZE;
+  }
+  if (viewportWidth >= MARKETPLACE_WIDE_VIEWPORT_WIDTH_BREAKPOINT) {
+    return MARKETPLACE_PAGE_SIZE;
+  }
+  return viewportHeight >= MARKETPLACE_PAGE_SIZE_HEIGHT_BREAKPOINT
+    ? MARKETPLACE_PAGE_SIZE
+    : MARKETPLACE_MIN_PAGE_SIZE;
 }

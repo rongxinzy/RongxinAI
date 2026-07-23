@@ -3,10 +3,12 @@ import { Button } from '@shared/components/ui/button';
 import { Card, CardAction, CardHeader, CardTitle } from '@shared/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { cn } from '@shared/lib/utils';
-import { Download, ExternalLink, Square } from 'lucide-react';
+import { Download, ExternalLink, X } from 'lucide-react';
+import type { ComponentType } from 'react';
 
-import { MarketplaceCapability, type MarketplaceModel } from '../../../../shared/marketplace';
+import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
+import { CustomProviderIcon, DeepSeekIcon, QwenIcon, ZhipuIcon } from '../../icons/providers';
 import { localInferenceMutedTextClass } from '../constants';
 import type { InstallProgressState } from '../types';
 import {
@@ -22,23 +24,12 @@ import {
 import { formatPullProgress } from '../utils/progress';
 import { InstallProgressBar } from './Common';
 
-const MarketplaceCardTagKind = {
-  Neutral: 'neutral',
-  Violet: 'violet',
-  Green: 'green',
-} as const;
+const marketplaceCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal shadow-none';
 
-type MarketplaceCardTagKind = (typeof MarketplaceCardTagKind)[keyof typeof MarketplaceCardTagKind];
-
-const marketplaceCardTagBaseClassName =
-  'h-7 rounded-md px-2.5 py-0 text-xs font-normal shadow-none';
-const marketplaceCardTagColorClassNames: Record<MarketplaceCardTagKind, string> = {
-  [MarketplaceCardTagKind.Neutral]:
-    'border-[var(--zy-model-tag-neutral-border)] bg-[var(--zy-model-tag-neutral-background)] text-[var(--zy-model-tag-neutral-foreground)]',
-  [MarketplaceCardTagKind.Violet]:
-    'border-[var(--zy-model-tag-violet-border)] bg-[var(--zy-model-tag-violet-background)] text-[var(--zy-model-tag-violet-foreground)]',
-  [MarketplaceCardTagKind.Green]:
-    'border-[var(--zy-model-tag-green-border)] bg-[var(--zy-model-tag-green-background)] text-[var(--zy-model-tag-green-foreground)]',
+const marketplacePublisherIcons: Record<string, ComponentType<{ className?: string }>> = {
+  deepseek: DeepSeekIcon,
+  qwen: QwenIcon,
+  zhipuai: ZhipuIcon,
 };
 
 export function MarketplaceModelCard({
@@ -57,6 +48,9 @@ export function MarketplaceModelCard({
   const progress = getMarketplaceInstallProgress(installProgress, model);
   const capabilities = getMarketplaceCapabilityTags(model);
   const publisher = getMarketplacePublisher(model.repoId);
+  const PublisherIcon = publisher
+    ? (marketplacePublisherIcons[publisher.toLocaleLowerCase()] ?? CustomProviderIcon)
+    : CustomProviderIcon;
   const details = [
     { label: i18nService.t('marketplaceModelSizeLabel'), value: model.sizes[0]?.trim() || null },
     {
@@ -69,23 +63,21 @@ export function MarketplaceModelCard({
   return (
     <Card
       size="sm"
-      className="relative w-full border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 hover:border-border hover:bg-muted/20 hover:shadow-md"
+      className="relative h-full w-full border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 hover:border-border hover:bg-muted/20 hover:shadow-md"
     >
-      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-4 gap-y-3 p-4">
-        <div className="col-start-1 row-start-1 min-w-0">
+      <CardHeader className="relative grid flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_1fr] gap-x-4 gap-y-1 p-4">
+        <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
+          <PublisherIcon
+            aria-hidden="true"
+            className={`size-4 shrink-0 ${localInferenceMutedTextClass}`}
+          />
           <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
             {getMarketplaceDisplayName(model.repoId)}
           </CardTitle>
-          {publisher ? (
-            <div className={`mt-1 truncate text-xs leading-4 ${localInferenceMutedTextClass}`}>
-              {i18nService.t('marketplacePublisherLabel')}
-              {publisher}
-            </div>
-          ) : null}
         </div>
 
         {model.detailUrl ? (
-          <CardAction className="col-start-2 row-start-1 self-start justify-self-end">
+          <CardAction className="relative z-20 col-start-2 row-start-1 self-start justify-self-end">
             <Button
               type="button"
               onClick={() => void openExternalUrl(model.detailUrl!)}
@@ -98,18 +90,24 @@ export function MarketplaceModelCard({
           </CardAction>
         ) : null}
 
-        <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-1.5 pr-2">
+        {publisher ? (
+          <div
+            className={`col-start-1 row-start-2 truncate text-xs leading-4 ${localInferenceMutedTextClass}`}
+          >
+            {i18nService.t('marketplacePublisherLabel')}
+            {publisher}
+          </div>
+        ) : null}
+
+        <div className="col-start-1 row-start-3 flex min-w-0 self-end flex-wrap items-center gap-1.5 pr-1">
           <HoverCard>
             <HoverCardTrigger
               delay={200}
               closeDelay={100}
               render={
                 <Badge
-                  variant="outline"
-                  className={cn(
-                    getMarketplaceCardTagClassName(MarketplaceCardTagKind.Neutral),
-                    'cursor-default',
-                  )}
+                  variant="secondary"
+                  className={cn(marketplaceCardTagBaseClassName, 'cursor-default')}
                 >
                   {i18nService.t('marketplaceDetails')}
                 </Badge>
@@ -128,19 +126,13 @@ export function MarketplaceModelCard({
             </HoverCardContent>
           </HoverCard>
           {capabilities.map(capability => (
-            <Badge
-              key={capability}
-              variant="outline"
-              className={getMarketplaceCardTagClassName(
-                getMarketplaceCapabilityTagKind(capability),
-              )}
-            >
+            <Badge key={capability} variant="secondary" className={marketplaceCardTagBaseClassName}>
               {capabilityLabel(capability)}
             </Badge>
           ))}
         </div>
 
-        <CardAction className="col-start-2 row-start-2 self-center justify-self-end">
+        <CardAction className="relative z-20 col-start-2 row-start-3 self-end justify-self-end">
           {installing ? (
             <Button
               type="button"
@@ -148,7 +140,7 @@ export function MarketplaceModelCard({
               size="sm"
               variant="outline"
             >
-              <Square data-icon="inline-start" />
+              <X data-icon="inline-start" />
               {i18nService.t('marketplaceCancelInstall')}
             </Button>
           ) : (
@@ -156,6 +148,7 @@ export function MarketplaceModelCard({
               type="button"
               disabled={loading}
               size="sm"
+              variant="outline"
               onClick={() => void onInstall(model)}
             >
               <Download data-icon="inline-start" />
@@ -163,32 +156,23 @@ export function MarketplaceModelCard({
             </Button>
           )}
         </CardAction>
-      </CardHeader>
-      {progress ? (
-        <div className="border-t border-border px-4 py-2">
-          <div
-            className={`flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}
-          >
-            <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
-            {typeof progress.percent === 'number' ? <span>{progress.percent}%</span> : null}
+
+        {progress ? (
+          <div className="absolute inset-y-4 left-4 z-10 flex w-2/3 items-center justify-center rounded-lg border border-border bg-card p-4">
+            <div className="w-full">
+              <div
+                className={`mb-1.5 flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}
+              >
+                <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
+                {typeof progress.percent === 'number' ? <span>{progress.percent}%</span> : null}
+              </div>
+              <InstallProgressBar progress={progress} />
+            </div>
           </div>
-          <InstallProgressBar progress={progress} className="mt-1.5" />
-        </div>
-      ) : null}
+        ) : null}
+      </CardHeader>
     </Card>
   );
-}
-
-function getMarketplaceCardTagClassName(kind: MarketplaceCardTagKind): string {
-  return cn(marketplaceCardTagBaseClassName, marketplaceCardTagColorClassNames[kind]);
-}
-
-function getMarketplaceCapabilityTagKind(
-  capability: MarketplaceModel['capability'],
-): MarketplaceCardTagKind {
-  return capability === MarketplaceCapability.Chat || capability === MarketplaceCapability.Embedding
-    ? MarketplaceCardTagKind.Green
-    : MarketplaceCardTagKind.Violet;
 }
 
 function MetadataRow({ label, value }: { label: string; value: string }) {

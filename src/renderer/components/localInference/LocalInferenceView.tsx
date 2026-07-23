@@ -26,7 +26,6 @@ import {
   LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
-  MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
@@ -116,6 +115,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
+  const [marketplaceToken, setMarketplaceToken] = useState<string | null>(null);
   useI18nLanguage();
   const launchLogs = useModelLaunchLogs();
   const marketplaceSearchRef = useRef<number>(0);
@@ -133,6 +133,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       ),
     [localModels],
   );
+
+  useEffect(() => {
+    void window.electron.marketplace
+      .getToken()
+      .then(setMarketplaceToken)
+      .catch(() => setMarketplaceToken(null));
+  }, []);
 
   const dismissToast = useCallback(() => {
     if (toastTimerRef.current) {
@@ -220,15 +227,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setMarketplaceHasSearched(true);
     void searchMarketplace(params);
   }, [marketplaceQuery, searchMarketplace]);
-
-  const handleMarketplaceBrowseAll = useCallback(() => {
-    setMarketplaceQuery('');
-    setMarketplaceHasSearched(true);
-    void searchMarketplace({
-      featuredOnly: false,
-      limit: MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
-    });
-  }, [searchMarketplace]);
 
   const refreshStatus = useCallback(async () => {
     const nextStatus = await window.electron.llamacpp.status();
@@ -676,7 +674,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       )}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
-          <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
+          <div className="w-full space-y-4 px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <LocalInferenceTabSelector activeTab={activeTab} onActiveTabChange={setActiveTab} />
               <div className="flex flex-wrap items-center gap-2">
@@ -741,9 +739,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 query={marketplaceQuery}
                 installedModelPathMap={installedModelPathMap}
                 installProgress={pullProgress}
+                savedToken={marketplaceToken}
+                onTokenSaved={setMarketplaceToken}
                 onQueryChange={setMarketplaceQuery}
                 onSearch={handleMarketplaceSearch}
-                onBrowseAll={handleMarketplaceBrowseAll}
                 onInstall={handleMarketplaceInstall}
               />
             )}
@@ -844,7 +843,8 @@ function resolveLlamaCppServiceAction(
   }
 }
 
-export const __test__getMarketplacePageSize = () => getMarketplacePageSize();
+export const __test__getMarketplacePageSize = (viewportHeight?: number, viewportWidth?: number) =>
+  getMarketplacePageSize(viewportHeight, viewportWidth);
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);

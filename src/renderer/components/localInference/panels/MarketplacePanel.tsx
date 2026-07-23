@@ -8,7 +8,7 @@ import {
 } from '@shared/components/ui/input-group';
 import { Label } from '@shared/components/ui/label';
 import { Eye, EyeOff, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
@@ -17,7 +17,11 @@ import { EmptyState } from '../components/Common';
 import { MarketplaceModelCard } from '../components/MarketplaceModelCard';
 import { localInferenceMutedTextClass } from '../constants';
 import type { InstallProgressState } from '../types';
-import { getInstallableMarketplaceModels, getMarketplacePageSize } from '../utils/marketplace';
+import {
+  getInstallableMarketplaceModels,
+  getMarketplaceInstallProgress,
+  getMarketplacePageSize,
+} from '../utils/marketplace';
 import { isPullInProgress } from '../utils/progress';
 
 export function MarketplacePanel({
@@ -29,9 +33,10 @@ export function MarketplacePanel({
   query,
   installedModelPathMap,
   installProgress,
+  savedToken,
+  onTokenSaved,
   onQueryChange,
   onSearch,
-  onBrowseAll,
   onInstall,
 }: {
   loading: boolean;
@@ -42,50 +47,61 @@ export function MarketplacePanel({
   query: string;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
+  savedToken: string | null;
+  onTokenSaved: (token: string | null) => void;
   onQueryChange: (v: string) => void;
   onSearch: () => void;
-  onBrowseAll: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenInputVisible, setTokenInputVisible] = useState(false);
-  const [savedToken, setSavedToken] = useState<string | null>(null);
-  const [tokenLoaded, setTokenLoaded] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(getMarketplacePageSize);
+  const pageRef = useRef(page);
+  const pageSizeRef = useRef(pageSize);
+  const resizeFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    window.electron.marketplace
-      .getToken()
-      .then(t => {
-        setSavedToken(t);
-      })
-      .catch(() => {});
+    pageRef.current = page;
+  }, [page]);
+
+  useEffect(() => {
+    const updatePageSize = () => {
+      const nextPageSize = getMarketplacePageSize();
+      const currentPageSize = pageSizeRef.current;
+      if (nextPageSize === currentPageSize) return;
+
+      const firstVisibleIndex = (pageRef.current - 1) * currentPageSize;
+      const nextPage = Math.floor(firstVisibleIndex / nextPageSize) + 1;
+      pageSizeRef.current = nextPageSize;
+      pageRef.current = nextPage;
+      setPageSize(nextPageSize);
+      setPage(nextPage);
+    };
+    const handleResize = () => {
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(updatePageSize);
+    };
+
+    updatePageSize();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+    };
   }, []);
 
   useEffect(() => {
-    if (tokenModalOpen && !tokenLoaded) {
-      window.electron.marketplace
-        .getToken()
-        .then(t => {
-          setSavedToken(t);
-          setTokenInput(t ?? '');
-          setTokenLoaded(true);
-        })
-        .catch(() => setTokenLoaded(true));
-    }
-    if (!tokenModalOpen) {
-      setTokenLoaded(false);
-      setTokenInputVisible(false);
-    }
-  }, [tokenLoaded, tokenModalOpen]);
+    if (tokenModalOpen) setTokenInput(savedToken ?? '');
+    else setTokenInputVisible(false);
+  }, [savedToken, tokenModalOpen]);
 
   const installableModels = useMemo(
     () => getInstallableMarketplaceModels(models, installedModelPathMap),
     [installedModelPathMap, models],
   );
-  const pageSize = getMarketplacePageSize();
   const pageCount = Math.max(1, Math.ceil(installableModels.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * pageSize;
@@ -107,14 +123,14 @@ export function MarketplacePanel({
   const handleSaveToken = async () => {
     const trimmed = tokenInput.trim();
     await window.electron.marketplace.setToken(trimmed);
-    setSavedToken(trimmed || null);
+    onTokenSaved(trimmed || null);
     setTokenModalOpen(false);
   };
 
   const handleClearToken = async () => {
     setTokenInput('');
     await window.electron.marketplace.setToken('');
-    setSavedToken(null);
+    onTokenSaved(null);
     setTokenModalOpen(false);
   };
 
@@ -159,13 +175,13 @@ export function MarketplacePanel({
       <div
         className={
           hasSearched
-            ? 'grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)_minmax(0,1fr)] lg:items-center'
+            ? 'flex flex-col gap-3'
             : 'flex min-h-[420px] flex-col items-center justify-center gap-8'
         }
       >
         {!hasSearched ? (
           <div className="w-full max-w-3xl space-y-3 text-center">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center gap-3">
               <h2 className="text-2xl font-semibold text-foreground">
                 {i18nService.t('marketplaceTitle')}
               </h2>
@@ -173,45 +189,46 @@ export function MarketplacePanel({
             </div>
           </div>
         ) : null}
-        <form
-          className={`w-full ${hasSearched ? 'lg:col-start-2' : 'max-w-4xl'}`}
-          onSubmit={event => {
-            event.preventDefault();
-            onSearch();
-          }}
+        <div
+          className={
+            hasSearched ? 'mx-auto flex w-full items-center justify-center gap-3' : 'w-full'
+          }
         >
-          <div className="flex gap-2">
-            <InputGroup className={hasSearched ? 'h-9 flex-1' : 'h-16 flex-1 rounded-2xl'}>
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupInput
-                value={query}
-                onChange={event => onQueryChange(event.target.value)}
-                placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-                className={hasSearched ? 'text-xs' : 'h-16 text-lg'}
-              />
-            </InputGroup>
-            <Button
-              type="submit"
-              disabled={marketplaceLoading}
-              className={hasSearched ? 'h-9 text-xs' : 'h-16 rounded-2xl px-8 text-lg'}
-            >
-              {marketplaceLoading && (
-                <RefreshCw data-icon="inline-start" className="animate-spin" />
-              )}
-              {i18nService.t('marketplaceSearch')}
-            </Button>
-          </div>
-        </form>
-        {hasSearched ? (
-          <div className="flex justify-start gap-2 lg:col-start-3 lg:justify-end">
-            <Button type="button" onClick={onBrowseAll} size="xs" variant="outline">
-              {i18nService.t('marketplaceBrowseAll')}
-            </Button>
-            {tokenSettingsButton}
-          </div>
-        ) : null}
+          <form
+            className={`min-w-0 ${hasSearched ? 'basis-1/2' : 'mx-auto w-full max-w-4xl'}`}
+            onSubmit={event => {
+              event.preventDefault();
+              onSearch();
+            }}
+          >
+            <div className="flex gap-2">
+              <InputGroup
+                className={hasSearched ? 'h-9 min-w-0 flex-1' : 'h-16 flex-1 rounded-2xl'}
+              >
+                <InputGroupAddon>
+                  <Search />
+                </InputGroupAddon>
+                <InputGroupInput
+                  value={query}
+                  onChange={event => onQueryChange(event.target.value)}
+                  placeholder={i18nService.t('marketplaceSearchPlaceholder')}
+                  className={hasSearched ? 'text-xs' : 'h-16 text-lg'}
+                />
+              </InputGroup>
+              <Button
+                type="submit"
+                disabled={marketplaceLoading}
+                className={hasSearched ? 'h-9 text-xs' : 'h-16 rounded-2xl px-8 text-lg'}
+              >
+                {marketplaceLoading && (
+                  <RefreshCw data-icon="inline-start" className="animate-spin" />
+                )}
+                {i18nService.t('marketplaceSearch')}
+              </Button>
+            </div>
+          </form>
+          {hasSearched ? <div className="shrink-0">{tokenSettingsButton}</div> : null}
+        </div>
       </div>
 
       {marketplaceError ? (
@@ -236,9 +253,9 @@ export function MarketplacePanel({
         <EmptyState title={i18nService.t('marketplaceNoModels')} className="min-h-[620px]" />
       ) : (
         <div className="flex flex-col">
-          <div className="grid auto-rows-min content-start gap-3 md:grid-cols-2">
+          <div className="grid auto-rows-min content-start gap-3 md:grid-cols-2 2xl:grid-cols-4">
             {visibleModels.map(model => {
-              const progress = installProgress[model.repoId] ?? installProgress[model.id];
+              const progress = getMarketplaceInstallProgress(installProgress, model);
               const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
               return (
                 <MarketplaceModelCard

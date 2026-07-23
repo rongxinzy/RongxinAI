@@ -66,28 +66,11 @@ const modelProviderIconMap = {
 } satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
 const MODEL_CARD_MAX_VISIBLE_TAGS = 6;
-const ModelCardTagKind = {
-  Neutral: 'neutral',
-  Violet: 'violet',
-  Green: 'green',
-} as const;
-
-type ModelCardTagKind = (typeof ModelCardTagKind)[keyof typeof ModelCardTagKind];
-
 type ModelCardTag = {
   label: string;
-  kind: ModelCardTagKind;
 };
 
 const modelCardTagBaseClassName = 'h-7 rounded-md px-2.5 py-0 text-xs font-normal shadow-none';
-const modelCardTagColorClassNames: Record<ModelCardTagKind, string> = {
-  [ModelCardTagKind.Neutral]:
-    'border-[var(--zy-model-tag-neutral-border)] bg-[var(--zy-model-tag-neutral-background)] text-[var(--zy-model-tag-neutral-foreground)]',
-  [ModelCardTagKind.Violet]:
-    'border-[var(--zy-model-tag-violet-border)] bg-[var(--zy-model-tag-violet-background)] text-[var(--zy-model-tag-violet-foreground)]',
-  [ModelCardTagKind.Green]:
-    'border-[var(--zy-model-tag-green-border)] bg-[var(--zy-model-tag-green-background)] text-[var(--zy-model-tag-green-foreground)]',
-};
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -221,7 +204,7 @@ export function ModelsPanel({
           </h2>
         ) : null}
         {modelCards.length > 0 ? (
-          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {modelCards.map(({ model, runningModel }) => (
               <ModelCard
                 key={model.name}
@@ -423,11 +406,8 @@ function ModelCard({
                 closeDelay={100}
                 render={
                   <Badge
-                    variant="outline"
-                    className={cn(
-                      getModelCardTagClassName(ModelCardTagKind.Neutral),
-                      'cursor-default',
-                    )}
+                    variant="secondary"
+                    className={cn(modelCardTagBaseClassName, 'cursor-default')}
                   >
                     {i18nService.t('localInferenceDetails')}
                   </Badge>
@@ -443,7 +423,7 @@ function ModelCard({
             </HoverCard>
           ) : null}
           {visibleTags.map(tag => (
-            <Badge key={tag.label} variant="outline" className={getModelCardTagClassName(tag.kind)}>
+            <Badge key={tag.label} variant="secondary" className={modelCardTagBaseClassName}>
               {tag.label}
             </Badge>
           ))}
@@ -538,28 +518,20 @@ function getModelCardTags(
   quantization?: string,
 ): ModelCardTag[] {
   return dedupeModelTags([
-    createModelCardTag(formatModelFamilyTag(model.details?.family), ModelCardTagKind.Neutral),
-    createModelCardTag(
-      formatModelTagValue(model.details?.parameter_size),
-      ModelCardTagKind.Neutral,
-    ),
-    createModelCardTag(formatModelTagValue(quantization), ModelCardTagKind.Violet),
-    createModelCardTag(formatModelFormatTag(model.details?.format), ModelCardTagKind.Green),
+    createModelCardTag(formatModelFamilyTag(model.details?.family)),
+    createModelCardTag(formatModelTagValue(model.details?.parameter_size)),
+    createModelCardTag(formatModelTagValue(quantization)),
+    createModelCardTag(formatModelFormatTag(model.details?.format)),
     createModelCardTag(
       contextValue
         ? `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`
         : null,
-      ModelCardTagKind.Violet,
     ),
   ]);
 }
 
-function getModelCardTagClassName(kind: ModelCardTagKind): string {
-  return cn(modelCardTagBaseClassName, modelCardTagColorClassNames[kind]);
-}
-
-function createModelCardTag(label: string | null, kind: ModelCardTagKind): ModelCardTag | null {
-  return label ? { label, kind } : null;
+function createModelCardTag(label: string | null): ModelCardTag | null {
+  return label ? { label } : null;
 }
 
 function formatModelFamilyTag(value?: string): string | null {
