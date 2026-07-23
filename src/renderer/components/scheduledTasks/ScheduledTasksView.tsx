@@ -12,7 +12,7 @@ import { Separator } from '@shared/components/ui/separator';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -99,17 +99,29 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
         index > 0 && '-ml-2',
       )}
     >
-      <motion.span
-        layoutId={isActive ? SCHEDULED_TASK_TAB_INDICATOR_ID : undefined}
-        className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-t-lg bg-secondary',
-          isActive && 'z-20 h-10 rounded-t-lg border border-b-0 border-border bg-card',
-        )}
-        animate={{ scale: tabScale }}
-        style={{ transformOrigin }}
-        transition={{ type: 'spring', stiffness: 500, damping: 36 }}
-        aria-hidden="true"
-      />
+      {!isActive && (
+        <motion.span
+          key="inactive-background"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-t-lg bg-secondary"
+          animate={{ scale: tabScale }}
+          style={{ transformOrigin }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' }}
+          aria-hidden="true"
+        />
+      )}
+      {isActive && (
+        <motion.span
+          key="active-indicator"
+          layoutId={SCHEDULED_TASK_TAB_INDICATOR_ID}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-10 rounded-t-lg border border-b-0 border-border bg-card"
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }
+          }
+          aria-hidden="true"
+        />
+      )}
       <motion.span
         className={cn(
           'relative z-30 inline-flex min-w-0 items-center justify-center gap-1.5 truncate',
@@ -324,29 +336,31 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 pt-3 pb-4">
           <div className="relative flex shrink-0 items-end">
             <Separator className="w-auto min-w-0 flex-1" />
-            <TabsList className="relative flex h-10 w-72 max-w-full items-end gap-0 rounded-none bg-transparent p-0 shadow-none">
-              <ScheduledTaskTabTrigger
-                value={SCHEDULED_TASK_TAB.Create}
-                activeTab={activeTab}
-                index={0}
-                label={i18nService.t('scheduledTasksNewTab')}
-                prefersReducedMotion={prefersReducedMotion}
-              />
-              <ScheduledTaskTabTrigger
-                value={SCHEDULED_TASK_TAB.Tasks}
-                activeTab={activeTab}
-                index={1}
-                label={i18nService.t('scheduledTasksTabTasks')}
-                prefersReducedMotion={prefersReducedMotion}
-              />
-              <ScheduledTaskTabTrigger
-                value={SCHEDULED_TASK_TAB.History}
-                activeTab={activeTab}
-                index={2}
-                label={i18nService.t('scheduledTasksTabHistory')}
-                prefersReducedMotion={prefersReducedMotion}
-              />
-            </TabsList>
+            <LayoutGroup id="scheduled-task-tabs">
+              <TabsList className="relative flex h-10 w-72 max-w-full items-end gap-0 rounded-none bg-transparent p-0 shadow-none">
+                <ScheduledTaskTabTrigger
+                  value={SCHEDULED_TASK_TAB.Create}
+                  activeTab={activeTab}
+                  index={0}
+                  label={i18nService.t('scheduledTasksNewTab')}
+                  prefersReducedMotion={prefersReducedMotion}
+                />
+                <ScheduledTaskTabTrigger
+                  value={SCHEDULED_TASK_TAB.Tasks}
+                  activeTab={activeTab}
+                  index={1}
+                  label={i18nService.t('scheduledTasksTabTasks')}
+                  prefersReducedMotion={prefersReducedMotion}
+                />
+                <ScheduledTaskTabTrigger
+                  value={SCHEDULED_TASK_TAB.History}
+                  activeTab={activeTab}
+                  index={2}
+                  label={i18nService.t('scheduledTasksTabHistory')}
+                  prefersReducedMotion={prefersReducedMotion}
+                />
+              </TabsList>
+            </LayoutGroup>
             <Separator className="w-auto min-w-0 flex-1" />
           </div>
 
