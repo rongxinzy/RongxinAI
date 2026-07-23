@@ -24,6 +24,7 @@ import { clearLoadingSessionId, setCurrentSession, setLoadingSessionId } from '.
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
+import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
@@ -145,11 +146,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       dispatch(setLoadingSessionId(session.id));
     });
 
-    // If the target session is already streaming in the background, restore its
+    // If the target session is actively streaming in the background, restore its
     // live snapshot immediately so the user sees the active stream without
-    // waiting for the DB round-trip.
+    // waiting for the DB round-trip. Only do this when the sidebar summary still
+    // reports a running status, so a stale snapshot cannot override a completed
+    // session after the renderer reloads.
     const streamingSnapshot = store.getState().cowork.streamingSessions[session.id];
-    if (streamingSnapshot) {
+    if (streamingSnapshot && session.status === CoworkSessionStatusValue.Running) {
       dispatch(setCurrentSession(streamingSnapshot));
     }
 

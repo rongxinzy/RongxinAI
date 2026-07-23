@@ -107,6 +107,10 @@ interface ActivePiSession {
   lastCompletedAnswerText: string;
   confirmationMode: 'modal' | 'text';
   unsubscribe: () => void;
+  /** Set to true once stopSession has aborted the turn. continueSession must not
+   * reuse the underlying Pi session object after it has been aborted; instead it
+   * should reconstruct the conversation from SQLite and create a fresh session. */
+  aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
 }
@@ -391,6 +395,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         lastCompletedAnswerText: '',
         confirmationMode: options.confirmationMode || 'modal',
         unsubscribe: () => {},
+        aborted: false,
         toolResultMessageIdByCallId: new Map(),
       };
 
@@ -422,9 +427,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     options: CoworkContinueOptions = {},
   ): Promise<void> {
     const active = this.activeSessions.get(sessionId);
-    if (!active) {
+    if (!active || active.aborted) {
+      if (active?.aborted) {
+        this.activeSessions.delete(sessionId);
+      }
       console.log(
-        `[PiRuntime] continueSession: session ${sessionId} not active, restoring context via prompt`,
+        `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, restoring context via prompt`,
       );
       const storedSession = this.store?.getSession(sessionId);
       // Load previous messages and embed them as context prepended to the PI prompt.
@@ -519,12 +527,16 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     this.finalizeActiveThinking(sessionId, active);
 
-    // Only abort the current turn — keep the session alive in activeSessions
-    // so continueSession can find it and preserve conversation history.
-    // Kill any running bash process first — PI SDK's abort() only stops the
-    // AI agent loop, not tool subprocesses (abortBash is only called by dispose).
+    // Mark the session as aborted so continueSession knows not to reuse the Pi
+    // session object, which may be in an inconsistent state after abort.
+    active.aborted = true;
+
+    // Only abort the current turn — keep the session entry in activeSessions
+    // so isSessionActive still reports true for IM routing, but do not reuse
+    // the underlying Pi session for subsequent turns.
     active.piSession.abortBash();
     active.abortController.abort();
+    active.unsubscribe();
     void active.piSession.abort();
     this.emit('sessionStopped', sessionId);
   }

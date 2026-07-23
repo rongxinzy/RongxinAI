@@ -370,11 +370,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         );
         let persistTimer: ReturnType<typeof setTimeout> | null = null;
         const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
+          const snapshot = store.getState().cowork.currentSession;
+          const streamingSnapshot = store.getState().cowork.streamingSessions[tempSessionId];
+          const baseSession =
+            snapshot?.id === tempSessionId
+              ? snapshot
+              : (streamingSnapshot ?? tempSession);
           const isStreamActive = status === CoworkSessionStatusValue.Running;
           const isCompleted = status === CoworkSessionStatusValue.Completed;
           const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
           const messages = [
-            ...tempSession.messages,
+            ...baseSession.messages,
             ...(thinkingContent
               ? [
                   {
@@ -408,7 +414,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               : []),
           ];
           return {
-            ...tempSession,
+            ...baseSession,
             status,
             updatedAt: Date.now(),
             messages,
@@ -756,12 +762,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       );
       let persistTimer: ReturnType<typeof setTimeout> | null = null;
       const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
+        const snapshot = store.getState().cowork.currentSession;
+        const streamingSnapshot = store.getState().cowork.streamingSessions[currentSession.id];
+        const baseSession =
+          snapshot?.id === currentSession.id
+            ? snapshot
+            : (streamingSnapshot ?? currentSession);
         const isStreamActive = status === CoworkSessionStatusValue.Running;
         const isCompleted = status === CoworkSessionStatusValue.Completed;
         const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
         const messages = [
-          ...currentSession.messages,
-          userMessage,
+          ...baseSession.messages,
           ...(thinkingContent
             ? [
                 {
@@ -795,7 +806,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             : []),
         ];
         return {
-          ...currentSession,
+          ...baseSession,
           status,
           updatedAt: Date.now(),
           messages,
@@ -805,13 +816,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const persistChatSnapshot = (force = false) => {
         const persist = () => {
           persistTimer = null;
-          const snapshot = store.getState().cowork.currentSession;
-          const sessionSnapshot =
-            snapshot?.id === currentSession.id
-              ? snapshot
-              : buildChatSnapshot(CoworkSessionStatusValue.Running);
           void coworkService
-            .saveChatSession(sessionSnapshot)
+            .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Running))
             .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
         };
         if (force) {

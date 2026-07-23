@@ -13,6 +13,7 @@ import {
   setCurrentSession,
   setLoadingSessionId,
 } from '../../store/slices/coworkSlice';
+import { CoworkSessionStatusValue } from '../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
@@ -78,8 +79,10 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
 
       // Restore the live streaming snapshot immediately so the stream stays
       // visible when switching back to a running session across workspaces.
+      // Only restore when the task summary still reports running, preventing a
+      // stale snapshot from overriding a completed session after reload.
       const streamingSnapshot = store.getState().cowork.streamingSessions[task.id];
-      if (streamingSnapshot) {
+      if (streamingSnapshot && task.status === CoworkSessionStatusValue.Running) {
         dispatch(setCurrentSession(streamingSnapshot));
       }
 

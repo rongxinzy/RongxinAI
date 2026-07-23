@@ -261,12 +261,23 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('stopSession', () => {
-    it('should keep session active (preserves history for continueSession)', async () => {
+    it('should keep session entry active (preserves IM routing) but mark it aborted', async () => {
       await adapter.startSession('test', 'Hello');
       adapter.stopSession('test');
-      // Session stays active so continueSession can find it and preserve history
+      // Session entry stays active so isSessionActive still reports true for IM,
+      // but the underlying Pi session is marked aborted.
       expect(adapter.isSessionActive('test')).toBe(true);
       expect(mockSession.abort).toHaveBeenCalled();
+    });
+
+    it('should cause continueSession to reconstruct after stop', async () => {
+      await adapter.startSession('test', 'Hello');
+      adapter.stopSession('test');
+      await adapter.continueSession('test', 'Next');
+      // After stop, continueSession must not reuse the aborted Pi session.
+      // It reconstructs from store history, creating a fresh Pi session.
+      expect(mockSession.subscribe).toHaveBeenCalledTimes(2);
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
     });
 
     it('should be safe to call on unknown session', () => {
