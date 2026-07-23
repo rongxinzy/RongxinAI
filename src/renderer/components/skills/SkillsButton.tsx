@@ -1,4 +1,5 @@
-import { Button } from '@shared/components/ui/button';
+import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
+import { cn } from '@shared/lib/utils';
 import { Puzzle } from 'lucide-react';
 import React from 'react';
 
@@ -18,15 +19,15 @@ const SkillsButton: React.FC<SkillsButtonProps> = ({
 }) => {
   return (
     <SkillsPopover onSelectSkill={onSelectSkill} onManageSkills={onManageSkills}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={`rounded-xl bg-surface text-muted-foreground hover:text-primary dark:hover:text-primary hover:bg-black/3 dark:hover:bg-white/4 ${className}`}
+      <PromptInputButton
+        className={cn(
+          'text-muted-foreground hover:bg-surface-raised hover:text-primary',
+          className,
+        )}
         title="Skills"
       >
-        <Puzzle className="h-5 w-5" />
-      </Button>
+        <Puzzle className="h-4 w-4" />
+      </PromptInputButton>
     </SkillsPopover>
   );
 };

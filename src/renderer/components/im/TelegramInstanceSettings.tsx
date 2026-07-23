@@ -102,7 +102,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
                 }
               }}
               autoFocus
-              className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent focus-visible:ring-0"
+              className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent"
             />
           ) : (
             <span

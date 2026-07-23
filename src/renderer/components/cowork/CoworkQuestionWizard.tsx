@@ -414,7 +414,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
                 value={otherInputs[currentStep] || ''}
                 onChange={e => handleOtherInputChange(e.target.value)}
                 placeholder={i18nService.t('coworkQuestionWizardOther')}
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground dark:placeholder:text-foregroundSecondary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors outline-none hover:ring-1 hover:ring-ring/40 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40 dark:placeholder:text-foregroundSecondary"
               />
               <Button variant="ghost" onClick={handleSkip}>
                 {i18nService.t('coworkQuestionWizardSkip')}

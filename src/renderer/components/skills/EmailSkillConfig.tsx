@@ -384,7 +384,7 @@ const EmailSkillConfig: React.FC<EmailSkillConfigProps> = ({ onClose }) => {
   const connectivityPassed = connectivityResult?.verdict === 'pass';
 
   const inputClassName =
-    'block w-full rounded-xl bg-surface-inset border-border border focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground px-3 py-2 text-xs';
+    'block w-full rounded-xl bg-surface-inset border-border border text-foreground px-3 py-2 text-xs';
   const labelClassName = 'block text-xs font-medium text-foreground mb-1';
 
   if (loading) {

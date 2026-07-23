@@ -10,7 +10,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { Separator } from '@shared/components/ui/separator';
 import { Check, Cog, Puzzle } from 'lucide-react';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
@@ -33,11 +33,35 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
   onManageSkills,
 }) => {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const skills = useSelector((state: RootState) => state.skill.skills);
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
 
-  // Filter enabled skills
-  const filteredSkills = skills.filter(s => s.enabled);
+  const enabledSkills = useMemo(
+    () =>
+      skills
+        .filter(skill => skill.enabled)
+        .map(skill => ({
+          skill,
+          localizedDescription: skillService.getLocalizedSkillDescription(
+            skill.id,
+            skill.name,
+            skill.description,
+          ),
+        })),
+    [skills],
+  );
+  const matchingSkills = useMemo(() => {
+    const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+    if (!normalizedSearchQuery) return enabledSkills;
+
+    return enabledSkills.filter(({ skill, localizedDescription }) =>
+      [skill.id, skill.name, localizedDescription]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(normalizedSearchQuery),
+    );
+  }, [enabledSkills, searchQuery]);
 
   const handleSelectSkill = useCallback(
     (skillId: string) => {
@@ -54,84 +78,96 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
     setOpen(false);
   }, [onManageSkills]);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setSearchQuery('');
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger nativeButton={false} render={children as React.ReactElement} />
       <PopoverContent
         side="top"
         align="start"
         sideOffset={4}
-        className="w-72 rounded-md! border-0! bg-surface! p-0 shadow-md ring-0! outline-none!"
+        className="w-72 rounded-md! border! border-border! bg-surface! p-0 shadow-md ring-0! outline-none!"
       >
         <Command
           shouldFilter={false}
-          className="rounded-md! bg-surface! **:data-[slot=input-group]:border-0! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none! **:data-[slot=input-group]:ring-0!"
+          className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none!"
         >
           <CommandInput
             placeholder={i18nService.t('searchSkills')}
-            className="bg-transparent focus:ring-0"
+            className="bg-transparent"
+            value={searchQuery}
+            onValueChange={setSearchQuery}
           />
           <CommandList className="max-h-64">
-            <CommandEmpty>{i18nService.t('noSkillsAvailable')}</CommandEmpty>
-            <CommandGroup>
-              {filteredSkills.map(skill => {
-                const isActive = activeSkillIds.includes(skill.id);
-                return (
-                  <CommandItem
-                    key={skill.id}
-                    value={skill.id}
-                    onSelect={() => handleSelectSkill(skill.id)}
-                    data-checked={isActive || undefined}
-                    className="flex items-start gap-3 px-3 py-2.5"
-                  >
-                    <div
-                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        isActive ? 'bg-primary text-white' : 'bg-muted'
-                      }`}
+            {matchingSkills.length === 0 ? (
+              <CommandEmpty>
+                {i18nService.t(searchQuery.trim() ? 'noMatchingSkills' : 'noSkillsAvailable')}
+              </CommandEmpty>
+            ) : (
+              <CommandGroup>
+                {matchingSkills.map(({ skill, localizedDescription }) => {
+                  const isActive = activeSkillIds.includes(skill.id);
+                  return (
+                    <CommandItem
+                      key={skill.id}
+                      value={`${skill.name} ${localizedDescription}`}
+                      onSelect={() => handleSelectSkill(skill.id)}
+                      data-checked={isActive || undefined}
+                      className="flex items-start gap-3 px-3 py-2.5"
                     >
-                      {isActive ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Puzzle className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-sm font-medium truncate ${
-                            isActive ? 'text-primary' : 'text-foreground'
-                          }`}
-                        >
-                          {skill.name}
-                        </span>
-                        {skill.isOfficial && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary shrink-0">
-                            {i18nService.t('official')}
-                          </span>
+                      <div
+                        className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                          isActive ? 'bg-primary text-white' : 'bg-muted'
+                        }`}
+                      >
+                        {isActive ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Puzzle className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {skillService.getLocalizedSkillDescription(
-                          skill.id,
-                          skill.name,
-                          skill.description,
-                        )}
-                      </p>
-                    </div>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-sm font-medium truncate ${
+                              isActive ? 'text-primary' : 'text-foreground'
+                            }`}
+                          >
+                            {skill.name}
+                          </span>
+                          {skill.isOfficial && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary shrink-0">
+                              {i18nService.t('official')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {localizedDescription}
+                        </p>
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
           </CommandList>
           <Separator />
-          <Button
-            variant="ghost"
-            onClick={handleManageSkills}
-            className="w-full flex items-center justify-between px-4 py-3 h-auto text-sm text-foreground hover:bg-muted transition-colors rounded-none rounded-b-xl"
-          >
-            <span>{i18nService.t('manageSkills')}</span>
-            <Cog className="h-4 w-4 text-muted-foreground" />
-          </Button>
+          <div className="p-1">
+            <Button
+              variant="ghost"
+              onClick={handleManageSkills}
+              className="w-full flex items-center justify-between rounded-md px-4 py-3 text-sm text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors"
+            >
+              <span>{i18nService.t('manageSkills')}</span>
+              <Cog className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

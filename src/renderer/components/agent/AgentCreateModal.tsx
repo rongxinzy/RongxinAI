@@ -369,7 +369,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-muted-foreground/45 focus-visible:ring-0"
+        className="min-h-0 flex-1 resize-none border-transparent bg-transparent text-sm leading-6 text-foreground placeholder:text-muted-foreground/45"
       />
     </div>
   );
@@ -401,7 +401,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                 onChange={e => setName(e.target.value)}
                 placeholder={i18nService.t('agentNamePlaceholder')}
                 aria-label={i18nService.t('agentName')}
-                className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0"
+                className="w-full border-0 bg-transparent text-lg font-semibold leading-6 text-foreground placeholder:text-muted-foreground/40"
                 autoFocus
               />
               <Input
@@ -410,7 +410,7 @@ const AgentCreateModal: React.FC<AgentCreateModalProps> = ({
                 onChange={e => setDescription(e.target.value)}
                 placeholder={i18nService.t('agentDescriptionPlaceholder')}
                 aria-label={i18nService.t('agentDescription')}
-                className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0"
+                className="mt-0.5 w-full border-0 bg-transparent text-sm leading-5 text-muted-foreground placeholder:text-muted-foreground/50"
               />
             </div>
           </div>

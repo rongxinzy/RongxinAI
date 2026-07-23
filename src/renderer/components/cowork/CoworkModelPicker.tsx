@@ -3,12 +3,14 @@ import {
 } from '@shared/components/ai-elements/model-selector';
 import {
   Command,
+  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
+import { useMemo, useState } from 'react';
 
 import { ProviderIcon } from '../../providers/uiRegistry';
 import { i18nService } from '../../services/i18n';
@@ -33,8 +35,29 @@ export function CoworkModelPicker({
   onOpenChange,
   onSelect,
 }: CoworkModelPickerProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const matchingModels = useMemo(() => {
+    const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+    if (!normalizedSearchQuery) return models;
+
+    return models.filter(model =>
+      [model.name, model.providerKey, model.provider]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(normalizedSearchQuery),
+    );
+  }, [models, searchQuery]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setSearchQuery('');
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         nativeButton={false}
         render={
@@ -53,30 +76,47 @@ export function CoworkModelPicker({
         }
       />
       <PopoverContent
-        className="w-72 p-0 bg-background border ring-0 rounded-md!"
+        className="w-72 rounded-md! border! border-border! bg-surface! p-0 shadow-md ring-0! outline-none!"
         side="top"
         align="start"
         sideOffset={4}
       >
-        <Command className="bg-background rounded-md! **:data-[slot=input-group]:bg-transparent **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground">
-          <CommandInput placeholder={i18nService.t('searchModels')} />
+        <Command
+          shouldFilter={false}
+          className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground"
+        >
+          <CommandInput
+            placeholder={i18nService.t('searchModels')}
+            className="bg-transparent"
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+          />
           <CommandList>
-            <CommandGroup heading={i18nService.t('serverModels')}>
-              {models.map(model => (
-                <CommandItem
-                  key={model.id}
-                  value={model.name}
-                  className="hover:bg-black/3 dark:hover:bg-white/4"
-                  onSelect={() => {
-                    onSelect(model);
-                    onOpenChange(false);
-                  }}
-                >
-                  <ModelProviderIcon provider={model.providerKey || model.provider || 'openai'} />
-                  <ModelSelectorName>{model.name}</ModelSelectorName>
+            {models.length === 0 ? (
+              <CommandGroup heading={i18nService.t('serverModels')}>
+                <CommandItem disabled value={i18nService.t('modelSelectorNone')}>
+                  {i18nService.t('modelSelectorNone')}
                 </CommandItem>
-              ))}
-            </CommandGroup>
+              </CommandGroup>
+            ) : matchingModels.length === 0 ? (
+              <CommandEmpty>{i18nService.t('modelSelectorNoMatches')}</CommandEmpty>
+            ) : (
+              <CommandGroup heading={i18nService.t('serverModels')}>
+                {matchingModels.map(model => (
+                  <CommandItem
+                    key={model.id}
+                    value={model.name}
+                    onSelect={() => {
+                      onSelect(model);
+                      handleOpenChange(false);
+                    }}
+                  >
+                    <ModelProviderIcon provider={model.providerKey || model.provider || 'openai'} />
+                    <ModelSelectorName>{model.name}</ModelSelectorName>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

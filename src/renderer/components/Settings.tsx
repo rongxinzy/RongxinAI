@@ -621,7 +621,7 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
       <SelectTrigger
         className="w-36 rounded-xl border dark:border-claude-darkBorder border-claude-border
           dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset dark:text-claude-darkText text-claude-text
-          px-3 py-1.5 text-sm focus:ring-1 focus:ring-claude-accent/30"
+          px-3 py-1.5 text-sm"
       >
         <SelectValue placeholder={currentLabel} />
       </SelectTrigger>
@@ -5488,7 +5488,7 @@ const Settings: React.FC<SettingsProps> = ({
                   onChange={event => setCoworkMemoryDraftText(event.target.value)}
                   placeholder={i18nService.t('coworkMemoryCrudTextPlaceholder')}
                   autoFocus
-                  className="min-h-[200px] w-full rounded-lg border px-3 py-2 text-sm border-border bg-surface text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="min-h-[200px] w-full rounded-lg border px-3 py-2 text-sm border-border bg-surface text-foreground"
                 />
               </div>
 

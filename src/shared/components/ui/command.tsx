@@ -65,7 +65,7 @@ function CommandInput({
         data-slot="command-input-group"
       >
         <CommandPrimitive.Input
-          data-slot="command-input"
+          data-slot="input-group-control"
           className={cn(
             'w-full text-sm outline-hidden bg-transparent disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-0 focus:border-0',
             className,
@@ -100,7 +100,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className={cn('py-6 text-center text-sm', className)}
+      className={cn('py-6 text-center text-sm text-muted-foreground', className)}
       {...props}
     />
   );

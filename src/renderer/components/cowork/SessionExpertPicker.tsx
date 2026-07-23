@@ -81,10 +81,10 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
           sideOffset={4}
           className="w-80 rounded-md! border-0! bg-surface! p-0 shadow-md ring-0! outline-none!"
         >
-          <Command className="rounded-md! bg-surface! **:data-[slot=input-group]:border-0! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none! **:data-[slot=input-group]:ring-0!">
+          <Command className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none!">
             <CommandInput
               placeholder={i18nService.t('searchSessionExperts')}
-              className="bg-transparent focus:ring-0"
+              className="bg-transparent"
             />
             <CommandList>
               <CommandEmpty>{i18nService.t('noSessionExperts')}</CommandEmpty>
