@@ -1,7 +1,0 @@
-name: PDF 文档
-description: 用于创建、填写、重新排版和校验 PDF 文档，并关注最终视觉质量。
-author: MiniMaxAI
-license: MIT
-version: 1.0.0
-category: document-processing
-skillmd: ./SKILL.md

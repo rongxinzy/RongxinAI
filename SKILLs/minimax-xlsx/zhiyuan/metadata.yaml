@@ -1,7 +1,0 @@
-name: Excel 表格
-description: 用于创建、读取、分析、编辑、格式化和校验 Excel 及其他表格文件。
-author: MiniMaxAI
-license: MIT
-version: 1.0.0
-category: productivity
-skillmd: ./SKILL.md

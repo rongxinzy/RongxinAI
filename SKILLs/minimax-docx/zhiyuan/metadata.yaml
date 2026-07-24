@@ -1,7 +1,0 @@
-name: Word 文档
-description: 用于创建、编辑、排版和校验专业 Word 文档，支持 Open XML 格式。
-author: MiniMaxAI
-license: MIT
-version: 1.0.0
-category: document-processing
-skillmd: ./SKILL.md
