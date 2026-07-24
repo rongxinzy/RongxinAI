@@ -4,6 +4,7 @@ import { Card, CardAction, CardHeader, CardTitle } from '@shared/components/ui/c
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { cn } from '@shared/lib/utils';
 import { Download, ExternalLink, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ComponentType } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
@@ -41,6 +42,9 @@ import { formatPullProgress } from '../utils/progress';
 import { InstallProgressBar } from './Common';
 
 const marketplaceCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal shadow-none';
+const marketplaceCardActionClassName =
+  'relative z-20 transition-[opacity,transform] duration-200 ease-out group-hover/card:translate-x-0 group-hover/card:opacity-100 group-hover/card:pointer-events-auto';
+const marketplaceCardHiddenActionClassName = 'pointer-events-none translate-x-1 opacity-0';
 
 const marketplaceModelIcons = {
   [ProviderName.Anthropic]: AnthropicIcon,
@@ -71,6 +75,10 @@ export function MarketplaceModelCard({
   onInstall: (model: MarketplaceModel) => Promise<void>;
 }) {
   const progress = getMarketplaceInstallProgress(installProgress, model);
+  const reduceMotion = useReducedMotion();
+  const motionTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const };
   const capabilities = getMarketplaceCapabilityTags(model);
   const publisher = getMarketplacePublisher(model.repoId);
   const displayName = getMarketplaceDisplayName(model.repoId);
@@ -86,119 +94,171 @@ export function MarketplaceModelCard({
   ];
 
   return (
-    <Card
-      size="sm"
-      className="relative h-full w-full border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 hover:border-border hover:bg-muted/20 hover:shadow-md"
+    <motion.div
+      className="relative h-full w-full"
+      whileHover={reduceMotion || progress ? undefined : { scale: 1.02, zIndex: 1 }}
+      transition={motionTransition}
     >
-      <CardHeader className="relative grid flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_1fr] gap-x-4 gap-y-1 p-4">
-        <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+      <Card
+        size="sm"
+        className="relative h-full w-full border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 hover:border-border hover:bg-muted/20 hover:shadow-md"
+      >
+        <CardHeader className="relative grid flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto_1fr] gap-x-4 gap-y-1 p-4">
+          <motion.div
+            className="col-start-1 row-start-1 flex min-w-0 items-center gap-2"
+            animate={
+              progress
+                ? { filter: 'blur(4px)', opacity: 0.45 }
+                : { filter: 'blur(0px)', opacity: 1 }
+            }
+            transition={motionTransition}
           >
-            <ModelIcon className="size-5" />
-          </span>
-          <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
-            {displayName}
-          </CardTitle>
-        </div>
-
-        {model.detailUrl ? (
-          <CardAction className="relative z-20 col-start-2 row-start-1 self-start justify-self-end">
-            <Button
-              type="button"
-              onClick={() => void openExternalUrl(model.detailUrl!)}
-              size="sm"
-              variant="outline"
+            <span
+              aria-hidden="true"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
             >
-              <ExternalLink data-icon="inline-start" />
-              {i18nService.t('marketplaceModelScopeLink')}
-            </Button>
-          </CardAction>
-        ) : null}
+              <ModelIcon className="size-5" />
+            </span>
+            <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
+              {displayName}
+            </CardTitle>
+          </motion.div>
 
-        {publisher ? (
-          <div
-            className={`col-start-1 row-start-2 truncate text-xs leading-4 ${localInferenceMutedTextClass}`}
-          >
-            {i18nService.t('marketplacePublisherLabel')}
-            {publisher}
-          </div>
-        ) : null}
-
-        <div className="col-start-1 row-start-3 flex min-w-0 self-end flex-wrap items-center gap-1.5 pr-1">
-          <HoverCard>
-            <HoverCardTrigger
-              delay={200}
-              closeDelay={100}
-              render={
-                <Badge
-                  variant="secondary"
-                  className={cn(marketplaceCardTagBaseClassName, 'cursor-default')}
-                >
-                  {i18nService.t('marketplaceDetails')}
-                </Badge>
-              }
-            />
-            <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
-              <div className="flex flex-col gap-2">
-                {details.map(item => (
-                  <MetadataRow
-                    key={item.label}
-                    label={item.label}
-                    value={item.value ?? i18nService.t('marketplaceMetadataUnavailable')}
-                  />
-                ))}
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-          {capabilities.map(capability => (
-            <Badge key={capability} variant="secondary" className={marketplaceCardTagBaseClassName}>
-              {capabilityLabel(capability)}
-            </Badge>
-          ))}
-        </div>
-
-        <CardAction className="relative z-20 col-start-2 row-start-3 self-end justify-self-end">
-          {installing ? (
-            <Button
-              type="button"
-              onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
-              size="sm"
-              variant="outline"
+          {model.detailUrl ? (
+            <CardAction
+              className={cn(
+                marketplaceCardActionClassName,
+                marketplaceCardHiddenActionClassName,
+                'col-start-2 row-start-1 self-start justify-self-end',
+              )}
             >
-              <X data-icon="inline-start" />
-              {i18nService.t('marketplaceCancelInstall')}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled={loading}
-              size="sm"
-              variant="outline"
-              onClick={() => void onInstall(model)}
-            >
-              <Download data-icon="inline-start" />
-              {i18nService.t('marketplaceInstall')}
-            </Button>
-          )}
-        </CardAction>
-
-        {progress ? (
-          <div className="absolute inset-y-4 left-4 z-10 flex w-2/3 items-center justify-center rounded-lg border border-border bg-card p-4">
-            <div className="w-full">
-              <div
-                className={`mb-1.5 flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}
+              <Button
+                type="button"
+                onClick={() => void openExternalUrl(model.detailUrl!)}
+                size="sm"
+                variant="outline"
               >
-                <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
-                {typeof progress.percent === 'number' ? <span>{progress.percent}%</span> : null}
-              </div>
-              <InstallProgressBar progress={progress} />
-            </div>
-          </div>
-        ) : null}
-      </CardHeader>
-    </Card>
+                <ExternalLink data-icon="inline-start" />
+                {i18nService.t('marketplaceModelScopeLink')}
+              </Button>
+            </CardAction>
+          ) : null}
+
+          {publisher ? (
+            <motion.div
+              className={`col-start-1 row-start-2 truncate text-xs leading-4 ${localInferenceMutedTextClass}`}
+              animate={
+                progress
+                  ? { filter: 'blur(4px)', opacity: 0.45 }
+                  : { filter: 'blur(0px)', opacity: 1 }
+              }
+              transition={motionTransition}
+            >
+              {i18nService.t('marketplacePublisherLabel')}
+              {publisher}
+            </motion.div>
+          ) : null}
+
+          <motion.div
+            className="col-start-1 row-start-3 flex min-w-0 self-end flex-wrap items-center gap-1.5 pr-1"
+            animate={
+              progress
+                ? { filter: 'blur(4px)', opacity: 0.45 }
+                : { filter: 'blur(0px)', opacity: 1 }
+            }
+            transition={motionTransition}
+          >
+            <HoverCard>
+              <HoverCardTrigger
+                delay={200}
+                closeDelay={100}
+                render={
+                  <Badge
+                    variant="secondary"
+                    className={cn(marketplaceCardTagBaseClassName, 'cursor-default')}
+                  >
+                    {i18nService.t('marketplaceDetails')}
+                  </Badge>
+                }
+              />
+              <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
+                <div className="flex flex-col gap-2">
+                  {details.map(item => (
+                    <MetadataRow
+                      key={item.label}
+                      label={item.label}
+                      value={item.value ?? i18nService.t('marketplaceMetadataUnavailable')}
+                    />
+                  ))}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+            {capabilities.map(capability => (
+              <Badge
+                key={capability}
+                variant="secondary"
+                className={marketplaceCardTagBaseClassName}
+              >
+                {capabilityLabel(capability)}
+              </Badge>
+            ))}
+          </motion.div>
+
+          <CardAction
+            className={cn(
+              marketplaceCardActionClassName,
+              !installing && marketplaceCardHiddenActionClassName,
+              'col-start-2 row-start-3 self-end justify-self-end',
+            )}
+          >
+            {installing ? (
+              <Button
+                type="button"
+                onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
+                size="sm"
+                variant="outline"
+              >
+                <X data-icon="inline-start" />
+                {i18nService.t('marketplaceCancelInstall')}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={loading}
+                size="sm"
+                variant="outline"
+                onClick={() => void onInstall(model)}
+              >
+                <Download data-icon="inline-start" />
+                {i18nService.t('marketplaceInstall')}
+              </Button>
+            )}
+          </CardAction>
+
+          <AnimatePresence initial={false}>
+            {progress ? (
+              <motion.div
+                initial={{ filter: 'blur(4px)', opacity: 0, y: 6 }}
+                animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+                exit={{ filter: 'blur(4px)', opacity: 0, y: -6 }}
+                transition={motionTransition}
+                className="pointer-events-none absolute inset-y-4 left-4 z-10 flex w-2/3 items-center justify-center"
+              >
+                <div className="w-full">
+                  <div
+                    className={`mb-1.5 flex items-center justify-between gap-2 text-[11px] ${localInferenceMutedTextClass}`}
+                  >
+                    <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
+                    {typeof progress.percent === 'number' ? <span>{progress.percent}%</span> : null}
+                  </div>
+                  <InstallProgressBar progress={progress} />
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </CardHeader>
+      </Card>
+    </motion.div>
   );
 }
 
