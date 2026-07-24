@@ -19,7 +19,14 @@ import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { FolderOpen, Link, Pencil, PlusCircle, Search, Upload, XCircle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
-import { isSkillTab, SkillTab } from './constants';
+import {
+  isSkillCategory,
+  isSkillTab,
+  skillCategories,
+  SkillCategory,
+  SkillCategoryTranslationKey,
+  SkillTab,
+} from './constants';
 
 interface SkillsPageToolbarProps {
   activeTab: SkillTab;
@@ -28,6 +35,8 @@ interface SkillsPageToolbarProps {
   isAddMenuOpen: boolean;
   isDownloading: boolean;
   onTabChange: (tab: SkillTab) => void;
+  category: SkillCategory;
+  onCategoryChange: (category: SkillCategory) => void;
   onSearchQueryChange: (value: string) => void;
   onClearSearch: () => void;
   onAddMenuOpenChange: (open: boolean) => void;
@@ -44,6 +53,8 @@ export function SkillsPageToolbar({
   isAddMenuOpen,
   isDownloading,
   onTabChange,
+  category,
+  onCategoryChange,
   onSearchQueryChange,
   onClearSearch,
   onAddMenuOpenChange,
@@ -78,61 +89,81 @@ export function SkillsPageToolbar({
         </Tabs>
       </div>
 
-      {isMarketplace && (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <InputGroup>
-            <InputGroupInput
-              type="search"
-              placeholder={i18nService.t('searchSkills')}
-              value={searchQuery}
-              onChange={event => onSearchQueryChange(event.target.value)}
-              aria-label={i18nService.t('searchSkills')}
-            />
-            <InputGroupAddon>
-              <Search />
-            </InputGroupAddon>
-            {searchQuery && (
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton
-                  size="icon-xs"
-                  aria-label={i18nService.t('clear')}
-                  onClick={onClearSearch}
-                >
-                  <XCircle />
-                </InputGroupButton>
-              </InputGroupAddon>
-            )}
-          </InputGroup>
+      {!isMarketplace && (
+        <Tabs
+          value={category}
+          onValueChange={value => {
+            if (isSkillCategory(value)) onCategoryChange(value);
+          }}
+          className="w-full overflow-x-auto"
+        >
+          <TabsList className="w-max min-w-full justify-start">
+            {skillCategories.map(item => (
+              <TabsTrigger key={item} value={item}>
+                {i18nService.t(SkillCategoryTranslationKey[item])}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
 
-          <DropdownMenu open={isAddMenuOpen} onOpenChange={onAddMenuOpenChange}>
-            <DropdownMenuTrigger render={<Button type="button" variant="outline" />}>
-              <PlusCircle data-icon="inline-start" />
-              {i18nService.t('addSkill')}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-64">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{i18nService.t('addSkillSecurityTip')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onUploadZip} disabled={isDownloading}>
-                  <Upload />
-                  {i18nService.t('uploadSkillZip')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onUploadFolder} disabled={isDownloading}>
-                  <FolderOpen />
-                  {i18nService.t('uploadSkillFolder')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onOpenRemoteImport} disabled={isDownloading}>
-                  <Link />
-                  {i18nService.t('remoteImport')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onCreateByChat} disabled={isDownloading}>
-                  <Pencil />
-                  {i18nService.t('createSkillByChat')}
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      {isMarketplace && (
+        <>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <InputGroup>
+              <InputGroupInput
+                type="search"
+                placeholder={i18nService.t('searchSkills')}
+                value={searchQuery}
+                onChange={event => onSearchQueryChange(event.target.value)}
+                aria-label={i18nService.t('searchSkills')}
+              />
+              <InputGroupAddon>
+                <Search />
+              </InputGroupAddon>
+              {searchQuery && (
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    size="icon-xs"
+                    aria-label={i18nService.t('clear')}
+                    onClick={onClearSearch}
+                  >
+                    <XCircle />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              )}
+            </InputGroup>
+
+            <DropdownMenu open={isAddMenuOpen} onOpenChange={onAddMenuOpenChange}>
+              <DropdownMenuTrigger render={<Button type="button" variant="outline" />}>
+                <PlusCircle data-icon="inline-start" />
+                {i18nService.t('addSkill')}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-64">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>{i18nService.t('addSkillSecurityTip')}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onUploadZip} disabled={isDownloading}>
+                    <Upload />
+                    {i18nService.t('uploadSkillZip')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onUploadFolder} disabled={isDownloading}>
+                    <FolderOpen />
+                    {i18nService.t('uploadSkillFolder')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onOpenRemoteImport} disabled={isDownloading}>
+                    <Link />
+                    {i18nService.t('remoteImport')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onCreateByChat} disabled={isDownloading}>
+                    <Pencil />
+                    {i18nService.t('createSkillByChat')}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </>
       )}
     </div>
   );

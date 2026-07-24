@@ -16,7 +16,7 @@ import { setSkills } from '../../store/slices/skillSlice';
 import { MarketplaceSkill, Skill } from '../../types/skill';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
-import { SkillTab, SkillToolbarPlacement } from './constants';
+import { getSkillCategory, SkillCategory, SkillTab, SkillToolbarPlacement } from './constants';
 import type { SkillToolbarPlacement as SkillToolbarPlacementType } from './constants';
 import { InstalledSkillGrid } from './InstalledSkillGrid';
 import { MarketplaceSkillGrid } from './MarketplaceSkillGrid';
@@ -54,6 +54,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   const [isAddSkillMenuOpen, setIsAddSkillMenuOpen] = useState(false);
   const [isRemoteImportOpen, setIsRemoteImportOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<SkillTab>(SkillTab.Installed);
+  const [skillCategory, setSkillCategory] = useState<SkillCategory>(SkillCategory.All);
   const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
   const [marketplaceNextPageNumber, setMarketplaceNextPageNumber] = useState(
     MARKETPLACE_NEXT_PAGE_NUMBER,
@@ -201,6 +202,13 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   // The installed tab contains every locally installed skill. Enabled state
   // controls runtime availability, not whether the card is listed.
   const installedSkills = skills;
+  const filteredInstalledSkills = useMemo(
+    () =>
+      skillCategory === SkillCategory.All
+        ? installedSkills
+        : installedSkills.filter(skill => getSkillCategory(skill.id) === skillCategory),
+    [installedSkills, skillCategory],
+  );
   const toggleInstalledSelection = (skillId: string) => {
     setSelectedInstalledIds(current => {
       const next = new Set(current);
@@ -552,6 +560,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         >
           <SkillsPageToolbar
             activeTab={activeTab}
+            category={skillCategory}
+            onCategoryChange={setSkillCategory}
             installedCount={installedSkills.length}
             searchQuery={skillSearchQuery}
             isAddMenuOpen={isAddSkillMenuOpen}
@@ -656,7 +666,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 )}
               </div>
               <InstalledSkillGrid
-                skills={installedSkills}
+                skills={filteredInstalledSkills}
                 readOnly={readOnly}
                 onSelect={setSelectedSkill}
                 onToggle={handleToggleSkill}
