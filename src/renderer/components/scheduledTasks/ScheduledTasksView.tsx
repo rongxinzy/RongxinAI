@@ -7,11 +7,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { LayeredTabsList, LayeredTabsSeparatorEdge } from '@shared/components/ui/layered-tabs';
-import { Tabs, TabsContent } from '@shared/components/ui/tabs';
+import {
+  LayeredTabsContent,
+  LayeredTabsList,
+  LayeredTabsSeparatorEdge,
+} from '@shared/components/ui/layered-tabs';
+import { Tabs } from '@shared/components/ui/tabs';
 import { Spinner } from '@shared/components/ui/spinner';
 import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -48,21 +51,6 @@ const SCHEDULED_TASK_TAB_ORDER: TabType[] = [
   SCHEDULED_TASK_TAB.Tasks,
   SCHEDULED_TASK_TAB.History,
 ];
-const tabContentVariants = {
-  enter: (direction: number) => ({
-    opacity: 0,
-    x: direction > 0 ? 28 : -28,
-  }),
-  center: {
-    opacity: 1,
-    x: 0,
-  },
-  exit: (direction: number) => ({
-    opacity: 0,
-    x: direction > 0 ? -28 : 28,
-  }),
-};
-
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -79,7 +67,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(SCHEDULED_TASK_TAB.Tasks);
   const [tabDirection, setTabDirection] = useState(1);
-  const prefersReducedMotion = useReducedMotion();
   const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
   const isFormDirtyRef = useRef(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -274,125 +261,77 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
         <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4">
           <div className="min-h-0 flex-1 overflow-hidden">
-            <TabsContent
+            <LayeredTabsContent
               value={SCHEDULED_TASK_TAB.Create}
-              keepMounted
+              activeValue={activeTab}
+              direction={tabDirection}
               className="h-full min-h-0 overflow-hidden"
+              contentClassName="h-full min-h-0 overflow-y-auto pt-4"
             >
-              <AnimatePresence initial={false} custom={tabDirection} mode="wait">
-                {activeTab === SCHEDULED_TASK_TAB.Create && (
-                  <motion.div
-                    key={SCHEDULED_TASK_TAB.Create}
-                    custom={tabDirection}
-                    variants={tabContentVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{
-                      duration: prefersReducedMotion ? 0 : 0.22,
-                      ease: 'easeOut',
+              <div className="w-full px-4">
+                {creatingTask ? (
+                  <TaskForm
+                    key={createFormKey}
+                    mode="create"
+                    prefill={templatePrefill}
+                    onCancel={() => {
+                      setCreatingTask(false);
+                      setTemplatePrefill(undefined);
+                      isFormDirtyRef.current = false;
                     }}
-                    className="h-full min-h-0 overflow-y-auto pt-4"
-                  >
-                    <div className="w-full px-4">
-                      {creatingTask ? (
-                        <TaskForm
-                          key={createFormKey}
-                          mode="create"
-                          prefill={templatePrefill}
-                          onCancel={() => {
-                            setCreatingTask(false);
-                            setTemplatePrefill(undefined);
-                            isFormDirtyRef.current = false;
-                          }}
-                          onSaved={handleCreateSaved}
-                          onDirtyChange={handleFormDirtyChange}
-                        />
-                      ) : (
-                        <TaskTemplateGallery
-                          onSelectTemplate={values => {
-                            setTemplatePrefill(values);
-                            setCreatingTask(true);
-                          }}
-                          onCustom={() => {
-                            setTemplatePrefill(undefined);
-                            setCreatingTask(true);
-                          }}
-                        />
-                      )}
-                    </div>
-                  </motion.div>
+                    onSaved={handleCreateSaved}
+                    onDirtyChange={handleFormDirtyChange}
+                  />
+                ) : (
+                  <TaskTemplateGallery
+                    onSelectTemplate={values => {
+                      setTemplatePrefill(values);
+                      setCreatingTask(true);
+                    }}
+                    onCustom={() => {
+                      setTemplatePrefill(undefined);
+                      setCreatingTask(true);
+                    }}
+                  />
                 )}
-              </AnimatePresence>
-            </TabsContent>
+              </div>
+            </LayeredTabsContent>
 
-            <TabsContent
+            <LayeredTabsContent
               value={SCHEDULED_TASK_TAB.Tasks}
-              keepMounted
+              activeValue={activeTab}
+              direction={tabDirection}
               className="h-full min-h-0 overflow-hidden"
+              contentClassName="h-full min-h-0 overflow-y-auto pt-4"
             >
-              <AnimatePresence initial={false} custom={tabDirection} mode="wait">
-                {activeTab === SCHEDULED_TASK_TAB.Tasks && (
-                  <motion.div
-                    key={SCHEDULED_TASK_TAB.Tasks}
-                    custom={tabDirection}
-                    variants={tabContentVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{
-                      duration: prefersReducedMotion ? 0 : 0.22,
-                      ease: 'easeOut',
-                    }}
-                    className="h-full min-h-0 overflow-y-auto pt-4"
-                  >
-                    <div className="w-full px-4">
-                      {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
-                      {viewMode === 'edit' && selectedTask && (
-                        <TaskForm
-                          mode="edit"
-                          task={selectedTask}
-                          onCancel={handleEditCancel}
-                          onSaved={() => dispatch(setViewMode('detail'))}
-                          onDirtyChange={handleFormDirtyChange}
-                        />
-                      )}
-                      {viewMode === 'detail' && selectedTask && (
-                        <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
-                      )}
-                    </div>
-                  </motion.div>
+              <div className="w-full px-4">
+                {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
+                {viewMode === 'edit' && selectedTask && (
+                  <TaskForm
+                    mode="edit"
+                    task={selectedTask}
+                    onCancel={handleEditCancel}
+                    onSaved={() => dispatch(setViewMode('detail'))}
+                    onDirtyChange={handleFormDirtyChange}
+                  />
                 )}
-              </AnimatePresence>
-            </TabsContent>
+                {viewMode === 'detail' && selectedTask && (
+                  <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
+                )}
+              </div>
+            </LayeredTabsContent>
 
-            <TabsContent
+            <LayeredTabsContent
               value={SCHEDULED_TASK_TAB.History}
-              keepMounted
+              activeValue={activeTab}
+              direction={tabDirection}
               className="h-full min-h-0 overflow-hidden"
+              contentClassName="h-full min-h-0 overflow-y-auto pt-4"
             >
-              <AnimatePresence initial={false} custom={tabDirection} mode="wait">
-                {activeTab === SCHEDULED_TASK_TAB.History && (
-                  <motion.div
-                    key={SCHEDULED_TASK_TAB.History}
-                    custom={tabDirection}
-                    variants={tabContentVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{
-                      duration: prefersReducedMotion ? 0 : 0.22,
-                      ease: 'easeOut',
-                    }}
-                    className="h-full min-h-0 overflow-y-auto pt-4"
-                  >
-                    <div className="w-full px-4">
-                      <AllRunsHistory />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+              <div className="w-full px-4">
+                <AllRunsHistory />
+              </div>
+            </LayeredTabsContent>
           </div>
         </div>
       </Tabs>

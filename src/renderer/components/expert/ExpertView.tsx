@@ -1,6 +1,10 @@
 import { Button } from '@shared/components/ui/button';
-import { LayeredTabsList, LayeredTabsSeparatorEdge } from '@shared/components/ui/layered-tabs';
-import { Tabs, TabsContent } from '@shared/components/ui/tabs';
+import {
+  LayeredTabsContent,
+  LayeredTabsList,
+  LayeredTabsSeparatorEdge,
+} from '@shared/components/ui/layered-tabs';
+import { Tabs } from '@shared/components/ui/tabs';
 import { PanelLeft, Pencil } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -27,6 +31,8 @@ const EXPERT_TAB = {
 
 type ExpertTab = (typeof EXPERT_TAB)[keyof typeof EXPERT_TAB];
 
+const EXPERT_TAB_ORDER: ExpertTab[] = [EXPERT_TAB.Experts, EXPERT_TAB.Skills, EXPERT_TAB.Mcp];
+
 const ExpertView: React.FC<ExpertViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -37,11 +43,21 @@ const ExpertView: React.FC<ExpertViewProps> = ({
 }) => {
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<ExpertTab>(EXPERT_TAB.Experts);
+  const [tabDirection, setTabDirection] = useState(1);
   const expertTabs = [
     { value: EXPERT_TAB.Experts, label: i18nService.t('expert') },
     { value: EXPERT_TAB.Skills, label: i18nService.t('skills') },
     { value: EXPERT_TAB.Mcp, label: i18nService.t('mcpServers') },
   ] as const;
+
+  const handleTabChange = (value: string) => {
+    const nextTab = value as ExpertTab;
+    if (nextTab === activeTab) return;
+    setTabDirection(
+      EXPERT_TAB_ORDER.indexOf(nextTab) >= EXPERT_TAB_ORDER.indexOf(activeTab) ? 1 : -1,
+    );
+    setActiveTab(nextTab);
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
@@ -65,9 +81,9 @@ const ExpertView: React.FC<ExpertViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={value => setActiveTab(value as ExpertTab)}
+        <Tabs
+          value={activeTab}
+          onValueChange={handleTabChange}
         className="min-h-0 flex-1 flex-col gap-0"
       >
         <LayeredTabsList
@@ -77,20 +93,35 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           className="pb-4"
         />
 
-        <TabsContent
+        <LayeredTabsContent
           value={EXPERT_TAB.Experts}
+          activeValue={activeTab}
+          direction={tabDirection}
           className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
+          contentClassName="h-full"
         >
           <PresetExpertList />
-        </TabsContent>
+        </LayeredTabsContent>
 
-        <TabsContent value={EXPERT_TAB.Skills} className="min-h-0 flex-1 overflow-hidden px-6 py-4">
+        <LayeredTabsContent
+          value={EXPERT_TAB.Skills}
+          activeValue={activeTab}
+          direction={tabDirection}
+          className="min-h-0 flex-1 overflow-hidden px-6 py-4"
+          contentClassName="h-full"
+        >
           <SkillsManager readOnly={readOnly} onCreateByChat={onCreateSkillByChat} />
-        </TabsContent>
+        </LayeredTabsContent>
 
-        <TabsContent value={EXPERT_TAB.Mcp} className="min-h-0 flex-1 overflow-hidden px-6 py-4">
+        <LayeredTabsContent
+          value={EXPERT_TAB.Mcp}
+          activeValue={activeTab}
+          direction={tabDirection}
+          className="min-h-0 flex-1 overflow-hidden px-6 py-4"
+          contentClassName="h-full"
+        >
           <McpManager />
-        </TabsContent>
+        </LayeredTabsContent>
       </Tabs>
     </div>
   );
