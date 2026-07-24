@@ -1,4 +1,3 @@
-import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import {
@@ -162,9 +161,6 @@ export function InstalledSkillGrid({
               {skill.displayDescription ||
                 skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}
             </CardDescription>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {skill.isOfficial && <Badge variant="secondary">{i18nService.t('official')}</Badge>}
-            </div>
           </CardContent>
         </Card>
       ))}

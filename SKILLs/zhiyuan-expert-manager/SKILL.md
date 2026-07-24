@@ -5,7 +5,6 @@ description: |
   Helps users create, validate, and register single agents or multi-agent teams
   as ZhiYuan Agent Agent entries. Trigger words: 创建专家、创建专家团、导入专家、
   生成专家包、expert manager、new expert.
-official: true
 ---
 
 # ZhiYuan Agent 专家管理器
