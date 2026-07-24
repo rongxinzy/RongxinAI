@@ -1,7 +1,4 @@
-import {
-  LayeredTabsList,
-  LayeredTabsSeparatorEdge,
-} from '@shared/components/ui/layered-tabs';
+import { LayeredTabsList, LayeredTabsSeparatorEdge } from '@shared/components/ui/layered-tabs';
 
 import { i18nService } from '../../../services/i18n';
 import type { LocalInferenceTab } from '../types';
@@ -16,20 +13,22 @@ const tabOptions: Array<{
 
 export function LocalInferenceTabSelector({
   activeTab,
+  isVisible = true,
 }: {
   activeTab: LocalInferenceTab;
+  isVisible?: boolean;
 }) {
   return (
     <LayeredTabsList
+      key={isVisible ? 'visible' : 'hidden'}
       value={activeTab}
-      className="gap-0"
+      className="relative z-10 -mt-px gap-0"
       items={tabOptions.map(tab => ({
         value: tab.value,
         label: i18nService.t(tab.labelKey),
       }))}
       separatorEdge={LayeredTabsSeparatorEdge.Top}
-      contentClassName="mx-0 w-auto"
-      listClassName="w-72"
+      showSeparator={false}
     />
   );
 }

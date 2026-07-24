@@ -64,6 +64,7 @@ import {
 
 interface LocalInferenceViewProps {
   isSidebarCollapsed?: boolean;
+  isVisible?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
@@ -84,6 +85,7 @@ let cachedStatus: OllamaStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   isSidebarCollapsed,
+  isVisible = true,
   onToggleSidebar,
   onNewChat,
   updateBadge,
@@ -657,6 +659,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   return (
     <div className="relative flex h-full flex-1 flex-col bg-background">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="flex h-full min-h-0 flex-1 flex-col gap-0"
+      >
       <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
         <div className="flex items-center space-x-3 h-8">
           {isSidebarCollapsed && (
@@ -684,51 +691,42 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
         <WindowTitleBar inline />
       </div>
+      <LocalInferenceTabSelector activeTab={activeTab} isVisible={isVisible} />
       {toast && (
         <div className="pointer-events-none absolute right-4 top-16 z-30 flex w-[min(24rem,calc(100%-2rem))] justify-end">
           <LocalInferenceToastView toast={toast} onClose={dismissToast} />
         </div>
       )}
-      <Tabs
-        value={activeTab}
-        onValueChange={handleTabChange}
-        className="flex min-h-0 flex-1 flex-col gap-0"
-      >
         <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
           <div className="w-full space-y-4 px-6 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <LocalInferenceTabSelector activeTab={activeTab} />
-              <div className="flex flex-wrap items-center gap-2">
-                {activeTab === 'models' ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      data-local-inference-toolbar-button="true"
-                      onClick={openAccessSettings}
-                    >
-                      <Globe data-icon="inline-start" />
-                      {i18nService.t('localInferenceAccessSettings')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      data-local-inference-toolbar-button="true"
-                      onClick={() => {
-                        setDraftModelsDir(modelsDir);
-                        setLibrarySettingsOpen(true);
-                      }}
-                    >
-                      <Settings2 data-icon="inline-start" />
-                      {i18nService.t('localInferenceLibrarySettings')}
-                    </Button>
-                  </>
-                ) : null}
+            {activeTab === 'models' ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-local-inference-toolbar-button="true"
+                  onClick={openAccessSettings}
+                >
+                  <Globe data-icon="inline-start" />
+                  {i18nService.t('localInferenceAccessSettings')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-local-inference-toolbar-button="true"
+                  onClick={() => {
+                    setDraftModelsDir(modelsDir);
+                    setLibrarySettingsOpen(true);
+                  }}
+                >
+                  <Settings2 data-icon="inline-start" />
+                  {i18nService.t('localInferenceLibrarySettings')}
+                </Button>
               </div>
-            </div>
+            ) : null}
 
             <LayeredTabsContent
               value="models"
