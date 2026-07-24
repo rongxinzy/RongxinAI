@@ -274,22 +274,26 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
         <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4">
           <div className="min-h-0 flex-1 overflow-hidden">
-            <TabsContent value={activeTab} keepMounted className="h-full min-h-0 overflow-hidden">
+            <TabsContent
+              value={SCHEDULED_TASK_TAB.Create}
+              keepMounted
+              className="h-full min-h-0 overflow-hidden"
+            >
               <AnimatePresence initial={false} custom={tabDirection} mode="wait">
-                <motion.div
-                  key={activeTab}
-                  custom={tabDirection}
-                  variants={tabContentVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    duration: prefersReducedMotion ? 0 : 0.22,
-                    ease: 'easeOut',
-                  }}
-                  className="h-full min-h-0 overflow-y-auto pt-4"
-                >
-                  {activeTab === SCHEDULED_TASK_TAB.Create && (
+                {activeTab === SCHEDULED_TASK_TAB.Create && (
+                  <motion.div
+                    key={SCHEDULED_TASK_TAB.Create}
+                    custom={tabDirection}
+                    variants={tabContentVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      duration: prefersReducedMotion ? 0 : 0.22,
+                      ease: 'easeOut',
+                    }}
+                    className="h-full min-h-0 overflow-y-auto pt-4"
+                  >
                     <div className="w-full px-4">
                       {creatingTask ? (
                         <TaskForm
@@ -317,9 +321,31 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                         />
                       )}
                     </div>
-                  )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </TabsContent>
 
-                  {activeTab === SCHEDULED_TASK_TAB.Tasks && (
+            <TabsContent
+              value={SCHEDULED_TASK_TAB.Tasks}
+              keepMounted
+              className="h-full min-h-0 overflow-hidden"
+            >
+              <AnimatePresence initial={false} custom={tabDirection} mode="wait">
+                {activeTab === SCHEDULED_TASK_TAB.Tasks && (
+                  <motion.div
+                    key={SCHEDULED_TASK_TAB.Tasks}
+                    custom={tabDirection}
+                    variants={tabContentVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      duration: prefersReducedMotion ? 0 : 0.22,
+                      ease: 'easeOut',
+                    }}
+                    className="h-full min-h-0 overflow-y-auto pt-4"
+                  >
                     <div className="w-full px-4">
                       {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
                       {viewMode === 'edit' && selectedTask && (
@@ -335,14 +361,36 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                         <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
                       )}
                     </div>
-                  )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </TabsContent>
 
-                  {activeTab === SCHEDULED_TASK_TAB.History && (
+            <TabsContent
+              value={SCHEDULED_TASK_TAB.History}
+              keepMounted
+              className="h-full min-h-0 overflow-hidden"
+            >
+              <AnimatePresence initial={false} custom={tabDirection} mode="wait">
+                {activeTab === SCHEDULED_TASK_TAB.History && (
+                  <motion.div
+                    key={SCHEDULED_TASK_TAB.History}
+                    custom={tabDirection}
+                    variants={tabContentVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      duration: prefersReducedMotion ? 0 : 0.22,
+                      ease: 'easeOut',
+                    }}
+                    className="h-full min-h-0 overflow-y-auto pt-4"
+                  >
                     <div className="w-full px-4">
                       <AllRunsHistory />
                     </div>
-                  )}
-                </motion.div>
+                  </motion.div>
+                )}
               </AnimatePresence>
             </TabsContent>
           </div>
