@@ -34,6 +34,7 @@ import {
   StoreIpc,
   WindowIpc,
 } from '../shared/ipc/channels';
+import type { CoworkSessionMode } from '../shared/cowork/constants';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
@@ -431,6 +432,7 @@ contextBridge.exposeInMainWorld('electron', {
       offset?: number;
       agentId?: string;
       workspaceId?: string;
+      mode?: CoworkSessionMode;
     }) => ipcRenderer.invoke(CoworkSessionIpc.List, options),
     getSessionMessages: (options: { sessionId: string; limit?: number; offset?: number }) =>
       ipcRenderer.invoke(CoworkSessionIpc.GetMessages, options),

@@ -7,7 +7,12 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 import { normalizeAgentAvatarIcon } from '../shared/agent/avatar';
-import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
+import {
+  COWORK_MESSAGE_PAGE_SIZE,
+  COWORK_SESSION_PAGE_SIZE,
+  CoworkSessionMode,
+  type CoworkSessionMode as CoworkSessionModeType,
+} from '../shared/cowork/constants';
 import type {
   CoworkSessionExpertInput,
   CoworkSessionExpertSnapshot,
@@ -1033,22 +1038,25 @@ export class CoworkStore {
     return pinOrder;
   }
 
-  countSessions(agentId?: string, workspaceId?: string): number {
+  countSessions(agentId?: string, workspaceId?: string, mode?: CoworkSessionModeType): number {
+    const filters: string[] = [];
+    const params: string[] = [];
     if (workspaceId) {
-      const row = this.db
-        .prepare('SELECT COUNT(*) as count FROM cowork_sessions WHERE workspace_id = ?')
-        .get(workspaceId) as { count: number } | undefined;
-      return row?.count || 0;
+      filters.push('workspace_id = ?');
+      params.push(workspaceId);
+    } else if (agentId) {
+      filters.push('agent_id = ?');
+      params.push(agentId);
     }
-    if (agentId) {
-      const row = this.db
-        .prepare('SELECT COUNT(*) as count FROM cowork_sessions WHERE agent_id = ?')
-        .get(agentId) as { count: number } | undefined;
-      return row?.count || 0;
+    if (mode) {
+      filters.push('mode = ?');
+      params.push(mode);
     }
-    const row = this.db.prepare('SELECT COUNT(*) as count FROM cowork_sessions').get() as
-      | { count: number }
-      | undefined;
+
+    const whereClause = filters.length > 0 ? ` WHERE ${filters.join(' AND ')}` : '';
+    const row = this.db
+      .prepare(`SELECT COUNT(*) as count FROM cowork_sessions${whereClause}`)
+      .get(...params) as { count: number } | undefined;
     return row?.count || 0;
   }
 
@@ -1057,6 +1065,7 @@ export class CoworkStore {
     offset = 0,
     agentId?: string,
     workspaceId?: string,
+    mode?: CoworkSessionModeType,
   ): CoworkSessionSummary[] {
     interface SessionSummaryRow {
       id: string;
@@ -1072,55 +1081,40 @@ export class CoworkStore {
       updated_at: number;
     }
 
-    let rows: SessionSummaryRow[];
+    const filters: string[] = [];
+    const params: Array<string | number> = [];
     if (workspaceId) {
-      rows = this.getAll<SessionSummaryRow>(
-        `
-        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
-        FROM cowork_sessions
-        WHERE workspace_id = ?
-        ORDER BY pinned DESC,
-          CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
-          CASE WHEN pinned = 0 THEN updated_at END DESC,
-          updated_at DESC
-        LIMIT ? OFFSET ?
-      `,
-        [workspaceId, limit, offset],
-      );
+      filters.push('workspace_id = ?');
+      params.push(workspaceId);
     } else if (agentId) {
-      rows = this.getAll<SessionSummaryRow>(
-        `
-        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
-        FROM cowork_sessions
-        WHERE agent_id = ?
-        ORDER BY pinned DESC,
-          CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
-          CASE WHEN pinned = 0 THEN updated_at END DESC,
-          updated_at DESC
-        LIMIT ? OFFSET ?
-      `,
-        [agentId, limit, offset],
-      );
-    } else {
-      rows = this.getAll<SessionSummaryRow>(
-        `
-        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
-        FROM cowork_sessions
-        ORDER BY pinned DESC,
-          CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
-          CASE WHEN pinned = 0 THEN updated_at END DESC,
-          updated_at DESC
-        LIMIT ? OFFSET ?
-      `,
-        [limit, offset],
-      );
+      filters.push('agent_id = ?');
+      params.push(agentId);
     }
+    if (mode) {
+      filters.push('mode = ?');
+      params.push(mode);
+    }
+
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+    const rows = this.getAll<SessionSummaryRow>(
+      `
+        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
+        FROM cowork_sessions
+        ${whereClause}
+        ORDER BY pinned DESC,
+          CASE WHEN pinned = 1 THEN COALESCE(pin_order, updated_at, created_at) END ASC,
+          CASE WHEN pinned = 0 THEN updated_at END DESC,
+          updated_at DESC
+        LIMIT ? OFFSET ?
+      `,
+      [...params, limit, offset],
+    );
 
     return rows.map(row => ({
       id: row.id,
       title: row.title,
       status: row.status as CoworkSessionStatus,
-      mode: (row.mode as 'work' | 'chat') || 'work',
+      mode: (row.mode as CoworkSessionModeType) || CoworkSessionMode.Work,
       pinned: Boolean(row.pinned),
       pinOrder: row.pin_order ?? null,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
@@ -1296,12 +1290,14 @@ export class CoworkStore {
       .get(message.id, sessionId) as { sequence: number } | undefined;
     const sequence =
       existing?.sequence ??
-      ((this.db
-        .prepare(
-          'SELECT COALESCE(MAX(sequence), 0) + 1 as next_seq FROM cowork_messages WHERE session_id = ?',
-        )
-        .get(sessionId) as { next_seq: number } | undefined)?.next_seq ??
-        1);
+      (
+        this.db
+          .prepare(
+            'SELECT COALESCE(MAX(sequence), 0) + 1 as next_seq FROM cowork_messages WHERE session_id = ?',
+          )
+          .get(sessionId) as { next_seq: number } | undefined
+      )?.next_seq ??
+      1;
 
     this.db
       .prepare(

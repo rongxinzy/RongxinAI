@@ -10,6 +10,7 @@ import coworkReducer, {
   setCurrentSession,
   setCurrentSessionId,
   setLoadingSessionId,
+  setChatSessions,
   setSessions,
   updateCurrentSessionModelOverride,
   updateSessionStatus,
@@ -112,6 +113,44 @@ test('addSession preserves the agent id in session summaries', () => {
   );
 
   expect(state.sessions[0].agentId).toBe('agent-2');
+});
+
+test('chat sessions use the chat cache without invalidating work sessions', () => {
+  const chatState = coworkReducer(
+    undefined,
+    addSession(
+      makeSession({
+        id: 'chat-session-1',
+        mode: 'chat',
+      }),
+    ),
+  );
+
+  expect(chatState.sessions).toEqual([]);
+  expect(chatState.chatSessions.map(session => session.id)).toEqual(['chat-session-1']);
+
+  const loadedState = coworkReducer(
+    coworkReducer(chatState, setSessions([makeSession({ id: 'work-session-1' })])),
+    setChatSessions(chatState.chatSessions),
+  );
+
+  expect(loadedState.sessions.map(session => session.id)).toEqual(['work-session-1']);
+  expect(loadedState.chatSessions.map(session => session.id)).toEqual(['chat-session-1']);
+  expect(loadedState.chatSessionsLoaded).toBe(true);
+});
+
+test('refreshing chat sessions keeps the work session array stable', () => {
+  const workState = coworkReducer(
+    undefined,
+    setSessions([makeSession({ id: 'work-session-1' })]),
+  );
+  const chatState = coworkReducer(
+    workState,
+    setChatSessions([makeSession({ id: 'chat-session-1', mode: 'chat' })]),
+  );
+
+  expect(chatState.sessions).toBe(workState.sessions);
+  expect(chatState.chatSessions).not.toBe(workState.chatSessions);
 });
 
 test('setCurrentSession preserves the agent id when inserting a summary', () => {

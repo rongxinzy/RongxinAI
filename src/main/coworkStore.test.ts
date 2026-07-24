@@ -25,6 +25,7 @@ import {
   DefaultAgentAvatarIcon,
   encodeAgentAvatarIcon,
 } from '../shared/agent/avatar';
+import { CoworkSessionMode } from '../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { CoworkStore } from './coworkStore';
 
@@ -217,6 +218,38 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(
     store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
   ).toEqual(expect.arrayContaining([first.id, second.id]));
+});
+
+test('listSessions filters by mode without mixing work and chat history', () => {
+  const work = store.createSession('work', '/tmp/workspace-a');
+  const chat = store.createSession(
+    'chat',
+    '/tmp/workspace-a',
+    '',
+    'local',
+    [],
+    'main',
+    '',
+    CoworkSessionMode.Chat,
+  );
+  const otherChat = store.createSession(
+    'other chat',
+    '/tmp/workspace-b',
+    '',
+    'local',
+    [],
+    'main',
+    '',
+    CoworkSessionMode.Chat,
+  );
+
+  expect(
+    store.listSessions(10, 0, undefined, undefined, CoworkSessionMode.Chat).map(s => s.id),
+  ).toEqual(expect.arrayContaining([chat.id, otherChat.id]));
+  expect(store.countSessions(undefined, undefined, CoworkSessionMode.Chat)).toBe(2);
+  expect(
+    store.listSessions(10, 0, undefined, work.workspaceId, CoworkSessionMode.Work).map(s => s.id),
+  ).toEqual([work.id]);
 });
 
 test('session expert snapshots persist independently from workspace and agent state', () => {

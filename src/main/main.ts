@@ -29,7 +29,11 @@ import {
 } from '../scheduledTask/migrate';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
-import { COWORK_MESSAGE_PAGE_SIZE, COWORK_SESSION_PAGE_SIZE } from '../shared/cowork/constants';
+import {
+  COWORK_MESSAGE_PAGE_SIZE,
+  COWORK_SESSION_PAGE_SIZE,
+  type CoworkSessionMode,
+} from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
   CoworkSessionExpertSource,
@@ -4158,16 +4162,23 @@ if (!gotTheLock) {
     'cowork:session:list',
     async (
       _event,
-      options?: { limit?: number; offset?: number; agentId?: string; workspaceId?: string },
+      options?: {
+        limit?: number;
+        offset?: number;
+        agentId?: string;
+        workspaceId?: string;
+        mode?: CoworkSessionMode;
+      },
     ) => {
       try {
         const limit = options?.limit ?? COWORK_SESSION_PAGE_SIZE;
         const offset = options?.offset ?? 0;
         const agentId = options?.agentId;
         const workspaceId = options?.workspaceId;
+        const mode = options?.mode;
         const store = getCoworkStore();
-        const sessions = store.listSessions(limit, offset, agentId, workspaceId);
-        const total = store.countSessions(agentId, workspaceId);
+        const sessions = store.listSessions(limit, offset, agentId, workspaceId, mode);
+        const total = store.countSessions(agentId, workspaceId, mode);
         return { success: true, sessions, hasMore: offset + sessions.length < total };
       } catch (error) {
         return {
