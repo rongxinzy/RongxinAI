@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const SOURCE = path.join(__dirname, '..', 'public', 'logo.png');
+const SOURCE = path.join(__dirname, '..', 'public', 'zhiyuan-logo-light-1600.png');
 const OUT_DIR = path.join(__dirname, '..', 'build', 'icons', 'win');
 const OUT_ICO = path.join(OUT_DIR, 'icon.ico');
 const SIZES = [256, 128, 64, 48, 32, 16];

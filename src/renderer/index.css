@@ -248,6 +248,22 @@
   }
 }
 
+/* Brand logo theme switching.
+ * Driven by the `.dark` class the theme engine toggles on <html>
+ * (see theme/engine/theme-manager.ts) — NOT Tailwind's `dark:` variant,
+ * which is bound to the OS `prefers-color-scheme` and would ignore the
+ * in-app theme setting. Light theme → ink-black wordmark; dark theme →
+ * white (reverse) wordmark from the dark-mode asset set. */
+.logo-dark {
+  display: none;
+}
+.dark .logo-light {
+  display: none;
+}
+.dark .logo-dark {
+  display: block;
+}
+
 /* KaTeX styles */
 .katex-display {
   overflow-x: auto;

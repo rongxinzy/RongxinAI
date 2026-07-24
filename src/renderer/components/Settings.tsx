@@ -5058,7 +5058,8 @@ const Settings: React.FC<SettingsProps> = ({
         return (
           <div className="flex min-h-full flex-col items-center pt-6 pb-3">
             {/* Logo & App Name */}
-            <img src="logo.png" alt="知远" className="h-16 w-auto mb-3 select-none" />
+            <img src="zhiyuan-logo-light.svg" alt="知远" className="logo-light h-16 w-auto mb-3 select-none" />
+            <img src="zhiyuan-logo-dark.svg" alt="知远" className="logo-dark h-16 w-auto mb-3 select-none" />
             <span className="text-xs text-muted-foreground mt-1">v{appVersion}</span>
             <span className="text-xs text-muted-foreground mt-0.5">开放源码，汇聚智慧</span>
 

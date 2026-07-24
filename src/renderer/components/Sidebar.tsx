@@ -339,7 +339,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="pt-3 pb-3">
           <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
             <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-              <img src="logo.png" alt="知远" className="h-5 w-auto select-none" />
+              <img src="zhiyuan-logo-light.svg" alt="知远" className="logo-light h-5 w-auto select-none" />
+              <img src="zhiyuan-logo-dark.svg" alt="知远" className="logo-dark h-5 w-auto select-none" />
               {updateBadge}
             </div>
             <Button
