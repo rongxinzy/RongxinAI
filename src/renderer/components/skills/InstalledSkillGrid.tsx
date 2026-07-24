@@ -59,7 +59,7 @@ export function InstalledSkillGrid({
           size="sm"
           role="button"
           tabIndex={0}
-          className="group cursor-pointer gap-3 border border-border ring-0 transition-colors hover:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="group relative cursor-pointer gap-3 border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md focus-visible:z-10 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           onClick={event => {
             const target = event.target as HTMLElement;
             if (target.closest('button, [role="switch"], [data-slot="switch"]')) return;
@@ -112,10 +112,7 @@ export function InstalledSkillGrid({
                     }
                   />
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      disabled={!onTrySkill}
-                      onClick={() => onTrySkill?.(skill.id)}
-                    >
+                    <DropdownMenuItem disabled={!onTrySkill} onClick={() => onTrySkill?.(skill.id)}>
                       <MessageCircle />
                       {i18nService.t('skillGoToConversation')}
                     </DropdownMenuItem>
