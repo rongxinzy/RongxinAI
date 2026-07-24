@@ -1,0 +1,49 @@
+{
+  "name": "content-writer",
+  "version": "1.0.0",
+  "description": "A professional content creation expert for articles, copywriting, and creative writing.",
+  "author": {
+    "name": "ZhiYuanAgent",
+    "email": "dev@zhiyuan.com"
+  },
+
+  "expertType": "agent",
+  "agentName": "content-writer",
+
+  "agents": ["./agents/content-writer.md"],
+
+  "displayName": {
+    "en": "Content Writer",
+    "zh": "文案创作专家"
+  },
+  "profession": {
+    "en": "Senior Content Strategist",
+    "zh": "资深内容策划师"
+  },
+  "displayDescription": {
+    "en": "Professional content writer for articles, marketing copy, social media, and creative storytelling. Delivers polished, audience-targeted content.",
+    "zh": "专业文案创作，涵盖文章撰写、营销文案、社交媒体和创意故事，输出面向目标受众的精炼内容。"
+  },
+  "categoryId": "06-ContentCreative",
+  "defaultInitPrompt": {
+    "zh": "帮我写一篇产品发布公告",
+    "en": "Help me write a product launch announcement"
+  },
+  "plugin": "content-writer",
+  "tags": [
+    { "en": "Copywriting", "zh": "文案写作" },
+    { "en": "Marketing", "zh": "营销推广" },
+    { "en": "Creative", "zh": "创意内容" }
+  ],
+  "quickPrompts": [
+    { "en": "Help me write a product launch announcement", "zh": "帮我写一篇产品发布公告" },
+    {
+      "en": "Write a WeChat official account article about AI",
+      "zh": "写一篇关于 AI 的微信公众号文章"
+    },
+    {
+      "en": "Create 5 social media post ideas for our new feature",
+      "zh": "为新功能创作 5 条社交媒体文案"
+    }
+  ]
+}
