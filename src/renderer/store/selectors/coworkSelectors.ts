@@ -33,6 +33,17 @@ export const selectUnreadSessionIds = (state: RootState) => state.cowork.unreadS
 
 export const selectAgentEngine = createSelector(selectCoworkConfig, config => config.agentEngine);
 
+export const resolveDisplayedSessionId = (
+  currentSessionId: string | null,
+  loadingSessionId: string | null,
+): string | null => loadingSessionId ?? currentSessionId;
+
+export const selectDisplayedSessionId = createSelector(
+  selectCurrentSessionId,
+  selectLoadingSessionId,
+  resolveDisplayedSessionId,
+);
+
 export const selectIsOpenClawEngine = createSelector(
   selectAgentEngine,
   engine => engine === 'openclaw',
