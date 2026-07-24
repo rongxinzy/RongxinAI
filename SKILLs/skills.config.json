@@ -1,16 +1,34 @@
 {
-  "version": 2,
+  "version": 1,
   "description": "Default skill configuration for RongxinAI",
   "defaults": {
-    "humanizer-zh": { "order": 10, "enabled": true },
-    "frontend-dev": { "order": 20, "enabled": true },
-    "minimax-docx": { "order": 30, "enabled": true },
-    "minimax-pdf": { "order": 40, "enabled": true },
-    "minimax-xlsx": { "order": 50, "enabled": true },
-    "guizang-ppt-skill": {
-      "displayName": "ppt风格制作v1",
-      "order": 60,
-      "enabled": false
-    }
+    "docx": { "order": 10, "enabled": true },
+    "web-search": { "order": 15, "enabled": true },
+    "xlsx": { "order": 20, "enabled": true },
+    "pptx": { "order": 30, "enabled": true },
+    "pdf": { "order": 40, "enabled": true },
+    "remotion": { "order": 50, "enabled": true },
+    "develop-web-game": { "order": 60, "enabled": true },
+    "playwright": { "order": 70, "enabled": true },
+    "create-plan": { "order": 80, "enabled": true },
+    "canvas-design": { "order": 90, "enabled": true },
+    "frontend-design": { "order": 100, "enabled": true },
+    "stock-analyzer": { "order": 110, "enabled": true },
+    "stock-announcements": { "order": 111, "enabled": true },
+    "stock-explorer": { "order": 112, "enabled": true },
+    "content-planner": { "order": 120, "enabled": true },
+    "article-writer": { "order": 121, "enabled": true },
+    "daily-trending": { "order": 122, "enabled": true },
+    "local-tools": { "order": 200, "enabled": true },
+    "weather": { "order": 210, "enabled": true },
+    "imap-smtp-email": { "order": 211, "enabled": true },
+    "seedance": { "order": 212, "enabled": true },
+    "seedream": { "order": 213, "enabled": true },
+    "films-search": { "order": 222, "enabled": true },
+    "music-search": { "order": 223, "enabled": true },
+    "technology-news-search": { "order": 224, "enabled": false },
+    "skill-vetter": { "order": 299, "enabled": true },
+    "skill-creator": { "order": 300, "enabled": true },
+    "zhiyuan-expert-manager": { "order": 310, "enabled": true }
   }
 }
