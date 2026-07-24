@@ -47,7 +47,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   const expertTabs = [
     { value: EXPERT_TAB.Experts, label: i18nService.t('expert') },
     { value: EXPERT_TAB.Skills, label: i18nService.t('skills') },
-    { value: EXPERT_TAB.Mcp, label: i18nService.t('mcpServers') },
+    { value: EXPERT_TAB.Mcp, label: i18nService.t('connectors') },
   ] as const;
 
   const handleTabChange = (value: string) => {
@@ -117,10 +117,12 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           value={EXPERT_TAB.Mcp}
           activeValue={activeTab}
           direction={tabDirection}
-          className="min-h-0 flex-1 overflow-hidden px-6 py-4"
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
           contentClassName="h-full"
         >
-          <McpManager />
+          <div className="mx-auto h-full w-full max-w-4xl">
+            <McpManager />
+          </div>
         </LayeredTabsContent>
       </Tabs>
     </div>

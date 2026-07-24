@@ -1,6 +1,5 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
-import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { Pencil, Plus, Plug, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,58 +17,18 @@ import {
 } from '../../types/mcp';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
+import { McpTab as McpTabValue, type McpTab as McpTabType } from './constants';
+import { McpManagerToolbar } from './McpManagerToolbar';
+import { filterMcpItems, useMcpSearchQuery } from './mcpSearch';
 import McpServerFormModal from './McpServerFormModal';
+
+export { McpTab } from './constants';
 
 const TRANSPORT_BADGE_COLORS: Record<string, string> = {
   stdio: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
   sse: 'bg-green-500/10 text-green-600 dark:text-green-400',
   http: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
 };
-
-export type McpTab = 'installed' | 'marketplace' | 'custom';
-
-interface McpManagerTabsProps {
-  activeTab: McpTab;
-  installedCount: number;
-  marketplaceCount: number;
-  customCount: number;
-  onTabChange: (tab: McpTab) => void;
-}
-
-export const McpManagerTabs: React.FC<McpManagerTabsProps> = ({
-  activeTab,
-  installedCount,
-  marketplaceCount,
-  customCount,
-  onTabChange,
-}) => (
-  <Tabs value={activeTab} onValueChange={value => onTabChange(value as McpTab)}>
-    <TabsList className="shadow-inset">
-      <TabsTrigger value="installed" className="data-active:shadow-elevated">
-        {i18nService.t('mcpInstalled')}
-        {installedCount > 0 && (
-          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">
-            {installedCount}
-          </span>
-        )}
-      </TabsTrigger>
-      <TabsTrigger value="marketplace" className="data-active:shadow-elevated">
-        {i18nService.t('mcpMarketplace')}
-        {marketplaceCount > 0 && (
-          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">
-            {marketplaceCount}
-          </span>
-        )}
-      </TabsTrigger>
-      <TabsTrigger value="custom" className="data-active:shadow-elevated">
-        {i18nService.t('mcpCustom')}
-        {customCount > 0 && (
-          <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">{customCount}</span>
-        )}
-      </TabsTrigger>
-    </TabsList>
-  </Tabs>
-);
 
 /**
  * Text with line-clamp-2 that shows a popover above the text when truncated.
@@ -124,8 +83,8 @@ const ClampedText: React.FC<{ text: string; className?: string }> = ({ text, cla
 };
 
 interface McpManagerProps {
-  activeTab?: McpTab;
-  onTabChange?: (tab: McpTab) => void;
+  activeTab?: McpTabType;
+  onTabChange?: (tab: McpTabType) => void;
   hideTabControl?: boolean;
 }
 
@@ -137,7 +96,10 @@ const McpManager: React.FC<McpManagerProps> = ({
   const dispatch = useDispatch();
   const servers = useSelector((state: RootState) => state.mcp.servers);
 
-  const [uncontrolledActiveTab, setUncontrolledActiveTab] = useState<McpTab>('installed');
+  const [uncontrolledActiveTab, setUncontrolledActiveTab] = useState<McpTabType>(
+    McpTabValue.Installed,
+  );
+  const [searchQuery, setSearchQuery] = useMcpSearchQuery();
   const [actionError, setActionError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<McpServerConfig | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -157,7 +119,7 @@ const McpManager: React.FC<McpManagerProps> = ({
   } | null>(null);
   const currentLanguage = i18nService.getLanguage();
   const activeTab = controlledActiveTab ?? uncontrolledActiveTab;
-  const setActiveTab = (tab: McpTab) => {
+  const setActiveTab = (tab: McpTabType) => {
     if (controlledActiveTab === undefined) {
       setUncontrolledActiveTab(tab);
     }
@@ -270,20 +232,33 @@ const McpManager: React.FC<McpManagerProps> = ({
   );
 
   const filteredInstalled = useMemo(() => {
-    return servers;
-  }, [servers]);
+    return filterMcpItems(servers, searchQuery, server =>
+      [server.name, server.transportType, getInstalledDescription(server)].join(' '),
+    );
+  }, [getInstalledDescription, searchQuery, servers]);
 
   const filteredCustom = useMemo(() => {
-    return servers.filter(s => !s.isBuiltIn);
-  }, [servers]);
+    return filterMcpItems(
+      servers.filter(server => !server.isBuiltIn),
+      searchQuery,
+      server =>
+        [server.name, server.transportType, server.description, getTransportSummary(server)].join(
+          ' ',
+        ),
+    );
+  }, [searchQuery, servers]);
 
   const filteredMarketplace = useMemo(() => {
-    let entries = [...dynamicRegistry];
+    let entries = filterMcpItems(dynamicRegistry, searchQuery, entry =>
+      [entry.name, entry.transportType, entry.category, getRegistryEntryDescription(entry)].join(
+        ' ',
+      ),
+    );
     if (activeCategory !== 'all') {
       entries = entries.filter(e => e.category === activeCategory);
     }
     return entries;
-  }, [activeCategory, dynamicRegistry]);
+  }, [activeCategory, dynamicRegistry, getRegistryEntryDescription, searchQuery]);
 
   const handleToggleEnabled = async (serverId: string) => {
     const targetServer = servers.find(s => s.id === serverId);
@@ -477,20 +452,19 @@ const McpManager: React.FC<McpManagerProps> = ({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5">
-        {!hideTabControl && (
-          <div className="flex justify-end">
-            <McpManagerTabs
-              activeTab={activeTab}
-              installedCount={servers.length}
-              marketplaceCount={marketplaceCount}
-              customCount={customCount}
-              onTabChange={setActiveTab}
-            />
-          </div>
-        )}
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <McpManagerToolbar
+          activeTab={activeTab}
+          installedCount={servers.length}
+          marketplaceCount={marketplaceCount}
+          customCount={customCount}
+          searchQuery={searchQuery}
+          showTabs={!hideTabControl}
+          onTabChange={setActiveTab}
+          onSearchQueryChange={setSearchQuery}
+        />
 
-        {activeTab === 'marketplace' && (
+        {activeTab === McpTabValue.Marketplace && (
           <div className="flex flex-wrap items-center gap-1.5">
             {dynamicCategories.map(cat => (
               <Button
@@ -510,7 +484,7 @@ const McpManager: React.FC<McpManagerProps> = ({
 
         <div className="min-h-0 flex-1">
           {/* ── Tab: Installed ──────────────────────────────── */}
-          {activeTab === 'installed' && (
+          {activeTab === McpTabValue.Installed && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {filteredInstalled.length === 0 ? (
                 <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -522,7 +496,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setActiveTab('marketplace')}
+                    onClick={() => setActiveTab(McpTabValue.Marketplace)}
                   >
                     {i18nService.t('mcpMarketplace')}
                   </Button>
@@ -618,7 +592,7 @@ const McpManager: React.FC<McpManagerProps> = ({
           )}
 
           {/* ── Tab: Marketplace ────────────────────────────── */}
-          {activeTab === 'marketplace' && (
+          {activeTab === McpTabValue.Marketplace && (
             <div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {filteredMarketplace.length === 0 ? (
@@ -690,7 +664,7 @@ const McpManager: React.FC<McpManagerProps> = ({
           )}
 
           {/* ── Tab: Custom ─────────────────────────────────── */}
-          {activeTab === 'custom' && (
+          {activeTab === McpTabValue.Custom && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {filteredCustom.length === 0 ? (
                 <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">

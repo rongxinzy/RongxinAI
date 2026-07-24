@@ -47,13 +47,13 @@ const McpView: React.FC<McpViewProps> = ({
               {updateBadge}
             </div>
           )}
-          <h1 className="text-lg font-semibold text-foreground">{i18nService.t('mcpServers')}</h1>
+          <h1 className="text-lg font-semibold text-foreground">{i18nService.t('connectors')}</h1>
         </div>
         <WindowTitleBar inline />
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6">
           <McpManager />
         </div>
       </div>
