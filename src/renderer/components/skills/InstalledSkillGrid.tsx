@@ -112,14 +112,23 @@ export function InstalledSkillGrid({
                     }
                   />
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem disabled={!onTrySkill} onClick={() => onTrySkill?.(skill.id)}>
+                    <DropdownMenuItem
+                      disabled={!onTrySkill}
+                      onClick={event => {
+                        event.stopPropagation();
+                        onTrySkill?.(skill.id);
+                      }}
+                    >
                       <MessageCircle />
                       {i18nService.t('skillGoToConversation')}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       variant="destructive"
                       disabled={skill.isBuiltIn}
-                      onClick={() => onUninstall(skill)}
+                      onClick={event => {
+                        event.stopPropagation();
+                        onUninstall(skill);
+                      }}
                     >
                       <Trash2 />
                       {i18nService.t('skillUninstall')}
