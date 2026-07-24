@@ -750,6 +750,7 @@ const App: React.FC = () => {
                 >
                   <LocalInferenceView
                     isSidebarCollapsed={isSidebarCollapsed}
+                    isVisible={mainView === 'localInference'}
                     onToggleSidebar={handleToggleSidebar}
                     onNewChat={handleNewChat}
                     updateBadge={isSidebarCollapsed ? updateBadge : null}

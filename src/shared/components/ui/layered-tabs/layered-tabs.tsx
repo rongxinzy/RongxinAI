@@ -19,6 +19,7 @@ export interface LayeredTabsListProps<Value extends string> {
   value: Value;
   items: readonly LayeredTabItem<Value>[];
   separatorEdge?: LayeredTabsSeparatorEdgeType;
+  showSeparator?: boolean;
   className?: string;
   contentClassName?: string;
   listClassName?: string;
@@ -147,6 +148,7 @@ export function LayeredTabsList<Value extends string>({
   value,
   items,
   separatorEdge = LayeredTabsSeparatorEdge.Top,
+  showSeparator = true,
   className,
   contentClassName,
   listClassName,
@@ -160,7 +162,9 @@ export function LayeredTabsList<Value extends string>({
 
   return (
     <div className={cn('relative flex w-full shrink-0', edgeStyles.root, className)}>
-      <Separator className={cn('absolute inset-x-0 z-0 w-auto', edgeStyles.separator)} />
+      {showSeparator ? (
+        <Separator className={cn('absolute inset-x-0 z-0 w-auto', edgeStyles.separator)} />
+      ) : null}
       <div
         className={cn(
           'relative z-10 mx-auto flex w-full max-w-2xl px-4',
