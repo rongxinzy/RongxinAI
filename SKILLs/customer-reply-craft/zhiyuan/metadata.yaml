@@ -1,0 +1,5 @@
+name: 客服回复助手
+description: 针对售前咨询、售后服务、投诉处理与退换货场景，生成专业、得体且符合情绪的客户回复。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

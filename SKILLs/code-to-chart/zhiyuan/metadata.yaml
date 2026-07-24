@@ -1,0 +1,5 @@
+name: 代码架构图
+description: 解析代码仓库的导入与依赖关系，生成清晰的 Mermaid 架构图、流程图和模块关系图。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md
