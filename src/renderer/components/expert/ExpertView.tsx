@@ -1,5 +1,6 @@
 import { Button } from '@shared/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { LayeredTabsList, LayeredTabsSeparatorEdge } from '@shared/components/ui/layered-tabs';
+import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { PanelLeft, Pencil } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -18,7 +19,13 @@ interface ExpertViewProps {
   onCreateSkillByChat?: () => void;
 }
 
-type ExpertTab = 'experts' | 'skills' | 'mcp';
+const EXPERT_TAB = {
+  Experts: 'experts',
+  Skills: 'skills',
+  Mcp: 'mcp',
+} as const;
+
+type ExpertTab = (typeof EXPERT_TAB)[keyof typeof EXPERT_TAB];
 
 const ExpertView: React.FC<ExpertViewProps> = ({
   isSidebarCollapsed,
@@ -29,12 +36,17 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   onCreateSkillByChat,
 }) => {
   const isMac = window.electron.platform === 'darwin';
-  const [activeTab, setActiveTab] = useState<ExpertTab>('experts');
+  const [activeTab, setActiveTab] = useState<ExpertTab>(EXPERT_TAB.Experts);
+  const expertTabs = [
+    { value: EXPERT_TAB.Experts, label: i18nService.t('expert') },
+    { value: EXPERT_TAB.Skills, label: i18nService.t('skills') },
+    { value: EXPERT_TAB.Mcp, label: i18nService.t('mcpServers') },
+  ] as const;
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
       {/* Header */}
-      <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
+      <div className="draggable flex h-12 shrink-0 items-center justify-between px-4">
         <div className="flex h-8 items-center gap-3">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
@@ -56,31 +68,27 @@ const ExpertView: React.FC<ExpertViewProps> = ({
       <Tabs
         value={activeTab}
         onValueChange={value => setActiveTab(value as ExpertTab)}
-        className="flex-1 flex flex-col min-h-0"
+        className="min-h-0 flex-1 flex-col gap-0"
       >
-        <div className="mt-3 w-full px-6">
-          <TabsList className="shadow-inset">
-            <TabsTrigger value="experts" className="data-active:shadow-elevated">
-              {i18nService.t('expert')}
-            </TabsTrigger>
-            <TabsTrigger value="skills" className="data-active:shadow-elevated">
-              {i18nService.t('skills')}
-            </TabsTrigger>
-            <TabsTrigger value="mcp" className="data-active:shadow-elevated">
-              {i18nService.t('mcpServers')}
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <LayeredTabsList
+          value={activeTab}
+          items={expertTabs}
+          separatorEdge={LayeredTabsSeparatorEdge.Top}
+          className="pb-4"
+        />
 
-        <TabsContent value="experts" className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+        <TabsContent
+          value={EXPERT_TAB.Experts}
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
+        >
           <PresetExpertList />
         </TabsContent>
 
-        <TabsContent value="skills" className="flex-1 min-h-0 overflow-hidden px-6 py-4">
+        <TabsContent value={EXPERT_TAB.Skills} className="min-h-0 flex-1 overflow-hidden px-6 py-4">
           <SkillsManager readOnly={readOnly} onCreateByChat={onCreateSkillByChat} />
         </TabsContent>
 
-        <TabsContent value="mcp" className="flex-1 min-h-0 overflow-hidden px-6 py-4">
+        <TabsContent value={EXPERT_TAB.Mcp} className="min-h-0 flex-1 overflow-hidden px-6 py-4">
           <McpManager />
         </TabsContent>
       </Tabs>
