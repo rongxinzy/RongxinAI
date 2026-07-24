@@ -215,7 +215,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task }) => {
                 <TableHead className="w-1/3 text-muted-foreground">
                   {i18nService.t('scheduledTasksHistoryColTitle')}
                 </TableHead>
-                <TableHead className="w-1/3 text-muted-foreground">
+                <TableHead className="w-1/3 text-center text-muted-foreground">
                   {i18nService.t('scheduledTasksHistoryColTime')}
                 </TableHead>
                 <TableHead className="w-1/3 text-right text-muted-foreground">
@@ -241,7 +241,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task }) => {
                         {run.status === 'running' && <Spinner className="size-3 text-blue-500" />}
                       </div>
                     </TableCell>
-                    <TableCell className="w-1/3">
+                    <TableCell className="w-1/3 text-center">
                       <span className="text-sm text-muted-foreground">
                         {formatDateTime(new Date(run.startedAt))}
                       </span>

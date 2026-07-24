@@ -7,10 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
-import { Separator } from '@shared/components/ui/separator';
+import { LayeredTabsList, LayeredTabsSeparatorEdge } from '@shared/components/ui/layered-tabs';
+import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { Spinner } from '@shared/components/ui/spinner';
-import { cn } from '@shared/lib/utils';
 import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -62,81 +61,6 @@ const tabContentVariants = {
     opacity: 0,
     x: direction > 0 ? -28 : 28,
   }),
-};
-
-interface ScheduledTaskTabTriggerProps {
-  value: TabType;
-  activeTab: TabType;
-  index: number;
-  label: string;
-  prefersReducedMotion: boolean | null;
-}
-
-const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
-  value,
-  activeTab,
-  index,
-  label,
-  prefersReducedMotion,
-}) => {
-  const isActive = value === activeTab;
-  const activeIndex = SCHEDULED_TASK_TAB_ORDER.indexOf(activeTab);
-  const tabLayer = isActive ? 20 : activeIndex === 0 ? 3 - index : index + 1;
-  const isThirdLayer = activeIndex === 0 ? index === 2 : activeIndex === 2 ? index === 0 : false;
-  const tabHeight = isActive ? 40 : isThirdLayer ? 27.5 : 32;
-  const tabWidth = isThirdLayer ? '86%' : '100%';
-  const textScale = isActive ? 1 : isThirdLayer ? 0.75 : 0.875;
-
-  return (
-    <TabsTrigger
-      value={value}
-      style={{ zIndex: isActive ? 30 : tabLayer, boxShadow: isActive ? 'none' : undefined }}
-      className={cn(
-        'group relative h-10 min-w-0 flex-1 rounded-t-lg rounded-b-none border-0 bg-transparent px-0 py-0 text-sm font-medium text-muted-foreground transition-colors duration-200 ease-out hover:text-foreground',
-        'data-active:z-10 data-active:border-b-0 data-active:bg-transparent data-active:font-semibold data-active:text-muted-foreground data-active:shadow-none data-active:hover:bg-transparent data-active:hover:text-muted-foreground dark:data-active:bg-transparent',
-        'after:inset-x-0 after:bottom-0 after:z-10 after:h-px after:bg-border after:opacity-100',
-        index > 0 && '-ml-4',
-      )}
-    >
-      <motion.span
-        key="inactive-background"
-        className={cn(
-          'pointer-events-none absolute bottom-0 rounded-t-lg border border-b-0 border-border transition-colors duration-200',
-          isActive && 'z-20 bg-card',
-          !isActive && !isThirdLayer && 'bg-secondary',
-          !isThirdLayer && 'shadow-md [clip-path:inset(-8px_-8px_0_-8px)]',
-          isThirdLayer && 'bg-surface-tertiary shadow-none',
-        )}
-        animate={{ height: tabHeight, width: tabWidth }}
-        style={{ left: index === 0 ? 'auto' : 0, right: index === 0 ? 0 : 'auto' }}
-        transition={{
-          height: prefersReducedMotion
-            ? { duration: 0 }
-            : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 },
-          width: { duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' },
-        }}
-        aria-hidden="true"
-      />
-      <motion.span
-        className="absolute bottom-0 z-30 inline-flex min-w-0 items-center justify-center gap-1.5 truncate text-base leading-none"
-        animate={{
-          height: tabHeight,
-          scale: textScale,
-          width: tabWidth,
-        }}
-        style={{ left: index === 0 ? 'auto' : 0, right: index === 0 ? 0 : 'auto' }}
-        transition={{
-          height: prefersReducedMotion
-            ? { duration: 0 }
-            : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 },
-          scale: { duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' },
-          width: { duration: prefersReducedMotion ? 0 : 0.2, ease: 'easeOut' },
-        }}
-      >
-        {label}
-      </motion.span>
-    </TabsTrigger>
-  );
 };
 
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
@@ -288,6 +212,12 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     (viewMode === 'detail' || viewMode === 'edit') &&
     selectedTaskId;
 
+  const scheduledTaskTabs = [
+    { value: SCHEDULED_TASK_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
+    { value: SCHEDULED_TASK_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
+    { value: SCHEDULED_TASK_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
+  ] as const;
+
   if (!gatewayReady || !initialDataLoaded) {
     return (
       <div className="flex h-full items-center justify-center bg-background">
@@ -302,7 +232,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
+      <div className="draggable flex h-12 shrink-0 items-center justify-between px-4">
         <div className="flex items-center gap-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
@@ -334,36 +264,15 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0">
-        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 pt-3 pb-4">
-          <div className="relative flex shrink-0 items-end">
-            <Separator className="w-auto min-w-0 flex-1" />
-            <TabsList className="relative flex h-10 w-72 max-w-full items-end gap-0 rounded-none bg-transparent p-0 shadow-none">
-              <ScheduledTaskTabTrigger
-                value={SCHEDULED_TASK_TAB.Create}
-                activeTab={activeTab}
-                index={0}
-                label={i18nService.t('scheduledTasksNewTab')}
-                prefersReducedMotion={prefersReducedMotion}
-              />
-              <ScheduledTaskTabTrigger
-                value={SCHEDULED_TASK_TAB.Tasks}
-                activeTab={activeTab}
-                index={1}
-                label={i18nService.t('scheduledTasksTabTasks')}
-                prefersReducedMotion={prefersReducedMotion}
-              />
-              <ScheduledTaskTabTrigger
-                value={SCHEDULED_TASK_TAB.History}
-                activeTab={activeTab}
-                index={2}
-                label={i18nService.t('scheduledTasksTabHistory')}
-                prefersReducedMotion={prefersReducedMotion}
-              />
-            </TabsList>
-            <Separator className="w-auto min-w-0 flex-1" />
-          </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="min-h-0 flex-1 gap-0">
+        <LayeredTabsList
+          value={activeTab}
+          items={scheduledTaskTabs}
+          separatorEdge={LayeredTabsSeparatorEdge.Top}
+          className="pb-4"
+        />
 
+        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4">
           <div className="min-h-0 flex-1 overflow-hidden">
             <TabsContent value={activeTab} keepMounted className="h-full min-h-0 overflow-hidden">
               <AnimatePresence initial={false} custom={tabDirection} mode="wait">
