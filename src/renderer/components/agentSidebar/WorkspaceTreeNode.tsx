@@ -139,7 +139,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                   key={task.id}
                   task={task}
                   isBatchMode={isBatchMode}
-                  isSelected={selectedIds.has(task.id)}
+                  isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
                   showBatchOption
                   onSelect={() => onSelectTask(task)}
                   onDelete={() => onDeleteTask(task)}

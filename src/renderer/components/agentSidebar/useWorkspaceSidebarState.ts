@@ -267,7 +267,7 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
           path: workspace.path,
           isExpanded: expanded,
           isTaskListExpanded: taskExpanded,
-          canExpandTasks: !taskExpanded && (hasMore[workspace.id] ?? false),
+          canExpandTasks: !taskExpanded && ((hasMore[workspace.id] ?? false) || filtered.length > AgentSidebarPageSize.Preview),
           canCollapseTasks: taskExpanded && filtered.length > AgentSidebarPageSize.Preview,
           isLoadingTasks: loadingIds.includes(workspace.id),
           hasLoadError: failedIds.includes(workspace.id),

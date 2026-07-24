@@ -514,7 +514,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         key={task.id}
                         task={task}
                         isBatchMode={isBatchMode}
-                        isSelected={selectedIds.has(task.id)}
+                        isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
                         onSelect={() => {
                           const session = allSessions.find(s => s.id === task.id);
                           if (session) void handleSelectSession(session);
