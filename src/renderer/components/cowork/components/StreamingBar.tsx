@@ -37,12 +37,3 @@ export const ArtifactPanelIcon: React.FC<React.SVGProps<SVGSVGElement> & { open?
     </svg>
   );
 };
-
-/** Bottom activity indicator. The execution group owns the readable status text. */
-export const StreamingBar: React.FC = () => (
-  <div className="shrink-0 animate-fade-in px-4 py-1">
-    <div className="max-w-5xl min-w-[320px] mx-auto">
-      <div className="streaming-bar" />
-    </div>
-  </div>
-);

@@ -46,7 +46,7 @@ import type {
 import { getCompactFolderName } from '../../utils/path';
 import { ArtifactPanel } from '../artifacts';
 import WindowTitleBar from '../window/WindowTitleBar';
-import { ArtifactPanelIcon, StreamingBar } from './components/StreamingBar';
+import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
@@ -1407,9 +1407,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 document.body,
               )}
           </div>
-
-          {/* Streaming Activity Bar */}
-          {isStreaming && <StreamingBar />}
 
           {/* Input Area */}
           <div className="px-4 pb-4 shrink-0">
