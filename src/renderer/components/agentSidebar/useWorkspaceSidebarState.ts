@@ -73,11 +73,13 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [scheduledExpandedIds, setScheduledExpandedIds] = useState<string[]>([]);
   const [scheduledExpandedTaskIds, setScheduledExpandedTaskIds] = useState<string[]>([]);
+  const [preferencesHydrated, setPreferencesHydrated] = useState(false);
   const [previews, setPreviews] = useState<Record<string, CoworkSessionSummary[]>>({});
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
   const [loadingIds, setLoadingIds] = useState<string[]>([]);
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const loadingKeysRef = useRef(new Set<string>());
+  const hasStoredPreferenceRef = useRef(false);
 
   const setLoading = useCallback((id: string, loading: boolean) => {
     setLoadingIds(current =>
@@ -95,10 +97,12 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
       .getItem<WorkspaceSidebarPreferenceState>(WORKSPACE_SIDEBAR_STATE_KEY)
       .then(state => {
         if (cancelled) return;
+        hasStoredPreferenceRef.current = state !== null && state !== undefined;
         setExpandedIds(state?.expandedWorkspaceIds ?? []);
         setExpandedTaskIds(state?.expandedTaskListWorkspaceIds ?? []);
         setScheduledExpandedIds(state?.scheduledExpandedWorkspaceIds ?? []);
         setScheduledExpandedTaskIds(state?.scheduledExpandedTaskListWorkspaceIds ?? []);
+        setPreferencesHydrated(true);
       });
     return () => {
       cancelled = true;
@@ -113,19 +117,34 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
     // re-expand — doing so causes a flicker / re-expand animation
     // because toggleExpanded removes the last ID first, then this
     // effect immediately re-adds it.
-    if (expandedIds.length || !workspaces.length || autoExpandInitializedRef.current) return;
+    if (
+      !preferencesHydrated ||
+      hasStoredPreferenceRef.current ||
+      expandedIds.length ||
+      !workspaces.length ||
+      autoExpandInitializedRef.current
+    ) {
+      return;
+    }
     autoExpandInitializedRef.current = true;
     setExpandedIds([workspaces[0].id]);
-  }, [expandedIds.length, workspaces]);
+  }, [expandedIds.length, preferencesHydrated, workspaces]);
 
   useEffect(() => {
+    if (!preferencesHydrated) return;
     void localStore.setItem(WORKSPACE_SIDEBAR_STATE_KEY, {
       expandedWorkspaceIds: expandedIds,
       expandedTaskListWorkspaceIds: expandedTaskIds,
       scheduledExpandedWorkspaceIds: scheduledExpandedIds,
       scheduledExpandedTaskListWorkspaceIds: scheduledExpandedTaskIds,
     } satisfies WorkspaceSidebarPreferenceState);
-  }, [expandedIds, expandedTaskIds, scheduledExpandedIds, scheduledExpandedTaskIds]);
+  }, [
+    expandedIds,
+    expandedTaskIds,
+    preferencesHydrated,
+    scheduledExpandedIds,
+    scheduledExpandedTaskIds,
+  ]);
 
   const loadWorkspaceTasks = useCallback(
     async (workspaceId: string, offset = 0, replace = offset === 0) => {
@@ -267,7 +286,9 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
           path: workspace.path,
           isExpanded: expanded,
           isTaskListExpanded: taskExpanded,
-          canExpandTasks: !taskExpanded && ((hasMore[workspace.id] ?? false) || filtered.length > AgentSidebarPageSize.Preview),
+          canExpandTasks:
+            !taskExpanded &&
+            ((hasMore[workspace.id] ?? false) || filtered.length > AgentSidebarPageSize.Preview),
           canCollapseTasks: taskExpanded && filtered.length > AgentSidebarPageSize.Preview,
           isLoadingTasks: loadingIds.includes(workspace.id),
           hasLoadError: failedIds.includes(workspace.id),

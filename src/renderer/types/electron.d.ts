@@ -2,6 +2,7 @@ import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
+import type { CoworkSessionMode } from '../../shared/cowork/constants';
 import type {
   LlamaCppCancelInstallResult,
   LlamaCppImportModelFilesResult,
@@ -714,6 +715,7 @@ interface IElectronAPI {
       offset?: number;
       agentId?: string;
       workspaceId?: string;
+      mode?: CoworkSessionMode;
     }) => Promise<{
       success: boolean;
       sessions?: CoworkSessionSummary[];

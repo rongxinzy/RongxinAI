@@ -16,6 +16,8 @@ import { i18nService } from '../services/i18n';
 import { RootState, store } from '../store';
 import {
   selectCoworkSessions,
+  selectChatSessions,
+  selectChatSessionsLoaded,
   selectCurrentSessionId,
   selectStreamingSessionIds,
   selectUnreadSessionIds,
@@ -76,6 +78,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const dispatch = useDispatch();
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const allSessions = useSelector(selectCoworkSessions);
+  const chatSessions = useSelector(selectChatSessions);
+  const chatSessionsLoaded = useSelector(selectChatSessionsLoaded);
   const streamingSessionIds = useSelector(selectStreamingSessionIds);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const unreadSessionIds = useSelector(selectUnreadSessionIds);
@@ -101,9 +105,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const sessions = React.useMemo(
     () =>
       workMode === WorkMode.Chat
-        ? allSessions.filter(s => s.mode === WorkMode.Chat)
+        ? chatSessions
         : allSessions.filter(s => s.mode !== WorkMode.Chat),
-    [allSessions, workMode],
+    [allSessions, chatSessions, workMode],
   );
 
   // Chat mode: map sessions to AgentSidebarTaskNode for AgentTaskRow rendering
@@ -498,7 +502,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {i18nService.t('chatRecentTitle')}
                   </h2>
                 </div>
-                {chatTaskNodes.length === 0 ? (
+                {!chatSessionsLoaded ? (
+                  <div className="flex items-center justify-center py-10 px-4 text-sm text-muted-foreground">
+                    {i18nService.t('loading')}
+                  </div>
+                ) : chatTaskNodes.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 px-4">
                     <MessageCircle className="size-10 text-muted-foreground mb-3" />
                     <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -517,12 +525,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                         isBatchMode={isBatchMode}
                         isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
                         onSelect={() => {
-                          const session = allSessions.find(s => s.id === task.id);
+                          const session = sessions.find(s => s.id === task.id);
                           if (session) void handleSelectSession(session);
                         }}
                         onDelete={() => handleDeleteSession(task.id)}
                         onShare={async () => {
-                          const session = allSessions.find(s => s.id === task.id);
+                          const session = sessions.find(s => s.id === task.id);
                           if (session) {
                             await handleSelectSession(session);
                             window.setTimeout(() => {

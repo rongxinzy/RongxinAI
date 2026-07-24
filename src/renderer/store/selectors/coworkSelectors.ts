@@ -7,6 +7,8 @@ import type { RootState } from '../index';
 // so useSelector's default === check is enough to skip re-renders.
 
 export const selectCoworkSessions = (state: RootState) => state.cowork.sessions;
+export const selectChatSessions = (state: RootState) => state.cowork.chatSessions;
+export const selectChatSessionsLoaded = (state: RootState) => state.cowork.chatSessionsLoaded;
 export const selectCurrentSessionId = (state: RootState) => state.cowork.currentSessionId;
 export const selectCurrentSession = (state: RootState) => state.cowork.currentSession;
 export const selectLoadingSessionId = (state: RootState) => state.cowork.loadingSessionId;

@@ -9,6 +9,7 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
+import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { removeSessionFromState, removeSessionsFromState } from './coworkDeleteState';
 
 export interface DraftAttachment {
@@ -22,6 +23,8 @@ interface CoworkState {
   sessions: CoworkSessionSummary[];
   /** Whether more sessions exist on the server beyond what is currently loaded. */
   hasMoreSessions: boolean;
+  chatSessions: CoworkSessionSummary[];
+  chatSessionsLoaded: boolean;
   currentSessionId: string | null;
   currentSession: CoworkSession | null;
   loadingSessionId: string | null;
@@ -42,6 +45,8 @@ interface CoworkState {
 const initialState: CoworkState = {
   sessions: [],
   hasMoreSessions: false,
+  chatSessions: [],
+  chatSessionsLoaded: false,
   currentSessionId: null,
   currentSession: null,
   loadingSessionId: null,
@@ -122,6 +127,37 @@ const toSessionSummary = (session: CoworkSession): CoworkSessionSummary => ({
   updatedAt: session.updatedAt,
 });
 
+const upsertSessionSummary = (
+  sessions: CoworkSessionSummary[],
+  summary: CoworkSessionSummary,
+): void => {
+  const index = sessions.findIndex(session => session.id === summary.id);
+  if (index === -1) {
+    sessions.unshift(summary);
+    return;
+  }
+  sessions[index] = { ...sessions[index], ...summary };
+};
+
+const updateSessionSummary = (
+  sessions: CoworkSessionSummary[],
+  sessionId: string,
+  update: (session: CoworkSessionSummary) => void,
+): void => {
+  const session = sessions.find(item => item.id === sessionId);
+  if (session) update(session);
+};
+
+const retainUnreadSessionIds = (state: CoworkState): void => {
+  const validSessionIds = new Set([
+    ...state.sessions.map(session => session.id),
+    ...state.chatSessions.map(session => session.id),
+  ]);
+  state.unreadSessionIds = state.unreadSessionIds.filter(
+    id => validSessionIds.has(id) && id !== state.currentSessionId,
+  );
+};
+
 const coworkSlice = createSlice({
   name: 'cowork',
   initialState,
@@ -132,10 +168,7 @@ const coworkSlice = createSlice({
 
     setSessions(state, action: PayloadAction<CoworkSessionSummary[]>) {
       state.sessions = action.payload;
-      const validSessionIds = new Set(action.payload.map(session => session.id));
-      state.unreadSessionIds = state.unreadSessionIds.filter(id => {
-        return validSessionIds.has(id) && id !== state.currentSessionId;
-      });
+      retainUnreadSessionIds(state);
     },
 
     setHasMoreSessions(state, action: PayloadAction<boolean>) {
@@ -151,6 +184,12 @@ const coworkSlice = createSlice({
       const newSessions = sessions.filter(s => !existingIds.has(s.id));
       state.sessions = [...state.sessions, ...newSessions];
       state.hasMoreSessions = hasMore;
+    },
+
+    setChatSessions(state, action: PayloadAction<CoworkSessionSummary[]>) {
+      state.chatSessions = action.payload;
+      state.chatSessionsLoaded = true;
+      retainUnreadSessionIds(state);
     },
 
     setCurrentSessionId(state, action: PayloadAction<string | null>) {
@@ -223,14 +262,10 @@ const coworkSlice = createSlice({
         cacheStreamingSession(state, state.currentSession!);
         if (!action.payload.id.startsWith('temp-')) {
           const summary = toSessionSummary(action.payload);
-          const sessionIndex = state.sessions.findIndex(s => s.id === summary.id);
-          if (sessionIndex !== -1) {
-            state.sessions[sessionIndex] = {
-              ...state.sessions[sessionIndex],
-              ...summary,
-            };
+          if (summary.mode === CoworkSessionMode.Chat) {
+            upsertSessionSummary(state.chatSessions, summary);
           } else {
-            state.sessions.unshift(summary);
+            upsertSessionSummary(state.sessions, summary);
           }
         }
         markSessionRead(state, action.payload.id);
@@ -248,11 +283,10 @@ const coworkSlice = createSlice({
 
     addSession(state, action: PayloadAction<CoworkSession>) {
       const summary = toSessionSummary(action.payload);
-      const existingIndex = state.sessions.findIndex(s => s.id === summary.id);
-      if (existingIndex !== -1) {
-        state.sessions[existingIndex] = { ...state.sessions[existingIndex], ...summary };
+      if (summary.mode === CoworkSessionMode.Chat) {
+        upsertSessionSummary(state.chatSessions, summary);
       } else {
-        state.sessions.unshift(summary);
+        upsertSessionSummary(state.sessions, summary);
       }
       state.currentSession = {
         ...action.payload,
@@ -271,12 +305,15 @@ const coworkSlice = createSlice({
       const { sessionId, status } = action.payload;
       setSessionStreaming(state, sessionId, status === CoworkSessionStatusValue.Running);
 
-      // Update in sessions list
-      const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        state.sessions[sessionIndex].status = status;
-        state.sessions[sessionIndex].updatedAt = Date.now();
-      }
+      const updatedAt = Date.now();
+      updateSessionSummary(state.sessions, sessionId, session => {
+        session.status = status;
+        session.updatedAt = updatedAt;
+      });
+      updateSessionSummary(state.chatSessions, sessionId, session => {
+        session.status = status;
+        session.updatedAt = updatedAt;
+      });
 
       // Update current session if applicable
       if (state.currentSession?.id === sessionId) {
@@ -294,11 +331,14 @@ const coworkSlice = createSlice({
 
     deleteSession(state, action: PayloadAction<string>) {
       removeSessionFromState(state, action.payload);
+      state.chatSessions = state.chatSessions.filter(session => session.id !== action.payload);
       setSessionStreaming(state, action.payload, false);
     },
 
     deleteSessions(state, action: PayloadAction<string[]>) {
       removeSessionsFromState(state, action.payload);
+      const sessionIdSet = new Set(action.payload);
+      state.chatSessions = state.chatSessions.filter(session => !sessionIdSet.has(session.id));
       for (const sessionId of action.payload) {
         setSessionStreaming(state, sessionId, false);
       }
@@ -326,11 +366,12 @@ const coworkSlice = createSlice({
         }
       }
 
-      // Update session in list
-      const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        state.sessions[sessionIndex].updatedAt = message.timestamp;
-      }
+      updateSessionSummary(state.sessions, sessionId, session => {
+        session.updatedAt = message.timestamp;
+      });
+      updateSessionSummary(state.chatSessions, sessionId, session => {
+        session.updatedAt = message.timestamp;
+      });
 
       markSessionUnread(state, sessionId);
     },
@@ -390,10 +431,12 @@ const coworkSlice = createSlice({
         }
       }
 
-      const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        state.sessions[sessionIndex].updatedAt = updatedAt;
-      }
+      updateSessionSummary(state.sessions, sessionId, session => {
+        session.updatedAt = updatedAt;
+      });
+      updateSessionSummary(state.chatSessions, sessionId, session => {
+        session.updatedAt = updatedAt;
+      });
 
       markSessionUnread(state, sessionId);
     },
@@ -407,13 +450,12 @@ const coworkSlice = createSlice({
       action: PayloadAction<{ sessionId: string; pinned: boolean; pinOrder?: number | null }>,
     ) {
       const { sessionId, pinned, pinOrder } = action.payload;
-      const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        state.sessions[sessionIndex].pinned = pinned;
-        state.sessions[sessionIndex].pinOrder = pinned
-          ? (pinOrder ?? state.sessions[sessionIndex].pinOrder ?? null)
-          : null;
-      }
+      const patchSummary = (session: CoworkSessionSummary) => {
+        session.pinned = pinned;
+        session.pinOrder = pinned ? (pinOrder ?? session.pinOrder ?? null) : null;
+      };
+      updateSessionSummary(state.sessions, sessionId, patchSummary);
+      updateSessionSummary(state.chatSessions, sessionId, patchSummary);
       if (state.currentSession?.id === sessionId) {
         state.currentSession.pinned = pinned;
         state.currentSession.pinOrder = pinned
@@ -424,11 +466,15 @@ const coworkSlice = createSlice({
 
     updateSessionTitle(state, action: PayloadAction<{ sessionId: string; title: string }>) {
       const { sessionId, title } = action.payload;
-      const sessionIndex = state.sessions.findIndex(s => s.id === sessionId);
-      if (sessionIndex !== -1) {
-        state.sessions[sessionIndex].title = title;
-        state.sessions[sessionIndex].updatedAt = Date.now();
-      }
+      const updatedAt = Date.now();
+      updateSessionSummary(state.sessions, sessionId, session => {
+        session.title = title;
+        session.updatedAt = updatedAt;
+      });
+      updateSessionSummary(state.chatSessions, sessionId, session => {
+        session.title = title;
+        session.updatedAt = updatedAt;
+      });
       if (state.currentSession?.id === sessionId) {
         state.currentSession.title = title;
         state.currentSession.updatedAt = Date.now();
@@ -521,6 +567,7 @@ export const {
   setSessions,
   setHasMoreSessions,
   appendSessions,
+  setChatSessions,
   setCurrentSessionId,
   setLoadingSessionId,
   clearLoadingSessionId,

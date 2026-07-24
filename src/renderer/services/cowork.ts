@@ -6,7 +6,7 @@ import {
 } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
-import { COWORK_SESSION_PAGE_SIZE } from '../../shared/cowork/constants';
+import { COWORK_SESSION_PAGE_SIZE, CoworkSessionMode } from '../../shared/cowork/constants';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
 import {
@@ -21,6 +21,7 @@ import {
   enqueuePendingPermission,
   prependMessages,
   setConfig,
+  setChatSessions,
   setCurrentSession,
   setHasMoreSessions,
   setRemoteManaged,
@@ -65,6 +66,7 @@ class CoworkService {
   private openClawStatusListeners = new Set<(status: OpenClawEngineStatus) => void>();
   private openClawEngineListenerAttached = false;
   private latestLoadSessionsRequestId = 0;
+  private latestLoadChatSessionsRequestId = 0;
   private latestLoadSessionRequestId = 0;
 
   async init(): Promise<void> {
@@ -75,7 +77,10 @@ class CoworkService {
 
     // Load workspaces and the sessions belonging to the selected workspace.
     await workspaceService.loadWorkspaces();
-    await this.loadSessions(undefined, store.getState().workspace.currentWorkspaceId ?? undefined);
+    await Promise.all([
+      this.loadSessions(undefined, store.getState().workspace.currentWorkspaceId ?? undefined),
+      this.loadChatSessions(),
+    ]);
 
     // Set up stream listeners
     this.setupStreamListeners();
@@ -112,7 +117,9 @@ class CoworkService {
       }
       // Check if session exists in current list
       const state = store.getState().cowork;
-      const sessionExists = state.sessions.some(s => s.id === sessionId);
+      const sessionExists = [...state.sessions, ...state.chatSessions].some(
+        session => session.id === sessionId,
+      );
 
       console.log(
         '[CoworkService] onStreamMessage: sessionId=',
@@ -129,9 +136,11 @@ class CoworkService {
         console.log(
           '[CoworkService] onStreamMessage: session NOT found in Redux, calling loadSessions...',
         );
-        await this.loadSessions();
+        await Promise.all([this.loadSessions(), this.loadChatSessions()]);
         const newState = store.getState().cowork;
-        const nowExists = newState.sessions.some(s => s.id === sessionId);
+        const nowExists = [...newState.sessions, ...newState.chatSessions].some(
+          session => session.id === sessionId,
+        );
         console.log(
           '[CoworkService] onStreamMessage: after loadSessions, sessionExists=',
           nowExists,
@@ -237,7 +246,7 @@ class CoworkService {
         'sessionIds:',
         beforeState.sessions.map(s => s.id).slice(0, 5),
       );
-      void this.loadSessions()
+      void Promise.all([this.loadSessions(), this.loadChatSessions()])
         .then(() => {
           const state = store.getState().cowork;
           console.log(
@@ -298,6 +307,7 @@ class CoworkService {
       agentId:
         workspaceService.isWorkspaceApiAvailable() && effectiveWorkspaceId ? undefined : agentId,
       workspaceId: workspaceService.isWorkspaceApiAvailable() ? effectiveWorkspaceId : undefined,
+      mode: CoworkSessionMode.Work,
     });
     if (result?.success && result.sessions) {
       // High-frequency IM traffic can trigger overlapping list refreshes.
@@ -307,6 +317,18 @@ class CoworkService {
       }
       store.dispatch(setSessions(result.sessions));
       store.dispatch(setHasMoreSessions(result.hasMore ?? false));
+    }
+  }
+
+  async loadChatSessions(): Promise<void> {
+    const requestId = ++this.latestLoadChatSessionsRequestId;
+    const result = await window.electron?.cowork?.listSessions({
+      limit: COWORK_SESSION_PAGE_SIZE,
+      offset: 0,
+      mode: CoworkSessionMode.Chat,
+    });
+    if (result?.success && result.sessions && requestId === this.latestLoadChatSessionsRequestId) {
+      store.dispatch(setChatSessions(result.sessions));
     }
   }
 
@@ -328,6 +350,7 @@ class CoworkService {
       limit,
       offset,
       workspaceId: workspaceService.isWorkspaceApiAvailable() ? workspaceId : undefined,
+      mode: CoworkSessionMode.Work,
     });
     return result ?? { success: false, error: 'Cowork IPC is unavailable' };
   }
@@ -348,6 +371,7 @@ class CoworkService {
       workspaceId: workspaceService.isWorkspaceApiAvailable()
         ? (store.getState().workspace.currentWorkspaceId ?? undefined)
         : undefined,
+      mode: CoworkSessionMode.Work,
     });
     if (result?.success && result.sessions) {
       store.dispatch(
