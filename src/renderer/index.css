@@ -23,6 +23,7 @@
   --color-surface: var(--zy-surface);
   --color-surface-foreground: var(--zy-surface-foreground);
   --color-surface-raised: var(--zy-surface-raised);
+  --color-surface-tertiary: var(--zy-surface-tertiary);
   --color-surface-overlay: var(--zy-surface-overlay);
   --color-surface-inset: var(--zy-surface-raised);
   --color-border: var(--zy-border);

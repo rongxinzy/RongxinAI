@@ -21,6 +21,7 @@ export const classicLight: ThemeDefinition = {
     surface: 'oklch(1 0 0)',
     'surface-foreground': 'oklch(0.147 0.004 49.25)',
     'surface-raised': 'oklch(0.97 0.001 106.424)',
+    'surface-tertiary': 'rgb(237 237 236)',
     'surface-overlay': 'oklch(1 0 0)',
     'chat-user': 'oklch(0.97 0.001 106.424)',
     'chat-user-foreground': 'oklch(0.147 0.004 49.25)',

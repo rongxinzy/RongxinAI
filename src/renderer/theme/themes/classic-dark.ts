@@ -21,6 +21,7 @@ export const classicDark: ThemeDefinition = {
     surface: 'oklch(0.216 0.006 56.043)',
     'surface-foreground': 'oklch(0.985 0.001 106.423)',
     'surface-raised': 'oklch(0.268 0.007 34.298)',
+    'surface-tertiary': 'oklch(0.32 0.007 34.298)',
     'surface-overlay': 'oklch(0.216 0.006 56.043)',
     'chat-user': 'oklch(0.268 0.007 34.298)',
     'chat-user-foreground': 'oklch(0.985 0.001 106.423)',

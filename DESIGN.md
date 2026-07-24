@@ -227,3 +227,37 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 - [ ] 每个可交互元素有 hover / focus / disabled 状态
 - [ ] 亮色与暗色两种外观下都看过效果
 - [ ] 组件优先使用 shadcn/ui 与 ai-elements（见 AGENTS.md），未自造轮子
+
+## 可复用的分割线 Tabs
+
+带重叠层级、阴影、尺寸和文字动效的 tabs 统一存放在：
+
+```text
+src/shared/components/ui/layered-tabs/
+├── constants.ts
+├── layered-tabs.tsx
+├── layered-tabs.test.ts
+└── index.ts
+```
+
+组件导出 `LayeredTabsList`，它必须放在现有 shadcn `Tabs` 根节点内部，与 `TabsContent` 配合使用。页面只提供受控的 `value`、`items` 和文案，不把页面业务状态、脏表单拦截或内容切换逻辑放进组件。
+
+```tsx
+<Tabs value={activeTab} onValueChange={setActiveTab}>
+  <LayeredTabsList
+    value={activeTab}
+    items={tabs}
+    separatorEdge={LayeredTabsSeparatorEdge.Top}
+  />
+  <TabsContent value={activeTab}>{content}</TabsContent>
+</Tabs>
+```
+
+`separatorEdge` 有两个变体：
+
+- `LayeredTabsSeparatorEdge.Top`：separator 位于 tab 顶部，tab 向下展开。
+- `LayeredTabsSeparatorEdge.Bottom`：separator 位于 tab 底部，tab 向上展开。
+
+`LayeredTabsList` 是 separator 的唯一拥有者。页面 header、TabsList 外层和其他父级不得再绘制同一位置的 `border` 或 `Separator`，否则 active tab 无法完整遮挡线段。页面需要调整宽度、外边距或内容间距时，使用组件的 `className`、`contentClassName` 和 `listClassName`，不要复制内部 trigger 和 surface 样式。
+
+组件使用 `motion` 处理 active 层级、背景表面和文字缩放，自动遵守 `prefers-reduced-motion`。新增 tab 数量或顺序时只需修改页面传入的 `items`，层级由组件统一计算；不要在页面中重新实现 z-index、三级尺寸或 separator 方向逻辑。

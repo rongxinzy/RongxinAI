@@ -23,6 +23,7 @@ export const TOKEN_CONTRACT = {
   surface: '--zy-surface',
   'surface-foreground': '--zy-surface-foreground',
   'surface-raised': '--zy-surface-raised',
+  'surface-tertiary': '--zy-surface-tertiary',
   'surface-overlay': '--zy-surface-overlay',
 
   // ── Chat bubbles ──
