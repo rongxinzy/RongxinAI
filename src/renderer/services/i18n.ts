@@ -1602,7 +1602,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     connectors: '连接器',
     connectorsDescription: '连接常用服务，让智能体在需要时查询信息、处理文件和完成更多任务。',
     mcpDescription: '配置和管理 MCP（Model Context Protocol）服务器，为您的智能体扩展工具能力',
-    searchMcpServers: '搜索 MCP 服务',
+    searchMcpServers: '搜索连接器',
     addMcpServer: '自定义',
     editMcpServer: '编辑 MCP 服务',
     deleteMcpServer: '删除 MCP 服务',
@@ -4027,7 +4027,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Connect the services you use so your agent can find information, work with files, and get more done when needed.',
     mcpDescription:
       "Configure and manage MCP (Model Context Protocol) servers to extend your agent's tool capabilities",
-    searchMcpServers: 'Search MCP servers',
+    searchMcpServers: 'Search connectors',
     addMcpServer: 'Custom',
     editMcpServer: 'Edit MCP Server',
     deleteMcpServer: 'Delete MCP Server',
