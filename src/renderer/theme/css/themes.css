@@ -15,6 +15,7 @@
   --zy-surface: oklch(1 0 0);
   --zy-surface-foreground: oklch(0.147 0.004 49.25);
   --zy-surface-raised: oklch(0.97 0.001 106.424);
+  --zy-surface-tertiary: rgb(237 237 236);
   --zy-surface-overlay: oklch(1 0 0);
   --zy-text-primary: oklch(0.147 0.004 49.25);
   --zy-text-secondary: oklch(0.553 0.013 58.071);
@@ -74,6 +75,7 @@
   --zy-surface: oklch(0.216 0.006 56.043);
   --zy-surface-foreground: oklch(0.985 0.001 106.423);
   --zy-surface-raised: oklch(0.268 0.007 34.298);
+  --zy-surface-tertiary: oklch(0.32 0.007 34.298);
   --zy-surface-overlay: oklch(0.216 0.006 56.043);
   --zy-text-primary: oklch(0.985 0.001 106.423);
   --zy-text-secondary: oklch(0.709 0.01 56.259);

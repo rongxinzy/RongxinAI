@@ -85,6 +85,7 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
   const isThirdLayer = activeIndex === 0 ? index === 2 : activeIndex === 2 ? index === 0 : false;
   const tabHeight = isActive ? 40 : isThirdLayer ? 27.5 : 32;
   const tabWidth = isThirdLayer ? '86%' : '100%';
+  const textScale = isActive ? 1 : isThirdLayer ? 0.75 : 0.875;
 
   return (
     <TabsTrigger
@@ -92,7 +93,7 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
       style={{ zIndex: isActive ? 30 : tabLayer, boxShadow: isActive ? 'none' : undefined }}
       className={cn(
         'group relative h-10 min-w-0 flex-1 rounded-t-lg rounded-b-none border-0 bg-transparent px-0 py-0 text-sm font-medium text-muted-foreground transition-colors duration-200 ease-out hover:text-foreground',
-        'data-active:z-10 data-active:border-b-0 data-active:bg-transparent data-active:font-semibold data-active:text-foreground data-active:shadow-none data-active:hover:bg-transparent dark:data-active:bg-transparent',
+        'data-active:z-10 data-active:border-b-0 data-active:bg-transparent data-active:font-semibold data-active:text-muted-foreground data-active:shadow-none data-active:hover:bg-transparent data-active:hover:text-muted-foreground dark:data-active:bg-transparent',
         'after:inset-x-0 after:bottom-0 after:z-10 after:h-px after:bg-border after:opacity-100',
         index > 0 && '-ml-4',
       )}
@@ -101,7 +102,10 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
         key="inactive-background"
         className={cn(
           'pointer-events-none absolute bottom-0 rounded-t-lg border border-b-0 border-border transition-colors duration-200',
-          isActive ? 'z-20 bg-card' : 'bg-secondary',
+          isActive && 'z-20 bg-card',
+          !isActive && !isThirdLayer && 'bg-secondary',
+          !isThirdLayer && 'shadow-md [clip-path:inset(-8px_-8px_0_-8px)]',
+          isThirdLayer && 'bg-surface-tertiary shadow-none',
         )}
         animate={{ height: tabHeight, width: tabWidth }}
         style={{ left: index === 0 ? 'auto' : 0, right: index === 0 ? 0 : 'auto' }}
@@ -114,10 +118,10 @@ const ScheduledTaskTabTrigger: React.FC<ScheduledTaskTabTriggerProps> = ({
         aria-hidden="true"
       />
       <motion.span
-        className="absolute bottom-0 z-30 inline-flex min-w-0 items-center justify-center gap-1.5 truncate"
+        className="absolute bottom-0 z-30 inline-flex min-w-0 items-center justify-center gap-1.5 truncate text-base leading-none"
         animate={{
-          height: isActive ? 40 : 32,
-          scale: isActive ? 1 : 0.88,
+          height: tabHeight,
+          scale: textScale,
           width: tabWidth,
         }}
         style={{ left: index === 0 ? 'auto' : 0, right: index === 0 ? 0 : 'auto' }}
