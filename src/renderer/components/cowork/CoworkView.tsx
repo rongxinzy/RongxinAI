@@ -1291,7 +1291,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         <div className="relative mx-auto flex min-h-full w-full max-w-5xl min-w-[320px] flex-col items-center justify-center gap-10 px-4 py-8">
           {/* Welcome Section - staggered entrance animation */}
           <div className="flex min-h-28 flex-col items-center justify-center gap-5 text-center">
-            <img src="logo.png" alt="logo" className="h-16 w-auto mx-auto animate-fade-in-up" />
+            <img src="zhiyuan-logo-light.svg" alt="logo" className="logo-light h-16 w-auto mx-auto animate-fade-in-up" />
+            <img src="zhiyuan-logo-dark.svg" alt="logo" className="logo-dark h-16 w-auto mx-auto animate-fade-in-up" />
             <p
               className={cn(
                 'min-h-5 max-w-md px-2 text-sm text-muted-foreground animate-fade-in-up',

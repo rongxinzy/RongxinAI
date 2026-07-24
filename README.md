@@ -1,7 +1,10 @@
 # 知远智能体 (ZhiYuan Agent)
 
 <p align="center">
-  <img src="public/logo.png" alt="知远智能体" width="120">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/zhiyuan-logo-dark-1600.png">
+    <img src="public/zhiyuan-logo-light-1600.png" alt="知远智能体" width="120">
+  </picture>
 </p>
 
 <p align="center">
