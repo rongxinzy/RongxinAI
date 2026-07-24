@@ -83,6 +83,42 @@ class SkillService {
     }
   }
 
+  async setSkillsEnabled(ids: string[], enabled: boolean): Promise<Skill[]> {
+    const setEnabledBatch = window.electron.skills.setEnabledBatch;
+    const useLegacyHandlers = async (): Promise<Skill[]> => {
+      // Older main/preload versions do not have the batch IPC. Keep writes
+      // serialized so each state update observes the previous one.
+      for (const id of ids) {
+        const result = await window.electron.skills.setEnabled({ id, enabled });
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update skills');
+        }
+      }
+      const latest = await window.electron.skills.list();
+      if (latest.success && latest.skills) {
+        this.skills = latest.skills;
+        return this.skills;
+      }
+      throw new Error(latest.error || 'Failed to update skills');
+    };
+
+    if (!setEnabledBatch) return useLegacyHandlers();
+
+    try {
+      const result = await setEnabledBatch({ ids, enabled });
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+        return this.skills;
+      }
+      throw new Error(result.error || 'Failed to update skills');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('No handler registered')) {
+        return useLegacyHandlers();
+      }
+      throw error;
+    }
+  }
+
   async setSkillPinned(id: string, pinned: boolean): Promise<Skill[]> {
     const result = await window.electron.skills.setPinned({ id, pinned });
     if (result.success && result.skills) {

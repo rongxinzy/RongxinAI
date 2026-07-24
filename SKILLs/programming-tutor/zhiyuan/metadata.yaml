@@ -1,5 +1,5 @@
 name: 编程学习导师
 description: 通过循序讲解、代码审查、调试引导、算法练习和项目辅导，帮助学习者建立扎实的编程能力。
-author: 开源社区
+author: Samuel Kahessay
 license: MIT
 skillmd: ./SKILL.md
