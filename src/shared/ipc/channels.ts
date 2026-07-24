@@ -21,10 +21,12 @@ export type StoreIpc = (typeof StoreIpc)[keyof typeof StoreIpc];
 export const SkillsIpc = {
   List: 'skills:list',
   SetEnabled: 'skills:setEnabled',
+  SetPinned: 'skills:setPinned',
   Delete: 'skills:delete',
   Download: 'skills:download',
   ConfirmInstall: 'skills:confirmInstall',
   GetRoot: 'skills:getRoot',
+  GetContent: 'skills:getContent',
   AutoRoutingPrompt: 'skills:autoRoutingPrompt',
   GetConfig: 'skills:getConfig',
   SetConfig: 'skills:setConfig',

@@ -21,7 +21,7 @@ const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   className,
-  overlayClassName: _overlayClassName,
+  overlayClassName,
   onClick,
   children,
 }) => {
@@ -34,7 +34,12 @@ const Modal: React.FC<ModalProps> = ({
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent className={className} showCloseButton={false} onClick={onClick}>
+      <DialogContent
+        className={className}
+        overlayClassName={overlayClassName}
+        showCloseButton={false}
+        onClick={onClick}
+      >
         {children}
       </DialogContent>
     </Dialog>

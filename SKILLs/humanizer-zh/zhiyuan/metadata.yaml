@@ -1,0 +1,9 @@
+name:
+  中文文本润色
+description:
+  识别并改写 AI 文本痕迹，让中文表达更自然、准确且有人味。
+author:
+  歸藏
+license:
+  MIT
+skillmd: ./SKILL.md

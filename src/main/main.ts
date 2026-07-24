@@ -3168,6 +3168,18 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle(SkillsIpc.SetPinned, (_event, options: { id: string; pinned: boolean }) => {
+    try {
+      const skills = getSkillManager().setSkillPinned(options.id, options.pinned);
+      return { success: true, skills };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update skill',
+      };
+    }
+  });
+
   ipcMain.handle('skills:delete', async (_event, id: string) => {
     try {
       const skills = await getSkillManager().deleteSkill(id);
@@ -3208,6 +3220,10 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle(SkillsIpc.GetContent, (_event, skillId: string) => {
+    return getSkillManager().getSkillContent(skillId);
+  });
+
   ipcMain.handle('skills:autoRoutingPrompt', () => {
     try {
       const prompt = getSkillManager().buildAutoRoutingPrompt();
@@ -3239,29 +3255,34 @@ if (!gotTheLock) {
     },
   );
 
-  ipcMain.handle(SkillsIpc.FetchMarketplace, async () => {
-    try {
-      const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
-      const token = createModelScopeTokenPool({
-        extraTokens: userToken ? [userToken] : [],
-      }).nextToken();
-      console.log('[SkillMarketplace] fetching skills from ModelScope OpenAPI');
-      const data = await fetchModelScopeSkillMarketplace({
-        token,
-        fetchImpl: (input, init) =>
-          session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
-            typeof fetch
-          >,
-      });
-      return { success: true, data };
-    } catch (error) {
-      console.error('[SkillMarketplace] fetch error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch skill marketplace',
-      };
-    }
-  });
+  ipcMain.handle(
+    SkillsIpc.FetchMarketplace,
+    async (_event, options?: { pageNumber?: number; pageSize?: number }) => {
+      try {
+        const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
+        const token = createModelScopeTokenPool({
+          extraTokens: userToken ? [userToken] : [],
+        }).nextToken();
+        console.log('[SkillMarketplace] fetching skills from ModelScope OpenAPI');
+        const data = await fetchModelScopeSkillMarketplace({
+          token,
+          pageNumber: options?.pageNumber,
+          pageSize: options?.pageSize,
+          fetchImpl: (input, init) =>
+            session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
+              typeof fetch
+            >,
+        });
+        return { success: true, data };
+      } catch (error) {
+        console.error('[SkillMarketplace] fetch error:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to fetch skill marketplace',
+        };
+      }
+    },
+  );
 
   ipcMain.handle('openclaw:engine:getStatus', async () => {
     try {

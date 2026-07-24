@@ -76,12 +76,13 @@ test('fetchModelScopeSkillMarketplace maps ModelScope skills to the app marketpl
           },
         ],
         localSkill: [],
+        hasMore: false,
       },
     },
   });
 });
 
-test('fetchModelScopeSkillMarketplace keeps only featured skills', async () => {
+test('fetchModelScopeSkillMarketplace orders a ModelScope page by downloads', async () => {
   const json = await fetchModelScopeSkillMarketplace({
     fetchImpl: async () => ({
       ok: true,
@@ -184,8 +185,40 @@ test('fetchModelScopeSkillMarketplace keeps only featured skills', async () => {
           },
         ],
         localSkill: [],
+        hasMore: false,
       },
     },
+  });
+});
+
+test('fetchModelScopeSkillMarketplace requests the specified page and reports more results', async () => {
+  const requestedUrls: string[] = [];
+  const json = await fetchModelScopeSkillMarketplace({
+    pageNumber: 4,
+    pageSize: 8,
+    fetchImpl: async input => {
+      requestedUrls.push(input);
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          data: {
+            skills: [],
+            total: 40,
+          },
+        }),
+        text: async () => '',
+      };
+    },
+  });
+
+  expect(requestedUrls).toEqual([
+    'https://modelscope.cn/openapi/v1/skills?page_number=4&page_size=8',
+  ]);
+  expect(JSON.parse(json).data.value).toMatchObject({
+    marketplace: [],
+    hasMore: true,
   });
 });
 

@@ -2,7 +2,6 @@ import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
-import type { CoworkSessionMode } from '../../shared/cowork/constants';
 import type {
   LlamaCppCancelInstallResult,
   LlamaCppImportModelFilesResult,
@@ -215,11 +214,19 @@ interface Skill {
   name: string;
   description: string;
   enabled: boolean;
+  pinned: boolean;
   isOfficial: boolean;
   isBuiltIn: boolean;
   updatedAt: number;
   prompt: string;
   skillPath: string;
+  iconUrl?: string;
+  displayName?: string;
+  displayDescription?: string;
+  displayAuthor?: string;
+  displayLicense?: string;
+  metadataContent?: string;
+  metadataFields?: Record<string, string>;
 }
 
 type EmailConnectivityCheckCode = 'imap_connection' | 'smtp_connection';
@@ -303,7 +310,7 @@ interface McpConnectionTestResult {
 
 import type { Platform } from '@shared/platform';
 
-import type { Agent } from './agent';
+import type { Agent, PresetAgent } from './agent';
 
 interface CreditItem {
   type: 'subscription' | 'boost' | 'free';
@@ -335,6 +342,10 @@ interface IElectronAPI {
       id: string;
       enabled: boolean;
     }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
+    setPinned: (options: {
+      id: string;
+      pinned: boolean;
+    }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     download: (source: string) => Promise<{
       success: boolean;
@@ -349,6 +360,9 @@ interface IElectronAPI {
       action: string,
     ) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     getRoot: () => Promise<{ success: boolean; path?: string; error?: string }>;
+    getContent: (
+      skillId: string,
+    ) => Promise<{ success: boolean; content?: string; error?: string }>;
     autoRoutingPrompt: () => Promise<{ success: boolean; prompt?: string | null; error?: string }>;
     getConfig: (
       skillId: string,
@@ -361,7 +375,11 @@ interface IElectronAPI {
       skillId: string,
       config: Record<string, string>,
     ) => Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }>;
-    fetchMarketplace: () => Promise<{ success: boolean; data?: string; error?: string }>;
+    fetchMarketplace: (options?: { pageNumber?: number; pageSize?: number }) => Promise<{
+      success: boolean;
+      data?: string;
+      error?: string;
+    }>;
     onChanged: (callback: () => void) => () => void;
   };
   mcp: {
@@ -453,9 +471,7 @@ interface IElectronAPI {
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;
     importModelFiles: (paths: string[]) => Promise<LlamaCppImportModelFilesResult>;
-    deleteModel: (
-      name: string,
-    ) => Promise<{
+    deleteModel: (name: string) => Promise<{
       success: boolean;
       deleted?: boolean;
       reason?: 'not-local-file' | 'not-app-managed';
@@ -541,9 +557,10 @@ interface IElectronAPI {
       },
     ) => Promise<Agent>;
     delete: (id: string) => Promise<boolean>;
-    importExpertPackage: (
-      expertDir: string,
-    ) => Promise<{
+    presets: () => Promise<PresetAgent[]>;
+    presetTemplates: () => Promise<PresetAgent[]>;
+    addPreset: (presetId: string) => Promise<Agent>;
+    importExpertPackage: (expertDir: string) => Promise<{
       success: boolean;
       agentIds?: string[];
       expertType?: string;
@@ -642,10 +659,7 @@ interface IElectronAPI {
       workspaces?: import('../../shared/workspace').Workspace[];
       error?: string;
     }>;
-    ensureWorkspace: (options: {
-      path: string;
-      name?: string;
-    }) => Promise<{
+    ensureWorkspace: (options: { path: string; name?: string }) => Promise<{
       success: boolean;
       workspace?: import('../../shared/workspace').Workspace;
       error?: string;
@@ -715,7 +729,6 @@ interface IElectronAPI {
       offset?: number;
       agentId?: string;
       workspaceId?: string;
-      mode?: CoworkSessionMode;
     }) => Promise<{
       success: boolean;
       sessions?: CoworkSessionSummary[];

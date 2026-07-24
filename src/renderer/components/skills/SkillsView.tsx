@@ -11,6 +11,7 @@ interface SkillsViewProps {
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   onCreateSkillByChat?: () => void;
+  onTrySkill?: (skillId: string) => void;
   updateBadge?: React.ReactNode;
   readOnly?: boolean;
 }
@@ -20,6 +21,7 @@ const SkillsView: React.FC<SkillsViewProps> = ({
   onToggleSidebar,
   onNewChat,
   onCreateSkillByChat,
+  onTrySkill,
   updateBadge,
   readOnly,
 }) => {
@@ -57,8 +59,12 @@ const SkillsView: React.FC<SkillsViewProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <SkillsManager readOnly={readOnly} onCreateByChat={onCreateSkillByChat} />
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <SkillsManager
+            readOnly={readOnly}
+            onCreateByChat={onCreateSkillByChat}
+            onTrySkill={onTrySkill}
+          />
         </div>
       </div>
     </div>

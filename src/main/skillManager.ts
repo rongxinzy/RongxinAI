@@ -331,15 +331,23 @@ export type SkillRecord = {
   name: string;
   description: string;
   enabled: boolean;
+  pinned: boolean;
   isOfficial: boolean;
   isBuiltIn: boolean;
   updatedAt: number;
   prompt: string;
   skillPath: string;
+  iconUrl?: string;
+  displayName?: string;
+  displayDescription?: string;
+  displayAuthor?: string;
+  displayLicense?: string;
+  metadataContent?: string;
+  metadataFields?: Record<string, string>;
   version?: string;
 };
 
-type SkillStateMap = Record<string, { enabled: boolean }>;
+type SkillStateMap = Record<string, { enabled: boolean; pinned?: boolean }>;
 
 type EmailConnectivityCheckCode = 'imap_connection' | 'smtp_connection';
 type EmailConnectivityCheckLevel = 'pass' | 'fail';
@@ -361,6 +369,7 @@ type EmailConnectivityTestResult = {
 type SkillDefaultConfig = {
   order?: number;
   enabled?: boolean;
+  displayName?: string;
 };
 
 type SkillsConfig = {
@@ -371,7 +380,18 @@ type SkillsConfig = {
 
 const SKILLS_DIR_NAME = 'SKILLs';
 const SKILL_FILE_NAME = 'SKILL.md';
+const SKILL_ICON_FILE_NAMES = ['icon.svg', 'icon.png', 'icon.webp', 'icon.jpg', 'icon.jpeg'] as const;
+const SKILL_ICON_MIME_TYPES: Record<(typeof SKILL_ICON_FILE_NAMES)[number], string> = {
+  'icon.svg': 'image/svg+xml',
+  'icon.png': 'image/png',
+  'icon.webp': 'image/webp',
+  'icon.jpg': 'image/jpeg',
+  'icon.jpeg': 'image/jpeg',
+};
 const SKILLS_CONFIG_FILE = 'skills.config.json';
+const RONGX_DIR_NAME = 'zhiyuan';
+const RONGX_METADATA_FILE_NAME = 'metadata.yaml';
+const RONGX_PRIMARY_METADATA_FIELDS = ['name', 'description', 'author', 'license'] as const;
 const SKILL_STATE_KEY = 'skills_state';
 const WATCH_DEBOUNCE_MS = 250;
 
@@ -1290,6 +1310,11 @@ export class SkillManager {
   }
 
   getSkillsRoot(): string {
+    const projectRoot = path.resolve(__dirname, '..');
+    const projectSkillsRoot = path.resolve(projectRoot, SKILLS_DIR_NAME);
+    if (!app.isPackaged && fs.existsSync(projectSkillsRoot)) {
+      return projectSkillsRoot;
+    }
     return path.resolve(app.getPath('userData'), SKILLS_DIR_NAME);
   }
 
@@ -1512,8 +1537,8 @@ export class SkillManager {
 
   private mergeSkillsConfig(bundledPath: string, targetPath: string): void {
     try {
-      const bundled = JSON.parse(fs.readFileSync(bundledPath, 'utf-8'));
-      const target = JSON.parse(fs.readFileSync(targetPath, 'utf-8'));
+      const bundled = JSON.parse(fs.readFileSync(bundledPath, 'utf-8')) as SkillsConfig;
+      const target = JSON.parse(fs.readFileSync(targetPath, 'utf-8')) as SkillsConfig;
       if (!bundled.defaults || !target.defaults) return;
       let changed = false;
       for (const [id, config] of Object.entries(bundled.defaults)) {
@@ -1522,12 +1547,17 @@ export class SkillManager {
           changed = true;
         }
       }
+      if (target.version < bundled.version) {
+        // Keep every existing entry so upgrades retain the user's prior defaults.
+        target.version = bundled.version;
+        changed = true;
+      }
       if (changed) {
         // Write to temp file first, then rename for atomic update
         const tmpPath = targetPath + '.tmp';
         fs.writeFileSync(tmpPath, JSON.stringify(target, null, 2) + '\n', 'utf-8');
         fs.renameSync(tmpPath, targetPath);
-        console.log('[skills] mergeSkillsConfig: merged new skill entries into user config');
+        console.log('[skills] mergeSkillsConfig: migrated user config without replacing existing defaults');
       }
     } catch (e) {
       console.warn('[skills] Failed to merge skills config:', e);
@@ -1561,6 +1591,7 @@ export class SkillManager {
     const skills = Array.from(skillMap.values());
 
     skills.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       const orderA = defaults[a.id]?.order ?? 999;
       const orderB = defaults[b.id]?.order ?? 999;
       if (orderA !== orderB) return orderA - orderB;
@@ -1600,7 +1631,27 @@ export class SkillManager {
 
   setSkillEnabled(id: string, enabled: boolean): SkillRecord[] {
     const state = this.loadSkillStateMap();
-    state[id] = { enabled };
+    state[id] = { ...state[id], enabled };
+    this.saveSkillStateMap(state);
+    this.notifySkillsChanged();
+    return this.listSkills();
+  }
+
+  getSkillContent(id: string): { success: boolean; content?: string; error?: string } {
+    const skill = this.listSkills().find(item => item.id === id);
+    if (!skill) return { success: false, error: 'Skill not found' };
+    try {
+      const raw = fs.readFileSync(skill.skillPath, 'utf8');
+      return { success: true, content: parseFrontmatter(raw).content.trim() };
+    } catch (error) {
+      console.error('[skills] Failed to read skill content:', error);
+      return { success: false, error: 'Failed to read skill content' };
+    }
+  }
+
+  setSkillPinned(id: string, pinned: boolean): SkillRecord[] {
+    const state = this.loadSkillStateMap();
+    state[id] = { ...state[id], enabled: state[id]?.enabled ?? true, pinned };
     this.saveSkillStateMap(state);
     this.notifySkillsChanged();
     return this.listSkills();
@@ -2421,6 +2472,14 @@ export class SkillManager {
         } catch (error) {
           console.warn('[skills] Failed to watch skill directory:', dir, error);
         }
+
+        const rongxDir = path.join(dir, RONGX_DIR_NAME);
+        if (!fs.existsSync(rongxDir)) return;
+        try {
+          this.watchers.push(fs.watch(rongxDir, skillDirWatchHandler));
+        } catch (error) {
+          console.warn('[skills] Failed to watch skill UI metadata directory:', rongxDir, error);
+        }
       });
     });
   }
@@ -2498,23 +2557,105 @@ export class SkillManager {
       const updatedAt = fs.statSync(skillFile).mtimeMs;
       const id = path.basename(dir);
       const prompt = content.trim();
+      const rongxMetadata = this.readRongxMetadata(dir);
+      const rongxDir = path.join(dir, RONGX_DIR_NAME);
+      const configuredIcon =
+        typeof frontmatter.icon === 'string' ? path.basename(frontmatter.icon) : undefined;
+      const iconPath = [
+        ...SKILL_ICON_FILE_NAMES.map(fileName => path.join(rongxDir, fileName)),
+        ...(configuredIcon ? [path.join(dir, configuredIcon)] : []),
+        ...SKILL_ICON_FILE_NAMES.map(fileName => path.join(dir, fileName)),
+      ].find(filePath => fs.existsSync(filePath));
       const defaultEnabled = defaults[id]?.enabled ?? true;
       const enabled = state[id]?.enabled ?? defaultEnabled;
+      const pinned = state[id]?.pinned ?? false;
       return {
         id,
         name,
         description,
         enabled,
+        pinned,
         isOfficial,
         isBuiltIn,
         updatedAt,
         prompt,
         skillPath: skillFile,
+        iconUrl: iconPath ? this.getSkillIconDataUrl(iconPath) : undefined,
+        displayName: rongxMetadata.name || defaults[id]?.displayName,
+        displayDescription: rongxMetadata.description,
+        displayAuthor: rongxMetadata.author,
+        displayLicense: rongxMetadata.license,
+        metadataContent: rongxMetadata.content,
+        metadataFields: rongxMetadata.fields,
         version,
       };
     } catch (error) {
       console.warn('[skills] Failed to parse skill:', dir, error);
       return null;
+    }
+  }
+
+  private readRongxMetadata(
+    skillDir: string,
+  ): {
+    name?: string;
+    description?: string;
+    author?: string;
+    license?: string;
+    content?: string;
+    fields?: Record<string, string>;
+  } {
+    const metadataPath = path.join(skillDir, RONGX_DIR_NAME, RONGX_METADATA_FILE_NAME);
+    if (!fs.existsSync(metadataPath)) return {};
+
+    try {
+      const content = fs.readFileSync(metadataPath, 'utf8');
+      const parsed = yaml.load(content);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+      const metadata = parsed as Record<string, unknown>;
+      const name = typeof metadata.name === 'string' ? metadata.name.trim() : '';
+      const description =
+        typeof metadata.description === 'string' ? metadata.description.trim() : '';
+      const author = typeof metadata.author === 'string' ? metadata.author.trim() : '';
+      const license = typeof metadata.license === 'string' ? metadata.license.trim() : '';
+      const fields = Object.fromEntries(
+        Object.entries(metadata)
+          .filter(
+            ([key, value]) =>
+              value !== undefined &&
+              value !== null &&
+              !RONGX_PRIMARY_METADATA_FIELDS.includes(
+                key as (typeof RONGX_PRIMARY_METADATA_FIELDS)[number],
+              ),
+          )
+          .map(([key, value]) => [
+            key,
+            typeof value === 'string' ? value.trim() : JSON.stringify(value),
+          ]),
+      );
+      return {
+        ...(name ? { name } : {}),
+        ...(description ? { description } : {}),
+        ...(author ? { author } : {}),
+        ...(license ? { license } : {}),
+        content,
+        ...(Object.keys(fields).length > 0 ? { fields } : {}),
+      };
+    } catch (error) {
+      console.warn('[skills] Failed to read rongx skill metadata:', metadataPath, error);
+      return {};
+    }
+  }
+
+  private getSkillIconDataUrl(iconPath: string): string | undefined {
+    try {
+      const iconFileName = path.basename(iconPath).toLowerCase() as keyof typeof SKILL_ICON_MIME_TYPES;
+      const mimeType = SKILL_ICON_MIME_TYPES[iconFileName];
+      if (!mimeType) return undefined;
+      return `data:${mimeType};base64,${fs.readFileSync(iconPath).toString('base64')}`;
+    } catch (error) {
+      console.warn('[skills] Failed to read skill icon:', iconPath, error);
+      return undefined;
     }
   }
 
@@ -2599,17 +2740,14 @@ export class SkillManager {
 
   getBundledSkillsRoot(): string {
     if (app.isPackaged) {
-      // In production, bundled SKILLs should be in Resources/SKILLs.
       const resourcesRoot = path.resolve(process.resourcesPath, SKILLS_DIR_NAME);
       if (fs.existsSync(resourcesRoot)) {
         return resourcesRoot;
       }
 
-      // Fallback for older packages where SKILLs are inside app.asar.
       return path.resolve(app.getAppPath(), SKILLS_DIR_NAME);
     }
 
-    // In development, use the project root (parent of dist-electron).
     // __dirname is dist-electron/, so we need to go up one level to get to project root
     const projectRoot = path.resolve(__dirname, '..');
     return path.resolve(projectRoot, SKILLS_DIR_NAME);

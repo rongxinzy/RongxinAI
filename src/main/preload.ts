@@ -77,18 +77,22 @@ contextBridge.exposeInMainWorld('electron', {
     list: () => ipcRenderer.invoke(SkillsIpc.List),
     setEnabled: (options: { id: string; enabled: boolean }) =>
       ipcRenderer.invoke(SkillsIpc.SetEnabled, options),
+    setPinned: (options: { id: string; pinned: boolean }) =>
+      ipcRenderer.invoke(SkillsIpc.SetPinned, options),
     delete: (id: string) => ipcRenderer.invoke(SkillsIpc.Delete, id),
     download: (source: string) => ipcRenderer.invoke(SkillsIpc.Download, source),
     confirmInstall: (pendingId: string, action: string) =>
       ipcRenderer.invoke(SkillsIpc.ConfirmInstall, pendingId, action),
     getRoot: () => ipcRenderer.invoke(SkillsIpc.GetRoot),
+    getContent: (skillId: string) => ipcRenderer.invoke(SkillsIpc.GetContent, skillId),
     autoRoutingPrompt: () => ipcRenderer.invoke(SkillsIpc.AutoRoutingPrompt),
     getConfig: (skillId: string) => ipcRenderer.invoke(SkillsIpc.GetConfig, skillId),
     setConfig: (skillId: string, config: Record<string, string>) =>
       ipcRenderer.invoke(SkillsIpc.SetConfig, skillId, config),
     testEmailConnectivity: (skillId: string, config: Record<string, string>) =>
       ipcRenderer.invoke(SkillsIpc.TestEmailConnectivity, skillId, config),
-    fetchMarketplace: () => ipcRenderer.invoke(SkillsIpc.FetchMarketplace),
+    fetchMarketplace: (options?: { pageNumber?: number; pageSize?: number }) =>
+      ipcRenderer.invoke(SkillsIpc.FetchMarketplace, options),
     onChanged: (callback: () => void) => onPushVoid(SkillsIpc.Changed, callback),
   },
 
