@@ -541,39 +541,6 @@ select::-ms-expand {
   animation: shimmer 1.5s infinite;
 }
 
-/* Streaming activity bar */
-.streaming-bar {
-  position: relative;
-  height: 2px;
-  overflow: hidden;
-  border-radius: 1px;
-  background: var(--zy-primary-muted);
-}
-.streaming-bar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 40%;
-  border-radius: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--zy-primary) 50%, transparent 100%);
-  opacity: 0.7;
-  animation: streaming-slide 1.5s ease-in-out infinite;
-}
-/* Streaming bar glow uses primary color */
-.streaming-bar::before {
-  box-shadow: 0 0 6px var(--zy-primary-muted);
-}
-@keyframes streaming-slide {
-  0% {
-    left: -40%;
-  }
-  100% {
-    left: 100%;
-  }
-}
-
 /* Respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
