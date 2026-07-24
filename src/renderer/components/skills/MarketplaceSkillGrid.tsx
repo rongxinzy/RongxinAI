@@ -23,6 +23,7 @@ import type { MarketplaceSkill } from '../../types/skill';
 interface MarketplaceSkillGridProps {
   skills: MarketplaceSkill[];
   installedSkillIds: ReadonlySet<string>;
+  installedSkillNames: ReadonlySet<string>;
   isInstallingSkillId: string | null;
   readOnly?: boolean;
   onSelect: (skill: MarketplaceSkill) => void;
@@ -33,6 +34,7 @@ interface MarketplaceSkillGridProps {
 export function MarketplaceSkillGrid({
   skills,
   installedSkillIds,
+  installedSkillNames,
   isInstallingSkillId,
   readOnly,
   onSelect,
@@ -56,7 +58,12 @@ export function MarketplaceSkillGrid({
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       {skills.map(skill => {
-        const isInstalled = installedSkillIds.has(skill.id);
+        const normalizedName = skill.name
+          .trim()
+          .toLowerCase()
+          .replace(/[\s_-]+/g, '-');
+        const isInstalled =
+          installedSkillIds.has(skill.id) || installedSkillNames.has(normalizedName);
         const isInstalling = isInstallingSkillId === skill.id;
 
         return (
@@ -86,7 +93,11 @@ export function MarketplaceSkillGrid({
                 </div>
                 <CardTitle className="truncate">{skill.name}</CardTitle>
               </div>
-              {isInstalled ? null : (
+              {isInstalled ? (
+                <span className="text-xs text-muted-foreground">
+                  {i18nService.t('skillAlreadyInstalled')}
+                </span>
+              ) : (
                 !readOnly &&
                 skill.installSource && (
                   <Button
@@ -99,7 +110,9 @@ export function MarketplaceSkillGrid({
                     }}
                   >
                     <Download data-icon="inline-start" />
-                    {isInstalling ? i18nService.t('skillInstalling') : i18nService.t('skillInstall')}
+                    {isInstalling
+                      ? i18nService.t('skillInstalling')
+                      : i18nService.t('skillInstall')}
                   </Button>
                 )
               )}
@@ -111,9 +124,14 @@ export function MarketplaceSkillGrid({
               </CardDescription>
               {isInstalling && (
                 <div className="absolute left-8 right-24 top-[42%] z-20 -translate-y-1/2">
-                  <div className="mb-1 text-center text-xs font-medium text-foreground">{installProgress}%</div>
+                  <div className="mb-1 text-center text-xs font-medium text-foreground">
+                    {installProgress}%
+                  </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${installProgress}%` }} />
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{ width: `${installProgress}%` }}
+                    />
                   </div>
                 </div>
               )}

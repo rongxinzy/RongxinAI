@@ -226,6 +226,18 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     if (result.success && result.skills) dispatch(setSkills(result.skills));
   };
   const installedSkillIds = useMemo(() => new Set(skills.map(skill => skill.id)), [skills]);
+  const installedSkillNames = useMemo(
+    () =>
+      new Set(
+        skills.map(skill =>
+          skill.name
+            .trim()
+            .toLowerCase()
+            .replace(/[\s_-]+/g, '-'),
+        ),
+      ),
+    [skills],
+  );
 
   const filteredMarketplaceSkills = useMemo(() => {
     const query = skillSearchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -448,7 +460,18 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   const getSkillInstallStatus = (
     marketplaceSkill: MarketplaceSkill,
   ): 'not_installed' | 'installed' => {
-    const installed = skills.find(s => s.id === marketplaceSkill.id);
+    const normalizedName = marketplaceSkill.name
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '-');
+    const installed = skills.find(
+      s =>
+        s.id === marketplaceSkill.id ||
+        s.name
+          .trim()
+          .toLowerCase()
+          .replace(/[\s_-]+/g, '-') === normalizedName,
+    );
     if (!installed) return 'not_installed';
     return 'installed';
   };
@@ -715,6 +738,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                   <MarketplaceSkillGrid
                     skills={filteredMarketplaceSkills}
                     installedSkillIds={installedSkillIds}
+                    installedSkillNames={installedSkillNames}
                     isInstallingSkillId={installingSkillId}
                     readOnly={readOnly}
                     onSelect={setSelectedMarketplaceSkill}
