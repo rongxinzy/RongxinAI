@@ -21,19 +21,6 @@ export interface Agent {
   updatedAt: number;
 }
 
-export interface PresetAgent {
-  id: string;
-  name: string;
-  nameEn: string;
-  icon: string;
-  description: string;
-  descriptionEn: string;
-  systemPrompt: string;
-  systemPromptEn: string;
-  skillIds: string[];
-  installed?: boolean;
-}
-
 export interface CreateAgentRequest {
   id?: string;
   name: string;

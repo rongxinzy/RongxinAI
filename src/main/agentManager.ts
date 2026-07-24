@@ -1,5 +1,4 @@
 import type { Agent, CoworkStore, CreateAgentRequest, UpdateAgentRequest } from './coworkStore';
-import { PRESET_AGENTS, type PresetAgent, presetToCreateRequest } from './presetAgents';
 
 /**
  * AgentManager handles CRUD operations for agents and preset agent installation.
@@ -44,35 +43,5 @@ export class AgentManager {
 
   deleteAgent(agentId: string): boolean {
     return this.store.deleteAgent(agentId);
-  }
-
-  // --- Preset agents ---
-
-  getPresetAgents(): PresetAgent[] {
-    const existingAgents = this.store.listAgents();
-    const existingPresetIds = new Set(
-      existingAgents.filter(a => a.source === 'preset').map(a => a.presetId),
-    );
-    // Only return presets that haven't been added yet
-    return PRESET_AGENTS.filter(p => !existingPresetIds.has(p.id));
-  }
-
-  getAllPresetAgents(): PresetAgent[] {
-    return PRESET_AGENTS;
-  }
-
-  addPresetAgent(presetId: string, defaultModel?: string): Agent | null {
-    const preset = PRESET_AGENTS.find(p => p.id === presetId);
-    if (!preset) return null;
-
-    // Check if already installed
-    const existing = this.store.getAgent(preset.id);
-    if (existing) return existing;
-
-    return this.store.createAgent({
-      ...presetToCreateRequest(preset),
-      model: defaultModel?.trim() || '',
-      workingDirectory: '',
-    });
   }
 }

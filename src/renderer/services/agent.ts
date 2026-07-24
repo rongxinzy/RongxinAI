@@ -12,7 +12,7 @@ import {
 import { clearCurrentSession } from '../store/slices/coworkSlice';
 import { clearAgentSelectedModel } from '../store/slices/modelSlice';
 import { clearActiveSkills, setActiveSkillIds } from '../store/slices/skillSlice';
-import type { Agent, PresetAgent } from '../types/agent';
+import type { Agent } from '../types/agent';
 
 class AgentService {
   async loadAgents(): Promise<void> {
@@ -154,57 +154,6 @@ class AgentService {
     } catch (error) {
       console.error('Failed to delete agent:', error);
       return false;
-    }
-  }
-
-  async getPresets(): Promise<PresetAgent[]> {
-    try {
-      const presets = await window.electron?.agents?.presets();
-      return presets ?? [];
-    } catch (error) {
-      console.error('Failed to get presets:', error);
-      return [];
-    }
-  }
-
-  async getPresetTemplates(): Promise<PresetAgent[]> {
-    try {
-      const presets = await window.electron?.agents?.presetTemplates();
-      return presets ?? [];
-    } catch (error) {
-      console.error('Failed to get preset agent templates:', error);
-      return [];
-    }
-  }
-
-  async addPreset(presetId: string): Promise<Agent | null> {
-    try {
-      const agent = await window.electron?.agents?.addPreset(presetId);
-      if (agent) {
-        store.dispatch(
-          addAgent({
-            id: agent.id,
-            name: agent.name,
-            description: agent.description,
-            icon: agent.icon,
-            model: agent.model ?? '',
-            workingDirectory: agent.workingDirectory ?? '',
-            enabled: agent.enabled,
-            pinned: agent.pinned ?? false,
-            pinOrder: agent.pinOrder ?? null,
-            isDefault: agent.isDefault,
-            source: agent.source,
-            presetId: agent.presetId ?? '',
-            systemPrompt: agent.systemPrompt ?? '',
-            skillIds: agent.skillIds ?? [],
-          }),
-        );
-        return agent;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to add preset agent:', error);
-      return null;
     }
   }
 

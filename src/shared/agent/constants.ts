@@ -10,9 +10,6 @@ export const AgentIpcChannel = {
   Create: 'agents:create',
   Update: 'agents:update',
   Delete: 'agents:delete',
-  Presets: 'agents:presets',
-  PresetTemplates: 'agents:presetTemplates',
-  AddPreset: 'agents:addPreset',
   ImportExpertPackage: 'agents:importExpertPackage',
   GetPresetExperts: 'agents:getPresetExperts',
 } as const;

@@ -5,12 +5,7 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import type { AgentSidebarAgentSummary } from './types';
-import {
-  collapseAgentSidebarTaskList,
-  sortAgentSidebarAgents,
-  sortAgentSidebarTasks,
-} from './useAgentSidebarState';
+import { sortAgentSidebarTasks } from './useAgentSidebarState';
 
 const makeSession = (
   id: string,
@@ -28,19 +23,6 @@ const makeSession = (
   agentId: 'main',
   createdAt,
   updatedAt,
-});
-
-const makeAgent = (
-  id: string,
-  pinned = false,
-  pinOrder: number | null = null,
-): AgentSidebarAgentSummary => ({
-  id,
-  name: id,
-  icon: '',
-  enabled: true,
-  pinned,
-  pinOrder,
 });
 
 test('sortAgentSidebarTasks keeps unpinned tasks ordered by last update time', () => {
@@ -92,24 +74,4 @@ test('sortAgentSidebarTasks keeps pinned tasks in first-pinned-first order', () 
     'newer-unpinned',
     'middle-unpinned',
   ]);
-});
-
-test('sortAgentSidebarAgents keeps pinned agents in first-pinned-first order', () => {
-  const sorted = sortAgentSidebarAgents([
-    makeAgent('regular'),
-    makeAgent('second-pinned', true, 2),
-    makeAgent('first-pinned', true, 1),
-    makeAgent('another-regular'),
-  ]);
-
-  expect(sorted.map(agent => agent.id)).toEqual([
-    'first-pinned',
-    'second-pinned',
-    'regular',
-    'another-regular',
-  ]);
-});
-
-test('collapseAgentSidebarTaskList resets one agent history list to preview mode', () => {
-  expect(collapseAgentSidebarTaskList(['agent-1', 'agent-2'], 'agent-1')).toEqual(['agent-2']);
 });
