@@ -2,7 +2,6 @@ import {
   LayeredTabsList,
   LayeredTabsSeparatorEdge,
 } from '@shared/components/ui/layered-tabs';
-import { Tabs } from '@shared/components/ui/tabs';
 
 import { i18nService } from '../../../services/i18n';
 import type { LocalInferenceTab } from '../types';
@@ -17,27 +16,20 @@ const tabOptions: Array<{
 
 export function LocalInferenceTabSelector({
   activeTab,
-  onActiveTabChange,
 }: {
   activeTab: LocalInferenceTab;
-  onActiveTabChange: (tab: LocalInferenceTab) => void;
 }) {
   return (
-    <Tabs
+    <LayeredTabsList
       value={activeTab}
       className="gap-0"
-      onValueChange={value => onActiveTabChange(value as LocalInferenceTab)}
-    >
-      <LayeredTabsList
-        value={activeTab}
-        items={tabOptions.map(tab => ({
-          value: tab.value,
-          label: i18nService.t(tab.labelKey),
-        }))}
-        separatorEdge={LayeredTabsSeparatorEdge.Top}
-        className="w-auto pb-4"
-        contentClassName="mx-0 w-auto"
-      />
-    </Tabs>
+      items={tabOptions.map(tab => ({
+        value: tab.value,
+        label: i18nService.t(tab.labelKey),
+      }))}
+      separatorEdge={LayeredTabsSeparatorEdge.Top}
+      contentClassName="mx-0 w-auto"
+      listClassName="w-72"
+    />
   );
 }

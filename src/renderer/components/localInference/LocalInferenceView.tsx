@@ -1,4 +1,6 @@
 import { Button } from '@shared/components/ui/button';
+import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
+import { Tabs } from '@shared/components/ui/tabs';
 import { Globe, PanelLeft, Pencil, Settings2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -76,6 +78,8 @@ const LlamaCppServiceAction = {
 
 type LlamaCppServiceAction = (typeof LlamaCppServiceAction)[keyof typeof LlamaCppServiceAction];
 
+const LOCAL_INFERENCE_TAB_ORDER: LocalInferenceTab[] = ['models', 'marketplace'];
+
 let cachedStatus: OllamaStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
@@ -93,6 +97,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
   );
+  const [tabDirection, setTabDirection] = useState(1);
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
   const [runningModels, setRunningModels] = useState<OllamaRunningModel[]>([]);
@@ -638,6 +643,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [runAction, runningModels, showToast],
   );
 
+  const handleTabChange = (value: string) => {
+    const nextTab = value as LocalInferenceTab;
+    if (nextTab === activeTab) return;
+    setTabDirection(
+      LOCAL_INFERENCE_TAB_ORDER.indexOf(nextTab) >=
+        LOCAL_INFERENCE_TAB_ORDER.indexOf(activeTab)
+        ? 1
+        : -1,
+    );
+    setActiveTab(nextTab);
+  };
+
   return (
     <div className="relative flex h-full flex-1 flex-col bg-background">
       <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
@@ -672,11 +689,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           <LocalInferenceToastView toast={toast} onClose={dismissToast} />
         </div>
       )}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="flex min-h-0 flex-1 flex-col gap-0"
+      >
+        <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
           <div className="w-full space-y-4 px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <LocalInferenceTabSelector activeTab={activeTab} onActiveTabChange={setActiveTab} />
+              <LocalInferenceTabSelector activeTab={activeTab} />
               <div className="flex flex-wrap items-center gap-2">
                 {activeTab === 'models' ? (
                   <>
@@ -708,8 +730,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               </div>
             </div>
 
-            {activeTab === 'models' ? (
-              <>
+            <LayeredTabsContent
+              value="models"
+              activeValue={activeTab}
+              direction={tabDirection}
+              className="min-h-0"
+              contentClassName="min-h-0"
+            >
                 <ModelsPanel
                   loading={loading}
                   loadingModelName={loadingModelName}
@@ -728,8 +755,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onOpenLaunchLog={launchLogs.openPanelForModel}
                   showRegisteredModelsTitle={false}
                 />
-              </>
-            ) : (
+            </LayeredTabsContent>
+            <LayeredTabsContent
+              value="marketplace"
+              activeValue={activeTab}
+              direction={tabDirection}
+              className="min-h-0"
+              contentClassName="min-h-0"
+            >
               <MarketplacePanel
                 loading={loading}
                 models={marketplaceModels}
@@ -745,11 +778,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 onSearch={handleMarketplaceSearch}
                 onInstall={handleMarketplaceInstall}
               />
-            )}
+            </LayeredTabsContent>
           </div>
         </div>
         <ModelLaunchLogSidebar state={launchLogs.state} onClose={launchLogs.closePanel} />
-      </div>
+        </div>
+      </Tabs>
 
       <ModelLibrarySettingsModal
         isOpen={librarySettingsOpen}
