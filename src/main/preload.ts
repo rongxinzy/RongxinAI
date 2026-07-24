@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld('electron', {
     list: () => ipcRenderer.invoke(SkillsIpc.List),
     setEnabled: (options: { id: string; enabled: boolean }) =>
       ipcRenderer.invoke(SkillsIpc.SetEnabled, options),
+    setEnabledBatch: (options: { ids: string[]; enabled: boolean }) =>
+      ipcRenderer.invoke(SkillsIpc.SetEnabledBatch, options),
     setPinned: (options: { id: string; pinned: boolean }) =>
       ipcRenderer.invoke(SkillsIpc.SetPinned, options),
     delete: (id: string) => ipcRenderer.invoke(SkillsIpc.Delete, id),

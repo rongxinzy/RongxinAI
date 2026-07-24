@@ -1637,11 +1637,26 @@ export class SkillManager {
     return this.listSkills();
   }
 
+  setSkillsEnabled(ids: string[], enabled: boolean): SkillRecord[] {
+    const state = this.loadSkillStateMap();
+    const uniqueIds = [...new Set(ids)];
+    for (const id of uniqueIds) {
+      state[id] = { ...state[id], enabled };
+    }
+    this.saveSkillStateMap(state);
+    this.notifySkillsChanged();
+    return this.listSkills();
+  }
+
   getSkillContent(id: string): { success: boolean; content?: string; error?: string } {
-    const skill = this.listSkills().find(item => item.id === id);
-    if (!skill) return { success: false, error: 'Skill not found' };
     try {
-      const raw = fs.readFileSync(skill.skillPath, 'utf8');
+      if (id !== path.basename(id)) return { success: false, error: 'Skill not found' };
+      const skillPath = this.getSkillRoots(this.ensureSkillsRoot())
+        .map(root => resolveWithin(root, id))
+        .map(dir => path.join(dir, SKILL_FILE_NAME))
+        .find(filePath => fs.existsSync(filePath));
+      if (!skillPath) return { success: false, error: 'Skill not found' };
+      const raw = fs.readFileSync(skillPath, 'utf8');
       return { success: true, content: parseFrontmatter(raw).content.trim() };
     } catch (error) {
       console.error('[skills] Failed to read skill content:', error);
@@ -2660,6 +2675,11 @@ export class SkillManager {
   }
 
   private listBuiltInSkillIds(): Set<string> {
+    // In development the bundled and user skill roots intentionally resolve to
+    // the same project directory. IDs alone cannot tell whether a folder was
+    // shipped with the app or downloaded during development, so never apply
+    // the packaged built-in restriction to that shared root.
+    if (!app.isPackaged) return new Set();
     const builtInRoot = this.getBundledSkillsRoot();
     if (!builtInRoot || !fs.existsSync(builtInRoot)) {
       return new Set();

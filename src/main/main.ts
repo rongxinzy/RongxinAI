@@ -3156,7 +3156,7 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('skills:setEnabled', (_event, options: { id: string; enabled: boolean }) => {
+  ipcMain.handle(SkillsIpc.SetEnabled, (_event, options: { id: string; enabled: boolean }) => {
     try {
       const skills = getSkillManager().setSkillEnabled(options.id, options.enabled);
       return { success: true, skills };
@@ -3164,6 +3164,18 @@ if (!gotTheLock) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update skill',
+      };
+    }
+  });
+
+  ipcMain.handle(SkillsIpc.SetEnabledBatch, (_event, options: { ids: string[]; enabled: boolean }) => {
+    try {
+      const skills = getSkillManager().setSkillsEnabled(options.ids, options.enabled);
+      return { success: true, skills };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update skills',
       };
     }
   });
