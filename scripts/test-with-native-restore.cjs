@@ -21,6 +21,11 @@ const testStatus =
     ? run(npmCommand, ['exec', '--', 'vitest', 'run', ...process.argv.slice(2)])
     : nodeBuildStatus;
 
+// CI jobs end after tests, so restoring Electron's ABI only adds a network dependency.
+if (process.env.CI === 'true') {
+  process.exit(testStatus);
+}
+
 // Tests use Node's ABI; restore Electron's ABI before returning to the caller.
 const electronRestoreStatus = run(npmCommand, ['run', 'rebuild:electron-native']);
 
