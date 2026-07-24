@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { PanelLeft, Pencil } from 'lucide-react';
-import React from 'react';
+import React, { useRef } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import WindowTitleBar from '../window/WindowTitleBar';
@@ -26,6 +26,7 @@ const SkillsView: React.FC<SkillsViewProps> = ({
   readOnly,
 }) => {
   const isMac = window.electron.platform === 'darwin';
+  const detailContainerRef = useRef<HTMLDivElement>(null);
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
       <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
@@ -58,12 +59,13 @@ const SkillsView: React.FC<SkillsViewProps> = ({
         <WindowTitleBar inline />
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
+      <div ref={detailContainerRef} className="relative flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <SkillsManager
             readOnly={readOnly}
             onCreateByChat={onCreateSkillByChat}
             onTrySkill={onTrySkill}
+            detailContainerRef={detailContainerRef}
           />
         </div>
       </div>

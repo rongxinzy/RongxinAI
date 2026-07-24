@@ -36,6 +36,7 @@ interface SkillsManagerProps {
   onCreateByChat?: () => void;
   onTrySkill?: (skillId: string) => void;
   toolbarPlacement?: SkillToolbarPlacementType;
+  detailContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 const SkillsManager: React.FC<SkillsManagerProps> = ({
@@ -43,6 +44,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   onCreateByChat,
   onTrySkill,
   toolbarPlacement = SkillToolbarPlacement.Inline,
+  detailContainerRef,
 }) => {
   const dispatch = useDispatch();
   const skills = useSelector((state: RootState) => state.skill.skills);
@@ -70,9 +72,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [selectedInstalledIds, setSelectedInstalledIds] = useState<Set<string>>(new Set());
   const [isBatchMode, setIsBatchMode] = useState(false);
-  const [selectedSkillContent, setSelectedSkillContent] = useState('');
-  const [isLoadingSkillContent, setIsLoadingSkillContent] = useState(false);
-  const [skillPendingDelete, setSkillPendingDelete] = useState<Skill | null>(null);
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
+  const [skillsPendingDelete, setSkillsPendingDelete] = useState<Skill[]>([]);
   const [isDeletingSkill, setIsDeletingSkill] = useState(false);
   const [securityReport, setSecurityReport] = useState<SkillSecurityReportData | null>(null);
   const [pendingInstallId, setPendingInstallId] = useState<string | null>(null);
@@ -209,6 +210,25 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         : installedSkills.filter(skill => getSkillCategory(skill.id) === skillCategory),
     [installedSkills, skillCategory],
   );
+  const selectedVisibleIds = useMemo(() => {
+    const visibleIds = new Set(filteredInstalledSkills.map(skill => skill.id));
+    return new Set([...selectedInstalledIds].filter(id => visibleIds.has(id)));
+  }, [filteredInstalledSkills, selectedInstalledIds]);
+  const selectedUninstallableIds = useMemo(
+    () =>
+      new Set(
+        [...selectedVisibleIds].filter(id => {
+          const skill = skills.find(item => item.id === id);
+          return skill && !skill.isBuiltIn;
+        }),
+      ),
+    [selectedVisibleIds, skills],
+  );
+
+  useEffect(() => {
+    setSelectedInstalledIds(new Set());
+  }, [activeTab, skillCategory]);
+
   const toggleInstalledSelection = (skillId: string) => {
     setSelectedInstalledIds(current => {
       const next = new Set(current);
@@ -218,12 +238,24 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     });
   };
   const batchToggleInstalled = async (enabled: boolean) => {
-    for (const id of selectedInstalledIds) {
+    const ids = [...selectedVisibleIds].filter(id => {
       const skill = skills.find(item => item.id === id);
-      if (skill && skill.enabled !== enabled) await skillService.setSkillEnabled(id, enabled);
+      return skill?.enabled !== enabled;
+    });
+    if (ids.length === 0) return;
+
+    setIsBatchUpdating(true);
+    try {
+      const updatedSkills = await skillService.setSkillsEnabled(ids, enabled);
+      dispatch(setSkills(updatedSkills));
+      setSkillActionError('');
+    } catch (error) {
+      setSkillActionError(
+        error instanceof Error ? error.message : i18nService.t('skillUpdateFailed'),
+      );
+    } finally {
+      setIsBatchUpdating(false);
     }
-    const result = await window.electron.skills.list();
-    if (result.success && result.skills) dispatch(setSkills(result.skills));
   };
   const installedSkillIds = useMemo(() => new Set(skills.map(skill => skill.id)), [skills]);
   const installedSkillNames = useMemo(
@@ -274,81 +306,37 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (!selectedSkill || activeTab !== SkillTab.Installed) {
-      setSelectedSkillContent('');
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoadingSkillContent(true);
-    window.electron.skills
-      .getContent(selectedSkill.id)
-      .then(result => {
-        if (!cancelled && result.success) {
-          setSelectedSkillContent(result.content || '');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingSkillContent(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, selectedSkill]);
-
-  const handleToggleSkillPin = async (skillId: string) => {
-    const targetSkill = skills.find(skill => skill.id === skillId);
-    if (!targetSkill) return;
-    try {
-      const updatedSkills = await skillService.setSkillPinned(skillId, !targetSkill.pinned);
-      dispatch(setSkills(updatedSkills));
-      setSkillActionError('');
-    } catch (error) {
-      setSkillActionError(
-        error instanceof Error ? error.message : i18nService.t('skillUpdateFailed'),
-      );
-    }
-  };
-
-  const handleRequestDeleteSkill = (skill: Skill) => {
-    if (skill.isBuiltIn) {
-      setSkillActionError(i18nService.t('skillBuiltInCannotDelete'));
-      return;
-    }
-    setSkillActionError('');
-    setSkillPendingDelete(skill);
-  };
-
-  const handleUninstallSkill = async (skill: Skill) => {
-    if (skill.isBuiltIn) {
-      await handleToggleSkill(skill.id);
-      return;
-    }
-    handleRequestDeleteSkill(skill);
-  };
-
   const handleCancelDeleteSkill = () => {
     if (isDeletingSkill) return;
-    setSkillPendingDelete(null);
+    setSkillsPendingDelete([]);
   };
 
   const handleConfirmDeleteSkill = async () => {
-    if (!skillPendingDelete || isDeletingSkill) return;
+    if (skillsPendingDelete.length === 0 || isDeletingSkill) return;
     setIsDeletingSkill(true);
     setSkillActionError('');
-    const result = await skillService.deleteSkill(skillPendingDelete.id);
-    if (!result.success) {
-      setSkillActionError(result.error || i18nService.t('skillDeleteFailed'));
+    let latestSkills: Skill[] | undefined;
+    try {
+      for (const skill of skillsPendingDelete) {
+        const result = await skillService.deleteSkill(skill.id);
+        if (!result.success) {
+          throw new Error(result.error || i18nService.t('skillDeleteFailed'));
+        }
+        latestSkills = result.skills;
+      }
+      if (latestSkills) {
+        dispatch(setSkills(latestSkills));
+      }
+      setSelectedInstalledIds(current => {
+        const deletedIds = new Set(skillsPendingDelete.map(skill => skill.id));
+        return new Set([...current].filter(id => !deletedIds.has(id)));
+      });
+      setSkillsPendingDelete([]);
+    } catch (error) {
+      setSkillActionError(error instanceof Error ? error.message : i18nService.t('skillDeleteFailed'));
+    } finally {
       setIsDeletingSkill(false);
-      return;
     }
-    if (result.skills) {
-      dispatch(setSkills(result.skills));
-    }
-    setIsDeletingSkill(false);
-    setSkillPendingDelete(null);
   };
 
   const handleAddSkillFromSource = async (source: string, sourceType: DirectImportSource) => {
@@ -609,7 +597,12 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 )}
               >
                 {!isBatchMode ? (
-                  <Button size="sm" variant="ghost" onClick={() => setIsBatchMode(true)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={readOnly}
+                    onClick={() => setIsBatchMode(true)}
+                  >
                     {i18nService.t('skillBatchManage')}
                   </Button>
                 ) : (
@@ -618,14 +611,16 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                       <span>
                         {i18nService
                           .t('skillBatchSelected')
-                          .replace('{count}', String(selectedInstalledIds.size))}
+                          .replace('{count}', String(selectedVisibleIds.size))}
                       </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          setSelectedInstalledIds(new Set(installedSkills.map(skill => skill.id)))
+                          setSelectedInstalledIds(
+                            new Set(filteredInstalledSkills.map(skill => skill.id)),
+                          )
                         }
                       >
                         {i18nService.t('skillSelectAll')}
@@ -644,7 +639,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                         className="min-w-16"
                         size="sm"
                         variant="outline"
-                        disabled={!selectedInstalledIds.size}
+                        disabled={readOnly || !selectedVisibleIds.size || isBatchUpdating}
                         onClick={() => batchToggleInstalled(true)}
                       >
                         {i18nService.t('skillBatchEnable')}
@@ -653,7 +648,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                         className="min-w-16"
                         size="sm"
                         variant="outline"
-                        disabled={!selectedInstalledIds.size}
+                        disabled={readOnly || !selectedVisibleIds.size || isBatchUpdating}
                         onClick={() => batchToggleInstalled(false)}
                       >
                         {i18nService.t('skillBatchDisable')}
@@ -662,12 +657,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                         className="min-w-16"
                         size="sm"
                         variant="outline"
-                        disabled={!selectedInstalledIds.size}
+                        disabled={
+                          readOnly || !selectedUninstallableIds.size || isBatchUpdating
+                        }
                         onClick={() => {
-                          selectedInstalledIds.forEach(id => {
-                            const skill = installedSkills.find(item => item.id === id);
-                            if (skill && !skill.isBuiltIn) void handleUninstallSkill(skill);
-                          });
+                          const selectedSkills = installedSkills.filter(skill =>
+                            selectedUninstallableIds.has(skill.id),
+                          );
+                          if (selectedSkills.length > 0) setSkillsPendingDelete(selectedSkills);
                         }}
                       >
                         {i18nService.t('skillUninstall')}
@@ -693,11 +690,9 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 readOnly={readOnly}
                 onSelect={setSelectedSkill}
                 onToggle={handleToggleSkill}
-                onUninstall={handleUninstallSkill}
-                onTogglePin={handleToggleSkillPin}
                 onTrySkill={onTrySkill}
                 resolveName={resolveSkillName}
-                selectedIds={isBatchMode ? selectedInstalledIds : new Set()}
+                selectedIds={isBatchMode ? selectedVisibleIds : new Set()}
                 onSelectToggle={toggleInstalledSelection}
                 batchMode={isBatchMode}
               />
@@ -870,17 +865,18 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         )}
 
       {selectedSkill &&
-        createPortal(
-          <SkillDocumentDialog
-            skill={selectedSkill}
-            content={selectedSkillContent}
-            isLoading={isLoadingSkillContent}
-            onClose={() => setSelectedSkill(null)}
-          />,
-          document.body,
-        )}
+        (detailContainerRef?.current
+          ? createPortal(
+              <SkillDocumentDialog skill={selectedSkill} onClose={() => setSelectedSkill(null)} />,
+              detailContainerRef.current,
+            )
+          : (
+              <div className="absolute inset-0 z-10">
+                <SkillDocumentDialog skill={selectedSkill} onClose={() => setSelectedSkill(null)} />
+              </div>
+            ))}
 
-      {skillPendingDelete &&
+      {skillsPendingDelete.length > 0 &&
         createPortal(
           <Modal
             onClose={handleCancelDeleteSkill}
@@ -891,7 +887,13 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
               {i18nService.t('deleteSkill')}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              {i18nService.t('skillDeleteConfirm').replace('{name}', skillPendingDelete.name)}
+              {skillsPendingDelete.length === 1
+                ? i18nService
+                    .t('skillDeleteConfirm')
+                    .replace('{name}', skillsPendingDelete[0].name)
+                : i18nService
+                    .t('skillBatchDeleteConfirm')
+                    .replace('{count}', String(skillsPendingDelete.length))}
             </p>
             {skillActionError && (
               <div className="mt-3 text-xs text-red-500">{skillActionError}</div>

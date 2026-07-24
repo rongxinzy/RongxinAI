@@ -1,12 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@shared/components/ui/dropdown-menu';
-import {
   Card,
   CardContent,
   CardDescription,
@@ -14,7 +8,7 @@ import {
   CardTitle,
 } from '@shared/components/ui/card';
 import { Switch } from '@shared/components/ui/switch';
-import { Ellipsis, MessageCircle, Pin, Puzzle, Trash2 } from 'lucide-react';
+import { MessageCircle, Puzzle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
@@ -25,8 +19,6 @@ interface InstalledSkillGridProps {
   readOnly?: boolean;
   onSelect: (skill: Skill) => void;
   onToggle: (skillId: string) => void;
-  onUninstall: (skill: Skill) => void;
-  onTogglePin: (skillId: string) => void;
   onTrySkill?: (skillId: string) => void;
   resolveName: (id: string, fallback: string) => string;
   selectedIds: Set<string>;
@@ -39,8 +31,6 @@ export function InstalledSkillGrid({
   readOnly,
   onSelect,
   onToggle,
-  onUninstall,
-  onTogglePin,
   onTrySkill,
   resolveName,
   selectedIds,
@@ -57,29 +47,24 @@ export function InstalledSkillGrid({
         <Card
           key={skill.id}
           size="sm"
-          role="button"
-          tabIndex={0}
-          className="group relative cursor-pointer gap-3 border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md focus-visible:z-10 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          onClick={event => {
-            const target = event.target as HTMLElement;
-            if (target.closest('button, [role="switch"], [data-slot="switch"]')) return;
-            onSelect(skill);
-          }}
-          onKeyDown={event => {
-            const target = event.target as HTMLElement;
-            if (target.closest('button, [role="switch"], [data-slot="switch"]')) return;
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onSelect(skill);
-            }
-          }}
+          className="group relative gap-3 border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md"
         >
-          <CardHeader className="grid-cols-[minmax(0,1fr)_auto] gap-3 p-0">
-            <div className="flex min-w-0 items-center gap-2">
+          {!batchMode && (
+            <button
+              type="button"
+              aria-label={skill.displayName || resolveName(skill.id, skill.name)}
+              className="absolute inset-0 z-0 rounded-[inherit] focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              onClick={() => onSelect(skill)}
+            />
+          )}
+          <CardHeader className="relative z-10 grid-cols-[minmax(0,1fr)_auto] gap-3 p-0">
+            <div className="pointer-events-none flex min-w-0 items-center gap-2">
               {batchMode && (
                 <Checkbox
+                  className="pointer-events-auto"
                   checked={selectedIds.has(skill.id)}
                   aria-label={skill.name}
+                  onPointerDown={event => event.stopPropagation()}
                   onClick={event => event.stopPropagation()}
                   onCheckedChange={() => onSelectToggle(skill.id)}
                 />
@@ -96,59 +81,35 @@ export function InstalledSkillGrid({
               </CardTitle>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={i18nService.t('skillActions')}
-                        onClick={event => event.stopPropagation()}
-                      >
-                        <Ellipsis />
-                      </Button>
-                    }
-                  />
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      disabled={!onTrySkill}
-                      onClick={event => {
-                        event.stopPropagation();
-                        onTrySkill?.(skill.id);
-                      }}
-                    >
-                      <MessageCircle />
-                      {i18nService.t('skillGoToConversation')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={skill.isBuiltIn}
-                      onClick={event => {
-                        event.stopPropagation();
-                        onUninstall(skill);
-                      }}
-                    >
-                      <Trash2 />
-                      {i18nService.t('skillUninstall')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={i18nService.t(skill.pinned ? 'skillUnpin' : 'skillPin')}
-                  onClick={event => {
-                    event.stopPropagation();
-                    onTogglePin(skill.id);
-                  }}
-                >
-                  <Pin className={skill.pinned ? 'fill-current' : undefined} />
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-skill-action
+                disabled={!onTrySkill}
+                onPointerDownCapture={event => {
+                  // Start navigation before the card's click handler can open the metadata dialog.
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTrySkill?.(skill.id);
+                }}
+                onClickCapture={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onKeyDownCapture={event => {
+                  event.stopPropagation();
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onTrySkill?.(skill.id);
+                  }
+                }}
+              >
+                <MessageCircle data-icon="inline-start" />
+                {i18nService.t('skillGoToConversation')}
+              </Button>
               <div
+                data-skill-toggle
                 onPointerDown={event => event.stopPropagation()}
                 onClick={event => event.stopPropagation()}
                 onKeyDown={event => event.stopPropagation()}
@@ -162,7 +123,7 @@ export function InstalledSkillGrid({
             </div>
           </CardHeader>
 
-          <CardContent className="flex flex-col gap-3 p-0">
+          <CardContent className="pointer-events-none relative z-10 flex flex-col gap-3 p-0">
             <CardDescription className="line-clamp-2">
               {skill.displayDescription ||
                 skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}

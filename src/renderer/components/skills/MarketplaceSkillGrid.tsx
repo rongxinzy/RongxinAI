@@ -73,7 +73,7 @@ export function MarketplaceSkillGrid({
             role="button"
             tabIndex={0}
             className={cn(
-              'relative gap-3 overflow-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
+              'group relative gap-3 overflow-hidden border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md focus-visible:z-10 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
               isInstallingSkillId && !isInstalling
                 ? 'pointer-events-none opacity-50'
                 : 'cursor-pointer hover:bg-muted',

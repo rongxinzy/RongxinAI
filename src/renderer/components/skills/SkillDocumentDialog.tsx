@@ -1,29 +1,29 @@
 import { Button } from '@shared/components/ui/button';
-import { DialogTitle } from '@shared/components/ui/dialog';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { X } from 'lucide-react';
+import { FileText, X } from 'lucide-react';
+import { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import { skillService } from '../../services/skill';
 import type { Skill } from '../../types/skill';
-import Modal from '../common/Modal';
 import MarkdownContent from '../MarkdownContent';
 
 interface SkillDocumentDialogProps {
   skill: Skill;
-  content: string;
-  isLoading: boolean;
   onClose: () => void;
 }
 
 const getMetadataEntries = (skill: Skill): Array<[string, string]> => {
-  return [
+  const primaryEntries: Array<[string, string]> = [
     ['name', skill.displayName || skill.name],
     ['description', skill.displayDescription || skill.description],
     ...(skill.displayAuthor ? [['author', skill.displayAuthor] as [string, string]] : []),
     ...(skill.displayLicense ? [['license', skill.displayLicense] as [string, string]] : []),
-    ...Object.entries(skill.metadataFields ?? {}),
   ];
+  const primaryKeys = new Set(primaryEntries.map(([key]) => key.toLowerCase()));
+  const extraEntries = Object.entries(skill.metadataFields ?? {}).filter(
+    ([key]) => !primaryKeys.has(key.toLowerCase()),
+  );
+  return [...primaryEntries, ...extraEntries];
 };
 
 const METADATA_LABEL_KEYS: Record<string, string> = {
@@ -40,21 +40,45 @@ const getMetadataLabel = (key: string): string => {
 
 export function SkillDocumentDialog({
   skill,
-  content,
-  isLoading,
   onClose,
 }: SkillDocumentDialogProps) {
+  const [showSkillContent, setShowSkillContent] = useState(false);
+  const [skillContent, setSkillContent] = useState('');
+  const [isLoadingSkillContent, setIsLoadingSkillContent] = useState(false);
+  const [skillContentError, setSkillContentError] = useState(false);
+
+  const handleToggleSkillContent = async () => {
+    if (showSkillContent) {
+      setShowSkillContent(false);
+      return;
+    }
+    setShowSkillContent(true);
+    if (skillContent || isLoadingSkillContent) return;
+
+    setIsLoadingSkillContent(true);
+    setSkillContentError(false);
+    try {
+      const result = await window.electron.skills.getContent(skill.id);
+      if (result.success) {
+        setSkillContent(result.content || '');
+      } else {
+        setSkillContentError(true);
+      }
+    } catch {
+      setSkillContentError(true);
+    } finally {
+      setIsLoadingSkillContent(false);
+    }
+  };
+
   return (
-    <Modal
-      onClose={onClose}
-      overlayClassName="bg-black/10 backdrop-blur-none"
-      className="flex h-[min(38rem,calc(100dvh-4rem))] w-full max-w-3xl flex-col gap-0 rounded-xl border border-border bg-surface p-0 shadow-lg sm:max-w-3xl"
-    >
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 p-4">
+      <section className="flex h-[min(38rem,calc(100%-2rem))] w-full max-w-3xl flex-col gap-0 overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
         <div className="min-w-0">
-          <DialogTitle className="truncate text-base font-semibold text-foreground">
+          <h2 className="truncate text-base font-semibold text-foreground">
             {skill.displayName || skill.name}
-          </DialogTitle>
+          </h2>
         </div>
         <Button
           type="button"
@@ -65,10 +89,10 @@ export function SkillDocumentDialog({
         >
           <X />
         </Button>
-      </header>
+        </header>
 
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto max-w-3xl px-8 py-6">
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="mx-auto max-w-3xl px-8 py-6">
           <dl className="m-0 grid gap-4 text-sm leading-6">
             {getMetadataEntries(skill)
               .filter(([key]) => key.toLowerCase() !== 'skillmd')
@@ -78,23 +102,35 @@ export function SkillDocumentDialog({
                   <dd className="mt-1 whitespace-pre-wrap break-words text-foreground">{value}</dd>
                 </div>
               ))}
-          </dl>
-          <div className="my-6 border-t border-border" />
-          <section aria-label="SKILL.md">
-            <div className="mb-4 text-sm font-semibold text-foreground">SKILL.md</div>
-            {isLoading ? (
-              <div className="py-8 text-sm text-muted-foreground">{i18nService.t('loading')}</div>
-            ) : content ? (
-              <MarkdownContent content={content} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}
-              </p>
-            )}
-          </section>
-        </div>
-      </ScrollArea>
-
-    </Modal>
+            </dl>
+            <div className="mt-6 border-t border-border pt-4">
+              <Button type="button" variant="outline" size="sm" onClick={handleToggleSkillContent}>
+                <FileText data-icon="inline-start" />
+                {i18nService.t(showSkillContent ? 'skillHideSkillMd' : 'skillViewSkillMd')}
+              </Button>
+              {showSkillContent && (
+                <section className="mt-4 border-t border-border pt-4">
+                  {isLoadingSkillContent ? (
+                    <div className="py-4 text-sm text-muted-foreground">
+                      {i18nService.t('loading')}
+                    </div>
+                  ) : skillContentError ? (
+                    <p className="text-sm text-destructive">
+                      {i18nService.t('skillContentUnavailable')}
+                    </p>
+                  ) : skillContent ? (
+                    <MarkdownContent content={skillContent} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {i18nService.t('skillContentUnavailable')}
+                    </p>
+                  )}
+                </section>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+      </section>
+    </div>
   );
 }
