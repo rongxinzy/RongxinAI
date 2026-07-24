@@ -247,7 +247,7 @@ const AgentTreeNode: React.FC<AgentTreeNodeProps> = ({
                   key={task.id}
                   task={task}
                   isBatchMode={isBatchMode}
-                  isSelected={selectedIds.has(task.id)}
+                  isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
                   showBatchOption={showBatchOption}
                   onSelect={() => onSelectTask(task)}
                   onDelete={() => onDeleteTask(task)}
