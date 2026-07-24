@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
 import { CoworkSessionStatusValue } from '../../types/cowork';
-import { selectIsStreaming } from './coworkSelectors';
+import { resolveDisplayedSessionId, selectIsStreaming } from './coworkSelectors';
 
 test('selectIsStreaming follows the active session stream registry', () => {
   const state = {
@@ -35,4 +35,16 @@ test('selectIsStreaming preserves a live session stream across a stale session s
       },
     } as never),
   ).toBe(true);
+});
+
+test('shows the loading target instead of the previous session', () => {
+  expect(resolveDisplayedSessionId('session-a', 'session-b')).toBe('session-b');
+});
+
+test('keeps the current session visible when it is also the loading target', () => {
+  expect(resolveDisplayedSessionId('session-b', 'session-b')).toBe('session-b');
+});
+
+test('shows the current session when no session is loading', () => {
+  expect(resolveDisplayedSessionId('session-a', null)).toBe('session-a');
 });

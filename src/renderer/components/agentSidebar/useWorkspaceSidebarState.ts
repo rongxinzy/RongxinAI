@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { coworkService } from '../../services/cowork';
 import { localStore } from '../../services/store';
 import { RootState } from '../../store';
@@ -9,6 +10,7 @@ import {
   selectCurrentSessionId,
   selectUnreadSessionIds,
 } from '../../store/selectors/coworkSelectors';
+import { WorkMode, type WorkMode as WorkModeType } from '../../store/workMode/constants';
 import type { CoworkSessionSummary } from '../../types/cowork';
 import { CoworkSessionStatusValue } from '../../types/cowork';
 import { AgentSidebarIndicator, AgentSidebarPageSize, isScheduledSessionTitle } from './constants';
@@ -17,11 +19,18 @@ import type {
   WorkspaceSidebarNode,
   WorkspaceSidebarPreferenceState,
 } from './types';
+import {
+  isSessionOwnedByWorkspace,
+  mergeSessionSummaries,
+  mergeSessionsIntoWorkspacePreviews,
+} from './workspaceSessionPreviews';
 
 const WORKSPACE_SIDEBAR_STATE_KEY = 'workspaceSidebar.state';
 
-const modeMatches = (session: CoworkSessionSummary, workMode: 'work' | 'chat') =>
-  workMode === 'chat' ? session.mode === 'chat' : session.mode !== 'chat';
+const modeMatches = (session: CoworkSessionSummary, workMode: WorkModeType) =>
+  workMode === WorkMode.Chat
+    ? session.mode === CoworkSessionMode.Chat
+    : session.mode !== CoworkSessionMode.Chat;
 
 const toTaskNode = (
   session: CoworkSessionSummary,
@@ -57,13 +66,7 @@ const sortTasks = (tasks: CoworkSessionSummary[]) =>
     return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
   });
 
-const mergeTasks = (current: CoworkSessionSummary[], incoming: CoworkSessionSummary[]) => {
-  const byId = new Map(current.map(session => [session.id, session]));
-  incoming.forEach(session => byId.set(session.id, session));
-  return [...byId.values()];
-};
-
-export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => {
+export const useWorkspaceSidebarState = (workMode: WorkModeType = WorkMode.Work) => {
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const sessions = useSelector(selectCoworkSessions);
@@ -169,7 +172,7 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
           ...current,
           [workspaceId]: replace
             ? (result.sessions ?? [])
-            : mergeTasks(current[workspaceId] ?? [], result.sessions ?? []),
+            : mergeSessionSummaries(current[workspaceId] ?? [], result.sessions ?? []),
         }));
         setHasMore(current => ({ ...current, [workspaceId]: result.hasMore ?? false }));
       } finally {
@@ -187,17 +190,12 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
   }, [loadWorkspaceTasks, previews, workspaces]);
 
   useEffect(() => {
-    const currentWorkspaceId = sessions.find(session =>
-      modeMatches(session, workMode),
-    )?.workspaceId;
-    if (!currentWorkspaceId) return;
-    setPreviews(current => ({
-      ...current,
-      [currentWorkspaceId]: mergeTasks(
-        current[currentWorkspaceId] ?? [],
+    setPreviews(current =>
+      mergeSessionsIntoWorkspacePreviews(
+        current,
         sessions.filter(session => modeMatches(session, workMode)),
       ),
-    }));
+    );
   }, [sessions, workMode]);
 
   const toggleExpanded = useCallback((workspaceId: string) => {
@@ -273,6 +271,7 @@ export const useWorkspaceSidebarState = (workMode: 'work' | 'chat' = 'work') => 
         const filtered = sortTasks(
           (previews[workspace.id] ?? []).filter(
             session =>
+              isSessionOwnedByWorkspace(session, workspace.id) &&
               modeMatches(session, workMode) &&
               isScheduledSessionTitle(session.title) === scheduled,
           ),

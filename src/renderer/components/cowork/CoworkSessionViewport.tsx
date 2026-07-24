@@ -19,7 +19,7 @@ const CoworkSessionViewport = ({ sessionId, ...props }: CoworkSessionViewportPro
   // If a live streaming snapshot has already been restored for this session,
   // show it immediately instead of a blank loading spinner. This keeps the
   // stream visible when switching back to a running session.
-  if (loadingSessionId && currentSession?.id !== sessionId) {
+  if (loadingSessionId === sessionId && currentSession?.id !== sessionId) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background">
         <Spinner className="size-5 text-muted-foreground" />

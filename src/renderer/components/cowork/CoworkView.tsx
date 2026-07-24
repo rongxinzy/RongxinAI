@@ -18,8 +18,8 @@ import { RootState, store } from '../../store';
 import {
   selectCoworkConfig,
   selectCurrentSession,
+  selectDisplayedSessionId,
   selectIsStreaming,
-  selectLoadingSessionId,
 } from '../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../store/selectors/workModeSelectors';
 import {
@@ -97,7 +97,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
   const currentSession = useSelector(selectCurrentSession);
-  const loadingSessionId = useSelector(selectLoadingSessionId);
+  const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
   const directChatModelId = useSelector((state: RootState) => state.model.defaultSelectedModel.id);
 
@@ -1252,8 +1252,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         </Button>
       </div>
     ) : null;
-
-  const displayedSessionId = currentSession?.id ?? loadingSessionId;
 
   if (displayedSessionId) {
     return (
