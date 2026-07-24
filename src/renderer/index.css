@@ -476,12 +476,6 @@ select::-ms-expand {
   background-color: var(--zy-surface-raised);
 }
 
-/* The local inference page uses a flat tab surface to match the surrounding page. */
-[data-local-inference-tab-selector] {
-  background-color: var(--zy-surface);
-  box-shadow: none;
-}
-
 /* Sidebar width transition */
 .sidebar-transition {
   transition: width 200ms ease-out;

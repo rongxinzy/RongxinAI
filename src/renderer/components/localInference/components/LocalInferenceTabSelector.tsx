@@ -1,4 +1,8 @@
-import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import {
+  LayeredTabsList,
+  LayeredTabsSeparatorEdge,
+} from '@shared/components/ui/layered-tabs';
+import { Tabs } from '@shared/components/ui/tabs';
 
 import { i18nService } from '../../../services/i18n';
 import type { LocalInferenceTab } from '../types';
@@ -24,13 +28,16 @@ export function LocalInferenceTabSelector({
       className="gap-0"
       onValueChange={value => onActiveTabChange(value as LocalInferenceTab)}
     >
-      <TabsList className="shadow-inset" data-local-inference-tab-selector>
-        {tabOptions.map(tab => (
-          <TabsTrigger key={tab.value} value={tab.value} className="data-active:shadow-elevated">
-            {i18nService.t(tab.labelKey)}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      <LayeredTabsList
+        value={activeTab}
+        items={tabOptions.map(tab => ({
+          value: tab.value,
+          label: i18nService.t(tab.labelKey),
+        }))}
+        separatorEdge={LayeredTabsSeparatorEdge.Top}
+        className="w-auto pb-4"
+        contentClassName="mx-0 w-auto"
+      />
     </Tabs>
   );
 }

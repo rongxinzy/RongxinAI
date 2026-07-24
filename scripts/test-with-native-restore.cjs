@@ -22,6 +22,6 @@ const testStatus =
     : nodeBuildStatus;
 
 // Tests use Node's ABI; restore Electron's ABI before returning to the caller.
-const electronRestoreStatus = run(npmCommand, ['run', 'precompile:electron']);
+const electronRestoreStatus = run(npmCommand, ['run', 'rebuild:electron-native']);
 
 process.exit(testStatus !== 0 ? testStatus : electronRestoreStatus);
