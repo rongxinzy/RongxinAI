@@ -375,18 +375,6 @@ contextBridge.exposeInMainWorld('electron', {
       const result = await ipcRenderer.invoke(AgentIpcChannel.Delete, id);
       return result?.success ? result.deleted : false;
     },
-    presets: async () => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.Presets);
-      return result?.success ? result.presets : [];
-    },
-    presetTemplates: async () => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.PresetTemplates);
-      return result?.success ? result.presets : [];
-    },
-    addPreset: async (presetId: string) => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.AddPreset, presetId);
-      return result?.success ? result.agent : null;
-    },
     importExpertPackage: async (expertDir: string) => {
       return await ipcRenderer.invoke(AgentIpcChannel.ImportExpertPackage, expertDir);
     },

@@ -4328,45 +4328,6 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle(AgentIpcChannel.Presets, async () => {
-    try {
-      const presets = getAgentManager().getPresetAgents();
-      return { success: true, presets };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get presets',
-      };
-    }
-  });
-
-  ipcMain.handle(AgentIpcChannel.PresetTemplates, async () => {
-    try {
-      const presets = getAgentManager().getAllPresetAgents();
-      return { success: true, presets };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get preset templates',
-      };
-    }
-  });
-
-  ipcMain.handle(AgentIpcChannel.AddPreset, async (_event, presetId: string) => {
-    try {
-      const agent = getAgentManager().addPresetAgent(presetId, resolveDefaultAgentModelRef());
-      syncOpenClawConfig({ reason: 'agent-preset-added' }).catch(err => {
-        console.error('[OpenClaw] config sync after agent-preset-added failed:', err);
-      });
-      return { success: true, agent };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add preset agent',
-      };
-    }
-  });
-
   ipcMain.handle(AgentIpcChannel.ImportExpertPackage, async (_event, expertDir: string) => {
     try {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();

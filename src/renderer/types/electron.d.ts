@@ -302,7 +302,7 @@ interface McpConnectionTestResult {
 
 import type { Platform } from '@shared/platform';
 
-import type { Agent, PresetAgent } from './agent';
+import type { Agent } from './agent';
 
 interface CreditItem {
   type: 'subscription' | 'boost' | 'free';
@@ -540,9 +540,6 @@ interface IElectronAPI {
       },
     ) => Promise<Agent>;
     delete: (id: string) => Promise<boolean>;
-    presets: () => Promise<PresetAgent[]>;
-    presetTemplates: () => Promise<PresetAgent[]>;
-    addPreset: (presetId: string) => Promise<Agent>;
     importExpertPackage: (
       expertDir: string,
     ) => Promise<{
