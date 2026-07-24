@@ -84,9 +84,9 @@ export function InstalledSkillGrid({
                   onCheckedChange={() => onSelectToggle(skill.id)}
                 />
               )}
-              <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                 {skill.iconUrl ? (
-                  <img src={skill.iconUrl} alt="" className="size-7 object-contain" />
+                  <img src={skill.iconUrl} alt="" className="size-8 object-contain" />
                 ) : (
                   <Puzzle className="size-4 text-muted-foreground" />
                 )}
