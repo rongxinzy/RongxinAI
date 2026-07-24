@@ -5,6 +5,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 
 import { mcpCategories, mcpRegistry } from '../../data/mcpRegistry';
+import githubIcon from '../../assets/mcp-icons/github.png';
+import gitlabIcon from '../../assets/mcp-icons/gitlab.png';
+import tavilyIcon from '../../assets/mcp-icons/tavily.png';
 import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
 import { RootState } from '../../store';
@@ -29,6 +32,22 @@ const TRANSPORT_BADGE_COLORS: Record<string, string> = {
   sse: 'bg-green-500/10 text-green-600 dark:text-green-400',
   http: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
 };
+
+const MCP_ICON_BY_ID: Record<string, string> = {
+  tavily: tavilyIcon,
+  github: githubIcon,
+  gitlab: gitlabIcon,
+};
+
+const McpIcon: React.FC<{ iconSrc?: string }> = ({ iconSrc }) => (
+  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
+    {iconSrc ? (
+      <img src={iconSrc} alt="" className="size-9 object-contain" />
+    ) : (
+      <Plug className="size-5 text-muted-foreground" />
+    )}
+  </div>
+);
 
 /**
  * Text with line-clamp-2 that shows a popover above the text when truncated.
@@ -203,6 +222,14 @@ const McpManager: React.FC<McpManagerProps> = ({
       );
     },
     [dynamicRegistry],
+  );
+
+  const getIconForServer = useCallback(
+    (server: McpServerConfig): string | undefined => {
+      const registryEntry = getRegistryEntryForServer(server);
+      return MCP_ICON_BY_ID[server.registryId || registryEntry?.id || ''];
+    },
+    [getRegistryEntryForServer],
   );
 
   const getTransportSummary = (server: McpServerConfig): string => {
@@ -508,17 +535,23 @@ const McpManager: React.FC<McpManagerProps> = ({
                   return (
                     <div
                       key={server.id}
-                      className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+                      className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
-                            <Plug className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <span className="text-sm font-medium text-foreground truncate">
+                      <McpIcon iconSrc={getIconForServer(server)} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">
                             {server.name}
                           </span>
+                          <span className={`hidden shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium sm:inline-flex ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}>
+                            {server.transportType}
+                          </span>
                         </div>
+                        <ClampedText
+                          text={installedDescription}
+                          className="mt-1 line-clamp-1 text-xs text-muted-foreground"
+                        />
+                      </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button
                             type="button"
@@ -545,14 +578,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                             onCheckedChange={() => handleToggleEnabled(server.id)}
                           />
                         </div>
-                      </div>
-
-                      <ClampedText
-                        text={installedDescription}
-                        className="text-xs text-muted-foreground mb-2"
-                      />
-
-                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <div className="hidden">
                         <span
                           className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
                         >
@@ -594,7 +620,7 @@ const McpManager: React.FC<McpManagerProps> = ({
           {/* ── Tab: Marketplace ────────────────────────────── */}
           {activeTab === McpTabValue.Marketplace && (
             <div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {filteredMarketplace.length === 0 ? (
                   <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
                     {i18nService.t('noMcpServersAvailable')}
@@ -603,18 +629,47 @@ const McpManager: React.FC<McpManagerProps> = ({
                   filteredMarketplace.map(entry => (
                     <div
                       key={entry.id}
-                      className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+                      className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
-                            <Plug className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <span className="text-sm font-medium text-foreground truncate">
+                      <McpIcon iconSrc={MCP_ICON_BY_ID[entry.id]} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">
                             {entry.name}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <ClampedText
+                          text={getRegistryEntryDescription(entry)}
+                          className="mt-1 line-clamp-1 text-xs text-muted-foreground"
+                        />
+                        {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
+                          <span className="mt-1 block text-xs text-amber-500 dark:text-amber-400">
+                            {entry.requiredEnvKeys.length} key
+                            {entry.requiredEnvKeys.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        <div className="hidden">
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 font-medium ${TRANSPORT_BADGE_COLORS[entry.transportType] || ''}`}
+                          >
+                            {entry.transportType}
+                          </span>
+                          <span className="shrink-0">·</span>
+                          <span className="min-w-0 truncate">
+                            {getStdioCommandSummary(entry.command, entry.defaultArgs)}
+                          </span>
+                          {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
+                            <>
+                              <span className="shrink-0">·</span>
+                              <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                                {entry.requiredEnvKeys.length} key
+                                {entry.requiredEnvKeys.length > 1 ? 's' : ''}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                           {installedRegistryIds.has(entry.id) ? (
                             <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
                               {i18nService.t('mcpInstalled')}
@@ -628,15 +683,8 @@ const McpManager: React.FC<McpManagerProps> = ({
                               {i18nService.t('mcpInstall')}
                             </Button>
                           )}
-                        </div>
                       </div>
-
-                      <ClampedText
-                        text={getRegistryEntryDescription(entry)}
-                        className="text-xs text-muted-foreground mb-2"
-                      />
-
-                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <div className="hidden">
                         <span
                           className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[entry.transportType] || ''}`}
                         >
