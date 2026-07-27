@@ -64,48 +64,44 @@ export function McpManagerToolbar({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {showTabs ? (
-          <Tabs
-            value={activeTab}
-            onValueChange={value => onTabChange(value as McpTabType)}
-            className="-mb-px self-end"
-          >
-            <TabsList variant="line">
-              {MCP_TAB_ITEMS.map(tab => {
-                const count = getTabCount(tab.value, installedCount, marketplaceCount, customCount);
+      <InputGroup className="w-full">
+        <InputGroupAddon>
+          <InputGroupText>
+            <Search />
+          </InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
+          value={searchQuery}
+          onChange={event => onSearchQueryChange(event.target.value)}
+          placeholder={i18nService.t('searchMcpServers')}
+          aria-label={i18nService.t('searchMcpServers')}
+        />
+      </InputGroup>
 
-                return (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    className="after:bottom-[-1px] after:h-1"
-                  >
-                    {i18nService.t(tab.labelKey)}
-                    {count > 0 ? <Badge variant="secondary">{count}</Badge> : null}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </Tabs>
-        ) : (
-          <span />
-        )}
+      {showTabs ? (
+        <Tabs
+          value={activeTab}
+          onValueChange={value => onTabChange(value as McpTabType)}
+          className="-mb-px self-start"
+        >
+          <TabsList variant="line">
+            {MCP_TAB_ITEMS.map(tab => {
+              const count = getTabCount(tab.value, installedCount, marketplaceCount, customCount);
 
-        <InputGroup className="w-full sm:w-64">
-          <InputGroupAddon>
-            <InputGroupText>
-              <Search />
-            </InputGroupText>
-          </InputGroupAddon>
-          <InputGroupInput
-            value={searchQuery}
-            onChange={event => onSearchQueryChange(event.target.value)}
-            placeholder={i18nService.t('searchMcpServers')}
-            aria-label={i18nService.t('searchMcpServers')}
-          />
-        </InputGroup>
-      </div>
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="after:bottom-[-1px] after:h-1"
+                >
+                  {i18nService.t(tab.labelKey)}
+                  {count > 0 ? <Badge variant="secondary">{count}</Badge> : null}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+      ) : null}
     </header>
   );
 }
