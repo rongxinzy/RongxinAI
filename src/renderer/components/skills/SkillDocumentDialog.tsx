@@ -128,7 +128,7 @@ export function SkillDocumentDialog({
     return () => {
       active = false;
     };
-  }, [skill.id]);
+  }, [skill.id, skill.prompt]);
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 p-4">
