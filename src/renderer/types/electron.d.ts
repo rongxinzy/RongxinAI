@@ -353,7 +353,7 @@ interface IElectronAPI {
       pinned: boolean;
     }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
-    download: (source: string) => Promise<{
+      download: (source: string, options?: { iconUrl?: string; displayName?: string }) => Promise<{
       success: boolean;
       skills?: Skill[];
       error?: string;
@@ -379,10 +379,15 @@ interface IElectronAPI {
       skillId: string,
       config: Record<string, string>,
     ) => Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }>;
-    fetchMarketplace: (options?: {
-      pageNumber?: number;
-      pageSize?: number;
-    }) => Promise<{ success: boolean; data?: string; error?: string }>;
+      fetchMarketplace: (options?: {
+        pageNumber?: number;
+        pageSize?: number;
+      }) => Promise<{ success: boolean; data?: string; error?: string }>;
+      fetchMarketplaceContent: (skillId: string) => Promise<{
+        success: boolean;
+        content?: string | null;
+        error?: string;
+      }>;
     onChanged: (callback: () => void) => () => void;
   };
   mcp: {

@@ -42,6 +42,7 @@ export interface MarketplaceSkill {
     versions?: number;
   };
   url: string; // Marketplace page URL
+  iconUrl?: string; // Marketplace logo URL provided by the source API
   installSource?: string;
   version: string;
   source: {

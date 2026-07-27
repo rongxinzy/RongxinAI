@@ -142,7 +142,7 @@ class SkillService {
     }
   }
 
-  async downloadSkill(source: string): Promise<{
+  async downloadSkill(source: string, options: { iconUrl?: string; displayName?: string } = {}): Promise<{
     success: boolean;
     skills?: Skill[];
     error?: string;
@@ -151,7 +151,10 @@ class SkillService {
     pendingInstallId?: string;
   }> {
     try {
-      const result = await window.electron.skills.download(source);
+      const result = await window.electron.skills.download(
+        source,
+        options.iconUrl || options.displayName ? options : undefined,
+      );
       if (result.success && result.skills) {
         this.skills = result.skills;
       }
