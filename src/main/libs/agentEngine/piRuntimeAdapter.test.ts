@@ -23,7 +23,16 @@ const hoisted = vi.hoisted(() => {
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
     mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
-    mockGetModel: vi.fn((provider: string, modelId: string) => ({ provider, id: modelId })),
+    mockGetModel: vi.fn((provider: string, modelId: string) => ({
+      provider,
+      id: modelId,
+      baseUrl:
+        provider === 'openai'
+          ? 'https://api.openai.com/v1'
+          : provider === 'moonshotai-cn'
+            ? 'https://api.moonshot.cn/v1'
+            : undefined,
+    })),
     mockModelRuntime: {
       registerProvider: vi.fn(),
       setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
@@ -68,6 +77,26 @@ const hoisted = vi.hoisted(() => {
             contextWindow: 272000,
             contextTokens: 272000,
             maxTokens: 16384,
+          },
+        };
+      }
+
+      if (providerName === 'moonshot') {
+        return {
+          config: {
+            apiKey: 'sk-moonshot',
+            baseURL: 'http://172.18.5.179:3000/v1',
+            model: modelName,
+            apiType: 'openai' as const,
+          },
+          providerMetadata: {
+            providerName: 'moonshot',
+            codingPlanEnabled: false,
+            supportsImage: true,
+            modelName,
+            contextWindow: 262144,
+            contextTokens: 262144,
+            maxTokens: 32768,
           },
         };
       }
@@ -214,6 +243,60 @@ describe('PiRuntimeAdapter', () => {
       );
       expect(mockModelRuntimeCreate).not.toHaveBeenCalled();
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('modelRuntime');
+    });
+
+    it('should register remote custom models with their configured endpoint and API key', async () => {
+      mockGetModel.mockImplementationOnce(() => undefined);
+
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'moonshot/kimi-for-coding',
+      });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('moonshot/kimi-for-coding');
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'moonshot',
+        expect.objectContaining({
+          baseUrl: 'http://172.18.5.179:3000/v1',
+          api: 'openai-completions',
+          models: [
+            expect.objectContaining({
+              provider: 'moonshot',
+              id: 'kimi-for-coding',
+              baseUrl: 'http://172.18.5.179:3000/v1',
+            }),
+          ],
+        }),
+      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('moonshot', 'sk-moonshot');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            provider: 'moonshot',
+            id: 'kimi-for-coding',
+            baseUrl: 'http://172.18.5.179:3000/v1',
+          }),
+          modelRuntime: mockModelRuntime,
+        }),
+      );
+    });
+
+    it('should not reuse a built-in model when the configured endpoint differs', async () => {
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'moonshot/kimi-k2.6',
+      });
+
+      expect(mockGetModel).toHaveBeenCalledWith('moonshotai-cn', 'kimi-k2.6');
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'moonshot',
+        expect.objectContaining({
+          baseUrl: 'http://172.18.5.179:3000/v1',
+          models: [expect.objectContaining({ id: 'kimi-k2.6' })],
+        }),
+      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('moonshot', 'sk-moonshot');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({ modelRuntime: mockModelRuntime }),
+      );
     });
 
     it('should make session active after start', async () => {

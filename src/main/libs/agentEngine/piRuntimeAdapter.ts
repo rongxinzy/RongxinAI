@@ -1692,16 +1692,30 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
   };
 }
 
-async function resolvePiLocalModelRuntime(
+function normalizePiBaseUrl(baseUrl: unknown): string {
+  return typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
+}
+
+function canUsePiBuiltinModel(
+  builtinModel: Record<string, unknown> | null,
+  resolution: ApiConfigResolution,
+): boolean {
+  if (!builtinModel || !resolution.config) return false;
+  return normalizePiBaseUrl(builtinModel.baseUrl) === normalizePiBaseUrl(resolution.config.baseURL);
+}
+
+async function resolvePiCustomModelRuntime(
   pi: PiModules,
   resolution: ApiConfigResolution,
+  builtinModel: Record<string, unknown> | null,
   existingModelRuntime?: PiModelRuntime | null,
 ): Promise<PiModelRuntime | null> {
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
-  if (!config || !providerMetadata || !isLocalProviderName(providerMetadata.providerName)) {
+  if (!config || !providerMetadata) {
     return null;
   }
+  if (canUsePiBuiltinModel(builtinModel, resolution)) return existingModelRuntime ?? null;
 
   const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
   const model = buildPiCustomModel(resolution);
@@ -1712,7 +1726,10 @@ async function resolvePiLocalModelRuntime(
     api: model.api,
     models: [model],
   });
-  await modelRuntime.setRuntimeApiKey(providerId, config.apiKey?.trim() || PI_LOCAL_API_KEY);
+  const apiKey =
+    config.apiKey?.trim() ||
+    (isLocalProviderName(providerMetadata.providerName) ? PI_LOCAL_API_KEY : '');
+  if (apiKey) await modelRuntime.setRuntimeApiKey(providerId, apiKey);
   return modelRuntime;
 }
 
@@ -1756,18 +1773,24 @@ async function resolvePiModel(
   }
 
   const builtinModel = buildPiBuiltinModel(pi, resolution);
-  const modelRuntime = await resolvePiLocalModelRuntime(pi, resolution, existingModelRuntime);
+  const modelRuntime = await resolvePiCustomModelRuntime(
+    pi,
+    resolution,
+    builtinModel,
+    existingModelRuntime,
+  );
   const customModel = buildPiCustomModel(resolution);
-  const localModel = modelRuntime?.getModel(
+  const registeredModel = modelRuntime?.getModel(
     resolution.providerMetadata.providerName,
     resolution.config.model,
   );
+  const useBuiltinModel = canUsePiBuiltinModel(builtinModel, resolution);
 
   return {
     model:
-      builtinModel ??
-      (localModel && typeof localModel === 'object'
-        ? (localModel as Record<string, unknown>)
+      (useBuiltinModel ? builtinModel : null) ??
+      (registeredModel && typeof registeredModel === 'object'
+        ? (registeredModel as Record<string, unknown>)
         : customModel),
     modelRuntime,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
