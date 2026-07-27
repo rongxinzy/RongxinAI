@@ -1,14 +1,19 @@
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
+import { FieldDescription, FieldLabel } from '@shared/components/ui/field';
 import { Input } from '@shared/components/ui/input';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
-import { Textarea } from '@shared/components/ui/textarea';
+import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@shared/components/ui/toggle-group';
 import { PlatformRegistry } from '@shared/platform';
+import { CircleAlert, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -28,6 +33,8 @@ import {
   resolveOpenClawModelSupportMessageKey,
 } from '../../utils/openclawModelSupport';
 import type { TaskTemplateValues } from './TaskTemplateGallery';
+import TaskFormBody from './TaskFormBody';
+import TaskTimePicker from './TaskTimePicker';
 import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 
 interface TaskFormProps {
@@ -131,6 +138,16 @@ const CRON_QUICK_PICKS: Array<{ labelKey: string; expr: string }> = [
   { labelKey: 'scheduledTasksFormCronQuickEveryHour', expr: '0 * * * *' },
   { labelKey: 'scheduledTasksFormCronQuickEvery15min', expr: '*/15 * * * *' },
 ];
+
+const PLAN_LABEL_KEY = {
+  once: 'scheduledTasksFormScheduleModeOnce',
+  hourly: 'scheduledTasksFormScheduleModeHourly',
+  daily: 'scheduledTasksFormScheduleModeDaily',
+  weekly: 'scheduledTasksFormScheduleModeWeekly',
+  monthly: 'scheduledTasksFormScheduleModeMonthly',
+  cron: 'scheduledTasksFormScheduleModeCronCustom',
+  advanced: 'scheduledTasksFormScheduleModeCronCustom',
+} as const;
 
 function isIMChannel(channel: string): boolean {
   return PlatformRegistry.isIMChannel(channel);
@@ -497,19 +514,13 @@ const TaskForm: React.FC<TaskFormProps> = ({
     }
   };
 
-  const labelClass = 'block text-[14px] font-normal leading-5 text-muted-foreground mb-1';
-  const errorClass = 'text-xs text-red-500 mt-1';
-  const hintClass = 'text-xs text-muted-foreground mt-0.5';
-
   // Resolve the selected agent's configured model for display
   const selectedAgent = agents.find(a => a.id === form.agentId) ?? null;
 
-  const timeValue = `${String(form.hour).padStart(2, '0')}:${String(form.minute).padStart(2, '0')}`;
-  const handleTimeChange = (value: string) => {
-    const [h, m] = value.split(':').map(Number);
-    if (!Number.isNaN(h) && !Number.isNaN(m)) {
-      updateForm({ hour: h, minute: m });
-    }
+  const getNotifyChannelLabel = (channel: ScheduledTaskChannelOption): string => {
+    const platform = PlatformRegistry.platformOfChannel(channel.value);
+    const platformLabel = platform ? i18nService.t(platform) || channel.label : channel.label;
+    return channel.accountId ? `${platformLabel} · ${channel.label}` : platformLabel;
   };
 
   const renderPlanSelect = () => (
@@ -518,27 +529,31 @@ const TaskForm: React.FC<TaskFormProps> = ({
       onValueChange={value => value && updateForm({ planType: value as PlanType })}
     >
       <SelectTrigger className="flex-1 min-w-0">
-        <SelectValue />
+        <SelectValue>{i18nService.t(PLAN_LABEL_KEY[form.planType])}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="once">{i18nService.t('scheduledTasksFormScheduleModeOnce')}</SelectItem>
-        <SelectItem value="hourly">
-          {i18nService.t('scheduledTasksFormScheduleModeHourly')}
-        </SelectItem>
-        <SelectItem value="daily">
-          {i18nService.t('scheduledTasksFormScheduleModeDaily')}
-        </SelectItem>
-        <SelectItem value="weekly">
-          {i18nService.t('scheduledTasksFormScheduleModeWeekly')}
-        </SelectItem>
-        <SelectItem value="monthly">
-          {i18nService.t('scheduledTasksFormScheduleModeMonthly')}
-        </SelectItem>
-        <SelectItem value="cron">
-          {i18nService.t(
-            'scheduledTasksFormScheduleModeCronCustom' as Parameters<typeof i18nService.t>[0],
-          )}
-        </SelectItem>
+        <SelectGroup>
+          <SelectItem value="once">
+            {i18nService.t('scheduledTasksFormScheduleModeOnce')}
+          </SelectItem>
+          <SelectItem value="hourly">
+            {i18nService.t('scheduledTasksFormScheduleModeHourly')}
+          </SelectItem>
+          <SelectItem value="daily">
+            {i18nService.t('scheduledTasksFormScheduleModeDaily')}
+          </SelectItem>
+          <SelectItem value="weekly">
+            {i18nService.t('scheduledTasksFormScheduleModeWeekly')}
+          </SelectItem>
+          <SelectItem value="monthly">
+            {i18nService.t('scheduledTasksFormScheduleModeMonthly')}
+          </SelectItem>
+          <SelectItem value="cron">
+            {i18nService.t(
+              'scheduledTasksFormScheduleModeCronCustom' as Parameters<typeof i18nService.t>[0],
+            )}
+          </SelectItem>
+        </SelectGroup>
       </SelectContent>
     </Select>
   );
@@ -561,42 +576,40 @@ const TaskForm: React.FC<TaskFormProps> = ({
       }
     };
 
-    const fieldSelectClass = 'flex-1 min-w-0 text-xs h-8 px-1.5';
+    const fieldSelectClass = 'w-full min-w-20 text-xs';
 
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">{renderPlanSelect()}</div>
 
-        {/* Mode tabs */}
-        <div className="flex items-center gap-0 border border-border rounded-lg overflow-hidden w-fit">
-          <Button
-            type="button"
-            variant={form.cronMode === 'builder' ? 'default' : 'ghost'}
-            size="xs"
-            onClick={handleSwitchToBuilder}
-            className="px-2.5 py-1 text-xs font-medium rounded-none transition-colors"
-          >
-            {i18nService.t(
-              'scheduledTasksFormCronModeBuilder' as Parameters<typeof i18nService.t>[0],
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant={form.cronMode === 'raw' ? 'default' : 'ghost'}
-            size="xs"
-            onClick={handleSwitchToRaw}
-            className="px-2.5 py-1 text-xs font-medium rounded-none transition-colors"
-          >
-            {i18nService.t('scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0])}
-          </Button>
-        </div>
+        <Tabs
+          value={form.cronMode}
+          onValueChange={value => {
+            if (value === 'builder') handleSwitchToBuilder();
+            if (value === 'raw') handleSwitchToRaw();
+          }}
+          className="gap-0"
+        >
+          <TabsList>
+            <TabsTrigger value="builder">
+              {i18nService.t(
+                'scheduledTasksFormCronModeBuilder' as Parameters<typeof i18nService.t>[0],
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="raw">
+              {i18nService.t(
+                'scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0],
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {form.cronMode === 'builder' ? (
-          <div className="rounded-lg border border-border bg-surface-raised/20 p-2.5 space-y-2">
+          <div className="rounded-lg border border-border bg-muted p-3 flex flex-col gap-2">
             {/* Field labels */}
             <div className="grid grid-cols-5 gap-1.5">
               {(['minute', 'hour', 'dom', 'month', 'dow'] as const).map(field => (
-                <div key={field} className="text-center text-xs text-muted-foreground font-medium">
+                <div key={field} className="text-left text-xs text-muted-foreground font-medium">
                   {i18nService.t(
                     `scheduledTasksFormCronField_${field}` as Parameters<typeof i18nService.t>[0],
                   )}
@@ -616,16 +629,18 @@ const TaskForm: React.FC<TaskFormProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="*">*</SelectItem>
-                  {Array.from({ length: 60 }, (_, i) => (
-                    <SelectItem key={i} value={String(i)}>
-                      {String(i).padStart(2, '0')}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="*/5">*/5</SelectItem>
-                  <SelectItem value="*/10">*/10</SelectItem>
-                  <SelectItem value="*/15">*/15</SelectItem>
-                  <SelectItem value="*/30">*/30</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="*">*</SelectItem>
+                    {Array.from({ length: 60 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {String(i).padStart(2, '0')}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="*/5">*/5</SelectItem>
+                    <SelectItem value="*/10">*/10</SelectItem>
+                    <SelectItem value="*/15">*/15</SelectItem>
+                    <SelectItem value="*/30">*/30</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               {/* Hour */}
@@ -639,16 +654,18 @@ const TaskForm: React.FC<TaskFormProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="*">*</SelectItem>
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <SelectItem key={i} value={String(i)}>
-                      {String(i).padStart(2, '0')}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="*/2">*/2</SelectItem>
-                  <SelectItem value="*/4">*/4</SelectItem>
-                  <SelectItem value="*/6">*/6</SelectItem>
-                  <SelectItem value="*/12">*/12</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="*">*</SelectItem>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {String(i).padStart(2, '0')}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="*/2">*/2</SelectItem>
+                    <SelectItem value="*/4">*/4</SelectItem>
+                    <SelectItem value="*/6">*/6</SelectItem>
+                    <SelectItem value="*/12">*/12</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               {/* DOM (day of month) */}
@@ -662,12 +679,14 @@ const TaskForm: React.FC<TaskFormProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="*">*</SelectItem>
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectItem value="*">*</SelectItem>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               {/* Month */}
@@ -681,12 +700,14 @@ const TaskForm: React.FC<TaskFormProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="*">*</SelectItem>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                    <SelectItem key={m} value={String(m)}>
-                      {m}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectItem value="*">*</SelectItem>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                      <SelectItem key={m} value={String(m)}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               {/* DOW (day of week) */}
@@ -700,14 +721,20 @@ const TaskForm: React.FC<TaskFormProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="*">*</SelectItem>
-                  {WEEKDAY_KEYS.map((key, idx) => (
-                    <SelectItem key={idx} value={String(idx)}>
-                      {i18nService.t(key)}
+                  <SelectGroup>
+                    <SelectItem value="*">*</SelectItem>
+                    {WEEKDAY_KEYS.map((key, idx) => (
+                      <SelectItem key={idx} value={String(idx)}>
+                        {i18nService.t(key)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="1-5">
+                      {i18nService.t('scheduledTasksCronWeekdays')}
                     </SelectItem>
-                  ))}
-                  <SelectItem value="1-5">{i18nService.t('scheduledTasksCronWeekdays')}</SelectItem>
-                  <SelectItem value="0,6">{i18nService.t('scheduledTasksCronWeekends')}</SelectItem>
+                    <SelectItem value="0,6">
+                      {i18nService.t('scheduledTasksCronWeekends')}
+                    </SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -718,7 +745,11 @@ const TaskForm: React.FC<TaskFormProps> = ({
               </span>
               {cronPreview !== null && (
                 <span
-                  className={`text-xs shrink-0 ${cronPreview.ok ? 'text-muted-foreground' : 'text-red-500'}`}
+                  className={
+                    cronPreview.ok
+                      ? 'text-xs shrink-0 text-muted-foreground'
+                      : 'text-xs shrink-0 text-destructive'
+                  }
                 >
                   {cronPreview.ok
                     ? cronPreview.label
@@ -733,7 +764,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
           </div>
         ) : (
           /* Raw expression input */
-          <div>
+          <div className="flex flex-col gap-1">
             <Input
               type="text"
               value={form.cronExpr}
@@ -744,15 +775,19 @@ const TaskForm: React.FC<TaskFormProps> = ({
               className="w-full"
               spellCheck={false}
             />
-            <p className={hintClass}>
+            <FieldDescription className="text-xs">
               {i18nService.t(
                 'scheduledTasksFormCronInputHint' as Parameters<typeof i18nService.t>[0],
               )}
-            </p>
+            </FieldDescription>
             {/* Live preview */}
             {form.cronExpr.trim() && cronPreview !== null && (
               <div
-                className={`mt-2 flex items-center gap-1.5 text-xs ${cronPreview.ok ? 'text-muted-foreground' : 'text-red-500'}`}
+                className={
+                  cronPreview.ok
+                    ? 'mt-1 flex items-center gap-1.5 text-xs text-muted-foreground'
+                    : 'mt-1 flex items-center gap-1.5 text-xs text-destructive'
+                }
               >
                 {cronPreview.ok ? (
                   <>
@@ -776,51 +811,47 @@ const TaskForm: React.FC<TaskFormProps> = ({
         )}
 
         {/* Quick pick chips */}
-        <div>
+        <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground mb-1">
             {i18nService.t(
               'scheduledTasksFormCronQuickTitle' as Parameters<typeof i18nService.t>[0],
             )}
           </p>
-          <div className="flex flex-wrap gap-1">
-            {CRON_QUICK_PICKS.map(({ labelKey, expr }) => {
-              const active = currentExpr === expr;
-              return (
-                <Button
-                  key={expr}
-                  type="button"
-                  variant={active ? 'outline' : 'ghost'}
-                  size="xs"
-                  onClick={() => {
-                    const parsed = exprToCronBuilder(expr);
-                    updateForm({
-                      cronExpr: expr,
-                      cronBuilder: parsed ?? form.cronBuilder,
-                    });
-                  }}
-                  className={`px-2 py-0.5 rounded-md text-xs border transition-colors ${
-                    active
-                      ? 'bg-primary/10 border-primary/40 text-primary font-medium'
-                      : 'bg-surface border-border text-muted-foreground hover:bg-surface-raised hover:text-foreground'
-                  }`}
-                >
-                  {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
-                  <span className="ml-1.5 opacity-50 font-mono">{expr}</span>
-                </Button>
-              );
-            })}
-          </div>
+          <ToggleGroup
+            value={[currentExpr]}
+            onValueChange={value => {
+              const expr = value[0];
+              if (!expr) return;
+              const parsed = exprToCronBuilder(expr);
+              updateForm({
+                cronExpr: expr,
+                cronBuilder: parsed ?? form.cronBuilder,
+              });
+            }}
+            variant="outline"
+            size="sm"
+            spacing={1}
+            className="flex-wrap"
+          >
+            {CRON_QUICK_PICKS.map(({ labelKey, expr }) => (
+              <ToggleGroupItem key={expr} value={expr}>
+                {i18nService.t(labelKey as Parameters<typeof i18nService.t>[0])}
+                <span className="ml-1.5 opacity-50 font-mono">{expr}</span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {/* Optional timezone */}
-        <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">
+        <div className="flex flex-col gap-1">
+          <FieldLabel htmlFor="scheduled-task-cron-timezone" className="text-xs">
             {i18nService.t('scheduledTasksFormCronTimezone' as Parameters<typeof i18nService.t>[0])}
             <span className="ml-1 text-muted-foreground font-normal">
               {i18nService.t('scheduledTasksFormOptional')}
             </span>
-          </label>
+          </FieldLabel>
           <Input
+            id="scheduled-task-cron-timezone"
             type="text"
             value={form.cronTz}
             onChange={e => updateForm({ cronTz: e.target.value })}
@@ -840,119 +871,89 @@ const TaskForm: React.FC<TaskFormProps> = ({
       const existingExpr = task?.schedule.kind === 'cron' ? task.schedule.expr : '';
       const existingTz = task?.schedule.kind === 'cron' ? (task.schedule.tz ?? '') : '';
       return (
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
-          <div className="rounded-lg bg-surface-raised/30 p-3 border border-border/50">
-            <p className="text-sm text-muted-foreground">{formatScheduleLabel(task!.schedule)}</p>
-            {existingExpr && (
-              <div className="flex items-center justify-end mt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={() =>
-                    updateForm({ planType: 'cron', cronExpr: existingExpr, cronTz: existingTz })
-                  }
-                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors shrink-0"
-                >
-                  {i18nService.t(
-                    'scheduledTasksFormAdvancedEditAsCron' as Parameters<typeof i18nService.t>[0],
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
+        <div className="rounded-lg bg-muted p-3 border border-border">
+          <p className="text-sm text-muted-foreground">{formatScheduleLabel(task!.schedule)}</p>
+          {existingExpr && (
+            <div className="flex items-center justify-end mt-2">
+              <Button
+                type="button"
+                variant="link"
+                size="xs"
+                onClick={() =>
+                  updateForm({ planType: 'cron', cronExpr: existingExpr, cronTz: existingTz })
+                }
+              >
+                {i18nService.t(
+                  'scheduledTasksFormAdvancedEditAsCron' as Parameters<typeof i18nService.t>[0],
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       );
     }
 
     if (isCron) {
-      return (
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
-          {renderCronSection()}
-        </div>
-      );
+      return renderCronSection();
     }
 
     if (form.planType === 'once') {
       const dateValue = `${form.year}-${String(form.month).padStart(2, '0')}-${String(form.day).padStart(2, '0')}`;
-      const fullTimeValue = `${timeValue}:${String(form.second).padStart(2, '0')}`;
       return (
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
-          <div className="flex items-center gap-3">
-            {renderPlanSelect()}
-            <Input
-              type="date"
-              value={dateValue}
-              onChange={e => {
-                const [y, mo, d] = e.target.value.split('-').map(Number);
-                if (!Number.isNaN(y)) updateForm({ year: y, month: mo, day: d });
-              }}
-              className="flex-1 min-w-0"
-            />
-            <Input
-              type="time"
-              step="1"
-              value={fullTimeValue}
-              onChange={e => {
-                const parts = e.target.value.split(':').map(Number);
-                const patch: Partial<FormState> = {};
-                if (!Number.isNaN(parts[0])) patch.hour = parts[0];
-                if (!Number.isNaN(parts[1])) patch.minute = parts[1];
-                if (parts.length > 2 && !Number.isNaN(parts[2])) patch.second = parts[2];
-                updateForm(patch);
-              }}
-              className="flex-1 min-w-0"
-            />
-          </div>
+        <div className="flex items-center gap-3">
+          {renderPlanSelect()}
+          <Input
+            type="date"
+            value={dateValue}
+            onChange={e => {
+              const [y, mo, d] = e.target.value.split('-').map(Number);
+              if (!Number.isNaN(y)) updateForm({ year: y, month: mo, day: d });
+            }}
+            className="flex-1 min-w-0"
+          />
+          <TaskTimePicker
+            hour={form.hour}
+            minute={form.minute}
+            second={form.second}
+            onChange={updateForm}
+          />
         </div>
       );
     }
 
     if (form.planType === 'daily') {
       return (
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
-          <div className="flex items-center gap-3">
-            {renderPlanSelect()}
-            <Input
-              type="time"
-              value={timeValue}
-              onChange={e => handleTimeChange(e.target.value)}
-              className="flex-1 min-w-0"
-            />
-          </div>
+        <div className="flex items-center gap-3">
+          {renderPlanSelect()}
+          <TaskTimePicker hour={form.hour} minute={form.minute} onChange={updateForm} />
         </div>
       );
     }
 
     if (form.planType === 'hourly') {
       return (
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
-          <div className="flex items-center gap-3">
-            {renderPlanSelect()}
-            <Select
-              value={String(form.minute)}
-              onValueChange={value => value !== null && updateForm({ minute: Number(value) })}
-            >
-              <SelectTrigger className="w-20 shrink-0 text-center">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
+        <div className="flex items-center gap-3">
+          {renderPlanSelect()}
+          <Select
+            value={String(form.minute)}
+            onValueChange={value => value !== null && updateForm({ minute: Number(value) })}
+          >
+            <SelectTrigger className="w-20 shrink-0">
+              <SelectValue>{String(form.minute).padStart(2, '0')}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
                 {Array.from({ length: 60 }, (_, i) => (
                   <SelectItem key={i} value={String(i)}>
                     {String(i).padStart(2, '0')}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-            <span className="shrink-0 text-sm text-muted-foreground">
-              {i18nService.t('scheduledTasksFormHourlyMinuteSuffix')}
-            </span>
-          </div>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <span className="shrink-0 text-sm text-muted-foreground">
+            {i18nService.t('scheduledTasksFormHourlyMinuteSuffix')}
+          </span>
         </div>
       );
     }
@@ -982,110 +983,89 @@ const TaskForm: React.FC<TaskFormProps> = ({
               ['scheduledTasksFormWeekShortSat', 6],
             ];
 
-      const toggleWeekday = (day: number) => {
-        const current = form.weekdays;
-        const next = current.includes(day) ? current.filter(d => d !== day) : [...current, day];
-        updateForm({ weekdays: next });
-      };
-
       return (
-        <div>
-          <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
+        <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             {renderPlanSelect()}
-            <Input
-              type="time"
-              value={timeValue}
-              onChange={e => handleTimeChange(e.target.value)}
-              className="flex-1 min-w-0"
-            />
+            <TaskTimePicker hour={form.hour} minute={form.minute} onChange={updateForm} />
           </div>
-          <div className="flex items-center gap-1.5 mt-2">
-            {WEEKDAY_SHORT_LABELS.map(([key, dayValue]) => {
-              const selected = form.weekdays.includes(dayValue);
-              return (
-                <Button
-                  key={dayValue}
-                  type="button"
-                  variant={selected ? 'default' : 'ghost'}
-                  size="icon-xs"
-                  onClick={() => toggleWeekday(dayValue)}
-                  className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
-                    selected
-                      ? 'bg-primary text-white'
-                      : 'border border-border text-muted-foreground hover:bg-surface-raised'
-                  }`}
-                >
-                  {i18nService.t(key)}
-                </Button>
-              );
-            })}
-          </div>
+          <ToggleGroup
+            multiple
+            value={form.weekdays.map(String)}
+            onValueChange={value => updateForm({ weekdays: value.map(Number) })}
+            variant="outline"
+            size="sm"
+            spacing={1}
+          >
+            {WEEKDAY_SHORT_LABELS.map(([key, dayValue]) => (
+              <ToggleGroupItem key={dayValue} value={String(dayValue)}>
+                {i18nService.t(key)}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
       );
     }
 
     return (
-      <div>
-        <label className={labelClass}>{i18nService.t('scheduledTasksFormScheduleType')}</label>
-        <div className="flex items-center gap-3">
-          {renderPlanSelect()}
-          <Select
-            value={String(form.monthDay)}
-            onValueChange={value => value !== null && updateForm({ monthDay: Number(value) })}
-          >
-            <SelectTrigger className="flex-1 min-w-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+      <div className="flex items-center gap-3">
+        {renderPlanSelect()}
+        <Select
+          value={String(form.monthDay)}
+          onValueChange={value => value !== null && updateForm({ monthDay: Number(value) })}
+        >
+          <SelectTrigger className="flex-1 min-w-0">
+            <SelectValue>
+              {`${form.monthDay}${i18nService.t('scheduledTasksFormMonthDaySuffix')}`}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
               {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
                 <SelectItem key={d} value={String(d)}>
                   {d}
                   {i18nService.t('scheduledTasksFormMonthDaySuffix')}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-          <Input
-            type="time"
-            value={timeValue}
-            onChange={e => handleTimeChange(e.target.value)}
-            className="flex-1 min-w-0"
-          />
-        </div>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <TaskTimePicker hour={form.hour} minute={form.minute} onChange={updateForm} />
       </div>
     );
   };
 
   const renderNotifyRow = () => (
-    <div>
-      <label className={labelClass}>{i18nService.t('scheduledTasksFormNotifyChannel')}</label>
-      <div className="flex items-center gap-3">
-        <Select
-          value={form.notifyChannel}
-          onValueChange={value => {
-            updateForm({
-              notifyChannel: value ?? 'none',
-              notifyTo: '',
-              notifyAccountId: undefined,
-            });
-          }}
-        >
-          <SelectTrigger className={showConversationSelector ? 'flex-1 min-w-0' : 'w-full'}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
+    <div className="flex items-center gap-3">
+      <Select
+        value={form.notifyChannel}
+        onValueChange={value => {
+          updateForm({
+            notifyChannel: value ?? 'none',
+            notifyTo: '',
+            notifyAccountId: undefined,
+          });
+        }}
+      >
+        <SelectTrigger className="flex-1 min-w-0">
+          <SelectValue>
+            {form.notifyChannel === 'none'
+              ? i18nService.t('scheduledTasksFormNotifyChannelNone')
+              : (() => {
+                  const channel = channelOptions.find(
+                    option => option.value === form.notifyChannel,
+                  );
+                  return channel ? getNotifyChannelLabel(channel) : form.notifyChannel;
+                })()}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
             <SelectItem value="none">
               {i18nService.t('scheduledTasksFormNotifyChannelNone')}
             </SelectItem>
             {channelOptions.map(channel => {
-              const platform = PlatformRegistry.platformOfChannel(channel.value);
-              const platformLabel = platform
-                ? i18nService.t(platform) || channel.label
-                : channel.label;
-              const displayName = channel.accountId
-                ? `${platformLabel} · ${channel.label}`
-                : platformLabel;
+              const displayName = getNotifyChannelLabel(channel);
               const unsupported = channel.value === 'openclaw-weixin';
               return (
                 <SelectItem
@@ -1099,25 +1079,27 @@ const TaskForm: React.FC<TaskFormProps> = ({
                 </SelectItem>
               );
             })}
-          </SelectContent>
-        </Select>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
 
-        {showConversationSelector && (
-          <Select
-            value={form.notifyTo}
-            onValueChange={value => updateForm({ notifyTo: value ?? '' })}
-            disabled={conversationsLoading}
-          >
-            <SelectTrigger className="flex-1 min-w-0">
-              <SelectValue
-                placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
-              />
-            </SelectTrigger>
-            <SelectContent>
+      {showConversationSelector && (
+        <Select
+          value={form.notifyTo}
+          onValueChange={value => updateForm({ notifyTo: value ?? '' })}
+          disabled={conversationsLoading}
+        >
+          <SelectTrigger className="flex-1 min-w-0">
+            <SelectValue
+              placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
               {conversations.length === 0 ? (
-                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                <SelectItem value="no-conversation" disabled>
                   {i18nService.t('scheduledTasksFormNotifyConversationNone')}
-                </div>
+                </SelectItem>
               ) : (
                 conversations.map(conv => (
                   <SelectItem key={conv.conversationId} value={conv.conversationId}>
@@ -1125,151 +1107,58 @@ const TaskForm: React.FC<TaskFormProps> = ({
                   </SelectItem>
                 ))
               )}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 
   return (
     <div className="flex flex-col min-h-0 h-full">
-      {/* Scrollable form body */}
       <div className="flex-1 overflow-y-auto py-3 min-h-0">
-        <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full">
-          <h2 className="text-[14px] font-normal leading-5 text-muted-foreground">
-            {mode === 'create'
-              ? i18nService.t('scheduledTasksFormCreate')
-              : i18nService.t('scheduledTasksFormUpdate')}
-          </h2>
-
-          {/* Task name */}
-          <div>
-            <label className={labelClass}>
-              {i18nService.t('scheduledTasksFormName')}
-              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-            </label>
-            <Input
-              type="text"
-              value={form.name}
-              onChange={event =>
-                updateForm({ name: event.target.value.slice(0, TASK_NAME_MAX_LENGTH) })
-              }
-              maxLength={TASK_NAME_MAX_LENGTH}
-              className="w-full"
-              placeholder={i18nService.t('scheduledTasksFormNamePlaceholder')}
-            />
-            {errors.name && <p className={errorClass}>{errors.name}</p>}
-          </div>
-
-          {/* Model binding */}
-          <div>
-            <label className={labelClass}>
-              {i18nService.t('scheduledTasksFormModel')}
-              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-            </label>
-            <Select
-              value={form.modelId}
-              onValueChange={value => {
-                updateForm({ modelId: value ?? '' });
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={i18nService.t('scheduledTasksFormModelPlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="" disabled>
-                  {i18nService.t('scheduledTasksFormModelPlaceholder')}
-                </SelectItem>
-                {availableModels.map(m => (
-                  <SelectItem key={m.id} value={toOpenClawModelRef(m)}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.modelId && <p className={errorClass}>{errors.modelId}</p>}
-          </div>
-
-          {/* Schedule */}
-          <div>
-            {renderScheduleRow()}
-            {errors.schedule && <p className={errorClass}>{errors.schedule}</p>}
-          </div>
-
-          {/* Prompt / payload */}
-          <div>
-            <div className="flex items-end justify-between mb-1">
-              <label className={labelClass} style={{ marginBottom: 0 }}>
-                {i18nService.t('scheduledTasksFormPayloadTextAgent')}
-                <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-              </label>
-            </div>
-            <div className="rounded-lg border border-border bg-(--zy-surface)">
-              <Textarea
-                value={form.payloadText}
-                onChange={event => updateForm({ payloadText: event.target.value })}
-                className="resize-y"
-                style={{ minHeight: '80px', height: '120px' }}
-                placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
-              />
-            </div>
-            <p className={hintClass}>
-              {i18nService.t(
-                'scheduledTasksFormPayloadTextAgentHint' as Parameters<typeof i18nService.t>[0],
-              )}
-            </p>
-
-            {errors.payloadText && <p className={errorClass}>{errors.payloadText}</p>}
-          </div>
-
-          {/* Notification */}
-          {renderNotifyRow()}
-        </div>
+        <TaskFormBody
+          mode={mode}
+          name={form.name}
+          modelId={form.modelId}
+          payloadText={form.payloadText}
+          errors={errors}
+          modelOptions={availableModels.map(model => ({
+            value: toOpenClawModelRef(model),
+            label: model.name,
+          }))}
+          scheduleControl={renderScheduleRow()}
+          notificationControl={renderNotifyRow()}
+          onNameChange={name => updateForm({ name: name.slice(0, TASK_NAME_MAX_LENGTH) })}
+          onModelChange={modelId => updateForm({ modelId })}
+          onPayloadTextChange={payloadText => updateForm({ payloadText })}
+        />
       </div>
 
-      {/* Submit error */}
       {submitError && (
-        <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
-          <span className="text-xs text-red-600 dark:text-red-400 wrap-break-word min-w-0">
-            {i18nService.t('scheduledTasksFormSubmitError')}
-            {submitError}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => setSubmitError(null)}
-            className="shrink-0 ml-auto text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-            aria-label="dismiss"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </Button>
-        </div>
+        <Alert variant="destructive" className="mb-2">
+          <CircleAlert />
+          <AlertTitle>{i18nService.t('scheduledTasksFormSubmitError')}</AlertTitle>
+          <AlertDescription>{submitError}</AlertDescription>
+          <AlertAction>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setSubmitError(null)}
+              aria-label={i18nService.t('close')}
+            >
+              <X />
+            </Button>
+          </AlertAction>
+        </Alert>
       )}
 
-      {/* Footer */}
       <div className="shrink-0 flex items-center justify-end gap-2 py-2.5 border-t border-border">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onCancel}
-          className="px-3 py-1.5 text-sm rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-        >
+        <Button type="button" variant="outline" onClick={onCancel}>
           {i18nService.t('cancel')}
         </Button>
-        <Button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={submitting}
-          className="px-4 py-1.5 text-[14px] font-normal leading-5 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50"
-        >
+        <Button type="button" onClick={() => void handleSubmit()} disabled={submitting}>
           {submitting
             ? i18nService.t('saving')
             : mode === 'create'

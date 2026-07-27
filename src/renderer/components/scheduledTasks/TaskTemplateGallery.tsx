@@ -6,7 +6,14 @@ import {
   CardTitle,
 } from '@shared/components/ui/card';
 import { cn } from '@shared/lib/utils';
-import { CalendarClock, CloudSun, Lightbulb, Newspaper, TrendingUp } from 'lucide-react';
+import {
+  CalendarClock,
+  CloudSun,
+  Lightbulb,
+  Newspaper,
+  SlidersHorizontal,
+  TrendingUp,
+} from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -141,10 +148,17 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
         onClick={onCustom}
       >
         <CardHeader>
-          <CardTitle className="text-muted-foreground">
-            {i18nService.t('taskTemplateCustomName')}
-          </CardTitle>
-          <CardDescription>{i18nService.t('taskTemplateCustomDesc')}</CardDescription>
+          <div className="flex items-start gap-2">
+            <div className="size-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground bg-muted">
+              <SlidersHorizontal className="size-4.5" />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <CardTitle className="text-muted-foreground">
+                {i18nService.t('taskTemplateCustomName')}
+              </CardTitle>
+              <CardDescription>{i18nService.t('taskTemplateCustomDesc')}</CardDescription>
+            </div>
+          </div>
         </CardHeader>
       </Card>
     </div>
