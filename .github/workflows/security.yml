@@ -3,7 +3,6 @@ name: Security Scan
 on:
   push:
     branches: [main, develop]
-  pull_request:
   schedule:
     - cron: '0 0 * * 1' # 每周一
 

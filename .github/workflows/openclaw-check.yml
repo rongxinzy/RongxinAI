@@ -6,9 +6,6 @@ on:
       - 'package.json'
       - 'scripts/ensure-openclaw-version.cjs'
       - 'scripts/**openclaw*'
-  pull_request:
-    paths:
-      - 'package.json'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
