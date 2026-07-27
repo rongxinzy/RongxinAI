@@ -1,0 +1,5 @@
+name: 法律文书起草
+description: 通过结构化问答生成保密协议、服务协议、隐私政策等常用法律文书初稿，并提示审核要点。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

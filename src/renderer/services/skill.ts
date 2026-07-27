@@ -1,4 +1,10 @@
-import { LocalizedText, LocalSkillInfo, MarketplaceSkill, Skill } from '../types/skill';
+import {
+  LocalizedText,
+  LocalSkillInfo,
+  MarketplaceSkill,
+  MarketplaceSkillPage,
+  Skill,
+} from '../types/skill';
 import { i18nService } from './i18n';
 
 export function resolveLocalizedText(text: string | LocalizedText): string {
@@ -38,8 +44,8 @@ class SkillService {
   private initialized = false;
   private localSkillDescriptions: Map<string, string | LocalizedText> = new Map();
   private marketplaceSkillDescriptions: Map<string, string | LocalizedText> = new Map();
-  private marketplaceCache: MarketplaceSkill[] | null = null;
-  private marketplaceFetchPromise: Promise<MarketplaceSkill[]> | null = null;
+  private marketplaceCache = new Map<string, MarketplaceSkillPage>();
+  private marketplaceFetchPromises = new Map<string, Promise<MarketplaceSkillPage>>();
 
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -77,6 +83,51 @@ class SkillService {
     }
   }
 
+  async setSkillsEnabled(ids: string[], enabled: boolean): Promise<Skill[]> {
+    const setEnabledBatch = window.electron.skills.setEnabledBatch;
+    const loadLegacyHandlers = async (): Promise<Skill[]> => {
+      // Older main/preload versions do not have the batch IPC. Keep writes
+      // serialized so each state update observes the previous one.
+      for (const id of ids) {
+        const result = await window.electron.skills.setEnabled({ id, enabled });
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update skills');
+        }
+      }
+      const latest = await window.electron.skills.list();
+      if (latest.success && latest.skills) {
+        this.skills = latest.skills;
+        return this.skills;
+      }
+      throw new Error(latest.error || 'Failed to update skills');
+    };
+
+    if (!setEnabledBatch) return loadLegacyHandlers();
+
+    try {
+      const result = await setEnabledBatch({ ids, enabled });
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+        return this.skills;
+      }
+      throw new Error(result.error || 'Failed to update skills');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('No handler registered')) {
+        return loadLegacyHandlers();
+      }
+      throw error;
+    }
+  }
+
+  async setSkillPinned(id: string, pinned: boolean): Promise<Skill[]> {
+    const result = await window.electron.skills.setPinned({ id, pinned });
+    if (result.success && result.skills) {
+      this.skills = result.skills;
+      return this.skills;
+    }
+    throw new Error(result.error || 'Failed to update skill');
+  }
+
   async deleteSkill(id: string): Promise<{ success: boolean; skills?: Skill[]; error?: string }> {
     try {
       const result = await window.electron.skills.delete(id);
@@ -91,7 +142,7 @@ class SkillService {
     }
   }
 
-  async downloadSkill(source: string): Promise<{
+  async downloadSkill(source: string, options: { iconUrl?: string; displayName?: string } = {}): Promise<{
     success: boolean;
     skills?: Skill[];
     error?: string;
@@ -100,7 +151,10 @@ class SkillService {
     pendingInstallId?: string;
   }> {
     try {
-      const result = await window.electron.skills.download(source);
+      const result = await window.electron.skills.download(
+        source,
+        options.iconUrl || options.displayName ? options : undefined,
+      );
       if (result.success && result.skills) {
         this.skills = result.skills;
       }
@@ -211,28 +265,34 @@ class SkillService {
   }
 
   async fetchMarketplaceSkills(
-    options: { forceRefresh?: boolean } = {},
-  ): Promise<MarketplaceSkill[]> {
-    const { forceRefresh = false } = options;
+    options: { forceRefresh?: boolean; pageNumber?: number; pageSize?: number } = {},
+  ): Promise<MarketplaceSkillPage> {
+    const { forceRefresh = false, pageNumber = 1, pageSize = 8 } = options;
+    const cacheKey = `${pageNumber}:${pageSize}`;
 
-    if (!forceRefresh && this.marketplaceCache) {
-      return this.marketplaceCache;
+    if (!forceRefresh && this.marketplaceCache.has(cacheKey)) {
+      return this.marketplaceCache.get(cacheKey)!;
     }
-    if (this.marketplaceFetchPromise) {
-      return this.marketplaceFetchPromise;
+    const pendingFetch = this.marketplaceFetchPromises.get(cacheKey);
+    if (pendingFetch) {
+      return pendingFetch;
     }
 
-    this.marketplaceFetchPromise = this.loadMarketplaceSkills();
+    const fetchPromise = this.loadMarketplaceSkills(pageNumber, pageSize);
+    this.marketplaceFetchPromises.set(cacheKey, fetchPromise);
     try {
-      return await this.marketplaceFetchPromise;
+      return await fetchPromise;
     } finally {
-      this.marketplaceFetchPromise = null;
+      this.marketplaceFetchPromises.delete(cacheKey);
     }
   }
 
-  private async loadMarketplaceSkills(): Promise<MarketplaceSkill[]> {
+  private async loadMarketplaceSkills(
+    pageNumber: number,
+    pageSize: number,
+  ): Promise<MarketplaceSkillPage> {
     try {
-      const result = await window.electron.skills.fetchMarketplace();
+      const result = await window.electron.skills.fetchMarketplace({ pageNumber, pageSize });
       if (!result.success || !result.data) {
         throw new Error(result.error || 'Failed to fetch');
       }
@@ -242,25 +302,30 @@ class SkillService {
       const localSkills: LocalSkillInfo[] = Array.isArray(value?.localSkill)
         ? value.localSkill
         : [];
-      this.localSkillDescriptions.clear();
+      if (pageNumber === 1) this.localSkillDescriptions.clear();
       for (const ls of localSkills) {
         this.localSkillDescriptions.set(ls.name, ls.description);
         this.localSkillDescriptions.set(ls.id, ls.description);
       }
       const skills: MarketplaceSkill[] = Array.isArray(value?.marketplace) ? value.marketplace : [];
       // Also store marketplace skill descriptions for i18n lookup (keyed by id)
-      this.marketplaceSkillDescriptions.clear();
+      if (pageNumber === 1) this.marketplaceSkillDescriptions.clear();
       for (const ms of skills) {
         if (typeof ms.description === 'object') {
           this.marketplaceSkillDescriptions.set(ms.id, ms.description);
         }
       }
-      this.marketplaceCache = skills;
-      return this.marketplaceCache;
+      const page = {
+        skills,
+        hasMore: value?.hasMore === true,
+      };
+      this.marketplaceCache.set(`${pageNumber}:${pageSize}`, page);
+      return page;
     } catch (error) {
       console.error('Failed to fetch marketplace skills:', error);
-      if (this.marketplaceCache) {
-        return this.marketplaceCache;
+      const cachedPage = this.marketplaceCache.get(`${pageNumber}:${pageSize}`);
+      if (cachedPage) {
+        return cachedPage;
       }
       throw error;
     }

@@ -4,11 +4,19 @@ export interface Skill {
   name: string;
   description: string;
   enabled: boolean; // Whether visible in popover
+  pinned: boolean;
   isOfficial: boolean; // "官方" badge
   isBuiltIn: boolean; // Bundled with app, cannot be deleted
   updatedAt: number; // Timestamp
   prompt: string; // System prompt content
   skillPath: string; // Absolute path to SKILL.md
+  iconUrl?: string; // Local skill icon resolved from its folder
+  displayName?: string; // Optional local UI label
+  displayDescription?: string; // Optional local UI description
+  displayAuthor?: string; // Optional local UI author
+  displayLicense?: string; // Optional local UI license
+  metadataContent?: string; // Raw local UI metadata YAML
+  metadataFields?: Record<string, string>; // Parsed local UI metadata fields
   version?: string; // Skill version from SKILL.md frontmatter
 }
 
@@ -34,6 +42,7 @@ export interface MarketplaceSkill {
     versions?: number;
   };
   url: string; // Marketplace page URL
+  iconUrl?: string; // Marketplace logo URL provided by the source API
   installSource?: string;
   version: string;
   source: {
@@ -41,4 +50,9 @@ export interface MarketplaceSkill {
     url: string; // Source repo URL
     author?: string; // Author name
   };
+}
+
+export interface MarketplaceSkillPage {
+  skills: MarketplaceSkill[];
+  hasMore: boolean;
 }

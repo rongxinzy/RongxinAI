@@ -21,6 +21,7 @@ interface ExpertViewProps {
   updateBadge?: React.ReactNode;
   readOnly?: boolean;
   onCreateSkillByChat?: () => void;
+  onTrySkill?: (skillId: string) => void;
 }
 
 const EXPERT_TAB = {
@@ -40,6 +41,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   updateBadge,
   readOnly,
   onCreateSkillByChat,
+  onTrySkill,
 }) => {
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<ExpertTab>(EXPERT_TAB.Experts);
@@ -81,9 +83,9 @@ const ExpertView: React.FC<ExpertViewProps> = ({
       </div>
 
       {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={handleTabChange}
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
         className="min-h-0 flex-1 flex-col gap-0"
       >
         <LayeredTabsList
@@ -110,7 +112,13 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           className="min-h-0 flex-1 overflow-hidden px-6 py-4"
           contentClassName="h-full"
         >
-          <SkillsManager readOnly={readOnly} onCreateByChat={onCreateSkillByChat} />
+          <div className="mx-auto h-full w-full max-w-4xl">
+            <SkillsManager
+              readOnly={readOnly}
+              onCreateByChat={onCreateSkillByChat}
+              onTrySkill={onTrySkill}
+            />
+          </div>
         </LayeredTabsContent>
 
         <LayeredTabsContent

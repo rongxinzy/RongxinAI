@@ -139,7 +139,10 @@ import {
 import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import type { McpToolManifestEntry } from './libs/mcpServerManager';
 import { McpServerManager } from './libs/mcpServerManager';
-import { fetchModelScopeSkillMarketplace } from './libs/modelscopeSkillMarketplace';
+import {
+  fetchModelScopeSkillContent,
+  fetchModelScopeSkillMarketplace,
+} from './libs/modelscopeSkillMarketplace';
 import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { OllamaManager } from './libs/ollamaManager';
@@ -3156,9 +3159,33 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('skills:setEnabled', (_event, options: { id: string; enabled: boolean }) => {
+  ipcMain.handle(SkillsIpc.SetEnabled, (_event, options: { id: string; enabled: boolean }) => {
     try {
       const skills = getSkillManager().setSkillEnabled(options.id, options.enabled);
+      return { success: true, skills };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update skill',
+      };
+    }
+  });
+
+  ipcMain.handle(SkillsIpc.SetEnabledBatch, (_event, options: { ids: string[]; enabled: boolean }) => {
+    try {
+      const skills = getSkillManager().setSkillsEnabled(options.ids, options.enabled);
+      return { success: true, skills };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update skills',
+      };
+    }
+  });
+
+  ipcMain.handle(SkillsIpc.SetPinned, (_event, options: { id: string; pinned: boolean }) => {
+    try {
+      const skills = getSkillManager().setSkillPinned(options.id, options.pinned);
       return { success: true, skills };
     } catch (error) {
       return {
@@ -3181,9 +3208,12 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('skills:download', async (_event, source: string) => {
-    return getSkillManager().downloadSkill(source);
-  });
+  ipcMain.handle(
+    'skills:download',
+    async (_event, source: string, options?: { iconUrl?: string; displayName?: string }) => {
+      return getSkillManager().downloadSkill(source, options);
+    },
+  );
 
   ipcMain.handle('skills:confirmInstall', async (_event, pendingId: string, action: string) => {
     const validActions = ['install', 'installDisabled', 'cancel'];
@@ -3206,6 +3236,10 @@ if (!gotTheLock) {
         error: error instanceof Error ? error.message : 'Failed to resolve skills root',
       };
     }
+  });
+
+  ipcMain.handle(SkillsIpc.GetContent, async (_event, skillId: string) => {
+    return getSkillManager().getSkillContent(skillId);
   });
 
   ipcMain.handle('skills:autoRoutingPrompt', () => {
@@ -3239,26 +3273,54 @@ if (!gotTheLock) {
     },
   );
 
-  ipcMain.handle(SkillsIpc.FetchMarketplace, async () => {
+  ipcMain.handle(
+    SkillsIpc.FetchMarketplace,
+    async (_event, options?: { pageNumber?: number; pageSize?: number }) => {
+      try {
+        const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
+        const token = createModelScopeTokenPool({
+          extraTokens: userToken ? [userToken] : [],
+        }).nextToken();
+        console.log('[SkillMarketplace] fetching skills from ModelScope OpenAPI');
+        const data = await fetchModelScopeSkillMarketplace({
+          token,
+          pageNumber: options?.pageNumber,
+          pageSize: options?.pageSize,
+          fetchImpl: (input, init) =>
+            session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
+              typeof fetch
+            >,
+        });
+        return { success: true, data };
+      } catch (error) {
+        console.error('[SkillMarketplace] fetch error:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to fetch skill marketplace',
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(SkillsIpc.FetchMarketplaceContent, async (_event, skillId: string) => {
     try {
       const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
       const token = createModelScopeTokenPool({
         extraTokens: userToken ? [userToken] : [],
       }).nextToken();
-      console.log('[SkillMarketplace] fetching skills from ModelScope OpenAPI');
-      const data = await fetchModelScopeSkillMarketplace({
+      const content = await fetchModelScopeSkillContent(skillId, {
         token,
         fetchImpl: (input, init) =>
           session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
             typeof fetch
           >,
       });
-      return { success: true, data };
+      return { success: true, content };
     } catch (error) {
-      console.error('[SkillMarketplace] fetch error:', error);
+      console.warn('[SkillMarketplace] content fetch failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch skill marketplace',
+        error: error instanceof Error ? error.message : 'Failed to fetch skill content',
       };
     }
   });

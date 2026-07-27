@@ -1,0 +1,5 @@
+name: 日志诊断
+description: 分析 JSON、syslog 和 Nginx 等日志中的异常模式，聚合错误、统计频率并定位高发时段。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

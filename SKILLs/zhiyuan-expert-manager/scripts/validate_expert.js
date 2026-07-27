@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Expert Validator for RongxinAI (pi engine).
+ * Expert Validator for ZhiYuan Agent.
  *
- * Validates an expert package against the RongxinAI expert specification.
+ * Validates an expert package against the ZhiYuan Agent expert specification.
  *
  * Usage:
  *   node validate_expert.js <path/to/expert-dir>

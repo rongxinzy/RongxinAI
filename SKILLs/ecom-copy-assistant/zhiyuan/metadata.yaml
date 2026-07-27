@@ -1,0 +1,5 @@
+name: 电商详情页文案
+description: 为淘宝、京东和亚马逊等平台生成商品标题、卖点、规格说明与常见问题，提升商品表达效率。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

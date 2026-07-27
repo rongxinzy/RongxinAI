@@ -21,15 +21,19 @@ export type StoreIpc = (typeof StoreIpc)[keyof typeof StoreIpc];
 export const SkillsIpc = {
   List: 'skills:list',
   SetEnabled: 'skills:setEnabled',
+  SetEnabledBatch: 'skills:setEnabledBatch',
+  SetPinned: 'skills:setPinned',
   Delete: 'skills:delete',
   Download: 'skills:download',
   ConfirmInstall: 'skills:confirmInstall',
   GetRoot: 'skills:getRoot',
+  GetContent: 'skills:getContent',
   AutoRoutingPrompt: 'skills:autoRoutingPrompt',
   GetConfig: 'skills:getConfig',
   SetConfig: 'skills:setConfig',
   TestEmailConnectivity: 'skills:testEmailConnectivity',
-  FetchMarketplace: 'skills:fetchMarketplace',
+    FetchMarketplace: 'skills:fetchMarketplace',
+    FetchMarketplaceContent: 'skills:fetchMarketplaceContent',
   Changed: 'skills:changed',
 } as const;
 export type SkillsIpc = (typeof SkillsIpc)[keyof typeof SkillsIpc];

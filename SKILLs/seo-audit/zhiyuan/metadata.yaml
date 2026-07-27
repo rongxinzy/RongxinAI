@@ -1,0 +1,5 @@
+name: SEO 网站诊断
+description: 审查网站的搜索可见性、技术结构、页面内容和关键词问题，给出按优先级排列的优化建议。
+author: Corey Haines
+license: MIT
+skillmd: ./SKILL.md

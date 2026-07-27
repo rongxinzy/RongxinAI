@@ -1,4 +1,4 @@
-# Team 型专用规范（RongxinAI / pi）
+# Team 型专用规范（ZhiYuan Agent / pi）
 
 ## 成员命名规范
 
@@ -71,9 +71,9 @@ Phase 2（串行，Phase 1 结论传入）：
 
 Workflow 数量根据用户实际高频场景设计，不是越多越好。
 
-## 与 WorkBuddy 的差异
+## 与 other applications 的差异
 
-| WorkBuddy      | RongxinAI / pi                              |
+| other applications      | ZhiYuan Agent / pi                              |
 | -------------- | ------------------------------------------- |
 | `TeamCreate`   | 无需显式创建团队，主理人直接调用 `subagent` |
 | `Agent spawn`  | `subagent` tool                             |

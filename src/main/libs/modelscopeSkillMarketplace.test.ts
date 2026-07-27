@@ -35,6 +35,7 @@ test('fetchModelScopeSkillMarketplace maps ModelScope skills to the app marketpl
               description: 'fallback description',
               developer: 'AMap-Web',
               source_url: 'https://github.com/AMap-Web/amap-lbs-skill',
+              logo_url: 'https://resources.modelscope.cn/skills/amap.png',
               category: 'developer-tools',
               tags: ['category:developer-tools', 'custom_tag:general-tools'],
               custom_tag: ['api-design'],
@@ -66,6 +67,7 @@ test('fetchModelScopeSkillMarketplace maps ModelScope skills to the app marketpl
               downloads: 791,
             },
             url: 'https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
+            iconUrl: 'https://resources.modelscope.cn/skills/amap.png',
             installSource: 'https://github.com/AMap-Web/amap-lbs-skill',
             version: '1.0.0',
             source: {
@@ -76,12 +78,13 @@ test('fetchModelScopeSkillMarketplace maps ModelScope skills to the app marketpl
           },
         ],
         localSkill: [],
+        hasMore: false,
       },
     },
   });
 });
 
-test('fetchModelScopeSkillMarketplace keeps only featured skills', async () => {
+test('fetchModelScopeSkillMarketplace orders a ModelScope page by downloads', async () => {
   const json = await fetchModelScopeSkillMarketplace({
     fetchImpl: async () => ({
       ok: true,
@@ -184,8 +187,40 @@ test('fetchModelScopeSkillMarketplace keeps only featured skills', async () => {
           },
         ],
         localSkill: [],
+        hasMore: false,
       },
     },
+  });
+});
+
+test('fetchModelScopeSkillMarketplace requests the specified page and reports more results', async () => {
+  const requestedUrls: string[] = [];
+  const json = await fetchModelScopeSkillMarketplace({
+    pageNumber: 4,
+    pageSize: 8,
+    fetchImpl: async input => {
+      requestedUrls.push(input);
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          data: {
+            skills: [],
+            total: 40,
+          },
+        }),
+        text: async () => '',
+      };
+    },
+  });
+
+  expect(requestedUrls).toEqual([
+    'https://modelscope.cn/openapi/v1/skills?page_number=4&page_size=8',
+  ]);
+  expect(JSON.parse(json).data.value).toMatchObject({
+    marketplace: [],
+    hasMore: true,
   });
 });
 
@@ -241,11 +276,11 @@ test('fetchModelScopeSkillMarketplace omits an install source when the skill onl
   });
 
   const skill = JSON.parse(json).data.value.marketplace[0];
-  expect(skill.installSource).toBeUndefined();
+  expect(skill.installSource).toBe('https://modelscope.cn/skills/@demo/platform-only');
   expect(skill.url).toBe('https://modelscope.cn/skills/@demo/platform-only');
 });
 
-test('resolveModelScopeSkillInstallSource returns null when no supported source is published', async () => {
+test('resolveModelScopeSkillInstallSource falls back to the ModelScope archive endpoint', async () => {
   await expect(
     resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@demo/platform-only', {
       fetchImpl: async () => ({
@@ -261,5 +296,7 @@ test('resolveModelScopeSkillInstallSource returns null when no supported source 
         text: async () => '',
       }),
     }),
-  ).resolves.toBeNull();
+  ).resolves.toBe(
+    'https://www.modelscope.cn/skills/@demo/platform-only/archive/zip/master',
+  );
 });

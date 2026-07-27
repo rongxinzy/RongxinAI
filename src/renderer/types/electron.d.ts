@@ -215,11 +215,20 @@ interface Skill {
   name: string;
   description: string;
   enabled: boolean;
+  pinned: boolean;
   isOfficial: boolean;
   isBuiltIn: boolean;
   updatedAt: number;
   prompt: string;
   skillPath: string;
+  iconUrl?: string;
+  displayName?: string;
+  displayDescription?: string;
+  displayAuthor?: string;
+  displayLicense?: string;
+  metadataContent?: string;
+  metadataFields?: Record<string, string>;
+  version?: string;
 }
 
 type EmailConnectivityCheckCode = 'imap_connection' | 'smtp_connection';
@@ -335,8 +344,16 @@ interface IElectronAPI {
       id: string;
       enabled: boolean;
     }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
+    setEnabledBatch?: (options: {
+      ids: string[];
+      enabled: boolean;
+    }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
+    setPinned: (options: {
+      id: string;
+      pinned: boolean;
+    }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
-    download: (source: string) => Promise<{
+      download: (source: string, options?: { iconUrl?: string; displayName?: string }) => Promise<{
       success: boolean;
       skills?: Skill[];
       error?: string;
@@ -349,6 +366,7 @@ interface IElectronAPI {
       action: string,
     ) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     getRoot: () => Promise<{ success: boolean; path?: string; error?: string }>;
+    getContent: (skillId: string) => Promise<{ success: boolean; content?: string; error?: string }>;
     autoRoutingPrompt: () => Promise<{ success: boolean; prompt?: string | null; error?: string }>;
     getConfig: (
       skillId: string,
@@ -361,7 +379,15 @@ interface IElectronAPI {
       skillId: string,
       config: Record<string, string>,
     ) => Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }>;
-    fetchMarketplace: () => Promise<{ success: boolean; data?: string; error?: string }>;
+      fetchMarketplace: (options?: {
+        pageNumber?: number;
+        pageSize?: number;
+      }) => Promise<{ success: boolean; data?: string; error?: string }>;
+      fetchMarketplaceContent: (skillId: string) => Promise<{
+        success: boolean;
+        content?: string | null;
+        error?: string;
+      }>;
     onChanged: (callback: () => void) => () => void;
   };
   mcp: {

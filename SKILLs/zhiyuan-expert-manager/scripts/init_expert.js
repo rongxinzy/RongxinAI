@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Expert Initializer for RongxinAI (pi engine).
+ * Expert Initializer for ZhiYuan Agent.
  *
  * Creates a new expert package directory from template, compatible with
- * RongxinAI's pi-based Cowork runtime.
+ * ZhiYuan Agent's Cowork runtime.
  *
  * Usage:
  *   node init_expert.js <expert-name> --type agent|team [--path <output-dir>]
  *
- * Output directory defaults to RongxinAI userData/expert-packages.
+ * Output directory defaults to the ZhiYuan Agent user data directory.
  */
 
 const fs = require('fs');
@@ -25,7 +25,7 @@ function getDefaultExpertPackagesDir() {
   } else {
     base = path.join(os.homedir(), '.config');
   }
-  return path.join(base, 'RongxinAI', 'expert-packages');
+  return path.join(base, 'ZhiYuanAgent', 'expert-packages');
 }
 
 function titleCase(name) {

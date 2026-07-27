@@ -1,0 +1,5 @@
+name: 法律风险评估
+description: 以统一的影响与可能性矩阵识别法律事项风险，帮助团队形成可复核的风险判断与跟进记录。
+author: 开源社区
+license: Apache-2.0
+skillmd: ./SKILL.md

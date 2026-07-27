@@ -1,0 +1,5 @@
+name: 实时网页搜索
+description: 通过本地浏览器检索最新网页、官方文档、新闻与实时信息，并提炼可信来源供后续核实与使用。
+author: ZhiYuanAgent
+license: MIT
+skillmd: ./SKILL.md

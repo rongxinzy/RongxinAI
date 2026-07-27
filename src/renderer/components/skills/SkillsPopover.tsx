@@ -141,11 +141,6 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                           >
                             {skill.name}
                           </span>
-                          {skill.isOfficial && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary shrink-0">
-                              {i18nService.t('official')}
-                            </span>
-                          )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {localizedDescription}
