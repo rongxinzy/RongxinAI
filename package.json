@@ -6,7 +6,7 @@
     "name": "ZhiYuanAgent",
     "email": "dev@zhiyuanagent.com"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "version": "2026.7.16",
   "openclaw": {
     "version": "v2026.4.14",

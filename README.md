@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-red.svg?style=for-the-badge" alt="GNU AGPL v3 License"></a>
   <br>
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-brightgreen?style=for-the-badge" alt="Platform">
   <br>
@@ -156,4 +156,4 @@ Scheduled tasks can be created from natural language or through the GUI. When a 
 
 ## License
 
-[MIT License](LICENSE)
+[GNU Affero General Public License v3.0](LICENSE)

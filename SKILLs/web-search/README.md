@@ -186,7 +186,7 @@ Claude: [Calls: bash SKILLs/web-search/scripts/search.sh "Next.js 14 features" 5
 SKILLs/web-search/
 ├── README.md                    # This file
 ├── SKILL.md                     # Skill documentation (for Claude)
-├── LICENSE.txt                  # MIT License
+├── LICENSE.txt                  # GNU AGPL v3.0
 ├── package.json                 # Dependencies
 ├── tsconfig.json                # TypeScript config
 ├── server/                      # Bridge Server source
@@ -309,7 +309,7 @@ bash scripts/start-server.sh
 
 ## License
 
-MIT License - See LICENSE.txt
+GNU Affero General Public License v3.0 - See LICENSE.txt
 
 ## Future Enhancements
 
