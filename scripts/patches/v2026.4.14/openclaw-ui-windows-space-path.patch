@@ -1,0 +1,74 @@
+diff --git a/scripts/ui.js b/scripts/ui.js
+index 8f7b8e0..b7b47fc 100644
+--- a/scripts/ui.js
++++ b/scripts/ui.js
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env node
+-import { spawn, spawnSync } from "node:child_process";
++import { exec, execSync, spawn, spawnSync } from "node:child_process";
+ import fs from "node:fs";
+ import { createRequire } from "node:module";
+ import path from "node:path";
+@@ -89,10 +89,36 @@ function createSpawnOptions(cmd, args, envOverride) {
+   };
+ }
+ 
++// Node.js's spawn({ shell: true }) on Windows fails to quote a .cmd/.bat
++// executable path that contains spaces (e.g. C:\Program Files\nodejs\pnpm.CMD),
++// causing cmd.exe to split the path at the first space.  Use exec/execSync for
++// that case so we can construct a properly quoted command line ourselves.
++function needsWindowsShellSpaceWorkaround(cmd) {
++  return process.platform === "win32" && cmd.includes(" ") && shouldUseShellForCommand(cmd);
++}
++
++function buildWindowsShellCommand(cmd, args) {
++  const quote = (arg) => {
++    if (typeof arg !== "string" || !arg.includes(" ")) {
++      return arg;
++    }
++    return `"${arg.replace(/"/g, '\\"')}"`;
++  };
++  return [quote(cmd), ...args.map(quote)].join(" ");
++}
++
+ function run(cmd, args) {
+   let child;
+   try {
+-    child = spawn(cmd, args, createSpawnOptions(cmd, args));
++    if (needsWindowsShellSpaceWorkaround(cmd)) {
++      child = exec(buildWindowsShellCommand(cmd, args), {
++        cwd: uiDir,
++        env: process.env,
++        stdio: "inherit",
++      });
++    } else {
++      child = spawn(cmd, args, createSpawnOptions(cmd, args));
++    }
+   } catch (err) {
+     console.error(`Failed to launch ${cmd}:`, err);
+     process.exit(1);
+@@ -111,6 +137,24 @@ function run(cmd, args) {
+ }
+ 
+ function runSync(cmd, args, envOverride) {
++  if (needsWindowsShellSpaceWorkaround(cmd)) {
++    try {
++      execSync(buildWindowsShellCommand(cmd, args), {
++        cwd: uiDir,
++        env: envOverride ?? process.env,
++        stdio: "inherit",
++      });
++      return;
++    } catch (err) {
++      if (typeof err.status === "number") {
++        process.exit(err.status);
++      }
++      console.error(`Failed to launch ${cmd}:`, err);
++      process.exit(1);
++      return;
++    }
++  }
++
+   let result;
+   try {
+     result = spawnSync(cmd, args, createSpawnOptions(cmd, args, envOverride));
