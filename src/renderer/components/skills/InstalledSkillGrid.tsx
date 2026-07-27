@@ -2,7 +2,6 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -12,6 +11,7 @@ import { MessageCircle, Puzzle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
+import { resolveSkillIconUrl } from '../../services/skillIcon';
 import type { Skill } from '../../types/skill';
 
 interface InstalledSkillGridProps {
@@ -47,7 +47,7 @@ export function InstalledSkillGrid({
         <Card
           key={skill.id}
           size="sm"
-          className="group relative gap-3 border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md"
+          className="group relative gap-0 border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md"
         >
           {!batchMode && (
             <button
@@ -57,8 +57,8 @@ export function InstalledSkillGrid({
               onClick={() => onSelect(skill)}
             />
           )}
-          <CardHeader className="relative z-10 grid-cols-[minmax(0,1fr)_auto] gap-3 p-0">
-            <div className="pointer-events-none flex min-w-0 items-center gap-2">
+          <CardHeader className="pointer-events-none relative z-10 grid-cols-[minmax(0,1fr)_auto] gap-3 p-0">
+            <div className="pointer-events-none flex min-w-0 items-center gap-2 self-center">
               {batchMode && (
                 <Checkbox
                   className="pointer-events-auto"
@@ -69,18 +69,28 @@ export function InstalledSkillGrid({
                   onCheckedChange={() => onSelectToggle(skill.id)}
                 />
               )}
-              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+              <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
                 {skill.iconUrl ? (
-                  <img src={skill.iconUrl} alt="" className="size-8 object-contain" />
+                  <img src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="size-8 object-contain" />
                 ) : (
-                  <Puzzle className="size-4 text-muted-foreground" />
+                  <Puzzle className="size-5 text-muted-foreground" />
                 )}
               </div>
-              <CardTitle className="truncate">
-                {skill.displayName || resolveName(skill.id, skill.name)}
-              </CardTitle>
+              <div className="min-w-0">
+                <CardTitle className="truncate">
+                  {skill.displayName || resolveName(skill.id, skill.name)}
+                </CardTitle>
+                <CardDescription className="truncate">
+                  {skill.displayDescription ||
+                    skillService.getLocalizedSkillDescription(
+                      skill.id,
+                      skill.name,
+                      skill.description,
+                    )}
+                </CardDescription>
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="pointer-events-none flex shrink-0 items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
               <Button
                 type="button"
                 variant="ghost"
@@ -111,7 +121,6 @@ export function InstalledSkillGrid({
               <div
                 data-skill-toggle
                 onPointerDown={event => event.stopPropagation()}
-                onClick={event => event.stopPropagation()}
                 onKeyDown={event => event.stopPropagation()}
               >
                 <Switch
@@ -123,12 +132,6 @@ export function InstalledSkillGrid({
             </div>
           </CardHeader>
 
-          <CardContent className="pointer-events-none relative z-10 flex flex-col gap-3 p-0">
-            <CardDescription className="line-clamp-2">
-              {skill.displayDescription ||
-                skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description)}
-            </CardDescription>
-          </CardContent>
         </Card>
       ))}
     </div>
