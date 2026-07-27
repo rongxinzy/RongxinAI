@@ -19,7 +19,7 @@ export interface AnySearchResponse {
 export async function searchAnySearchGateway(input: {
   query?: unknown;
   maxResults?: unknown;
-}): Promise<AnySearchResponse> {
+}, externalSignal?: AbortSignal): Promise<AnySearchResponse> {
   const query = typeof input.query === "string" ? input.query.trim() : "";
   if (!query || query.length > 500)
     throw new Error("Search query must be between 1 and 500 characters.");
@@ -37,7 +37,9 @@ export async function searchAnySearchGateway(input: {
           Authorization: `Bearer ${resolveAnySearchGatewayToken()}`,
         },
         body: JSON.stringify({ query, max_results: maxResults }),
-        signal: controller.signal,
+        signal: externalSignal
+          ? AbortSignal.any([controller.signal, externalSignal])
+          : controller.signal,
       },
     );
     if (!response.ok)

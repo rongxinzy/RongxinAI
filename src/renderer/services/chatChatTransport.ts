@@ -156,6 +156,8 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             },
             history,
             directChatOptions,
+            requestId,
+            abortSignal,
           )
           .then(() => {
             close();

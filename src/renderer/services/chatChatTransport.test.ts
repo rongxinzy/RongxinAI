@@ -99,3 +99,28 @@ test('only uses messages before the latest user turn as history', async () => {
   expect(capturedHistory).toHaveLength(3);
   expect(capturedHistory?.map(m => m.content)).toEqual(['hi', 'thinking...', 'hello']);
 });
+
+test('passes the request id and abort signal through the native tool loop', async () => {
+  vi.mocked(apiService.chatWithWebSearch).mockImplementation(
+    () => new Promise<{ content: string }>(() => {}),
+  );
+  const abortController = new AbortController();
+  const transport = new ChatChatTransport({});
+  const stream = await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+    abortSignal: abortController.signal,
+  });
+
+  const calls = vi.mocked(apiService.chatWithWebSearch).mock.calls;
+  const call = calls[calls.length - 1];
+  const requestId = call[4];
+  expect(typeof requestId).toBe('string');
+  expect(call[5]).toBe(abortController.signal);
+
+  abortController.abort();
+  await collectChunks(stream);
+  expect(apiService.cancelOngoingRequest).toHaveBeenCalledWith(requestId);
+});

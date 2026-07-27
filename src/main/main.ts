@@ -39,7 +39,11 @@ import {
   CoworkSessionExpertSource,
 } from '../shared/cowork/sessionExperts';
 import { ApiIpc, CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
-import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
+import {
+  ApiFetchSchema,
+  ApiStreamSchema,
+  CoworkSessionStartSchema,
+} from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc } from '../shared/workspace';
@@ -6329,13 +6333,20 @@ if (!gotTheLock) {
 
   // API 代理处理程序 - 解决 CORS 问题
   ipcMain.handle(ApiIpc.WebSearch, async (_event, rawInput: unknown) => {
+    const input =
+      rawInput && typeof rawInput === 'object' ? (rawInput as Record<string, unknown>) : {};
+    const requestId = typeof input.requestId === 'string' ? input.requestId : null;
+    const controller = new AbortController();
+    if (requestId) activeStreamControllers.set(requestId, controller);
     try {
-      const data = await searchAnySearchGateway(
-        rawInput && typeof rawInput === 'object' ? (rawInput as Record<string, unknown>) : {},
-      );
+      const data = await searchAnySearchGateway(input, controller.signal);
       return { ok: true, data };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : 'Search unavailable.' };
+    } finally {
+      if (requestId && activeStreamControllers.get(requestId) === controller) {
+        activeStreamControllers.delete(requestId);
+      }
     }
   });
 
