@@ -36,6 +36,8 @@ import { WorkMode } from '../../store/workMode/constants';
 import {
   CoworkSessionStatusValue,
   type CoworkImageAttachment,
+  type CoworkPermissionRequest,
+  type CoworkPermissionResult,
   type CoworkSession,
   type OpenClawEngineStatus,
 } from '../../types/cowork';
@@ -54,6 +56,8 @@ export interface CoworkViewProps {
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
+  inlineQuestionPermission?: CoworkPermissionRequest | null;
+  onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
 }
 
 const CoworkView: React.FC<CoworkViewProps> = ({
@@ -63,6 +67,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   onToggleSidebar,
   onNewChat,
   updateBadge,
+  inlineQuestionPermission,
+  onRespondToInlineQuestion,
 }) => {
   const dispatch = useDispatch();
 
@@ -373,9 +379,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           const snapshot = store.getState().cowork.currentSession;
           const streamingSnapshot = store.getState().cowork.streamingSessions[tempSessionId];
           const baseSession =
-            snapshot?.id === tempSessionId
-              ? snapshot
-              : (streamingSnapshot ?? tempSession);
+            snapshot?.id === tempSessionId ? snapshot : (streamingSnapshot ?? tempSession);
           const isStreamActive = status === CoworkSessionStatusValue.Running;
           const isCompleted = status === CoworkSessionStatusValue.Completed;
           const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
@@ -765,9 +769,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         const snapshot = store.getState().cowork.currentSession;
         const streamingSnapshot = store.getState().cowork.streamingSessions[currentSession.id];
         const baseSession =
-          snapshot?.id === currentSession.id
-            ? snapshot
-            : (streamingSnapshot ?? currentSession);
+          snapshot?.id === currentSession.id ? snapshot : (streamingSnapshot ?? currentSession);
         const isStreamActive = status === CoworkSessionStatusValue.Running;
         const isCompleted = status === CoworkSessionStatusValue.Completed;
         const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
@@ -1270,6 +1272,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           isDirectChat={workMode === WorkMode.Chat}
           localThinkingEnabled={localThinkingEnabled}
           onLocalThinkingEnabledChange={setLocalThinkingEnabled}
+          inlineQuestionPermission={inlineQuestionPermission}
+          onRespondToInlineQuestion={onRespondToInlineQuestion}
         />
       </div>
     );
@@ -1289,8 +1293,16 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         <div className="relative mx-auto flex min-h-full w-full max-w-5xl min-w-[320px] flex-col items-center justify-center gap-10 px-4 py-8">
           {/* Welcome Section - staggered entrance animation */}
           <div className="flex min-h-28 flex-col items-center justify-center gap-5 text-center">
-            <img src="zhiyuan-logo-light.svg" alt="logo" className="logo-light h-16 w-auto mx-auto animate-fade-in-up" />
-            <img src="zhiyuan-logo-dark.svg" alt="logo" className="logo-dark h-16 w-auto mx-auto animate-fade-in-up" />
+            <img
+              src="zhiyuan-logo-light.svg"
+              alt="logo"
+              className="logo-light h-16 w-auto mx-auto animate-fade-in-up"
+            />
+            <img
+              src="zhiyuan-logo-dark.svg"
+              alt="logo"
+              className="logo-dark h-16 w-auto mx-auto animate-fade-in-up"
+            />
             <p
               className={cn(
                 'min-h-5 max-w-md px-2 text-sm text-muted-foreground animate-fade-in-up',

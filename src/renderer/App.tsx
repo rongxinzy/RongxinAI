@@ -8,6 +8,10 @@ import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate
 import { CoworkView } from './components/cowork';
 import CoworkPermissionModal from './components/cowork/CoworkPermissionModal';
 import CoworkQuestionWizard from './components/cowork/CoworkQuestionWizard';
+import {
+  hasAskUserQuestions,
+  isAskUserQuestionPermission,
+} from './components/cowork/askUserQuestion';
 import ExpertView from './components/expert/ExpertView';
 import { LocalInferenceView } from './components/localInference';
 import { McpView } from './components/mcp';
@@ -178,7 +182,6 @@ const App: React.FC = () => {
 
         setIsInitialized(true);
         mark('shell ready');
-
       } catch (error) {
         const elapsed = Math.round(performance.now() - t0);
         const msg = error instanceof Error ? error.message : String(error);
@@ -500,6 +503,14 @@ const App: React.FC = () => {
     [pendingPermission],
   );
 
+  const isInlineAskUserQuestion = Boolean(
+    pendingPermission &&
+    mainView === 'cowork' &&
+    pendingPermission.sessionId === currentSessionId &&
+    isAskUserQuestionPermission(pendingPermission) &&
+    hasAskUserQuestions(pendingPermission),
+  );
+
   const handleCloseSettings = () => {
     setShowSettings(false);
     const config = configService.getConfig();
@@ -624,10 +635,10 @@ const App: React.FC = () => {
 
   // 根据场景选择使用哪个权限组件
   const permissionModal = useMemo(() => {
-    if (!pendingPermission) return null;
+    if (!pendingPermission || isInlineAskUserQuestion) return null;
 
     // 检查是否为 AskUserQuestion 且有多个问题 -> 使用向导式组件
-    const isQuestionTool = pendingPermission.toolName === 'AskUserQuestion';
+    const isQuestionTool = isAskUserQuestionPermission(pendingPermission);
     if (isQuestionTool && pendingPermission.toolInput) {
       const rawQuestions = (pendingPermission.toolInput as Record<string, unknown>).questions;
       const hasMultipleQuestions = Array.isArray(rawQuestions) && rawQuestions.length > 1;
@@ -646,9 +657,9 @@ const App: React.FC = () => {
     return (
       <CoworkPermissionModal permission={pendingPermission} onRespond={handlePermissionResponse} />
     );
-  }, [pendingPermission, handlePermissionResponse]);
+  }, [pendingPermission, handlePermissionResponse, isInlineAskUserQuestion]);
 
-  const isOverlayActive = showSettings || showUpdateModal || pendingPermission !== null;
+  const isOverlayActive = showSettings || showUpdateModal || permissionModal !== null;
   const shouldShowUpdateBadge =
     updateInfo &&
     appUpdateState.status !== AppUpdateStatus.Checking &&
@@ -797,6 +808,8 @@ const App: React.FC = () => {
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
                   updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
+                  onRespondToInlineQuestion={handlePermissionResponse}
                 />
               )}
             </div>

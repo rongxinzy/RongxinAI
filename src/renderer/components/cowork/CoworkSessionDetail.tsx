@@ -42,6 +42,8 @@ import type {
   CoworkImageAttachment,
   CoworkMessage,
   CoworkMessageMetadata,
+  CoworkPermissionRequest,
+  CoworkPermissionResult,
 } from '../../types/cowork';
 import { getCompactFolderName } from '../../utils/path';
 import { ArtifactPanel } from '../artifacts';
@@ -76,6 +78,7 @@ import {
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useInitialConversationPosition } from './hooks/useInitialConversationPosition';
 import { TodoQueue } from './TodoQueue';
+import AskUserQuestionCard from './AskUserQuestionCard';
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
@@ -94,6 +97,8 @@ interface CoworkSessionDetailProps {
   isDirectChat?: boolean;
   localThinkingEnabled?: boolean;
   onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
+  inlineQuestionPermission?: CoworkPermissionRequest | null;
+  onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
 }
 
 const NAV_SCROLL_LOCK_DURATION = 800;
@@ -152,6 +157,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   isDirectChat = false,
   localThinkingEnabled,
   onLocalThinkingEnabledChange,
+  inlineQuestionPermission,
+  onRespondToInlineQuestion,
 }) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
@@ -852,6 +859,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   );
 
   const messages = currentSession?.messages;
+  const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
 
@@ -1149,6 +1157,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               >
                 <div ref={scrollContainerRef}>
                   {renderConversationTurns()}
+                  {inlineQuestionPermission && onRespondToInlineQuestion && (
+                    <div className="px-3 pt-3">
+                      <AskUserQuestionCard
+                        permission={inlineQuestionPermission}
+                        onRespond={onRespondToInlineQuestion}
+                      />
+                    </div>
+                  )}
                   <div className="h-20" />
                 </div>
               </ConversationContent>
@@ -1424,7 +1440,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                       ? 'chatPlaceholder'
                       : 'coworkContinuePlaceholder',
                 )}
-                disabled={remoteManaged}
+                disabled={remoteManaged || isAwaitingInlineQuestion}
                 size="large"
                 remoteManaged={remoteManaged}
                 onManageSkills={remoteManaged ? undefined : onManageSkills}
