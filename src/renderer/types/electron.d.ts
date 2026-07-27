@@ -565,6 +565,11 @@ interface IElectronAPI {
     }>;
   };
   api: {
+    webSearch: (input: { query: string; maxResults?: number }) => Promise<{
+      ok: boolean;
+      data?: { query: string; results: Array<{ title: string; url: string; snippet: string; content?: string }> };
+      error?: string;
+    }>;
     fetch: (options: {
       url: string;
       method: string;

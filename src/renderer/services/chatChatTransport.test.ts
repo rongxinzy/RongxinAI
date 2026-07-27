@@ -6,7 +6,7 @@ import { ChatChatTransport } from './chatChatTransport';
 
 vi.mock('./api', () => ({
   apiService: {
-    chat: vi.fn(),
+    chatWithWebSearch: vi.fn(),
     cancelOngoingRequest: vi.fn(),
   },
 }));
@@ -27,7 +27,7 @@ async function collectChunks(stream: ReadableStream<Record<string, unknown>>): P
 test('emits reasoning-end when reasoning stream finishes before content', async () => {
   let onProgress: ((content: string, reasoning?: string) => void) | undefined;
   let resolveChat: (() => void) | undefined;
-  vi.mocked(apiService.chat).mockImplementation(
+  vi.mocked(apiService.chatWithWebSearch).mockImplementation(
     async (_message: string | unknown, progress?: (content: string, reasoning?: string) => void) => {
       onProgress = progress;
       return new Promise<{ content: string; reasoning?: string }>(resolve => {
@@ -69,7 +69,7 @@ test('emits reasoning-end when reasoning stream finishes before content', async 
 
 test('only uses messages before the latest user turn as history', async () => {
   let capturedHistory: Array<{ role: 'user' | 'assistant'; content: string }> | undefined;
-  vi.mocked(apiService.chat).mockImplementation(
+  vi.mocked(apiService.chatWithWebSearch).mockImplementation(
     async (
       _message: string | unknown,
       _progress?: (content: string, reasoning?: string) => void,

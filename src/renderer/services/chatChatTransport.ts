@@ -18,11 +18,8 @@ function extractText(message: UIMessage): string {
 }
 
 /**
- * A `ChatTransport` that bridges the `apiService.chat()` call (direct LLM,
- * no agent engine) into the AI SDK v6 `useChat` hook.
- *
- * Much simpler than CoworkChatTransport — no tool use, no permissions,
- * just text + reasoning streaming.
+ * A `ChatTransport` for direct LLM chat with provider-native web-search tool
+ * calling. Search execution remains in Electron's main process.
  */
 export class ChatChatTransport implements ChatTransport<UIMessage> {
   constructor(private readonly options: DirectChatRequestOptions = {}) {}
@@ -107,7 +104,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         }
 
         void apiService
-          .chat(
+          .chatWithWebSearch(
             prompt,
             (content, reasoning) => {
               if (abortSignal?.aborted) {
@@ -159,7 +156,6 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             },
             history,
             directChatOptions,
-            requestId,
           )
           .then(() => {
             close();

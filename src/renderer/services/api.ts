@@ -509,6 +509,81 @@ class ApiService {
     }
   }
 
+  /** Native provider tool loop; the gateway credential stays in the main process. */
+  async chatWithWebSearch(message: string, onProgress?: (content: string, reasoning?: string) => void, history: ChatMessagePayload[] = [], options: DirectChatRequestOptions = {}): Promise<{ content: string; reasoning?: string }> {
+    if (!this.config) throw new ApiError('API configuration not set. Please configure your API settings in the settings menu.');
+    const modelState = store.getState().model;
+    const requestedModelId = options.modelId?.trim();
+    const selectedModel = requestedModelId ? (modelState.availableModels.find(model => model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId) ?? modelState.defaultSelectedModel) : modelState.defaultSelectedModel;
+    const provider = this.detectProvider(selectedModel.id, selectedModel.providerKey ?? selectedModel.provider);
+    const config = this.getProviderConfig(provider) ?? this.config;
+    if (this.providerRequiresApiKey(provider) && !config.apiKey) throw new ApiError('API key is not configured. Please set your API key in the settings menu.');
+    const prompt = 'Use the web_search tool when current, factual, or external information would improve the answer. Cite result URLs when you use search.';
+    if (this.normalizeApiFormat(config.apiFormat) === 'anthropic') {
+      const messages = [...history.filter(item => item.role !== 'system'), { role: 'user' as const, content: message }].map(item => this.formatAnthropicMessage(item, !!selectedModel.supportsImage)).filter(Boolean) as any[];
+      return this.runAnthropicWebSearchLoop(messages, [prompt, ...history.filter(item => item.role === 'system').map(item => item.content)].filter(Boolean).join('\n'), selectedModel.id, config, onProgress);
+    }
+    if (this.normalizeApiFormat(config.apiFormat) === 'gemini') {
+      const contents = [...history.filter(item => item.role !== 'system'), { role: 'user' as const, content: message }].map(item => ({ role: item.role === 'assistant' ? 'model' : 'user', parts: [{ text: item.content }] }));
+      return this.runGeminiWebSearchLoop(contents, [prompt, ...history.filter(item => item.role === 'system').map(item => item.content)].filter(Boolean).join('\n'), selectedModel.id, config, onProgress);
+    }
+    const messages = [{ role: 'system', content: prompt }, ...history.map(item => this.formatOpenAIMessage(item, !!selectedModel.supportsImage)).filter(Boolean), { role: 'user', content: message }];
+    return this.runOpenAIWebSearchLoop(messages, selectedModel.id, config, onProgress);
+  }
+
+  private async callJson(url: string, headers: Record<string, string>, body: unknown): Promise<any> {
+    const response = await window.electron.api.fetch({ url, method: 'POST', headers, body: JSON.stringify(body) });
+    if (!response.ok) { const data = response.data as any; throw new ApiError(data?.error?.message || response.statusText || 'API request failed', response.status, data); }
+    return response.data;
+  }
+
+  private async executeWebSearch(call: { query?: unknown; max_results?: unknown }): Promise<unknown> {
+    const response = await window.electron.api.webSearch({ query: typeof call.query === 'string' ? call.query : '', ...(typeof call.max_results === 'number' ? { maxResults: call.max_results } : {}) });
+    return response.ok ? response.data : { error: response.error || 'Search is temporarily unavailable.' };
+  }
+
+  private webSearchTool() {
+    return { name: 'web_search', description: 'Search the public web for up-to-date information. Returns titles, URLs, and short extracts.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Precise search query.' }, max_results: { type: 'integer', minimum: 1, maximum: 10 } }, required: ['query'], additionalProperties: false } };
+  }
+
+  private async runOpenAIWebSearchLoop(messages: any[], model: string, config: ApiConfig, onProgress?: (content: string) => void): Promise<{ content: string }> {
+    const headers = { 'Content-Type': 'application/json', ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}) };
+    for (let turn = 0; turn < 4; turn += 1) {
+      const data = await this.callJson(this.buildOpenAICompatibleChatCompletionsUrl(config.baseUrl), headers, { model, messages, tools: [{ type: 'function', function: this.webSearchTool() }], tool_choice: 'auto' });
+      const assistant = data?.choices?.[0]?.message;
+      if (!assistant) throw new ApiError('No content received from the API. Please try again.');
+      const calls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls.filter((call: any) => call?.function?.name === 'web_search') : [];
+      messages.push(assistant);
+      if (!calls.length) { const content = typeof assistant.content === 'string' ? assistant.content : ''; onProgress?.(content); return { content }; }
+      for (const call of calls.slice(0, 3)) { let args: { query?: unknown; max_results?: unknown } = {}; try { args = JSON.parse(call.function.arguments || '{}'); } catch {} messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(await this.executeWebSearch(args)) }); }
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
+  private async runAnthropicWebSearchLoop(messages: any[], system: string, model: string, config: ApiConfig, onProgress?: (content: string) => void): Promise<{ content: string }> {
+    const headers = { 'Content-Type': 'application/json', 'x-api-key': config.apiKey, 'anthropic-version': '2023-06-01' };
+    for (let turn = 0; turn < 4; turn += 1) {
+      const tool = this.webSearchTool();
+      const data = await this.callJson(`${config.baseUrl.trim().replace(/\/+$/, '')}/v1/messages`, headers, { model, max_tokens: 8192, system, messages, tools: [{ name: tool.name, description: tool.description, input_schema: tool.parameters }] });
+      const content = Array.isArray(data?.content) ? data.content : []; const calls = content.filter((block: any) => block?.type === 'tool_use' && block.name === 'web_search');
+      if (!calls.length) { const text = content.filter((block: any) => block?.type === 'text').map((block: any) => block.text).join(''); onProgress?.(text); return { content: text }; }
+      messages.push({ role: 'assistant', content });
+      messages.push({ role: 'user', content: await Promise.all(calls.slice(0, 3).map(async (call: any) => ({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(await this.executeWebSearch(call.input || {})) }))) });
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
+  private async runGeminiWebSearchLoop(contents: any[], system: string, model: string, config: ApiConfig, onProgress?: (content: string) => void): Promise<{ content: string }> {
+    const baseUrl = config.baseUrl.trim().replace(/\/+$/, '') || 'https://generativelanguage.googleapis.com/v1beta'; const tool = this.webSearchTool();
+    for (let turn = 0; turn < 4; turn += 1) {
+      const data = await this.callJson(`${baseUrl}/models/${model}:generateContent`, { 'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey }, { contents, systemInstruction: { parts: [{ text: system }] }, tools: [{ functionDeclarations: [{ name: tool.name, description: tool.description, parameters: tool.parameters }] }], generationConfig: { maxOutputTokens: 8192 } });
+      const content = data?.candidates?.[0]?.content; const calls = Array.isArray(content?.parts) ? content.parts.filter((part: any) => part.functionCall?.name === 'web_search') : [];
+      if (!calls.length) { const text = (content?.parts || []).filter((part: any) => typeof part.text === 'string').map((part: any) => part.text).join(''); onProgress?.(text); return { content: text }; }
+      contents.push(content); contents.push({ role: 'user', parts: await Promise.all(calls.slice(0, 3).map(async (part: any) => ({ functionResponse: { name: 'web_search', response: await this.executeWebSearch(part.functionCall.args || {}) } }))) });
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
   // Anthropic API 调用
   private async chatWithAnthropic(
     message: ChatUserMessageInput,
