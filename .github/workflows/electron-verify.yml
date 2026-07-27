@@ -3,12 +3,6 @@ name: Electron Verify
 on:
   push:
     branches: [main, develop]
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'electron-builder.json'
-      - 'package.json'
-      - 'vite.config.ts'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -43,19 +37,19 @@ jobs:
           echo "=== Verifying dist/ structure ==="
           for f in dist/index.html; do
             if [ ! -f "$f" ]; then
-              echo "❌ $f not found"
+              echo "? $f not found"
               exit 1
             fi
           done
-          echo "✓ dist/ structure verified"
+          echo "? dist/ structure verified"
 
           echo "=== Verifying dist-electron/ structure ==="
           for f in dist-electron/main.js dist-electron/preload.js; do
             if [ ! -f "$f" ]; then
-              echo "❌ $f not found"
+              echo "? $f not found"
               exit 1
             fi
           done
-          echo "✓ dist-electron/ structure verified"
+          echo "? dist-electron/ structure verified"
 
           echo "=== Build verification complete ==="
