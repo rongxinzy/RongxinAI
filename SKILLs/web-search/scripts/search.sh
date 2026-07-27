@@ -515,6 +515,19 @@ cleanup_browser() {
   rm -f "$CONNECTION_CACHE"
 }
 
+search_via_anysearch_gateway() {
+  local QUERY="$1"
+  local MAX_RESULTS="$2"
+
+  if ! resolve_http_node_runtime; then
+    echo -e "${RED}✗ Internal web search requires the bundled Node runtime${NC}" >&2
+    return 1
+  fi
+
+  env "${HTTP_NODE_ENV_PREFIX[@]}" "$HTTP_NODE_CMD" "${HTTP_NODE_ARGS[@]}" \
+    "$SCRIPT_DIR/anysearch-search.mjs" "$QUERY" "$MAX_RESULTS"
+}
+
 # Main execution
 main() {
   # Parse arguments
@@ -534,6 +547,14 @@ main() {
       exit 1
     fi
     QUERY="$(cat "$QUERY_FILE")"
+  fi
+
+  # The production path is the ZhiYuan-owned AnySearch gateway. The credential
+  # is injected by Electron main process and is never requested from or shown to
+  # the user. Keep the local browser bridge as a development/offline fallback.
+  if [ -n "${ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN:-}" ]; then
+    search_via_anysearch_gateway "$QUERY" "$MAX_RESULTS"
+    exit $?
   fi
 
   if ! ensure_http_client_available; then

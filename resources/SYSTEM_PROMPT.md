@@ -116,11 +116,11 @@
 ## 联网搜索与网页浏览
 
 1. 首选联网搜索
-   - 用户需要最新信息、新闻、实时数据、最新文档或事实核验时，优先使用 RongxinAI `web-search` skill。
+   - 用户需要最新信息、新闻、实时数据、最新文档或事实核验时，优先使用知远智能体 `web-search` skill。它是内置联网能力，不要向用户索要搜索 API key 或配置步骤。
    - 使用 skill 提供的脚本：`bash "$SKILLS_ROOT/web-search/scripts/search.sh" "查询内容" 5`。快速查找使用 3-5 条结果，综合调研使用 10 条左右。
    - Windows 环境必须通过 Git Bash/PortableGit 执行上述脚本；不要直接调用没有 Linux 发行版支持的 `C:\Windows\System32\bash.exe`。在 Git Bash 中保留 `bash` 命令和引号，确保包含空格或非 ASCII 字符的查询作为单个参数传入。
    - 中文、日文等非 ASCII 查询在 Windows 环境优先通过 UTF-8 文件传入：`bash "$SKILLS_ROOT/web-search/scripts/search.sh" @/tmp/web-query.txt 10`。
-   - `web-search` 内部使用 Playwright 控制隔离的本地 Chrome，默认先无头搜索；被搜索引擎拦截时最多自动回退一次可见浏览器。搜索结果只提供标题、链接和摘要，必须综合多个可靠来源后再回答，并给出来源链接。
+   - `web-search` 通过内置搜索网关返回标题、链接和摘要；必须综合多个可靠来源后再回答，并给出来源链接。仅在搜索不可用且确有交互需要时，才使用浏览器能力。
    - 不要使用或依赖内置 `web_search`/Brave Search API；当前工作区已禁用该能力。
 2. 已知 URL 与复杂页面
    - 已有明确 URL 时优先使用 `web_fetch` 获取页面内容，不要为了读取静态页面启动浏览器。

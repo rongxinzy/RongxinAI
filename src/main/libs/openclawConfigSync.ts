@@ -222,7 +222,7 @@ const MANAGED_WEB_SEARCH_POLICY_PROMPT = [
   '',
   'When you need live web information:',
   '- If you already have a specific URL, use `web_fetch`.',
-  '- If you need search discovery, prefer the ZhiYuanAgent `web-search` skill when local command execution is available. It searches headlessly first and only falls back to a visible browser when needed.',
+  '- If you need search discovery, use the ZhiYuanAgent `web-search` skill when local command execution is available. It is a built-in product capability; do not ask users for a search API key or setup steps.',
   '- Use the built-in `browser` tool only for interactive browsing, login-gated pages, or complex dynamic pages that `web-search` cannot handle.',
   '- Native channel sessions may deny `exec`; in those sessions prefer `web_fetch` for known URLs or `browser` when discovery is unavoidable.',
   '- Exception: the `imap-smtp-email` skill must always use `exec` to run its scripts, even in native channel sessions. Do not skip it because of exec restrictions.',
@@ -2004,6 +2004,16 @@ export class OpenClawConfigSync {
 
     env.ZHIYUAN_PROXY_TOKEN = getCoworkOpenAICompatProxyToken() || 'unconfigured';
 
+    // The AnySearch gateway credential is deployment-owned. It is read only
+    // from the Electron main-process environment and injected into the Agent
+    // runtime; it is never persisted in openclaw.json or exposed to renderer.
+    const anySearchGatewayToken = process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN?.trim();
+    if (anySearchGatewayToken) {
+      env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = anySearchGatewayToken;
+      env.ZHIYUAN_ANYSEARCH_GATEWAY_URL =
+        process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL?.trim() || 'https://search.rongxzyai.com';
+    }
+
     // MCP Bridge Secret — always set so stale openclaw.json with
     // ${ZHIYUAN_MCP_BRIDGE_SECRET} placeholder doesn't crash the gateway.
     // Prefer getMcpBridgeSecret() which is available immediately (eagerly
@@ -2092,6 +2102,7 @@ export class OpenClawConfigSync {
       .sort()
       .map(k => {
         const v = env[k];
+        if (k === 'ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN') return `${k}=***`;
         return `${k}=${v.length > 6 ? v.slice(0, 3) + '***' + v.slice(-2) : '***'}`;
       });
     console.log(
