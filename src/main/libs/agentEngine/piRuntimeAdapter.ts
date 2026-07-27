@@ -34,6 +34,14 @@ import {
 } from '../claudeSettings';
 import { getSkillsRoot } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
+import {
+  createPiAskUserQuestionTool,
+  PiAskUserQuestionToolName,
+  PiAskUserQuestionSystemPrompt,
+  PiAskUserQuestionTimeoutMs,
+  type PiAskUserQuestionInput,
+  type PiAskUserQuestionResponse,
+} from './piAskUserQuestion';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type {
   CoworkContinueOptions,
@@ -206,6 +214,15 @@ if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
   private readonly approvalSessionMap = new Map<string, string>();
+  private readonly pendingAskUserQuestions = new Map<
+    string,
+    {
+      sessionId: string;
+      resolve: (response: PiAskUserQuestionResponse) => void;
+      timer: ReturnType<typeof setTimeout>;
+      removeAbortListener?: () => void;
+    }
+  >();
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
 
@@ -327,8 +344,16 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
 
-      // Build custom tools: MCP proxy + optional subagent for Team Leads
+      // Build custom tools: MCP proxy + optional subagent for Team Leads.
+      // Each call creates a distinct tool instance for this Pi session, so its
+      // sequential execution mode cannot block another session.
       const customTools: Record<string, unknown>[] = [];
+
+      customTools.push(
+        createPiAskUserQuestionTool((toolCallId, input, signal) =>
+          this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
+        ),
+      );
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
       const mcpProxyTool = this.buildMcpProxyTool();
@@ -522,6 +547,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   }
 
   stopSession(sessionId: string): void {
+    this.dismissAskUserQuestionsBySession(sessionId);
     const active = this.activeSessions.get(sessionId);
     if (!active) return;
 
@@ -548,6 +574,17 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   }
 
   respondToPermission(requestId: string, result: PermissionResult): void {
+    const pendingQuestion = this.pendingAskUserQuestions.get(requestId);
+    if (pendingQuestion) {
+      this.finishAskUserQuestion(requestId, {
+        behavior: result.behavior,
+        ...(result.behavior === 'allow'
+          ? { updatedInput: result.updatedInput }
+          : { message: result.message }),
+      });
+      return;
+    }
+
     const sessionId = this.approvalSessionMap.get(requestId);
     if (!sessionId) return;
     this.approvalSessionMap.delete(requestId);
@@ -601,7 +638,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
               ),
             }),
       systemPromptOverride: () => systemPrompt || '',
-      appendSystemPromptOverride: (): string[] => [],
+      // Pi bypasses tool promptGuidelines when systemPromptOverride is non-empty.
+      // Append this policy so it remains present for both default and custom prompts.
+      appendSystemPromptOverride: (): string[] => [PiAskUserQuestionSystemPrompt],
     });
     await resourceLoader.reload();
     return resourceLoader;
@@ -1087,6 +1126,78 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private clearApprovalsBySession(sessionId: string): void {
     for (const [requestId, sid] of this.approvalSessionMap.entries()) {
       if (sid === sessionId) this.approvalSessionMap.delete(requestId);
+    }
+  }
+
+  private requestAskUserQuestion(
+    sessionId: string,
+    toolCallId: string,
+    input: PiAskUserQuestionInput,
+    signal?: AbortSignal,
+  ): Promise<PiAskUserQuestionResponse> {
+    if (signal?.aborted) {
+      return Promise.resolve({ behavior: 'deny', message: 'The request was cancelled.' });
+    }
+
+    const requestId = randomUUID();
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        this.finishAskUserQuestion(requestId, {
+          behavior: 'deny',
+          message: 'The question timed out without a response.',
+        });
+      }, PiAskUserQuestionTimeoutMs);
+
+      const onAbort = () => {
+        this.finishAskUserQuestion(requestId, {
+          behavior: 'deny',
+          message: 'The request was cancelled.',
+        });
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+
+      this.pendingAskUserQuestions.set(requestId, {
+        sessionId,
+        resolve,
+        timer,
+        removeAbortListener: () => signal?.removeEventListener('abort', onAbort),
+      });
+
+      try {
+        this.emit('permissionRequest', sessionId, {
+          requestId,
+          toolName: PiAskUserQuestionToolName,
+          toolInput: input as unknown as Record<string, unknown>,
+          toolUseId: toolCallId,
+        });
+      } catch (error) {
+        console.error('[PiRuntime] failed to emit AskUserQuestion request:', error);
+        this.finishAskUserQuestion(requestId, {
+          behavior: 'deny',
+          message: 'Unable to show the question to the user.',
+        });
+      }
+    });
+  }
+
+  private finishAskUserQuestion(requestId: string, response: PiAskUserQuestionResponse): void {
+    const pending = this.pendingAskUserQuestions.get(requestId);
+    if (!pending) return;
+    this.pendingAskUserQuestions.delete(requestId);
+    clearTimeout(pending.timer);
+    pending.removeAbortListener?.();
+    pending.resolve(response);
+    this.emit('permissionDismiss', requestId);
+  }
+
+  private dismissAskUserQuestionsBySession(sessionId: string): void {
+    for (const [requestId, pending] of this.pendingAskUserQuestions.entries()) {
+      if (pending.sessionId === sessionId) {
+        this.finishAskUserQuestion(requestId, {
+          behavior: 'deny',
+          message: 'The session was stopped.',
+        });
+      }
     }
   }
 

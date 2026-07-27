@@ -123,6 +123,7 @@ vi.mock('../claudeSettings', () => ({
 }));
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 
 describe('PiRuntimeAdapter', () => {
   let adapter: PiRuntimeAdapter;
@@ -350,6 +351,116 @@ describe('PiRuntimeAdapter', () => {
       expect(() =>
         adapter.respondToPermission('unknown', { behavior: 'deny', message: 'no' }),
       ).not.toThrow();
+    });
+
+    it('appends the AskUserQuestion policy when a custom system prompt is configured', async () => {
+      await adapter.startSession('test', 'Hello Pi', { systemPrompt: 'Custom instructions' });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.appendSystemPromptOverride()).toEqual([PiAskUserQuestionSystemPrompt]);
+    });
+
+    it('resolves a Pi AskUserQuestion tool call with the renderer response', async () => {
+      const permissionRequests: Array<{ requestId: string; toolInput: Record<string, unknown> }> =
+        [];
+      const dismissals: string[] = [];
+      adapter.on('permissionRequest', (_sessionId, request) => {
+        permissionRequests.push({ requestId: request.requestId, toolInput: request.toolInput });
+      });
+      adapter.on('permissionDismiss', requestId => dismissals.push(requestId));
+
+      await adapter.startSession('test', 'Ask me something');
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{
+          name: string;
+          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<{
+            content: Array<{ text: string }>;
+          }>;
+        }>;
+      };
+      const askUserTool = sessionOptions.customTools?.find(tool => tool.name === 'AskUserQuestion');
+      expect(askUserTool).toBeDefined();
+
+      const toolResult = askUserTool!.execute('tool-call-1', {
+        questions: [
+          {
+            question: 'Continue?',
+            options: [{ label: 'Yes' }, { label: 'No' }],
+          },
+        ],
+      });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(1));
+
+      adapter.respondToPermission(permissionRequests[0].requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { 'Continue?': 'Yes' } },
+      });
+
+      await expect(toolResult).resolves.toMatchObject({
+        content: [{ text: 'Continue?: Yes' }],
+      });
+      expect(dismissals).toEqual([permissionRequests[0].requestId]);
+    });
+
+    it('keeps AskUserQuestion waits isolated to their owning Pi session', async () => {
+      const permissionRequests: Array<{ sessionId: string; requestId: string }> = [];
+      adapter.on('permissionRequest', (sessionId, request) => {
+        permissionRequests.push({ sessionId, requestId: request.requestId });
+      });
+
+      await adapter.startSession('session-a', 'Ask A');
+      await adapter.startSession('session-b', 'Ask B');
+
+      const getAskUserTool = (callIndex: number) => {
+        const sessionOptions = mockCreateAgentSession.mock.calls[callIndex]?.[0] as {
+          customTools?: Array<{
+            name: string;
+            execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
+          }>;
+        };
+        const tool = sessionOptions.customTools?.find(item => item.name === 'AskUserQuestion');
+        expect(tool).toBeDefined();
+        return tool!;
+      };
+
+      const question = {
+        questions: [
+          {
+            question: 'Continue?',
+            options: [{ label: 'Yes' }, { label: 'No' }],
+          },
+        ],
+      };
+      let sessionAResolved = false;
+      const sessionAResult = getAskUserTool(0)
+        .execute('tool-call-a', question)
+        .then(result => {
+          sessionAResolved = true;
+          return result;
+        });
+      const sessionBResult = getAskUserTool(1).execute('tool-call-b', question);
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(2));
+
+      const sessionBRequest = permissionRequests.find(request => request.sessionId === 'session-b');
+      expect(sessionBRequest).toBeDefined();
+      adapter.respondToPermission(sessionBRequest!.requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { 'Continue?': 'Yes' } },
+      });
+
+      await expect(sessionBResult).resolves.toMatchObject({
+        content: [{ text: 'Continue?: Yes' }],
+      });
+      expect(sessionAResolved).toBe(false);
+
+      const sessionARequest = permissionRequests.find(request => request.sessionId === 'session-a');
+      expect(sessionARequest).toBeDefined();
+      adapter.respondToPermission(sessionARequest!.requestId, { behavior: 'deny' });
+      await expect(sessionAResult).resolves.toMatchObject({
+        content: [{ text: 'The user denied the operation.' }],
+      });
     });
   });
 

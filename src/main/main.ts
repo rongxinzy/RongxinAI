@@ -1742,6 +1742,18 @@ const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
     });
   });
 
+  runtime.on('permissionDismiss', (requestId: string) => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.send('cowork:stream:permissionDismiss', { requestId });
+      } catch (error) {
+        console.error('Failed to forward cowork permission dismissal:', error);
+      }
+    });
+  });
+
   runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
