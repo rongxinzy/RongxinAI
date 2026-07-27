@@ -29,10 +29,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ========== macOS 构建 ==========
+  # ========== macOS ?? ==========
   build-macos:
     if: ${{ github.event_name == 'push' || inputs.build_macos }}
     runs-on: macos-latest
+    environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,10 +63,11 @@ jobs:
           path: release/*.dmg
           retention-days: 7
 
-  # ========== Windows 构建 ==========
+  # ========== Windows ?? ==========
   build-windows:
     if: ${{ github.event_name == 'push' || inputs.build_windows }}
     runs-on: windows-latest
+    environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -82,7 +84,7 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      # Windows 需要 Python 运行时
+      # Windows ?? Python ???
       - name: Setup Python Runtime
         run: npm run setup:python-runtime
         env:
@@ -101,10 +103,11 @@ jobs:
           path: release/*.exe
           retention-days: 7
 
-  # ========== Linux 构建 ==========
+  # ========== Linux ?? ==========
   build-linux:
     if: ${{ github.event_name == 'push' || inputs.build_linux }}
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -140,7 +143,7 @@ jobs:
             release/*.deb
           retention-days: 7
 
-  # ========== 创建 Release ==========
+  # ========== ?? Release ==========
   create-release:
     needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
