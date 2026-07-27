@@ -36,6 +36,7 @@ export interface CoworkRuntimeEvents {
     metadata?: Record<string, unknown>,
   ) => void;
   permissionRequest: (sessionId: string, request: PermissionRequest) => void;
+  permissionDismiss: (requestId: string) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
   sessionStopped: (sessionId: string) => void;
