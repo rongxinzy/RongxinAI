@@ -32,7 +32,8 @@ export const SkillsIpc = {
   GetConfig: 'skills:getConfig',
   SetConfig: 'skills:setConfig',
   TestEmailConnectivity: 'skills:testEmailConnectivity',
-  FetchMarketplace: 'skills:fetchMarketplace',
+    FetchMarketplace: 'skills:fetchMarketplace',
+    FetchMarketplaceContent: 'skills:fetchMarketplaceContent',
   Changed: 'skills:changed',
 } as const;
 export type SkillsIpc = (typeof SkillsIpc)[keyof typeof SkillsIpc];

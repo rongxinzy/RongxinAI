@@ -139,7 +139,10 @@ import {
 import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import type { McpToolManifestEntry } from './libs/mcpServerManager';
 import { McpServerManager } from './libs/mcpServerManager';
-import { fetchModelScopeSkillMarketplace } from './libs/modelscopeSkillMarketplace';
+import {
+  fetchModelScopeSkillContent,
+  fetchModelScopeSkillMarketplace,
+} from './libs/modelscopeSkillMarketplace';
 import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { OllamaManager } from './libs/ollamaManager';
@@ -3205,9 +3208,12 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('skills:download', async (_event, source: string) => {
-    return getSkillManager().downloadSkill(source);
-  });
+  ipcMain.handle(
+    'skills:download',
+    async (_event, source: string, options?: { iconUrl?: string; displayName?: string }) => {
+      return getSkillManager().downloadSkill(source, options);
+    },
+  );
 
   ipcMain.handle('skills:confirmInstall', async (_event, pendingId: string, action: string) => {
     const validActions = ['install', 'installDisabled', 'cancel'];
@@ -3232,7 +3238,7 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle(SkillsIpc.GetContent, (_event, skillId: string) => {
+  ipcMain.handle(SkillsIpc.GetContent, async (_event, skillId: string) => {
     return getSkillManager().getSkillContent(skillId);
   });
 
@@ -3295,6 +3301,29 @@ if (!gotTheLock) {
       }
     },
   );
+
+  ipcMain.handle(SkillsIpc.FetchMarketplaceContent, async (_event, skillId: string) => {
+    try {
+      const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
+      const token = createModelScopeTokenPool({
+        extraTokens: userToken ? [userToken] : [],
+      }).nextToken();
+      const content = await fetchModelScopeSkillContent(skillId, {
+        token,
+        fetchImpl: (input, init) =>
+          session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
+            typeof fetch
+          >,
+      });
+      return { success: true, content };
+    } catch (error) {
+      console.warn('[SkillMarketplace] content fetch failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch skill content',
+      };
+    }
+  });
 
   ipcMain.handle('openclaw:engine:getStatus', async () => {
     try {

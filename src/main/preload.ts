@@ -82,7 +82,8 @@ contextBridge.exposeInMainWorld('electron', {
     setPinned: (options: { id: string; pinned: boolean }) =>
       ipcRenderer.invoke(SkillsIpc.SetPinned, options),
     delete: (id: string) => ipcRenderer.invoke(SkillsIpc.Delete, id),
-    download: (source: string) => ipcRenderer.invoke(SkillsIpc.Download, source),
+    download: (source: string, options?: { iconUrl?: string; displayName?: string }) =>
+      ipcRenderer.invoke(SkillsIpc.Download, source, options),
     confirmInstall: (pendingId: string, action: string) =>
       ipcRenderer.invoke(SkillsIpc.ConfirmInstall, pendingId, action),
     getRoot: () => ipcRenderer.invoke(SkillsIpc.GetRoot),
@@ -95,6 +96,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(SkillsIpc.TestEmailConnectivity, skillId, config),
     fetchMarketplace: (options?: { pageNumber?: number; pageSize?: number }) =>
       ipcRenderer.invoke(SkillsIpc.FetchMarketplace, options),
+    fetchMarketplaceContent: (skillId: string) =>
+      ipcRenderer.invoke(SkillsIpc.FetchMarketplaceContent, skillId),
     onChanged: (callback: () => void) => onPushVoid(SkillsIpc.Changed, callback),
   },
 

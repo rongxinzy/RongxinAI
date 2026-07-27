@@ -4,6 +4,7 @@ import { app, BrowserWindow, session } from 'electron';
 import extractZip from 'extract-zip';
 import fs from 'fs';
 import yaml from 'js-yaml';
+import JSZip from 'jszip';
 import path from 'path';
 
 import { cpRecursiveSync } from './fsCompat';
@@ -347,7 +348,21 @@ export type SkillRecord = {
   version?: string;
 };
 
-type SkillStateMap = Record<string, { enabled: boolean; pinned?: boolean }>;
+type SkillStateMap = Record<
+  string,
+  {
+    enabled: boolean;
+    pinned?: boolean;
+    iconUrl?: string;
+    displayName?: string;
+    userInstalled?: boolean;
+  }
+>;
+
+type SkillInstallOptions = {
+  iconUrl?: string;
+  displayName?: string;
+};
 
 type EmailConnectivityCheckCode = 'imap_connection' | 'smtp_connection';
 type EmailConnectivityCheckLevel = 'pass' | 'fail';
@@ -1130,7 +1145,9 @@ const isRemoteZipUrl = (source: string): boolean => {
     const url = new URL(source);
     return (
       (url.protocol === 'http:' || url.protocol === 'https:') &&
-      url.pathname.toLowerCase().endsWith('.zip')
+      (url.pathname.toLowerCase().endsWith('.zip') ||
+        (url.hostname.toLowerCase().endsWith('modelscope.cn') &&
+          /\/skills\/[^/]+\/[^/]+\/archive\/zip\//i.test(url.pathname)))
     );
   } catch {
     return false;
@@ -1152,7 +1169,13 @@ const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string>
   const extractRoot = path.join(tempRoot, 'remote-skill');
   fs.writeFileSync(zipPath, buffer);
   fs.mkdirSync(extractRoot, { recursive: true });
-  await extractZip(zipPath, { dir: extractRoot });
+  try {
+    await extractZip(zipPath, { dir: extractRoot });
+  } catch (error) {
+    if (!zipUrl.includes('modelscope.cn/skills/')) throw error;
+    console.warn('[SkillManager] standard ZIP extraction failed, using ModelScope-compatible parser');
+    await extractModelScopeZip(buffer, extractRoot);
+  }
 
   const extractedDirs = fs
     .readdirSync(extractRoot)
@@ -1171,6 +1194,22 @@ const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string>
 
   return extractRoot;
 };
+
+async function extractModelScopeZip(buffer: Buffer, destination: string): Promise<void> {
+  const archive = await JSZip.loadAsync(buffer);
+  for (const [entryName, entry] of Object.entries(archive.files)) {
+    const normalized = entryName.replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!normalized || normalized.split('/').some(part => part === '..')) continue;
+    const target = path.resolve(destination, normalized);
+    if (!target.startsWith(path.resolve(destination) + path.sep)) continue;
+    if (entry.dir) {
+      fs.mkdirSync(target, { recursive: true });
+      continue;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, await entry.async('nodebuffer'));
+  }
+}
 
 const normalizeGithubSubpath = (value: string): string | null => {
   const trimmed = value.trim().replace(/^\/+|\/+$/g, '');
@@ -1295,6 +1334,8 @@ export class SkillManager {
       timer: NodeJS.Timeout;
       isUpgrade?: boolean;
       existingSkillDir?: string;
+      iconUrl?: string;
+      displayName?: string;
     }
   >();
   private upgradingSkillIds = new Set<string>();
@@ -1581,7 +1622,9 @@ export class SkillManager {
           dir,
           state,
           defaults,
-          builtInSkillIds.has(path.basename(dir)),
+          builtInSkillIds.has(path.basename(dir)) &&
+            !state[path.basename(dir)]?.userInstalled &&
+            !state[path.basename(dir)]?.iconUrl,
         );
         if (!skill) return;
         skillMap.set(skill.id, skill);
@@ -1648,7 +1691,11 @@ export class SkillManager {
     return this.listSkills();
   }
 
-  getSkillContent(id: string): { success: boolean; content?: string; error?: string } {
+  async getSkillContent(id: string): Promise<{
+    success: boolean;
+    content?: string;
+    error?: string;
+  }> {
     try {
       if (id !== path.basename(id)) return { success: false, error: 'Skill not found' };
       const skillPath = this.getSkillRoots(this.ensureSkillsRoot())
@@ -1656,7 +1703,7 @@ export class SkillManager {
         .map(dir => path.join(dir, SKILL_FILE_NAME))
         .find(filePath => fs.existsSync(filePath));
       if (!skillPath) return { success: false, error: 'Skill not found' };
-      const raw = fs.readFileSync(skillPath, 'utf8');
+      const raw = await fs.promises.readFile(skillPath, 'utf8');
       return { success: true, content: parseFrontmatter(raw).content.trim() };
     } catch (error) {
       console.error('[skills] Failed to read skill content:', error);
@@ -1805,7 +1852,7 @@ export class SkillManager {
     return resolvedSource;
   }
 
-  async downloadSkill(source: string): Promise<{
+  async downloadSkill(source: string, options: SkillInstallOptions = {}): Promise<{
     success: boolean;
     skills?: SkillRecord[];
     error?: string;
@@ -1998,6 +2045,8 @@ export class SkillManager {
           root,
           skillDirs,
           timer,
+          iconUrl: options.iconUrl,
+          displayName: options.displayName,
         });
 
         return {
@@ -2009,6 +2058,7 @@ export class SkillManager {
 
       // Safe or scan failed 鈥?install directly
       console.log(`[SkillManager] Skill is safe (or scan failed), installing directly`);
+      const installedIds: string[] = [];
       for (const skillDir of skillDirs) {
         const folderName = normalizeFolderName(path.basename(skillDir));
         let targetDir = resolveWithin(root, folderName);
@@ -2033,7 +2083,10 @@ export class SkillManager {
             normalizeResult.detail || 'unknown',
           );
         }
+        installedIds.push(path.basename(targetDir));
       }
+
+      this.persistSkillInstallState(installedIds, options);
 
       cleanupPathSafely(cleanupPath);
       cleanupPath = null;
@@ -2389,6 +2442,7 @@ export class SkillManager {
       }
     }
 
+    this.persistSkillInstallState(installedIds, pending);
     cleanupPathSafely(pending.cleanupPath);
 
     // If user chose 'installDisabled', disable all newly installed skills
@@ -2595,8 +2649,8 @@ export class SkillManager {
         updatedAt,
         prompt,
         skillPath: skillFile,
-        iconUrl: iconPath ? this.getSkillIconDataUrl(iconPath) : undefined,
-        displayName: rongxMetadata.name || defaults[id]?.displayName,
+        iconUrl: iconPath ? this.getSkillIconDataUrl(iconPath) : state[id]?.iconUrl,
+        displayName: state[id]?.displayName || rongxMetadata.name || defaults[id]?.displayName,
         displayDescription: rongxMetadata.description,
         displayAuthor: rongxMetadata.author,
         displayLicense: rongxMetadata.license,
@@ -2675,31 +2729,34 @@ export class SkillManager {
   }
 
   private listBuiltInSkillIds(): Set<string> {
-    // In development the bundled and user skill roots intentionally resolve to
-    // the same project directory. IDs alone cannot tell whether a folder was
-    // shipped with the app or downloaded during development, so never apply
-    // the packaged built-in restriction to that shared root.
-    if (!app.isPackaged) return new Set();
     const builtInRoot = this.getBundledSkillsRoot();
     if (!builtInRoot || !fs.existsSync(builtInRoot)) {
       return new Set();
     }
     try {
+      const builtInIds = new Set<string>();
       const configPath = path.join(builtInRoot, SKILLS_CONFIG_FILE);
       if (fs.existsSync(configPath)) {
         const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         if (parsed?.defaults && typeof parsed.defaults === 'object') {
-          return new Set(Object.keys(parsed.defaults));
+          Object.keys(parsed.defaults).forEach(id => builtInIds.add(id));
         }
       }
+      listSkillDirs(builtInRoot).forEach(dir => builtInIds.add(path.basename(dir)));
+      return builtInIds;
     } catch (error) {
       console.warn('[skills] Failed to parse skills.config.json for built-in skill list:', error);
     }
+    // In development the bundled and user roots can be the same directory.
+    // Treat every bundled directory as protected unless an install operation
+    // explicitly marked that ID as user-installed in the persistent state.
     return new Set(listSkillDirs(builtInRoot).map(dir => path.basename(dir)));
   }
 
   private isBuiltInSkillId(id: string): boolean {
-    return this.listBuiltInSkillIds().has(id);
+    if (!this.listBuiltInSkillIds().has(id)) return false;
+    const state = this.loadSkillStateMap();
+    return !state[id]?.userInstalled && !state[id]?.iconUrl;
   }
 
   private loadSkillStateMap(): SkillStateMap {
@@ -2718,6 +2775,25 @@ export class SkillManager {
 
   private saveSkillStateMap(map: SkillStateMap): void {
     this.getStore().set(SKILL_STATE_KEY, map);
+  }
+
+  private persistSkillInstallState(
+    ids: string[],
+    options: { iconUrl?: string; displayName?: string },
+  ): void {
+    const normalizedIconUrl = options.iconUrl?.trim();
+    const normalizedDisplayName = options.displayName?.trim();
+    const state = this.loadSkillStateMap();
+    for (const id of ids) {
+      state[id] = {
+        ...state[id],
+        enabled: state[id]?.enabled ?? true,
+        userInstalled: true,
+        ...(normalizedIconUrl ? { iconUrl: normalizedIconUrl } : {}),
+        ...(normalizedDisplayName ? { displayName: normalizedDisplayName } : {}),
+      };
+    }
+    this.saveSkillStateMap(state);
   }
 
   private loadSkillsDefaults(roots: string[]): Record<string, SkillDefaultConfig> {
