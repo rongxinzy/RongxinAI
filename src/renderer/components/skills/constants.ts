@@ -3,6 +3,8 @@ export const SkillTab = {
   Marketplace: 'marketplace',
 } as const;
 
+export const SKILL_PAGE_SIZE = 14;
+
 export type SkillTab = (typeof SkillTab)[keyof typeof SkillTab];
 
 export const SkillCategory = {

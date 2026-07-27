@@ -1,11 +1,6 @@
-import { Button } from '@shared/components/ui/button';
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
+import { Button } from '@shared/components/ui/button';
+import { Card } from '@shared/components/ui/card';
 import {
   Empty,
   EmptyDescription,
@@ -13,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@shared/components/ui/empty';
+import { Progress } from '@shared/components/ui/progress';
 import { cn } from '@shared/lib/utils';
 import { Download, Puzzle } from 'lucide-react';
 
@@ -59,7 +55,7 @@ export function MarketplaceSkillGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {skills.map(skill => {
         const normalizedName = skill.name
           .trim()
@@ -72,46 +68,38 @@ export function MarketplaceSkillGrid({
         return (
           <Card
             key={skill.id}
-            size="sm"
-            role="button"
-            tabIndex={0}
             className={cn(
-              'group relative gap-3 overflow-hidden border border-border ring-0 transition-[transform,box-shadow,background-color] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:bg-muted hover:shadow-md focus-visible:z-10 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
-              isInstallingSkillId && !isInstalling
-                ? 'pointer-events-none opacity-50'
-                : 'cursor-pointer hover:bg-muted',
+              'group relative min-h-20 flex-row items-center gap-3 border border-border bg-card px-4 py-3 transition-colors hover:bg-muted',
+              isInstallingSkillId && !isInstalling && 'pointer-events-none opacity-50',
             )}
-            onClick={() => {
-              onSelect(skill);
-            }}
-            onKeyDown={event => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onSelect(skill);
-              }
-            }}
           >
-            <CardHeader className="items-center grid-cols-[minmax(0,1fr)_auto] gap-3 p-0">
-              <div className="flex min-w-0 items-center gap-2 self-center">
-                <Avatar className="size-12 rounded-lg bg-muted">
-                  {skill.iconUrl && (
-                    <AvatarImage
-                      src={resolveSkillIconUrl(skill.iconUrl)}
-                      alt=""
-                      className="m-auto size-8 rounded-lg object-contain p-0"
-                    />
-                  )}
-                  <AvatarFallback className="rounded-md">
-                    <Puzzle />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <CardTitle className="truncate">{skill.name}</CardTitle>
-                  <CardDescription className="truncate">
-                    {resolveLocalizedText(skill.description)}
-                  </CardDescription>
-                </div>
+            <button
+              type="button"
+              disabled={Boolean(isInstallingSkillId && !isInstalling)}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-md py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              onClick={() => onSelect(skill)}
+            >
+              <Avatar className="size-12 shrink-0 rounded-xl bg-muted">
+                {skill.iconUrl && (
+                  <AvatarImage
+                    src={resolveSkillIconUrl(skill.iconUrl)}
+                    alt=""
+                    className="m-auto size-8 rounded-lg object-contain"
+                  />
+                )}
+                <AvatarFallback className="rounded-md">
+                  <Puzzle />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{skill.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {resolveLocalizedText(skill.description)}
+                </p>
               </div>
+            </button>
+
+            <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {isInstalled ? (
                 <span className="text-xs text-muted-foreground">
                   {i18nService.t('skillAlreadyInstalled')}
@@ -119,48 +107,26 @@ export function MarketplaceSkillGrid({
               ) : (
                 !readOnly &&
                 skill.installSource && (
-                  <div
-                    className={cn(
-                      'transition-opacity duration-200',
-                      'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-                    )}
+                  <Button
+                    type="button"
+                    size="xs"
+                    disabled={isInstalling}
+                    onClick={() => onInstall(skill)}
                   >
-                    <Button
-                      type="button"
-                      size="xs"
-                      disabled={isInstalling}
-                      onClick={event => {
-                        event.stopPropagation();
-                        onInstall(skill);
-                      }}
-                    >
-                      <Download data-icon="inline-start" />
-                      {isInstalling
-                        ? i18nService.t('skillInstalling')
-                        : i18nService.t('skillInstall')}
-                    </Button>
-                  </div>
+                    <Download data-icon="inline-start" />
+                    {isInstalling
+                      ? i18nService.t('skillInstalling')
+                      : i18nService.t('skillInstall')}
+                  </Button>
                 )
               )}
-            </CardHeader>
+            </div>
 
             {isInstalling && !isDetailOpen && (
-              <div className="absolute left-8 right-24 top-[42%] z-20 -translate-y-1/2">
-                <div className="mb-1 text-center text-xs font-medium text-foreground">
-                  {installProgress}%
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-[width]"
-                    style={{ width: `${installProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            {isInstalling && !isDetailOpen && (
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 left-0 right-20 z-10 bg-background/25 backdrop-blur-[2px]"
+              <Progress
+                value={installProgress}
+                aria-label={`${i18nService.t('skillInstalling')} ${installProgress}%`}
+                className="absolute bottom-0 left-0 h-1 w-full gap-0 rounded-none"
               />
             )}
           </Card>

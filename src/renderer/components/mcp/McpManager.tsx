@@ -20,7 +20,8 @@ import {
 } from '../../types/mcp';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
-import { McpTab as McpTabValue, type McpTab as McpTabType } from './constants';
+import { ListPagination } from '../common/ListPagination';
+import { McpTab as McpTabValue, MCP_PAGE_SIZE, type McpTab as McpTabType } from './constants';
 import { McpManagerToolbar } from './McpManagerToolbar';
 import { filterMcpItems, useMcpSearchQuery } from './mcpSearch';
 import McpServerFormModal from './McpServerFormModal';
@@ -126,6 +127,7 @@ const McpManager: React.FC<McpManagerProps> = ({
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null);
   const [installingRegistry, setInstallingRegistry] = useState<McpRegistryEntry | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const [dynamicRegistry, setDynamicRegistry] = useState<McpRegistryEntry[]>(mcpRegistry);
   const [dynamicCategories, setDynamicCategories] =
     useState<ReadonlyArray<{ id: string; key: string; name_zh?: string; name_en?: string }>>(
@@ -286,6 +288,31 @@ const McpManager: React.FC<McpManagerProps> = ({
     }
     return entries;
   }, [activeCategory, dynamicRegistry, getRegistryEntryDescription, searchQuery]);
+
+  const customPageItemCount = filteredCustom.length > 0 ? filteredCustom.length + 1 : 0;
+  const activeItemCount =
+    activeTab === McpTabValue.Installed
+      ? filteredInstalled.length
+      : activeTab === McpTabValue.Marketplace
+        ? filteredMarketplace.length
+        : customPageItemCount;
+  const totalPages = Math.max(1, Math.ceil(activeItemCount / MCP_PAGE_SIZE));
+  const pageStart = (currentPage - 1) * MCP_PAGE_SIZE;
+  const paginatedInstalled = filteredInstalled.slice(pageStart, pageStart + MCP_PAGE_SIZE);
+  const paginatedMarketplace = filteredMarketplace.slice(pageStart, pageStart + MCP_PAGE_SIZE);
+  const customPageStart = currentPage === 1 ? 0 : pageStart - 1;
+  const paginatedCustom = filteredCustom.slice(
+    customPageStart,
+    customPageStart + (currentPage === 1 ? MCP_PAGE_SIZE - 1 : MCP_PAGE_SIZE),
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, activeCategory, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(page => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const handleToggleEnabled = async (serverId: string) => {
     const targetServer = servers.find(s => s.id === serverId);
@@ -509,49 +536,52 @@ const McpManager: React.FC<McpManagerProps> = ({
           </div>
         )}
 
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2">
           {/* ── Tab: Installed ──────────────────────────────── */}
           {activeTab === McpTabValue.Installed && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {filteredInstalled.length === 0 ? (
-                <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
-                  <Plug className="size-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    {i18nService.t('mcpNoInstalledServers')}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setActiveTab(McpTabValue.Marketplace)}
-                  >
-                    {i18nService.t('mcpMarketplace')}
-                  </Button>
-                </div>
-              ) : (
-                filteredInstalled.map(server => {
-                  const registryEntry = getRegistryEntryForServer(server);
-                  const installedDescription = getInstalledDescription(server);
-                  return (
-                    <div
-                      key={server.id}
-                      className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
+            <div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {filteredInstalled.length === 0 ? (
+                  <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
+                    <Plug className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {i18nService.t('mcpNoInstalledServers')}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab(McpTabValue.Marketplace)}
                     >
-                      <McpIcon iconSrc={getIconForServer(server)} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate text-sm font-medium text-foreground">
-                            {server.name}
-                          </span>
-                          <span className={`hidden shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium sm:inline-flex ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}>
-                            {server.transportType}
-                          </span>
+                      {i18nService.t('mcpMarketplace')}
+                    </Button>
+                  </div>
+                ) : (
+                  paginatedInstalled.map(server => {
+                    const registryEntry = getRegistryEntryForServer(server);
+                    const installedDescription = getInstalledDescription(server);
+                    return (
+                      <div
+                        key={server.id}
+                        className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
+                      >
+                        <McpIcon iconSrc={getIconForServer(server)} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-sm font-medium text-foreground">
+                              {server.name}
+                            </span>
+                            <span
+                              className={`hidden shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium sm:inline-flex ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
+                            >
+                              {server.transportType}
+                            </span>
+                          </div>
+                          <ClampedText
+                            text={installedDescription}
+                            className="mt-1 line-clamp-1 text-xs text-muted-foreground"
+                          />
                         </div>
-                        <ClampedText
-                          text={installedDescription}
-                          className="mt-1 line-clamp-1 text-xs text-muted-foreground"
-                        />
-                      </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button
                             type="button"
@@ -578,42 +608,49 @@ const McpManager: React.FC<McpManagerProps> = ({
                             onCheckedChange={() => handleToggleEnabled(server.id)}
                           />
                         </div>
-                      <div className="hidden">
-                        <span
-                          className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
-                        >
-                          {server.transportType}
-                        </span>
-                        {server.transportType === 'stdio' && server.command && (
-                          <>
-                            <span className="shrink-0">·</span>
-                            <span className="truncate min-w-0">
-                              {getStdioCommandSummary(server.command, server.args)}
-                            </span>
-                          </>
-                        )}
-                        {(server.transportType === 'sse' || server.transportType === 'http') &&
-                          server.url && (
+                        <div className="hidden">
+                          <span
+                            className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
+                          >
+                            {server.transportType}
+                          </span>
+                          {server.transportType === 'stdio' && server.command && (
                             <>
                               <span className="shrink-0">·</span>
-                              <span className="truncate min-w-0">{server.url}</span>
-                            </>
-                          )}
-                        {registryEntry?.requiredEnvKeys &&
-                          registryEntry.requiredEnvKeys.length > 0 && (
-                            <>
-                              <span className="shrink-0">·</span>
-                              <span className="shrink-0 text-amber-500 dark:text-amber-400">
-                                {registryEntry.requiredEnvKeys.length} key
-                                {registryEntry.requiredEnvKeys.length > 1 ? 's' : ''}
+                              <span className="truncate min-w-0">
+                                {getStdioCommandSummary(server.command, server.args)}
                               </span>
                             </>
                           )}
+                          {(server.transportType === 'sse' || server.transportType === 'http') &&
+                            server.url && (
+                              <>
+                                <span className="shrink-0">·</span>
+                                <span className="truncate min-w-0">{server.url}</span>
+                              </>
+                            )}
+                          {registryEntry?.requiredEnvKeys &&
+                            registryEntry.requiredEnvKeys.length > 0 && (
+                              <>
+                                <span className="shrink-0">·</span>
+                                <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                                  {registryEntry.requiredEnvKeys.length} key
+                                  {registryEntry.requiredEnvKeys.length > 1 ? 's' : ''}
+                                </span>
+                              </>
+                            )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
+              <ListPagination
+                page={currentPage}
+                totalPages={totalPages}
+                className="py-4"
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
 
@@ -626,7 +663,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                     {i18nService.t('noMcpServersAvailable')}
                   </div>
                 ) : (
-                  filteredMarketplace.map(entry => (
+                  paginatedMarketplace.map(entry => (
                     <div
                       key={entry.id}
                       className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
@@ -670,19 +707,19 @@ const McpManager: React.FC<McpManagerProps> = ({
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                          {installedRegistryIds.has(entry.id) ? (
-                            <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
-                              {i18nService.t('mcpInstalled')}
-                            </span>
-                          ) : (
-                            <Button
-                              type="button"
-                              onClick={() => handleInstallFromRegistry(entry)}
-                              className="h-7 px-2.5 text-xs"
-                            >
-                              {i18nService.t('mcpInstall')}
-                            </Button>
-                          )}
+                        {installedRegistryIds.has(entry.id) ? (
+                          <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
+                            {i18nService.t('mcpInstalled')}
+                          </span>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={() => handleInstallFromRegistry(entry)}
+                            className="h-7 px-2.5 text-xs"
+                          >
+                            {i18nService.t('mcpInstall')}
+                          </Button>
+                        )}
                       </div>
                       <div className="hidden">
                         <span
@@ -708,103 +745,117 @@ const McpManager: React.FC<McpManagerProps> = ({
                   ))
                 )}
               </div>
+              <ListPagination
+                page={currentPage}
+                totalPages={totalPages}
+                className="py-4"
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
 
           {/* ── Tab: Custom ─────────────────────────────────── */}
           {activeTab === McpTabValue.Custom && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {filteredCustom.length === 0 ? (
-                <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
-                  <Plug className="size-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">{i18nService.t('mcpCustom')}</p>
-                  <Button type="button" size="sm" onClick={handleOpenCreateForm}>
-                    <Plus data-icon="inline-start" />
-                    {i18nService.t('addMcpServer')}
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleOpenCreateForm}
-                    className="h-auto min-h-32 border-dashed text-muted-foreground"
-                  >
-                    <Plus data-icon="inline-start" />
-                    {i18nService.t('addMcpServer')}
-                  </Button>
-                  {filteredCustom.map(server => (
-                    <div
-                      key={server.id}
-                      className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+            <div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {filteredCustom.length === 0 ? (
+                  <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
+                    <Plug className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{i18nService.t('mcpCustom')}</p>
+                    <Button type="button" size="sm" onClick={handleOpenCreateForm}>
+                      <Plus data-icon="inline-start" />
+                      {i18nService.t('addMcpServer')}
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenCreateForm}
+                      className="h-auto min-h-32 border-dashed text-muted-foreground"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
-                            <Plug className="h-4 w-4 text-muted-foreground" />
+                      <Plus data-icon="inline-start" />
+                      {i18nService.t('addMcpServer')}
+                    </Button>
+                    {paginatedCustom.map(server => (
+                      <div
+                        key={server.id}
+                        className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                              <Plug className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <span className="text-sm font-medium text-foreground truncate">
+                              {server.name}
+                            </span>
                           </div>
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {server.name}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenEditForm(server)}
+                              className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
+                              title={i18nService.t('editMcpServer')}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRequestDelete(server)}
+                              className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                              title={i18nService.t('deleteMcpServer')}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Switch
+                              checked={server.enabled}
+                              onCheckedChange={() => handleToggleEnabled(server.id)}
+                            />
+                          </div>
+                        </div>
+
+                        <ClampedText
+                          text={server.description || getTransportSummary(server)}
+                          className="text-xs text-muted-foreground mb-2"
+                        />
+
+                        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                          <span
+                            className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
+                          >
+                            {server.transportType}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenEditForm(server)}
-                            className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
-                            title={i18nService.t('editMcpServer')}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRequestDelete(server)}
-                            className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
-                            title={i18nService.t('deleteMcpServer')}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Switch
-                            checked={server.enabled}
-                            onCheckedChange={() => handleToggleEnabled(server.id)}
-                          />
-                        </div>
-                      </div>
-
-                      <ClampedText
-                        text={server.description || getTransportSummary(server)}
-                        className="text-xs text-muted-foreground mb-2"
-                      />
-
-                      <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                        <span
-                          className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${TRANSPORT_BADGE_COLORS[server.transportType] || ''}`}
-                        >
-                          {server.transportType}
-                        </span>
-                        {server.transportType === 'stdio' && server.command && (
-                          <>
-                            <span className="shrink-0">·</span>
-                            <span className="truncate min-w-0">{server.command}</span>
-                          </>
-                        )}
-                        {(server.transportType === 'sse' || server.transportType === 'http') &&
-                          server.url && (
+                          {server.transportType === 'stdio' && server.command && (
                             <>
                               <span className="shrink-0">·</span>
-                              <span className="truncate min-w-0">{server.url}</span>
+                              <span className="truncate min-w-0">{server.command}</span>
                             </>
                           )}
+                          {(server.transportType === 'sse' || server.transportType === 'http') &&
+                            server.url && (
+                              <>
+                                <span className="shrink-0">·</span>
+                                <span className="truncate min-w-0">{server.url}</span>
+                              </>
+                            )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </>
-              )}
+                    ))}
+                  </>
+                )}
+              </div>
+              <ListPagination
+                page={currentPage}
+                totalPages={totalPages}
+                className="py-4"
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </div>
