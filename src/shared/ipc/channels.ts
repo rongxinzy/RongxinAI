@@ -75,6 +75,7 @@ export type EnterpriseIpc = (typeof EnterpriseIpc)[keyof typeof EnterpriseIpc];
 // ─── API (HTTP proxy) ───────────────────────────────────────────────────────
 export const ApiIpc = {
   Fetch: 'api:fetch',
+  WebSearch: 'api:web-search',
   Stream: 'api:stream',
   CancelStream: 'api:stream:cancel',
   /** Dynamic: `api:stream:${requestId}:data` */

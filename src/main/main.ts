@@ -38,12 +38,18 @@ import {
   type CoworkSessionExpertInput,
   CoworkSessionExpertSource,
 } from '../shared/cowork/sessionExperts';
-import { CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
-import { ApiFetchSchema, ApiStreamSchema, CoworkSessionStartSchema } from '../shared/ipc/schemas';
+import { ApiIpc, CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
+import {
+  ApiFetchSchema,
+  ApiStreamSchema,
+  CoworkSessionStartSchema,
+} from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
+import { searchAnySearchGateway } from './libs/anysearchGateway';
+import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './libs/anysearchGatewayCredentials';
 import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { applyCoworkLanguagePrompt, type CoworkPromptLanguage } from './coworkLanguagePrompt';
@@ -933,6 +939,10 @@ let piRuntimeAdapter: PiRuntimeAdapter | null = null;
 
 const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
   if (!piRuntimeAdapter) {
+    // Pi shell tools inherit the main-process environment. Keep the gateway
+    // credential here so installed builds work without user configuration.
+    process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = resolveAnySearchGatewayToken();
+    process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
     // Pi SDK resolves API keys from environment variables (ANTHROPIC_API_KEY etc.).
     // Inject keys from ZhiYuanAgent's provider configuration before initializing Pi.
     const keys = resolveAllProviderApiKeys();
@@ -6396,6 +6406,24 @@ if (!gotTheLock) {
   };
 
   // API 代理处理程序 - 解决 CORS 问题
+  ipcMain.handle(ApiIpc.WebSearch, async (_event, rawInput: unknown) => {
+    const input =
+      rawInput && typeof rawInput === 'object' ? (rawInput as Record<string, unknown>) : {};
+    const requestId = typeof input.requestId === 'string' ? input.requestId : null;
+    const controller = new AbortController();
+    if (requestId) activeStreamControllers.set(requestId, controller);
+    try {
+      const data = await searchAnySearchGateway(input, controller.signal);
+      return { ok: true, data };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Search unavailable.' };
+    } finally {
+      if (requestId && activeStreamControllers.get(requestId) === controller) {
+        activeStreamControllers.delete(requestId);
+      }
+    }
+  });
+
   ipcMain.handle('api:fetch', async (_event, rawOptions: unknown) => {
     const options = ApiFetchSchema.input.parse(rawOptions);
     console.log(

@@ -509,6 +509,751 @@ class ApiService {
     }
   }
 
+  /** Native provider tool loop; the gateway credential stays in the main process. */
+  async chatWithWebSearch(
+    message: string,
+    onProgress?: (content: string, reasoning?: string) => void,
+    history: ChatMessagePayload[] = [],
+    options: DirectChatRequestOptions = {},
+    requestId: string = generateRequestId(),
+    abortSignal?: AbortSignal,
+  ): Promise<{ content: string; reasoning?: string }> {
+    if (!this.config) {
+      throw new ApiError(
+        'API configuration not set. Please configure your API settings in the settings menu.',
+      );
+    }
+    const modelState = store.getState().model;
+    const requestedModelId = options.modelId?.trim();
+    const selectedModel = requestedModelId
+      ? (modelState.availableModels.find(
+          model =>
+            model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId,
+        ) ?? modelState.defaultSelectedModel)
+      : modelState.defaultSelectedModel;
+    const provider = this.detectProvider(
+      selectedModel.id,
+      selectedModel.providerKey ?? selectedModel.provider,
+    );
+    const config = this.getProviderConfig(provider) ?? this.config;
+    if (this.providerRequiresApiKey(provider) && !config.apiKey) {
+      throw new ApiError(
+        'API key is not configured. Please set your API key in the settings menu.',
+      );
+    }
+    const prompt =
+      'Use the web_search tool when current, factual, or external information would improve the answer. Cite result URLs when you use search.';
+    const system = [
+      prompt,
+      ...history.filter(item => item.role === 'system').map(item => item.content),
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const apiFormat = this.normalizeApiFormat(config.apiFormat);
+    const userMessage: ChatMessagePayload = { role: 'user', content: message };
+
+    if (apiFormat === 'anthropic') {
+      const messages = [...history.filter(item => item.role !== 'system'), userMessage]
+        .map(item => this.formatAnthropicMessage(item, !!selectedModel.supportsImage))
+        .filter(Boolean) as any[];
+      return this.runAnthropicWebSearchLoop(
+        messages,
+        system,
+        selectedModel.id,
+        config,
+        onProgress,
+        requestId,
+        abortSignal,
+      );
+    }
+    if (apiFormat === 'gemini') {
+      const contents = [...history.filter(item => item.role !== 'system'), userMessage].map(item => ({
+        role: item.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: item.content }],
+      }));
+      return this.runGeminiWebSearchLoop(
+        contents,
+        system,
+        selectedModel.id,
+        config,
+        onProgress,
+        requestId,
+        abortSignal,
+      );
+    }
+    if (this.shouldUseOpenAIResponsesApi(provider)) {
+      const input = [...history.filter(item => item.role !== 'system'), userMessage]
+        .map(item => this.formatOpenAIResponsesInputMessage(item, !!selectedModel.supportsImage))
+        .filter(Boolean) as any[];
+      return this.runOpenAIResponsesWebSearchLoop(
+        input,
+        system,
+        selectedModel.id,
+        config,
+        onProgress,
+        requestId,
+        abortSignal,
+      );
+    }
+    const messages = [
+      { role: 'system', content: system },
+      ...history
+        .filter(item => item.role !== 'system')
+        .map(item => this.formatOpenAIMessage(item, !!selectedModel.supportsImage))
+        .filter(Boolean),
+      { role: 'user', content: message },
+    ];
+    return this.runOpenAIWebSearchLoop(
+      messages,
+      selectedModel.id,
+      config,
+      provider,
+      onProgress,
+      requestId,
+      abortSignal,
+    );
+  }
+
+  private throwIfAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) throw new DOMException('The request was aborted.', 'AbortError');
+  }
+
+  private async consumeSse(
+    url: string,
+    headers: Record<string, string>,
+    body: unknown,
+    requestId: string,
+    onEvent: (event: any) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<void> {
+    this.throwIfAborted(abortSignal);
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let buffer = '';
+
+      const settle = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        this.cleanup(requestId);
+        if (error) reject(error);
+        else resolve();
+      };
+      const parseBuffer = (flush = false) => {
+        const lines = buffer.split('\n');
+        buffer = flush ? '' : (lines.pop() ?? '');
+        for (const rawLine of lines) {
+          const line = rawLine.replace(/\r$/, '');
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            onEvent(JSON.parse(data));
+          } catch {
+            // Ignore keepalives and provider-specific non-JSON SSE frames.
+          }
+        }
+      };
+
+      const removeData = window.electron.api.onStreamData(requestId, chunk => {
+        buffer += chunk;
+        parseBuffer();
+      });
+      const removeDone = window.electron.api.onStreamDone(requestId, () => {
+        parseBuffer(true);
+        settle();
+      });
+      const removeError = window.electron.api.onStreamError(requestId, error => {
+        settle(new ApiError(typeof error === 'string' ? error : error.message));
+      });
+      const removeAbort = window.electron.api.onStreamAbort(requestId, () => {
+        settle(new DOMException('The request was aborted.', 'AbortError'));
+      });
+      const handleSignalAbort = () => {
+        void window.electron.api.cancelStream(requestId);
+        settle(new DOMException('The request was aborted.', 'AbortError'));
+      };
+      abortSignal?.addEventListener('abort', handleSignalAbort, { once: true });
+      const removeSignalAbort = () =>
+        abortSignal?.removeEventListener('abort', handleSignalAbort);
+      this.streamRequests.register(requestId, [
+        removeData,
+        removeDone,
+        removeError,
+        removeAbort,
+        removeSignalAbort,
+      ]);
+
+      if (abortSignal?.aborted) {
+        handleSignalAbort();
+        return;
+      }
+      window.electron.api
+        .stream({
+          url,
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          requestId,
+        })
+        .then(response => {
+          if (!response.ok) {
+            settle(new ApiError(response.error || response.statusText, response.status));
+          }
+        })
+        .catch(error => {
+          settle(error instanceof Error ? error : new Error(String(error)));
+        });
+    });
+  }
+
+  private async streamOpenAIChatResponse(
+    url: string,
+    headers: Record<string, string>,
+    body: Record<string, unknown>,
+    requestId: string,
+    onProgress?: (content: string, reasoning?: string) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<any> {
+    let content = '';
+    let reasoning = '';
+    const calls = new Map<number, { id: string; name: string; arguments: string }>();
+    await this.consumeSse(
+      url,
+      headers,
+      { ...body, stream: true },
+      requestId,
+      event => {
+        const delta = event?.choices?.[0]?.delta;
+        if (!delta) return;
+        if (typeof delta.content === 'string') content += delta.content;
+        const reasoningDelta =
+          typeof delta.reasoning_content === 'string'
+            ? delta.reasoning_content
+            : typeof delta.reasoning === 'string'
+              ? delta.reasoning
+              : '';
+        reasoning += reasoningDelta;
+        if (delta.content || reasoningDelta) onProgress?.(content, reasoning || undefined);
+        if (Array.isArray(delta.tool_calls)) {
+          delta.tool_calls.forEach((toolCall: any) => {
+            const index = typeof toolCall.index === 'number' ? toolCall.index : calls.size;
+            const current = calls.get(index) || { id: '', name: '', arguments: '' };
+            if (toolCall.id) current.id = toolCall.id;
+            if (toolCall.function?.name) current.name = toolCall.function.name;
+            if (toolCall.function?.arguments) {
+              current.arguments += toolCall.function.arguments;
+            }
+            calls.set(index, current);
+          });
+        }
+      },
+      abortSignal,
+    );
+    return {
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: content || null,
+            ...(calls.size
+              ? {
+                  tool_calls: [...calls.values()].map(call => ({
+                    id: call.id,
+                    type: 'function',
+                    function: { name: call.name, arguments: call.arguments },
+                  })),
+                }
+              : {}),
+          },
+        },
+      ],
+    };
+  }
+
+  private async streamOpenAIResponsesResponse(
+    url: string,
+    headers: Record<string, string>,
+    body: Record<string, unknown>,
+    requestId: string,
+    onProgress?: (content: string, reasoning?: string) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<any> {
+    let content = '';
+    let reasoning = '';
+    let completedOutput: any[] | null = null;
+    const output = new Map<number, any>();
+    await this.consumeSse(
+      url,
+      headers,
+      { ...body, stream: true },
+      requestId,
+      event => {
+        const type = event?.type;
+        if (type === 'response.output_text.delta' && typeof event.delta === 'string') {
+          content += event.delta;
+          onProgress?.(content, reasoning || undefined);
+        } else if (
+          type === 'response.reasoning_summary_text.delta' &&
+          typeof event.delta === 'string'
+        ) {
+          reasoning += event.delta;
+          onProgress?.(content, reasoning);
+        } else if (type === 'response.output_item.added' && event.item) {
+          output.set(event.output_index ?? output.size, { ...event.item });
+        } else if (
+          type === 'response.function_call_arguments.delta' &&
+          typeof event.delta === 'string'
+        ) {
+          const index = event.output_index ?? 0;
+          const item = output.get(index) || {
+            type: 'function_call',
+            arguments: '',
+          };
+          item.arguments = `${item.arguments || ''}${event.delta}`;
+          output.set(index, item);
+        } else if (type === 'response.output_item.done' && event.item) {
+          output.set(event.output_index ?? output.size, event.item);
+        } else if (type === 'response.completed' && Array.isArray(event.response?.output)) {
+          completedOutput = event.response.output;
+        }
+      },
+      abortSignal,
+    );
+    return {
+      output_text: content,
+      output: completedOutput || [...output.entries()].sort(([a], [b]) => a - b).map(([, item]) => item),
+    };
+  }
+
+  private async streamAnthropicResponse(
+    url: string,
+    headers: Record<string, string>,
+    body: Record<string, unknown>,
+    requestId: string,
+    onProgress?: (content: string, reasoning?: string) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<any> {
+    const blocks = new Map<number, any>();
+    let text = '';
+    let reasoning = '';
+    await this.consumeSse(
+      url,
+      headers,
+      { ...body, stream: true },
+      requestId,
+      event => {
+        const index = typeof event?.index === 'number' ? event.index : 0;
+        if (event?.type === 'content_block_start' && event.content_block) {
+          blocks.set(index, { ...event.content_block });
+        } else if (event?.type === 'content_block_delta') {
+          const block = blocks.get(index) || {};
+          if (event.delta?.type === 'text_delta' && typeof event.delta.text === 'string') {
+            block.type = 'text';
+            block.text = `${block.text || ''}${event.delta.text}`;
+            text += event.delta.text;
+            onProgress?.(text, reasoning || undefined);
+          } else if (
+            event.delta?.type === 'thinking_delta' &&
+            typeof event.delta.thinking === 'string'
+          ) {
+            reasoning += event.delta.thinking;
+            onProgress?.(text, reasoning);
+          } else if (
+            event.delta?.type === 'input_json_delta' &&
+            typeof event.delta.partial_json === 'string'
+          ) {
+            block.inputJson = `${block.inputJson || ''}${event.delta.partial_json}`;
+          }
+          blocks.set(index, block);
+        }
+      },
+      abortSignal,
+    );
+    const content = [...blocks.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, block]) => {
+        if (block.type !== 'tool_use') return block;
+        let input = {};
+        try {
+          input = block.inputJson ? JSON.parse(block.inputJson) : block.input || {};
+        } catch {
+          input = {};
+        }
+        return { ...block, input };
+      });
+    return { content };
+  }
+
+  private async streamGeminiResponse(
+    url: string,
+    headers: Record<string, string>,
+    body: Record<string, unknown>,
+    requestId: string,
+    onProgress?: (content: string) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<any> {
+    let text = '';
+    const functionCalls: any[] = [];
+    await this.consumeSse(
+      `${url}?alt=sse`,
+      headers,
+      body,
+      requestId,
+      event => {
+        const parts = event?.candidates?.[0]?.content?.parts;
+        if (!Array.isArray(parts)) return;
+        parts.forEach((part: any) => {
+          if (typeof part.text === 'string') {
+            text += part.text;
+            onProgress?.(text);
+          }
+          if (part.functionCall) functionCalls.push(part);
+        });
+      },
+      abortSignal,
+    );
+    return {
+      candidates: [
+        {
+          content: {
+            role: 'model',
+            parts: [...(text ? [{ text }] : []), ...functionCalls],
+          },
+        },
+      ],
+    };
+  }
+
+  private async executeWebSearch(
+    call: { query?: unknown; max_results?: unknown },
+    requestId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<unknown> {
+    this.throwIfAborted(abortSignal);
+    const response = await window.electron.api.webSearch({
+      query: typeof call.query === 'string' ? call.query : '',
+      ...(typeof call.max_results === 'number' ? { maxResults: call.max_results } : {}),
+      requestId,
+    });
+    this.throwIfAborted(abortSignal);
+    return response.ok
+      ? response.data
+      : { error: response.error || 'Search is temporarily unavailable.' };
+  }
+
+  private webSearchTool() {
+    return {
+      name: 'web_search',
+      description:
+        'Search the public web for up-to-date information. Returns titles, URLs, and short extracts.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Precise search query.' },
+          max_results: { type: 'integer', minimum: 1, maximum: 10 },
+        },
+        required: ['query'],
+        additionalProperties: false,
+      },
+    };
+  }
+
+  private async executeSearchCalls(
+    calls: Array<{ args: { query?: unknown; max_results?: unknown } }>,
+    requestId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<unknown[]> {
+    const results: unknown[] = [];
+    for (let index = 0; index < calls.length; index += 1) {
+      results.push(
+        index < 3
+          ? await this.executeWebSearch(calls[index].args, requestId, abortSignal)
+          : { error: 'Only three web_search calls are allowed per model turn.' },
+      );
+    }
+    return results;
+  }
+
+  private async runOpenAIResponsesWebSearchLoop(
+    input: any[],
+    instructions: string,
+    model: string,
+    config: ApiConfig,
+    onProgress: ((content: string) => void) | undefined,
+    requestId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<{ content: string }> {
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.apiKey}`,
+    };
+    const tool = this.webSearchTool();
+    for (let turn = 0; turn < 4; turn += 1) {
+      const data = await this.streamOpenAIResponsesResponse(
+        this.buildOpenAIResponsesUrl(config.baseUrl),
+        headers,
+        {
+          model,
+          input,
+          instructions,
+          tools: [{ type: 'function', ...tool, strict: true }],
+        },
+        requestId,
+        onProgress,
+        abortSignal,
+      );
+      const output = Array.isArray(data?.output) ? data.output : [];
+      const functionCalls = output.filter(
+        (item: any) => item?.type === 'function_call' && item.name === 'web_search',
+      );
+      if (!functionCalls.length) {
+        const content = this.extractResponsesOutputText(data);
+        onProgress?.(content);
+        return { content };
+      }
+      input.push(...output);
+      const parsedCalls = functionCalls.map((call: any) => {
+        let args = {};
+        try {
+          args = JSON.parse(call.arguments || '{}');
+        } catch {
+          args = {};
+        }
+        return { args };
+      });
+      const results = await this.executeSearchCalls(parsedCalls, requestId, abortSignal);
+      functionCalls.forEach((call: any, index: number) => {
+        input.push({
+          type: 'function_call_output',
+          call_id: call.call_id,
+          output: JSON.stringify(results[index]),
+        });
+      });
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
+  private async runOpenAIWebSearchLoop(
+    messages: any[],
+    model: string,
+    config: ApiConfig,
+    provider: string,
+    onProgress: ((content: string) => void) | undefined,
+    requestId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<{ content: string }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+    };
+    if (provider === ProviderName.Copilot) {
+      headers['Copilot-Integration-Id'] = 'vscode-chat';
+      headers['Editor-Version'] = 'vscode/1.96.2';
+      headers['Editor-Plugin-Version'] = 'copilot-chat/0.26.7';
+      headers['User-Agent'] = 'GitHubCopilotChat/0.26.7';
+      headers['Openai-Intent'] = 'conversation-panel';
+    }
+    for (let turn = 0; turn < 4; turn += 1) {
+      let data: any;
+      let attempt = 0;
+      while (true) {
+        try {
+          data = await this.streamOpenAIChatResponse(
+            this.buildOpenAICompatibleChatCompletionsUrl(config.baseUrl),
+            headers,
+            {
+              model,
+              messages,
+              tools: [{ type: 'function', function: this.webSearchTool() }],
+              tool_choice: 'auto',
+            },
+            requestId,
+            onProgress,
+            abortSignal,
+          );
+          break;
+        } catch (error) {
+          if (
+            provider !== ProviderName.LlamaCpp ||
+            !(error instanceof ApiError) ||
+            !shouldRetryLocalInferenceSlot(error) ||
+            attempt >= LOCAL_INFERENCE_SLOT_RETRY_DELAYS_MS.length
+          ) {
+            throw error;
+          }
+          await waitForLocalInferenceSlot(LOCAL_INFERENCE_SLOT_RETRY_DELAYS_MS[attempt]);
+          this.throwIfAborted(abortSignal);
+          attempt += 1;
+        }
+      }
+      const assistant = data?.choices?.[0]?.message;
+      if (!assistant) {
+        throw new ApiError('No content received from the API. Please try again.');
+      }
+      const calls = Array.isArray(assistant.tool_calls)
+        ? assistant.tool_calls.filter((call: any) => call?.function?.name === 'web_search')
+        : [];
+      messages.push(assistant);
+      if (!calls.length) {
+        const content = typeof assistant.content === 'string' ? assistant.content : '';
+        onProgress?.(content);
+        return { content };
+      }
+      const parsedCalls = calls.map((call: any) => {
+        let args = {};
+        try {
+          args = JSON.parse(call.function.arguments || '{}');
+        } catch {
+          args = {};
+        }
+        return { args };
+      });
+      const results = await this.executeSearchCalls(parsedCalls, requestId, abortSignal);
+      calls.forEach((call: any, index: number) => {
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: JSON.stringify(results[index]),
+        });
+      });
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
+  private async runAnthropicWebSearchLoop(
+    messages: any[],
+    system: string,
+    model: string,
+    config: ApiConfig,
+    onProgress: ((content: string) => void) | undefined,
+    requestId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<{ content: string }> {
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': config.apiKey,
+      'anthropic-version': '2023-06-01',
+    };
+    for (let turn = 0; turn < 4; turn += 1) {
+      const tool = this.webSearchTool();
+      const data = await this.streamAnthropicResponse(
+        `${config.baseUrl.trim().replace(/\/+$/, '')}/v1/messages`,
+        headers,
+        {
+          model,
+          max_tokens: 8192,
+          system,
+          messages,
+          tools: [
+            {
+              name: tool.name,
+              description: tool.description,
+              input_schema: tool.parameters,
+            },
+          ],
+        },
+        requestId,
+        onProgress,
+        abortSignal,
+      );
+      const content = Array.isArray(data?.content) ? data.content : [];
+      const calls = content.filter(
+        (block: any) => block?.type === 'tool_use' && block.name === 'web_search',
+      );
+      if (!calls.length) {
+        const text = content
+          .filter((block: any) => block?.type === 'text')
+          .map((block: any) => block.text)
+          .join('');
+        onProgress?.(text);
+        return { content: text };
+      }
+      messages.push({ role: 'assistant', content });
+      const results = await this.executeSearchCalls(
+        calls.map((call: any) => ({ args: call.input || {} })),
+        requestId,
+        abortSignal,
+      );
+      messages.push({
+        role: 'user',
+        content: calls.map((call: any, index: number) => ({
+          type: 'tool_result',
+          tool_use_id: call.id,
+          content: JSON.stringify(results[index]),
+        })),
+      });
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
+  private async runGeminiWebSearchLoop(
+    contents: any[],
+    system: string,
+    model: string,
+    config: ApiConfig,
+    onProgress: ((content: string) => void) | undefined,
+    requestId: string,
+    abortSignal?: AbortSignal,
+  ): Promise<{ content: string }> {
+    const baseUrl =
+      config.baseUrl.trim().replace(/\/+$/, '') ||
+      'https://generativelanguage.googleapis.com/v1beta';
+    const tool = this.webSearchTool();
+    for (let turn = 0; turn < 4; turn += 1) {
+      const data = await this.streamGeminiResponse(
+        `${baseUrl}/models/${model}:streamGenerateContent`,
+        {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': config.apiKey,
+        },
+        {
+          contents,
+          systemInstruction: { parts: [{ text: system }] },
+          tools: [
+            {
+              functionDeclarations: [
+                {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.parameters,
+                },
+              ],
+            },
+          ],
+          generationConfig: { maxOutputTokens: 8192 },
+        },
+        requestId,
+        onProgress,
+        abortSignal,
+      );
+      const content = data?.candidates?.[0]?.content;
+      const calls = Array.isArray(content?.parts)
+        ? content.parts.filter((part: any) => part.functionCall?.name === 'web_search')
+        : [];
+      if (!calls.length) {
+        const text = (content?.parts || [])
+          .filter((part: any) => typeof part.text === 'string')
+          .map((part: any) => part.text)
+          .join('');
+        onProgress?.(text);
+        return { content: text };
+      }
+      contents.push(content);
+      const results = await this.executeSearchCalls(
+        calls.map((part: any) => ({ args: part.functionCall.args || {} })),
+        requestId,
+        abortSignal,
+      );
+      contents.push({
+        role: 'user',
+        parts: calls.map((_part: any, index: number) => ({
+          functionResponse: { name: 'web_search', response: results[index] },
+        })),
+      });
+    }
+    throw new ApiError('Search tool call limit reached.');
+  }
+
   // Anthropic API 调用
   private async chatWithAnthropic(
     message: ChatUserMessageInput,

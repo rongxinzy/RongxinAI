@@ -244,6 +244,9 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   api: {
+    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) =>
+      ipcRenderer.invoke(ApiIpc.WebSearch, input),
+
     fetch: (options: {
       url: string;
       method: string;
