@@ -1,0 +1,5 @@
+name: Word 文档处理
+description: 创建、编辑、分析和校验 Word 文档，支持中文排版、模板应用和修订。
+author: MiniMax
+license: MIT
+skillmd: ./SKILL.md
