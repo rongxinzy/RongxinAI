@@ -8,9 +8,9 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import { Spinner } from '@shared/components/ui/spinner';
-import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { cn } from '@shared/lib/utils';
 import { CalendarClock, PanelLeft, Pencil } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
@@ -41,6 +41,8 @@ const AUTO_TAB = {
 
 type AutoTab = (typeof AUTO_TAB)[keyof typeof AUTO_TAB];
 
+const AUTO_TAB_ORDER: AutoTab[] = [AUTO_TAB.Create, AUTO_TAB.Tasks, AUTO_TAB.History];
+
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -57,6 +59,31 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
   const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
   const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
+
+  // Directional pane slide: track previous tab to know which way to slide.
+  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Tasks));
+  const tabDir =
+    AUTO_TAB_ORDER.indexOf(activeTab) >= prevTabIndexRef.current ? 'right' : 'left';
+  prevTabIndexRef.current = AUTO_TAB_ORDER.indexOf(activeTab);
+
+  // Sliding underline indicator: measure the active tab button and translate a single bar.
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const tabRowRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const update = () => {
+      const el = tabRefs.current[activeTab];
+      if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (tabRowRef.current) ro.observe(tabRowRef.current);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [activeTab, tasks.length]);
 
   // Create-task modal (template-prefilled or blank custom)
   const [createOpen, setCreateOpen] = useState(false);
@@ -188,36 +215,56 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             </div>
           </section>
 
-          {/* ── Tab list on the divider line ── */}
-          <div className="border-b border-border">
-            <Tabs
-              value={activeTab}
-              onValueChange={value => setActiveTab(value as AutoTab)}
-              className="-mb-px self-start"
-            >
-              <TabsList variant="line">
-                <TabsTrigger
-                  value={AUTO_TAB.Create}
-                  className="after:bottom-[-1px] after:h-1"
-                >
-                  {i18nService.t('scheduledTasksNewTab')}
-                </TabsTrigger>
-                <TabsTrigger value={AUTO_TAB.Tasks} className="after:bottom-[-1px] after:h-1">
-                  {i18nService.t('scheduledTasksTabTasks')}
-                  {tasks.length > 0 ? <Badge variant="secondary">{tasks.length}</Badge> : null}
-                </TabsTrigger>
-                <TabsTrigger
-                  value={AUTO_TAB.History}
-                  className="after:bottom-[-1px] after:h-1"
-                >
-                  {i18nService.t('scheduledTasksTabHistory')}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          {/* ── Tab list on the divider line, with a sliding underline ── */}
+          <div className="relative border-b border-border">
+            <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
+              {([
+                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
+                { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
+                { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
+              ] as const).map(tab => {
+                const active = activeTab === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    ref={el => {
+                      tabRefs.current[tab.value] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setActiveTab(tab.value)}
+                    className={cn(
+                      'relative -mb-px flex items-center gap-2 border-b-2 border-transparent pb-2.5 text-sm font-medium outline-none transition-colors focus-visible:text-foreground',
+                      active
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {tab.label}
+                    {tab.value === AUTO_TAB.Tasks && tasks.length > 0 && (
+                      <Badge variant="secondary">{tasks.length}</Badge>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <span
+              aria-hidden
+              className="absolute bottom-0 h-0.5 rounded-full bg-primary transition-[left,width] duration-300 ease-smooth"
+              style={{
+                left: indicator?.left ?? 0,
+                width: indicator?.width ?? 0,
+                opacity: indicator ? 1 : 0,
+              }}
+            />
           </div>
 
-          {/* ── Active pane ── */}
-          <div key={activeTab} className="animate-fade-in pt-6">
+          {/* ── Active pane (directional slide) ── */}
+          <div
+            key={`${activeTab}-${tabDir}`}
+            className={cn('pt-6', tabDir === 'right' ? 'animate-slide-in-right' : 'animate-slide-in-left')}
+          >
             {activeTab === AUTO_TAB.Create && (
               <TaskTemplateGallery
                 onSelectTemplate={values => openCreateModal(values)}
