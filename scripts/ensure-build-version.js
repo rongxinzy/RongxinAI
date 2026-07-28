@@ -13,15 +13,22 @@ const fs = require('fs');
 const path = require('path');
 
 const version = process.env.APP_BUILD_VERSION;
-if (!version) {
-  process.exit(0);
-}
+const variant = process.env.RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE;
+if (!version && !variant) process.exit(0);
 
 const pkgPath = path.join(__dirname, '..', 'package.json');
 let content = fs.readFileSync(pkgPath, 'utf8');
 
-// Replace only the first top-level "version" field
-content = content.replace(/("version"\s*:\s*)"[^"]+"/, `$1"${version}"`);
+// Replace only the first top-level "version" field.
+if (version) content = content.replace(/("version"\s*:\s*)"[^"]+"/, `$1"${version}"`);
+
+if (variant === 'lite' || variant === 'full') {
+  if (/"zhiyuanUpdateVariant"\s*:/.test(content)) {
+    content = content.replace(/("zhiyuanUpdateVariant"\s*:\s*)"[^"]+"/, `$1"${variant}"`);
+  } else {
+    content = content.replace(/("version"\s*:\s*"[^"]+",\n)/, `$1  "zhiyuanUpdateVariant": "${variant}",\n`);
+  }
+}
 fs.writeFileSync(pkgPath, content, 'utf8');
 
-console.log(`[ensure-build-version] Patched version to: ${version}`);
+console.log(`[ensure-build-version] Patched version=${version || 'unchanged'}, variant=${variant || 'unchanged'}`);

@@ -34,10 +34,10 @@ const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   const updateInfo = updateState.info;
   if (!updateInfo) return null;
 
-  const { latestVersion, date, changeLog, url } = updateInfo;
+  const { latestVersion, date, changeLog, manualDownload } = updateInfo;
   const lang = i18nService.getLanguage();
   const currentLog = changeLog?.[lang] ?? { title: '', content: [] };
-  const isManualUrl = url.includes('#') || url.endsWith('/download-list');
+  const isManualUrl = manualDownload;
   const isInstalling = updateState.status === AppUpdateStatus.Installing;
   const canDismiss = updateState.status !== AppUpdateStatus.Downloading && !isInstalling;
   const canInstall =

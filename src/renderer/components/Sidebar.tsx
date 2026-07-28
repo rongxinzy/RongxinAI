@@ -49,7 +49,7 @@ interface SidebarProps {
   onNewChat: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  updateBadge?: React.ReactNode;
+  updateEntry?: React.ReactNode;
   hideLogin?: boolean;
 }
 
@@ -72,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNewChat,
   isCollapsed,
   onToggleCollapse,
-  updateBadge,
+  updateEntry,
   hideLogin,
 }) => {
   const dispatch = useDispatch();
@@ -345,7 +345,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
               <img src="zhiyuan-logo-light.svg" alt="知远" className="logo-light h-5 w-auto select-none" />
               <img src="zhiyuan-logo-dark.svg" alt="知远" className="logo-dark h-5 w-auto select-none" />
-              {updateBadge}
             </div>
             <Button
               type="button"
@@ -621,6 +620,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : (
           <div className="space-y-1 px-3 pb-3 pt-1">
+            {updateEntry}
             <div className="flex items-center gap-1">
               {!hideLogin && (
                 <div className="flex-1 min-w-0">

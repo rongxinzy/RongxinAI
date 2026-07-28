@@ -1,0 +1,91 @@
+name: Publish online update
+
+on:
+  push:
+    branches: [release]
+
+concurrency:
+  group: zhiyuan-online-update-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        run: echo "version=$(date -u +%Y.%-m.%-d)-build.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+  build-windows-lite:
+    needs: prepare-release
+    runs-on: windows-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.x' }
+      - run: npm install
+      - run: npm run setup:python-runtime
+        env: { ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }} }
+      - run: npm run dist:win:lite
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - uses: actions/upload-artifact@v4
+        with: { name: win32-x64-lite, path: 'release/*.exe' }
+
+  build-macos-arm64:
+    needs: prepare-release
+    runs-on: macos-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.x' }
+      - run: npm install
+      - run: node scripts/ensure-build-version.js && npm run dist:mac
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - uses: actions/upload-artifact@v4
+        with: { name: darwin-arm64-default, path: 'release/*.dmg' }
+
+  publish:
+    needs: [prepare-release, build-windows-lite, build-macos-arm64]
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.x' }
+      - name: Install AWS CLI
+        run: pipx install awscli
+      - name: Create signed manifest
+        run: node scripts/release/publish-update-manifest.mjs manifest/stable.json "${{ needs.prepare-release.outputs.version }}" "$GITHUB_SHA" "$(find artifacts/win32-x64-lite -name '*.exe' -print -quit):win32:x64:lite" "$(find artifacts/darwin-arm64-default -name '*.dmg' -print -quit):darwin:arm64:default"
+        env:
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
+      - name: Upload immutable artifacts then atomically publish manifest
+        run: |
+          aws s3 cp "$(find artifacts/win32-x64-lite -name '*.exe' -print -quit)" "s3://zhiyuan-releases/releases/${{ needs.prepare-release.outputs.version }}/win32-x64-lite/" --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp "$(find artifacts/darwin-arm64-default -name '*.dmg' -print -quit)" "s3://zhiyuan-releases/releases/${{ needs.prepare-release.outputs.version }}/darwin-arm64-default/" --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp manifest/stable.json s3://zhiyuan-releases/channels/stable.json --cache-control no-store
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Smoke test Update Worker
+        run: |
+          curl --fail --silent --show-error 'https://updates.rongxzyai.com/v1/updates/latest?channel=stable&platform=win32&arch=x64&variant=lite' | jq -e '.algorithm == "Ed25519"'
