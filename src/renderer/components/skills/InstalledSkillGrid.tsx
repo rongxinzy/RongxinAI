@@ -58,7 +58,7 @@ export function InstalledSkillGrid({
               />
             )}
 
-            <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 items-center gap-2">
+            <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 items-center gap-3">
               {batchMode && (
                 <Checkbox
                   className="pointer-events-auto"
@@ -105,7 +105,7 @@ export function InstalledSkillGrid({
 
 function SkillIcon({ skill }: { skill: Skill }) {
   return (
-    <Avatar className="size-10 shrink-0 rounded-xl bg-muted">
+    <Avatar className="size-12 shrink-0 rounded-xl bg-muted">
       {skill.iconUrl && (
         <AvatarImage
           src={resolveSkillIconUrl(skill.iconUrl)}
