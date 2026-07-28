@@ -8,7 +8,7 @@ RongxinAI 前端设计标准。本文件是**项目级约束**：所有新增和
 
 1. **`shadcn`** — shadcn/ui 组件用法、样式规则、表单、组合、图标。项目中 shadcn 组件安装于 `@shared/components/ui/*`。
 2. **`ai-elements`** — Vercel AI Elements 的 AI 原生组件（`Message`、`PromptInput`、`ModelSelector`、`Conversation`、`Suggestion`、`Reasoning`、`Sources` 等）。安装于 `@shared/components/ai-elements/*`。
-3. **`rongxinai-ui-adapter`** — 本项目适配层：文件位置约定、i18n（`t()` 包裹所有用户可见文本）、常量（`as const` 对象定义判别值）、lobster theme 映射表、页面级组件选择矩阵、以及 `--zy-*` ↔ shadcn 语义 token 的对应关系。
+3. **`rongxinai-ui-adapter`** — 本项目适配层：文件位置约定、i18n（`t()` 包裹所有用户可见文本）、常量（`as const` 对象定义判别值）、`--zy-*` 主题映射表、页面级组件选择矩阵、以及 `--zy-*` ↔ shadcn 语义 token 的对应关系。
 
 **使用规则：**
 
@@ -60,6 +60,19 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 边框     | `border` / `border-subtle`                    | 分隔线、控件描边                                       |
 | 强调     | `primary` / `primary-hover` / `primary-muted` | 唯一的品牌强调色，用于主按钮、激活态、链接、focus ring |
 | 状态     | `destructive` / `success` / `warning`         | 仅用于语义状态，不作装饰                               |
+
+### 当前色值参考（Light）
+
+| Token | oklch | 等效 RGB |
+|-------|-------|----------|
+| `--zy-primary` / `--zy-foreground` / `--zy-text-primary` | `oklch(0.366 0.008 253)` | `rgb(60, 63, 67)` |
+| `--zy-text-secondary` / `--zy-text-muted` | `oklch(0.553 0.013 58.071)` | ≈ `rgb(128, 125, 119)` |
+| `--zy-background` | `oklch(1 0 0)` | `#ffffff` |
+| `--zy-surface-raised` | `oklch(0.97 0.001 106.424)` | ≈ `#f5f5f4` |
+| `--zy-border` | `oklch(0.923 0.003 48.717)` | ≈ `#e7e5e4` |
+| `--zy-destructive` | `oklch(0.577 0.245 27.325)` | ≈ `#ef4444` |
+
+> `primary`、`foreground`、`text-primary` 三者同值（`rgb(60,63,67)`，冷灰偏蓝），是 2026-07-28 验收后确定的统一主色。
 
 规则：
 
