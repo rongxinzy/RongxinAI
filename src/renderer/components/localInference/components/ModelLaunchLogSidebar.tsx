@@ -12,10 +12,10 @@ import {
   LlamaCppModelLaunchLogPhase,
 } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
+import { LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS } from '../constants';
 import type { ModelLaunchLogPanelState } from '../hooks/useModelLaunchLogs';
 import { ModelLaunchLogPanelStatus } from '../hooks/useModelLaunchLogs';
 
-const MODEL_LAUNCH_LOG_SIDEBAR_TRANSITION_MS = 500;
 const MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH = 300;
 const MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH = 720;
 const MODEL_LAUNCH_LOG_MAIN_CONTENT_MIN_WIDTH = 520;
@@ -58,12 +58,13 @@ export function ModelLaunchLogSidebar({
     setIsEntered(false);
     const timeout = window.setTimeout(() => {
       setIsPresent(false);
-    }, MODEL_LAUNCH_LOG_SIDEBAR_TRANSITION_MS);
+    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
 
     return () => window.clearTimeout(timeout);
   }, [state.visible]);
 
   const isPanelEntered = state.visible && isEntered;
+  const isPanelPresent = state.visible || isPresent;
   const handleDownloadLogs = () => {
     if (state.logs.length === 0) return;
 
@@ -117,10 +118,13 @@ export function ModelLaunchLogSidebar({
       aria-hidden={!state.visible}
       className={cn(
         'relative flex h-full shrink-0 border-l bg-background ease-in-out',
-        isResizing ? 'transition-[opacity,border-color]' : 'transition-[width,opacity,border-color] duration-500',
-        state.visible ? 'overflow-visible border-border opacity-100' : 'overflow-hidden border-transparent opacity-0',
+        'overflow-hidden transition-[width,border-color]',
+        isPanelPresent ? 'border-border' : 'border-transparent',
       )}
-      style={{ width: state.visible ? sidebarWidth : 0 }}
+      style={{
+        width: isPanelEntered ? sidebarWidth : 0,
+        transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
+      }}
     >
       {isPresent ? (
         <div
@@ -138,10 +142,13 @@ export function ModelLaunchLogSidebar({
       {isPresent ? (
         <div
           className={cn(
-            'flex h-full shrink-0 flex-col overflow-hidden transition-[transform,opacity] duration-500 ease-in-out',
+            'flex h-full shrink-0 flex-col overflow-hidden transition-[transform,opacity] ease-in-out',
             isPanelEntered ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0',
           )}
-          style={{ width: sidebarWidth }}
+          style={{
+            width: sidebarWidth,
+            transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
+          }}
         >
 
           <div className="min-h-0 flex-1 overflow-hidden p-2">
