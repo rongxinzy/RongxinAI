@@ -316,19 +316,21 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
       {/* Create-task modal */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" showCloseButton>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{i18nService.t('scheduledTasksNewTask')}</DialogTitle>
             <DialogDescription>{i18nService.t('scheduledTasksNewTask')}</DialogDescription>
           </DialogHeader>
-          <TaskForm
-            key={createFormKey}
-            mode="create"
-            prefill={createPrefill}
-            onCancel={() => setCreateOpen(false)}
-            onSaved={handleCreateSaved}
-            onDirtyChange={() => {}}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
+            <TaskForm
+              key={createFormKey}
+              mode="create"
+              prefill={createPrefill}
+              onCancel={() => setCreateOpen(false)}
+              onSaved={handleCreateSaved}
+              onDirtyChange={() => {}}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -342,23 +344,25 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           }
         }}
       >
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" showCloseButton>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{detailTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
             <DialogDescription>{detailTask?.name ?? ''}</DialogDescription>
           </DialogHeader>
-          {detailTask &&
-            (detailEdit ? (
-              <TaskForm
-                mode="edit"
-                task={detailTask}
-                onCancel={() => setDetailEdit(false)}
-                onSaved={() => setDetailEdit(false)}
-                onDirtyChange={() => {}}
-              />
-            ) : (
-              <TaskDetail task={detailTask} onRequestDelete={handleRequestDelete} />
-            ))}
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
+            {detailTask &&
+              (detailEdit ? (
+                <TaskForm
+                  mode="edit"
+                  task={detailTask}
+                  onCancel={() => setDetailEdit(false)}
+                  onSaved={() => setDetailEdit(false)}
+                  onDirtyChange={() => {}}
+                />
+              ) : (
+                <TaskDetail task={detailTask} onRequestDelete={handleRequestDelete} />
+              ))}
+          </div>
         </DialogContent>
       </Dialog>
 
