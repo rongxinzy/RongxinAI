@@ -4,20 +4,20 @@
 [data-theme='classic-light'] {
   color-scheme: light;
   /* ── Mapped to shadcn bridge ── */
-  --zy-primary: oklch(0.216 0.006 56.043);
+  --zy-primary: oklch(0.366 0.008 253);
   --zy-primary-foreground: oklch(0.985 0.001 106.423);
   --zy-primary-hover: oklch(0.147 0.004 49.25);
   --zy-primary-muted: oklch(0.97 0.001 106.424);
   --zy-accent: oklch(0.97 0.001 106.424);
   --zy-accent-foreground: oklch(0.216 0.006 56.043);
   --zy-background: oklch(1 0 0);
-  --zy-foreground: oklch(0.147 0.004 49.25);
+  --zy-foreground: oklch(0.366 0.008 253);
   --zy-surface: oklch(1 0 0);
-  --zy-surface-foreground: oklch(0.147 0.004 49.25);
+  --zy-surface-foreground: oklch(0.366 0.008 253);
   --zy-surface-raised: oklch(0.97 0.001 106.424);
   --zy-surface-tertiary: rgb(237 237 236);
   --zy-surface-overlay: oklch(1 0 0);
-  --zy-text-primary: oklch(0.147 0.004 49.25);
+  --zy-text-primary: oklch(0.366 0.008 253);
   --zy-text-secondary: oklch(0.553 0.013 58.071);
   --zy-text-muted: oklch(0.553 0.013 58.071);
   --zy-border: oklch(0.923 0.003 48.717);
