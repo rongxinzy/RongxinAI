@@ -14,7 +14,7 @@ import { Download, Puzzle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { resolveLocalizedText } from '../../services/skill';
-import { resolveSkillIconUrl } from '../../services/skillIcon';
+import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { MarketplaceSkill } from '../../types/skill';
 
 interface MarketplaceSkillGridProps {
@@ -76,10 +76,10 @@ export function MarketplaceSkillGrid({
             <button
               type="button"
               disabled={Boolean(isInstallingSkillId && !isInstalling)}
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-md py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               onClick={() => onSelect(skill)}
             >
-              <Avatar className="size-12 shrink-0 rounded-xl bg-muted">
+              <Avatar className="size-10 shrink-0 rounded-xl bg-muted">
                 {skill.iconUrl && (
                   <AvatarImage
                     src={resolveSkillIconUrl(skill.iconUrl)}
@@ -87,8 +87,8 @@ export function MarketplaceSkillGrid({
                     className="m-auto size-8 rounded-lg object-contain"
                   />
                 )}
-                <AvatarFallback className="rounded-md">
-                  <Puzzle />
+                <AvatarFallback className="rounded-lg text-xl font-semibold text-muted-foreground">
+                  {getSkillInitial(skill.name)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">

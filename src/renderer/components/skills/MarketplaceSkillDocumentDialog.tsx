@@ -1,12 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
 import { Button } from '@shared/components/ui/button';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { CheckCircle, Plus, Puzzle, X } from 'lucide-react';
+import { CheckCircle, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { resolveLocalizedText } from '../../services/skill';
-import { resolveSkillIconUrl } from '../../services/skillIcon';
+import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { MarketplaceSkill } from '../../types/skill';
 import MarkdownContent from '../MarkdownContent';
 
@@ -74,8 +74,8 @@ export function MarketplaceSkillDocumentDialog({
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="size-9 rounded-lg">
               {skill.iconUrl && <AvatarImage src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="object-contain" />}
-              <AvatarFallback className="rounded-lg">
-                <Puzzle />
+              <AvatarFallback className="rounded-lg text-lg font-semibold text-muted-foreground">
+                {getSkillInitial(skill.name)}
               </AvatarFallback>
             </Avatar>
             <h2 className="truncate text-base font-semibold text-foreground">

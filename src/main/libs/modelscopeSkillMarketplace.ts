@@ -64,11 +64,6 @@ type FetchModelScopeSkillMarketplaceOptions = {
   pageSize?: number;
 };
 
-type ResolveModelScopeSkillInstallSourceOptions = {
-  token?: string | null;
-  fetchImpl?: FetchLike;
-};
-
 type FetchModelScopeSkillContentOptions = {
   token?: string | null;
   fetchImpl?: FetchLike;
@@ -141,27 +136,16 @@ export async function fetchModelScopeSkillMarketplace(
 
 export async function resolveModelScopeSkillInstallSource(
   source: string,
-  options: ResolveModelScopeSkillInstallSourceOptions = {},
 ): Promise<string | null> {
   const parsed = parseModelScopeSkillUrl(source);
   if (!parsed) {
     return null;
   }
 
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
-  const detail = await fetchModelScopeSkillDetail(parsed.skillId, {
-    token: options.token,
-    fetchImpl,
-  });
-  const directSource = getSupportedInstallSource(detail);
-  if (directSource) return directSource;
-  return fetchModelScopeSkillArchiveUrl(parsed.skillId, { fetchImpl });
+  return fetchModelScopeSkillArchiveUrl(parsed.skillId);
 }
 
-async function fetchModelScopeSkillArchiveUrl(
-  skillId: string,
-  _input: { fetchImpl: FetchLike },
-): Promise<string | null> {
+async function fetchModelScopeSkillArchiveUrl(skillId: string): Promise<string | null> {
   const normalizedId = skillId
     .split('/')
     .map(segment => segment.trim())
@@ -285,7 +269,10 @@ function toMarketplaceSkill(skill: ModelScopeSkillRecord): MarketplaceSkillRecor
     return null;
   }
 
-  const installSource = getSupportedInstallSource(skill) || buildModelScopeSkillPageUrl(skillId);
+  // ModelScope records can include an upstream webpage (for example, ClawHub) in
+  // source_url. Keep that for attribution only; installations must be resolved
+  // through the ModelScope skill endpoint.
+  const installSource = buildModelScopeSkillPageUrl(skillId);
   const sourceUrl = readNonEmptyString(skill.source_url) || buildModelScopeSkillPageUrl(skillId);
   const iconUrl = readNonEmptyString(skill.logo_url);
   const description = buildLocalizedDescription(skill);
@@ -341,38 +328,6 @@ function normalizePageSize(value: number | undefined): number {
     return MODELSCOPE_SKILL_MARKETPLACE.DefaultPageSize;
   }
   return Math.min(value, MODELSCOPE_SKILL_MARKETPLACE.MaximumPageSize);
-}
-
-function getSupportedInstallSource(skill: ModelScopeSkillRecord): string | null {
-  const sourceUrl = readSupportedInstallSource(skill.source_url);
-  if (sourceUrl) {
-    return sourceUrl;
-  }
-
-  return extractInstallSourceFromCommands(skill.install_command);
-}
-
-function extractInstallSourceFromCommands(commands: string[] | undefined): string | null {
-  if (!Array.isArray(commands)) {
-    return null;
-  }
-  for (const command of commands) {
-    const trimmed = command.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const urlMatch = trimmed.match(/https?:\/\/[^\s'"]+/i);
-    const source = readSupportedInstallSource(urlMatch?.[0]);
-    if (source) {
-      return source;
-    }
-  }
-  return null;
-}
-
-function readSupportedInstallSource(value: unknown): string | null {
-  const source = readNonEmptyString(value);
-  return source && !parseModelScopeSkillUrl(source) ? source : null;
 }
 
 function readNonEmptyString(value: unknown): string | null {

@@ -2,11 +2,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avata
 import { Button } from '@shared/components/ui/button';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Switch } from '@shared/components/ui/switch';
-import { MessageCircle, Puzzle, Trash2, X } from 'lucide-react';
+import { MessageCircle, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import { resolveSkillIconUrl } from '../../services/skillIcon';
+import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { Skill } from '../../types/skill';
 import MarkdownContent from '../MarkdownContent';
 
@@ -137,8 +137,8 @@ export function SkillDocumentDialog({
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="size-9 rounded-lg">
               {skill.iconUrl && <AvatarImage src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="object-contain" />}
-              <AvatarFallback className="rounded-lg">
-                <Puzzle />
+              <AvatarFallback className="rounded-lg text-lg font-semibold text-muted-foreground">
+                {getSkillInitial(skill.displayName || skill.name)}
               </AvatarFallback>
             </Avatar>
             <h2 className="truncate text-base font-semibold text-foreground">
