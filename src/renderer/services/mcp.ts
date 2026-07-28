@@ -221,6 +221,17 @@ class McpService {
     await window.electron.mcp.cancelAuthorize(requestId);
   }
 
+  async getFeishuCliStatus(): Promise<{ installed: boolean }> {
+    const result = await window.electron.mcp.getFeishuCliStatus();
+    if (!result.success) throw new Error(result.error || 'Failed to inspect Feishu CLI');
+    return { installed: result.installed };
+  }
+
+  async prepareFeishuCli(): Promise<void> {
+    const result = await window.electron.mcp.prepareFeishuCli();
+    if (!result.success) throw new Error(result.error || 'Failed to install Feishu CLI');
+  }
+
   async loadIcon(iconPath: string): Promise<string | undefined> {
     const result = await window.electron.mcp.loadIcon(iconPath);
     return result.success ? result.data : undefined;

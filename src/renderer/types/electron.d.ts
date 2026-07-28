@@ -273,6 +273,7 @@ interface McpServerConfigIPC {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -435,6 +436,8 @@ interface IElectronAPI {
     refreshBridge: () => Promise<{ success: boolean; tools: number; error?: string }>;
     authorize: (data: any) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
     cancelAuthorize: (requestId: string) => Promise<{ success: boolean }>;
+    getFeishuCliStatus: () => Promise<{ success: boolean; installed: boolean; error?: string }>;
+    prepareFeishuCli: () => Promise<{ success: boolean; error?: string }>;
     loadIcon: (iconPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
     onBridgeSyncStart: (callback: () => void) => () => void;
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) => () => void;

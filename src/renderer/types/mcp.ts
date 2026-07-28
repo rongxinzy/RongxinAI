@@ -12,6 +12,7 @@ export interface McpServerConfig {
   env?: Record<string, string>; // stdio
   url?: string; // sse / http
   headers?: Record<string, string>; // sse / http
+  timeout?: number;
   isBuiltIn: boolean; // installed from built-in registry
   githubUrl?: string; // GitHub repository URL
   registryId?: string; // matching registry entry ID
@@ -28,6 +29,7 @@ export interface McpServerFormData {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -93,6 +95,7 @@ export interface McpPresentationSection {
 
 export interface McpPresentationLocale {
   description?: string;
+  examples?: string[];
   connect?: {
     usage?: McpPresentationSection;
     data?: McpPresentationSection;
