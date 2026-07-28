@@ -1,0 +1,10 @@
+{
+  "id": "notion",
+  "name": "Notion",
+  "transportType": "http",
+  "url": "https://mcp.notion.com/mcp",
+  "authType": "oauth",
+  "iconPath": "zhiyuan/icon.png",
+  "metadataPath": "zhiyuan/connector.yaml",
+  "skills": ["knowledge-capture", "meeting-intelligence", "research-documentation", "spec-to-implementation"]
+}

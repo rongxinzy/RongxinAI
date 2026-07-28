@@ -1,0 +1,24 @@
+{
+  "categories": [
+    {
+      "id": "productivity",
+      "name_zh": "效率工具",
+      "name_en": "Productivity"
+    }
+  ],
+  "servers": [
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description_zh": "在线协作与知识库管理平台",
+      "description_en": "A connected workspace for collaboration and knowledge management",
+      "category": "productivity",
+      "transportType": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "authType": "oauth",
+      "connectorPath": "notion/mcp.json",
+      "iconPath": "notion/zhiyuan/icon.png",
+      "metadataPath": "notion/zhiyuan/connector.yaml"
+    }
+  ]
+}

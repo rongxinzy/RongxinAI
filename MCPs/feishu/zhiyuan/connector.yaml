@@ -1,0 +1,35 @@
+id: feishu
+icon: icon.png
+presentation:
+  name: 飞书
+  authorization: cli
+  zh:
+    description: 飞书文档、日历、消息、云盘、审批和知识库协作服务。
+    connect:
+      usage:
+        title: 如何使用
+        description: 仅当你明确要求时，智能体才会调用飞书提供的工具完成任务。
+      data:
+        title: 数据与权限
+        description: 仅访问你在飞书授权过程中明确允许的内容和操作范围。
+      control:
+        title: 你始终可控
+        description: 你可以随时在已安装服务中断开飞书连接或重新授权。
+      authorization:
+        title: 官方登录
+        description: 通过飞书官方命令行工具完成配置和浏览器登录。
+  en:
+    description: Collaboration services for Feishu documents, calendars, messages, drive, approvals, and knowledge bases.
+    connect:
+      usage:
+        title: How it works
+        description: The agent uses Feishu tools only when you explicitly request them.
+      data:
+        title: Data and permissions
+        description: Only content and actions you explicitly approve during Feishu authorization are accessed.
+      control:
+        title: You stay in control
+        description: You can disconnect or re-authorize Feishu at any time from installed services.
+      authorization:
+        title: Official sign-in
+        description: Configuration and browser sign-in are completed through Feishu's official command-line tool.

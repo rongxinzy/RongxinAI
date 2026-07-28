@@ -1,0 +1,35 @@
+id: notion
+icon: icon.png
+presentation:
+  name: Notion
+  authorization: oauth
+  zh:
+    description: 在线协作与知识库管理平台。
+    connect:
+      usage:
+        title: 如何使用
+        description: 仅当你明确要求时，智能体才会调用 Notion 提供的工具完成任务。
+      data:
+        title: 数据与权限
+        description: 仅访问你在授权页中明确允许的内容和操作范围。
+      control:
+        title: 你始终可控
+        description: 你可以随时断开 Notion 连接或重新授权。
+      authorization:
+        title: 安全授权
+        description: 将使用系统默认浏览器完成 Notion 官方登录与授权。
+  en:
+    description: Online collaboration and knowledge management workspace.
+    connect:
+      usage:
+        title: How it works
+        description: The agent uses Notion tools only when you explicitly request it.
+      data:
+        title: Data and permissions
+        description: Only content and actions approved during authorization are accessed.
+      control:
+        title: You stay in control
+        description: You can disconnect or re-authorize Notion at any time.
+      authorization:
+        title: Secure authorization
+        description: Your system browser opens Notion's official sign-in and authorization page.
