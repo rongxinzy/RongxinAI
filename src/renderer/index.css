@@ -10,6 +10,10 @@
 
 /* ── Tailwind v4 theme configuration ── */
 @theme {
+  /* Typography scale extension (arithmetic series, 2px step — see DESIGN.md) */
+  --text-xxl: 22px;
+  --text-xxl--line-height: 1.375;
+
   /* Semantic theme colors (driven by CSS variables) */
   --color-background: var(--zy-background);
   --color-foreground: var(--zy-foreground);

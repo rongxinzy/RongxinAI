@@ -176,7 +176,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 <CalendarClock className="size-6 text-primary" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold leading-snug text-foreground">
+                <h1 className="text-xxl font-semibold text-foreground">
                   {i18nService.t('scheduledTasksTitle')}
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
