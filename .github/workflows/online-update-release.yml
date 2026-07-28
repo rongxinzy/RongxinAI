@@ -2,9 +2,8 @@ name: Publish online update
 
 on:
   push:
-    branches:
-      - release
-      - "release-*"
+    tags:
+      - "v*"
 
 concurrency:
   group: zhiyuan-online-update-production
@@ -18,12 +17,42 @@ env:
 
 jobs:
   prepare-release:
+    needs: quality
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.source.outputs.commit }}
     steps:
-      - id: version
-        run: echo "version=$(date -u +%Y.%-m.%-d)-build.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Derive and validate the release version from the tag
+        id: version
+        shell: bash
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Release tags must use v<semver>, for example v2026.7.28-build.1" >&2
+            exit 1
+          fi
+          echo "version=${TAG_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Ensure the tagged commit is already in main
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          tag_commit="$(git rev-parse "${GITHUB_REF_NAME}^{}")"
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "Release tag must point to a commit reachable from origin/main" >&2
+            exit 1
+          fi
+          echo "commit=$tag_commit" >> "$GITHUB_OUTPUT"
+
+  quality:
+    uses: ./.github/workflows/ci.yml
 
   build-windows-lite:
     needs: prepare-release
@@ -31,6 +60,8 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/setup-node@v4
         with: { node-version: "24.x" }
       - uses: oven-sh/setup-bun@v2
@@ -57,6 +88,8 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/setup-node@v4
         with: { node-version: "24.x" }
       - uses: oven-sh/setup-bun@v2
@@ -81,6 +114,8 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/download-artifact@v4
         with: { path: artifacts }
       - uses: actions/setup-node@v4
@@ -105,7 +140,7 @@ jobs:
           node scripts/release/publish-update-manifest.mjs \
             manifest/stable.json \
             '${{ needs.prepare-release.outputs.version }}' \
-            "$GITHUB_SHA" \
+            '${{ needs.prepare-release.outputs.commit }}' \
             '${{ steps.artifacts.outputs.windows }}:win32:x64:lite' \
             '${{ steps.artifacts.outputs.macos }}:darwin:arm64:default'
         env:

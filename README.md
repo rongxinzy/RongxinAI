@@ -52,7 +52,7 @@ The current stable installers are available from the [official download page](ht
 - macOS on Apple Silicon
 - Linux packages can be built from source
 
-Want to understand what the installer runs or how online updates are protected? Review the [release workflow](.github/workflows/online-update-release.yml) and [update design](https://github.com/rongxinzy/zhiyuanBackend/blob/main/docs/online-update-design.md) here on GitHub.
+Want to understand what the installer runs or how online updates are protected? Review the [release workflow](.github/workflows/online-update-release.yml) and [update design](https://github.com/rongxinzy/zhiyuanBackend/blob/main/docs/online-update-design.md) here on GitHub. Stable releases are created only by pushing a SemVer tag such as `v2026.7.28-build.1` for a commit already in `main`.
 
 ## Stay in the loop
 
