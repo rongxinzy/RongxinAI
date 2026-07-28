@@ -3,6 +3,11 @@ const MODELSCOPE_IMAGE_HOSTS = new Set([
   'modelscope.oss-cn-beijing.aliyuncs.com',
 ]);
 
+export function getSkillInitial(name: string): string {
+  const first = name.trim().split(/[\s_-]+/)[0] || '?';
+  return Array.from(first)[0]?.toUpperCase() || '?';
+}
+
 /** Request a larger ModelScope OSS variant so small marketplace logos are not stretched. */
 export function resolveSkillIconUrl(iconUrl?: string): string | undefined {
   const value = iconUrl?.trim();

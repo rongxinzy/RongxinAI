@@ -2,11 +2,12 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { Card } from '@shared/components/ui/card';
 import { Switch } from '@shared/components/ui/switch';
-import { MessageCircle, Puzzle } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
+import { MessageCircle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
-import { resolveSkillIconUrl } from '../../services/skillIcon';
+import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { Skill } from '../../types/skill';
 
 interface InstalledSkillGridProps {
@@ -104,13 +105,18 @@ export function InstalledSkillGrid({
 
 function SkillIcon({ skill }: { skill: Skill }) {
   return (
-    <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
-      {skill.iconUrl ? (
-        <img src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="size-8 object-contain" />
-      ) : (
-        <Puzzle className="size-5 text-muted-foreground" />
+    <Avatar className="size-12 shrink-0 rounded-xl bg-muted">
+      {skill.iconUrl && (
+        <AvatarImage
+          src={resolveSkillIconUrl(skill.iconUrl)}
+          alt=""
+          className="m-auto size-8 object-contain"
+        />
       )}
-    </div>
+      <AvatarFallback className="rounded-xl text-xl font-semibold text-muted-foreground">
+        {getSkillInitial(skill.displayName || skill.name)}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 

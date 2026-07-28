@@ -14,7 +14,7 @@ import { Download, Puzzle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { resolveLocalizedText } from '../../services/skill';
-import { resolveSkillIconUrl } from '../../services/skillIcon';
+import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { MarketplaceSkill } from '../../types/skill';
 
 interface MarketplaceSkillGridProps {
@@ -87,8 +87,8 @@ export function MarketplaceSkillGrid({
                     className="m-auto size-8 rounded-lg object-contain"
                   />
                 )}
-                <AvatarFallback className="rounded-md">
-                  <Puzzle />
+                <AvatarFallback className="rounded-lg text-xl font-semibold text-muted-foreground">
+                  {getSkillInitial(skill.name)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
