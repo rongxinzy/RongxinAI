@@ -6,22 +6,22 @@
         "pptx-work-report": {
           "label": "工作汇报",
           "description": "季度工作总结与下阶段规划汇报",
-          "prompt": "制作一份季度工作汇报 PPT,包含以下内容:\n\n1. 本季度核心工作成果回顾\n2. 关键项目进展与里程碑达成情况\n3. 重点数据指标完成度(用图表呈现)\n4. 遇到的问题与解决方案\n5. 团队协作亮点\n6. 下季度工作计划与目标\n7. 需要的资源支持\n\n风格要求:简洁商务风,逻辑清晰,数据可视化,适合向管理层汇报。"
+          "prompt": "制作一份季度工作汇报 PPT,包含以下内容:\n\n1. 本季度核心工作成果回顾;\n2. 关键项目进展与里程碑达成情况;\n3. 重点数据指标完成度(用图表呈现);\n4. 遇到的问题与解决方案;\n5. 团队协作亮点;\n6. 下季度工作计划与目标;\n7. 需要的资源支持;\n\n风格要求:简洁商务风,逻辑清晰,数据可视化,适合向管理层汇报。"
         },
         "pptx-content-research": {
           "label": "内容调研",
           "description": "行业趋势与竞品分析调研报告",
-          "prompt": "制作一份行业调研分析报告 PPT,涵盖以下板块:\n\n1. 调研背景与目的说明\n2. 行业整体发展现状与市场规模\n3. 主要竞品对比分析(功能、定价、用户口碑)\n4. 目标用户画像与核心需求洞察\n5. 行业趋势与机会点总结\n6. 可落地的策略建议\n\n风格要求:数据驱动,图表丰富,观点有理有据,适合团队内部分享讨论。"
+          "prompt": "制作一份行业调研分析报告 PPT,涵盖以下板块:\n\n1. 调研背景与目的说明;\n2. 行业整体发展现状与市场规模;\n3. 主要竞品对比分析(功能、定价、用户口碑);\n4. 目标用户画像与核心需求洞察;\n5. 行业趋势与机会点总结;\n6. 可落地的策略建议;\n\n风格要求:数据驱动,图表丰富,观点有理有据,适合团队内部分享讨论。"
         },
         "pptx-education": {
           "label": "教育教学",
           "description": "课堂教学课件与知识讲解",
-          "prompt": "制作一套关于「太阳系与行星探索」的科普教学课件,适合中学生课堂使用,包含:\n\n1. 太阳系全景概览\n2. 八大行星的基本特征对比(大小、距离、温度等)\n3. 地球的特殊性——为什么适合生命存在\n4. 人类探索太空的重要里程碑\n5. 课堂互动问答环节(设计 3-4 道思考题)\n6. 拓展阅读推荐\n\n风格要求:生动活泼,配色明快,内容由浅入深,激发学生好奇心与探索欲。"
+          "prompt": "制作一套关于「太阳系与行星探索」的科普教学课件,适合中学生课堂使用,包含:\n\n1. 太阳系全景概览;\n2. 八大行星的基本特征对比(大小、距离、温度等);\n3. 地球的特殊性——为什么适合生命存在;\n4. 人类探索太空的重要里程碑;\n5. 课堂互动问答环节(设计 3-4 道思考题);\n6. 拓展阅读推荐;\n\n风格要求:生动活泼,配色明快,内容由浅入深,激发学生好奇心与探索欲。"
         },
         "pptx-ai-intro": {
           "label": "人工智能入门",
           "description": "零基础了解 AI 的科普演示",
-          "prompt": "制作一份面向零基础观众的人工智能入门科普 PPT,内容包括:\n\n1. 什么是人工智能——用生活中的例子解释\n2. AI 的发展简史(从图灵测试到大语言模型)\n3. 常见的 AI 应用场景(语音助手、推荐系统、自动驾驶等)\n4. 机器学习的基本原理(用直观类比说明)\n5. 大模型与 ChatGPT 是怎么工作的\n6. AI 能做什么、不能做什么\n7. 普通人如何开始使用 AI 工具提升效率\n\n风格要求:通俗易懂,多用图示和类比,避免专业术语堆砌,让完全不懂技术的人也能看明白。"
+          "prompt": "制作一份面向零基础观众的人工智能入门科普 PPT,内容包括:\n\n1. 什么是人工智能——用生活中的例子解释;\n2. AI 的发展简史(从图灵测试到大语言模型);\n3. 常见的 AI 应用场景(语音助手、推荐系统、自动驾驶等);\n4. 机器学习的基本原理(用直观类比说明);\n5. 大模型与 ChatGPT 是怎么工作的;\n6. AI 能做什么、不能做什么;\n7. 普通人如何开始使用 AI 工具提升效率;\n\n风格要求:通俗易懂,多用图示和类比,避免专业术语堆砌,让完全不懂技术的人也能看明白。"
         }
       }
     },
@@ -31,22 +31,22 @@
         "excel-summary": {
           "label": "Excel 汇总统计",
           "description": "对 Excel 数据做分类汇总与统计",
-          "prompt": "请读取我的 Excel 文件,帮我完成以下工作:\n\n1. 按类别对数据进行分类汇总(求和、计数、平均值)\n2. 生成各类别的占比分析\n3. 标注异常值和关键数据\n4. 输出一份整理好的汇总统计 Excel 文件,包含图表"
+          "prompt": "请读取我的 Excel 文件,帮我完成以下工作:\n\n1. 按类别对数据进行分类汇总(求和、计数、平均值);\n2. 生成各类别的占比分析;\n3. 标注异常值和关键数据;\n4. 输出一份整理好的汇总统计 Excel 文件,包含图表。"
         },
         "image-to-excel": {
           "label": "图片/截图转表格",
           "description": "识别图片中的表格数据并生成 Excel",
-          "prompt": "请识别我上传的图片中的表格内容,帮我:\n\n1. 提取图片中所有表格数据\n2. 整理为规范的行列格式\n3. 修正识别中可能出现的错误\n4. 生成一份格式清晰的 Excel 文件"
+          "prompt": "请识别我上传的图片中的表格内容,帮我:\n\n1. 提取图片中所有表格数据;\n2. 整理为规范的行列格式;\n3. 修正识别中可能出现的错误;\n4. 生成一份格式清晰的 Excel 文件。"
         },
         "word-report": {
           "label": "数据生成报告",
           "description": "基于数据文件生成 Word 分析报告",
-          "prompt": "请根据我提供的数据文件,帮我生成一份 Word 分析报告,要求:\n\n1. 包含数据概况说明\n2. 核心指标统计与趋势分析\n3. 重点发现与结论总结\n4. 排版专业、条理清晰,可直接用于汇报"
+          "prompt": "请根据我提供的数据文件,帮我生成一份 Word 分析报告,要求:\n\n1. 包含数据概况说明;\n2. 核心指标统计与趋势分析;\n3. 重点发现与结论总结;\n4. 排版专业、条理清晰,可直接用于汇报。"
         },
         "multi-excel-merge": {
           "label": "多表合并整理",
           "description": "合并多个 Excel 文件并统一格式",
-          "prompt": "我有多个 Excel 文件需要合并整理,请帮我:\n\n1. 将多个文件的数据合并到一张表中\n2. 统一列名和数据格式\n3. 去除重复数据\n4. 生成一份合并后的 Excel 文件,并添加数据来源标记"
+          "prompt": "我有多个 Excel 文件需要合并整理,请帮我:\n\n1. 将多个文件的数据合并到一张表中;\n2. 统一列名和数据格式;\n3. 去除重复数据;\n4. 生成一份合并后的 Excel 文件,并添加数据来源标记。"
         }
       }
     },
@@ -56,22 +56,22 @@
         "edu-english-words": {
           "label": "英语单词学习",
           "description": "高效记忆英语单词",
-          "prompt": "我正在准备英语四级考试,请帮我整理一份高频核心词汇学习清单,要求:\n\n1. 挑选 20 个高频必考单词\n2. 每个单词给出音标、中文释义和一个简短例句\n3. 按主题分组(如校园生活、工作职场、科技等)\n4. 在最后给出一组小测验题,帮助我自测记忆效果"
+          "prompt": "我正在准备英语四级考试,请帮我整理一份高频核心词汇学习清单,要求:\n\n1. 挑选 20 个高频必考单词;\n2. 每个单词给出音标、中文释义和一个简短例句;\n3. 按主题分组(如校园生活、工作职场、科技等);\n4. 在最后给出一组小测验题,帮助我自测记忆效果。"
         },
         "edu-math-explain": {
           "label": "数学题讲解",
           "description": "数学难题的详细解题过程",
-          "prompt": "请用简单易懂的方式讲解以下数学知识:\n\n题目:一元二次方程 2x² + 3x - 5 = 0 的求解\n\n要求:\n1. 先回顾一元二次方程的一般形式和求根公式\n2. 一步步展示完整的代入和计算过程\n3. 用判别式分析根的情况\n4. 最后验算答案是否正确\n5. 再出一道类似的练习题让我巩固"
+          "prompt": "请用简单易懂的方式讲解以下数学知识:\n\n题目:一元二次方程 2x² + 3x - 5 = 0 的求解\n\n要求:\n1. 先回顾一元二次方程的一般形式和求根公式;\n2. 一步步展示完整的代入和计算过程;\n3. 用判别式分析根的情况;\n4. 最后验算答案是否正确;\n5. 再出一道类似的练习题让我巩固。"
         },
         "edu-essay-writing": {
           "label": "作文写作辅导",
           "description": "提升写作能力与技巧",
-          "prompt": "请以「我最难忘的一次旅行」为题,帮我进行作文写作辅导:\n\n1. 先给出一个清晰的写作提纲(开头、正文、结尾的结构建议)\n2. 分享 3 个让文章更生动的写作技巧(如细节描写、感官描写、借景抒情)\n3. 写一段示范开头,展示如何吸引读者\n4. 列出 5 个可以用在这篇作文中的好词好句\n5. 提醒常见的写作问题和避坑要点"
+          "prompt": "请以「我最难忘的一次旅行」为题,帮我进行作文写作辅导:\n\n1. 先给出一个清晰的写作提纲(开头、正文、结尾的结构建议);\n2. 分享 3 个让文章更生动的写作技巧(如细节描写、感官描写、借景抒情);\n3. 写一段示范开头,展示如何吸引读者;\n4. 列出 5 个可以用在这篇作文中的好词好句;\n5. 提醒常见的写作问题和避坑要点。"
         },
         "edu-knowledge-explain": {
           "label": "知识点科普",
           "description": "用通俗语言解释复杂知识",
-          "prompt": "请用通俗易懂的语言给我科普「光合作用」这个知识点:\n\n1. 用一句话概括光合作用是什么\n2. 用生活中的类比来解释它的原理\n3. 画出光合作用的简要过程(文字版流程图)\n4. 说明光合作用对地球和人类的重要意义\n5. 提出 3 个思考题,帮助我加深理解"
+          "prompt": "请用通俗易懂的语言给我科普「光合作用」这个知识点:\n\n1. 用一句话概括光合作用是什么;\n2. 用生活中的类比来解释它的原理;\n3. 画出光合作用的简要过程(文字版流程图);\n4. 说明光合作用对地球和人类的重要意义; \n5. 提出 3 个思考题,帮助我加深理解。"
         }
       }
     },
@@ -81,22 +81,22 @@
         "web-resume": {
           "label": "个人简历",
           "description": "在线简历与作品集页面",
-          "prompt": "帮我制作一个精美的在线个人简历页面。\n\n基本信息:\n- 姓名:张小明\n- 职位:产品经理(5年经验)\n- 联系方式:邮箱、手机、微信二维码占位区\n\n页面内容:\n- 个人简介:一段简短的自我介绍,突出核心优势\n- 工作经历:3段工作经历,含公司名、职位、时间、主要成果\n- 专业技能:以进度条形式展示产品设计、数据分析、项目管理等技能\n- 项目案例:展示3个代表项目的卡片,含项目名称和简短描述\n- 教育背景与证书\n\n设计风格:\n简洁专业、左右分栏布局、深色侧边栏搭配白色主内容区。适合直接分享给面试官或合作伙伴。"
+          "prompt": "帮我制作一个精美的在线个人简历页面。\n\n基本信息:\n- 姓名:张小明;\n- 职位:产品经理(5年经验);\n- 联系方式:邮箱、手机、微信二维码占位区。\n\n页面内容:\n- 个人简介:一段简短的自我介绍,突出核心优势;\n- 工作经历:3段工作经历,含公司名、职位、时间、主要成果;\n- 专业技能:以进度条形式展示产品设计、数据分析、项目管理等技能;\n- 项目案例:展示3个代表项目的卡片,含项目名称和简短描述;\n- 教育背景与证书。\n\n设计风格:\n简洁专业、左右分栏布局、深色侧边栏搭配白色主内容区。适合直接分享给面试官或合作伙伴。"
         },
         "web-store": {
           "label": "店铺主页",
           "description": "小型商铺或工作室展示页",
-          "prompt": "帮我做一个烘焙工作室的展示网页,工作室名叫「麦田烘焙」。\n\n页面内容:\n- 首屏大图:工作室名称、一句口号「用心烘焙,温暖每一天」、\"查看菜单\"按钮\n- 招牌产品:展示6款人气产品卡片(含图片占位、名称、价格、简短描述)\n- 关于我们:工作室的故事,创始人理念,配一张店内环境图占位\n- 顾客好评:3条用户评价,带头像和星级评分\n- 联系与地址:营业时间、地址、电话,嵌入地图占位区域\n\n设计风格:\n温馨文艺、奶油色和棕色为主色调、圆角卡片、手写风格标题字体。整体氛围温暖亲切。"
+          "prompt": "帮我做一个烘焙工作室的展示网页,工作室名叫「麦田烘焙」。\n\n页面内容:\n- 首屏大图:工作室名称、一句口号「用心烘焙,温暖每一天」、\"查看菜单\"按钮;\n- 招牌产品:展示6款人气产品卡片(含图片占位、名称、价格、简短描述);\n- 关于我们:工作室的故事,创始人理念,配一张店内环境图占位;\n- 顾客好评:3条用户评价,带头像和星级评分;\n- 联系与地址:营业时间、地址、电话,嵌入地图占位区域;\n\n设计风格:\n温馨文艺、奶油色和棕色为主色调、圆角卡片、手写风格标题字体。整体氛围温暖亲切。"
         },
         "web-event": {
           "label": "活动邀请函",
           "description": "聚会、婚礼或活动的在线邀请页",
-          "prompt": "帮我制作一个生日派对的在线邀请函网页。\n\n活动信息:\n- 主题:「Leo的30岁生日派对」\n- 时间:2025年8月15日 周六 晚上7:00\n- 地点:星光花园餐厅 三楼露台\n\n页面内容:\n- 开场动画:标题渐入,彩色纸屑飘落效果\n- 邀请语:一段温馨的邀请文字\n- 活动安排:时间轴展示派对流程(签到、晚宴、游戏、蛋糕、自由交流)\n- 着装建议:休闲正装,配色参考图占位\n- 交通指引:地址信息和停车提示\n- RSVP确认:\"我会参加\"和\"很遗憾不能到\"两个按钮\n\n设计风格:\n浪漫活泼、深蓝色星空背景、金色点缀文字、充满庆祝氛围。页面要适合手机浏览。"
+          "prompt": "帮我制作一个生日派对的在线邀请函网页。\n\n活动信息:\n- 主题:「Leo的30岁生日派对」;\n- 时间:2025年8月15日 周六 晚上7:00;\n- 地点:星光花园餐厅 三楼露台;\n\n页面内容:\n- 开场动画:标题渐入,彩色纸屑飘落效果;\n- 邀请语:一段温馨的邀请文字;\n- 活动安排:时间轴展示派对流程(签到、晚宴、游戏、蛋糕、自由交流);\n- 着装建议:休闲正装,配色参考图占位;\n- 交通指引:地址信息和停车提示;\n- RSVP确认:\"我会参加\"和\"很遗憾不能到\"两个按钮;\n\n设计风格:\n浪漫活泼、深蓝色星空背景、金色点缀文字、充满庆祝氛围。页面要适合手机浏览。"
         },
         "web-survey": {
           "label": "调查问卷",
           "description": "在线表单与问卷收集页",
-          "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填)\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意)\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块)\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障)\n- 单选题:使用频率(每天/每周/每月/偶尔)\n- 文本题:您的建议或意见(大文本框)\n- 提交按钮,提交后显示感谢页面\n\n设计风格:\n清爽简洁、白色背景、蓝绿色主色调、每道题之间有足够间距、带进度条显示填写进度。适合手机端操作。"
+          "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填);\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意);\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块);\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障);\n- 单选题:使用频率(每天/每周/每月/偶尔);\n- 文本题:您的建议或意见(大文本框);\n- 提交按钮,提交后显示感谢页面。\n\n设计风格:\n清爽简洁、白色背景、蓝绿色主色调、每道题之间有足够间距、带进度条显示填写进度。适合手机端操作。"
         }
       }
     }
@@ -133,22 +133,22 @@
         "excel-summary": {
           "label": "Excel Summary",
           "description": "Categorize and summarize Excel data",
-          "prompt": "Please read my Excel file and help me complete the following tasks:\n\n1. Categorize data by category (sum, count, average)\n2. Generate proportion analysis for each category\n3. Mark outliers and key data points\n4. Output a well-organized summary statistics Excel file with charts"
+          "prompt": "Please read my Excel file and help me complete the following tasks:\n\n1. Categorize data by category (sum, count, average)\n2. Generate proportion analysis for each category\n3. Mark outliers and key data points\n4. Output a well-organized summary statistics Excel file with charts."
         },
         "image-to-excel": {
           "label": "Image to Table",
           "description": "Recognize table data in images and generate Excel",
-          "prompt": "Please recognize the table content in the image I uploaded and help me:\n\n1. Extract all table data from the image\n2. Organize into standard row and column format\n3. Correct possible recognition errors\n4. Generate a clearly formatted Excel file"
+          "prompt": "Please recognize the table content in the image I uploaded and help me:\n\n1. Extract all table data from the image\n2. Organize into standard row and column format\n3. Correct possible recognition errors\n4. Generate a clearly formatted Excel file."
         },
         "word-report": {
           "label": "Data Report",
           "description": "Generate Word analysis report based on data files",
-          "prompt": "Please generate a Word analysis report based on the data file I provided, with the following requirements:\n\n1. Include data overview description\n2. Core metrics statistics and trend analysis\n3. Key findings and conclusion summary\n4. Professional layout, clear structure, ready for reporting"
+          "prompt": "Please generate a Word analysis report based on the data file I provided, with the following requirements:\n\n1. Include data overview description\n2. Core metrics statistics and trend analysis\n3. Key findings and conclusion summary\n4. Professional layout, clear structure, ready for reporting."
         },
         "multi-excel-merge": {
           "label": "Merge Multiple Tables",
           "description": "Merge multiple Excel files and standardize format",
-          "prompt": "I have multiple Excel files that need to be merged and organized. Please help me:\n\n1. Merge data from multiple files into one table\n2. Standardize column names and data formats\n3. Remove duplicate data\n4. Generate a merged Excel file with data source markers"
+          "prompt": "I have multiple Excel files that need to be merged and organized. Please help me:\n\n1. Merge data from multiple files into one table\n2. Standardize column names and data formats\n3. Remove duplicate data\n4. Generate a merged Excel file with data source markers."
         }
       }
     },
@@ -158,22 +158,22 @@
         "edu-english-words": {
           "label": "English Vocabulary",
           "description": "Efficiently memorize English words",
-          "prompt": "I am preparing for the CET-4 exam. Please help me organize a high-frequency core vocabulary learning list with the following requirements:\n\n1. Select 20 high-frequency must-know words\n2. Provide phonetic symbols, Chinese definitions, and a short example sentence for each word\n3. Group by theme (such as campus life, work, technology, etc.)\n4. Provide a quiz at the end to help me test my memory"
+          "prompt": "I am preparing for the CET-4 exam. Please help me organize a high-frequency core vocabulary learning list with the following requirements:\n\n1. Select 20 high-frequency must-know words\n2. Provide phonetic symbols, Chinese definitions, and a short example sentence for each word\n3. Group by theme (such as campus life, work, technology, etc.)\n4. Provide a quiz at the end to help me test my memory."
         },
         "edu-math-explain": {
           "label": "Math Problem Explanation",
           "description": "Detailed solution process for math problems",
-          "prompt": "Please explain the following mathematical knowledge in an easy-to-understand way:\n\nProblem: Solve the quadratic equation 2x² + 3x - 5 = 0\n\nRequirements:\n1. First review the general form of quadratic equations and the quadratic formula\n2. Show the complete substitution and calculation process step by step\n3. Analyze the nature of roots using the discriminant\n4. Finally verify if the answer is correct\n5. Provide a similar practice problem for me to consolidate"
+          "prompt": "Please explain the following mathematical knowledge in an easy-to-understand way:\n\nProblem: Solve the quadratic equation 2x² + 3x - 5 = 0\n\nRequirements:\n1. First review the general form of quadratic equations and the quadratic formula\n2. Show the complete substitution and calculation process step by step\n3. Analyze the nature of roots using the discriminant\n4. Finally verify if the answer is correct\n5. Provide a similar practice problem for me to consolidate."
         },
         "edu-essay-writing": {
           "label": "Essay Writing Guidance",
           "description": "Improve writing skills and techniques",
-          "prompt": "Please provide essay writing guidance on the topic \"My Most Unforgettable Trip\":\n\n1. First provide a clear writing outline (structural suggestions for introduction, body, and conclusion)\n2. Share 3 techniques to make the article more vivid (such as detailed description, sensory description, scene-based emotion)\n3. Write a sample opening paragraph to show how to attract readers\n4. List 5 good words and sentences that can be used in this essay\n5. Remind common writing problems and pitfalls to avoid"
+          "prompt": "Please provide essay writing guidance on the topic \"My Most Unforgettable Trip\":\n\n1. First provide a clear writing outline (structural suggestions for introduction, body, and conclusion)\n2. Share 3 techniques to make the article more vivid (such as detailed description, sensory description, scene-based emotion)\n3. Write a sample opening paragraph to show how to attract readers\n4. List 5 good words and sentences that can be used in this essay\n5. Remind common writing problems and pitfalls to avoid."
         },
         "edu-knowledge-explain": {
           "label": "Knowledge Explanation",
           "description": "Explain complex knowledge in simple language",
-          "prompt": "Please explain the concept of \"photosynthesis\" in easy-to-understand language:\n\n1. Summarize what photosynthesis is in one sentence\n2. Explain the principle with everyday life analogies\n3. Draw a simple process of photosynthesis (text-based flowchart)\n4. Explain the importance of photosynthesis for Earth and humanity\n5. Propose 3 thinking questions to help me deepen my understanding"
+          "prompt": "Please explain the concept of \"photosynthesis\" in easy-to-understand language:\n\n1. Summarize what photosynthesis is in one sentence\n2. Explain the principle with everyday life analogies\n3. Draw a simple process of photosynthesis (text-based flowchart)\n4. Explain the importance of photosynthesis for Earth and humanity\n5. Propose 3 thinking questions to help me deepen my understanding."
         }
       }
     },
@@ -204,3 +204,4 @@
     }
   }
 }
+
