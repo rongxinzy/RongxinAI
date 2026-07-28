@@ -134,6 +134,7 @@ export const TurnBlock: React.FC<{
     isFinalAnswer: boolean,
     forceComplete = false,
     mutedExecution = false,
+    isLastInSequence = true,
   ) => {
     // ── Thinking: collapsed Reasoning block with shimmer ──
     if (item.type === 'assistant' && item.message.metadata?.isThinking) {
@@ -151,6 +152,7 @@ export const TurnBlock: React.FC<{
           defaultOpen={true}
           autoClose={false}
           duration={durationSeconds}
+          showConnector
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
@@ -170,7 +172,7 @@ export const TurnBlock: React.FC<{
         <ToolCard
           key={item.group.toolUse.id}
           group={item.group}
-          isLastInSequence
+          isLastInSequence={isLastInSequence}
           muted={mutedExecution}
           mapDisplayText={mapDisplayText}
         />
@@ -179,13 +181,27 @@ export const TurnBlock: React.FC<{
 
     // ── Orphan tool result ──
     if (item.type === 'tool_result') {
-      return <div key={item.message.id}>{renderOrphanToolResult(item.message)}</div>;
+      return (
+        <div key={item.message.id} className="relative">
+          {!isLastInSequence && (
+            <div aria-hidden="true" className="absolute top-full -bottom-3 left-2 w-px bg-border" />
+          )}
+          {renderOrphanToolResult(item.message)}
+        </div>
+      );
     }
 
     // ── System message ──
     if (item.type === 'system') {
       const sys = renderSystemMessage(item.message);
-      return sys ? <div key={item.message.id}>{sys}</div> : null;
+      return sys ? (
+        <div key={item.message.id} className="relative">
+          {!isLastInSequence && (
+            <div aria-hidden="true" className="absolute top-full -bottom-3 left-2 w-px bg-border" />
+          )}
+          {sys}
+        </div>
+      ) : null;
     }
 
     // ── Assistant answer ──
@@ -301,7 +317,9 @@ export const TurnBlock: React.FC<{
           )}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
-          {group.items.map((item, idx) => renderItem(item, idx, false, false, true))}
+          {group.items.map((item, idx) =>
+            renderItem(item, idx, false, false, true, idx === group.items.length - 1),
+          )}
         </ChainOfThoughtContent>
       </ChainOfThought>
     );
@@ -310,13 +328,23 @@ export const TurnBlock: React.FC<{
     <div className="px-4 py-2">
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-3">
             {finalAnswerStarted && previousItems.length > 0 && (
               <ExecutionSummary summary={executionSummary}>
-                {previousItems.map((item, index) => {
-                  const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
-                  return renderItem(item, index, false, true, !isAnswer);
-                })}
+                {previousGroups.map(group =>
+                  group.items.map((item, index) => {
+                    const isAnswer =
+                      item.type === 'assistant' && !item.message.metadata?.isThinking;
+                    return renderItem(
+                      item,
+                      index,
+                      false,
+                      true,
+                      !isAnswer,
+                      isAnswer || index === group.items.length - 1,
+                    );
+                  }),
+                )}
               </ExecutionSummary>
             )}
             {finalAnswerStarted && finalAnswerGroup
