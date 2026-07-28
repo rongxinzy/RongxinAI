@@ -362,6 +362,14 @@ const App: React.FC = () => {
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
+  const handleTryMcp = useCallback((prompt?: string) => {
+    if (prompt?.trim()) {
+      dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
+    }
+    dispatch(setWorkMode(WorkMode.Work));
+    handleNewChat();
+  }, [dispatch, handleNewChat]);
+
   const handleCreateSkillByChat = useCallback(() => {
     dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
     coworkService.clearSession();
@@ -800,6 +808,7 @@ const App: React.FC = () => {
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
+                  onUseMcp={handleTryMcp}
                   updateBadge={null}
                 />
               ) : mainView === 'expert' ? (
@@ -811,6 +820,7 @@ const App: React.FC = () => {
                   readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                   onCreateSkillByChat={handleCreateSkillByChat}
                   onTrySkill={handleTrySkill}
+                  onUseMcp={handleTryMcp}
                 />
               ) : mainView === 'localInference' ? null : (
                 <CoworkView

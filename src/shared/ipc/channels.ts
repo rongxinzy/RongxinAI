@@ -48,6 +48,11 @@ export const McpIpc = {
   TestConnection: 'mcp:testConnection',
   FetchMarketplace: 'mcp:fetchMarketplace',
   RefreshBridge: 'mcp:refreshBridge',
+  Authorize: 'mcp:authorize',
+  CancelAuthorize: 'mcp:cancelAuthorize',
+  GetFeishuCliStatus: 'mcp:feishuCliStatus',
+  PrepareFeishuCli: 'mcp:prepareFeishuCli',
+  LoadIcon: 'mcp:loadIcon',
   BridgeSyncStart: 'mcp:bridge:syncStart',
   BridgeSyncDone: 'mcp:bridge:syncDone',
 } as const;

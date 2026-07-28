@@ -26,10 +26,9 @@
       "description_zh": "GitHub 平台集成：仓库、Issues、PR、Actions 管理",
       "description_en": "GitHub platform integration: repos, issues, PRs, Actions management",
       "category": "developer",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-github"],
-      "requiredEnvKeys": ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+      "transportType": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "authType": "token"
     },
     {
       "id": "gitlab",
@@ -92,10 +91,9 @@
       "description_zh": "Notion API：搜索、创建/更新页面、管理数据库",
       "description_en": "Notion API: search, create/update pages, manage databases",
       "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@notionhq/notion-mcp-server"],
-      "requiredEnvKeys": ["OPENAPI_MCP_HEADERS"]
+      "transportType": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "authType": "oauth"
     },
     {
       "id": "slack",

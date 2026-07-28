@@ -1462,22 +1462,29 @@ export class OpenClawConfigSync {
     console.log(
       `[OpenClawConfigSync] getMcpBridgeConfig: callbackUrl=${mcpBridgeCfg?.callbackUrl ?? 'null'}, tools=${mcpBridgeCfg?.tools?.length ?? 0}`,
     );
-    if (
-      hasMcpBridgePlugin &&
-      mcpBridgeCfg &&
-      mcpBridgeCfg.tools.length > 0 &&
-      managedConfig.plugins
-    ) {
+    if (hasMcpBridgePlugin && managedConfig.plugins) {
       const plugins = managedConfig.plugins as Record<string, unknown>;
       const entries = plugins.entries as Record<string, Record<string, unknown>>;
-      entries['mcp-bridge'] = {
-        ...entries['mcp-bridge'],
-        config: {
-          callbackUrl: mcpBridgeCfg.callbackUrl,
-          secret: '${ZHIYUAN_MCP_BRIDGE_SECRET}',
-          tools: mcpBridgeCfg.tools.map(normalizeMcpBridgeToolManifestEntry),
-        },
-      };
+      const currentEntry = entries['mcp-bridge'] || {};
+      if (mcpBridgeCfg && mcpBridgeCfg.tools.length > 0) {
+        entries['mcp-bridge'] = {
+          ...currentEntry,
+          enabled: true,
+          config: {
+            callbackUrl: mcpBridgeCfg.callbackUrl,
+            secret: '${ZHIYUAN_MCP_BRIDGE_SECRET}',
+            tools: mcpBridgeCfg.tools.map(normalizeMcpBridgeToolManifestEntry),
+          },
+        };
+      } else {
+        // Remove the old callback/tool manifest when the last MCP is
+        // uninstalled. Keeping this config would leave stale tools attached
+        // to the Agent even though the local server row and credentials were
+        // deleted.
+        const detachedEntry: Record<string, unknown> = { ...currentEntry, enabled: false };
+        delete detachedEntry.config;
+        entries['mcp-bridge'] = detachedEntry;
+      }
     }
 
     // Sync AskUserQuestion plugin config — uses the same HTTP callback server
@@ -2323,23 +2330,26 @@ export class OpenClawConfigSync {
    *   Linux:   ~/.config/ZhiYuanAgent/SKILLs
    */
   private resolveSkillsExtraDirs(): string[] {
-    const userDataSkillsDir = path.join(app.getPath('userData'), 'SKILLs');
-    try {
-      if (fs.statSync(userDataSkillsDir).isDirectory()) {
-        return [userDataSkillsDir];
+    const skillsDirs = [
+      path.join(app.getPath('userData'), 'SKILLs'),
+      path.join(app.getPath('userData'), 'MCPs', 'feishu', 'skills'),
+    ];
+    return skillsDirs.filter(directory => {
+      try {
+        return fs.statSync(directory).isDirectory();
+      } catch (err: unknown) {
+        // ENOENT is expected on fresh installs before any skills sync.
+        if (
+          err &&
+          typeof err === 'object' &&
+          'code' in err &&
+          (err as NodeJS.ErrnoException).code !== 'ENOENT'
+        ) {
+          console.warn('[OpenClawConfigSync] Failed to stat skills directory:', err);
+        }
+        return false;
       }
-    } catch (err: unknown) {
-      // ENOENT is expected on fresh installs before any skills sync.
-      if (
-        err &&
-        typeof err === 'object' &&
-        'code' in err &&
-        (err as NodeJS.ErrnoException).code !== 'ENOENT'
-      ) {
-        console.warn('[OpenClawConfigSync] Failed to stat SKILLs directory:', err);
-      }
-    }
-    return [];
+    });
   }
 
   /**

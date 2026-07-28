@@ -22,6 +22,7 @@ interface ExpertViewProps {
   readOnly?: boolean;
   onCreateSkillByChat?: () => void;
   onTrySkill?: (skillId: string) => void;
+  onUseMcp?: (prompt?: string) => void;
 }
 
 const EXPERT_TAB = {
@@ -42,6 +43,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   readOnly,
   onCreateSkillByChat,
   onTrySkill,
+  onUseMcp,
 }) => {
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<ExpertTab>(EXPERT_TAB.Experts);
@@ -129,7 +131,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           contentClassName="h-full"
         >
           <div className="mx-auto h-full w-full max-w-4xl">
-            <McpManager />
+            <McpManager onUseMcp={onUseMcp} />
           </div>
         </LayeredTabsContent>
       </Tabs>

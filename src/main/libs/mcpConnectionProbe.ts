@@ -5,9 +5,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 import type { McpServerFormData, McpServerRecord } from '../mcpStore';
 import { getEnhancedEnv } from './coworkUtil';
-import { resolveStdioCommand } from './mcpServerManager';
+import { expandMcpTemplate, resolveStdioCommand, unresolvedMcpTemplateKeys } from './mcpServerManager';
 
-const MCP_CONNECTION_TEST_TIMEOUT_MS = 20_000;
 const MAX_RECENT_STDERR_LINES = 20;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -68,6 +67,7 @@ function buildProbeRecord(data: McpServerFormData): McpServerRecord {
     env: data.env,
     url: data.url,
     headers: data.headers,
+    timeout: data.timeout,
     isBuiltIn: !!data.isBuiltIn,
     githubUrl: data.githubUrl,
     registryId: data.registryId,
@@ -86,6 +86,7 @@ export async function probeMcpConnection(
   data: McpServerFormData,
 ): Promise<McpConnectionProbeResult> {
   const record = buildProbeRecord(data);
+  const timeoutMs = (record.timeout ?? 20) * 1000;
   let transport: StdioClientTransport | SSEClientTransport | StreamableHTTPClientTransport;
   const recentStderr: string[] = [];
 
@@ -111,13 +112,30 @@ export async function probeMcpConnection(
         transport.stderr.on('data', (chunk: Buffer) => appendRecentStderr(recentStderr, chunk));
       }
     } else {
-      const rawUrl = record.url?.trim();
+      const unresolved = unresolvedMcpTemplateKeys([
+        record.url,
+        ...Object.values(record.headers || {}),
+      ]).filter(key => !record.env?.[key]);
+      if (unresolved.length > 0) {
+        return { success: false, error: `Missing MCP credentials: ${unresolved.join(', ')}` };
+      }
+      const rawUrl = record.url ? expandMcpTemplate(record.url, record.env).trim() : undefined;
       if (!rawUrl) {
         return { success: false, error: 'URL is required for SSE/HTTP transport.' };
       }
 
       const parsedUrl = new URL(rawUrl);
-      const requestInit = buildRemoteRequestInit(record);
+      const requestInit = buildRemoteRequestInit({
+        ...record,
+        headers: record.headers
+          ? Object.fromEntries(
+              Object.entries(record.headers).map(([key, value]) => [
+                key,
+                expandMcpTemplate(value, record.env),
+              ]),
+            )
+          : undefined,
+      });
       transport =
         record.transportType === 'sse'
           ? new SSEClientTransport(parsedUrl, requestInit ? { requestInit } : undefined)
@@ -138,12 +156,12 @@ export async function probeMcpConnection(
   try {
     await withTimeout(
       client.connect(transport),
-      MCP_CONNECTION_TEST_TIMEOUT_MS,
+      timeoutMs,
       'MCP stdio initialize',
     );
     const toolResult = await withTimeout(
       client.listTools(),
-      MCP_CONNECTION_TEST_TIMEOUT_MS,
+      timeoutMs,
       'MCP listTools',
     );
     return {

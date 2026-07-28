@@ -1,176 +1,72 @@
 import { McpRegistryEntry } from '../types/mcp';
 
-/**
- * Built-in MCP server registry.
- * These are popular, mainstream MCP servers that users can install with one click.
- * Each entry is a template — the user fills in required config (API keys, paths)
- * before it is saved to the database.
- */
+/** Fallback entries used only when the bundled marketplace cannot be loaded. */
 export const mcpRegistry: McpRegistryEntry[] = [
-  // ── Search ──────────────────────────────────────────────
-  {
-    id: 'tavily',
-    name: 'Tavily',
-    descriptionKey: 'mcpDesc_tavily',
-    category: 'search',
-    categoryKey: 'mcpCategorySearch',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', 'tavily-mcp@latest'],
-    requiredEnvKeys: ['TAVILY_API_KEY'],
-  },
-
-  // ── Developer Tools ─────────────────────────────────────
-  {
-    id: 'github',
-    name: 'GitHub',
-    descriptionKey: 'mcpDesc_github',
-    category: 'developer',
-    categoryKey: 'mcpCategoryDeveloper',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@modelcontextprotocol/server-github'],
-    requiredEnvKeys: ['GITHUB_PERSONAL_ACCESS_TOKEN'],
-  },
-  {
-    id: 'gitlab',
-    name: 'GitLab',
-    descriptionKey: 'mcpDesc_gitlab',
-    category: 'developer',
-    categoryKey: 'mcpCategoryDeveloper',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@modelcontextprotocol/server-gitlab'],
-    requiredEnvKeys: ['GITLAB_PERSONAL_ACCESS_TOKEN'],
-    optionalEnvKeys: ['GITLAB_API_URL'],
-  },
-  {
-    id: 'context7',
-    name: 'Context7',
-    descriptionKey: 'mcpDesc_context7',
-    category: 'developer',
-    categoryKey: 'mcpCategoryDeveloper',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@upstash/context7-mcp@latest'],
-  },
-
-  // ── Productivity ────────────────────────────────────────
-  {
-    id: 'google-drive',
-    name: 'Google Drive',
-    descriptionKey: 'mcpDesc_google_drive',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@modelcontextprotocol/server-gdrive'],
-    optionalEnvKeys: ['GDRIVE_CREDENTIALS_PATH'],
-  },
-  {
-    id: 'gmail',
-    name: 'Gmail',
-    descriptionKey: 'mcpDesc_gmail',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'],
-    requiredEnvKeys: ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REDIRECT_URI'],
-  },
-  {
-    id: 'google-calendar',
-    name: 'Google Calendar',
-    descriptionKey: 'mcpDesc_google_calendar',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@cocal/google-calendar-mcp'],
-    requiredEnvKeys: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'],
-  },
   {
     id: 'notion',
     name: 'Notion',
-    descriptionKey: 'mcpDesc_notion',
+    descriptionKey: '',
+    description_zh: '\u5728\u7ebf\u534f\u4f5c\u4e0e\u77e5\u8bc6\u5e93\u7ba1\u7406\u5de5\u4f5c\u533a',
+    description_en: 'A connected workspace for collaboration and knowledge management.',
+    category: 'productivity',
+    categoryKey: 'mcpCategoryProductivity',
+    transportType: 'http',
+    url: 'https://mcp.notion.com/mcp',
+    authType: 'oauth',
+  },
+  {
+    id: 'supabase',
+    name: 'Supabase',
+    descriptionKey: '',
+    description_zh: 'Supabase \u6570\u636e\u5e93\u3001\u8868\u3001\u8fb9\u7f18\u51fd\u6570\u548c\u9879\u76ee\u7ba1\u7406',
+    description_en: 'Supabase database, tables, edge functions, and project management.',
+    category: 'developer',
+    categoryKey: 'mcpCategoryDeveloper',
+    transportType: 'http',
+    url: 'https://mcp.supabase.com/mcp',
+    authType: 'oauth',
+  },
+  {
+    id: 'jinshuju',
+    name: '\u91d1\u6570\u636e',
+    descriptionKey: '',
+    description_zh: '\u91d1\u6570\u636e\u8868\u5355\u3001\u6570\u636e\u67e5\u8be2\u548c\u81ea\u52a8\u5316',
+    description_en: 'Jinshuju forms, data queries, and workflow automation.',
+    category: 'productivity',
+    categoryKey: 'mcpCategoryProductivity',
+    transportType: 'http',
+    url: 'https://jinshuju.net/mcp',
+    authType: 'oauth',
+  },
+  {
+    id: 'feishu',
+    name: '\u98de\u4e66',
+    descriptionKey: '',
+    description_zh: '\u98de\u4e66\u6587\u6863\u3001\u65e5\u5386\u3001\u6d88\u606f\u3001\u4e91\u76d8\u548c\u5ba1\u6279\u534f\u4f5c',
+    description_en: 'Feishu documents, calendars, messages, drive, and approvals.',
     category: 'productivity',
     categoryKey: 'mcpCategoryProductivity',
     transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@notionhq/notion-mcp-server'],
-    requiredEnvKeys: ['OPENAPI_MCP_HEADERS'],
+    command: 'lark-cli',
+    authType: 'cli',
   },
   {
-    id: 'slack',
-    name: 'Slack',
-    descriptionKey: 'mcpDesc_slack',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@modelcontextprotocol/server-slack'],
-    requiredEnvKeys: ['SLACK_BOT_TOKEN', 'SLACK_TEAM_ID'],
-  },
-  {
-    id: 'todoist',
-    name: 'TodoList',
-    descriptionKey: 'mcpDesc_todoist',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', 'todoist-mcp@latest'],
-    requiredEnvKeys: ['TODOIST_API_TOKEN'],
-  },
-
-  // ── Browser ─────────────────────────────────────────────
-  {
-    id: 'playwright',
-    name: 'Playwright',
-    descriptionKey: 'mcpDesc_playwright',
-    category: 'browser',
-    categoryKey: 'mcpCategoryBrowser',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@executeautomation/playwright-mcp-server'],
-  },
-
-  // ── Design ──────────────────────────────────────────────
-  {
-    id: 'canva',
-    name: 'Canva',
-    descriptionKey: 'mcpDesc_canva',
-    category: 'design',
-    categoryKey: 'mcpCategoryDesign',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@iflow-mcp/mattcoatsworth-canva-mcp-server'],
-    requiredEnvKeys: ['CANVA_API_KEY'],
-  },
-
-  // ── Data & API ──────────────────────────────────────────
-  {
-    id: 'firecrawl',
-    name: 'Firecrawl',
-    descriptionKey: 'mcpDesc_firecrawl',
+    id: 'pkulaw',
+    name: '\u5317\u5927\u6cd5\u5b9d',
+    descriptionKey: '',
+    description_zh: '\u4e2d\u56fd\u6cd5\u5f8b\u6cd5\u89c4\u3001\u6848\u4f8b\u548c\u53f8\u6cd5\u6570\u636e\u68c0\u7d22',
+    description_en: 'Chinese laws, regulations, and judicial case search.',
     category: 'data-api',
     categoryKey: 'mcpCategoryDataApi',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', 'firecrawl-mcp@latest'],
-    requiredEnvKeys: ['FIRECRAWL_API_KEY'],
+    transportType: 'http',
+    url: 'https://apim-gateway.pkulaw.com/mcp-law-agg/1.0.0/mcp',
+    authType: 'oauth',
   },
 ];
 
-/**
- * All available categories with their i18n keys.
- */
 export const mcpCategories = [
   { id: 'all', key: 'mcpCategoryAll' },
-  { id: 'search', key: 'mcpCategorySearch' },
   { id: 'developer', key: 'mcpCategoryDeveloper' },
   { id: 'productivity', key: 'mcpCategoryProductivity' },
-  { id: 'browser', key: 'mcpCategoryBrowser' },
-  { id: 'design', key: 'mcpCategoryDesign' },
   { id: 'data-api', key: 'mcpCategoryDataApi' },
 ] as const;

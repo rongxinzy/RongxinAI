@@ -997,6 +997,22 @@ export class OpenClawEngineManager extends EventEmitter {
       env.PATH = [cliShimDir, currentPath].filter(Boolean).join(path.delimiter);
     }
 
+    // Feishu is provided through its official CLI plus connector skills. The
+    // CLI is installed per user, so expose that exact authorized executable to
+    // the Agent runtime instead of relying on a global npm installation.
+    const feishuCliBinDir = path.join(
+      app.getPath('userData'),
+      'MCPs',
+      'feishu',
+      'cli',
+      'node_modules',
+      '.bin',
+    );
+    if (fs.existsSync(feishuCliBinDir)) {
+      const currentPath = env.PATH || env.Path || '';
+      env.PATH = [feishuCliBinDir, currentPath].filter(Boolean).join(path.delimiter);
+    }
+
     // Prepend bundled/user Python runtime paths so gateway exec commands
     // find the ZhiYuanAgent-managed Python instead of the Windows Store stub.
     appendPythonRuntimeToEnv(env as Record<string, string | undefined>);

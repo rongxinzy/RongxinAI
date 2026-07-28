@@ -43,6 +43,48 @@ interface ManagedMcpServer {
 }
 
 const MAX_RECENT_STDERR_LINES = 20;
+const MCP_SERVER_CLOSE_TIMEOUT_MS = 3_000;
+
+function withMcpTimeout<T>(promise: Promise<T>, timeoutSeconds: number, label: string): Promise<T> {
+  const timeoutMs = timeoutSeconds * 1000;
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutSeconds}s`)), timeoutMs);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function closeClientWithTimeout(client: Client, serverName: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      client.close(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`MCP server close timed out after ${MCP_SERVER_CLOSE_TIMEOUT_MS}ms`)),
+          MCP_SERVER_CLOSE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    return true;
+  } catch (error) {
+    log(
+      'WARN',
+      `Error stopping "${serverName}": ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * Race a promise against an AbortSignal.  When the signal fires first the
@@ -106,6 +148,36 @@ function summarizeConfiguredEnvKeys(env: Record<string, string> | undefined): st
 
 function isProxyConfigured(env: Record<string, string>): boolean {
   return !!(env.http_proxy || env.HTTP_PROXY || env.https_proxy || env.HTTPS_PROXY);
+}
+
+/** Expand connector placeholders such as ${TOKEN} from the server's stored env. */
+export function expandMcpTemplate(value: string, env?: Record<string, string>): string {
+  return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, key: string) => {
+    const replacement = env?.[key];
+    return replacement === undefined ? `\${${key}}` : replacement;
+  });
+}
+
+export function unresolvedMcpTemplateKeys(values: Array<string | undefined>): string[] {
+  const keys = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    for (const match of value.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
+      keys.add(match[1]);
+    }
+  }
+  return [...keys].sort();
+}
+
+function ensureMcpTemplatesResolved(
+  values: Array<string | undefined>,
+  env: Record<string, string> | undefined,
+  serverName: string,
+): void {
+  const missing = unresolvedMcpTemplateKeys(values).filter(key => !env?.[key]);
+  if (missing.length > 0) {
+    throw new Error(`MCP server "${serverName}" is missing credentials: ${missing.join(', ')}`);
+  }
 }
 
 // ── Windows hidden-subprocess init script ────────────────────────
@@ -477,7 +549,12 @@ export class McpServerManager {
       }
       transport = stdioTransport;
     } else {
-      const rawUrl = record.url?.trim();
+      ensureMcpTemplatesResolved(
+        [record.url, ...Object.values(record.headers || {})],
+        record.env,
+        record.name,
+      );
+      const rawUrl = record.url ? expandMcpTemplate(record.url, record.env).trim() : undefined;
       if (!rawUrl) {
         log(
           'WARN',
@@ -497,7 +574,17 @@ export class McpServerManager {
         return null;
       }
 
-      const requestInit = this.buildRemoteRequestInit(record);
+      const requestInit = this.buildRemoteRequestInit({
+        ...record,
+        headers: record.headers
+          ? Object.fromEntries(
+              Object.entries(record.headers).map(([key, value]) => [
+                key,
+                expandMcpTemplate(value, record.env),
+              ]),
+            )
+          : undefined,
+      });
       if (record.transportType === 'sse') {
         log('INFO', `Starting "${record.name}" via SSE: url=${parsedUrl.toString()}`);
         transport = new SSEClientTransport(parsedUrl, requestInit ? { requestInit } : undefined);
@@ -516,7 +603,7 @@ export class McpServerManager {
     );
 
     try {
-      await client.connect(transport);
+      await withMcpTimeout(client.connect(transport), record.timeout ?? 60, `MCP server "${record.name}" connection`);
       log('INFO', `Connected to MCP server "${record.name}"`);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
@@ -534,7 +621,7 @@ export class McpServerManager {
     // Discover tools
     let tools: McpToolManifestEntry[] = [];
     try {
-      const result = await client.listTools();
+      const result = await withMcpTimeout(client.listTools(), record.timeout ?? 60, `MCP server "${record.name}" tool discovery`);
       tools = (result.tools || []).map(t => ({
         server: record.name,
         name: t.name,
@@ -591,7 +678,11 @@ export class McpServerManager {
 
       // Race the tool call against the abort signal so that in-flight MCP calls
       // return immediately when the gateway drops the HTTP connection (e.g. after chat.abort).
-      const toolPromise = server.client.callTool({ name: toolName, arguments: args });
+      const toolPromise = withMcpTimeout(
+        server.client.callTool({ name: toolName, arguments: args }),
+        server.record.timeout ?? 60,
+        `Tool "${toolName}"`,
+      );
       let result: Awaited<typeof toolPromise>;
       if (options?.signal) {
         result = await raceAbortSignal(toolPromise, options.signal, `Tool "${toolName}" aborted`);
@@ -649,14 +740,8 @@ export class McpServerManager {
     for (const [name, server] of this.servers) {
       closePromises.push(
         (async () => {
-          try {
-            await server.client.close();
+          if (await closeClientWithTimeout(server.client, name)) {
             log('INFO', `Stopped MCP server "${name}"`);
-          } catch (error) {
-            log(
-              'WARN',
-              `Error stopping "${name}": ${error instanceof Error ? error.message : String(error)}`,
-            );
           }
         })(),
       );

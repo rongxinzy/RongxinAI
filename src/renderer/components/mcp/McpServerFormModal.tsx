@@ -52,6 +52,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
   const [envRows, setEnvRows] = useState<{ key: string; value: string; required?: boolean }[]>([]);
   const [url, setUrl] = useState('');
   const [headerRows, setHeaderRows] = useState<{ key: string; value: string }[]>([]);
+  const [timeoutText, setTimeoutText] = useState('60');
   const [error, setError] = useState('');
   const [envErrors, setEnvErrors] = useState<Record<number, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -81,19 +82,20 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
           ? Object.entries(server.headers).map(([key, value]) => ({ key, value }))
           : [],
       );
+      setTimeoutText(String(server.timeout ?? 60));
     } else if (registryEntry) {
       // Registry install mode — pre-fill from template
       setName(registryEntry.name);
       const registryDescription =
         (i18nService.getLanguage() === 'zh'
-          ? registryEntry.description_zh
-          : registryEntry.description_en) ||
+          ? registryEntry.description_zh || registryEntry.description_en
+          : registryEntry.description_en || registryEntry.description_zh) ||
         (registryEntry.descriptionKey ? i18nService.t(registryEntry.descriptionKey) : '');
       setDescription(registryDescription);
       setTransportType(registryEntry.transportType);
-      setCommand(registryEntry.command);
+      setCommand(registryEntry.command || '');
       // defaultArgs + argPlaceholders
-      const allArgs = [...registryEntry.defaultArgs];
+      const allArgs = [...(registryEntry.defaultArgs || [])];
       if (registryEntry.argPlaceholders) {
         allArgs.push(...registryEntry.argPlaceholders);
       }
@@ -111,8 +113,11 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
         }
       }
       setEnvRows(envEntries);
-      setUrl('');
-      setHeaderRows([]);
+      setUrl(registryEntry.url || '');
+      setHeaderRows(
+        Object.entries(registryEntry.headers || {}).map(([key, value]) => ({ key, value })),
+      );
+      setTimeoutText('60');
     } else {
       // Create mode
       setName('');
@@ -123,6 +128,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       setEnvRows([]);
       setUrl('');
       setHeaderRows([]);
+      setTimeoutText('60');
     }
     setError('');
     setEnvErrors({});
@@ -185,6 +191,13 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       description: description.trim(),
       transportType,
     };
+
+    const timeout = Number(timeoutText);
+    if (!Number.isInteger(timeout) || timeout < 1 || timeout > 600) {
+      setError(i18nService.t('mcpTimeoutInvalid'));
+      return null;
+    }
+    data.timeout = timeout;
 
     if (transportType === 'stdio') {
       data.command = validatedCommand;
@@ -481,6 +494,19 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
               </Field>
             </>
           )}
+
+          <Field>
+            <FieldLabel htmlFor="mcp-timeout">{i18nService.t('mcpTimeout')}</FieldLabel>
+            <Input
+              id="mcp-timeout"
+              type="number"
+              min="1"
+              max="600"
+              value={timeoutText}
+              onChange={event => setTimeoutText(event.target.value)}
+            />
+            <p className="text-sm text-muted-foreground">{i18nService.t('mcpTimeoutHint')}</p>
+          </Field>
 
           {error ? <FieldError>{error}</FieldError> : null}
         </FieldGroup>

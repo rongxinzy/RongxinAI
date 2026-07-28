@@ -1,0 +1,14 @@
+id: baidu-netdisk
+presentation:
+  name: "\u767e\u5ea6\u7f51\u76d8"
+  authorization: token
+  zh:
+    description: "\u767e\u5ea6\u7f51\u76d8\u6587\u4ef6\u641c\u7d22\u3001\u8bfb\u53d6\u548c\u7ba1\u7406"
+    examples:
+      - "\u8bf7\u5728\u767e\u5ea6\u7f51\u76d8\u4e2d\u641c\u7d22\u5305\u542b\u300c\u9879\u76ee\u65b9\u6848\u300d\u7684\u6587\u4ef6\uff0c\u5217\u51fa\u6700\u8fd1\u4fee\u6539\u7684\u4e94\u4e2a\u7ed3\u679c\u3002"
+      - "\u8bf7\u68c0\u67e5\u767e\u5ea6\u7f51\u76d8\u4e2d\u6211\u4eca\u65e5\u4e0a\u4f20\u7684\u6587\u4ef6\uff0c\u6309\u6587\u4ef6\u7c7b\u578b\u6574\u7406\u6210\u6e05\u5355\u3002"
+  en:
+    description: Baidu Netdisk file search, reading, and management.
+    examples:
+      - Search Baidu Netdisk for files containing project proposal and list the five most recently modified results.
+      - Review files uploaded to Baidu Netdisk today and organize them by file type.

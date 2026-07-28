@@ -12,6 +12,7 @@ export interface McpServerConfig {
   env?: Record<string, string>; // stdio
   url?: string; // sse / http
   headers?: Record<string, string>; // sse / http
+  timeout?: number;
   isBuiltIn: boolean; // installed from built-in registry
   githubUrl?: string; // GitHub repository URL
   registryId?: string; // matching registry entry ID
@@ -28,6 +29,7 @@ export interface McpServerFormData {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -49,11 +51,18 @@ export interface McpRegistryEntry {
   category: McpCategory; // category tag
   categoryKey: string; // i18n translation key for category
   transportType: McpTransportType;
-  command: string; // default command, e.g. 'npx'
-  defaultArgs: string[]; // default arguments
+  command?: string; // default command, e.g. 'npx'
+  defaultArgs?: string[]; // default arguments
+  url?: string; // default URL for SSE / HTTP servers
+  headers?: Record<string, string>;
+  authType?: 'oauth' | 'cli' | 'token' | 'external';
+  connectorPath?: string;
+  iconPath?: string;
+  metadataPath?: string;
   requiredEnvKeys?: string[]; // env vars the user must fill
   optionalEnvKeys?: string[]; // optional env vars
   argPlaceholders?: string[]; // placeholder hints for args (e.g. path)
+  presentation?: McpPresentation;
 }
 
 // Remote marketplace server entry
@@ -64,10 +73,42 @@ export interface McpMarketplaceServer {
   description_en?: string;
   category: string;
   transportType: string;
-  command: string;
-  defaultArgs: string[];
+  descriptionKey?: string;
+  categoryKey?: string;
+  command?: string;
+  defaultArgs?: string[];
+  url?: string;
+  headers?: Record<string, string>;
+  authType?: 'oauth' | 'cli' | 'token' | 'external';
+  connectorPath?: string;
+  iconPath?: string;
+  metadataPath?: string;
   requiredEnvKeys?: string[];
   optionalEnvKeys?: string[];
+  presentation?: McpPresentation;
+}
+
+export interface McpPresentationSection {
+  title?: string;
+  description?: string;
+}
+
+export interface McpPresentationLocale {
+  description?: string;
+  examples?: string[];
+  connect?: {
+    usage?: McpPresentationSection;
+    data?: McpPresentationSection;
+    control?: McpPresentationSection;
+    authorization?: McpPresentationSection;
+  };
+}
+
+export interface McpPresentation {
+  name?: string;
+  authorization?: string;
+  zh?: McpPresentationLocale;
+  en?: McpPresentationLocale;
 }
 
 // Dynamic marketplace category from remote

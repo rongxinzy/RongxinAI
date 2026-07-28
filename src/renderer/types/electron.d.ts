@@ -273,6 +273,7 @@ interface McpServerConfigIPC {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -287,10 +288,30 @@ interface McpMarketplaceServer {
   description_en: string;
   category: string;
   transportType: 'stdio' | 'sse' | 'http';
-  command: string;
-  defaultArgs: string[];
+  descriptionKey?: string;
+  categoryKey?: string;
+  command?: string;
+  defaultArgs?: string[];
+  url?: string;
+  headers?: Record<string, string>;
+  authType?: 'oauth' | 'cli' | 'token' | 'external';
+  connectorPath?: string;
+  iconPath?: string;
+  metadataPath?: string;
   requiredEnvKeys?: string[];
   optionalEnvKeys?: string[];
+  presentation?: {
+    name?: string;
+    authorization?: string;
+    zh?: {
+      description?: string;
+      connect?: Record<string, { title?: string; description?: string }>;
+    };
+    en?: {
+      description?: string;
+      connect?: Record<string, { title?: string; description?: string }>;
+    };
+  };
 }
 
 interface McpMarketplaceCategory {
@@ -413,6 +434,11 @@ interface IElectronAPI {
       error?: string;
     }>;
     refreshBridge: () => Promise<{ success: boolean; tools: number; error?: string }>;
+    authorize: (data: any) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
+    cancelAuthorize: (requestId: string) => Promise<{ success: boolean }>;
+    getFeishuCliStatus: () => Promise<{ success: boolean; installed: boolean; error?: string }>;
+    prepareFeishuCli: () => Promise<{ success: boolean; error?: string }>;
+    loadIcon: (iconPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
     onBridgeSyncStart: (callback: () => void) => () => void;
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) => () => void;
   };
