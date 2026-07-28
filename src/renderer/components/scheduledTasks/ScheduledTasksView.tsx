@@ -1,7 +1,16 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@shared/components/ui/dialog';
 import { Spinner } from '@shared/components/ui/spinner';
-import { ArrowLeft, CalendarClock, PanelLeft, Pencil } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { CalendarClock, PanelLeft, Pencil } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
@@ -24,6 +33,14 @@ interface ScheduledTasksViewProps {
   updateBadge?: React.ReactNode;
 }
 
+const AUTO_TAB = {
+  Create: 'create',
+  Tasks: 'tasks',
+  History: 'history',
+} as const;
+
+type AutoTab = (typeof AUTO_TAB)[keyof typeof AUTO_TAB];
+
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -35,19 +52,33 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const viewMode = useSelector((state: RootState) => state.scheduledTask.viewMode);
   const selectedTaskId = useSelector((state: RootState) => state.scheduledTask.selectedTaskId);
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
-  const selectedTask = selectedTaskId ? (tasks.find(t => t.id === selectedTaskId) ?? null) : null;
   const gatewayReady = useGatewayReady();
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
-  const isFormDirtyRef = useRef(false);
-  const [createFormKey, setCreateFormKey] = useState(0);
-  const [creatingTask, setCreatingTask] = useState(false);
-  const [templatePrefill, setTemplatePrefill] = useState<TaskTemplateValues | undefined>();
-  const tasksSectionRef = useRef<HTMLElement>(null);
 
-  const handleFormDirtyChange = useCallback((dirty: boolean) => {
-    isFormDirtyRef.current = dirty;
-  }, []);
+  const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
+  const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
+
+  // Create-task modal (template-prefilled or blank custom)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<TaskTemplateValues | undefined>();
+  const [createFormKey, setCreateFormKey] = useState(0);
+
+  // Task detail / edit modal, driven by mirroring redux selection
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [detailEdit, setDetailEdit] = useState(false);
+  const detailTask = detailTaskId ? (tasks.find(t => t.id === detailTaskId) ?? null) : null;
+
+  // Mirror redux selection (from TaskList card-click / dropdown edit) into the modal,
+  // then clear the selection so list and modal stay decoupled.
+  useEffect(() => {
+    if (!selectedTaskId) return;
+    if (viewMode === 'detail' || viewMode === 'edit') {
+      setDetailTaskId(selectedTaskId);
+      setDetailEdit(viewMode === 'edit');
+      dispatch(selectTask(null));
+      dispatch(setViewMode('list'));
+    }
+  }, [selectedTaskId, viewMode, dispatch]);
 
   const handleRequestDelete = useCallback((taskId: string, taskName: string) => {
     setDeleteTaskInfo({ id: taskId, name: taskName });
@@ -58,11 +89,11 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     const taskId = deleteTaskInfo.id;
     setDeleteTaskInfo(null);
     await scheduledTaskService.deleteTask(taskId);
-    if (selectedTaskId === taskId) {
-      dispatch(selectTask(null));
-      dispatch(setViewMode('list'));
+    if (detailTaskId === taskId) {
+      setDetailTaskId(null);
+      setDetailEdit(false);
     }
-  }, [deleteTaskInfo, selectedTaskId, dispatch]);
+  }, [deleteTaskInfo, detailTaskId]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteTaskInfo(null);
@@ -90,39 +121,21 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     };
   }, [gatewayReady]);
 
-  const handleBackToList = () => {
-    dispatch(selectTask(null));
-    dispatch(setViewMode('list'));
-  };
+  const openCreateModal = useCallback((prefill?: TaskTemplateValues) => {
+    setCreatePrefill(prefill);
+    setCreateFormKey(k => k + 1);
+    setCreateOpen(true);
+  }, []);
 
-  const handleEditCancel = useCallback(() => {
-    if (selectedTaskId) {
-      dispatch(setViewMode('detail'));
-    } else {
-      dispatch(setViewMode('list'));
+  const handleCreateSaved = useCallback((newTaskId?: string) => {
+    setCreateOpen(false);
+    setCreatePrefill(undefined);
+    setActiveTab(AUTO_TAB.Tasks);
+    if (newTaskId) {
+      setDetailTaskId(newTaskId);
+      setDetailEdit(false);
     }
-  }, [selectedTaskId, dispatch]);
-
-  const handleCreateSaved = useCallback(
-    (newTaskId?: string) => {
-      isFormDirtyRef.current = false;
-      setCreatingTask(false);
-      setTemplatePrefill(undefined);
-      setCreateFormKey(k => k + 1);
-      if (newTaskId) {
-        dispatch(selectTask(newTaskId));
-        dispatch(setViewMode('detail'));
-        tasksSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        dispatch(selectTask(null));
-        dispatch(setViewMode('list'));
-      }
-    },
-    [dispatch],
-  );
-
-  // Show back arrow when viewing task detail or editing
-  const showBack = (viewMode === 'detail' || viewMode === 'edit') && selectedTaskId;
+  }, []);
 
   if (!gatewayReady || !initialDataLoaded) {
     return (
@@ -151,26 +164,15 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               {updateBadge}
             </div>
           )}
-          {showBack && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBackToList}
-              className="non-draggable"
-              aria-label={i18nService.t('back')}
-            >
-              <ArrowLeft />
-            </Button>
-          )}
         </div>
         <WindowTitleBar inline />
       </div>
 
-      {/* Single-page content: three sections separated by dividers */}
+      {/* Scrollable content */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-8 pb-8">
+        <div className="mx-auto w-full max-w-2xl px-8 pb-10">
           {/* ── Hero ── */}
-          <section className="animate-fade-in-up py-8">
+          <section className="animate-fade-in-up pt-8 pb-6">
             <div className="flex items-center gap-4">
               <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
                 <CalendarClock className="size-6 text-primary" />
@@ -186,78 +188,97 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             </div>
           </section>
 
-          <div className="border-t border-border-subtle" />
-          {/* ── Section: Create ── */}
-          <section className="py-6">
-            <h2 className="text-base font-semibold text-foreground">
-              {i18nService.t('scheduledTasksNewTab')}
-            </h2>
-            <div className="mt-4">
-              {creatingTask ? (
-                <TaskForm
-                  key={createFormKey}
-                  mode="create"
-                  prefill={templatePrefill}
-                  onCancel={() => {
-                    setCreatingTask(false);
-                    setTemplatePrefill(undefined);
-                    isFormDirtyRef.current = false;
-                  }}
-                  onSaved={handleCreateSaved}
-                  onDirtyChange={handleFormDirtyChange}
-                />
-              ) : (
-                <TaskTemplateGallery
-                  onSelectTemplate={values => {
-                    setTemplatePrefill(values);
-                    setCreatingTask(true);
-                  }}
-                  onCustom={() => {
-                    setTemplatePrefill(undefined);
-                    setCreatingTask(true);
-                  }}
-                />
-              )}
-            </div>
-          </section>
+          {/* ── Tab list on the divider line ── */}
+          <div className="border-b border-border">
+            <Tabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AutoTab)}
+              className="-mb-px self-start"
+            >
+              <TabsList variant="line">
+                <TabsTrigger
+                  value={AUTO_TAB.Create}
+                  className="after:bottom-[-1px] after:h-1"
+                >
+                  {i18nService.t('scheduledTasksNewTab')}
+                </TabsTrigger>
+                <TabsTrigger value={AUTO_TAB.Tasks} className="after:bottom-[-1px] after:h-1">
+                  {i18nService.t('scheduledTasksTabTasks')}
+                  {tasks.length > 0 ? <Badge variant="secondary">{tasks.length}</Badge> : null}
+                </TabsTrigger>
+                <TabsTrigger
+                  value={AUTO_TAB.History}
+                  className="after:bottom-[-1px] after:h-1"
+                >
+                  {i18nService.t('scheduledTasksTabHistory')}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-          <div className="border-t border-border-subtle" />
+          {/* ── Active pane ── */}
+          <div key={activeTab} className="animate-fade-in pt-6">
+            {activeTab === AUTO_TAB.Create && (
+              <TaskTemplateGallery
+                onSelectTemplate={values => openCreateModal(values)}
+                onCustom={() => openCreateModal(undefined)}
+              />
+            )}
 
-          {/* ── Section: Tasks ── */}
-          <section ref={tasksSectionRef} className="scroll-mt-4 py-6">
-            <h2 className="text-base font-semibold text-foreground">
-              {i18nService.t('scheduledTasksTabTasks')}
-            </h2>
-            <div className="mt-4">
-              {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
-              {viewMode === 'edit' && selectedTask && (
-                <TaskForm
-                  mode="edit"
-                  task={selectedTask}
-                  onCancel={handleEditCancel}
-                  onSaved={() => dispatch(setViewMode('detail'))}
-                  onDirtyChange={handleFormDirtyChange}
-                />
-              )}
-              {viewMode === 'detail' && selectedTask && (
-                <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
-              )}
-            </div>
-          </section>
+            {activeTab === AUTO_TAB.Tasks && <TaskList onRequestDelete={handleRequestDelete} />}
 
-          <div className="border-t border-border-subtle" />
-
-          {/* ── Section: History ── */}
-          <section className="py-6">
-            <h2 className="text-base font-semibold text-foreground">
-              {i18nService.t('scheduledTasksTabHistory')}
-            </h2>
-            <div className="mt-4">
-              <AllRunsHistory />
-            </div>
-          </section>
+            {activeTab === AUTO_TAB.History && <AllRunsHistory />}
+          </div>
         </div>
       </div>
+
+      {/* Create-task modal */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" showCloseButton>
+          <DialogHeader className="sr-only">
+            <DialogTitle>{i18nService.t('scheduledTasksNewTask')}</DialogTitle>
+            <DialogDescription>{i18nService.t('scheduledTasksNewTask')}</DialogDescription>
+          </DialogHeader>
+          <TaskForm
+            key={createFormKey}
+            mode="create"
+            prefill={createPrefill}
+            onCancel={() => setCreateOpen(false)}
+            onSaved={handleCreateSaved}
+            onDirtyChange={() => {}}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Task detail / edit modal */}
+      <Dialog
+        open={detailTask !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setDetailTaskId(null);
+            setDetailEdit(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" showCloseButton>
+          <DialogHeader className="sr-only">
+            <DialogTitle>{detailTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
+            <DialogDescription>{detailTask?.name ?? ''}</DialogDescription>
+          </DialogHeader>
+          {detailTask &&
+            (detailEdit ? (
+              <TaskForm
+                mode="edit"
+                task={detailTask}
+                onCancel={() => setDetailEdit(false)}
+                onSaved={() => setDetailEdit(false)}
+                onDirtyChange={() => {}}
+              />
+            ) : (
+              <TaskDetail task={detailTask} onRequestDelete={handleRequestDelete} />
+            ))}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation modal */}
       {deleteTaskInfo && (
