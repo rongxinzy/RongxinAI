@@ -1,0 +1,5 @@
+name: Python 性能分析
+description: 使用性能剖析与内存分析定位 Python 程序瓶颈，输出 CPU 热点、内存问题和优化方向。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

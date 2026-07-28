@@ -23,6 +23,7 @@ type ModelScopeSkillRecord = {
   owner?: string;
   developer?: string;
   source_url?: string;
+  logo_url?: string;
   category?: string;
   tags?: string[];
   custom_tag?: string[];
@@ -32,6 +33,10 @@ type ModelScopeSkillRecord = {
     zh?: ModelScopeSkillLocale;
   };
   install_command?: string[];
+  readme?: string;
+  skill_md?: string;
+  skillMd?: string;
+  content?: string;
 };
 
 type MarketplaceSkillRecord = {
@@ -42,6 +47,7 @@ type MarketplaceSkillRecord = {
     downloads: number;
   };
   url: string;
+  iconUrl?: string;
   installSource?: string;
   version: string;
   source: {
@@ -54,9 +60,16 @@ type MarketplaceSkillRecord = {
 type FetchModelScopeSkillMarketplaceOptions = {
   token?: string | null;
   fetchImpl?: FetchLike;
+  pageNumber?: number;
+  pageSize?: number;
 };
 
 type ResolveModelScopeSkillInstallSourceOptions = {
+  token?: string | null;
+  fetchImpl?: FetchLike;
+};
+
+type FetchModelScopeSkillContentOptions = {
   token?: string | null;
   fetchImpl?: FetchLike;
 };
@@ -67,9 +80,9 @@ const MODELSCOPE_SKILL_MARKETPLACE = {
   SkillsApiPath: '/openapi/v1/skills',
   UserAgent: 'ZhiYuanAgent/skill-marketplace',
   DefaultPageNumber: 1,
-  DefaultPageSize: 100,
+  DefaultPageSize: 8,
+  MaximumPageSize: 100,
   DefaultVersion: '1.0.0',
-  FeaturedSkillLimit: 24,
 } as const;
 
 export function buildModelScopeSkillPageUrl(skillId: string): string {
@@ -101,18 +114,26 @@ export async function fetchModelScopeSkillMarketplace(
   const payload = await fetchModelScopeSkillsPage({
     token: options.token,
     fetchImpl,
+    pageNumber: options.pageNumber,
+    pageSize: options.pageSize,
   });
   const skills = Array.isArray(payload.data?.skills) ? payload.data.skills : [];
-  const marketplace = curateFeaturedMarketplace(
+  const pageSize = normalizePageSize(options.pageSize);
+  const pageNumber = normalizePageNumber(options.pageNumber);
+  const marketplace = sortMarketplaceSkills(
     skills
       .map(skill => toMarketplaceSkill(skill))
       .filter((skill): skill is MarketplaceSkillRecord => skill !== null),
   );
+  const total = payload.data?.total;
+  const hasMore =
+    typeof total === 'number' ? pageNumber * pageSize < total : skills.length === pageSize;
   return JSON.stringify({
     data: {
       value: {
         marketplace,
         localSkill: [],
+        hasMore,
       },
     },
   });
@@ -132,16 +153,76 @@ export async function resolveModelScopeSkillInstallSource(
     token: options.token,
     fetchImpl,
   });
-  return getSupportedInstallSource(detail);
+  const directSource = getSupportedInstallSource(detail);
+  if (directSource) return directSource;
+  return fetchModelScopeSkillArchiveUrl(parsed.skillId, { fetchImpl });
+}
+
+async function fetchModelScopeSkillArchiveUrl(
+  skillId: string,
+  _input: { fetchImpl: FetchLike },
+): Promise<string | null> {
+  const normalizedId = skillId
+    .split('/')
+    .map(segment => segment.trim())
+    .filter(Boolean)
+    .join('/');
+  return normalizedId
+    ? `https://www.modelscope.cn/skills/${normalizedId}/archive/zip/master`
+    : null;
+}
+
+export async function fetchModelScopeSkillContent(
+  skillId: string,
+  options: FetchModelScopeSkillContentOptions = {},
+): Promise<string | null> {
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const detail = await fetchModelScopeSkillDetail(skillId, {
+    token: options.token,
+    fetchImpl,
+  });
+  const inlineContent = [detail.skill_md, detail.skillMd, detail.readme, detail.content].find(
+    value => typeof value === 'string' && value.trim(),
+  );
+  if (typeof inlineContent === 'string') return inlineContent;
+
+  const sourceUrl = readNonEmptyString(detail.source_url);
+  const rawUrl = sourceUrl ? toGitHubSkillMdUrl(sourceUrl) : null;
+  if (!rawUrl) return null;
+  const response = await fetchImpl(rawUrl, { method: 'GET' });
+  if (!response.ok) return null;
+  const content = await response.text();
+  return content.trim() ? content : null;
+}
+
+function toGitHubSkillMdUrl(source: string): string | null {
+  try {
+    const url = new URL(source);
+    if (url.hostname.toLowerCase() !== 'github.com') return null;
+    const segments = url.pathname.split('/').filter(Boolean);
+    const markerIndex = segments.findIndex(segment => segment === 'tree' || segment === 'blob');
+    if (segments.length < 4 || markerIndex < 2) return null;
+    const owner = segments[0];
+    const repository = segments[1];
+    const ref = segments[markerIndex + 1];
+    const path = segments.slice(markerIndex + 2);
+    if (!owner || !repository || !ref || path.length === 0) return null;
+    const filePath = path[path.length - 1].toLowerCase() === 'skill.md' ? path : [...path, 'SKILL.md'];
+    return `https://raw.githubusercontent.com/${owner}/${repository}/${ref}/${filePath.join('/')}`;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchModelScopeSkillsPage(input: {
   token?: string | null;
   fetchImpl: FetchLike;
-}): Promise<{ data?: { skills?: ModelScopeSkillRecord[] } }> {
+  pageNumber?: number;
+  pageSize?: number;
+}): Promise<{ data?: { skills?: ModelScopeSkillRecord[]; total?: number } }> {
   const query = new URLSearchParams({
-    page_number: String(MODELSCOPE_SKILL_MARKETPLACE.DefaultPageNumber),
-    page_size: String(MODELSCOPE_SKILL_MARKETPLACE.DefaultPageSize),
+    page_number: String(normalizePageNumber(input.pageNumber)),
+    page_size: String(normalizePageSize(input.pageSize)),
   });
   const response = await input.fetchImpl(
     `${MODELSCOPE_SKILL_MARKETPLACE.BaseUrl}${MODELSCOPE_SKILL_MARKETPLACE.SkillsApiPath}?${query.toString()}`,
@@ -156,7 +237,7 @@ async function fetchModelScopeSkillsPage(input: {
       `[SkillMarketplace] ModelScope skills request failed: HTTP ${response.status}${detail ? ` ${detail}` : ''}`,
     );
   }
-  return (await response.json()) as { data?: { skills?: ModelScopeSkillRecord[] } };
+  return (await response.json()) as { data?: { skills?: ModelScopeSkillRecord[]; total?: number } };
 }
 
 async function fetchModelScopeSkillDetail(
@@ -204,8 +285,9 @@ function toMarketplaceSkill(skill: ModelScopeSkillRecord): MarketplaceSkillRecor
     return null;
   }
 
-  const installSource = getSupportedInstallSource(skill);
+  const installSource = getSupportedInstallSource(skill) || buildModelScopeSkillPageUrl(skillId);
   const sourceUrl = readNonEmptyString(skill.source_url) || buildModelScopeSkillPageUrl(skillId);
+  const iconUrl = readNonEmptyString(skill.logo_url);
   const description = buildLocalizedDescription(skill);
 
   return {
@@ -216,6 +298,7 @@ function toMarketplaceSkill(skill: ModelScopeSkillRecord): MarketplaceSkillRecor
       downloads: typeof skill.downloads === 'number' ? skill.downloads : 0,
     },
     url: buildModelScopeSkillPageUrl(skillId),
+    ...(iconUrl ? { iconUrl } : {}),
     ...(installSource ? { installSource } : {}),
     version: MODELSCOPE_SKILL_MARKETPLACE.DefaultVersion,
     source: {
@@ -237,16 +320,27 @@ function buildLocalizedDescription(
   return { zh, en };
 }
 
-function curateFeaturedMarketplace(skills: MarketplaceSkillRecord[]): MarketplaceSkillRecord[] {
-  return [...skills]
-    .sort((left, right) => {
-      const downloadDelta = (right.stats.downloads ?? 0) - (left.stats.downloads ?? 0);
-      if (downloadDelta !== 0) {
-        return downloadDelta;
-      }
-      return left.name.localeCompare(right.name);
-    })
-    .slice(0, MODELSCOPE_SKILL_MARKETPLACE.FeaturedSkillLimit);
+function normalizePageNumber(value: number | undefined): number {
+  return Number.isInteger(value) && value > 0
+    ? value
+    : MODELSCOPE_SKILL_MARKETPLACE.DefaultPageNumber;
+}
+
+function sortMarketplaceSkills(skills: MarketplaceSkillRecord[]): MarketplaceSkillRecord[] {
+  return [...skills].sort((left, right) => {
+    const downloadDelta = (right.stats.downloads ?? 0) - (left.stats.downloads ?? 0);
+    if (downloadDelta !== 0) {
+      return downloadDelta;
+    }
+    return left.name.localeCompare(right.name);
+  });
+}
+
+function normalizePageSize(value: number | undefined): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    return MODELSCOPE_SKILL_MARKETPLACE.DefaultPageSize;
+  }
+  return Math.min(value, MODELSCOPE_SKILL_MARKETPLACE.MaximumPageSize);
 }
 
 function getSupportedInstallSource(skill: ModelScopeSkillRecord): string | null {

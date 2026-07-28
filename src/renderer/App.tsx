@@ -44,6 +44,7 @@ import {
 import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
+import { setActiveSkillIds } from './store/slices/skillSlice';
 import { WorkMode } from './store/workMode/constants';
 import { setWorkMode } from './store/workMode/workModeSlice';
 import type { CoworkPermissionResult } from './types/cowork';
@@ -367,6 +368,15 @@ const App: React.FC = () => {
     dispatch(clearSelection());
     setMainView('cowork');
   }, [dispatch]);
+
+  const handleTrySkill = useCallback(
+    (skillId: string) => {
+      dispatch(setActiveSkillIds([skillId]));
+      dispatch(setWorkMode(WorkMode.Work));
+      handleNewChat();
+    },
+    [dispatch, handleNewChat],
+  );
 
   const showToast = useCallback((message: string, autoClose: boolean = true) => {
     setToastMessage(message);
@@ -774,6 +784,7 @@ const App: React.FC = () => {
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
                   onCreateSkillByChat={handleCreateSkillByChat}
+                  onTrySkill={handleTrySkill}
                   updateBadge={isSidebarCollapsed ? updateBadge : null}
                   readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                 />
@@ -799,6 +810,7 @@ const App: React.FC = () => {
                   updateBadge={isSidebarCollapsed ? updateBadge : null}
                   readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                   onCreateSkillByChat={handleCreateSkillByChat}
+                  onTrySkill={handleTrySkill}
                 />
               ) : mainView === 'localInference' ? null : (
                 <CoworkView

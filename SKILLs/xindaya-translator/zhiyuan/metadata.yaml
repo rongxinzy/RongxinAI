@@ -1,0 +1,5 @@
+name: 中英专业翻译
+description: 提供兼顾准确、流畅与语境的中英双向翻译，适用于学术、商务、技术和法律类文本。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

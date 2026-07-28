@@ -157,3 +157,7 @@ Scheduled tasks can be created from natural language or through the GUI. When a 
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)
+
+## Sponsors
+
+Special thanks to [AnySearch](https://www.anysearch.com/) for sponsoring ZhiYuan Agent and supporting its built-in web search capabilities.

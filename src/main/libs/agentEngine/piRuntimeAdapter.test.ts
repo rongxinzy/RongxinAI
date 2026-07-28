@@ -23,7 +23,16 @@ const hoisted = vi.hoisted(() => {
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
     mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
-    mockGetModel: vi.fn((provider: string, modelId: string) => ({ provider, id: modelId })),
+    mockGetModel: vi.fn((provider: string, modelId: string) => ({
+      provider,
+      id: modelId,
+      baseUrl:
+        provider === 'openai'
+          ? 'https://api.openai.com/v1'
+          : provider === 'moonshotai-cn'
+            ? 'https://api.moonshot.cn/v1'
+            : undefined,
+    })),
     mockModelRuntime: {
       registerProvider: vi.fn(),
       setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
@@ -68,6 +77,26 @@ const hoisted = vi.hoisted(() => {
             contextWindow: 272000,
             contextTokens: 272000,
             maxTokens: 16384,
+          },
+        };
+      }
+
+      if (providerName === 'moonshot') {
+        return {
+          config: {
+            apiKey: 'sk-moonshot',
+            baseURL: 'http://172.18.5.179:3000/v1',
+            model: modelName,
+            apiType: 'openai' as const,
+          },
+          providerMetadata: {
+            providerName: 'moonshot',
+            codingPlanEnabled: false,
+            supportsImage: true,
+            modelName,
+            contextWindow: 262144,
+            contextTokens: 262144,
+            maxTokens: 32768,
           },
         };
       }
@@ -123,6 +152,7 @@ vi.mock('../claudeSettings', () => ({
 }));
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 
 describe('PiRuntimeAdapter', () => {
   let adapter: PiRuntimeAdapter;
@@ -213,6 +243,60 @@ describe('PiRuntimeAdapter', () => {
       );
       expect(mockModelRuntimeCreate).not.toHaveBeenCalled();
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('modelRuntime');
+    });
+
+    it('should register remote custom models with their configured endpoint and API key', async () => {
+      mockGetModel.mockImplementationOnce(() => undefined);
+
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'moonshot/kimi-for-coding',
+      });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('moonshot/kimi-for-coding');
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'moonshot',
+        expect.objectContaining({
+          baseUrl: 'http://172.18.5.179:3000/v1',
+          api: 'openai-completions',
+          models: [
+            expect.objectContaining({
+              provider: 'moonshot',
+              id: 'kimi-for-coding',
+              baseUrl: 'http://172.18.5.179:3000/v1',
+            }),
+          ],
+        }),
+      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('moonshot', 'sk-moonshot');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            provider: 'moonshot',
+            id: 'kimi-for-coding',
+            baseUrl: 'http://172.18.5.179:3000/v1',
+          }),
+          modelRuntime: mockModelRuntime,
+        }),
+      );
+    });
+
+    it('should not reuse a built-in model when the configured endpoint differs', async () => {
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'moonshot/kimi-k2.6',
+      });
+
+      expect(mockGetModel).toHaveBeenCalledWith('moonshotai-cn', 'kimi-k2.6');
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'moonshot',
+        expect.objectContaining({
+          baseUrl: 'http://172.18.5.179:3000/v1',
+          models: [expect.objectContaining({ id: 'kimi-k2.6' })],
+        }),
+      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('moonshot', 'sk-moonshot');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({ modelRuntime: mockModelRuntime }),
+      );
     });
 
     it('should make session active after start', async () => {
@@ -350,6 +434,116 @@ describe('PiRuntimeAdapter', () => {
       expect(() =>
         adapter.respondToPermission('unknown', { behavior: 'deny', message: 'no' }),
       ).not.toThrow();
+    });
+
+    it('appends the AskUserQuestion policy when a custom system prompt is configured', async () => {
+      await adapter.startSession('test', 'Hello Pi', { systemPrompt: 'Custom instructions' });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.appendSystemPromptOverride()).toEqual([PiAskUserQuestionSystemPrompt]);
+    });
+
+    it('resolves a Pi AskUserQuestion tool call with the renderer response', async () => {
+      const permissionRequests: Array<{ requestId: string; toolInput: Record<string, unknown> }> =
+        [];
+      const dismissals: string[] = [];
+      adapter.on('permissionRequest', (_sessionId, request) => {
+        permissionRequests.push({ requestId: request.requestId, toolInput: request.toolInput });
+      });
+      adapter.on('permissionDismiss', requestId => dismissals.push(requestId));
+
+      await adapter.startSession('test', 'Ask me something');
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{
+          name: string;
+          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<{
+            content: Array<{ text: string }>;
+          }>;
+        }>;
+      };
+      const askUserTool = sessionOptions.customTools?.find(tool => tool.name === 'AskUserQuestion');
+      expect(askUserTool).toBeDefined();
+
+      const toolResult = askUserTool!.execute('tool-call-1', {
+        questions: [
+          {
+            question: 'Continue?',
+            options: [{ label: 'Yes' }, { label: 'No' }],
+          },
+        ],
+      });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(1));
+
+      adapter.respondToPermission(permissionRequests[0].requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { 'Continue?': 'Yes' } },
+      });
+
+      await expect(toolResult).resolves.toMatchObject({
+        content: [{ text: 'Continue?: Yes' }],
+      });
+      expect(dismissals).toEqual([permissionRequests[0].requestId]);
+    });
+
+    it('keeps AskUserQuestion waits isolated to their owning Pi session', async () => {
+      const permissionRequests: Array<{ sessionId: string; requestId: string }> = [];
+      adapter.on('permissionRequest', (sessionId, request) => {
+        permissionRequests.push({ sessionId, requestId: request.requestId });
+      });
+
+      await adapter.startSession('session-a', 'Ask A');
+      await adapter.startSession('session-b', 'Ask B');
+
+      const getAskUserTool = (callIndex: number) => {
+        const sessionOptions = mockCreateAgentSession.mock.calls[callIndex]?.[0] as {
+          customTools?: Array<{
+            name: string;
+            execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
+          }>;
+        };
+        const tool = sessionOptions.customTools?.find(item => item.name === 'AskUserQuestion');
+        expect(tool).toBeDefined();
+        return tool!;
+      };
+
+      const question = {
+        questions: [
+          {
+            question: 'Continue?',
+            options: [{ label: 'Yes' }, { label: 'No' }],
+          },
+        ],
+      };
+      let sessionAResolved = false;
+      const sessionAResult = getAskUserTool(0)
+        .execute('tool-call-a', question)
+        .then(result => {
+          sessionAResolved = true;
+          return result;
+        });
+      const sessionBResult = getAskUserTool(1).execute('tool-call-b', question);
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(2));
+
+      const sessionBRequest = permissionRequests.find(request => request.sessionId === 'session-b');
+      expect(sessionBRequest).toBeDefined();
+      adapter.respondToPermission(sessionBRequest!.requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { 'Continue?': 'Yes' } },
+      });
+
+      await expect(sessionBResult).resolves.toMatchObject({
+        content: [{ text: 'Continue?: Yes' }],
+      });
+      expect(sessionAResolved).toBe(false);
+
+      const sessionARequest = permissionRequests.find(request => request.sessionId === 'session-a');
+      expect(sessionARequest).toBeDefined();
+      adapter.respondToPermission(sessionARequest!.requestId, { behavior: 'deny' });
+      await expect(sessionAResult).resolves.toMatchObject({
+        content: [{ text: 'The user denied the operation.' }],
+      });
     });
   });
 

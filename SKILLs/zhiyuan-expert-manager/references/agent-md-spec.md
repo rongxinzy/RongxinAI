@@ -1,4 +1,4 @@
-# Agent MD 规范（RongxinAI / pi）
+# Agent MD 规范（ZhiYuan Agent / pi）
 
 ## Frontmatter
 
@@ -25,7 +25,7 @@ maxTurns: { 默认50 }
 ### 可选字段
 
 ```yaml
-skills: [{ skill-name }] # 启动时预加载的 Skill（RongxinAI SKILLs 目录中的 skill 名）
+skills: [{ skill-name }] # 启动时预加载的 Skill（ZhiYuan Agent SKILLs 目录中的 skill 名）
 ```
 
 ---

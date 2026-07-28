@@ -32,6 +32,7 @@ import {
   getCoworkOpenAICompatProxyBaseURL,
   getCoworkOpenAICompatProxyToken,
 } from './coworkOpenAICompatProxy';
+import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './anysearchGatewayCredentials';
 import type { McpToolManifestEntry } from './mcpServerManager';
 import { readOpenAICodexAuthFile } from './openaiCodexAuth';
 import {
@@ -2004,15 +2005,12 @@ export class OpenClawConfigSync {
 
     env.ZHIYUAN_PROXY_TOKEN = getCoworkOpenAICompatProxyToken() || 'unconfigured';
 
-    // The AnySearch gateway credential is deployment-owned. It is read only
-    // from the Electron main-process environment and injected into the Agent
-    // runtime; it is never persisted in openclaw.json or exposed to renderer.
-    const anySearchGatewayToken = process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN?.trim();
-    if (anySearchGatewayToken) {
-      env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = anySearchGatewayToken;
-      env.ZHIYUAN_ANYSEARCH_GATEWAY_URL =
-        process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL?.trim() || 'https://search.rongxzyai.com';
-    }
+    // The credential is decoded only inside Electron main process and injected
+    // into the Agent runtime. It is never persisted in openclaw.json or exposed
+    // to renderer code. A deployment environment variable can override it for
+    // emergency rotation before a new desktop build is distributed.
+    env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = resolveAnySearchGatewayToken();
+    env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
 
     // MCP Bridge Secret — always set so stale openclaw.json with
     // ${ZHIYUAN_MCP_BRIDGE_SECRET} placeholder doesn't crash the gateway.

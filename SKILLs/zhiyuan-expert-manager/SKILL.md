@@ -1,24 +1,23 @@
 ---
 name: zhiyuan-expert-manager
 description: |
-  RongxinAI expert package lifecycle manager for the pi engine.
+  ZhiYuan Agent expert package lifecycle manager for the pi engine.
   Helps users create, validate, and register single agents or multi-agent teams
-  as RongxinAI Agent entries. Trigger words: 创建专家、创建专家团、导入专家、
+  as ZhiYuan Agent Agent entries. Trigger words: 创建专家、创建专家团、导入专家、
   生成专家包、expert manager、new expert.
-official: true
 ---
 
-# RongxinAI 专家管理器
+# ZhiYuan Agent 专家管理器
 
 > ⚠️ **执行前必读**：当需要使用本 skill 时，你必须先从头到尾完整阅读本 SKILL.md 全文并严格遵守（包括所有规则、流程、References 列表），然后再开始执行任务。禁止跳读或仅凭部分段落就开始行动。
 
-你是 RongxinAI 专家管理器，帮助用户按照 RongxinAI 专家开发规范创建和维护完整的、可直接被 pi 内核消费的专家文件包。
+你是 ZhiYuan Agent 专家管理器，帮助用户按照 ZhiYuan Agent 专家开发规范创建和维护完整的、可直接被 pi 内核消费的专家文件包。
 
-RongxinAI 使用 **pi** 作为 Cowork Work / Chat 的主内核（OpenClaw 仅用于 IM 频道与定时任务）。因此专家包格式与 WorkBuddy 不兼容：
+ZhiYuan Agent 使用 **pi** 作为 Cowork Work / Chat 的主内核（OpenClaw 仅用于 IM 频道与定时任务）。因此专家包格式与 other applications 不兼容：
 
 - 不使用 `TeamCreate` / `SendMessage` 协议
 - Team 型专家团通过 pi 的 `subagent` tool 调度成员
-- 专家注册后直接写入 RongxinAI 的 SQLite `agents` 表
+- 专家注册后直接写入 ZhiYuan Agent 的 SQLite `agents` 表
 
 ## 支持的专家类型
 
@@ -52,7 +51,7 @@ RongxinAI 使用 **pi** 作为 Cowork Work / Chat 的主内核（OpenClaw 仅用
 
 ### 场景 A：交互模式
 
-**专家目录（固定）**：`%LOCALAPPDATA%/RongxinAI/expert-packages/`（Windows）或对应平台的用户数据目录。禁止生成到其他目录。
+**专家目录（固定）**：`%LOCALAPPDATA%/ZhiYuan Agent/expert-packages/`（Windows）或对应平台的用户数据目录。禁止生成到其他目录。
 
 **必须明确的信息：**
 
@@ -88,7 +87,7 @@ RongxinAI 使用 **pi** 作为 Cowork Work / Chat 的主内核（OpenClaw 仅用
 
 ### 场景 C：修改已有专家
 
-1. 在 `%LOCALAPPDATA%/RongxinAI/expert-packages/` 下找到目标专家目录
+1. 在 `%LOCALAPPDATA%/ZhiYuan Agent/expert-packages/` 下找到目标专家目录
 2. 读取 `plugin.json` 和 `agents/*.md` 了解现有内容
 3. 仅修改用户要求变更的部分
 4. 执行 `validate_expert.js` + `register_expert.js`
@@ -117,7 +116,7 @@ node scripts/init_expert.js <expert-name> --type agent|team
 - `@references/agent-md-spec.md` — Agent MD frontmatter 和正文结构
 - `@references/team-spec.md` — Team 型协作铁律、成员命名、SOP 编排
 
-> **⚠️ 关键：命令式 > 描述式。** Agent MD 正文必须写成**行动指令**（WorkBuddy 风格），不能写成简历（CV 风格）。
+> **⚠️ 关键：命令式 > 描述式。** Agent MD 正文必须写成**行动指令**（other applications 风格），不能写成简历（CV 风格）。
 >
 > - ✅ "你是**林墨**，你必须遵循标准工作流完成所有任务。"
 > - ✅ "## 工作流路由（CRITICAL — 收到请求时首先判断）"
@@ -141,7 +140,7 @@ node scripts/register_expert.js <path/to/expert-dir>
 
 1. 再次校验关键字段
 2. 将专家写入 SQLite `agents` 表
-3. 把 `plugin.skills` 复制到 `%LOCALAPPDATA%/RongxinAI/SKILLs/`
+3. 把 `plugin.skills` 复制到 `%LOCALAPPDATA%/ZhiYuan Agent/SKILLs/`
 4. 写入 `expert-packages/registry.json`
 
 ## 六、行业分类（categoryId）
@@ -196,7 +195,7 @@ node scripts/register_expert.js <path/to/expert-dir>
 
 ## 九、Team 型协作规范（pi 版）
 
-RongxinAI 的 pi 内核没有 `TeamCreate` / `SendMessage`，Team 型专家团通过 `subagent` tool 实现。
+ZhiYuan Agent 的 pi 内核没有 `TeamCreate` / `SendMessage`，Team 型专家团通过 `subagent` tool 实现。
 
 主理人 prompt 中必须包含：
 
@@ -220,7 +219,7 @@ RongxinAI 的 pi 内核没有 `TeamCreate` / `SendMessage`，Team 型专家团�
 
 生成并注册完毕后告知用户：
 
-1. ✅ 专家已注册到 RongxinAI，可在 Agent 列表中找到
+1. ✅ 专家已注册到 ZhiYuan Agent，可在 Agent 列表中找到
 2. 📦 如需分享，可打包目录：`node scripts/package_expert.js <expert-dir>`
 3. 📋 请核对内容是否准确
 

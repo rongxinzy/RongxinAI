@@ -162,3 +162,7 @@ Cowork 是核心会话系统。用户任务从 Renderer 通过 IPC 发送到 Mai
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)
+
+## 赞助
+
+感谢 [AnySearch](https://www.anysearch.com/) 对知远智能体的赞助与支持，为项目的内置联网搜索能力提供助力。

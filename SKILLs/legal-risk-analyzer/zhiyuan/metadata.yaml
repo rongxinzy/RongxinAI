@@ -1,0 +1,5 @@
+name: 法律风险分析
+description: 使用严重程度与发生概率框架评估业务和合同风险，输出风险分级、处置建议与升级路径。
+author: Anthropic
+license: Apache-2.0
+skillmd: ./SKILL.md

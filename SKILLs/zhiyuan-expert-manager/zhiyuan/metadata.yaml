@@ -1,0 +1,9 @@
+name:
+  专家创建与管理
+description:
+  创建、校验、导入和维护单专家或多专家协作包，快速将专业工作流配置为可直接使用的智能体。
+author:
+  知远智能体
+license:
+  MIT
+skillmd: ./SKILL.md

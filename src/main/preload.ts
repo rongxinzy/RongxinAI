@@ -77,18 +77,27 @@ contextBridge.exposeInMainWorld('electron', {
     list: () => ipcRenderer.invoke(SkillsIpc.List),
     setEnabled: (options: { id: string; enabled: boolean }) =>
       ipcRenderer.invoke(SkillsIpc.SetEnabled, options),
+    setEnabledBatch: (options: { ids: string[]; enabled: boolean }) =>
+      ipcRenderer.invoke(SkillsIpc.SetEnabledBatch, options),
+    setPinned: (options: { id: string; pinned: boolean }) =>
+      ipcRenderer.invoke(SkillsIpc.SetPinned, options),
     delete: (id: string) => ipcRenderer.invoke(SkillsIpc.Delete, id),
-    download: (source: string) => ipcRenderer.invoke(SkillsIpc.Download, source),
+    download: (source: string, options?: { iconUrl?: string; displayName?: string }) =>
+      ipcRenderer.invoke(SkillsIpc.Download, source, options),
     confirmInstall: (pendingId: string, action: string) =>
       ipcRenderer.invoke(SkillsIpc.ConfirmInstall, pendingId, action),
     getRoot: () => ipcRenderer.invoke(SkillsIpc.GetRoot),
+    getContent: (skillId: string) => ipcRenderer.invoke(SkillsIpc.GetContent, skillId),
     autoRoutingPrompt: () => ipcRenderer.invoke(SkillsIpc.AutoRoutingPrompt),
     getConfig: (skillId: string) => ipcRenderer.invoke(SkillsIpc.GetConfig, skillId),
     setConfig: (skillId: string, config: Record<string, string>) =>
       ipcRenderer.invoke(SkillsIpc.SetConfig, skillId, config),
     testEmailConnectivity: (skillId: string, config: Record<string, string>) =>
       ipcRenderer.invoke(SkillsIpc.TestEmailConnectivity, skillId, config),
-    fetchMarketplace: () => ipcRenderer.invoke(SkillsIpc.FetchMarketplace),
+    fetchMarketplace: (options?: { pageNumber?: number; pageSize?: number }) =>
+      ipcRenderer.invoke(SkillsIpc.FetchMarketplace, options),
+    fetchMarketplaceContent: (skillId: string) =>
+      ipcRenderer.invoke(SkillsIpc.FetchMarketplaceContent, skillId),
     onChanged: (callback: () => void) => onPushVoid(SkillsIpc.Changed, callback),
   },
 
@@ -235,6 +244,9 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   api: {
+    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) =>
+      ipcRenderer.invoke(ApiIpc.WebSearch, input),
+
     fetch: (options: {
       url: string;
       method: string;

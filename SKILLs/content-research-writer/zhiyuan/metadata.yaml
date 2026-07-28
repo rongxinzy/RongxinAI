@@ -1,0 +1,5 @@
+name: 内容调研写作
+description: 将资料调研、引用核验、结构梳理与写作优化结合，协助产出可信且易读的内容文章。
+author: ComposioHQ
+license: Apache-2.0
+skillmd: ./SKILL.md

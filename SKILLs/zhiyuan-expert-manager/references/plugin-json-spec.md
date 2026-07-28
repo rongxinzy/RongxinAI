@@ -1,4 +1,4 @@
-# plugin.json 字段规范（RongxinAI / pi）
+# plugin.json 字段规范（ZhiYuan Agent / pi）
 
 ## 基础字段（必填）
 
@@ -28,7 +28,7 @@
 | 字段     | 类型     | 说明                                               |
 | -------- | -------- | -------------------------------------------------- |
 | `agents` | string[] | Agent 定义文件路径列表                             |
-| `skills` | string[] | Skill 目录路径列表（会被复制到 RongxinAI SKILLs/） |
+| `skills` | string[] | Skill 目录路径列表（会被复制到 ZhiYuan Agent SKILLs/） |
 
 ## 展示字段（必填）
 
