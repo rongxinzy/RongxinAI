@@ -310,7 +310,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceInfer: '推理',
     marketplaceOpenModel: '打开模型',
     marketplaceOpenModelScope: 'ModelScope',
-    marketplaceModelScopeLink: '魔塔链接',
+    marketplaceModelScopeLink: '魔搭链接',
     marketplaceDownloads: '{count} 次下载',
     marketplaceCancel: '取消',
     marketplaceCancelling: '取消中...',
@@ -322,8 +322,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplacePullCancelled: '拉取已取消',
     marketplaceTokenSettings: '设置魔搭 API Token',
     marketplaceTokenSettingsTitle: '配置魔搭社区 API Token',
-    marketplaceTokenSettingsDesc:
-      '填入 Token 后可使用 ModelScope OpenAPI 搜索，获得更准确的模型列表和更快的搜索速度。在 modelscope.cn 注册账号后，前往个人设置 → 访问令牌获取。',
     marketplaceTokenPlaceholder: '请输入魔搭社区 API Token',
     marketplaceTokenSave: '保存',
     marketplaceTokenClear: '清除',
@@ -2692,8 +2690,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplacePullCancelled: 'Pull cancelled',
     marketplaceTokenSettings: 'ModelScope API Token',
     marketplaceTokenSettingsTitle: 'Configure ModelScope API Token',
-    marketplaceTokenSettingsDesc:
-      'Enter a token to enable ModelScope OpenAPI search for faster, more accurate model results. Register at modelscope.cn, then go to Settings → Access Tokens.',
     marketplaceTokenPlaceholder: 'Enter ModelScope API token',
     marketplaceTokenSave: 'Save',
     marketplaceTokenClear: 'Clear',

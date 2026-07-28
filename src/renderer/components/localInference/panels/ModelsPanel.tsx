@@ -48,6 +48,7 @@ import {
   reorderLocalModelOrder,
   writeLocalModelOrder,
 } from '../utils/modelOrder';
+import { ListPagination } from '../../common/ListPagination';
 import { type LocalModelProvider, resolveLocalModelProvider } from '../utils/modelProvider';
 import { formatBytes, formatDate } from '../utils/progress';
 
@@ -67,6 +68,8 @@ const modelProviderIconMap = {
 } satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
 const MODEL_CARD_MAX_VISIBLE_TAGS = 6;
+const MODEL_PAGE_SIZE_WITHOUT_LOG = 16;
+const MODEL_PAGE_SIZE_WITH_LOG = 8;
 const modelCardActionClassName =
   'relative z-20 transition-[opacity,transform] duration-200 ease-out group-hover/card:translate-x-0 group-hover/card:opacity-100 group-hover/card:pointer-events-auto';
 const modelCardHiddenActionClassName = 'pointer-events-none translate-x-1 opacity-0';
@@ -93,6 +96,7 @@ type ModelsPanelProps = {
     props: { disabled: boolean; onClick: () => void },
   ) => React.ReactNode;
   showRegisteredModelsTitle?: boolean;
+  logPanelVisible?: boolean;
 };
 
 type ModelCardProps = {
@@ -133,10 +137,12 @@ export function ModelsPanel({
   onOpenLaunchLog,
   renderLoadButton,
   showRegisteredModelsTitle = true,
+  logPanelVisible = false,
 }: ModelsPanelProps) {
   const [pendingDeleteModel, setPendingDeleteModel] = useState<LlamaCppModel | null>(null);
   const [modelOrder, setModelOrder] = useState<string[]>(readLocalModelOrder);
   const [draggedModelName, setDraggedModelName] = useState<string | null>(null);
+  const [modelPage, setModelPage] = useState(1);
   const availableModels = useMemo(
     () => mergeVisibleModels(localModels, runningModels),
     [localModels, runningModels],
@@ -156,6 +162,24 @@ export function ModelsPanel({
       return model ? [{ model, runningModel: findRunningModel(runningModels, model.name) }] : [];
     });
   }, [availableModels, orderedModelNames, runningModels]);
+  const modelsPerPage = logPanelVisible ? MODEL_PAGE_SIZE_WITH_LOG : MODEL_PAGE_SIZE_WITHOUT_LOG;
+  const totalModelPages = Math.max(1, Math.ceil(modelCards.length / modelsPerPage));
+  const currentModelPage = Math.min(modelPage, totalModelPages);
+  const modelGridClassName = logPanelVisible
+    ? 'grid-cols-2'
+    : 'grid-cols-2 2xl:grid-cols-4';
+  const visibleModelCards = modelCards.slice(
+    (currentModelPage - 1) * modelsPerPage,
+    currentModelPage * modelsPerPage,
+  );
+
+  useEffect(() => {
+    setModelPage(1);
+  }, [modelsPerPage]);
+
+  useEffect(() => {
+    if (modelPage > totalModelPages) setModelPage(totalModelPages);
+  }, [modelPage, totalModelPages]);
 
   useEffect(() => {
     setModelOrder(currentOrder => {
@@ -208,31 +232,44 @@ export function ModelsPanel({
           </h2>
         ) : null}
         {modelCards.length > 0 ? (
-          <div className="grid auto-rows-min content-start gap-3 md:grid-cols-2 2xl:grid-cols-4">
-            {modelCards.map(({ model, runningModel }) => (
-              <ModelCard
-                key={model.name}
-                model={model}
-                runningModel={runningModel}
-                preference={modelPreferences[model.name]}
-                loading={loading}
-                loadingModel={loadingModelName === model.name}
-                unloading={unloadingModelName === model.name}
-                onLoadModel={() => onLoadModel(model)}
-                onConfigureContext={() => onConfigureContext(model)}
-                onUnload={() => onUnload(model.name)}
-                dragging={draggedModelName === model.name}
-                onDragStart={event => handleCardDragStart(event, model.name)}
-                onDragOver={event => event.preventDefault()}
-                onDrop={event => handleCardDrop(event, model.name)}
-                onDragEnd={() => setDraggedModelName(null)}
-                renderLoadButton={
-                  renderLoadButton ? props => renderLoadButton(model, props) : undefined
-                }
-                onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
-              />
-            ))}
-          </div>
+          <>
+            <div
+              className={cn(
+                'grid w-full auto-rows-min content-start gap-3',
+                modelGridClassName,
+              )}
+            >
+              {visibleModelCards.map(({ model, runningModel }) => (
+                <ModelCard
+                  key={model.name}
+                  model={model}
+                  runningModel={runningModel}
+                  preference={modelPreferences[model.name]}
+                  loading={loading}
+                  loadingModel={loadingModelName === model.name}
+                  unloading={unloadingModelName === model.name}
+                  onLoadModel={() => onLoadModel(model)}
+                  onConfigureContext={() => onConfigureContext(model)}
+                  onUnload={() => onUnload(model.name)}
+                  dragging={draggedModelName === model.name}
+                  onDragStart={event => handleCardDragStart(event, model.name)}
+                  onDragOver={event => event.preventDefault()}
+                  onDrop={event => handleCardDrop(event, model.name)}
+                  onDragEnd={() => setDraggedModelName(null)}
+                  renderLoadButton={
+                    renderLoadButton ? props => renderLoadButton(model, props) : undefined
+                  }
+                  onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
+                />
+              ))}
+            </div>
+            <ListPagination
+              page={currentModelPage}
+              totalPages={totalModelPages}
+              onPageChange={setModelPage}
+              className="pt-1"
+            />
+          </>
         ) : null}
       </section>
 
@@ -318,7 +355,8 @@ function ModelCard({
 
   return (
     <motion.div
-      className="relative w-full"
+
+      className="relative h-full w-full"
       whileHover={
         reduceMotion || loadingModel || unloading || dragging
           ? undefined
@@ -334,7 +372,7 @@ function ModelCard({
         onDrop={onDrop}
         onDragEnd={onDragEnd}
         className={cn(
-          'relative w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+          'relative h-full w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
           'hover:border-border hover:bg-muted/20 hover:shadow-md',
           (loadingModel || unloading) && 'bg-muted/30',
           dragging && 'opacity-50',
