@@ -98,6 +98,7 @@
     "dist:linux": "npm run build && npm run compile:electron && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --linux --publish never",
     "clean:release": "rimraf release",
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
+    "generate:app-icons": "python3 scripts/generate-app-icons.py",
     "setup:mingit": "node scripts/setup-mingit.js",
     "setup:python-runtime": "node scripts/setup-python-runtime.js",
     "setup:uv-runtime": "node scripts/setup-uv-runtime.js",
@@ -130,7 +131,7 @@
     "llamacpp:runtime:linux-x64": "node scripts/run-build-llamacpp-runtime.cjs linux-x64 && node scripts/sync-llamacpp-runtime-current.cjs linux-x64",
     "llamacpp:runtime:linux-arm64": "node scripts/run-build-llamacpp-runtime.cjs linux-arm64 && node scripts/sync-llamacpp-runtime-current.cjs linux-arm64",
     "upload:artifact": "node scripts/upload-artifact.cjs",
-    "regenerate:icon": "bash scripts/regenerate-mac-icon.sh",
+    "regenerate:icon": "python3 scripts/generate-app-icons.py",
     "fix:mac-icon": "bash scripts/fix-mac-icon-display.sh"
   },
   "dependencies": {
