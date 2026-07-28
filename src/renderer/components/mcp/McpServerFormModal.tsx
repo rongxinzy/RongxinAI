@@ -86,14 +86,14 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       setName(registryEntry.name);
       const registryDescription =
         (i18nService.getLanguage() === 'zh'
-          ? registryEntry.description_zh
-          : registryEntry.description_en) ||
+          ? registryEntry.description_zh || registryEntry.description_en
+          : registryEntry.description_en || registryEntry.description_zh) ||
         (registryEntry.descriptionKey ? i18nService.t(registryEntry.descriptionKey) : '');
       setDescription(registryDescription);
       setTransportType(registryEntry.transportType);
-      setCommand(registryEntry.command);
+      setCommand(registryEntry.command || '');
       // defaultArgs + argPlaceholders
-      const allArgs = [...registryEntry.defaultArgs];
+      const allArgs = [...(registryEntry.defaultArgs || [])];
       if (registryEntry.argPlaceholders) {
         allArgs.push(...registryEntry.argPlaceholders);
       }
@@ -111,8 +111,10 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
         }
       }
       setEnvRows(envEntries);
-      setUrl('');
-      setHeaderRows([]);
+      setUrl(registryEntry.url || '');
+      setHeaderRows(
+        Object.entries(registryEntry.headers || {}).map(([key, value]) => ({ key, value })),
+      );
     } else {
       // Create mode
       setName('');
