@@ -1,11 +1,10 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
-import { Pencil, Plus, Plug, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Plus, Plug, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { mcpCategories, mcpRegistry } from '../../data/mcpRegistry';
-import githubIcon from '../../assets/mcp-icons/github.png';
 import gitlabIcon from '../../assets/mcp-icons/gitlab.png';
 import tavilyIcon from '../../assets/mcp-icons/tavily.png';
 import { i18nService } from '../../services/i18n';
@@ -21,10 +20,18 @@ import {
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import { ListPagination } from '../common/ListPagination';
+import { GitHubCopilotIcon } from '../icons/providers';
 import { McpTab as McpTabValue, MCP_PAGE_SIZE, type McpTab as McpTabType } from './constants';
 import { McpManagerToolbar } from './McpManagerToolbar';
 import { filterMcpItems, useMcpSearchQuery } from './mcpSearch';
+import { McpOfficialConnectDialog } from './McpOfficialConnectDialog';
 import McpServerFormModal from './McpServerFormModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@shared/components/ui/dropdown-menu';
 
 export { McpTab } from './constants';
 
@@ -36,16 +43,25 @@ const TRANSPORT_BADGE_COLORS: Record<string, string> = {
 
 const MCP_ICON_BY_ID: Record<string, string> = {
   tavily: tavilyIcon,
-  github: githubIcon,
   gitlab: gitlabIcon,
 };
 
-const McpIcon: React.FC<{ iconSrc?: string }> = ({ iconSrc }) => (
+const McpIcon: React.FC<{
+  iconSrc?: string;
+  fallbackIcon?: React.ComponentType<{ className?: string }>;
+  fallbackIconClassName?: string;
+  imageClassName?: string;
+}> = ({
+  iconSrc,
+  fallbackIcon: FallbackIcon = Plug,
+  fallbackIconClassName = 'size-5 text-muted-foreground',
+  imageClassName = 'size-9',
+}) => (
   <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
     {iconSrc ? (
-      <img src={iconSrc} alt="" className="size-9 object-contain" />
+      <img src={iconSrc} alt="" className={`${imageClassName} object-contain`} />
     ) : (
-      <Plug className="size-5 text-muted-foreground" />
+      <FallbackIcon className={fallbackIconClassName} />
     )}
   </div>
 );
@@ -106,12 +122,14 @@ interface McpManagerProps {
   activeTab?: McpTabType;
   onTabChange?: (tab: McpTabType) => void;
   hideTabControl?: boolean;
+  onUseMcp?: () => void;
 }
 
 const McpManager: React.FC<McpManagerProps> = ({
   activeTab: controlledActiveTab,
   onTabChange,
   hideTabControl = false,
+  onUseMcp,
 }) => {
   const dispatch = useDispatch();
   const servers = useSelector((state: RootState) => state.mcp.servers);
@@ -129,15 +147,16 @@ const McpManager: React.FC<McpManagerProps> = ({
   const [activeCategory, setActiveCategory] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [dynamicRegistry, setDynamicRegistry] = useState<McpRegistryEntry[]>(mcpRegistry);
+  const [officialConnectEntry, setOfficialConnectEntry] = useState<McpRegistryEntry | null>(null);
+  const [isOfficialConnecting, setIsOfficialConnecting] = useState(false);
+  const officialConnectAttemptRef = useRef(0);
+  const officialAuthorizationRequestRef = useRef<string | null>(null);
+  const [officialIcons, setOfficialIcons] = useState<Record<string, string>>({});
   const [dynamicCategories, setDynamicCategories] =
     useState<ReadonlyArray<{ id: string; key: string; name_zh?: string; name_en?: string }>>(
       mcpCategories,
     );
   const [bridgeSyncing, setBridgeSyncing] = useState(false);
-  const [bridgeSyncResult, setBridgeSyncResult] = useState<{
-    tools: number;
-    error?: string;
-  } | null>(null);
   const currentLanguage = i18nService.getLanguage();
   const activeTab = controlledActiveTab ?? uncontrolledActiveTab;
   const setActiveTab = (tab: McpTabType) => {
@@ -185,6 +204,25 @@ const McpManager: React.FC<McpManagerProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    let isActive = true;
+    const loadIcons = async () => {
+      const entries = await Promise.all(
+        dynamicRegistry
+          .filter(entry => entry.iconPath)
+          .map(async entry => ({ id: entry.id, icon: await mcpService.loadIcon(entry.iconPath!) })),
+      );
+      if (!isActive) return;
+      setOfficialIcons(
+        Object.fromEntries(entries.flatMap(entry => (entry.icon ? [[entry.id, entry.icon]] : []))),
+      );
+    };
+    loadIcons();
+    return () => {
+      isActive = false;
+    };
+  }, [dynamicRegistry]);
+
   const installedRegistryIds = useMemo(() => {
     const ids = new Set<string>();
     for (const s of servers) {
@@ -195,6 +233,10 @@ const McpManager: React.FC<McpManagerProps> = ({
 
   const getRegistryEntryDescription = useCallback(
     (entry: McpRegistryEntry): string => {
+      const presentationLocale = entry.presentation?.[
+        currentLanguage === 'zh' ? 'zh' : 'en'
+      ];
+      if (presentationLocale?.description) return presentationLocale.description;
       const remoteDescription =
         currentLanguage === 'zh' ? entry.description_zh : entry.description_en;
       if (remoteDescription) return remoteDescription;
@@ -229,9 +271,10 @@ const McpManager: React.FC<McpManagerProps> = ({
   const getIconForServer = useCallback(
     (server: McpServerConfig): string | undefined => {
       const registryEntry = getRegistryEntryForServer(server);
-      return MCP_ICON_BY_ID[server.registryId || registryEntry?.id || ''];
+      const registryId = server.registryId || registryEntry?.id || '';
+      return officialIcons[registryId] || MCP_ICON_BY_ID[registryId];
     },
-    [getRegistryEntryForServer],
+    [getRegistryEntryForServer, officialIcons],
   );
 
   const getTransportSummary = (server: McpServerConfig): string => {
@@ -360,9 +403,82 @@ const McpManager: React.FC<McpManagerProps> = ({
   };
 
   const handleInstallFromRegistry = (entry: McpRegistryEntry) => {
+    if (entry.authType === 'oauth' || entry.authType === 'cli' || entry.authType === 'external') {
+      setOfficialConnectEntry(entry);
+      return;
+    }
     setEditingServer(null);
     setInstallingRegistry(entry);
     setIsFormOpen(true);
+  };
+
+  const handleUseMcp = async (server: McpServerConfig) => {
+    const registryEntry = getRegistryEntryForServer(server);
+    // Feishu is an official CLI + Skills integration, not a stdio MCP
+    // transport. Its row is only used to represent installation state.
+    if (!server.enabled && registryEntry?.authType !== 'cli') {
+      try {
+        const updatedServers = await mcpService.setServerEnabled(server.id, true);
+        dispatch(setMcpServers(updatedServers));
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'));
+        return;
+      }
+    }
+    onUseMcp?.();
+  };
+
+  const handleOfficialConnect = async () => {
+    if (!officialConnectEntry || isOfficialConnecting) return;
+    const attempt = ++officialConnectAttemptRef.current;
+    const requestId = crypto.randomUUID();
+    officialAuthorizationRequestRef.current = requestId;
+    setIsOfficialConnecting(true);
+    setActionError('');
+    let result: { success: boolean; servers?: McpServerConfig[]; error?: string };
+    try {
+      result = await mcpService.authorize(
+        {
+          name: officialConnectEntry.name,
+          description: getRegistryEntryDescription(officialConnectEntry),
+          transportType: officialConnectEntry.transportType,
+          command: officialConnectEntry.command,
+          args: officialConnectEntry.defaultArgs,
+          url: officialConnectEntry.url,
+          headers: officialConnectEntry.headers,
+          isBuiltIn: true,
+          registryId: officialConnectEntry.id,
+        },
+        requestId,
+      );
+    } catch (error) {
+      if (attempt === officialConnectAttemptRef.current) {
+        officialAuthorizationRequestRef.current = null;
+        setIsOfficialConnecting(false);
+        setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
+      }
+      return;
+    }
+    if (attempt !== officialConnectAttemptRef.current) return;
+    officialAuthorizationRequestRef.current = null;
+    setIsOfficialConnecting(false);
+    if (!result.success) {
+      setActionError(result.error || i18nService.t('mcpCreateFailed'));
+      return;
+    }
+    if (result.servers) dispatch(setMcpServers(result.servers));
+    setOfficialConnectEntry(null);
+  };
+
+  const handleCloseOfficialConnect = () => {
+    officialConnectAttemptRef.current += 1;
+    const requestId = officialAuthorizationRequestRef.current;
+    officialAuthorizationRequestRef.current = null;
+    if (requestId) {
+      void mcpService.cancelAuthorize(requestId);
+    }
+    setIsOfficialConnecting(false);
+    setOfficialConnectEntry(null);
   };
 
   const handleCloseForm = () => {
@@ -412,27 +528,18 @@ const McpManager: React.FC<McpManagerProps> = ({
 
     const cleanupStart = mcpService.onBridgeSyncStart(() => {
       setBridgeSyncing(true);
-      setBridgeSyncResult(null);
       // Fallback: auto-clear overlay after 40s to prevent permanent lock
       if (syncTimeout) clearTimeout(syncTimeout);
       syncTimeout = setTimeout(() => {
         setBridgeSyncing(false);
-        setBridgeSyncResult({
-          tools: 0,
-          error: i18nService.t('mcpBridgeSyncError') || 'Sync timed out',
-        });
       }, 40_000);
     });
-    const cleanupDone = mcpService.onBridgeSyncDone(data => {
+    const cleanupDone = mcpService.onBridgeSyncDone(() => {
       if (syncTimeout) {
         clearTimeout(syncTimeout);
         syncTimeout = null;
       }
       setBridgeSyncing(false);
-      setBridgeSyncResult({ tools: data.tools, error: data.error });
-      if (!data.error) {
-        setTimeout(() => setBridgeSyncResult(null), 5000);
-      }
     });
     return () => {
       cleanupStart();
@@ -479,32 +586,6 @@ const McpManager: React.FC<McpManagerProps> = ({
       )}
 
       {actionError && <ErrorMessage message={actionError} onClose={() => setActionError('')} />}
-
-      {/* MCP Bridge sync result */}
-      {!bridgeSyncing && bridgeSyncResult && (
-        <div
-          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs border ${
-            bridgeSyncResult.error
-              ? 'dark:bg-red-500/10 bg-red-50 dark:text-red-400 text-red-600 dark:border-red-500/20 border-red-200'
-              : 'dark:bg-green-500/10 bg-green-50 dark:text-green-400 text-green-600 dark:border-green-500/20 border-green-200'
-          }`}
-        >
-          <span>
-            {bridgeSyncResult.error
-              ? `${i18nService.t('mcpBridgeSyncError') || 'Sync failed'}: ${bridgeSyncResult.error}`
-              : `${i18nService.t('mcpBridgeSyncDone') || 'MCP tools synced'}: ${bridgeSyncResult.tools} ${bridgeSyncResult.tools === 1 ? 'tool' : 'tools'}`}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setBridgeSyncResult(null)}
-            className="ml-2 h-auto w-auto opacity-60 hover:opacity-100"
-          >
-            <span className="text-lg leading-none">&times;</span>
-          </Button>
-        </div>
-      )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <McpManagerToolbar
@@ -565,7 +646,18 @@ const McpManager: React.FC<McpManagerProps> = ({
                         key={server.id}
                         className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
                       >
-                        <McpIcon iconSrc={getIconForServer(server)} />
+                        <McpIcon
+                          iconSrc={getIconForServer(server)}
+                          fallbackIcon={
+                            registryEntry?.id === 'github' ? GitHubCopilotIcon : undefined
+                          }
+                          fallbackIconClassName={
+                            registryEntry?.id === 'github'
+                              ? 'size-9 text-[#181717]'
+                              : undefined
+                          }
+                          imageClassName={registryEntry?.id === 'supabase' ? 'size-full' : undefined}
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="truncate text-sm font-medium text-foreground">
@@ -582,31 +674,28 @@ const McpManager: React.FC<McpManagerProps> = ({
                             className="mt-1 line-clamp-1 text-xs text-muted-foreground"
                           />
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100">
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenEditForm(server)}
-                            className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
-                            title={i18nService.t('editMcpServer')}
+                            size="sm"
+                            onClick={() => handleUseMcp(server)}
+                            className="h-8 px-3 text-xs"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            {i18nService.t('mcpUse')}
                           </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRequestDelete(server)}
-                            className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
-                            title={i18nService.t('deleteMcpServer')}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Switch
-                            checked={server.enabled}
-                            onCheckedChange={() => handleToggleEnabled(server.id)}
-                          />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={<Button type="button" variant="ghost" size="icon" className="size-8" aria-label={i18nService.t('mcpMoreActions')} />}
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem variant="destructive" onClick={() => handleRequestDelete(server)}>
+                                <Trash2 />
+                                {i18nService.t('mcpUninstall')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <div className="hidden">
                           <span
@@ -668,7 +757,14 @@ const McpManager: React.FC<McpManagerProps> = ({
                       key={entry.id}
                       className="group flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
                     >
-                      <McpIcon iconSrc={MCP_ICON_BY_ID[entry.id]} />
+                      <McpIcon
+                        iconSrc={officialIcons[entry.id] || MCP_ICON_BY_ID[entry.id]}
+                        fallbackIcon={entry.id === 'github' ? GitHubCopilotIcon : undefined}
+                        fallbackIconClassName={
+                          entry.id === 'github' ? 'size-9 text-[#181717]' : undefined
+                        }
+                        imageClassName={entry.id === 'supabase' ? 'size-full' : undefined}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-sm font-medium text-foreground">
@@ -706,7 +802,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                           )}
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100">
                         {installedRegistryIds.has(entry.id) ? (
                           <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
                             {i18nService.t('mcpInstalled')}
@@ -906,6 +1002,13 @@ const McpManager: React.FC<McpManagerProps> = ({
         existingNames={existingNames}
         onClose={handleCloseForm}
         onSave={handleSaveForm}
+      />
+      <McpOfficialConnectDialog
+        entry={officialConnectEntry}
+        iconSrc={officialConnectEntry ? officialIcons[officialConnectEntry.id] : undefined}
+        isConnecting={isOfficialConnecting}
+        onClose={handleCloseOfficialConnect}
+        onConnect={handleOfficialConnect}
       />
     </div>
   );

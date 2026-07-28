@@ -9,7 +9,7 @@ import {
 import { Database, Plug, ShieldCheck, Unplug } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
-import type { McpRegistryEntry } from '../../types/mcp';
+import type { McpPresentationLocale, McpRegistryEntry } from '../../types/mcp';
 
 interface McpOfficialConnectDialogProps {
   entry: McpRegistryEntry | null;
@@ -27,6 +27,13 @@ export function McpOfficialConnectDialog({
   onConnect,
 }: McpOfficialConnectDialogProps) {
   const isOpen = entry !== null;
+  const locale = entry
+    ? ((entry.presentation?.[i18nService.getLanguage() === 'zh' ? 'zh' : 'en'] ||
+        entry.presentation?.en ||
+        entry.presentation?.zh) as McpPresentationLocale | undefined)
+    : undefined;
+  const displayName = entry?.presentation?.name || entry?.name || '';
+  const requiresExternalAccess = entry?.authType === 'external';
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
@@ -39,22 +46,28 @@ export function McpOfficialConnectDialog({
                   {iconSrc ? <img src={iconSrc} alt="" className="size-full object-contain" /> : <Plug className="size-8 text-foreground" />}
                 </div>
               </div>
-              <DialogTitle className="mt-5">{i18nService.t('mcpConnectTitle').replace('{name}', entry.name)}</DialogTitle>
+              <DialogTitle className="mt-5">
+                {i18nService.t('mcpConnectTitle').replace('{name}', displayName)}
+              </DialogTitle>
               <DialogDescription className="mt-2 text-center">
                 {i18nService.t('mcpConnectSubtitle')}
               </DialogDescription>
             </DialogHeader>
 
             <div className="mx-6 overflow-hidden rounded-xl border border-border bg-muted/40">
-              <ConnectInfo icon={Plug} titleKey="mcpConnectUsageTitle" bodyKey="mcpConnectUsageBody" />
-              <ConnectInfo icon={Database} titleKey="mcpConnectDataTitle" bodyKey="mcpConnectDataBody" />
-              <ConnectInfo icon={Unplug} titleKey="mcpConnectControlTitle" bodyKey="mcpConnectControlBody" />
-              <ConnectInfo icon={ShieldCheck} titleKey="mcpConnectAuthTitle" bodyKey="mcpConnectAuthBody" last />
+              <ConnectInfo icon={Plug} titleKey="mcpConnectUsageTitle" bodyKey="mcpConnectUsageBody" section={locale?.connect?.usage} />
+              <ConnectInfo icon={Database} titleKey="mcpConnectDataTitle" bodyKey="mcpConnectDataBody" section={locale?.connect?.data} />
+              <ConnectInfo icon={Unplug} titleKey="mcpConnectControlTitle" bodyKey="mcpConnectControlBody" section={locale?.connect?.control} />
+              <ConnectInfo icon={ShieldCheck} titleKey="mcpConnectAuthTitle" bodyKey="mcpConnectAuthBody" section={locale?.connect?.authorization} last />
             </div>
 
             <div className="p-6 pt-5">
-              <Button className="w-full" onClick={onConnect} disabled={isConnecting}>
-                {isConnecting ? i18nService.t('mcpConnecting') : i18nService.t('mcpConnect')}
+              <Button className="w-full" onClick={onConnect} disabled={isConnecting || requiresExternalAccess}>
+                {requiresExternalAccess
+                  ? i18nService.t('mcpExternalUnavailable')
+                  : isConnecting
+                    ? i18nService.t('mcpConnecting')
+                    : i18nService.t('mcpConnect')}
               </Button>
             </div>
           </>
@@ -68,11 +81,13 @@ function ConnectInfo({
   icon: Icon,
   titleKey,
   bodyKey,
+  section,
   last = false,
 }: {
   icon: typeof Plug;
   titleKey: string;
   bodyKey: string;
+  section?: { title?: string; description?: string };
   last?: boolean;
 }) {
   return (
@@ -80,8 +95,8 @@ function ConnectInfo({
       <div className="flex gap-3">
         <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div>
-          <p className="text-sm font-medium text-foreground">{i18nService.t(titleKey)}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{i18nService.t(bodyKey)}</p>
+          <p className="text-sm font-medium text-foreground">{section?.title || i18nService.t(titleKey)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{section?.description || i18nService.t(bodyKey)}</p>
         </div>
       </div>
     </div>

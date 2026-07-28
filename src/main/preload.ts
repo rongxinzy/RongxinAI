@@ -112,6 +112,7 @@ contextBridge.exposeInMainWorld('electron', {
     fetchMarketplace: () => ipcRenderer.invoke(McpIpc.FetchMarketplace),
     refreshBridge: () => ipcRenderer.invoke(McpIpc.RefreshBridge),
     authorize: (data: unknown) => ipcRenderer.invoke(McpIpc.Authorize, data),
+    cancelAuthorize: (requestId: string) => ipcRenderer.invoke(McpIpc.CancelAuthorize, requestId),
     loadIcon: (iconPath: string) => ipcRenderer.invoke(McpIpc.LoadIcon, iconPath),
     onBridgeSyncStart: (callback: () => void) => onPushVoid(McpIpc.BridgeSyncStart, callback),
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) =>

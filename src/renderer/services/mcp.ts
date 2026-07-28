@@ -59,6 +59,7 @@ function convertMarketplaceToRegistry(servers: McpMarketplaceServer[]): McpRegis
     metadataPath: s.metadataPath,
     requiredEnvKeys: s.requiredEnvKeys,
     optionalEnvKeys: s.optionalEnvKeys,
+    presentation: s.presentation,
   }));
 }
 
@@ -209,8 +210,15 @@ class McpService {
     }
   }
 
-  async authorize(data: McpServerFormData): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
-    return window.electron.mcp.authorize(data);
+  async authorize(
+    data: McpServerFormData,
+    requestId: string,
+  ): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
+    return window.electron.mcp.authorize({ ...data, authorizationRequestId: requestId });
+  }
+
+  async cancelAuthorize(requestId: string): Promise<void> {
+    await window.electron.mcp.cancelAuthorize(requestId);
   }
 
   async loadIcon(iconPath: string): Promise<string | undefined> {

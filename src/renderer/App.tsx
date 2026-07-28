@@ -362,6 +362,11 @@ const App: React.FC = () => {
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
+  const handleTryMcp = useCallback(() => {
+    dispatch(setWorkMode(WorkMode.Work));
+    handleNewChat();
+  }, [dispatch, handleNewChat]);
+
   const handleCreateSkillByChat = useCallback(() => {
     dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
     coworkService.clearSession();
@@ -800,6 +805,7 @@ const App: React.FC = () => {
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
+                  onUseMcp={handleTryMcp}
                   updateBadge={null}
                 />
               ) : mainView === 'expert' ? (

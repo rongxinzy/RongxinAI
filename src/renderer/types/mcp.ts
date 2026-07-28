@@ -53,13 +53,14 @@ export interface McpRegistryEntry {
   defaultArgs?: string[]; // default arguments
   url?: string; // default URL for SSE / HTTP servers
   headers?: Record<string, string>;
-  authType?: 'oauth';
+  authType?: 'oauth' | 'cli' | 'token' | 'external';
   connectorPath?: string;
   iconPath?: string;
   metadataPath?: string;
   requiredEnvKeys?: string[]; // env vars the user must fill
   optionalEnvKeys?: string[]; // optional env vars
   argPlaceholders?: string[]; // placeholder hints for args (e.g. path)
+  presentation?: McpPresentation;
 }
 
 // Remote marketplace server entry
@@ -76,12 +77,35 @@ export interface McpMarketplaceServer {
   defaultArgs?: string[];
   url?: string;
   headers?: Record<string, string>;
-  authType?: 'oauth';
+  authType?: 'oauth' | 'cli' | 'token' | 'external';
   connectorPath?: string;
   iconPath?: string;
   metadataPath?: string;
   requiredEnvKeys?: string[];
   optionalEnvKeys?: string[];
+  presentation?: McpPresentation;
+}
+
+export interface McpPresentationSection {
+  title?: string;
+  description?: string;
+}
+
+export interface McpPresentationLocale {
+  description?: string;
+  connect?: {
+    usage?: McpPresentationSection;
+    data?: McpPresentationSection;
+    control?: McpPresentationSection;
+    authorization?: McpPresentationSection;
+  };
+}
+
+export interface McpPresentation {
+  name?: string;
+  authorization?: string;
+  zh?: McpPresentationLocale;
+  en?: McpPresentationLocale;
 }
 
 // Dynamic marketplace category from remote

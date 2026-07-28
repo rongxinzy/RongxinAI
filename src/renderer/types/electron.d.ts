@@ -293,12 +293,24 @@ interface McpMarketplaceServer {
   defaultArgs?: string[];
   url?: string;
   headers?: Record<string, string>;
-  authType?: 'oauth';
+  authType?: 'oauth' | 'cli' | 'token' | 'external';
   connectorPath?: string;
   iconPath?: string;
   metadataPath?: string;
   requiredEnvKeys?: string[];
   optionalEnvKeys?: string[];
+  presentation?: {
+    name?: string;
+    authorization?: string;
+    zh?: {
+      description?: string;
+      connect?: Record<string, { title?: string; description?: string }>;
+    };
+    en?: {
+      description?: string;
+      connect?: Record<string, { title?: string; description?: string }>;
+    };
+  };
 }
 
 interface McpMarketplaceCategory {
@@ -422,6 +434,7 @@ interface IElectronAPI {
     }>;
     refreshBridge: () => Promise<{ success: boolean; tools: number; error?: string }>;
     authorize: (data: any) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
+    cancelAuthorize: (requestId: string) => Promise<{ success: boolean }>;
     loadIcon: (iconPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
     onBridgeSyncStart: (callback: () => void) => () => void;
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) => () => void;

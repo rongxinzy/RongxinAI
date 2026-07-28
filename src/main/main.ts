@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { spawn } from 'child_process';
 import type { WebContents } from 'electron';
 import {
   app,
@@ -128,11 +129,7 @@ import {
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
 import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
-import {
-  getMcpMarketplaceUrl,
-  getServerApiBaseUrl,
-  refreshEndpointsTestMode,
-} from './libs/endpoints';
+import { getServerApiBaseUrl, refreshEndpointsTestMode } from './libs/endpoints';
 import {
   mergeEnterpriseOpenclawConfig,
   resolveEnterpriseConfigPath,
@@ -140,6 +137,7 @@ import {
 } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { LlamaCppOpenClawEligibilityReason } from './libs/llamacppOpenClawBinding';
+import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
@@ -150,6 +148,7 @@ import {
 import { probeMcpConnection } from './libs/mcpConnectionProbe';
 import type { McpToolManifestEntry } from './libs/mcpServerManager';
 import { McpServerManager } from './libs/mcpServerManager';
+import { loadBundledMcpMarketplace } from './mcpMarketplace';
 import {
   fetchModelScopeSkillContent,
   fetchModelScopeSkillMarketplace,
@@ -988,6 +987,8 @@ let mcpBridgeServer: McpBridgeServer | null = null;
 let mcpBridgeSecret: string = require('crypto').randomUUID();
 let mcpBridgeStartPromise: Promise<McpBridgeConfig | null> | null = null;
 let mcpInitPromise: Promise<McpToolManifestEntry[]> | null = null;
+let mcpLifecycleGeneration = 0;
+const activeMcpAuthorizations = new Map<string, { cancelled: boolean }>();
 let imGatewayManager: IMGatewayManager | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
@@ -1905,6 +1906,152 @@ const getMcpStore = () => {
   return mcpStore;
 };
 
+const FEISHU_CLI_TIMEOUT_MS = 120_000;
+const FEISHU_MCP_REGISTRY_ID = 'feishu';
+
+const getFeishuCliRoot = (): string => path.join(app.getPath('userData'), 'MCPs', 'feishu', 'cli');
+
+const getLocalFeishuCliCommand = (): string | null => {
+  const binName = process.platform === 'win32' ? 'lark-cli.cmd' : 'lark-cli';
+  const command = path.join(getFeishuCliRoot(), 'node_modules', '.bin', binName);
+  return fs.existsSync(command) ? command : null;
+};
+
+const runFeishuCliCommand = (command: string, args: string[], cwd?: string): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+      cwd,
+      shell: process.platform === 'win32',
+    });
+    let output = '';
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill();
+      reject(new Error(`Feishu CLI command timed out after ${FEISHU_CLI_TIMEOUT_MS}ms`));
+    }, FEISHU_CLI_TIMEOUT_MS);
+    child.stdout.on('data', chunk => {
+      output += String(chunk);
+    });
+    child.stderr.on('data', chunk => {
+      output += String(chunk);
+    });
+    child.once('error', error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('close', code => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve(output);
+        return;
+      }
+      reject(new Error(output.trim() || `${command} exited with code ${code ?? 'unknown'}`));
+    });
+  });
+
+const findFeishuCliCommand = async (): Promise<string | null> => {
+  return getLocalFeishuCliCommand();
+};
+
+const authorizeFeishuCli = async (): Promise<void> => {
+  let cliCommand = await findFeishuCliCommand();
+  if (!cliCommand) {
+    const cliRoot = getFeishuCliRoot();
+    fs.mkdirSync(cliRoot, { recursive: true });
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    await runFeishuCliCommand(
+      npmCommand,
+      ['install', '--prefix', cliRoot, '--no-save', '@larksuite/cli'],
+      cliRoot,
+    );
+    cliCommand = await findFeishuCliCommand();
+  }
+  if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
+  const cliRoot = getFeishuCliRoot();
+
+  try {
+    await runFeishuCliCommand(cliCommand, ['config', 'show'], cliRoot);
+  } catch {
+    await runFeishuCliCommand(cliCommand, ['config', 'init', '--new', '--lang', 'en'], cliRoot);
+  }
+
+  await runFeishuCliCommand(cliCommand, ['auth', 'login', '--recommend'], cliRoot);
+  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot);
+};
+
+const logoutFeishuCli = async (): Promise<void> => {
+  const cliCommand = await findFeishuCliCommand();
+  if (!cliCommand) return;
+
+  await runFeishuCliCommand(cliCommand, ['auth', 'logout'], getFeishuCliRoot());
+  console.log('[Feishu] official CLI authorization removed');
+};
+
+const resolveBundledFeishuSkills = (): string | null => {
+  const candidates = [
+    path.join(process.resourcesPath, 'MCPs', 'feishu', 'skills'),
+    path.join(app.getAppPath(), 'MCPs', 'feishu', 'skills'),
+    path.join(process.cwd(), 'MCPs', 'feishu', 'skills'),
+  ];
+  return candidates.find(candidate => fs.existsSync(candidate)) || null;
+};
+
+const installFeishuSkills = (): void => {
+  const source = resolveBundledFeishuSkills();
+  if (!source) throw new Error('Bundled Feishu skills were not found');
+  // Keep connector-provided skills in the per-user directory. This avoids
+  // mutating the checked-out development SKILLs tree while still letting the
+  // Agent load them through its user extraDirs configuration.
+  const target = path.join(app.getPath('userData'), 'MCPs', 'feishu', 'skills');
+  fs.mkdirSync(target, { recursive: true });
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    fs.cpSync(path.join(source, entry.name), path.join(target, entry.name), {
+      recursive: true,
+      force: true,
+    });
+  }
+  console.log('[Feishu] official CLI skills installed for the Agent');
+};
+
+const removeFeishuSkills = (): void => {
+  const target = path.join(app.getPath('userData'), 'MCPs', 'feishu', 'skills');
+  if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true });
+  console.log('[Feishu] official CLI skills removed from the Agent');
+};
+
+const refreshMcpOAuthHeaders = async <T extends { id: string; registryId?: string; url?: string; headers?: Record<string, string> }>(
+  servers: T[],
+): Promise<T[]> => {
+  const oauthManager = new McpOAuthManager(getStore());
+  return Promise.all(
+    servers.map(async server => {
+      if (!server.registryId || !server.url) return server;
+      try {
+        const accessToken = await oauthManager.refreshAccessToken(server.registryId, server.url);
+        if (!accessToken) return server;
+        const headers = { ...server.headers, Authorization: `Bearer ${accessToken}` };
+        getMcpStore().updateServer(server.id, { headers });
+        return { ...server, headers };
+      } catch (error) {
+        console.warn(
+          `[McpAuth] failed to refresh OAuth token for ${server.registryId}; using the stored token:`,
+          error,
+        );
+        return server;
+      }
+    }),
+  );
+};
+
 /**
  * Initialize MCP servers and discover tools.
  *
@@ -1916,10 +2063,11 @@ const getMcpStore = () => {
  */
 const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
   if (mcpInitPromise) return mcpInitPromise;
+  const generation = mcpLifecycleGeneration;
 
   mcpInitPromise = (async (): Promise<McpToolManifestEntry[]> => {
     try {
-      const enabledServers = getMcpStore().getEnabledServers();
+      const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
       if (enabledServers.length === 0) {
         console.log('[McpInit] No MCP servers configured, skipping');
         return [];
@@ -1939,6 +2087,10 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
 
       console.log(`[McpInit] Starting ${enabledServers.length} MCP servers...`);
       const tools = await mcpServerManager.startServers(enabledServers);
+      if (generation !== mcpLifecycleGeneration) {
+        await mcpServerManager.stopServers();
+        return [];
+      }
       console.log(`[McpInit] MCP servers started: ${tools.length} tools discovered`);
       return tools;
     } catch (err) {
@@ -2087,6 +2239,7 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
   }
   mcpBridgeRefreshPromise = (async () => {
     try {
+      const generation = ++mcpLifecycleGeneration;
       console.log('[McpBridge] refreshing after config change...');
       broadcastMcpBridgeSync('mcp:bridge:syncStart');
 
@@ -2094,6 +2247,9 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
       if (mcpServerManager) {
         await mcpServerManager.stopServers();
       }
+      // Invalidate any in-flight discovery promise. The next bridge start must
+      // read the current enabled-server list after a delete/disable operation.
+      mcpInitPromise = null;
       // Reset the start promise so the dedup inside startMcpBridge does not
       // return a stale promise whose closure still captures the old enabled
       // server list (e.g. from a concurrent bootstrap or gateway-restart
@@ -2102,25 +2258,24 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
 
       // 2. Re-discover tools from the new set of enabled servers
       const bridgeConfig = await startMcpBridge();
+      if (generation !== mcpLifecycleGeneration) {
+        return { tools: 0, error: 'MCP configuration changed during refresh' };
+      }
       const toolCount = bridgeConfig?.tools.length ?? 0;
       console.log(`[McpBridge] refresh: ${toolCount} tools discovered`);
 
-      // 3. Sync openclaw.json and restart the gateway in the background.
-      //    The gateway pins its config snapshot at startup so a restart is
-      //    required to pick up the new mcp-bridge callbackUrl/tools.  We
-      //    fire-and-forget here so the renderer gets immediate feedback
-      //    (the tools are already discovered and the bridge is running)
-      //    instead of blocking on the full gateway startup (~90+ seconds).
-      syncOpenClawConfig({ reason: 'mcp-server-changed' })
-        .then(r => {
-          if (!r.success) console.error('[McpBridge] background config sync failed:', r.error);
-        })
-        .catch(err => console.error('[McpBridge] background config sync error:', err));
+      // 3. Sync openclaw.json before reporting completion. The gateway pins
+      // its MCP tool snapshot at startup, so returning before this write lets
+      // an uninstall appear complete while the Agent still has stale tools.
+      const syncResult = await syncOpenClawConfig({ reason: 'mcp-server-changed' });
+      if (!syncResult.success) {
+        console.error('[McpBridge] config sync failed after refresh:', syncResult.error);
+      }
 
       console.log(
-        `[McpBridge] refresh complete: ${toolCount} tools discovered, gateway restart in background`,
+        `[McpBridge] refresh complete: ${toolCount} tools discovered and Agent config synchronized`,
       );
-      return { tools: toolCount };
+      return { tools: toolCount, error: syncResult.success ? undefined : syncResult.error };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('[McpBridge] refresh error:', msg);
@@ -3485,6 +3640,8 @@ if (!gotTheLock) {
         env?: Record<string, string>;
         url?: string;
         headers?: Record<string, string>;
+        isBuiltIn?: boolean;
+        registryId?: string;
       },
     ) => {
       try {
@@ -3493,7 +3650,10 @@ if (!gotTheLock) {
           return { success: false, error: validationError };
         }
 
-        getMcpStore().createServer(data as McpServerFormData);
+        const createdServer = getMcpStore().createServer(data as McpServerFormData);
+        if (data.isBuiltIn) {
+          getMcpStore().setEnabled(createdServer.id, true);
+        }
         const servers = getMcpStore().listServers();
         // Trigger async MCP bridge refresh (don't await — let UI show DB result immediately)
         refreshMcpBridge().catch(err =>
@@ -3585,10 +3745,28 @@ if (!gotTheLock) {
 
   ipcMain.handle(McpIpc.Delete, async (_event, id: string) => {
     try {
+      const existing = getMcpStore().getServer(id);
+      if (!existing) {
+        return { success: false, error: 'MCP server not found' };
+      }
+      if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
+        await logoutFeishuCli();
+        removeFeishuSkills();
+      }
       getMcpStore().deleteServer(id);
+      // OAuth sessions are keyed by the registry id during authorization,
+      // while the installed server row has its own random database id. Clear
+      // both keys so uninstall actually unlinks this App's authorization.
+      const oauthKeys = new Set([id, existing.registryId].filter(Boolean));
+      for (const oauthKey of oauthKeys) {
+        getStore().delete(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
+      }
       const servers = getMcpStore().listServers();
-      refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
-      return { success: true, servers };
+      const refreshResult = await refreshMcpBridge();
+      if (refreshResult.error) {
+        console.error('[McpBridge] refresh after uninstall failed:', refreshResult.error);
+      }
+      return { success: true, servers, refreshError: refreshResult.error };
     } catch (error) {
       return {
         success: false,
@@ -3603,6 +3781,9 @@ if (!gotTheLock) {
         const existing = getMcpStore().getServer(options.id);
         if (!existing) {
           return { success: false, error: 'MCP server not found' };
+        }
+        if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
+          return { success: true, servers: getMcpStore().listServers() };
         }
         const validationError = await validateStoredMcpServerConfig(existing);
         if (validationError) {
@@ -3627,44 +3808,119 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(McpIpc.FetchMarketplace, async () => {
-    const url = getMcpMarketplaceUrl();
     try {
-      const https = await import('https');
-      const data = await new Promise<string>((resolve, reject) => {
-        const req = https.get(url, { timeout: 10000 }, res => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`HTTP ${res.statusCode}`));
-            res.resume();
-            return;
-          }
-          let body = '';
-          res.setEncoding('utf8');
-          res.on('data', (chunk: string) => {
-            body += chunk;
-          });
-          res.on('end', () => resolve(body));
-          res.on('error', reject);
-        });
-        req.on('error', reject);
-        req.on('timeout', () => {
-          req.destroy();
-          reject(new Error('Request timeout'));
-        });
-      });
-      const json = JSON.parse(data);
-      const value = json?.data?.value;
-      if (!value) {
-        return { success: false, error: 'Invalid response: missing data.value' };
-      }
-      const marketplace = typeof value === 'string' ? JSON.parse(value) : value;
-      return { success: true, data: marketplace };
+      return {
+        success: true,
+        data: loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath),
+      };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch marketplace',
+        error: error instanceof Error ? error.message : 'Failed to load bundled MCP marketplace',
       };
     }
   });
+
+  ipcMain.handle(McpIpc.LoadIcon, async (_event, iconPath: string) => {
+    try {
+      const marketplace = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath);
+      if (!marketplace.servers.some(server => (server as { iconPath?: string }).iconPath === iconPath)) {
+        return { success: false, error: 'MCP icon is not registered' };
+      }
+      const roots = [
+        path.join(process.resourcesPath, 'MCPs'),
+        path.join(app.getAppPath(), 'MCPs'),
+        path.join(process.cwd(), 'MCPs'),
+      ];
+      for (const root of roots) {
+        const filePath = path.resolve(root, iconPath);
+        if (!filePath.startsWith(`${root}${path.sep}`) || !fs.existsSync(filePath)) continue;
+        const extension = path.extname(filePath).toLowerCase();
+        const mimeType =
+          extension === '.png'
+            ? 'image/png'
+            : extension === '.jpg' || extension === '.jpeg'
+              ? 'image/jpeg'
+              : extension === '.svg'
+                ? 'image/svg+xml'
+                : null;
+        if (!mimeType) return { success: false, error: 'Unsupported MCP icon format' };
+        return { success: true, data: `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}` };
+      }
+      return { success: false, error: 'MCP icon was not found' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to load MCP icon' };
+    }
+  });
+
+  ipcMain.handle(McpIpc.CancelAuthorize, (_event, requestId: string) => {
+    const pending = activeMcpAuthorizations.get(requestId);
+    if (pending) pending.cancelled = true;
+    return { success: true };
+  });
+
+  ipcMain.handle(
+    McpIpc.Authorize,
+    async (_event, rawData: McpServerFormData & { authorizationRequestId?: string }) => {
+      const { authorizationRequestId, ...data } = rawData;
+      const cancellation = authorizationRequestId ? { cancelled: false } : null;
+      if (authorizationRequestId && cancellation) {
+        activeMcpAuthorizations.set(authorizationRequestId, cancellation);
+      }
+      const ensureNotCancelled = () => {
+        if (cancellation?.cancelled) throw new Error('MCP authorization was cancelled');
+      };
+    try {
+      ensureNotCancelled();
+      if (data.registryId === FEISHU_MCP_REGISTRY_ID) {
+        await authorizeFeishuCli();
+        ensureNotCancelled();
+        installFeishuSkills();
+        ensureNotCancelled();
+        const existingFeishu = getMcpStore()
+          .listServers()
+          .find(server => server.registryId === FEISHU_MCP_REGISTRY_ID);
+        if (!existingFeishu) {
+          getMcpStore().createServer({
+            name: data.name,
+            description: data.description,
+            transportType: 'stdio',
+            command: 'lark-cli',
+            isBuiltIn: true,
+            registryId: FEISHU_MCP_REGISTRY_ID,
+          });
+        }
+        const servers = getMcpStore().listServers();
+        const refreshResult = await refreshMcpBridge();
+        if (refreshResult.error) {
+          console.error('[McpBridge] Feishu refresh error:', refreshResult.error);
+        }
+        return { success: true, servers, refreshError: refreshResult.error };
+      }
+      const validationError = await validateMcpServerConfig(data);
+      if (validationError) return { success: false, error: validationError };
+      if (!data.registryId || !data.url) return { success: false, error: 'Official MCP configuration is incomplete' };
+
+      const accessToken = await new McpOAuthManager(getStore()).authorize(data.registryId, data.url);
+      ensureNotCancelled();
+      if (!accessToken) return { success: false, error: 'OAuth authorization did not return an access token' };
+
+      const createdServer = getMcpStore().createServer({
+        ...data,
+        isBuiltIn: true,
+        headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
+      });
+      getMcpStore().setEnabled(createdServer.id, true);
+      const servers = getMcpStore().listServers();
+      refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
+      return { success: true, servers };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to authorize MCP server' };
+    } finally {
+      if (authorizationRequestId) activeMcpAuthorizations.delete(authorizationRequestId);
+    }
+  },
+  );
 
   // Explicit bridge refresh — renderer can await this for loading state
   ipcMain.handle(McpIpc.RefreshBridge, async () => {

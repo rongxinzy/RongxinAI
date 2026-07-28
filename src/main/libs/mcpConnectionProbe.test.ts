@@ -83,6 +83,9 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 
 vi.mock('./mcpServerManager', () => ({
   resolveStdioCommand: resolveStdioCommandMock,
+  expandMcpTemplate: (value: string, env?: Record<string, string>) =>
+    value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, key: string) => env?.[key] ?? `\${${key}}`),
+  unresolvedMcpTemplateKeys: () => [],
 }));
 
 vi.mock('./coworkUtil', () => ({

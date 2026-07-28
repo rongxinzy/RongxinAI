@@ -49,6 +49,7 @@ export const McpIpc = {
   FetchMarketplace: 'mcp:fetchMarketplace',
   RefreshBridge: 'mcp:refreshBridge',
   Authorize: 'mcp:authorize',
+  CancelAuthorize: 'mcp:cancelAuthorize',
   LoadIcon: 'mcp:loadIcon',
   BridgeSyncStart: 'mcp:bridge:syncStart',
   BridgeSyncDone: 'mcp:bridge:syncDone',

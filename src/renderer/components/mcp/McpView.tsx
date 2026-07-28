@@ -10,6 +10,7 @@ interface McpViewProps {
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
+  onUseMcp?: () => void;
   updateBadge?: React.ReactNode;
 }
 
@@ -17,6 +18,7 @@ const McpView: React.FC<McpViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,
+  onUseMcp,
   updateBadge,
 }) => {
   const isMac = window.electron.platform === 'darwin';
@@ -54,7 +56,7 @@ const McpView: React.FC<McpViewProps> = ({
 
       <div className="flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable">
         <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6">
-          <McpManager />
+          <McpManager onUseMcp={onUseMcp} />
         </div>
       </div>
     </div>

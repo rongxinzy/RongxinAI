@@ -1,0 +1,19 @@
+id: supabase
+icon: icon.png
+presentation:
+  name: Supabase
+  authorization: oauth
+  zh:
+    description: "Supabase \u6570\u636e\u5e93\u3001\u8868\u3001\u8fb9\u7f18\u51fd\u6570\u548c\u9879\u76ee\u7ba1\u7406"
+    connect:
+      usage: { title: "\u5982\u4f55\u4f7f\u7528", description: "\u4ec5\u5728\u4f60\u660e\u786e\u8bf7\u6c42\u65f6\u8c03\u7528 Supabase \u5de5\u5177\u3002" }
+      data: { title: "\u6570\u636e\u4e0e\u6743\u9650", description: "\u53ea\u8bbf\u95ee Supabase \u6388\u6743\u9875\u9762\u5141\u8bb8\u7684\u9879\u76ee\u8d44\u6e90\u3002" }
+      control: { title: "\u4f60\u59cb\u7ec8\u53ef\u63a7", description: "\u4f60\u53ef\u4ee5\u968f\u65f6\u65ad\u5f00 Supabase \u8fde\u63a5\u3002" }
+      authorization: { title: "\u5b89\u5168\u6388\u6743", description: "\u7cfb\u7edf\u6d4f\u89c8\u5668\u5c06\u6253\u5f00 Supabase \u5b98\u65b9 OAuth \u9875\u9762\u3002" }
+  en:
+    description: Supabase database, tables, edge functions, and project management.
+    connect:
+      usage: { title: How it works, description: The agent uses Supabase tools only when you explicitly request them. }
+      data: { title: Data and permissions, description: Only projects approved during authorization are accessed. }
+      control: { title: You stay in control, description: You can disconnect Supabase at any time. }
+      authorization: { title: Secure authorization, description: Your browser opens Supabase's official OAuth page. }

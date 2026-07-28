@@ -5,7 +5,24 @@ import http from 'http';
 
 import type { SqliteStore } from '../sqliteStore';
 
-const OAUTH_STORE_PREFIX = 'mcp.oauth.';
+export const MCP_OAUTH_STORE_PREFIX = 'mcp.oauth.';
+const MCP_OAUTH_REQUEST_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 interface OAuthSession {
   clientInformation?: OAuthClientInformationMixed;
@@ -19,7 +36,7 @@ class StoredOAuthProvider implements OAuthClientProvider {
   private session: OAuthSession;
 
   constructor(private readonly store: SqliteStore, serverId: string, redirectUri: string) {
-    this.key = `${OAUTH_STORE_PREFIX}${serverId}`;
+    this.key = `${MCP_OAUTH_STORE_PREFIX}${serverId}`;
     this.redirectUri = redirectUri;
     this.session = store.get<OAuthSession>(this.key) || {};
   }
@@ -55,7 +72,11 @@ export class McpOAuthManager {
     const provider = new StoredOAuthProvider(this.store, serverId, redirectUri);
 
     try {
-      const result = await auth(provider, { serverUrl, scope: undefined });
+      const result = await withTimeout(
+        auth(provider, { serverUrl, scope: undefined }),
+        MCP_OAUTH_REQUEST_TIMEOUT_MS,
+        'MCP OAuth discovery',
+      );
       if (result === 'AUTHORIZED') return provider.tokens()?.access_token || '';
       const code = await new Promise<string>((resolve, reject) => {
         callbackServer.once('request', (request, response) => {
@@ -67,10 +88,32 @@ export class McpOAuthManager {
           else resolve(authorizationCode);
         });
       });
-      await auth(provider, { serverUrl, authorizationCode: code });
+      await withTimeout(
+        auth(provider, { serverUrl, authorizationCode: code }),
+        MCP_OAUTH_REQUEST_TIMEOUT_MS,
+        'MCP OAuth token exchange',
+      );
       return provider.tokens()?.access_token || '';
     } finally {
       callbackServer.close();
     }
+  }
+
+  /**
+   * Refresh an existing OAuth session without opening a browser. Returns null
+   * when the session has no refresh token and therefore needs interactive auth.
+   */
+  async refreshAccessToken(serverId: string, serverUrl: string): Promise<string | null> {
+    const provider = new StoredOAuthProvider(
+      this.store,
+      serverId,
+      'http://127.0.0.1:1/mcp-oauth/callback',
+    );
+    if (!provider.tokens()?.refresh_token) return null;
+    const result = await auth(provider, { serverUrl, scope: undefined });
+    if (result !== 'AUTHORIZED') {
+      throw new Error('OAuth token refresh requires interactive authorization');
+    }
+    return provider.tokens()?.access_token || null;
   }
 }

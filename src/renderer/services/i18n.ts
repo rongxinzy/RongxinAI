@@ -1677,6 +1677,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     saveMcpServer: '保存',
     // MCP 市场 & 注册表
     mcpInstalled: '已安装',
+    mcpInUse: '使用中',
     mcpMarketplace: '市场',
     mcpCustom: '自定义',
     mcpCustomDescription: '手动配置 MCP 服务器',
@@ -1697,6 +1698,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpConnectControlBody: '你可以随时在已安装服务中断开连接或重新授权。',
     mcpConnectAuthTitle: '安全授权',
     mcpConnectAuthBody: '将使用系统默认浏览器完成服务方的官方登录与授权。',
+    mcpExternalUnavailable: '需要服务方开通后才能连接',
     mcpInstallFromUrl: '通过 URL 安装',
     mcpInstallFromUrlTitle: '通过 URL 安装 MCP',
     mcpInstallFromUrlPlaceholder: '输入 npm 包名或 URL',
@@ -4154,6 +4156,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     saveMcpServer: 'Save',
     // MCP Marketplace & Registry
     mcpInstalled: 'Installed',
+    mcpInUse: 'In use',
     mcpMarketplace: 'Marketplace',
     mcpCustom: 'Custom',
     mcpCustomDescription: 'Manually configure an MCP server',
@@ -4174,6 +4177,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpConnectControlBody: 'You can disconnect or re-authorize the service at any time from installed services.',
     mcpConnectAuthTitle: 'Secure authorization',
     mcpConnectAuthBody: 'Your system browser opens the provider\'s official sign-in and authorization page.',
+    mcpExternalUnavailable: 'Official provider access is required before connecting',
     mcpInstallFromUrl: 'Install from URL',
     mcpInstallFromUrlTitle: 'Install MCP from URL',
     mcpInstallFromUrlPlaceholder: 'Enter npm package name or URL',

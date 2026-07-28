@@ -108,6 +108,36 @@ function isProxyConfigured(env: Record<string, string>): boolean {
   return !!(env.http_proxy || env.HTTP_PROXY || env.https_proxy || env.HTTPS_PROXY);
 }
 
+/** Expand connector placeholders such as ${TOKEN} from the server's stored env. */
+export function expandMcpTemplate(value: string, env?: Record<string, string>): string {
+  return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, key: string) => {
+    const replacement = env?.[key];
+    return replacement === undefined ? `\${${key}}` : replacement;
+  });
+}
+
+export function unresolvedMcpTemplateKeys(values: Array<string | undefined>): string[] {
+  const keys = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    for (const match of value.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) {
+      keys.add(match[1]);
+    }
+  }
+  return [...keys].sort();
+}
+
+function ensureMcpTemplatesResolved(
+  values: Array<string | undefined>,
+  env: Record<string, string> | undefined,
+  serverName: string,
+): void {
+  const missing = unresolvedMcpTemplateKeys(values).filter(key => !env?.[key]);
+  if (missing.length > 0) {
+    throw new Error(`MCP server "${serverName}" is missing credentials: ${missing.join(', ')}`);
+  }
+}
+
 // ── Windows hidden-subprocess init script ────────────────────────
 const WINDOWS_HIDE_INIT_SCRIPT_NAME = 'mcp-bridge-windows-hide-init.js';
 const WINDOWS_HIDE_INIT_SCRIPT_CONTENT = [
@@ -477,7 +507,12 @@ export class McpServerManager {
       }
       transport = stdioTransport;
     } else {
-      const rawUrl = record.url?.trim();
+      ensureMcpTemplatesResolved(
+        [record.url, ...Object.values(record.headers || {})],
+        record.env,
+        record.name,
+      );
+      const rawUrl = record.url ? expandMcpTemplate(record.url, record.env).trim() : undefined;
       if (!rawUrl) {
         log(
           'WARN',
@@ -497,7 +532,17 @@ export class McpServerManager {
         return null;
       }
 
-      const requestInit = this.buildRemoteRequestInit(record);
+      const requestInit = this.buildRemoteRequestInit({
+        ...record,
+        headers: record.headers
+          ? Object.fromEntries(
+              Object.entries(record.headers).map(([key, value]) => [
+                key,
+                expandMcpTemplate(value, record.env),
+              ]),
+            )
+          : undefined,
+      });
       if (record.transportType === 'sse') {
         log('INFO', `Starting "${record.name}" via SSE: url=${parsedUrl.toString()}`);
         transport = new SSEClientTransport(parsedUrl, requestInit ? { requestInit } : undefined);
