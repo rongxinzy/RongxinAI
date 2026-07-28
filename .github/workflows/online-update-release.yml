@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - release
-      - 'release-*'
+      - "release-*"
 
 concurrency:
   group: zhiyuan-online-update-production
@@ -32,19 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '24.x' }
-      - run: npm install
-      - run: npm run setup:python-runtime
+        with: { node-version: "24.x" }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.3.14" }
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run setup:python-runtime
         env:
           ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
-      - run: npm run dist:win:lite
+      - run: bun run dist:win:lite
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - uses: actions/upload-artifact@v4
-        with: { name: win32-x64-lite, path: 'release/*.exe' }
+        with: { name: win32-x64-lite, path: "release/*.exe" }
 
   build-macos-arm64:
     needs: prepare-release
@@ -53,17 +55,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '24.x' }
-      - run: npm install
-      - run: node scripts/ensure-build-version.js && npm run prepare:update-release && npm run dist:mac
+        with: { node-version: "24.x" }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.3.14" }
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - uses: actions/upload-artifact@v4
-        with: { name: darwin-arm64-default, path: 'release/*.dmg' }
+        with: { name: darwin-arm64-default, path: "release/*.dmg" }
 
   publish:
     needs: [prepare-release, build-windows-lite, build-macos-arm64]
@@ -74,7 +78,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { path: artifacts }
       - uses: actions/setup-node@v4
-        with: { node-version: '24.x' }
+        with: { node-version: "24.x" }
       - name: Install release tools
         run: |
           pipx install 'awscli>=1.45.10,<2'
