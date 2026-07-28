@@ -362,7 +362,10 @@ const App: React.FC = () => {
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
-  const handleTryMcp = useCallback(() => {
+  const handleTryMcp = useCallback((prompt?: string) => {
+    if (prompt?.trim()) {
+      dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
+    }
     dispatch(setWorkMode(WorkMode.Work));
     handleNewChat();
   }, [dispatch, handleNewChat]);
@@ -817,6 +820,7 @@ const App: React.FC = () => {
                   readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                   onCreateSkillByChat={handleCreateSkillByChat}
                   onTrySkill={handleTrySkill}
+                  onUseMcp={handleTryMcp}
                 />
               ) : mainView === 'localInference' ? null : (
                 <CoworkView

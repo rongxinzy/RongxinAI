@@ -10,7 +10,7 @@ interface McpViewProps {
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
-  onUseMcp?: () => void;
+  onUseMcp?: (prompt?: string) => void;
   updateBadge?: React.ReactNode;
 }
 

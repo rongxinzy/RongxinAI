@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { Database, Plug, ShieldCheck, Unplug } from 'lucide-react';
+import { Database, LoaderCircle, Plug, ShieldCheck, Unplug } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import type { McpPresentationLocale, McpRegistryEntry } from '../../types/mcp';
@@ -15,16 +15,24 @@ interface McpOfficialConnectDialogProps {
   entry: McpRegistryEntry | null;
   iconSrc?: string;
   isConnecting: boolean;
+  isFeishuCliReady?: boolean;
+  isPreparing?: boolean;
+  error?: string;
   onClose: () => void;
   onConnect: () => void;
+  onPrepare?: () => void;
 }
 
 export function McpOfficialConnectDialog({
   entry,
   iconSrc,
   isConnecting,
+  isFeishuCliReady = false,
+  isPreparing = false,
+  error,
   onClose,
   onConnect,
+  onPrepare,
 }: McpOfficialConnectDialogProps) {
   const isOpen = entry !== null;
   const locale = entry
@@ -34,6 +42,32 @@ export function McpOfficialConnectDialog({
     : undefined;
   const displayName = entry?.presentation?.name || entry?.name || '';
   const requiresExternalAccess = entry?.authType === 'external';
+  const isFeishu = entry?.id === 'feishu';
+  const title = isFeishu
+    ? i18nService.t(isFeishuCliReady ? 'mcpFeishuLoginTitle' : 'mcpFeishuInstallTitle')
+    : i18nService.t('mcpConnectTitle').replace('{name}', displayName);
+  const subtitle = isFeishu ? i18nService.t('mcpFeishuSubtitle') : i18nService.t('mcpConnectSubtitle');
+  const actionLabel = isFeishu
+    ? isPreparing
+      ? i18nService.t('mcpFeishuInstalling')
+      : isFeishuCliReady
+        ? isConnecting
+          ? i18nService.t('mcpFeishuLoggingIn')
+          : i18nService.t('mcpFeishuLogin')
+        : i18nService.t('mcpFeishuInstall')
+    : requiresExternalAccess
+      ? i18nService.t('mcpExternalUnavailable')
+      : isConnecting
+        ? i18nService.t('mcpConnecting')
+        : i18nService.t('mcpConnect');
+  const isActionBusy = isConnecting || isPreparing;
+  const handleAction = () => {
+    if (isFeishu && !isFeishuCliReady) {
+      onPrepare?.();
+      return;
+    }
+    onConnect();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
@@ -47,10 +81,10 @@ export function McpOfficialConnectDialog({
                 </div>
               </div>
               <DialogTitle className="mt-5">
-                {i18nService.t('mcpConnectTitle').replace('{name}', displayName)}
+                {title}
               </DialogTitle>
               <DialogDescription className="mt-2 text-center">
-                {i18nService.t('mcpConnectSubtitle')}
+                {subtitle}
               </DialogDescription>
             </DialogHeader>
 
@@ -62,12 +96,10 @@ export function McpOfficialConnectDialog({
             </div>
 
             <div className="p-6 pt-5">
-              <Button className="w-full" onClick={onConnect} disabled={isConnecting || requiresExternalAccess}>
-                {requiresExternalAccess
-                  ? i18nService.t('mcpExternalUnavailable')
-                  : isConnecting
-                    ? i18nService.t('mcpConnecting')
-                    : i18nService.t('mcpConnect')}
+              {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+              <Button className="w-full" onClick={handleAction} disabled={isActionBusy || requiresExternalAccess}>
+                {isActionBusy && <LoaderCircle className="size-4 animate-spin" />}
+                {actionLabel}
               </Button>
             </div>
           </>
