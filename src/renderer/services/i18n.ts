@@ -1969,6 +1969,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // 定时任务
     scheduledTasks: '自动化',
     scheduledTasksTitle: '自动化',
+    scheduledTasksHeroDesc: '按计划自动执行任务，并追踪每一次运行记录',
     scheduledTasksNewTask: '新建任务',
     scheduledTasksNewTab: '新建',
     taskTemplateSectionTitle: '快速创建定时任务',
@@ -4460,6 +4461,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Scheduled Tasks
     scheduledTasks: 'Automation',
     scheduledTasksTitle: 'Automation',
+    scheduledTasksHeroDesc: 'Run tasks automatically on schedule and track every execution.',
     scheduledTasksNewTask: 'New Task',
     scheduledTasksNewTab: 'New',
     taskTemplateSectionTitle: 'Quick Setup',

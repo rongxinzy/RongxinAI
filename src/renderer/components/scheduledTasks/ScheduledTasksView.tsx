@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { Spinner } from '@shared/components/ui/spinner';
-import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
+import { ArrowLeft, CalendarClock, PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -162,9 +162,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               <ArrowLeft />
             </Button>
           )}
-          <h1 className="text-lg font-semibold text-foreground">
-            {i18nService.t('scheduledTasksTitle')}
-          </h1>
         </div>
         <WindowTitleBar inline />
       </div>
@@ -172,6 +169,24 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       {/* Single-page content: three sections separated by dividers */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl px-8 pb-8">
+          {/* ── Hero ── */}
+          <section className="animate-fade-in-up py-6">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-muted">
+                <CalendarClock className="size-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold leading-snug text-foreground">
+                  {i18nService.t('scheduledTasksTitle')}
+                </h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {i18nService.t('scheduledTasksHeroDesc')}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <div className="border-t border-border-subtle" />
           {/* ── Section: Create ── */}
           <section className="py-6">
             <h2 className="text-base font-semibold text-foreground">
