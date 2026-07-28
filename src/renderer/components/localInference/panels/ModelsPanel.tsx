@@ -15,7 +15,16 @@ import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { Box, Play, Settings2, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { type ComponentType, type DragEvent, useEffect, useMemo, useState } from 'react';
+import {
+  type ComponentType,
+  type CSSProperties,
+  type DragEvent,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import type {
   LlamaCppModel,
@@ -41,7 +50,10 @@ import {
   XiaomiIcon,
   ZhipuIcon,
 } from '../../icons/providers';
-import { localInferenceMutedTextClass } from '../constants';
+import {
+  LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS,
+  localInferenceMutedTextClass,
+} from '../constants';
 import {
   readLocalModelOrder,
   reconcileLocalModelOrder,
@@ -70,6 +82,10 @@ const modelProviderIconMap = {
 const MODEL_CARD_MAX_VISIBLE_TAGS = 6;
 const MODEL_PAGE_SIZE_WITHOUT_LOG = 16;
 const MODEL_PAGE_SIZE_WITH_LOG = 8;
+const MODEL_PAGE_GRID_COLUMNS_WITH_LOG = 2;
+const MODEL_PAGE_GRID_COLUMNS_WIDE = 4;
+const MODEL_CARD_LAYOUT_TRANSITION_SECONDS =
+  LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS / 1000;
 const modelCardActionClassName =
   'relative z-20 transition-[opacity,transform] duration-200 ease-out group-hover/card:translate-x-0 group-hover/card:opacity-100 group-hover/card:pointer-events-auto';
 const modelCardHiddenActionClassName = 'pointer-events-none translate-x-1 opacity-0';
@@ -116,11 +132,28 @@ type ModelCardProps = {
   onDragEnd: () => void;
   renderLoadButton?: (props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
   onOpenLaunchLog: (modelName: string) => void;
+  frozenWidth?: number | null;
+  transitionOffset?: ModelCardTransitionOffset | null;
 };
 
 type ModelCardEntry = {
   model: LlamaCppModel;
   runningModel?: LlamaCppRunningModel;
+};
+
+type FrozenModelCardLayout = {
+  id: number;
+  width: number;
+  height: number;
+  columnGap: number;
+  rowGap: number;
+  sourceColumns: number;
+  targetColumns: number;
+};
+
+type ModelCardTransitionOffset = {
+  x: number;
+  y: number;
 };
 
 export function ModelsPanel({
@@ -143,6 +176,15 @@ export function ModelsPanel({
   const [modelOrder, setModelOrder] = useState<string[]>(readLocalModelOrder);
   const [draggedModelName, setDraggedModelName] = useState<string | null>(null);
   const [modelPage, setModelPage] = useState(1);
+  const [logPanelLayoutVisible, setLogPanelLayoutVisible] = useState(logPanelVisible);
+  const [frozenLayout, setFrozenLayout] = useState<FrozenModelCardLayout | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const previousLogPanelVisibleRef = useRef(logPanelVisible);
+  const modelCardTransitionIdRef = useRef(0);
+  const latestGridLayoutRef = useRef<Pick<
+    FrozenModelCardLayout,
+    'width' | 'height' | 'columnGap' | 'rowGap' | 'sourceColumns'
+  > | null>(null);
   const availableModels = useMemo(
     () => mergeVisibleModels(localModels, runningModels),
     [localModels, runningModels],
@@ -162,16 +204,50 @@ export function ModelsPanel({
       return model ? [{ model, runningModel: findRunningModel(runningModels, model.name) }] : [];
     });
   }, [availableModels, orderedModelNames, runningModels]);
-  const modelsPerPage = logPanelVisible ? MODEL_PAGE_SIZE_WITH_LOG : MODEL_PAGE_SIZE_WITHOUT_LOG;
+  const modelsPerPage = logPanelLayoutVisible
+    ? MODEL_PAGE_SIZE_WITH_LOG
+    : MODEL_PAGE_SIZE_WITHOUT_LOG;
   const totalModelPages = Math.max(1, Math.ceil(modelCards.length / modelsPerPage));
   const currentModelPage = Math.min(modelPage, totalModelPages);
-  const modelGridClassName = logPanelVisible
+  const modelGridClassName = logPanelLayoutVisible
     ? 'grid-cols-2'
     : 'grid-cols-2 2xl:grid-cols-4';
   const visibleModelCards = modelCards.slice(
     (currentModelPage - 1) * modelsPerPage,
     currentModelPage * modelsPerPage,
   );
+
+  useLayoutEffect(() => {
+    if (previousLogPanelVisibleRef.current === logPanelVisible) return undefined;
+
+    const measuredLayout = latestGridLayoutRef.current ?? measureModelGridLayout(gridRef.current);
+    previousLogPanelVisibleRef.current = logPanelVisible;
+
+    if (measuredLayout) {
+      modelCardTransitionIdRef.current += 1;
+      setFrozenLayout({
+        id: modelCardTransitionIdRef.current,
+        ...measuredLayout,
+        targetColumns: getTargetModelGridColumns(logPanelVisible),
+      });
+    }
+    setLogPanelLayoutVisible(logPanelVisible);
+
+    const timeout = window.setTimeout(() => {
+      setFrozenLayout(null);
+      const nextLayout = measureModelGridLayout(gridRef.current);
+      if (nextLayout) latestGridLayoutRef.current = nextLayout;
+    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [logPanelVisible]);
+
+  useLayoutEffect(() => {
+    if (frozenLayout !== null) return;
+
+    const measuredLayout = measureModelGridLayout(gridRef.current);
+    if (measuredLayout) latestGridLayoutRef.current = measuredLayout;
+  });
 
   useEffect(() => {
     setModelPage(1);
@@ -234,14 +310,16 @@ export function ModelsPanel({
         {modelCards.length > 0 ? (
           <>
             <div
+              ref={gridRef}
               className={cn(
                 'grid w-full auto-rows-min content-start gap-3',
-                modelGridClassName,
+                frozenLayout ? 'justify-start' : modelGridClassName,
               )}
+              style={getFrozenModelGridStyle(frozenLayout)}
             >
-              {visibleModelCards.map(({ model, runningModel }) => (
+              {visibleModelCards.map(({ model, runningModel }, index) => (
                 <ModelCard
-                  key={model.name}
+                  key={frozenLayout ? `${model.name}:${frozenLayout.id}` : model.name}
                   model={model}
                   runningModel={runningModel}
                   preference={modelPreferences[model.name]}
@@ -260,6 +338,8 @@ export function ModelsPanel({
                     renderLoadButton ? props => renderLoadButton(model, props) : undefined
                   }
                   onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
+                  frozenWidth={frozenLayout?.width}
+                  transitionOffset={getModelCardTransitionOffset(index, frozenLayout)}
                 />
               ))}
             </div>
@@ -313,6 +393,75 @@ export function ModelsPanel({
   );
 }
 
+function getFrozenModelGridStyle(
+  layout: FrozenModelCardLayout | null,
+): CSSProperties | undefined {
+  if (!layout) return undefined;
+
+  return {
+    gridTemplateColumns: `repeat(${layout.targetColumns}, ${layout.width}px)`,
+  };
+}
+
+function getModelCardTransitionOffset(
+  index: number,
+  layout: FrozenModelCardLayout | null,
+): ModelCardTransitionOffset | null {
+  if (!layout) return null;
+
+  const sourcePosition = getModelCardGridPosition(index, layout.sourceColumns);
+  const targetPosition = getModelCardGridPosition(index, layout.targetColumns);
+  const x = (sourcePosition.column - targetPosition.column) * (layout.width + layout.columnGap);
+  const y = (sourcePosition.row - targetPosition.row) * (layout.height + layout.rowGap);
+
+  if (x === 0 && y === 0) return null;
+  return { x, y };
+}
+
+function getModelCardGridPosition(index: number, columns: number): { column: number; row: number } {
+  const normalizedColumns = Math.max(1, columns);
+  return {
+    column: index % normalizedColumns,
+    row: Math.floor(index / normalizedColumns),
+  };
+}
+
+function getTargetModelGridColumns(logPanelVisible: boolean): number {
+  if (logPanelVisible) return MODEL_PAGE_GRID_COLUMNS_WITH_LOG;
+  return window.matchMedia('(min-width: 1536px)').matches
+    ? MODEL_PAGE_GRID_COLUMNS_WIDE
+    : MODEL_PAGE_GRID_COLUMNS_WITH_LOG;
+}
+
+function measureModelGridLayout(
+  grid: HTMLDivElement | null,
+): Pick<FrozenModelCardLayout, 'width' | 'height' | 'columnGap' | 'rowGap' | 'sourceColumns'> | null {
+  const firstCard = grid?.querySelector<HTMLElement>(
+    '[data-local-inference-model-card-frame="true"]',
+  );
+  if (!grid || !firstCard) return null;
+
+  const cardRect = firstCard.getBoundingClientRect();
+  const gridStyle = window.getComputedStyle(grid);
+  const sourceColumns = gridStyle.gridTemplateColumns
+    .split(' ')
+    .filter(Boolean)
+    .length;
+
+  return {
+    width: cardRect.width,
+    height: cardRect.height,
+    columnGap: parseCssPixelValue(gridStyle.columnGap),
+    rowGap: parseCssPixelValue(gridStyle.rowGap),
+    sourceColumns: Math.max(1, sourceColumns),
+  };
+}
+
+function parseCssPixelValue(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function ModelCard({
   model,
   runningModel,
@@ -330,10 +479,18 @@ function ModelCard({
   onDragEnd,
   renderLoadButton,
   onOpenLaunchLog,
+  frozenWidth,
+  transitionOffset,
 }: ModelCardProps) {
   const isRunning = Boolean(runningModel);
   const reduceMotion = useReducedMotion();
-  const motionTransition = reduceMotion
+  const layoutTransition = reduceMotion
+    ? { duration: 0 }
+    : {
+        duration: MODEL_CARD_LAYOUT_TRANSITION_SECONDS,
+        ease: [0.4, 0, 0.2, 1] as const,
+      };
+  const hoverTransition = reduceMotion
     ? { duration: 0 }
     : { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const };
   const buttonsDisabled = loading || unloading;
@@ -355,14 +512,20 @@ function ModelCard({
 
   return (
     <motion.div
-
-      className="relative h-full w-full"
+      data-local-inference-model-card-frame="true"
+      className={cn(
+        'relative h-full w-full transform-gpu',
+        transitionOffset && 'will-change-transform',
+      )}
+      initial={transitionOffset ?? { x: 0, y: 0 }}
+      animate={{ x: 0, y: 0 }}
+      style={frozenWidth ? { width: frozenWidth } : undefined}
       whileHover={
         reduceMotion || loadingModel || unloading || dragging
           ? undefined
           : { scale: 1.02, zIndex: 1 }
       }
-      transition={motionTransition}
+      transition={{ x: layoutTransition, y: layoutTransition, scale: hoverTransition }}
     >
       <Card
         size="sm"
@@ -372,7 +535,7 @@ function ModelCard({
         onDrop={onDrop}
         onDragEnd={onDragEnd}
         className={cn(
-          'relative h-full w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-all duration-200 active:cursor-grabbing',
+          'relative h-full w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-[background-color,border-color,box-shadow] duration-200 active:cursor-grabbing',
           'hover:border-border hover:bg-muted/20 hover:shadow-md',
           (loadingModel || unloading) && 'bg-muted/30',
           dragging && 'opacity-50',

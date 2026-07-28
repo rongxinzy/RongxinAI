@@ -95,11 +95,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleWorkModeChange = useCallback((checked: boolean) => {
     const mode = checked ? WorkMode.Chat : WorkMode.Work;
     dispatch(setWorkMode(mode));
+    if (mode === WorkMode.Chat) {
+      onShowCowork();
+    }
     setIsBatchMode(false);
     setSelectedIds(new Set());
     setShowBatchDeleteConfirm(false);
     void configService.updateConfig({ workMode: mode });
-  }, [dispatch]);
+  }, [dispatch, onShowCowork]);
 
   // Filter sessions by workMode — chat sessions only visible in chat mode
   const sessions = React.useMemo(
