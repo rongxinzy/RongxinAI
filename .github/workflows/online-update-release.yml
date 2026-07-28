@@ -11,6 +11,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  R2_BUCKET: zhiyuan-releases
+
 jobs:
   prepare-release:
     runs-on: ubuntu-latest
@@ -30,7 +33,8 @@ jobs:
         with: { node-version: '24.x' }
       - run: npm install
       - run: npm run setup:python-runtime
-        env: { ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }} }
+        env:
+          ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
       - run: npm run dist:win:lite
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
@@ -49,7 +53,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '24.x' }
       - run: npm install
-      - run: node scripts/ensure-build-version.js && npm run dist:mac
+      - run: node scripts/ensure-build-version.js && npm run prepare:update-release && npm run dist:mac
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -69,23 +73,167 @@ jobs:
         with: { path: artifacts }
       - uses: actions/setup-node@v4
         with: { node-version: '24.x' }
-      - name: Install AWS CLI
-        run: pipx install awscli
-      - name: Create signed manifest
-        run: node scripts/release/publish-update-manifest.mjs manifest/stable.json "${{ needs.prepare-release.outputs.version }}" "$GITHUB_SHA" "$(find artifacts/win32-x64-lite -name '*.exe' -print -quit):win32:x64:lite" "$(find artifacts/darwin-arm64-default -name '*.dmg' -print -quit):darwin:arm64:default"
+      - name: Install release tools
+        run: |
+          pipx install 'awscli>=1.45.10,<2'
+          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Resolve artifacts
+        id: artifacts
+        run: |
+          mapfile -t windows_artifacts < <(find artifacts/win32-x64-lite -type f -name '*.exe')
+          mapfile -t macos_artifacts < <(find artifacts/darwin-arm64-default -type f -name '*.dmg')
+          if [[ ${#windows_artifacts[@]} -ne 1 || ${#macos_artifacts[@]} -ne 1 ]]; then
+            echo 'Expected exactly one Windows installer and one macOS installer' >&2
+            exit 1
+          fi
+          echo "windows=${windows_artifacts[0]}" >> "$GITHUB_OUTPUT"
+          echo "macos=${macos_artifacts[0]}" >> "$GITHUB_OUTPUT"
+      - name: Create and verify signed manifest
+        run: |
+          node scripts/release/publish-update-manifest.mjs \
+            manifest/stable.json \
+            '${{ needs.prepare-release.outputs.version }}' \
+            "$GITHUB_SHA" \
+            '${{ steps.artifacts.outputs.windows }}:win32:x64:lite' \
+            '${{ steps.artifacts.outputs.macos }}:darwin:arm64:default'
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
-      - name: Upload immutable artifacts then atomically publish manifest
+      - name: Read current stable manifest
+        id: current
         run: |
-          aws s3 cp "$(find artifacts/win32-x64-lite -name '*.exe' -print -quit)" "s3://zhiyuan-releases/releases/${{ needs.prepare-release.outputs.version }}/win32-x64-lite/" --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp "$(find artifacts/darwin-arm64-default -name '*.dmg' -print -quit)" "s3://zhiyuan-releases/releases/${{ needs.prepare-release.outputs.version }}/darwin-arm64-default/" --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp manifest/stable.json s3://zhiyuan-releases/channels/stable.json --cache-control no-store
+          set +e
+          aws s3api head-object \
+            --bucket "$R2_BUCKET" \
+            --key channels/stable.json \
+            > manifest/current-head.json 2> manifest/current-head.err
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            aws s3api get-object \
+              --bucket "$R2_BUCKET" \
+              --key channels/stable.json \
+              manifest/current.json > /dev/null
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "etag=$(jq -r '.ETag' manifest/current-head.json)" >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/current-head.err; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            cat manifest/current-head.err >&2
+            exit "$status"
+          fi
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      - name: Smoke test Update Worker
+      - name: Enforce monotonic release version
+        id: version_check
         run: |
-          curl --fail --silent --show-error 'https://updates.rongxzyai.com/v1/updates/latest?channel=stable&platform=win32&arch=x64&variant=lite' | jq -e '.algorithm == "Ed25519"'
+          current_path='-'
+          if [[ '${{ steps.current.outputs.exists }}' == 'true' ]]; then
+            current_path='manifest/current.json'
+          fi
+          node scripts/release/verify-update-transition.mjs \
+            "$current_path" \
+            manifest/stable.json \
+            '${{ needs.prepare-release.outputs.version }}'
+        env:
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+      - name: Upload immutable artifacts and verify remote sizes
+        if: steps.version_check.outputs.idempotent != 'true'
+        run: |
+          version='${{ needs.prepare-release.outputs.version }}'
+          windows_path='${{ steps.artifacts.outputs.windows }}'
+          macos_path='${{ steps.artifacts.outputs.macos }}'
+          windows_key="releases/$version/win32-x64-lite/$(basename "$windows_path")"
+          macos_key="releases/$version/darwin-arm64-default/$(basename "$macos_path")"
+
+          aws s3 cp "$windows_path" "s3://$R2_BUCKET/$windows_key" \
+            --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp "$macos_path" "s3://$R2_BUCKET/$macos_key" \
+            --cache-control 'public, max-age=31536000, immutable'
+
+          windows_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$windows_key" --query ContentLength --output text)
+          macos_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$macos_key" --query ContentLength --output text)
+          [[ "$windows_remote_size" == "$(stat --format='%s' "$windows_path")" ]]
+          [[ "$macos_remote_size" == "$(stat --format='%s' "$macos_path")" ]]
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Preserve previous stable manifest
+        if: steps.version_check.outputs.idempotent != 'true' && steps.current.outputs.exists == 'true'
+        run: |
+          aws s3api put-object \
+            --bucket "$R2_BUCKET" \
+            --key channels/stable.previous.json \
+            --body manifest/current.json \
+            --content-type application/json \
+            --cache-control no-store
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Conditionally publish stable manifest
+        id: publish
+        if: steps.version_check.outputs.idempotent != 'true'
+        run: |
+          conditional_args=(--if-none-match '*')
+          if [[ '${{ steps.current.outputs.exists }}' == 'true' ]]; then
+            conditional_args=(--if-match '${{ steps.current.outputs.etag }}')
+          fi
+          aws s3api put-object \
+            --bucket "$R2_BUCKET" \
+            --key channels/stable.json \
+            --body manifest/stable.json \
+            --content-type application/json \
+            --cache-control no-store \
+            "${conditional_args[@]}" \
+            > manifest/publish-result.json
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          echo "etag=$(jq -r '.ETag' manifest/publish-result.json)" >> "$GITHUB_OUTPUT"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Smoke test published release and roll back on failure
+        run: |
+          set +e
+          node scripts/release/verify-published-update.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            win32:x64:lite \
+            darwin:arm64:default
+          smoke_status=$?
+          set -e
+
+          if [[ $smoke_status -ne 0 && '${{ steps.publish.outputs.changed }}' == 'true' ]]; then
+            if [[ '${{ steps.current.outputs.exists }}' == 'true' ]]; then
+              aws s3api put-object \
+                --bucket "$R2_BUCKET" \
+                --key channels/stable.json \
+                --body manifest/current.json \
+                --content-type application/json \
+                --cache-control no-store \
+                --if-match '${{ steps.publish.outputs.etag }}'
+            else
+              published_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.json --query ETag --output text)
+              if [[ "$published_etag" != '${{ steps.publish.outputs.etag }}' ]]; then
+                echo 'Stable manifest changed concurrently; refusing an unsafe rollback' >&2
+                exit 1
+              fi
+              aws s3api delete-object --bucket "$R2_BUCKET" --key channels/stable.json
+            fi
+          fi
+          exit "$smoke_status"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}

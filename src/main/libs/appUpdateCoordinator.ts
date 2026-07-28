@@ -17,7 +17,7 @@ import type { SqliteStore } from '../sqliteStore';
 
 const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
 const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
-const MANIFEST_ETAG_KEY_PREFIX = 'app_update_manifest_etag';
+const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
 
 type ManifestReleaseNotes = {
   zh?: { title?: unknown; items?: unknown };
@@ -49,6 +49,11 @@ type SignedManifest = {
   signature?: unknown;
 };
 
+type CachedSignedManifest = {
+  etag: string;
+  envelope: unknown;
+};
+
 const initialState = (): AppUpdateRuntimeState => ({
   status: AppUpdateStatus.Idle,
   source: null,
@@ -68,7 +73,9 @@ function releaseNotes(value: ManifestReleaseNotes | undefined, language: 'zh' | 
   const notes = value?.[language];
   return {
     title: typeof notes?.title === 'string' ? notes.title : '',
-    content: Array.isArray(notes?.items) ? notes.items.filter((item): item is string => typeof item === 'string') : [],
+    content: Array.isArray(notes?.items)
+      ? notes.items.filter((item): item is string => typeof item === 'string')
+      : [],
   };
 }
 
@@ -107,8 +114,16 @@ export class AppUpdateCoordinator {
     return this.getState();
   }
 
-  async installReadyUpdate(): Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }> {
-    return { success: false, state: this.getState(), error: 'In-app installation is not enabled yet' };
+  async installReadyUpdate(): Promise<{
+    success: boolean;
+    state: AppUpdateRuntimeState;
+    error?: string;
+  }> {
+    return {
+      success: false,
+      state: this.getState(),
+      error: 'In-app installation is not enabled yet',
+    };
   }
 
   private async checkForUpdate(source: AppUpdateSource): Promise<AppUpdateCheckResult> {
@@ -128,7 +143,10 @@ export class AppUpdateCoordinator {
       });
       return { success: true, state, updateFound: true };
     } catch (error) {
-      console.warn('[AppUpdate] update check failed:', error instanceof Error ? error.message : 'unknown');
+      console.warn(
+        '[AppUpdate] update check failed:',
+        error instanceof Error ? error.message : 'unknown',
+      );
       const state = this.setState(initialState());
       return {
         success: false,
@@ -145,8 +163,8 @@ export class AppUpdateCoordinator {
     const variant = this.resolveBuildVariant();
     if (!['win32', 'darwin'].includes(platform) || !['x64', 'arm64'].includes(arch)) return null;
 
-    const etagKey = `${MANIFEST_ETAG_KEY_PREFIX}:${platform}:${arch}:${variant}`;
-    const etag = this.store.get<string>(etagKey);
+    const cacheKey = `${MANIFEST_CACHE_KEY_PREFIX}:${platform}:${arch}:${variant}`;
+    const cachedManifest = this.readCachedManifest(cacheKey);
     const url = new URL(UPDATE_ENDPOINT);
     url.searchParams.set('channel', 'stable');
     url.searchParams.set('platform', platform);
@@ -154,21 +172,52 @@ export class AppUpdateCoordinator {
     url.searchParams.set('variant', variant);
 
     const response = await fetch(url, {
-      headers: etag ? { 'if-none-match': etag, accept: 'application/json' } : { accept: 'application/json' },
+      headers: cachedManifest
+        ? { 'if-none-match': cachedManifest.etag, accept: 'application/json' }
+        : { accept: 'application/json' },
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
     });
-    if (response.status === 304 || response.status === 404) return null;
-    if (!response.ok) throw new Error(`Update service returned HTTP ${response.status}`);
+    if (response.status === 404) {
+      this.store.delete(cacheKey);
+      return null;
+    }
+    if (response.status === 304 && !cachedManifest) {
+      throw new Error('Update service returned 304 without a cached manifest');
+    }
+    if (response.status !== 304 && !response.ok) {
+      throw new Error(`Update service returned HTTP ${response.status}`);
+    }
 
-    const envelope: unknown = await response.json();
+    const envelope: unknown =
+      response.status === 304 ? cachedManifest?.envelope : await response.json();
     const payload = this.verifyAndDecodeManifest(envelope);
     const info = this.toUpdateInfo(payload, { platform, arch, variant });
-    if (!info || !this.isNewerVersion(info.latestVersion, currentVersion)) return null;
 
-    const receivedEtag = response.headers.get('etag');
-    if (receivedEtag) this.store.set(etagKey, receivedEtag);
+    if (response.status !== 304) {
+      const receivedEtag = response.headers.get('etag');
+      if (receivedEtag) {
+        this.store.set<CachedSignedManifest>(cacheKey, { etag: receivedEtag, envelope });
+      } else {
+        this.store.delete(cacheKey);
+      }
+    }
+    if (!info || !this.isNewerVersion(info.latestVersion, currentVersion)) return null;
     return info;
+  }
+
+  private readCachedManifest(key: string): CachedSignedManifest | null {
+    const value = this.store.get<unknown>(key);
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      typeof (value as CachedSignedManifest).etag !== 'string' ||
+      !(value as CachedSignedManifest).etag ||
+      !('envelope' in value)
+    ) {
+      return null;
+    }
+    return value as CachedSignedManifest;
   }
 
   private verifyAndDecodeManifest(value: unknown): UpdatePayload {
@@ -190,7 +239,11 @@ export class AppUpdateCoordinator {
     const isValid = crypto.verify(
       null,
       payloadBytes,
-      crypto.createPublicKey({ key: Buffer.from(trustedKey, 'base64'), format: 'der', type: 'spki' }),
+      crypto.createPublicKey({
+        key: Buffer.from(trustedKey, 'base64'),
+        format: 'der',
+        type: 'spki',
+      }),
       base64UrlToBuffer(envelope.signature),
     );
     if (!isValid) throw new Error('Update manifest signature verification failed');
@@ -241,7 +294,10 @@ export class AppUpdateCoordinator {
     return {
       latestVersion: payload.version,
       date: typeof payload.publishedAt === 'string' ? payload.publishedAt : '',
-      changeLog: { zh: releaseNotes(payload.releaseNotes, 'zh'), en: releaseNotes(payload.releaseNotes, 'en') },
+      changeLog: {
+        zh: releaseNotes(payload.releaseNotes, 'zh'),
+        en: releaseNotes(payload.releaseNotes, 'en'),
+      },
       url: downloadUrl.toString(),
       expectedSize: artifact.size,
       expectedSha256: artifact.sha256,
@@ -254,7 +310,9 @@ export class AppUpdateCoordinator {
   private resolveBuildVariant(): string {
     if (process.platform !== 'win32') return 'default';
     try {
-      const packageJson = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8')) as { zhiyuanUpdateVariant?: unknown };
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'),
+      ) as { zhiyuanUpdateVariant?: unknown };
       return packageJson.zhiyuanUpdateVariant === 'full' ? 'full' : 'lite';
     } catch {
       return 'lite';
@@ -277,7 +335,11 @@ export class AppUpdateCoordinator {
 
   isMandatoryForCurrentVersion(): boolean {
     const info = this.state.info;
-    return Boolean(info?.mandatory && info.minimumSupportedVersion && lt(this.resolveCurrentVersion(), info.minimumSupportedVersion));
+    return Boolean(
+      info?.mandatory &&
+      info.minimumSupportedVersion &&
+      lt(this.resolveCurrentVersion(), info.minimumSupportedVersion),
+    );
   }
 
   private setState(nextState: AppUpdateRuntimeState): AppUpdateRuntimeState {

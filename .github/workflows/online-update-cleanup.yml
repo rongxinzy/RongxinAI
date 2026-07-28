@@ -1,0 +1,87 @@
+name: Clean online update storage
+
+on:
+  schedule:
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: zhiyuan-online-update-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      R2_BUCKET: zhiyuan-releases
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.x' }
+      - name: Install release tools
+        run: |
+          pipx install 'awscli>=1.45.10,<2'
+          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Read manifests and release inventory
+        id: inventory
+        run: |
+          mkdir -p manifest/cleanup
+          aws s3api get-object \
+            --bucket "$R2_BUCKET" \
+            --key channels/stable.json \
+            manifest/stable.json > /dev/null
+
+          set +e
+          aws s3api head-object \
+            --bucket "$R2_BUCKET" \
+            --key channels/stable.previous.json \
+            > manifest/previous-head.json 2> manifest/previous-head.err
+          previous_status=$?
+          set -e
+          if [[ $previous_status -eq 0 ]]; then
+            aws s3api get-object \
+              --bucket "$R2_BUCKET" \
+              --key channels/stable.previous.json \
+              manifest/previous.json > /dev/null
+            echo 'previous=true' >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
+            echo 'previous=false' >> "$GITHUB_OUTPUT"
+          else
+            cat manifest/previous-head.err >&2
+            exit "$previous_status"
+          fi
+
+          aws s3api list-objects-v2 \
+            --bucket "$R2_BUCKET" \
+            --prefix releases/ \
+            > manifest/release-objects.json
+      - name: Plan expired object cleanup
+        run: |
+          previous_path='-'
+          previous_head_path='-'
+          if [[ '${{ steps.inventory.outputs.previous }}' == 'true' ]]; then
+            previous_path='manifest/previous.json'
+            previous_head_path='manifest/previous-head.json'
+          fi
+          node scripts/release/plan-r2-cleanup.mjs \
+            manifest/stable.json \
+            "$previous_path" \
+            "$previous_head_path" \
+            manifest/release-objects.json \
+            manifest/cleanup
+      - name: Delete expired unreferenced objects
+        run: |
+          for batch in manifest/cleanup/delete-*.json; do
+            [[ -e "$batch" ]] || continue
+            aws s3api delete-objects --bucket "$R2_BUCKET" --delete "file://$batch"
+          done
