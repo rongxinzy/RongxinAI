@@ -82,7 +82,7 @@ SKILLs/web-search/
 ├── README.md                    # Main documentation (400+ lines)
 ├── SKILL.md                     # Claude guidance (600+ lines)
 ├── TEST.md                      # E2E test guide (300+ lines)
-├── LICENSE.txt                  # MIT License
+├── LICENSE.txt                  # GNU AGPL v3.0
 ├── package.json                 # Dependencies (playwright-core, express)
 ├── tsconfig.json                # TypeScript config
 ├── server/                      # Bridge Server (800+ lines)
