@@ -182,6 +182,26 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     setCreateOpen(true);
   }, []);
 
+  // WAI-ARIA tablist keyboard nav: ←/→ (and Home/End) move focus + activate with wrap,
+  // so the sliding underline follows the keyboard as well as the pointer.
+  const handleTabKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, value: AutoTab) => {
+      const idx = AUTO_TAB_ORDER.indexOf(value);
+      let next = -1;
+      if (e.key === 'ArrowRight') next = (idx + 1) % AUTO_TAB_ORDER.length;
+      else if (e.key === 'ArrowLeft')
+        next = (idx - 1 + AUTO_TAB_ORDER.length) % AUTO_TAB_ORDER.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = AUTO_TAB_ORDER.length - 1;
+      if (next < 0) return;
+      e.preventDefault();
+      const target = AUTO_TAB_ORDER[next];
+      setActiveTab(target);
+      tabRefs.current[target]?.focus();
+    },
+    [],
+  );
+
   const handleCreateSaved = useCallback((newTaskId?: string) => {
     setCreateOpen(false);
     setCreatePrefill(undefined);
@@ -261,7 +281,9 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                     type="button"
                     role="tab"
                     aria-selected={active}
+                    tabIndex={active ? 0 : -1}
                     onClick={() => setActiveTab(tab.value)}
+                    onKeyDown={e => handleTabKeyDown(e, tab.value)}
                     className={cn(
                       'relative -mb-px flex items-center gap-2 border-b-2 border-transparent pb-2.5 text-sm font-medium outline-none transition-colors focus-visible:text-foreground',
                       active
