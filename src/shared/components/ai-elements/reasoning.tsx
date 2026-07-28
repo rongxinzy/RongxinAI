@@ -33,6 +33,7 @@ interface ReasoningContextValue {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   duration: number | undefined;
+  showConnector: boolean;
 }
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
@@ -48,6 +49,7 @@ export const useReasoning = () => {
 export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   isStreaming?: boolean;
   autoClose?: boolean;
+  showConnector?: boolean;
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -62,6 +64,7 @@ export const Reasoning = memo(
     className,
     isStreaming = false,
     autoClose = true,
+    showConnector = false,
     open,
     defaultOpen,
     onOpenChange,
@@ -127,18 +130,24 @@ export const Reasoning = memo(
     );
 
     const contextValue = useMemo(
-      () => ({ duration, isOpen, isStreaming, setIsOpen }),
-      [duration, isOpen, isStreaming, setIsOpen],
+      () => ({ duration, isOpen, isStreaming, setIsOpen, showConnector }),
+      [duration, isOpen, isStreaming, setIsOpen, showConnector],
     );
 
     return (
       <ReasoningContext.Provider value={contextValue}>
         <Collapsible
-          className={cn('not-prose mb-4', className)}
+          className={cn('not-prose', showConnector ? 'relative mb-0' : 'mb-4', className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
         >
+          {showConnector && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-5 -bottom-3 left-2 w-px bg-border"
+            />
+          )}
           {children}
         </Collapsible>
       </ReasoningContext.Provider>
@@ -197,20 +206,25 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
-export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => (
-  <CollapsibleContent
-    className={cn(
-      'mt-4 text-sm',
-      'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
-      className,
-    )}
-    {...props}
-  >
-    <Streamdown plugins={streamdownPlugins} components={{ pre: AiPre }}>
-      {children}
-    </Streamdown>
-  </CollapsibleContent>
-));
+export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
+  const { showConnector } = useReasoning();
+
+  return (
+    <CollapsibleContent
+      className={cn(
+        'mt-4 text-sm',
+        showConnector && 'pl-4',
+        'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
+        className,
+      )}
+      {...props}
+    >
+      <Streamdown plugins={streamdownPlugins} components={{ pre: AiPre }}>
+        {children}
+      </Streamdown>
+    </CollapsibleContent>
+  );
+});
 
 Reasoning.displayName = 'Reasoning';
 ReasoningTrigger.displayName = 'ReasoningTrigger';

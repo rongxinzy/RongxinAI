@@ -27,7 +27,7 @@ export const AssistantBubble: React.FC<{
 
   return (
     <div
-      className="py-1 px-4 focus:outline-none"
+      className="py-1 focus:outline-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

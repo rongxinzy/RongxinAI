@@ -14,6 +14,7 @@ import {
   ToolInput,
   ToolOutput,
 } from '@shared/components/ai-elements/tool';
+import { cn } from '@shared/lib/utils';
 import type { ToolUIPart } from 'ai';
 import { Check } from 'lucide-react';
 import React, { useMemo } from 'react';
@@ -100,11 +101,11 @@ export const ToolCard: React.FC<{
     : (toolInputDisplay ?? '');
 
   return (
-    <div className="relative py-1">
+    <div className="relative">
       {!isLastInSequence && (
-        <div className="absolute left-[3.5px] top-[14px] bottom-[-8px] w-px bg-border" />
+        <div className="absolute top-full -bottom-3 left-2 w-px bg-border" aria-hidden="true" />
       )}
-      <Tool className={muted ? 'text-muted-foreground' : undefined}>
+      <Tool className={cn('mb-0', muted && 'text-muted-foreground')}>
         <ToolHeader
           type={`tool-${rawToolName}` as ToolUIPart['type']}
           state={toolState}
