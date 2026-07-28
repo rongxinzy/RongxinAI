@@ -67,21 +67,40 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   prevTabIndexRef.current = AUTO_TAB_ORDER.indexOf(activeTab);
 
   // Sliding underline indicator: measure the active tab button and translate a single bar.
+  // The view can mount while a route ancestor is still hidden / mid-transform, so the first
+  // measurement may read 0 — poll with rAF until the button has a real width (with a safety
+  // timeout) so the bar never stays invisible. A ResizeObserver covers later width changes
+  // (e.g. the count badge appearing/disappearing).
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabRowRef = useRef<HTMLDivElement>(null);
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
   useLayoutEffect(() => {
-    const update = () => {
+    let raf = 0;
+    let timeout = 0;
+    const measure = () => {
       const el = tabRefs.current[activeTab];
-      if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+      if (el && el.offsetWidth > 0) {
+        setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+        return true;
+      }
+      return false;
     };
-    update();
-    const ro = new ResizeObserver(update);
+    const poll = () => {
+      if (measure()) return;
+      raf = requestAnimationFrame(poll);
+    };
+    if (!measure()) {
+      raf = requestAnimationFrame(poll);
+      timeout = window.setTimeout(measure, 600);
+    }
+    const ro = new ResizeObserver(() => measure());
     if (tabRowRef.current) ro.observe(tabRowRef.current);
-    window.addEventListener('resize', update);
+    window.addEventListener('resize', measure);
     return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
       ro.disconnect();
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', measure);
     };
   }, [activeTab, tasks.length]);
 
