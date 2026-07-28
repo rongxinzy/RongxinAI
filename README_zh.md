@@ -161,14 +161,6 @@ bun run dist:linux
 - 想交流工作流、使用经验和社区提案，可以提交标题清晰的[功能提案](https://github.com/rongxinzy/RongxinAI/issues)。
 - 修改代码前请先阅读 [`AGENTS.md`](AGENTS.md)，然后提交 Pull Request。
 
-### 社区传播文案
-
-在相关讨论中，可以直接复用这句话介绍知远：
-
-> 知远是一个开源、本地优先的桌面 AI Agent：能读写文件、运行终端、操作浏览器、调用技能与 MCP，也能使用本地 GGUF 模型；敏感操作由用户逐次批准。
-
-需要展开技术细节时，请把读者带回本仓库查看[架构](#知远智能体如何工作)、[源代码](https://github.com/rongxinzy/RongxinAI)与[发布流程](.github/workflows/online-update-release.yml)，让信息形成从体验到理解、再到参与的闭环。
-
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)

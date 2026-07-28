@@ -161,14 +161,6 @@ bun run dist:linux
 - Use a clearly titled [feature proposal](https://github.com/rongxinzy/RongxinAI/issues) to share workflows and community ideas.
 - Read [`AGENTS.md`](AGENTS.md) before making a code change, then open a pull request.
 
-### Share kit
-
-When ZhiYuan is relevant to a conversation, this short description is ready to reuse:
-
-> ZhiYuan is an open-source, local-first desktop AI agent that can work with files, terminals, browsers, skills, MCP tools, and local GGUF models, while keeping sensitive actions approval-gated.
-
-For a deeper technical explanation, link people back to this repository so they can inspect the [architecture](#how-zhiyuan-agent-works), [source code](https://github.com/rongxinzy/RongxinAI), and [release process](.github/workflows/online-update-release.yml).
-
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)
