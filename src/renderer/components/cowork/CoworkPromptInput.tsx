@@ -64,7 +64,7 @@ type CoworkAttachment = DraftAttachment;
 // returning a new [] on every call (when draftAttachments[draftKey] is undefined).
 const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
 /** Skills available in Chat mode (no local filesystem access) */
-const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx']);
+const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx', 'frontend-design']);
 const IMAGE_EXTENSIONS = new Set([
   '.png',
   '.jpg',

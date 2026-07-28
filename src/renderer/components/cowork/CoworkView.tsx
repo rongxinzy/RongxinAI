@@ -48,6 +48,7 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
+import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -99,6 +100,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const startRequestIdRef = useRef(0);
   // Ref for CoworkPromptInput
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
+  const quickActionActivationRef = useRef<string | null>(null);
 
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
@@ -1112,29 +1114,41 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     return quickActions.find(action => action.id === selectedActionId);
   }, [quickActions, selectedActionId]);
 
-  // Handle quick action button click: select action + activate skill in one batch
+  // Handle quick action button click and activate its mapped skill.
   const handleActionSelect = (actionId: string) => {
     dispatch(selectAction(actionId));
+    quickActionActivationRef.current = null;
     const action = quickActions.find(a => a.id === actionId);
-    if (action) {
-      const targetSkill = skills.find(s => s.id === action.skillMapping);
-      if (targetSkill) {
-        dispatch(setActiveSkillIds([targetSkill.id]));
-      }
+    const targetSkill = action && skills.find(s => s.id === action.skillMapping);
+    if (targetSkill) {
+      quickActionActivationRef.current = actionId;
+      dispatch(setActiveSkillIds([targetSkill.id]));
     }
   };
 
-  // When the mapped skill is deactivated from input area, restore the QuickActionBar
+  // Activate a mapped skill once it becomes available, and clear the quick action when
+  // the user removes that skill from the input area.
   useEffect(() => {
-    if (!selectedActionId) return;
-    const action = quickActions.find(a => a.id === selectedActionId);
-    if (action) {
-      const skillStillActive = activeSkillIds.includes(action.skillMapping);
-      if (!skillStillActive) {
-        dispatch(clearSelection());
-      }
+    if (!selectedActionId) {
+      quickActionActivationRef.current = null;
+      return;
     }
-  }, [activeSkillIds, dispatch, quickActions, selectedActionId]);
+    const action = quickActions.find(a => a.id === selectedActionId);
+    const targetSkill = action && skills.find(s => s.id === action.skillMapping);
+    if (!action || !targetSkill) return;
+
+    if (quickActionActivationRef.current !== selectedActionId) {
+      quickActionActivationRef.current = selectedActionId;
+      if (!activeSkillIds.includes(targetSkill.id)) {
+        dispatch(setActiveSkillIds([targetSkill.id]));
+      }
+      return;
+    }
+
+    if (shouldClearQuickActionSelection(action, skills, activeSkillIds)) {
+      dispatch(clearSelection());
+    }
+  }, [activeSkillIds, dispatch, quickActions, selectedActionId, skills]);
 
   // Handle prompt selection from QuickAction
   const handleQuickActionPromptSelect = (prompt: string) => {
