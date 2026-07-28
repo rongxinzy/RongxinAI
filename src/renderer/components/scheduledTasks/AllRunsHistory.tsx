@@ -54,9 +54,13 @@ const EMPTY_TASK_RUNS: ScheduledTaskRun[] = [];
 
 interface AllRunsHistoryProps {
   task?: ScheduledTask;
+  /** Show the in-flight "running" status (filter chip + rows). Default true.
+   *  The per-task detail view passes false: a running entry is redundant with the
+   *  task's live status card shown above the history. */
+  showRunning?: boolean;
 }
 
-const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task }) => {
+const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = true }) => {
   const allRuns = useSelector((state: RootState) => state.scheduledTask.allRuns);
   const allRunsHasMore = useSelector((state: RootState) => state.scheduledTask.allRunsHasMore);
   const taskRuns = useSelector((state: RootState) =>
@@ -144,7 +148,9 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task }) => {
         {/* Filter area */}
         <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
           <ButtonGroup>
-            {(['success', 'error', 'skipped', 'running'] as const).map(s => (
+            {(['success', 'error', 'skipped', 'running'] as const)
+              .filter(s => showRunning || s !== 'running')
+              .map(s => (
               <Button
                 key={s}
                 variant="outline"
@@ -238,7 +244,9 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task }) => {
                     <TableCell className="w-1/3 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm text-foreground truncate">{run.taskName}</span>
-                        {run.status === 'running' && <Spinner className="size-3 text-blue-500" />}
+                        {showRunning && run.status === 'running' && (
+                          <Spinner className="size-3 text-blue-500" />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="w-1/3 text-center">

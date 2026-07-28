@@ -1,21 +1,16 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import {
-  LayeredTabsContent,
-  LayeredTabsList,
-  LayeredTabsSeparatorEdge,
-} from '@shared/components/ui/layered-tabs';
-import { Tabs } from '@shared/components/ui/tabs';
 import { Spinner } from '@shared/components/ui/spinner';
-import { ArrowLeft, PanelLeft, Pencil } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { cn } from '@shared/lib/utils';
+import { CalendarClock, PanelLeft, Pencil } from 'lucide-react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
@@ -38,19 +33,16 @@ interface ScheduledTasksViewProps {
   updateBadge?: React.ReactNode;
 }
 
-const SCHEDULED_TASK_TAB = {
+const AUTO_TAB = {
   Create: 'create',
   Tasks: 'tasks',
   History: 'history',
 } as const;
 
-type TabType = (typeof SCHEDULED_TASK_TAB)[keyof typeof SCHEDULED_TASK_TAB];
+type AutoTab = (typeof AUTO_TAB)[keyof typeof AUTO_TAB];
 
-const SCHEDULED_TASK_TAB_ORDER: TabType[] = [
-  SCHEDULED_TASK_TAB.Create,
-  SCHEDULED_TASK_TAB.Tasks,
-  SCHEDULED_TASK_TAB.History,
-];
+const AUTO_TAB_ORDER: AutoTab[] = [AUTO_TAB.Tasks, AUTO_TAB.Create, AUTO_TAB.History];
+
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -62,22 +54,86 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const viewMode = useSelector((state: RootState) => state.scheduledTask.viewMode);
   const selectedTaskId = useSelector((state: RootState) => state.scheduledTask.selectedTaskId);
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
-  const selectedTask = selectedTaskId ? (tasks.find(t => t.id === selectedTaskId) ?? null) : null;
   const gatewayReady = useGatewayReady();
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>(SCHEDULED_TASK_TAB.Tasks);
-  const [tabDirection, setTabDirection] = useState(1);
-  const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
-  const isFormDirtyRef = useRef(false);
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-  const pendingTabSwitchRef = useRef<TabType | null>(null);
-  const [createFormKey, setCreateFormKey] = useState(0);
-  const [creatingTask, setCreatingTask] = useState(false);
-  const [templatePrefill, setTemplatePrefill] = useState<TaskTemplateValues | undefined>();
 
-  const handleFormDirtyChange = useCallback((dirty: boolean) => {
-    isFormDirtyRef.current = dirty;
+  const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
+  const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
+
+  // Directional pane slide: track previous tab to know which way to slide.
+  // The first reveal fades in (direction-neutral) so entry never slides "backward";
+  // every later switch slides from the side you are heading (left / right).
+  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Tasks));
+  const [mounted, setMounted] = useState(false);
+  const tabDir: 'left' | 'right' | null = mounted
+    ? AUTO_TAB_ORDER.indexOf(activeTab) >= prevTabIndexRef.current
+      ? 'right'
+      : 'left'
+    : null;
+  prevTabIndexRef.current = AUTO_TAB_ORDER.indexOf(activeTab);
+  useEffect(() => {
+    setMounted(true);
   }, []);
+
+  // Sliding underline indicator: measure the active tab button and translate a single bar.
+  // The view can mount while a route ancestor is still hidden / mid-transform, so the first
+  // measurement may read 0 — poll with rAF until the button has a real width (with a safety
+  // timeout) so the bar never stays invisible. A ResizeObserver covers later width changes
+  // (e.g. the count badge appearing/disappearing).
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const tabRowRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    let raf = 0;
+    let timeout = 0;
+    const measure = () => {
+      const el = tabRefs.current[activeTab];
+      if (el && el.offsetWidth > 0) {
+        setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+        return true;
+      }
+      return false;
+    };
+    const poll = () => {
+      if (measure()) return;
+      raf = requestAnimationFrame(poll);
+    };
+    if (!measure()) {
+      raf = requestAnimationFrame(poll);
+      timeout = window.setTimeout(measure, 600);
+    }
+    const ro = new ResizeObserver(() => measure());
+    if (tabRowRef.current) ro.observe(tabRowRef.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [activeTab, tasks.length]);
+
+  // Create-task modal (template-prefilled or blank custom)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<TaskTemplateValues | undefined>();
+  const [createFormKey, setCreateFormKey] = useState(0);
+
+  // Task detail / edit modal, driven by mirroring redux selection
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [detailEdit, setDetailEdit] = useState(false);
+  const detailTask = detailTaskId ? (tasks.find(t => t.id === detailTaskId) ?? null) : null;
+
+  // Mirror redux selection (from TaskList card-click / dropdown edit) into the modal,
+  // then clear the selection so list and modal stay decoupled.
+  useEffect(() => {
+    if (!selectedTaskId) return;
+    if (viewMode === 'detail' || viewMode === 'edit') {
+      setDetailTaskId(selectedTaskId);
+      setDetailEdit(viewMode === 'edit');
+      dispatch(selectTask(null));
+      dispatch(setViewMode('list'));
+    }
+  }, [selectedTaskId, viewMode, dispatch]);
 
   const handleRequestDelete = useCallback((taskId: string, taskName: string) => {
     setDeleteTaskInfo({ id: taskId, name: taskName });
@@ -88,11 +144,11 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     const taskId = deleteTaskInfo.id;
     setDeleteTaskInfo(null);
     await scheduledTaskService.deleteTask(taskId);
-    if (selectedTaskId === taskId) {
-      dispatch(selectTask(null));
-      dispatch(setViewMode('list'));
+    if (detailTaskId === taskId) {
+      setDetailTaskId(null);
+      setDetailEdit(false);
     }
-  }, [deleteTaskInfo, selectedTaskId, dispatch]);
+  }, [deleteTaskInfo, detailTaskId]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteTaskInfo(null);
@@ -120,90 +176,41 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     };
   }, [gatewayReady]);
 
-  const switchToTab = useCallback(
-    (tab: TabType) => {
-      setTabDirection(
-        SCHEDULED_TASK_TAB_ORDER.indexOf(tab) >= SCHEDULED_TASK_TAB_ORDER.indexOf(activeTab)
-          ? 1
-          : -1,
-      );
-      if (isFormDirtyRef.current && activeTab === SCHEDULED_TASK_TAB.Create) {
-        pendingTabSwitchRef.current = tab;
-        setShowLeaveConfirm(true);
-        return;
-      }
-      setActiveTab(tab);
-      if (tab === SCHEDULED_TASK_TAB.Tasks) {
-        dispatch(selectTask(null));
-        dispatch(setViewMode('list'));
-      }
+  const openCreateModal = useCallback((prefill?: TaskTemplateValues) => {
+    setCreatePrefill(prefill);
+    setCreateFormKey(k => k + 1);
+    setCreateOpen(true);
+  }, []);
+
+  // WAI-ARIA tablist keyboard nav: ←/→ (and Home/End) move focus + activate with wrap,
+  // so the sliding underline follows the keyboard as well as the pointer.
+  const handleTabKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, value: AutoTab) => {
+      const idx = AUTO_TAB_ORDER.indexOf(value);
+      let next = -1;
+      if (e.key === 'ArrowRight') next = (idx + 1) % AUTO_TAB_ORDER.length;
+      else if (e.key === 'ArrowLeft')
+        next = (idx - 1 + AUTO_TAB_ORDER.length) % AUTO_TAB_ORDER.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = AUTO_TAB_ORDER.length - 1;
+      if (next < 0) return;
+      e.preventDefault();
+      const target = AUTO_TAB_ORDER[next];
+      setActiveTab(target);
+      tabRefs.current[target]?.focus();
     },
-    [activeTab, dispatch],
+    [],
   );
 
-  const handleTabChange = (value: string) => {
-    const tab = value as TabType;
-    if (tab === activeTab) return;
-    if (tab === SCHEDULED_TASK_TAB.Create) {
-      setTabDirection(
-        SCHEDULED_TASK_TAB_ORDER.indexOf(tab) >= SCHEDULED_TASK_TAB_ORDER.indexOf(activeTab)
-          ? 1
-          : -1,
-      );
-      // Reset to template gallery
-      setCreatingTask(false);
-      setTemplatePrefill(undefined);
-      setCreateFormKey(k => k + 1);
-      isFormDirtyRef.current = false;
-      setActiveTab(SCHEDULED_TASK_TAB.Create);
-    } else {
-      switchToTab(tab);
+  const handleCreateSaved = useCallback((newTaskId?: string) => {
+    setCreateOpen(false);
+    setCreatePrefill(undefined);
+    setActiveTab(AUTO_TAB.Tasks);
+    if (newTaskId) {
+      setDetailTaskId(newTaskId);
+      setDetailEdit(false);
     }
-  };
-
-  const handleBackToList = () => {
-    dispatch(selectTask(null));
-    dispatch(setViewMode('list'));
-  };
-
-  const handleEditCancel = useCallback(() => {
-    if (selectedTaskId) {
-      dispatch(setViewMode('detail'));
-    } else {
-      dispatch(setViewMode('list'));
-    }
-  }, [selectedTaskId, dispatch]);
-
-  const handleCreateSaved = useCallback(
-    (newTaskId?: string) => {
-      isFormDirtyRef.current = false;
-      setCreatingTask(false);
-      setTemplatePrefill(undefined);
-      setCreateFormKey(k => k + 1);
-      setTabDirection(1);
-      setActiveTab(SCHEDULED_TASK_TAB.Tasks);
-      if (newTaskId) {
-        dispatch(selectTask(newTaskId));
-        dispatch(setViewMode('detail'));
-      } else {
-        dispatch(selectTask(null));
-        dispatch(setViewMode('list'));
-      }
-    },
-    [dispatch],
-  );
-
-  // Show back arrow when viewing task detail or editing within tasks tab
-  const showBack =
-    activeTab === SCHEDULED_TASK_TAB.Tasks &&
-    (viewMode === 'detail' || viewMode === 'edit') &&
-    selectedTaskId;
-
-  const scheduledTaskTabs = [
-    { value: SCHEDULED_TASK_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
-    { value: SCHEDULED_TASK_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
-    { value: SCHEDULED_TASK_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
-  ] as const;
+  }, []);
 
   if (!gatewayReady || !initialDataLoaded) {
     return (
@@ -232,109 +239,154 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               {updateBadge}
             </div>
           )}
-          {showBack && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBackToList}
-              className="non-draggable"
-              aria-label={i18nService.t('back')}
-            >
-              <ArrowLeft />
-            </Button>
-          )}
-          <h1 className="text-lg font-semibold text-foreground">
-            {i18nService.t('scheduledTasksTitle')}
-          </h1>
         </div>
         <WindowTitleBar inline />
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="min-h-0 flex-1 gap-0">
-        <LayeredTabsList
-          value={activeTab}
-          items={scheduledTaskTabs}
-          separatorEdge={LayeredTabsSeparatorEdge.Top}
-          className="pb-4"
-        />
-
-        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4">
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <LayeredTabsContent
-              value={SCHEDULED_TASK_TAB.Create}
-              activeValue={activeTab}
-              direction={tabDirection}
-              className="h-full min-h-0 overflow-hidden"
-              contentClassName="h-full min-h-0 overflow-y-auto pt-4"
-            >
-              <div className="w-full px-4">
-                {creatingTask ? (
-                  <TaskForm
-                    key={createFormKey}
-                    mode="create"
-                    prefill={templatePrefill}
-                    onCancel={() => {
-                      setCreatingTask(false);
-                      setTemplatePrefill(undefined);
-                      isFormDirtyRef.current = false;
-                    }}
-                    onSaved={handleCreateSaved}
-                    onDirtyChange={handleFormDirtyChange}
-                  />
-                ) : (
-                  <TaskTemplateGallery
-                    onSelectTemplate={values => {
-                      setTemplatePrefill(values);
-                      setCreatingTask(true);
-                    }}
-                    onCustom={() => {
-                      setTemplatePrefill(undefined);
-                      setCreatingTask(true);
-                    }}
-                  />
-                )}
+      {/* Scrollable content */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-2xl px-8 pb-10">
+          {/* ── Hero ── */}
+          <section className="animate-fade-in-up pt-8 pb-6">
+            <div className="flex items-center gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+                <CalendarClock className="size-6 text-primary" />
               </div>
-            </LayeredTabsContent>
-
-            <LayeredTabsContent
-              value={SCHEDULED_TASK_TAB.Tasks}
-              activeValue={activeTab}
-              direction={tabDirection}
-              className="h-full min-h-0 overflow-hidden"
-              contentClassName="h-full min-h-0 overflow-y-auto pt-4"
-            >
-              <div className="w-full px-4">
-                {viewMode === 'list' && <TaskList onRequestDelete={handleRequestDelete} />}
-                {viewMode === 'edit' && selectedTask && (
-                  <TaskForm
-                    mode="edit"
-                    task={selectedTask}
-                    onCancel={handleEditCancel}
-                    onSaved={() => dispatch(setViewMode('detail'))}
-                    onDirtyChange={handleFormDirtyChange}
-                  />
-                )}
-                {viewMode === 'detail' && selectedTask && (
-                  <TaskDetail task={selectedTask} onRequestDelete={handleRequestDelete} />
-                )}
+              <div className="min-w-0">
+                <h1 className="text-xxl font-semibold text-foreground">
+                  {i18nService.t('scheduledTasksTitle')}
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {i18nService.t('scheduledTasksHeroDesc')}
+                </p>
               </div>
-            </LayeredTabsContent>
+            </div>
+          </section>
 
-            <LayeredTabsContent
-              value={SCHEDULED_TASK_TAB.History}
-              activeValue={activeTab}
-              direction={tabDirection}
-              className="h-full min-h-0 overflow-hidden"
-              contentClassName="h-full min-h-0 overflow-y-auto pt-4"
-            >
-              <div className="w-full px-4">
-                <AllRunsHistory />
-              </div>
-            </LayeredTabsContent>
+          {/* ── Tab list on the divider line, with a sliding underline ── */}
+          <div className="relative border-b border-border">
+            <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
+              {([
+                { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
+                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
+                { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
+              ] as const).map(tab => {
+                const active = activeTab === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    ref={el => {
+                      tabRefs.current[tab.value] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    tabIndex={active ? 0 : -1}
+                    onClick={() => setActiveTab(tab.value)}
+                    onKeyDown={e => handleTabKeyDown(e, tab.value)}
+                    className={cn(
+                      'relative -mb-px flex items-center gap-2 border-b-2 border-transparent pb-2.5 text-sm font-medium outline-none transition-colors focus-visible:text-foreground',
+                      active
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {tab.label}
+                    {tab.value === AUTO_TAB.Tasks && tasks.length > 0 && (
+                      <Badge variant="secondary">{tasks.length}</Badge>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <span
+              aria-hidden
+              className="absolute bottom-0 h-0.5 rounded-full bg-primary transition-[left,width] duration-300 ease-smooth"
+              style={{
+                left: indicator?.left ?? 0,
+                width: indicator?.width ?? 0,
+                opacity: indicator ? 1 : 0,
+              }}
+            />
+          </div>
+
+          {/* ── Active pane (directional slide) ── */}
+          <div
+            key={`${activeTab}-${tabDir ?? 'init'}`}
+            className={cn(
+              'pt-6',
+              tabDir === 'right'
+                ? 'animate-slide-in-right'
+                : tabDir === 'left'
+                  ? 'animate-slide-in-left'
+                  : 'animate-fade-in',
+            )}
+          >
+            {activeTab === AUTO_TAB.Create && (
+              <TaskTemplateGallery
+                onSelectTemplate={values => openCreateModal(values)}
+                onCustom={() => openCreateModal(undefined)}
+              />
+            )}
+
+            {activeTab === AUTO_TAB.Tasks && <TaskList onRequestDelete={handleRequestDelete} />}
+
+            {activeTab === AUTO_TAB.History && <AllRunsHistory />}
           </div>
         </div>
-      </Tabs>
+      </div>
+
+      {/* Create-task modal */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{i18nService.t('scheduledTasksNewTask')}</DialogTitle>
+            <DialogDescription>{i18nService.t('scheduledTasksNewTask')}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
+            <TaskForm
+              key={createFormKey}
+              mode="create"
+              prefill={createPrefill}
+              onCancel={() => setCreateOpen(false)}
+              onSaved={handleCreateSaved}
+              onDirtyChange={() => {}}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task detail / edit modal */}
+      <Dialog
+        open={detailTask !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setDetailTaskId(null);
+            setDetailEdit(false);
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{detailTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
+            <DialogDescription>{detailTask?.name ?? ''}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
+            {detailTask &&
+              (detailEdit ? (
+                <TaskForm
+                  mode="edit"
+                  task={detailTask}
+                  onCancel={() => setDetailEdit(false)}
+                  onSaved={() => setDetailEdit(false)}
+                  onDirtyChange={() => {}}
+                />
+              ) : (
+                <TaskDetail task={detailTask} onRequestDelete={handleRequestDelete} />
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation modal */}
       {deleteTaskInfo && (
@@ -344,53 +396,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           onCancel={handleCancelDelete}
         />
       )}
-
-      {/* Unsaved changes confirmation */}
-      <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{i18nService.t('taskFormUnsavedChanges')}</DialogTitle>
-            <DialogDescription>{i18nService.t('taskFormLeaveConfirm')}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowLeaveConfirm(false);
-                pendingTabSwitchRef.current = null;
-              }}
-            >
-              {i18nService.t('taskFormStay')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                setShowLeaveConfirm(false);
-                isFormDirtyRef.current = false;
-                const target = pendingTabSwitchRef.current;
-                pendingTabSwitchRef.current = null;
-                if (target) {
-                  setActiveTab(target);
-                  if (target === SCHEDULED_TASK_TAB.Tasks) {
-                    setTabDirection(
-                      SCHEDULED_TASK_TAB_ORDER.indexOf(target) >=
-                        SCHEDULED_TASK_TAB_ORDER.indexOf(activeTab)
-                        ? 1
-                        : -1,
-                    );
-                    dispatch(selectTask(null));
-                    dispatch(setViewMode('list'));
-                  }
-                }
-              }}
-            >
-              {i18nService.t('taskFormLeave')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

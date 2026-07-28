@@ -106,7 +106,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
         {TEMPLATES.map(tpl => (
           <Card
             key={tpl.id}
-            className="cursor-pointer hover:shadow-md transition-all shadow-sm h-full"
+            className="cursor-pointer hover:bg-muted/50 hover:shadow-md transition-all shadow-sm h-full"
             onClick={() =>
               onSelectTemplate({
                 name: i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0]),

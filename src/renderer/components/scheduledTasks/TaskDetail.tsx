@@ -58,7 +58,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
   const valueClass = 'text-sm text-foreground';
 
   return (
-    <div className="py-4 flex flex-col gap-4 max-w-3xl mx-auto">
+    <div className="py-4 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-foreground truncate" title={task.name}>
@@ -193,7 +193,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
 
       <div className="flex flex-col gap-3">
         <h3 className={sectionTitleClass}>{i18nService.t('scheduledTasksRunHistory')}</h3>
-        <AllRunsHistory task={task} />
+        <AllRunsHistory task={task} showRunning={false} />
       </div>
     </div>
   );

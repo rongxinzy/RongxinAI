@@ -80,13 +80,19 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
           {statusLabel}
         </Badge>
 
-        <Switch
-          checked={task.enabled}
+        <div
           onClick={e => e.stopPropagation()}
-          onCheckedChange={(checked: boolean) => {
-            void scheduledTaskService.toggleTask(task.id, checked);
-          }}
-        />
+          onPointerDown={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          className="shrink-0"
+        >
+          <Switch
+            checked={task.enabled}
+            onCheckedChange={(checked: boolean) => {
+              void scheduledTaskService.toggleTask(task.id, checked);
+            }}
+          />
+        </div>
       </CardContent>
 
       <DropdownMenu>
