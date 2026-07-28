@@ -2,7 +2,9 @@ name: Publish online update
 
 on:
   push:
-    branches: [release]
+    branches:
+      - release
+      - 'release-*'
 
 concurrency:
   group: zhiyuan-online-update-production
