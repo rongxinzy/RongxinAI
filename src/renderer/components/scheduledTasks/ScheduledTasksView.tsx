@@ -170,16 +170,16 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl px-8 pb-8">
           {/* ── Hero ── */}
-          <section className="animate-fade-in-up py-6">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-muted">
-                <CalendarClock className="size-5 text-primary" />
+          <section className="animate-fade-in-up py-8">
+            <div className="flex items-center gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+                <CalendarClock className="size-6 text-primary" />
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold leading-snug text-foreground">
                   {i18nService.t('scheduledTasksTitle')}
                 </h1>
-                <p className="mt-0.5 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {i18nService.t('scheduledTasksHeroDesc')}
                 </p>
               </div>
