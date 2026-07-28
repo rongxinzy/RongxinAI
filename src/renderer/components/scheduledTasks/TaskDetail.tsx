@@ -193,7 +193,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
 
       <div className="flex flex-col gap-3">
         <h3 className={sectionTitleClass}>{i18nService.t('scheduledTasksRunHistory')}</h3>
-        <AllRunsHistory task={task} />
+        <AllRunsHistory task={task} showRunning={false} />
       </div>
     </div>
   );
