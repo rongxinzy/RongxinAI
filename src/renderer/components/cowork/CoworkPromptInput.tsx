@@ -63,7 +63,11 @@ type CoworkAttachment = DraftAttachment;
 // Stable empty array reference to avoid unnecessary re-renders from useSelector
 // returning a new [] on every call (when draftAttachments[draftKey] is undefined).
 const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
-/** Skills available in Chat mode (no local filesystem access) */
+/**
+ * Chat mode injects a skill's instructions into a direct LLM request but cannot run skill
+ * scripts. Keep this as an explicit allowlist of skills that remain useful as guidance alone.
+ * Replace it with capability-based filtering once skills expose that metadata.
+ */
 const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx', 'frontend-design']);
 const IMAGE_EXTENSIONS = new Set([
   '.png',
@@ -1147,7 +1151,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                             e.stopPropagation();
                             handleFolderSelect('');
                           }}
-                          className="shrink-0 ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                          className="shrink-0 ml-0.5 p-0.5 rounded hover:bg-surface-raised transition-colors"
                         >
                           <X className="h-3 w-3" />
                         </span>

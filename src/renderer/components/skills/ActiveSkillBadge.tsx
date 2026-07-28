@@ -47,7 +47,7 @@ const ActiveSkillBadge: React.FC = () => {
       {showQuickActionFallback && quickActionSkillId && (
         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-transparent">
           <Puzzle className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-medium text-primary max-w-[80px] truncate">
+          <span className="max-w-20 truncate text-xs font-medium text-primary">
             {quickActionSkillId}
           </span>
           <Button
@@ -55,7 +55,7 @@ const ActiveSkillBadge: React.FC = () => {
             variant="ghost"
             size="icon-xs"
             onClick={handleRemoveQuickAction}
-            className="ml-0.5 size-auto rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            className="ml-0.5 size-auto rounded p-0.5 hover:bg-surface-raised transition-colors"
             title={i18nService.t('clearSkill')}
           >
             <X className="size-3 text-primary" />
@@ -68,7 +68,7 @@ const ActiveSkillBadge: React.FC = () => {
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-transparent"
         >
           <Puzzle className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-medium text-primary max-w-[80px] truncate">
+          <span className="max-w-20 truncate text-xs font-medium text-primary">
             {skill.name}
           </span>
           <Button
@@ -76,7 +76,7 @@ const ActiveSkillBadge: React.FC = () => {
             variant="ghost"
             size="icon-xs"
             onClick={e => handleRemoveSkill(e, skill.id)}
-            className="ml-0.5 size-auto rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            className="ml-0.5 size-auto rounded p-0.5 hover:bg-surface-raised transition-colors"
             title={i18nService.t('clearSkill')}
           >
             <X className="size-3 text-primary" />
