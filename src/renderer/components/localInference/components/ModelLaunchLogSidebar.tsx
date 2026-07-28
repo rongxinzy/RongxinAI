@@ -117,7 +117,7 @@ export function ModelLaunchLogSidebar({
       aria-hidden={!state.visible}
       className={cn(
         'relative flex h-full shrink-0 border-l bg-background ease-in-out',
-        isResizing ? 'transition-[opacity,border-color]' : 'transition-[width,opacity,border-color] duration-500',
+        'transition-[opacity,border-color] duration-500',
         state.visible ? 'overflow-visible border-border opacity-100' : 'overflow-hidden border-transparent opacity-0',
       )}
       style={{ width: state.visible ? sidebarWidth : 0 }}

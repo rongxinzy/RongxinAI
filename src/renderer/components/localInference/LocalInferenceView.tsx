@@ -698,7 +698,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
       )}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
+        <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]">
           <div className="w-full space-y-4 px-6 py-4">
             {activeTab === 'models' ? (
               <div className="flex flex-wrap items-center justify-end gap-2">
