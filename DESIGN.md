@@ -86,7 +86,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 ### 字体族
 
-- **界面字体：** 系统字体栈（`index.css` 中 `:root` 已定义：SF Pro / PingFang SC / Microsoft YaHei / Inter / system-ui 等）。禁止引入 Web 字体文件。
+- **界面字体：** 系统字体栈（`index.css` 中 `:root` 已定义：system-ui / Segoe UI（Windows 英文）/ SF Pro（macOS）/ PingFang SC / Microsoft YaHei UI（中文）/ Noto Sans CJK SC）。禁止引入 Web 字体文件。
 - **代码字体：** `'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace`。所有代码块、行内代码、终端、diff 统一使用。
 - 全局统一，禁止在组件上用 `font-family` 覆盖。
 
