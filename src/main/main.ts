@@ -2401,15 +2401,19 @@ const PRELOAD_PATH = app.isPackaged
   ? path.join(__dirname, 'preload.js')
   : path.join(__dirname, '../dist-electron/preload.js');
 
-// 获取应用图标路径（Windows 使用 .ico，其他平台使用 .png）
+// 获取应用图标路径（与安装包/桌面快捷方式保持一致，不复用系统托盘图标）
 const getAppIconPath = (): string | undefined => {
   if (process.platform !== 'win32' && process.platform !== 'linux') return undefined;
-  const basePath = app.isPackaged
-    ? path.join(process.resourcesPath, 'tray')
-    : path.join(__dirname, '..', 'resources', 'tray');
-  return process.platform === 'win32'
-    ? path.join(basePath, 'tray-icon.ico')
-    : path.join(basePath, 'tray-icon.png');
+  if (app.isPackaged) {
+    const packagedIconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+    return path.join(process.resourcesPath, 'app-icons', packagedIconName);
+  }
+
+  const developmentIconPath =
+    process.platform === 'win32'
+      ? path.join('win', 'icon.ico')
+      : path.join('png', '256x256.png');
+  return path.join(__dirname, '..', 'build', 'icons', developmentIconPath);
 };
 
 // 保存对主窗口的引用

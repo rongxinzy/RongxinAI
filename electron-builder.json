@@ -45,6 +45,14 @@
   ],
   "extraResources": [
     {
+      "from": "build/icons/win/icon.ico",
+      "to": "app-icons/icon.ico"
+    },
+    {
+      "from": "build/icons/png/256x256.png",
+      "to": "app-icons/icon.png"
+    },
+    {
       "from": "resources/tray",
       "to": "tray",
       "filter": ["**/*"]
