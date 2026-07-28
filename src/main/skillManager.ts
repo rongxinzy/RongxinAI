@@ -1842,13 +1842,7 @@ export class SkillManager {
       return source;
     }
 
-    const resolvedSource = await resolveModelScopeSkillInstallSource(source, {
-      token: this.getModelScopeApiToken(),
-      fetchImpl: (input, init) =>
-        session.defaultSession.fetch(input, init as RequestInit) as unknown as ReturnType<
-          typeof fetch
-        >,
-    });
+    const resolvedSource = await resolveModelScopeSkillInstallSource(source);
     return resolvedSource;
   }
 

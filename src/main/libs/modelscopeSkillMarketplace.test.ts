@@ -68,7 +68,7 @@ test('fetchModelScopeSkillMarketplace maps ModelScope skills to the app marketpl
             },
             url: 'https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
             iconUrl: 'https://resources.modelscope.cn/skills/amap.png',
-            installSource: 'https://github.com/AMap-Web/amap-lbs-skill',
+            installSource: 'https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
             version: '1.0.0',
             source: {
               from: 'ModelScope',
@@ -142,7 +142,7 @@ test('fetchModelScopeSkillMarketplace orders a ModelScope page by downloads', as
               downloads: 500,
             },
             url: 'https://modelscope.cn/skills/@demo/high-skill',
-            installSource: 'https://github.com/demo/high-skill',
+            installSource: 'https://modelscope.cn/skills/@demo/high-skill',
             version: '1.0.0',
             source: {
               from: 'ModelScope',
@@ -160,7 +160,7 @@ test('fetchModelScopeSkillMarketplace orders a ModelScope page by downloads', as
               downloads: 300,
             },
             url: 'https://modelscope.cn/skills/@demo/mid-skill',
-            installSource: 'https://github.com/demo/mid-skill',
+            installSource: 'https://modelscope.cn/skills/@demo/mid-skill',
             version: '1.0.0',
             source: {
               from: 'ModelScope',
@@ -178,7 +178,7 @@ test('fetchModelScopeSkillMarketplace orders a ModelScope page by downloads', as
               downloads: 5,
             },
             url: 'https://modelscope.cn/skills/@demo/low-skill',
-            installSource: 'https://github.com/demo/low-skill',
+            installSource: 'https://modelscope.cn/skills/@demo/low-skill',
             version: '1.0.0',
             source: {
               from: 'ModelScope',
@@ -224,33 +224,38 @@ test('fetchModelScopeSkillMarketplace requests the specified page and reports mo
   });
 });
 
-test('resolveModelScopeSkillInstallSource prefers source_url from skill detail', async () => {
-  const requestedUrls: string[] = [];
+test('resolveModelScopeSkillInstallSource uses the ModelScope archive instead of an upstream source URL', async () => {
   await expect(
-    resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill', {
-      fetchImpl: async input => {
-        requestedUrls.push(input);
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({
-            data: {
-              id: '@AMap-Web/amap-lbs-skill',
-              source_url: 'https://github.com/AMap-Web/amap-lbs-skill',
-              install_command: [
-                'npx skills add https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill',
-              ],
+    resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill'),
+  ).resolves.toBe(
+    'https://www.modelscope.cn/skills/@AMap-Web/amap-lbs-skill/archive/zip/master',
+  );
+});
+
+test('fetchModelScopeSkillMarketplace does not treat a ClawHub source URL as an install source', async () => {
+  const json = await fetchModelScopeSkillMarketplace({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          skills: [
+            {
+              id: 'steipete/weather',
+              display_name: 'Weather',
+              source_url: 'https://clawhub.ai/steipete/weather',
             },
-          }),
-          text: async () => '',
-        };
-      },
+          ],
+        },
+      }),
+      text: async () => '',
     }),
-  ).resolves.toBe('https://github.com/AMap-Web/amap-lbs-skill');
-  expect(requestedUrls).toEqual([
-    'https://modelscope.cn/openapi/v1/skills/@AMap-Web/amap-lbs-skill',
-  ]);
+  });
+
+  const skill = JSON.parse(json).data.value.marketplace[0];
+  expect(skill.installSource).toBe('https://modelscope.cn/skills/steipete/weather');
+  expect(skill.source.url).toBe('https://clawhub.ai/steipete/weather');
 });
 
 test('fetchModelScopeSkillMarketplace omits an install source when the skill only links back to ModelScope', async () => {
@@ -280,22 +285,9 @@ test('fetchModelScopeSkillMarketplace omits an install source when the skill onl
   expect(skill.url).toBe('https://modelscope.cn/skills/@demo/platform-only');
 });
 
-test('resolveModelScopeSkillInstallSource falls back to the ModelScope archive endpoint', async () => {
+test('resolveModelScopeSkillInstallSource builds the official ModelScope archive endpoint', async () => {
   await expect(
-    resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@demo/platform-only', {
-      fetchImpl: async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({
-          data: {
-            id: '@demo/platform-only',
-            install_command: ['npx skills add https://modelscope.cn/skills/@demo/platform-only'],
-          },
-        }),
-        text: async () => '',
-      }),
-    }),
+    resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@demo/platform-only'),
   ).resolves.toBe(
     'https://www.modelscope.cn/skills/@demo/platform-only/archive/zip/master',
   );

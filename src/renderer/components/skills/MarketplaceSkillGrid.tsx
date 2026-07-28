@@ -76,10 +76,10 @@ export function MarketplaceSkillGrid({
             <button
               type="button"
               disabled={Boolean(isInstallingSkillId && !isInstalling)}
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-md py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               onClick={() => onSelect(skill)}
             >
-              <Avatar className="size-12 shrink-0 rounded-xl bg-muted">
+              <Avatar className="size-10 shrink-0 rounded-xl bg-muted">
                 {skill.iconUrl && (
                   <AvatarImage
                     src={resolveSkillIconUrl(skill.iconUrl)}
