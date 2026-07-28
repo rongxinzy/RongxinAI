@@ -50,6 +50,8 @@ export const McpIpc = {
   RefreshBridge: 'mcp:refreshBridge',
   Authorize: 'mcp:authorize',
   CancelAuthorize: 'mcp:cancelAuthorize',
+  GetFeishuCliStatus: 'mcp:feishuCliStatus',
+  PrepareFeishuCli: 'mcp:prepareFeishuCli',
   LoadIcon: 'mcp:loadIcon',
   BridgeSyncStart: 'mcp:bridge:syncStart',
   BridgeSyncDone: 'mcp:bridge:syncDone',

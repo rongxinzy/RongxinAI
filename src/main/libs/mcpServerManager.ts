@@ -45,6 +45,23 @@ interface ManagedMcpServer {
 const MAX_RECENT_STDERR_LINES = 20;
 const MCP_SERVER_CLOSE_TIMEOUT_MS = 3_000;
 
+function withMcpTimeout<T>(promise: Promise<T>, timeoutSeconds: number, label: string): Promise<T> {
+  const timeoutMs = timeoutSeconds * 1000;
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutSeconds}s`)), timeoutMs);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function closeClientWithTimeout(client: Client, serverName: string): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -586,7 +603,7 @@ export class McpServerManager {
     );
 
     try {
-      await client.connect(transport);
+      await withMcpTimeout(client.connect(transport), record.timeout ?? 60, `MCP server "${record.name}" connection`);
       log('INFO', `Connected to MCP server "${record.name}"`);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
@@ -604,7 +621,7 @@ export class McpServerManager {
     // Discover tools
     let tools: McpToolManifestEntry[] = [];
     try {
-      const result = await client.listTools();
+      const result = await withMcpTimeout(client.listTools(), record.timeout ?? 60, `MCP server "${record.name}" tool discovery`);
       tools = (result.tools || []).map(t => ({
         server: record.name,
         name: t.name,
@@ -661,7 +678,11 @@ export class McpServerManager {
 
       // Race the tool call against the abort signal so that in-flight MCP calls
       // return immediately when the gateway drops the HTTP connection (e.g. after chat.abort).
-      const toolPromise = server.client.callTool({ name: toolName, arguments: args });
+      const toolPromise = withMcpTimeout(
+        server.client.callTool({ name: toolName, arguments: args }),
+        server.record.timeout ?? 60,
+        `Tool "${toolName}"`,
+      );
       let result: Awaited<typeof toolPromise>;
       if (options?.signal) {
         result = await raceAbortSignal(toolPromise, options.signal, `Tool "${toolName}" aborted`);

@@ -7,7 +7,6 @@ import type { McpServerFormData, McpServerRecord } from '../mcpStore';
 import { getEnhancedEnv } from './coworkUtil';
 import { expandMcpTemplate, resolveStdioCommand, unresolvedMcpTemplateKeys } from './mcpServerManager';
 
-const MCP_CONNECTION_TEST_TIMEOUT_MS = 20_000;
 const MAX_RECENT_STDERR_LINES = 20;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -68,6 +67,7 @@ function buildProbeRecord(data: McpServerFormData): McpServerRecord {
     env: data.env,
     url: data.url,
     headers: data.headers,
+    timeout: data.timeout,
     isBuiltIn: !!data.isBuiltIn,
     githubUrl: data.githubUrl,
     registryId: data.registryId,
@@ -86,6 +86,7 @@ export async function probeMcpConnection(
   data: McpServerFormData,
 ): Promise<McpConnectionProbeResult> {
   const record = buildProbeRecord(data);
+  const timeoutMs = (record.timeout ?? 20) * 1000;
   let transport: StdioClientTransport | SSEClientTransport | StreamableHTTPClientTransport;
   const recentStderr: string[] = [];
 
@@ -155,12 +156,12 @@ export async function probeMcpConnection(
   try {
     await withTimeout(
       client.connect(transport),
-      MCP_CONNECTION_TEST_TIMEOUT_MS,
+      timeoutMs,
       'MCP stdio initialize',
     );
     const toolResult = await withTimeout(
       client.listTools(),
-      MCP_CONNECTION_TEST_TIMEOUT_MS,
+      timeoutMs,
       'MCP listTools',
     );
     return {

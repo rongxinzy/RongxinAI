@@ -988,7 +988,7 @@ let mcpBridgeSecret: string = require('crypto').randomUUID();
 let mcpBridgeStartPromise: Promise<McpBridgeConfig | null> | null = null;
 let mcpInitPromise: Promise<McpToolManifestEntry[]> | null = null;
 let mcpLifecycleGeneration = 0;
-const activeMcpAuthorizations = new Map<string, { cancelled: boolean }>();
+const activeMcpAuthorizations = new Map<string, AbortController>();
 let imGatewayManager: IMGatewayManager | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
@@ -1907,6 +1907,7 @@ const getMcpStore = () => {
 };
 
 const FEISHU_CLI_TIMEOUT_MS = 120_000;
+const FEISHU_CLI_AUTH_TIMEOUT_MS = 600_000;
 const FEISHU_MCP_REGISTRY_ID = 'feishu';
 
 const getFeishuCliRoot = (): string => path.join(app.getPath('userData'), 'MCPs', 'feishu', 'cli');
@@ -1917,7 +1918,13 @@ const getLocalFeishuCliCommand = (): string | null => {
   return fs.existsSync(command) ? command : null;
 };
 
-const runFeishuCliCommand = (command: string, args: string[], cwd?: string): Promise<string> =>
+const runFeishuCliCommand = (
+  command: string,
+  args: string[],
+  cwd?: string,
+  timeoutMs = FEISHU_CLI_TIMEOUT_MS,
+  signal?: AbortSignal,
+): Promise<string> =>
   new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -1927,12 +1934,27 @@ const runFeishuCliCommand = (command: string, args: string[], cwd?: string): Pro
     });
     let output = '';
     let settled = false;
-    const timer = setTimeout(() => {
+    let timer: NodeJS.Timeout | null = null;
+    const abort = () => {
       if (settled) return;
       settled = true;
+      if (timer) clearTimeout(timer);
       child.kill();
-      reject(new Error(`Feishu CLI command timed out after ${FEISHU_CLI_TIMEOUT_MS}ms`));
-    }, FEISHU_CLI_TIMEOUT_MS);
+      reject(new Error('MCP authorization was cancelled'));
+    };
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+    signal?.addEventListener('abort', abort, { once: true });
+    const finish = () => signal?.removeEventListener('abort', abort);
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      finish();
+      child.kill();
+      reject(new Error(`Feishu CLI command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
     child.stdout.on('data', chunk => {
       output += String(chunk);
     });
@@ -1942,13 +1964,15 @@ const runFeishuCliCommand = (command: string, args: string[], cwd?: string): Pro
     child.once('error', error => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      finish();
+      if (timer) clearTimeout(timer);
       reject(error);
     });
     child.once('close', code => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      finish();
+      if (timer) clearTimeout(timer);
       if (code === 0) {
         resolve(output);
         return;
@@ -1961,7 +1985,7 @@ const findFeishuCliCommand = async (): Promise<string | null> => {
   return getLocalFeishuCliCommand();
 };
 
-const authorizeFeishuCli = async (): Promise<void> => {
+const prepareFeishuCli = async (): Promise<void> => {
   let cliCommand = await findFeishuCliCommand();
   if (!cliCommand) {
     const cliRoot = getFeishuCliRoot();
@@ -1982,9 +2006,45 @@ const authorizeFeishuCli = async (): Promise<void> => {
   } catch {
     await runFeishuCliCommand(cliCommand, ['config', 'init', '--new', '--lang', 'en'], cliRoot);
   }
+};
 
-  await runFeishuCliCommand(cliCommand, ['auth', 'login', '--recommend'], cliRoot);
-  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot);
+const authorizeFeishuCli = async (signal?: AbortSignal): Promise<void> => {
+  await prepareFeishuCli();
+  const cliCommand = await findFeishuCliCommand();
+  if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
+  const cliRoot = getFeishuCliRoot();
+
+  const authOutput = await runFeishuCliCommand(
+    cliCommand,
+    ['auth', 'login', '--recommend', '--no-wait', '--json'],
+    cliRoot,
+    FEISHU_CLI_TIMEOUT_MS,
+    signal,
+  );
+  let authPayload: { device_code?: string; verification_url?: string } | null = null;
+  for (const line of authOutput.trim().split(/\r?\n/).reverse()) {
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (parsed && typeof parsed === 'object') {
+        authPayload = parsed as { device_code?: string; verification_url?: string };
+        break;
+      }
+    } catch {
+      // The CLI may include human-readable notices around its JSON output.
+    }
+  }
+  if (!authPayload?.device_code || !authPayload.verification_url) {
+    throw new Error('Feishu CLI did not return a browser authorization URL');
+  }
+  await shell.openExternal(authPayload.verification_url);
+  await runFeishuCliCommand(
+    cliCommand,
+    ['auth', 'login', '--device-code', authPayload.device_code, '--json'],
+    cliRoot,
+    FEISHU_CLI_AUTH_TIMEOUT_MS,
+    signal,
+  );
+  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, FEISHU_CLI_TIMEOUT_MS, signal);
 };
 
 const logoutFeishuCli = async (): Promise<void> => {
@@ -3750,7 +3810,11 @@ if (!gotTheLock) {
         return { success: false, error: 'MCP server not found' };
       }
       if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
-        await logoutFeishuCli();
+        try {
+          await logoutFeishuCli();
+        } catch (error) {
+          console.warn('[Feishu] CLI logout failed while uninstalling the connector:', error);
+        }
         removeFeishuSkills();
       }
       getMcpStore().deleteServer(id);
@@ -3854,26 +3918,39 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(McpIpc.CancelAuthorize, (_event, requestId: string) => {
-    const pending = activeMcpAuthorizations.get(requestId);
-    if (pending) pending.cancelled = true;
+    activeMcpAuthorizations.get(requestId)?.abort();
     return { success: true };
+  });
+
+  ipcMain.handle(McpIpc.GetFeishuCliStatus, () => ({
+    success: true,
+    installed: Boolean(getLocalFeishuCliCommand()),
+  }));
+
+  ipcMain.handle(McpIpc.PrepareFeishuCli, async () => {
+    try {
+      await prepareFeishuCli();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to install Feishu CLI' };
+    }
   });
 
   ipcMain.handle(
     McpIpc.Authorize,
     async (_event, rawData: McpServerFormData & { authorizationRequestId?: string }) => {
       const { authorizationRequestId, ...data } = rawData;
-      const cancellation = authorizationRequestId ? { cancelled: false } : null;
+      const cancellation = authorizationRequestId ? new AbortController() : null;
       if (authorizationRequestId && cancellation) {
         activeMcpAuthorizations.set(authorizationRequestId, cancellation);
       }
       const ensureNotCancelled = () => {
-        if (cancellation?.cancelled) throw new Error('MCP authorization was cancelled');
+        if (cancellation?.signal.aborted) throw new Error('MCP authorization was cancelled');
       };
     try {
       ensureNotCancelled();
       if (data.registryId === FEISHU_MCP_REGISTRY_ID) {
-        await authorizeFeishuCli();
+        await authorizeFeishuCli(cancellation?.signal);
         ensureNotCancelled();
         installFeishuSkills();
         ensureNotCancelled();
@@ -3901,7 +3978,11 @@ if (!gotTheLock) {
       if (validationError) return { success: false, error: validationError };
       if (!data.registryId || !data.url) return { success: false, error: 'Official MCP configuration is incomplete' };
 
-      const accessToken = await new McpOAuthManager(getStore()).authorize(data.registryId, data.url);
+      const accessToken = await new McpOAuthManager(getStore()).authorize(
+        data.registryId,
+        data.url,
+        cancellation?.signal,
+      );
       ensureNotCancelled();
       if (!accessToken) return { success: false, error: 'OAuth authorization did not return an access token' };
 

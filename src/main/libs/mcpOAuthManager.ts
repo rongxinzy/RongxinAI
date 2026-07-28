@@ -8,16 +8,36 @@ import type { SqliteStore } from '../sqliteStore';
 export const MCP_OAUTH_STORE_PREFIX = 'mcp.oauth.';
 const MCP_OAUTH_REQUEST_TIMEOUT_MS = 30_000;
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+  signal?: AbortSignal,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    let timer: NodeJS.Timeout | null = null;
+    const abort = () => reject(new Error('MCP authorization was cancelled'));
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    };
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    if (signal?.aborted) {
+      cleanup();
+      abort();
+      return;
+    }
+    signal?.addEventListener('abort', abort, { once: true });
     promise.then(
       value => {
-        clearTimeout(timer);
+        cleanup();
         resolve(value);
       },
       error => {
-        clearTimeout(timer);
+        cleanup();
         reject(error);
       },
     );
@@ -60,7 +80,7 @@ class StoredOAuthProvider implements OAuthClientProvider {
 export class McpOAuthManager {
   constructor(private readonly store: SqliteStore) {}
 
-  async authorize(serverId: string, serverUrl: string): Promise<string> {
+  async authorize(serverId: string, serverUrl: string, signal?: AbortSignal): Promise<string> {
     const callbackServer = http.createServer();
     await new Promise<void>((resolve, reject) => {
       callbackServer.once('error', reject);
@@ -76,10 +96,18 @@ export class McpOAuthManager {
         auth(provider, { serverUrl, scope: undefined }),
         MCP_OAUTH_REQUEST_TIMEOUT_MS,
         'MCP OAuth discovery',
+        signal,
       );
       if (result === 'AUTHORIZED') return provider.tokens()?.access_token || '';
       const code = await new Promise<string>((resolve, reject) => {
+        const abort = () => reject(new Error('MCP authorization was cancelled'));
+        if (signal?.aborted) {
+          abort();
+          return;
+        }
+        signal?.addEventListener('abort', abort, { once: true });
         callbackServer.once('request', (request, response) => {
+          signal?.removeEventListener('abort', abort);
           const url = new URL(request.url || '/', redirectUri);
           const authorizationCode = url.searchParams.get('code');
           response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -92,6 +120,7 @@ export class McpOAuthManager {
         auth(provider, { serverUrl, authorizationCode: code }),
         MCP_OAUTH_REQUEST_TIMEOUT_MS,
         'MCP OAuth token exchange',
+        signal,
       );
       return provider.tokens()?.access_token || '';
     } finally {

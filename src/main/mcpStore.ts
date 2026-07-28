@@ -12,6 +12,7 @@ export interface McpServerRecord {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -28,6 +29,7 @@ export interface McpServerFormData {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -50,6 +52,7 @@ interface McpConfigJson {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  timeout?: number;
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
@@ -81,6 +84,7 @@ export class McpStore {
       env: config.env,
       url: config.url,
       headers: config.headers,
+      timeout: config.timeout,
       isBuiltIn: config.isBuiltIn === true,
       githubUrl: config.githubUrl,
       registryId: config.registryId,
@@ -97,6 +101,7 @@ export class McpStore {
     if (data.url !== undefined) config.url = data.url;
     if (data.headers !== undefined && Object.keys(data.headers).length > 0)
       config.headers = data.headers;
+    if (data.timeout !== undefined) config.timeout = data.timeout;
     if (data.isBuiltIn) config.isBuiltIn = true;
     if (data.githubUrl) config.githubUrl = data.githubUrl;
     if (data.registryId) config.registryId = data.registryId;
@@ -151,6 +156,7 @@ export class McpStore {
       env: data.env !== undefined ? data.env : existing.env,
       url: data.url !== undefined ? data.url : existing.url,
       headers: data.headers !== undefined ? data.headers : existing.headers,
+      timeout: data.timeout !== undefined ? data.timeout : existing.timeout,
       isBuiltIn: data.isBuiltIn !== undefined ? data.isBuiltIn : existing.isBuiltIn,
       githubUrl: data.githubUrl !== undefined ? data.githubUrl : existing.githubUrl,
       registryId: data.registryId !== undefined ? data.registryId : existing.registryId,

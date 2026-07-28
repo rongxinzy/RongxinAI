@@ -9,6 +9,7 @@ export interface McpPresentationSection {
 
 export interface McpPresentationLocale {
   description?: string;
+  examples?: string[];
   connect?: {
     usage?: McpPresentationSection;
     data?: McpPresentationSection;
