@@ -460,7 +460,7 @@ const App: React.FC = () => {
       appUpdateState.status === AppUpdateStatus.Error ||
       appUpdateState.status === AppUpdateStatus.Available
     ) {
-      const isManualUrl = updateInfo.url.includes('#') || updateInfo.url.endsWith('/download-list');
+      const isManualUrl = updateInfo.manualDownload;
       if (!isManualUrl) {
         shouldInstallReadyUpdateRef.current = appUpdateState.status === AppUpdateStatus.Available;
         const retryResult = await window.electron.appUpdate.retryDownload();
@@ -472,7 +472,7 @@ const App: React.FC = () => {
       }
     }
 
-    if (updateInfo.url.includes('#') || updateInfo.url.endsWith('/download-list')) {
+    if (updateInfo.manualDownload) {
       shouldInstallReadyUpdateRef.current = false;
       setShowUpdateModal(false);
       try {
@@ -495,7 +495,7 @@ const App: React.FC = () => {
 
   const handleRetryUpdate = useCallback(async () => {
     if (!updateInfo) return;
-    if (updateInfo.url.includes('#') || updateInfo.url.endsWith('/download-list')) {
+    if (updateInfo.manualDownload) {
       shouldInstallReadyUpdateRef.current = false;
       setShowUpdateModal(false);
       await window.electron.shell.openExternal(updateInfo.url);
@@ -674,7 +674,7 @@ const App: React.FC = () => {
     updateInfo &&
     appUpdateState.status !== AppUpdateStatus.Checking &&
     appUpdateState.status !== AppUpdateStatus.Downloading;
-  const updateBadge = shouldShowUpdateBadge ? (
+  const updateEntry = shouldShowUpdateBadge ? (
     <AppUpdateBadge
       latestVersion={updateInfo.latestVersion}
       status={appUpdateState.status}
@@ -756,7 +756,7 @@ const App: React.FC = () => {
             onNewChat={handleNewChat}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
-            updateBadge={!isSidebarCollapsed ? updateBadge : null}
+            updateEntry={!isSidebarCollapsed ? updateEntry : null}
             hideLogin={true}
           />
           <div
@@ -774,7 +774,7 @@ const App: React.FC = () => {
                     isVisible={mainView === 'localInference'}
                     onToggleSidebar={handleToggleSidebar}
                     onNewChat={handleNewChat}
-                    updateBadge={isSidebarCollapsed ? updateBadge : null}
+                    updateBadge={null}
                   />
                 </div>
               )}
@@ -785,7 +785,7 @@ const App: React.FC = () => {
                   onNewChat={handleNewChat}
                   onCreateSkillByChat={handleCreateSkillByChat}
                   onTrySkill={handleTrySkill}
-                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  updateBadge={null}
                   readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                 />
               ) : mainView === 'scheduledTasks' ? (
@@ -793,21 +793,21 @@ const App: React.FC = () => {
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
-                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  updateBadge={null}
                 />
               ) : mainView === 'mcp' ? (
                 <McpView
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
-                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  updateBadge={null}
                 />
               ) : mainView === 'expert' ? (
                 <ExpertView
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
-                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  updateBadge={null}
                   readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                   onCreateSkillByChat={handleCreateSkillByChat}
                   onTrySkill={handleTrySkill}
@@ -819,7 +819,7 @@ const App: React.FC = () => {
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
-                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                  updateBadge={null}
                   inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
                   onRespondToInlineQuestion={handlePermissionResponse}
                 />

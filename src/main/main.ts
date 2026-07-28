@@ -28,7 +28,12 @@ import {
   migrateScheduledTasksToOpenclaw,
 } from '../scheduledTask/migrate';
 import { AgentIpcChannel } from '../shared/agent/constants';
-import { AppUpdateIpc } from '../shared/appUpdate/constants';
+import {
+  APP_UPDATE_POLL_INTERVAL_MS,
+  APP_UPDATE_STARTUP_DELAY_JITTER_MS,
+  APP_UPDATE_STARTUP_DELAY_MIN_MS,
+  AppUpdateIpc,
+} from '../shared/appUpdate/constants';
 import {
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
@@ -1062,6 +1067,22 @@ const getAppUpdateCoordinator = (): AppUpdateCoordinator => {
     appUpdateCoordinator = new AppUpdateCoordinator(getStore());
   }
   return appUpdateCoordinator;
+};
+
+let appUpdatePollTimer: NodeJS.Timeout | null = null;
+let lastSuccessfulAppUpdateCheckAt = 0;
+
+const checkForAppUpdate = (): void => {
+  void getAppUpdateCoordinator().checkNow().then(result => {
+    if (result.success) lastSuccessfulAppUpdateCheckAt = Date.now();
+  });
+};
+
+const startAppUpdatePolling = (): void => {
+  if (appUpdatePollTimer) return;
+  const startupDelay = APP_UPDATE_STARTUP_DELAY_MIN_MS + Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
+  setTimeout(checkForAppUpdate, startupDelay);
+  appUpdatePollTimer = setInterval(checkForAppUpdate, APP_UPDATE_POLL_INTERVAL_MS);
 };
 
 const forwardOpenClawStatus = (status: OpenClawEngineStatus): void => {
@@ -7452,6 +7473,7 @@ if (!gotTheLock) {
     createWindow();
     profiler.measure('createWindow');
     console.log('[Main] initApp: window created');
+    startAppUpdatePolling();
 
     // ── Step 2-4: Skill bootstrap (non-blocking) ────────────────────
     console.log('[Main] initApp: starting skill bootstrap');
@@ -7573,6 +7595,9 @@ if (!gotTheLock) {
     powerMonitor.on('resume', () => {
       if (openClawRuntimeAdapter) {
         openClawRuntimeAdapter.onSystemResume();
+      }
+      if (Date.now() - lastSuccessfulAppUpdateCheckAt >= APP_UPDATE_POLL_INTERVAL_MS) {
+        checkForAppUpdate();
       }
     });
 

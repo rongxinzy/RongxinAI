@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { ArrowUpCircle, Download } from 'lucide-react';
 import React from 'react';
 
 import {
@@ -28,12 +29,12 @@ const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, 
       type="button"
       variant="outline"
       onClick={onClick}
-      className="non-draggable inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/18 dark:text-emerald-400 transition-colors whitespace-nowrap h-auto"
+      className="non-draggable flex h-8 w-full items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-primary hover:bg-primary/10"
       title={`${label} ${latestVersion}`}
       aria-label={`${label} ${latestVersion}`}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-      <span>{label}</span>
+      {status === AppUpdateStatus.Downloading ? <Download className="h-4 w-4 shrink-0" /> : <ArrowUpCircle className="h-4 w-4 shrink-0" />}
+      <span className="truncate">{label} v{latestVersion}</span>
     </Button>
   );
 };

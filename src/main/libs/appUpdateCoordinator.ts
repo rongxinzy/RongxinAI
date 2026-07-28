@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { app, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { gt, lt, valid } from 'semver';
 
 import {
   type AppUpdateCheckResult,
@@ -11,43 +12,46 @@ import {
   AppUpdateSource,
   AppUpdateStatus,
 } from '../../shared/appUpdate/constants';
+import { APP_UPDATE_TRUSTED_KEYS } from '../../shared/appUpdate/trustedKeys';
 import type { SqliteStore } from '../sqliteStore';
-import { downloadUpdate } from './appUpdateInstaller';
 
-type ChangeLogLang = {
-  title?: string;
-  content?: string[];
+const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
+const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
+const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
+
+type ManifestReleaseNotes = {
+  zh?: { title?: unknown; items?: unknown };
+  en?: { title?: unknown; items?: unknown };
 };
 
-type PlatformDownload = {
-  url?: string;
-};
-
-type UpdateApiResponse = {
-  code?: number;
-  data?: {
-    value?: {
-      version?: string;
-      date?: string;
-      changeLog?: {
-        ch?: ChangeLogLang;
-        en?: ChangeLogLang;
-      };
-      macIntel?: PlatformDownload;
-      macArm?: PlatformDownload;
-      windowsX64?: PlatformDownload;
-    };
+type UpdatePayload = {
+  channel?: unknown;
+  version?: unknown;
+  publishedAt?: unknown;
+  minimumSupportedVersion?: unknown;
+  mandatory?: unknown;
+  releaseNotes?: ManifestReleaseNotes;
+  artifact?: {
+    platform?: unknown;
+    arch?: unknown;
+    variant?: unknown;
+    url?: unknown;
+    size?: unknown;
+    sha256?: unknown;
   };
 };
 
-const APP_UPDATE_TEST_CURRENT_VERSION_ENV = 'ZHIYUAN_UPDATE_CURRENT_VERSION';
-const APP_UPDATE_READY_FILE_KEY_PREFIX = 'app_update_ready_file';
+type SignedManifest = {
+  schemaVersion?: unknown;
+  keyId?: unknown;
+  algorithm?: unknown;
+  payload?: unknown;
+  signature?: unknown;
+};
 
-type StoredReadyFile = {
-  version: string;
-  filePath: string;
-  fileHash: string;
-  info?: AppUpdateInfo;
+type CachedSignedManifest = {
+  etag: string;
+  envelope: unknown;
 };
 
 const initialState = (): AppUpdateRuntimeState => ({
@@ -60,40 +64,48 @@ const initialState = (): AppUpdateRuntimeState => ({
   errorMessage: null,
 });
 
+function base64UrlToBuffer(value: string): Buffer {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url value');
+  return Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+}
+
+function releaseNotes(value: ManifestReleaseNotes | undefined, language: 'zh' | 'en') {
+  const notes = value?.[language];
+  return {
+    title: typeof notes?.title === 'string' ? notes.title : '',
+    content: Array.isArray(notes?.items)
+      ? notes.items.filter((item): item is string => typeof item === 'string')
+      : [],
+  };
+}
+
 export class AppUpdateCoordinator {
   private state: AppUpdateRuntimeState = initialState();
   private readonly store: SqliteStore;
-  private autoOpenReadyModal = false;
-  private flowSequence = 0;
-  private activeFlowId = 0;
-  private activeFlowSource: AppUpdateSource | null = null;
+  private checkPromise: Promise<AppUpdateCheckResult> | null = null;
 
   constructor(store: SqliteStore) {
     this.store = store;
-    this.restoreStoredReadyState();
   }
 
   getState(): AppUpdateRuntimeState {
     return { ...this.state };
   }
 
-  shouldAutoOpenReadyModal(): boolean {
-    return this.autoOpenReadyModal;
+  async checkNow(options: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
+    if (this.isUpdateDisabled()) {
+      return { success: true, state: this.setState(initialState()), updateFound: false };
+    }
+    if (this.checkPromise) return this.checkPromise;
+
+    const source = options.manual ? AppUpdateSource.Manual : AppUpdateSource.Auto;
+    this.checkPromise = this.checkForUpdate(source).finally(() => {
+      this.checkPromise = null;
+    });
+    return this.checkPromise;
   }
 
-  consumeAutoOpenReadyModal(): void {
-    this.autoOpenReadyModal = false;
-  }
-
-  async checkNow(_options?: {
-    manual?: boolean;
-    userId?: string | null;
-  }): Promise<AppUpdateCheckResult> {
-    console.log('[AppUpdate] update system is disabled');
-    const state = this.resetToIdle();
-    return { success: true, state, updateFound: false };
-  }
-
+  /** Phase 1 deliberately does not download or execute unsigned installers. */
   async retryDownload(): Promise<AppUpdateRuntimeState> {
     return this.getState();
   }
@@ -110,522 +122,232 @@ export class AppUpdateCoordinator {
     return {
       success: false,
       state: this.getState(),
-      error: 'Update system is disabled',
+      error: 'In-app installation is not enabled yet',
     };
   }
 
-  private resetToIdle(): AppUpdateRuntimeState {
-    const previousReadyFilePath = this.state.readyFilePath;
-    const previousSource = this.state.source;
-    const state = this.setState(initialState());
-    if (previousReadyFilePath) {
-      void this.cleanupReadyFile(previousReadyFilePath);
-    }
-    this.clearStoredReadyFile(previousSource);
-    return state;
-  }
-
-  private async startDownload(
-    info: AppUpdateInfo,
-    flowId: number,
-    source: AppUpdateSource,
-  ): Promise<AppUpdateRuntimeState> {
-    console.log(
-      `[AppUpdate] startDownload requested, flowId=${flowId}, source=${source}, version=${info.latestVersion}, url=${info.url}`,
-    );
-    this.setState({
-      status: AppUpdateStatus.Downloading,
-      source,
-      info,
-      progress: null,
-      readyFilePath: null,
-      readyFileHash: null,
-      errorMessage: null,
-    });
-
+  private async checkForUpdate(source: AppUpdateSource): Promise<AppUpdateCheckResult> {
+    this.setState({ ...initialState(), status: AppUpdateStatus.Checking, source });
     try {
-      const filePath = await downloadUpdate(info.url, source, progress => {
-        if (!this.isFlowActive(flowId, source)) {
-          console.log(
-            `[AppUpdate] ignoring stale download progress, flowId=${flowId}, source=${source}, activeFlowId=${this.activeFlowId}, activeSource=${this.activeFlowSource ?? 'none'}`,
-          );
-          return;
-        }
-        this.setState({
-          ...this.state,
-          status: AppUpdateStatus.Downloading,
-          source,
-          info,
-          progress,
-          errorMessage: null,
-        });
-      });
-      if (!this.isFlowActive(flowId, source)) {
-        console.log(
-          `[AppUpdate] ignoring stale download completion, flowId=${flowId}, source=${source}, filePath=${filePath}`,
-        );
-        return this.getState();
+      const currentVersion = this.resolveCurrentVersion();
+      const info = await this.fetchUpdateInfo(currentVersion);
+      if (!info) {
+        const state = this.setState(initialState());
+        return { success: true, state, updateFound: false };
       }
-
-      const fileHash = await this.computeFileHash(filePath);
-      console.log(
-        `[AppUpdate] download completed, flowId=${flowId}, source=${source}, version=${info.latestVersion}, filePath=${filePath}, fileHash=${fileHash}`,
-      );
-      this.setStoredReadyFile({
-        version: info.latestVersion,
-        filePath,
-        fileHash,
-        info,
-      });
-      await this.pruneCachedInstallerFiles(source, [filePath]);
-      this.autoOpenReadyModal = true;
-      return this.setState({
-        status: AppUpdateStatus.Ready,
+      const state = this.setState({
+        ...initialState(),
+        status: AppUpdateStatus.Available,
         source,
         info,
-        progress: null,
-        readyFilePath: filePath,
-        readyFileHash: fileHash,
-        errorMessage: null,
       });
+      return { success: true, state, updateFound: true };
     } catch (error) {
-      if (!this.isFlowActive(flowId, source)) {
-        console.log(
-          `[AppUpdate] ignoring stale download failure, flowId=${flowId}, source=${source}, error=${error instanceof Error ? error.message : String(error)}`,
-        );
-        return this.getState();
+      console.warn(
+        '[AppUpdate] update check failed:',
+        error instanceof Error ? error.message : 'unknown',
+      );
+      const state = this.setState(initialState());
+      return {
+        success: false,
+        state,
+        updateFound: false,
+        error: error instanceof Error ? error.message : 'Update check failed',
+      };
+    }
+  }
+
+  private async fetchUpdateInfo(currentVersion: string): Promise<AppUpdateInfo | null> {
+    const platform = process.platform;
+    const arch = process.arch;
+    const variant = this.resolveBuildVariant();
+    if (!['win32', 'darwin'].includes(platform) || !['x64', 'arm64'].includes(arch)) return null;
+
+    const cacheKey = `${MANIFEST_CACHE_KEY_PREFIX}:${platform}:${arch}:${variant}`;
+    const cachedManifest = this.readCachedManifest(cacheKey);
+    const url = new URL(UPDATE_ENDPOINT);
+    url.searchParams.set('channel', 'stable');
+    url.searchParams.set('platform', platform);
+    url.searchParams.set('arch', arch);
+    url.searchParams.set('variant', variant);
+
+    const response = await fetch(url, {
+      headers: cachedManifest
+        ? { 'if-none-match': cachedManifest.etag, accept: 'application/json' }
+        : { accept: 'application/json' },
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.status === 404) {
+      this.store.delete(cacheKey);
+      return null;
+    }
+    if (response.status === 304 && !cachedManifest) {
+      throw new Error('Update service returned 304 without a cached manifest');
+    }
+    if (response.status !== 304 && !response.ok) {
+      throw new Error(`Update service returned HTTP ${response.status}`);
+    }
+
+    const envelope: unknown =
+      response.status === 304 ? cachedManifest?.envelope : await response.json();
+    const payload = this.verifyAndDecodeManifest(envelope);
+    const info = this.toUpdateInfo(payload, { platform, arch, variant });
+
+    if (response.status !== 304) {
+      const receivedEtag = response.headers.get('etag');
+      if (receivedEtag) {
+        this.store.set<CachedSignedManifest>(cacheKey, { etag: receivedEtag, envelope });
+      } else {
+        this.store.delete(cacheKey);
       }
-      const cancelled = error instanceof Error && error.message === 'Download cancelled';
-      if (cancelled) {
-        console.log(
-          `[AppUpdate] download cancelled for active flow, flowId=${flowId}, source=${source}`,
-        );
-        this.clearStoredReadyFile(source);
-        return this.setState({
-          status: AppUpdateStatus.Available,
-          source,
-          info,
-          progress: null,
-          readyFilePath: null,
-          readyFileHash: null,
-          errorMessage: null,
-        });
-      }
-
-      console.error('[AppUpdate] background download failed:', error);
-      this.clearStoredReadyFile(source);
-      return this.setState({
-        status: AppUpdateStatus.Error,
-        source,
-        info,
-        progress: null,
-        readyFilePath: null,
-        readyFileHash: null,
-        errorMessage: error instanceof Error ? error.message : 'Download failed',
-      });
     }
+    if (!info || !this.isNewerVersion(info.latestVersion, currentVersion)) return null;
+    return info;
   }
 
-  private async fetchUpdateInfo(
-    _currentVersion: string,
-    _manual: boolean,
-    _userId?: string | null,
-  ): Promise<AppUpdateInfo | null> {
-    return null;
+  private readCachedManifest(key: string): CachedSignedManifest | null {
+    const value = this.store.get<unknown>(key);
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      typeof (value as CachedSignedManifest).etag !== 'string' ||
+      !(value as CachedSignedManifest).etag ||
+      !('envelope' in value)
+    ) {
+      return null;
+    }
+    return value as CachedSignedManifest;
   }
 
-  private getPlatformDownloadUrl(
-    value: NonNullable<NonNullable<UpdateApiResponse['data']>['value']> | undefined,
-  ): string {
-    if (process.platform === 'darwin') {
-      const download = process.arch === 'arm64' ? value?.macArm : value?.macIntel;
-      return download?.url?.trim() || '';
+  private verifyAndDecodeManifest(value: unknown): UpdatePayload {
+    if (!value || typeof value !== 'object') throw new Error('Invalid update manifest');
+    const envelope = value as SignedManifest;
+    if (
+      envelope.schemaVersion !== 1 ||
+      envelope.algorithm !== 'Ed25519' ||
+      typeof envelope.keyId !== 'string' ||
+      typeof envelope.payload !== 'string' ||
+      typeof envelope.signature !== 'string'
+    ) {
+      throw new Error('Unsupported update manifest');
     }
+    const trustedKey = APP_UPDATE_TRUSTED_KEYS[envelope.keyId];
+    if (!trustedKey) throw new Error(`Unknown update signing key: ${envelope.keyId}`);
 
-    if (process.platform === 'win32') {
-      return value?.windowsX64?.url?.trim() || '';
-    }
+    const payloadBytes = base64UrlToBuffer(envelope.payload);
+    const isValid = crypto.verify(
+      null,
+      payloadBytes,
+      crypto.createPublicKey({
+        key: Buffer.from(trustedKey, 'base64'),
+        format: 'der',
+        type: 'spki',
+      }),
+      base64UrlToBuffer(envelope.signature),
+    );
+    if (!isValid) throw new Error('Update manifest signature verification failed');
 
-    return '';
+    const payload: unknown = JSON.parse(payloadBytes.toString('utf8'));
+    if (!payload || typeof payload !== 'object') throw new Error('Invalid update manifest payload');
+    return payload as UpdatePayload;
   }
 
-  private canPredownload(url: string): boolean {
-    if (process.platform !== 'darwin' && process.platform !== 'win32') {
-      return false;
+  private toUpdateInfo(
+    payload: UpdatePayload,
+    target: { platform: string; arch: string; variant: string },
+  ): AppUpdateInfo | null {
+    const artifact = payload.artifact;
+    if (
+      payload.channel !== 'stable' ||
+      typeof payload.version !== 'string' ||
+      !valid(payload.version) ||
+      !artifact ||
+      artifact.platform !== target.platform ||
+      artifact.arch !== target.arch ||
+      artifact.variant !== target.variant ||
+      typeof artifact.url !== 'string' ||
+      typeof artifact.size !== 'number' ||
+      !Number.isSafeInteger(artifact.size) ||
+      artifact.size <= 0 ||
+      typeof artifact.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(artifact.sha256)
+    ) {
+      throw new Error('Update manifest payload failed validation');
     }
-    return this.isDirectInstallerUrl(url);
+
+    const downloadUrl = new URL(artifact.url);
+    const expectedExtension = target.platform === 'darwin' ? '.dmg' : '.exe';
+    if (
+      downloadUrl.protocol !== 'https:' ||
+      downloadUrl.hostname !== DOWNLOAD_HOST ||
+      !downloadUrl.pathname.startsWith('/releases/') ||
+      !downloadUrl.pathname.toLowerCase().endsWith(expectedExtension)
+    ) {
+      throw new Error('Update artifact URL is not allowed');
+    }
+
+    const minimumSupportedVersion =
+      typeof payload.minimumSupportedVersion === 'string' && valid(payload.minimumSupportedVersion)
+        ? payload.minimumSupportedVersion
+        : null;
+    return {
+      latestVersion: payload.version,
+      date: typeof payload.publishedAt === 'string' ? payload.publishedAt : '',
+      changeLog: {
+        zh: releaseNotes(payload.releaseNotes, 'zh'),
+        en: releaseNotes(payload.releaseNotes, 'en'),
+      },
+      url: downloadUrl.toString(),
+      expectedSize: artifact.size,
+      expectedSha256: artifact.sha256,
+      manualDownload: true,
+      mandatory: payload.mandatory === true,
+      minimumSupportedVersion,
+    };
   }
 
-  private isDirectInstallerUrl(url: string): boolean {
-    if (!url || url.includes('#') || url.endsWith('/download-list')) {
-      return false;
+  private resolveBuildVariant(): string {
+    if (process.platform !== 'win32') return 'default';
+    try {
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'),
+      ) as { zhiyuanUpdateVariant?: unknown };
+      return packageJson.zhiyuanUpdateVariant === 'full' ? 'full' : 'lite';
+    } catch {
+      return 'lite';
     }
-    const normalizedPath = new URL(url).pathname.toLowerCase();
-    if (process.platform === 'darwin') {
-      return normalizedPath.endsWith('.dmg');
-    }
-    if (process.platform === 'win32') {
-      return normalizedPath.endsWith('.exe');
-    }
-    return false;
   }
 
   private isUpdateDisabled(): boolean {
-    return true;
+    return this.store.get<{ disableUpdate?: boolean }>('enterprise_config')?.disableUpdate === true;
   }
 
   private resolveCurrentVersion(): string {
-    const overriddenVersion = process.env[APP_UPDATE_TEST_CURRENT_VERSION_ENV]?.trim();
-    if (overriddenVersion) {
-      console.log(
-        `[AppUpdate] using overridden current version from ${APP_UPDATE_TEST_CURRENT_VERSION_ENV}: ${overriddenVersion}`,
-      );
-      return overriddenVersion;
-    }
-
-    return app.getVersion();
+    const version = app.getVersion();
+    if (!valid(version)) throw new Error(`Current application version is not SemVer: ${version}`);
+    return version;
   }
 
   private isNewerVersion(latestVersion: string, currentVersion: string): boolean {
-    return this.compareVersions(latestVersion, currentVersion) > 0;
+    return gt(latestVersion, currentVersion);
   }
 
-  private compareVersions(a: string, b: string): number {
-    const aParts = this.toVersionParts(a);
-    const bParts = this.toVersionParts(b);
-    const maxLength = Math.max(aParts.length, bParts.length);
-
-    for (let index = 0; index < maxLength; index += 1) {
-      const left = aParts[index] ?? 0;
-      const right = bParts[index] ?? 0;
-      if (left > right) return 1;
-      if (left < right) return -1;
-    }
-
-    return 0;
-  }
-
-  private toVersionParts(version: string): number[] {
-    return version.split('.').map(part => {
-      const match = part.trim().match(/^\d+/);
-      return match ? Number.parseInt(match[0], 10) : 0;
-    });
+  isMandatoryForCurrentVersion(): boolean {
+    const info = this.state.info;
+    return Boolean(
+      info?.mandatory &&
+      info.minimumSupportedVersion &&
+      lt(this.resolveCurrentVersion(), info.minimumSupportedVersion),
+    );
   }
 
   private setState(nextState: AppUpdateRuntimeState): AppUpdateRuntimeState {
     this.state = { ...nextState };
     const snapshot = this.getState();
     for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send(AppUpdateIpc.StateChanged, snapshot);
-      }
+      if (!window.isDestroyed()) window.webContents.send(AppUpdateIpc.StateChanged, snapshot);
     }
     return snapshot;
-  }
-
-  private beginFlow(source: AppUpdateSource, reason: string): number {
-    const flowId = ++this.flowSequence;
-    this.activeFlowId = flowId;
-    this.activeFlowSource = source;
-    console.log(`[AppUpdate] begin flow, flowId=${flowId}, source=${source}, reason=${reason}`);
-    return flowId;
-  }
-
-  private isFlowActive(flowId: number, source: AppUpdateSource): boolean {
-    return this.activeFlowId === flowId && this.activeFlowSource === source;
-  }
-
-  private async cleanupReadyFile(filePath: string): Promise<void> {
-    if (!filePath) {
-      return;
-    }
-    try {
-      await fs.promises.unlink(filePath);
-    } catch {
-      // Best effort cleanup only.
-    }
-  }
-
-  private getUpdateCacheDir(): string {
-    return path.join(app.getPath('userData'), 'updates');
-  }
-
-  private isCachedInstallerForSource(filename: string, source: AppUpdateSource | null): boolean {
-    if (!filename.startsWith('zhiyuan-update-')) {
-      return false;
-    }
-    if (source == null) {
-      return true;
-    }
-    if (filename.startsWith(`zhiyuan-update-${source}-`)) {
-      return true;
-    }
-    return /^zhiyuan-update-\d+/.test(filename);
-  }
-
-  private async pruneCachedInstallerFiles(
-    source: AppUpdateSource | null,
-    keepFilePaths: string[] = [],
-  ): Promise<void> {
-    const keepSet = new Set(keepFilePaths.filter(Boolean).map(filePath => path.resolve(filePath)));
-    const cacheDir = this.getUpdateCacheDir();
-
-    try {
-      const entries = await fs.promises.readdir(cacheDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isFile()) {
-          continue;
-        }
-        if (!this.isCachedInstallerForSource(entry.name, source)) {
-          continue;
-        }
-        const entryPath = path.resolve(cacheDir, entry.name);
-        if (keepSet.has(entryPath)) {
-          continue;
-        }
-        await fs.promises.unlink(entryPath).catch(() => {});
-        console.log(`[AppUpdate] pruned cached installer file: ${entryPath}`);
-      }
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT') {
-        console.warn('[AppUpdate] failed to prune cached installer files:', error);
-      }
-    }
-  }
-
-  private async resolveMatchingReadyFile(
-    previousState: AppUpdateRuntimeState,
-    targetSource: AppUpdateSource,
-    latestVersion: string,
-  ): Promise<StoredReadyFile | null> {
-    console.log(
-      `[AppUpdate] resolveMatchingReadyFile started, targetSource=${targetSource}, previousStatus=${previousState.status}, previousSource=${previousState.source ?? 'none'}, previousVersion=${previousState.info?.latestVersion ?? 'none'}, latestVersion=${latestVersion}`,
-    );
-    const inMemoryReadyFile =
-      previousState.source === targetSource &&
-      previousState.status === AppUpdateStatus.Ready &&
-      previousState.info?.latestVersion === latestVersion &&
-      previousState.readyFilePath != null &&
-      previousState.readyFileHash != null
-        ? {
-            version: latestVersion,
-            filePath: previousState.readyFilePath,
-            fileHash: previousState.readyFileHash,
-          }
-        : null;
-
-    if (inMemoryReadyFile) {
-      console.log(`[AppUpdate] checking in-memory ready file: ${inMemoryReadyFile.filePath}`);
-      const isValid = await this.isReadyFileValid(
-        inMemoryReadyFile.filePath,
-        inMemoryReadyFile.fileHash,
-      );
-      if (isValid) {
-        console.log('[AppUpdate] in-memory ready file is valid');
-        return inMemoryReadyFile;
-      }
-      console.warn('[AppUpdate] in-memory ready file is invalid');
-    }
-
-    const storedReadyFile = this.getStoredReadyFile(targetSource);
-    if (!storedReadyFile || storedReadyFile.version !== latestVersion) {
-      console.log(
-        `[AppUpdate] stored ready file mismatch, targetSource=${targetSource}, storedVersion=${storedReadyFile?.version ?? 'none'}, latestVersion=${latestVersion}`,
-      );
-      return null;
-    }
-
-    console.log(`[AppUpdate] checking persisted ready file: ${storedReadyFile.filePath}`);
-    const isValid = await this.isReadyFileValid(storedReadyFile.filePath, storedReadyFile.fileHash);
-    if (isValid) {
-      console.log('[AppUpdate] persisted ready file is valid');
-      return storedReadyFile;
-    }
-
-    console.warn(
-      `[AppUpdate] persisted ready file is invalid, deleting: ${storedReadyFile.filePath}`,
-    );
-    await this.cleanupReadyFile(storedReadyFile.filePath);
-    this.clearStoredReadyFile(targetSource);
-    return null;
-  }
-
-  private async isReadyFileValid(filePath: string, expectedHash: string): Promise<boolean> {
-    try {
-      const stat = await fs.promises.stat(filePath);
-      if (!stat.isFile() || stat.size <= 0) {
-        console.warn(
-          `[AppUpdate] ready file validation failed: file missing or empty, path=${filePath}`,
-        );
-        return false;
-      }
-      const actualHash = await this.computeFileHash(filePath);
-      if (actualHash !== expectedHash) {
-        console.warn(
-          `[AppUpdate] ready file validation failed: hash mismatch, path=${filePath}, expectedHash=${expectedHash}, actualHash=${actualHash}`,
-        );
-      }
-      return actualHash === expectedHash;
-    } catch {
-      console.warn(`[AppUpdate] ready file validation failed: stat/hash threw, path=${filePath}`);
-      return false;
-    }
-  }
-
-  private async computeFileHash(filePath: string): Promise<string> {
-    return await new Promise((resolve, reject) => {
-      const hash = crypto.createHash('sha256');
-      const stream = fs.createReadStream(filePath);
-
-      stream.on('error', reject);
-      stream.on('data', chunk => {
-        hash.update(chunk);
-      });
-      stream.on('end', () => {
-        resolve(hash.digest('hex'));
-      });
-    });
-  }
-
-  private restoreStoredReadyState(): void {
-    // When the update system is disabled, clear any stale persisted state
-    // left over from earlier versions.  Otherwise a stored ready-file
-    // record (version + installer path) keeps showing "有新版本" on every
-    // startup even though fetchUpdateInfo() is hardcoded to return null.
-    if (this.isUpdateDisabled()) {
-      console.log('[AppUpdate] update system is disabled, clearing any persisted ready state');
-      for (const source of [AppUpdateSource.Manual, AppUpdateSource.Auto] as AppUpdateSource[]) {
-        const stale = this.getStoredReadyFile(source);
-        if (stale) {
-          this.clearStoredReadyFile(source);
-          void this.cleanupReadyFile(stale.filePath);
-        }
-        void this.pruneCachedInstallerFiles(source);
-      }
-      return;
-    }
-
-    const sources: AppUpdateSource[] = [AppUpdateSource.Manual, AppUpdateSource.Auto];
-    let restored = false;
-
-    for (const source of sources) {
-      const storedReadyFile = this.getStoredReadyFile(source);
-      if (!storedReadyFile) {
-        continue;
-      }
-
-      console.log(
-        `[AppUpdate] restoring persisted ready file, source=${source}, version=${storedReadyFile.version}, filePath=${storedReadyFile.filePath}`,
-      );
-
-      if (this.compareVersions(storedReadyFile.version, this.resolveCurrentVersion()) <= 0) {
-        console.log(
-          `[AppUpdate] persisted ready file is not newer than current version, clearing it: source=${source}, storedVersion=${storedReadyFile.version}, currentVersion=${this.resolveCurrentVersion()}`,
-        );
-        this.clearStoredReadyFile(source);
-        void this.pruneCachedInstallerFiles(source);
-        continue;
-      }
-
-      try {
-        const stat = fs.statSync(storedReadyFile.filePath);
-        if (!stat.isFile() || stat.size <= 0) {
-          console.warn(
-            `[AppUpdate] persisted ready file is missing or empty during startup restore: ${storedReadyFile.filePath}`,
-          );
-          this.clearStoredReadyFile(source);
-          void this.pruneCachedInstallerFiles(source);
-          continue;
-        }
-      } catch {
-        console.warn(
-          `[AppUpdate] persisted ready file stat failed during startup restore: ${storedReadyFile.filePath}`,
-        );
-        this.clearStoredReadyFile(source);
-        void this.pruneCachedInstallerFiles(source);
-        continue;
-      }
-
-      this.state = {
-        status: AppUpdateStatus.Ready,
-        source,
-        info: storedReadyFile.info ?? this.createStoredReadyInfo(storedReadyFile.version),
-        progress: null,
-        readyFilePath: storedReadyFile.filePath,
-        readyFileHash: storedReadyFile.fileHash,
-        errorMessage: null,
-      };
-      void this.pruneCachedInstallerFiles(source, [storedReadyFile.filePath]);
-      console.log(
-        `[AppUpdate] restored ready update into runtime state, source=${source}, version=${this.state.info?.latestVersion ?? 'none'}, filePath=${this.state.readyFilePath ?? 'none'}`,
-      );
-      restored = true;
-      break;
-    }
-
-    if (!restored) {
-      console.log('[AppUpdate] no persisted ready file found during startup restore');
-      void this.pruneCachedInstallerFiles(AppUpdateSource.Manual);
-      void this.pruneCachedInstallerFiles(AppUpdateSource.Auto);
-    }
-  }
-
-  private createStoredReadyInfo(version: string): AppUpdateInfo {
-    return {
-      latestVersion: version,
-      date: '',
-      changeLog: {
-        zh: { title: '', content: [] },
-        en: { title: '', content: [] },
-      },
-      url: '',
-    };
-  }
-
-  private getReadyFileStoreKey(source: AppUpdateSource | null): string {
-    return `${APP_UPDATE_READY_FILE_KEY_PREFIX}:${source ?? 'unknown'}`;
-  }
-
-  private getStoredReadyFile(source: AppUpdateSource | null): StoredReadyFile | null {
-    try {
-      const key = this.getReadyFileStoreKey(source);
-      const value = this.store.get<StoredReadyFile>(key);
-      if (!value?.version || !value.filePath || !value.fileHash) {
-        console.log('[AppUpdate] persisted ready file record is missing required fields');
-        return null;
-      }
-      console.log(
-        `[AppUpdate] loaded persisted ready file record, source=${source ?? 'unknown'}, version=${value.version}, filePath=${value.filePath}`,
-      );
-      return value;
-    } catch (error) {
-      console.warn('[AppUpdate] failed to read stored ready file:', error);
-      return null;
-    }
-  }
-
-  private setStoredReadyFile(value: StoredReadyFile): void {
-    try {
-      const source = this.state.source ?? AppUpdateSource.Auto;
-      this.store.set(this.getReadyFileStoreKey(source), value);
-      console.log(
-        `[AppUpdate] persisted ready file record, source=${source}, version=${value.version}, filePath=${value.filePath}`,
-      );
-    } catch (error) {
-      console.warn('[AppUpdate] failed to persist ready file:', error);
-    }
-  }
-
-  private clearStoredReadyFile(source: AppUpdateSource | null): void {
-    if (source == null) {
-      return;
-    }
-    try {
-      this.store.delete(this.getReadyFileStoreKey(source));
-      console.log(`[AppUpdate] cleared persisted ready file record for source=${source}`);
-    } catch (error) {
-      console.warn('[AppUpdate] failed to clear stored ready file:', error);
-    }
   }
 }

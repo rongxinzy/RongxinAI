@@ -43,6 +43,11 @@ export interface AppUpdateInfo {
   date: string;
   changeLog: { zh: ChangeLogEntry; en: ChangeLogEntry };
   url: string;
+  expectedSize: number;
+  expectedSha256: string;
+  manualDownload: boolean;
+  mandatory: boolean;
+  minimumSupportedVersion: string | null;
 }
 
 export interface AppUpdateRuntimeState {
@@ -63,7 +68,8 @@ export interface AppUpdateCheckResult {
 }
 
 export const APP_UPDATE_POLL_INTERVAL_MS = 12 * 60 * 60 * 1000;
-export const APP_UPDATE_HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000;
+export const APP_UPDATE_STARTUP_DELAY_MIN_MS = 30 * 1000;
+export const APP_UPDATE_STARTUP_DELAY_JITTER_MS = 60 * 1000;
 
 export const AppUpdateAction = {
   OpenDownloadPage: 'openDownloadPage',

@@ -3,6 +3,8 @@ build/win-full/*
 !build/icons/
 !build/icons/**
 release/
+!scripts/release/
+!scripts/release/**
 node_modules
 dist
 dist-electron
