@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SOURCE_LOGO = PROJECT_ROOT / "public" / "zhiyuan-logo-dark-1600.png"
+SOURCE_LOGO = PROJECT_ROOT / "public" / "zhiyuan-logo-light-1600.png"
 PNG_DIR = PROJECT_ROOT / "build" / "icons" / "png"
 WINDOWS_ICON = PROJECT_ROOT / "build" / "icons" / "win" / "icon.ico"
 MAC_ICON = PROJECT_ROOT / "build" / "icons" / "mac" / "icon.icns"
@@ -25,8 +25,9 @@ ICO_SIZES = ((16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256,
 
 
 def make_gradient() -> Image.Image:
-    top = (96, 154, 255)
-    bottom = (35, 92, 232)
+    # Match the official website: cool white paper fading into a soft blue glow.
+    top = (255, 255, 255)
+    bottom = (237, 245, 255)
     gradient = Image.new("RGBA", (CANVAS_SIZE, CANVAS_SIZE))
     pixels = gradient.load()
 
@@ -34,9 +35,19 @@ def make_gradient() -> Image.Image:
         vertical = y / (CANVAS_SIZE - 1)
         for x in range(CANVAS_SIZE):
             horizontal = x / (CANVAS_SIZE - 1)
-            blend = min(1.0, vertical * 0.72 + horizontal * 0.28)
-            pixels[x, y] = tuple(
+            blend = min(1.0, vertical * 0.76 + horizontal * 0.24)
+            base = tuple(
                 round(top[channel] * (1 - blend) + bottom[channel] * blend)
+                for channel in range(3)
+            )
+
+            glow_x = (x - 760) / 540
+            glow_y = (y - 800) / 500
+            glow = max(0.0, 1.0 - (glow_x * glow_x + glow_y * glow_y))
+            accent = (108, 165, 255)
+            accent_strength = glow * 0.14
+            pixels[x, y] = tuple(
+                round(base[channel] * (1 - accent_strength) + accent[channel] * accent_strength)
                 for channel in range(3)
             ) + (255,)
 
@@ -47,13 +58,17 @@ def make_master_icon() -> Image.Image:
     canvas = Image.new("RGBA", (CANVAS_SIZE, CANVAS_SIZE), (0, 0, 0, 0))
     mask = Image.new("L", (CANVAS_SIZE, CANVAS_SIZE), 0)
     ImageDraw.Draw(mask).rounded_rectangle(ICON_BOUNDS, radius=ICON_RADIUS, fill=255)
+
     canvas.alpha_composite(Image.composite(make_gradient(), Image.new("RGBA", canvas.size), mask))
 
-    highlight = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    highlight_mask = Image.new("L", canvas.size, 0)
-    ImageDraw.Draw(highlight_mask).ellipse((118, 90, 760, 650), fill=48)
-    highlight.paste((255, 255, 255, 48), mask=highlight_mask)
-    canvas.alpha_composite(Image.composite(highlight, Image.new("RGBA", canvas.size), mask))
+    border = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    ImageDraw.Draw(border).rounded_rectangle(
+        ICON_BOUNDS,
+        radius=ICON_RADIUS,
+        outline=(208, 213, 221, 210),
+        width=12,
+    )
+    canvas.alpha_composite(border)
 
     logo = Image.open(SOURCE_LOGO).convert("RGBA")
     alpha = logo.getchannel("A")
@@ -61,12 +76,10 @@ def make_master_icon() -> Image.Image:
     if bounding_box is None:
         raise RuntimeError(f"Logo has no visible pixels: {SOURCE_LOGO}")
 
-    logo_alpha = alpha.crop(bounding_box)
+    wordmark = logo.crop(bounding_box)
     logo_width = 748
-    logo_height = round(logo_alpha.height * logo_width / logo_alpha.width)
-    logo_alpha = logo_alpha.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
-    wordmark = Image.new("RGBA", (logo_width, logo_height), (255, 255, 255, 0))
-    wordmark.putalpha(logo_alpha)
+    logo_height = round(wordmark.height * logo_width / wordmark.width)
+    wordmark = wordmark.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
 
     position = ((CANVAS_SIZE - logo_width) // 2, (CANVAS_SIZE - logo_height) // 2 + 8)
     canvas.alpha_composite(wordmark, position)
