@@ -43,6 +43,31 @@ interface ManagedMcpServer {
 }
 
 const MAX_RECENT_STDERR_LINES = 20;
+const MCP_SERVER_CLOSE_TIMEOUT_MS = 3_000;
+
+async function closeClientWithTimeout(client: Client, serverName: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      client.close(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`MCP server close timed out after ${MCP_SERVER_CLOSE_TIMEOUT_MS}ms`)),
+          MCP_SERVER_CLOSE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    return true;
+  } catch (error) {
+    log(
+      'WARN',
+      `Error stopping "${serverName}": ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * Race a promise against an AbortSignal.  When the signal fires first the
@@ -694,14 +719,8 @@ export class McpServerManager {
     for (const [name, server] of this.servers) {
       closePromises.push(
         (async () => {
-          try {
-            await server.client.close();
+          if (await closeClientWithTimeout(server.client, name)) {
             log('INFO', `Stopped MCP server "${name}"`);
-          } catch (error) {
-            log(
-              'WARN',
-              `Error stopping "${name}": ${error instanceof Error ? error.message : String(error)}`,
-            );
           }
         })(),
       );
