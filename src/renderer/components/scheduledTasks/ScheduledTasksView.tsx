@@ -41,7 +41,7 @@ const AUTO_TAB = {
 
 type AutoTab = (typeof AUTO_TAB)[keyof typeof AUTO_TAB];
 
-const AUTO_TAB_ORDER: AutoTab[] = [AUTO_TAB.Create, AUTO_TAB.Tasks, AUTO_TAB.History];
+const AUTO_TAB_ORDER: AutoTab[] = [AUTO_TAB.Tasks, AUTO_TAB.Create, AUTO_TAB.History];
 
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   isSidebarCollapsed,
@@ -57,14 +57,23 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const gatewayReady = useGatewayReady();
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
+  const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Create);
   const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
 
   // Directional pane slide: track previous tab to know which way to slide.
-  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Tasks));
-  const tabDir =
-    AUTO_TAB_ORDER.indexOf(activeTab) >= prevTabIndexRef.current ? 'right' : 'left';
+  // The first reveal fades in (direction-neutral) so entry never slides "backward";
+  // every later switch slides from the side you are heading (left / right).
+  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Create));
+  const [mounted, setMounted] = useState(false);
+  const tabDir: 'left' | 'right' | null = mounted
+    ? AUTO_TAB_ORDER.indexOf(activeTab) >= prevTabIndexRef.current
+      ? 'right'
+      : 'left'
+    : null;
   prevTabIndexRef.current = AUTO_TAB_ORDER.indexOf(activeTab);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sliding underline indicator: measure the active tab button and translate a single bar.
   // The view can mount while a route ancestor is still hidden / mid-transform, so the first
@@ -238,8 +247,8 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           <div className="relative border-b border-border">
             <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
               {([
-                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
                 { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
+                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
                 { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
               ] as const).map(tab => {
                 const active = activeTab === tab.value;
@@ -281,8 +290,15 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
           {/* ── Active pane (directional slide) ── */}
           <div
-            key={`${activeTab}-${tabDir}`}
-            className={cn('pt-6', tabDir === 'right' ? 'animate-slide-in-right' : 'animate-slide-in-left')}
+            key={`${activeTab}-${tabDir ?? 'init'}`}
+            className={cn(
+              'pt-6',
+              tabDir === 'right'
+                ? 'animate-slide-in-right'
+                : tabDir === 'left'
+                  ? 'animate-slide-in-left'
+                  : 'animate-fade-in',
+            )}
           >
             {activeTab === AUTO_TAB.Create && (
               <TaskTemplateGallery
