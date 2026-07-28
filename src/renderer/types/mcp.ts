@@ -49,8 +49,14 @@ export interface McpRegistryEntry {
   category: McpCategory; // category tag
   categoryKey: string; // i18n translation key for category
   transportType: McpTransportType;
-  command: string; // default command, e.g. 'npx'
-  defaultArgs: string[]; // default arguments
+  command?: string; // default command, e.g. 'npx'
+  defaultArgs?: string[]; // default arguments
+  url?: string; // default URL for SSE / HTTP servers
+  headers?: Record<string, string>;
+  authType?: 'oauth';
+  connectorPath?: string;
+  iconPath?: string;
+  metadataPath?: string;
   requiredEnvKeys?: string[]; // env vars the user must fill
   optionalEnvKeys?: string[]; // optional env vars
   argPlaceholders?: string[]; // placeholder hints for args (e.g. path)
@@ -64,8 +70,16 @@ export interface McpMarketplaceServer {
   description_en?: string;
   category: string;
   transportType: string;
-  command: string;
-  defaultArgs: string[];
+  descriptionKey?: string;
+  categoryKey?: string;
+  command?: string;
+  defaultArgs?: string[];
+  url?: string;
+  headers?: Record<string, string>;
+  authType?: 'oauth';
+  connectorPath?: string;
+  iconPath?: string;
+  metadataPath?: string;
   requiredEnvKeys?: string[];
   optionalEnvKeys?: string[];
 }

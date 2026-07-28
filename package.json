@@ -28,11 +28,6 @@
         "version": "2026.4.22"
       },
       {
-        "id": "openclaw-weixin",
-        "npm": "@tencent-weixin/openclaw-weixin",
-        "version": "2.4.3"
-      },
-      {
         "id": "clawemail-email",
         "npm": "@clawemail/email",
         "version": "0.9.12"

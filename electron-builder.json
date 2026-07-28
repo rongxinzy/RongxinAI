@@ -60,6 +60,11 @@
     {
       "from": "resources/modelscope.tokens.local.json",
       "to": "modelscope.tokens.local.json"
+    },
+    {
+      "from": "MCPs",
+      "to": "MCPs",
+      "filter": ["**/*"]
     }
   ],
   "protocols": [

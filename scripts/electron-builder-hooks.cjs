@@ -955,6 +955,11 @@ async function beforePack(context) {
         prefix: 'SKILLs',
       },
       {
+        label: 'MCPs',
+        dir: path.join(__dirname, '..', 'MCPs'),
+        prefix: 'MCPs',
+      },
+      {
         label: 'Python runtime',
         dir: path.join(__dirname, '..', 'resources', 'python-win'),
         prefix: 'python-win',

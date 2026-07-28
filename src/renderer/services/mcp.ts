@@ -43,14 +43,20 @@ function convertMarketplaceToRegistry(servers: McpMarketplaceServer[]): McpRegis
   return servers.map(s => ({
     id: s.id,
     name: s.name,
-    descriptionKey: '',
+    descriptionKey: s.descriptionKey || '',
     description_zh: s.description_zh,
     description_en: s.description_en,
     category: s.category as McpCategory,
-    categoryKey: '',
+    categoryKey: s.categoryKey || '',
     transportType: s.transportType as McpRegistryEntry['transportType'],
     command: s.command,
     defaultArgs: s.defaultArgs,
+    url: s.url,
+    headers: s.headers,
+    authType: s.authType,
+    connectorPath: s.connectorPath,
+    iconPath: s.iconPath,
+    metadataPath: s.metadataPath,
     requiredEnvKeys: s.requiredEnvKeys,
     optionalEnvKeys: s.optionalEnvKeys,
   }));
@@ -201,6 +207,15 @@ class McpService {
       console.error('Failed to refresh MCP bridge:', error);
       return { success: false, tools: 0, error: message };
     }
+  }
+
+  async authorize(data: McpServerFormData): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
+    return window.electron.mcp.authorize(data);
+  }
+
+  async loadIcon(iconPath: string): Promise<string | undefined> {
+    const result = await window.electron.mcp.loadIcon(iconPath);
+    return result.success ? result.data : undefined;
   }
 
   onBridgeSyncStart(callback: () => void): () => void {
