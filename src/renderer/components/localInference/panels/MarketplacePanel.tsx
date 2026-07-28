@@ -6,7 +6,6 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@shared/components/ui/input-group';
-import { Label } from '@shared/components/ui/label';
 import { Eye, EyeOff, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -318,13 +317,7 @@ export function MarketplacePanel({
               <X />
             </Button>
           </div>
-          <p className={`text-sm leading-relaxed ${localInferenceMutedTextClass}`}>
-            {i18nService.t('marketplaceTokenSettingsDesc')}
-          </p>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="marketplace-token">
-              {i18nService.t('marketplaceTokenSettingsTitle')}
-            </Label>
             <InputGroup>
               <InputGroupInput
                 id="marketplace-token"

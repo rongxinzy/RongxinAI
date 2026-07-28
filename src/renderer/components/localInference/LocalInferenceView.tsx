@@ -752,6 +752,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   }}
                   onOpenLaunchLog={launchLogs.openPanelForModel}
                   showRegisteredModelsTitle={false}
+                  logPanelVisible={launchLogs.state.visible}
                 />
             </LayeredTabsContent>
             <LayeredTabsContent
