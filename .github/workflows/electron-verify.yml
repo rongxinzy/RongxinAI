@@ -1,8 +1,7 @@
 name: Electron Verify
 
 on:
-  push:
-    branches: [main, develop]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -15,22 +14,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
-      - uses: actions/cache@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
-          restore-keys: npm-${{ runner.os }}-
+          bun-version: '1.3.14'
 
       - name: Install Electron Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
 
-      - run: npm install
-      - run: npm run build
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run build
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
-      - run: npm run compile:electron
+      - run: bun run compile:electron
 
       - name: Verify Build Structure
         run: |

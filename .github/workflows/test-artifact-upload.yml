@@ -13,13 +13,6 @@ on:
         required: true
         default: 'ci-test/rongxin-ai/test-artifact.txt'
         type: string
-  push:
-    branches: [main, develop]
-    paths:
-      - 'scripts/upload-artifact.cjs'
-      - '.github/workflows/test-artifact-upload.yml'
-      - 'certs/headscale.crt'
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

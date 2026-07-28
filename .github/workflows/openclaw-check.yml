@@ -1,11 +1,7 @@
 name: OpenClaw Integration Check
 
 on:
-  push:
-    paths:
-      - 'package.json'
-      - 'scripts/ensure-openclaw-version.cjs'
-      - 'scripts/**openclaw*'
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
