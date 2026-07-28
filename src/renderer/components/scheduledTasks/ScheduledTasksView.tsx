@@ -57,13 +57,13 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const gatewayReady = useGatewayReady();
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Create);
+  const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
   const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
 
   // Directional pane slide: track previous tab to know which way to slide.
   // The first reveal fades in (direction-neutral) so entry never slides "backward";
   // every later switch slides from the side you are heading (left / right).
-  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Create));
+  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Tasks));
   const [mounted, setMounted] = useState(false);
   const tabDir: 'left' | 'right' | null = mounted
     ? AUTO_TAB_ORDER.indexOf(activeTab) >= prevTabIndexRef.current
