@@ -1,9 +1,9 @@
 import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
 import { cn } from '@shared/lib/utils';
-import { Puzzle } from 'lucide-react';
 import React from 'react';
 
 import { Skill } from '../../types/skill';
+import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import SkillsPopover from './SkillsPopover';
 
 interface SkillsButtonProps {
@@ -26,7 +26,7 @@ const SkillsButton: React.FC<SkillsButtonProps> = ({
         )}
         title="Skills"
       >
-        <Puzzle className="h-4 w-4" />
+        <PlusMenuSkillsIcon className="h-4 w-4" />
       </PromptInputButton>
     </SkillsPopover>
   );

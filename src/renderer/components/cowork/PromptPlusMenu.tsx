@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
-import { Plus } from 'lucide-react';
+import { Cable, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -23,12 +23,10 @@ import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
 import { toggleActiveSkill } from '../../store/slices/skillSlice';
 import {
-  PlusMenuConnectorsIcon,
   PlusMenuExpertGlyphIcon,
   PlusMenuExpertsIcon,
   PlusMenuFilesIcon,
   PlusMenuManageIcon,
-  PlusMenuServerGlyphIcon,
   PlusMenuSkillGlyphIcon,
   PlusMenuSkillsIcon,
 } from './plusMenuIcons';
@@ -66,6 +64,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const [open, setOpen] = useState(false);
   const [mcpLoading, setMcpLoading] = useState(false);
   const [pendingServerId, setPendingServerId] = useState<string | null>(null);
+  const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
 
   const skills = useSelector((state: RootState) => state.skill.skills);
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
@@ -74,6 +73,16 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
 
   const enabledSkills = useMemo(() => skills.filter(skill => skill.enabled), [skills]);
+  const serverRegistryIdsKey = useMemo(
+    () =>
+      JSON.stringify(
+        mcpServers
+          .map(server => server.registryId ?? server.id)
+          .filter((id, index, ids) => ids.indexOf(id) === index)
+          .sort(),
+      ),
+    [mcpServers],
+  );
 
   const availableExperts = useMemo(
     () =>
@@ -102,8 +111,8 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
     [experts],
   );
 
-  // Refresh the connector list every time the menu opens so toggles made
-  // elsewhere (connectors page) are reflected.
+  // Refresh the connector list every time the menu opens so management changes
+  // elsewhere are reflected.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -120,6 +129,34 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
       cancelled = true;
     };
   }, [open, dispatch]);
+
+  useEffect(() => {
+    const requestedIds = JSON.parse(serverRegistryIdsKey) as string[];
+    if (!open || requestedIds.length === 0) return;
+    let cancelled = false;
+
+    const loadServerIcons = async () => {
+      const marketplace = await mcpService.fetchMarketplace();
+      if (!marketplace || cancelled) return;
+
+      const iconEntries = marketplace.registry.filter(
+        entry => requestedIds.includes(entry.id) && entry.iconPath,
+      );
+      const loadedIcons = await Promise.all(
+        iconEntries.map(async entry => [entry.id, await mcpService.loadIcon(entry.iconPath!)] as const),
+      );
+      if (cancelled) return;
+
+      setServerIcons(
+        Object.fromEntries(loadedIcons.flatMap(([id, icon]) => (icon ? [[id, icon]] : []))),
+      );
+    };
+
+    void loadServerIcons();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, serverRegistryIdsKey]);
 
   const handleToggleServer = useCallback(
     async (serverId: string, enabled: boolean) => {
@@ -171,7 +208,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             <PlusMenuSkillsIcon className="size-4" />
             <span className="truncate">{i18nService.t('skills')}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
+          <DropdownMenuSubContent align="center" className="w-56">
             {enabledSkills.length === 0 ? (
               <DropdownMenuItem disabled>{i18nService.t('noSkillsAvailable')}</DropdownMenuItem>
             ) : (
@@ -179,8 +216,10 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                 <DropdownMenuCheckboxItem
                   key={skill.id}
                   checked={activeSkillIds.includes(skill.id)}
-                  closeOnClick={false}
-                  onCheckedChange={() => dispatch(toggleActiveSkill(skill.id))}
+                  onCheckedChange={() => {
+                    dispatch(toggleActiveSkill(skill.id));
+                    setOpen(false);
+                  }}
                 >
                   {skill.iconUrl ? (
                     <img
@@ -209,7 +248,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
               <PlusMenuExpertsIcon className="size-4" />
               <span className="truncate">{i18nService.t('sessionExperts')}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-56">
+            <DropdownMenuSubContent align="center" className="w-56">
               {availableExperts.map(expert => (
                 <DropdownMenuCheckboxItem
                   key={expert.id}
@@ -242,10 +281,10 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
 
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <PlusMenuConnectorsIcon className="size-4" />
+            <Cable className="size-4" />
             <span className="truncate">{i18nService.t('connectors')}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
+          <DropdownMenuSubContent align="center" className="w-56">
             {mcpLoading ? (
               <DropdownMenuItem disabled>{i18nService.t('loading')}</DropdownMenuItem>
             ) : mcpServers.length === 0 ? (
@@ -260,7 +299,15 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                     void handleToggleServer(server.id, !server.enabled);
                   }}
                 >
-                  <PlusMenuServerGlyphIcon className="size-4" />
+                  {serverIcons[server.registryId ?? server.id] ? (
+                    <img
+                      src={serverIcons[server.registryId ?? server.id]}
+                      alt=""
+                      className="size-4 object-contain"
+                    />
+                  ) : (
+                    <Cable className="size-4" />
+                  )}
                   <span className="truncate">{server.name}</span>
                   <Switch
                     size="sm"

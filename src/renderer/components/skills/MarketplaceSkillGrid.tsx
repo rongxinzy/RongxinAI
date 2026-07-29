@@ -10,9 +10,10 @@ import {
 } from '@shared/components/ui/empty';
 import { Progress } from '@shared/components/ui/progress';
 import { cn } from '@shared/lib/utils';
-import { Download, Puzzle } from 'lucide-react';
+import { Download } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
+import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import { resolveLocalizedText } from '../../services/skill';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { MarketplaceSkill } from '../../types/skill';
@@ -45,7 +46,7 @@ export function MarketplaceSkillGrid({
       <Empty className="min-h-48 border border-dashed">
         <EmptyHeader>
           <EmptyMedia variant="icon">
-            <Puzzle />
+            <PlusMenuSkillsIcon />
           </EmptyMedia>
           <EmptyTitle>{i18nService.t('skillMarketplaceEmpty')}</EmptyTitle>
           <EmptyDescription>{i18nService.t('skillMarketplaceEmptyDescription')}</EmptyDescription>

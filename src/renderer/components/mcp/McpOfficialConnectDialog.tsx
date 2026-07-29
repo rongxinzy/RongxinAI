@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { Database, LoaderCircle, Plug, ShieldCheck, Unplug } from 'lucide-react';
+import { Cable, Database, LoaderCircle, Plug, ShieldCheck, Unplug } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import type { McpPresentationLocale, McpRegistryEntry } from '../../types/mcp';
@@ -77,7 +77,7 @@ export function McpOfficialConnectDialog({
             <DialogHeader className="items-center px-6 pt-8 pb-6 text-center">
               <div className="flex items-center">
                 <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
-                  {iconSrc ? <img src={iconSrc} alt="" className="size-full object-contain" /> : <Plug className="size-8 text-foreground" />}
+                  {iconSrc ? <img src={iconSrc} alt="" className="size-full object-contain" /> : <Cable className="size-8 text-foreground" />}
                 </div>
               </div>
               <DialogTitle className="mt-5">

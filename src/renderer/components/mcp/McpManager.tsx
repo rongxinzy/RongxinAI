@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
-import { LoaderCircle, MoreHorizontal, Pencil, Plus, Plug, Trash2 } from 'lucide-react';
+import { Cable, LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -20,7 +20,12 @@ import {
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import { ListPagination } from '../common/ListPagination';
-import { McpTab as McpTabValue, MCP_PAGE_SIZE, type McpTab as McpTabType } from './constants';
+import {
+  McpTab as McpTabValue,
+  MCP_PAGE_SIZE,
+  type McpRegistryId,
+  type McpTab as McpTabType,
+} from './constants';
 import { McpManagerToolbar } from './McpManagerToolbar';
 import { filterMcpItems, useMcpSearchQuery } from './mcpSearch';
 import { McpOfficialConnectDialog } from './McpOfficialConnectDialog';
@@ -55,7 +60,7 @@ const McpIcon: React.FC<{
 }> = ({
   iconSrc,
   fallbackLabel,
-  fallbackIcon: FallbackIcon = Plug,
+  fallbackIcon: FallbackIcon = Cable,
   fallbackIconClassName = 'size-5 text-muted-foreground',
   imageClassName = 'size-9',
 }) => (
@@ -129,6 +134,8 @@ interface McpManagerProps {
   onTabChange?: (tab: McpTabType) => void;
   hideTabControl?: boolean;
   onUseMcp?: (prompt?: string) => void;
+  openRegistryId?: McpRegistryId;
+  openMarketplace?: boolean;
 }
 
 const McpManager: React.FC<McpManagerProps> = ({
@@ -136,6 +143,8 @@ const McpManager: React.FC<McpManagerProps> = ({
   onTabChange,
   hideTabControl = false,
   onUseMcp,
+  openRegistryId,
+  openMarketplace = false,
 }) => {
   const dispatch = useDispatch();
   const servers = useSelector((state: RootState) => state.mcp.servers);
@@ -178,6 +187,13 @@ const McpManager: React.FC<McpManagerProps> = ({
     }
     onTabChange?.(tab);
   };
+
+  useEffect(() => {
+    if (!openRegistryId && !openMarketplace) return;
+    setActiveTab(McpTabValue.Marketplace);
+    setActiveCategory('all');
+    setSearchQuery('');
+  }, [openMarketplace, openRegistryId]);
 
   useEffect(() => {
     let isActive = true;
@@ -360,7 +376,7 @@ const McpManager: React.FC<McpManagerProps> = ({
 
   const filteredMarketplace = useMemo(() => {
     let entries = filterMcpItems(dynamicRegistry, searchQuery, entry =>
-      [entry.name, entry.transportType, entry.category, getRegistryEntryDescription(entry)].join(
+      [entry.id, entry.name, entry.transportType, entry.category, getRegistryEntryDescription(entry)].join(
         ' ',
       ),
     );
@@ -733,7 +749,7 @@ const McpManager: React.FC<McpManagerProps> = ({
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {filteredInstalled.length === 0 ? (
                   <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
-                    <Plug className="size-8 text-muted-foreground" />
+                    <Cable className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       {i18nService.t('mcpNoInstalledServers')}
                     </p>
@@ -978,7 +994,7 @@ const McpManager: React.FC<McpManagerProps> = ({
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {filteredCustom.length === 0 ? (
                   <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
-                    <Plug className="size-8 text-muted-foreground" />
+                    <Cable className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">{i18nService.t('mcpCustom')}</p>
                     <Button type="button" size="sm" onClick={handleOpenCreateForm}>
                       <Plus data-icon="inline-start" />
@@ -1004,7 +1020,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
-                              <Plug className="h-4 w-4 text-muted-foreground" />
+                              <Cable className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <span className="text-sm font-medium text-foreground truncate">
                               {server.name}
