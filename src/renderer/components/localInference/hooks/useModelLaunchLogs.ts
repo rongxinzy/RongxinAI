@@ -16,7 +16,6 @@ export type ModelLaunchLogPanelStatus =
 
 export type ModelLaunchLogPanelState = {
   visible: boolean;
-  collapsed: boolean;
   status: ModelLaunchLogPanelStatus;
   sessionId: string | null;
   modelName: string | null;
@@ -25,7 +24,6 @@ export type ModelLaunchLogPanelState = {
 
 const initialState: ModelLaunchLogPanelState = {
   visible: false,
-  collapsed: false,
   status: ModelLaunchLogPanelStatus.Idle,
   sessionId: null,
   modelName: null,
@@ -34,7 +32,6 @@ const initialState: ModelLaunchLogPanelState = {
 
 export function useModelLaunchLogs() {
   const [state, setState] = useState<ModelLaunchLogPanelState>(initialState);
-  const userClosedCurrentLaunchRef = useRef(false);
   const stateRef = useRef<ModelLaunchLogPanelState>(initialState);
 
   useEffect(() => {
@@ -46,13 +43,10 @@ export function useModelLaunchLogs() {
 
     setState(current => {
       const nextStatus = getStatusForEvent(event, current.status);
-      const failed = nextStatus === ModelLaunchLogPanelStatus.Failed;
       const logs = mergeLaunchLogEvents(current.logs, event);
 
       return {
         ...current,
-        visible: current.visible,
-        collapsed: failed ? false : current.collapsed,
         status: nextStatus,
         sessionId: current.sessionId ?? event.sessionId,
         modelName: current.modelName ?? event.modelName,
@@ -73,10 +67,8 @@ export function useModelLaunchLogs() {
     options: { visible?: boolean } = {},
   ) => {
     const { visible = false } = options;
-    userClosedCurrentLaunchRef.current = false;
     setState({
       visible,
-      collapsed: false,
       status: ModelLaunchLogPanelStatus.Starting,
       sessionId: null,
       modelName,
@@ -97,26 +89,21 @@ export function useModelLaunchLogs() {
   const markModelLaunchFailed = useCallback(() => {
     setState(current => ({
       ...current,
-      visible: current.visible,
-      collapsed: false,
       status: ModelLaunchLogPanelStatus.Failed,
     }));
   }, []);
 
   const openPanelForModel = useCallback((modelName: string) => {
-    userClosedCurrentLaunchRef.current = false;
     setState(current => {
       if (current.modelName === modelName || !current.modelName) {
         return {
           ...current,
           visible: true,
-          collapsed: false,
           modelName,
         };
       }
       return {
         visible: true,
-        collapsed: false,
         status: ModelLaunchLogPanelStatus.Idle,
         sessionId: null,
         modelName,
@@ -125,17 +112,8 @@ export function useModelLaunchLogs() {
     });
   }, []);
 
-  const setCollapsed = useCallback((collapsed: boolean) => {
-    setState(current => ({ ...current, collapsed }));
-  }, []);
-
   const closePanel = useCallback(() => {
-    userClosedCurrentLaunchRef.current = true;
     setState(current => ({ ...current, visible: false }));
-  }, []);
-
-  const clearLogs = useCallback(() => {
-    setState(current => ({ ...current, logs: [] }));
   }, []);
 
   return {
@@ -144,9 +122,7 @@ export function useModelLaunchLogs() {
     openPanelForModel,
     markModelLaunchSucceeded,
     markModelLaunchFailed,
-    setCollapsed,
     closePanel,
-    clearLogs,
   };
 }
 
