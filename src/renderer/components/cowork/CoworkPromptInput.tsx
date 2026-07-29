@@ -48,7 +48,6 @@ import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
-import { getCompactFolderName } from '../../utils/path';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
@@ -723,11 +722,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
     };
 
-    const truncatePath = (path: string, maxLength = 30): string => {
-      if (!path) return i18nService.t('noFolderSelected');
-      return getCompactFolderName(path, maxLength) || i18nService.t('noFolderSelected');
-    };
-
     const handleFolderSelect = (path: string) => {
       if (onWorkingDirectoryChange) {
         onWorkingDirectoryChange(path);
@@ -1283,26 +1277,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <div className="relative mt-1.5 flex justify-start">
             <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
               <PromptInputButton
-                className={`gap-1.5 rounded-md text-muted-foreground hover:bg-surface-raised hover:text-foreground ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                className={`gap-1 px-2 text-sm hover:bg-surface-raised ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
               >
-                <Folder className="h-3.5 w-3.5 shrink-0" />
-                <span className="max-w-[200px] truncate text-xs">
-                  {truncatePath(workingDirectory)}
-                </span>
-                <ChevronDown className="h-3 w-3 shrink-0" />
-                {workingDirectory && (
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleFolderSelect('');
-                    }}
-                    className="shrink-0 ml-0.5 p-0.5 rounded hover:bg-surface-raised transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
-                )}
+                <Folder className="size-4 shrink-0" />
+                <span>{i18nService.t('enterProjectWork')}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </PromptInputButton>
             </FolderSelectorPopover>
             {showFolderRequiredWarning && (

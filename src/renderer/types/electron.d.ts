@@ -895,6 +895,19 @@ interface IElectronAPI {
       title?: string;
     }) => Promise<{ response: number }>;
   };
+  project: {
+    getDefaultBaseDir: () => Promise<{ success: boolean; path: string | null; error?: string }>;
+    createDirectory: (options: {
+      name: string;
+      baseDir?: string;
+    }) => Promise<{
+      success: boolean;
+      path: string | null;
+      code?: 'invalid-name' | 'already-exists';
+      error?: string;
+    }>;
+    ensureScratchDir: () => Promise<{ success: boolean; path: string | null; error?: string }>;
+  };
   shell: {
     openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>;
     showItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;

@@ -29,6 +29,7 @@ import {
   OpenAICodexOAuthIpc,
   OpenClawEngineIpc,
   PermissionsIpc,
+  ProjectIpc,
   ShellIpc,
   SkillsIpc,
   StoreIpc,
@@ -570,6 +571,13 @@ contextBridge.exposeInMainWorld('electron', {
       type?: 'none' | 'info' | 'error' | 'question' | 'warning';
       title?: string;
     }) => ipcRenderer.invoke(DialogIpc.ShowMessageBox, options),
+  },
+
+  project: {
+    getDefaultBaseDir: () => ipcRenderer.invoke(ProjectIpc.GetDefaultBaseDir),
+    createDirectory: (options: { name: string; baseDir?: string }) =>
+      ipcRenderer.invoke(ProjectIpc.CreateDirectory, options),
+    ensureScratchDir: () => ipcRenderer.invoke(ProjectIpc.EnsureScratchDir),
   },
 
   shell: {

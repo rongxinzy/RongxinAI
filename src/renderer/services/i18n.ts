@@ -1174,9 +1174,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Multi-Agent 管理
     createAgent: '创建 Agent',
     myAgents: '我的项目',
-    workspaces: '工作区',
-    workspaceAdd: '添加工作区',
-    workspaceNoWorkspaces: '还没有工作区',
+    workspaces: '项目',
+    workspaceAdd: '添加项目',
+    workspaceNoWorkspaces: '还没有项目',
     defaultAgentDisplayName: '主项目',
     myAgentSidebarPinned: '置顶',
     myAgentSidebarExpandMore: '展开显示',
@@ -1417,6 +1417,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     folderDriveRootNotAllowed:
       '不支持使用磁盘根目录作为工作目录，请选择一个子文件夹（例如 D:\\Projects）。',
     coworkOpenFolder: '打开文件夹',
+    enterProjectWork: '进入项目工作',
+    createBlankProject: '新建空白项目',
+    useExistingFolder: '使用现有文件夹',
+    useNoFolder: '不使用文件夹',
+    createProjectTitle: '创建项目',
+    createProjectNamePlaceholder: '请输入文件夹名称',
+    projectPathLabel: '选择项目路径',
+    projectNameRequired: '请输入项目名称',
+    projectNameInvalid: '项目名称不能包含 \\ / : * ? " < > | 字符',
+    projectAlreadyExists: '同名项目已存在，请更换名称',
+    projectCreateFailed: '创建项目失败，请重试',
 
     // Cowork 错误消息
     coworkErrorAuthInvalid: 'API 密钥无效或已过期，请在设置中检查并更新您的 API 密钥。',
@@ -3687,9 +3698,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Multi-Agent management
     createAgent: 'Create Agent',
     myAgents: 'My Projects',
-    workspaces: 'Workspaces',
-    workspaceAdd: 'Add workspace',
-    workspaceNoWorkspaces: 'No workspaces yet',
+    workspaces: 'Projects',
+    workspaceAdd: 'Add project',
+    workspaceNoWorkspaces: 'No projects yet',
     defaultAgentDisplayName: 'Primary Project',
     myAgentSidebarPinned: 'Pinned',
     myAgentSidebarExpandMore: 'Show more',
@@ -3941,6 +3952,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     folderDriveRootNotAllowed:
       'Drive root directories are not supported as working directories. Please select a subfolder (e.g. D:\\Projects).',
     coworkOpenFolder: 'Open folder',
+    enterProjectWork: 'Work in a Project',
+    createBlankProject: 'New Blank Project',
+    useExistingFolder: 'Use Existing Folder',
+    useNoFolder: "Don't Use a Folder",
+    createProjectTitle: 'Create Project',
+    createProjectNamePlaceholder: 'Enter a folder name',
+    projectPathLabel: 'Project Location',
+    projectNameRequired: 'Please enter a project name',
+    projectNameInvalid: 'The project name cannot contain \\ / : * ? " < > | characters',
+    projectAlreadyExists: 'A project with this name already exists',
+    projectCreateFailed: 'Failed to create the project. Please try again.',
 
     // Cowork error messages
     coworkErrorAuthInvalid:

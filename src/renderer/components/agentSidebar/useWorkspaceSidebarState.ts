@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { coworkService } from '../../services/cowork';
+import { i18nService } from '../../services/i18n';
 import { localStore } from '../../services/store';
 import { RootState } from '../../store';
 import {
@@ -13,6 +14,7 @@ import {
 import { WorkMode, type WorkMode as WorkModeType } from '../../store/workMode/constants';
 import type { CoworkSessionSummary } from '../../types/cowork';
 import { CoworkSessionStatusValue } from '../../types/cowork';
+import { isScratchWorkspacePath } from '../../utils/path';
 import { AgentSidebarIndicator, AgentSidebarPageSize, isScheduledSessionTitle } from './constants';
 import type {
   AgentSidebarTaskNode,
@@ -281,7 +283,11 @@ export const useWorkspaceSidebarState = (workMode: WorkModeType = WorkMode.Work)
         const visible = taskExpanded ? filtered : filtered.slice(0, AgentSidebarPageSize.Preview);
         return {
           id: workspace.id,
-          name: workspace.name,
+          // The scratch workspace (「不使用文件夹」) displays as 无项目 instead
+          // of its folder basename.
+          name: isScratchWorkspacePath(workspace.path)
+            ? i18nService.t('noProject')
+            : workspace.name,
           path: workspace.path,
           isExpanded: expanded,
           isTaskListExpanded: taskExpanded,

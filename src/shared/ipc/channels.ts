@@ -185,6 +185,14 @@ export const CoworkStreamIpc = {
 } as const;
 export type CoworkStreamIpc = (typeof CoworkStreamIpc)[keyof typeof CoworkStreamIpc];
 
+// ─── Project (working directory helpers) ────────────────────────────────────
+export const ProjectIpc = {
+  GetDefaultBaseDir: 'project:getDefaultBaseDir',
+  CreateDirectory: 'project:createDirectory',
+  EnsureScratchDir: 'project:ensureScratchDir',
+} as const;
+export type ProjectIpc = (typeof ProjectIpc)[keyof typeof ProjectIpc];
+
 // ─── Dialog ─────────────────────────────────────────────────────────────────
 export const DialogIpc = {
   SelectDirectory: 'dialog:selectDirectory',

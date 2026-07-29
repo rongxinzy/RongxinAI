@@ -23,3 +23,13 @@ export const getCompactFolderName = (rawPath: string, maxLength?: number): strin
 
   return folderName;
 };
+
+/**
+ * Matches the shared scratch workspace directory created by the
+ * `project:ensureScratchDir` IPC (`<home>/.zhiyuan/scratch`). Used to display
+ * that workspace as 「无项目」 instead of its folder basename.
+ */
+export const isScratchWorkspacePath = (rawPath: string): boolean => {
+  const normalized = rawPath.trim().replace(/[\\/]+$/, '');
+  return /[\\/]\.zhiyuan[\\/]scratch$/i.test(normalized);
+};
