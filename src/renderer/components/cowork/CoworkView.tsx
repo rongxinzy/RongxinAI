@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { PanelLeft, Pencil, ShieldCheck } from 'lucide-react';
+import { PanelLeft, Pencil } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -55,6 +55,7 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
+import SecurityStatusIndicator from './SecurityStatusIndicator';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 
 export interface CoworkViewProps {
@@ -1282,12 +1283,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         )}
       </div>
       <div className="non-draggable flex items-center">
-        <div className="flex items-center gap-1.5 mr-2 px-2.5 py-1">
-          <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-          <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
-            {i18nService.t('zhiyuanGuardEnabled')}
-          </span>
-        </div>
+        <SecurityStatusIndicator />
         <WindowTitleBar inline />
       </div>
     </div>
