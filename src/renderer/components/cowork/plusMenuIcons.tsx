@@ -54,15 +54,6 @@ export const PlusMenuExpertsIcon: React.FC<PlusMenuIconProps> = ({ className }) 
 );
 
 /** 连接器：两个节点与一条连接线。 */
-export const PlusMenuConnectorsIcon: React.FC<PlusMenuIconProps> = ({ className }) => (
-  <svg {...baseProps} className={className}>
-    <rect x="1.8" y="6" width="4" height="4" rx="1.2" />
-    <rect x="10.2" y="6" width="4" height="4" rx="1.2" />
-    <path d="M5.8 8h4.4" />
-    <circle cx="8" cy="8" r="0.4" fill="currentColor" stroke="none" />
-  </svg>
-);
-
 /** 管理：三行滑杆。 */
 export const PlusMenuManageIcon: React.FC<PlusMenuIconProps> = ({ className }) => (
   <svg {...baseProps} className={className}>

@@ -10,7 +10,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
-import { Plus } from 'lucide-react';
+import { Cable, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -22,7 +22,6 @@ import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
 import { toggleActiveSkill } from '../../store/slices/skillSlice';
 import {
-  PlusMenuConnectorsIcon,
   PlusMenuExpertGlyphIcon,
   PlusMenuExpertsIcon,
   PlusMenuFilesIcon,
@@ -258,7 +257,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
 
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <PlusMenuConnectorsIcon className="size-4" />
+            <Cable className="size-4" />
             <span className="truncate">{i18nService.t('connectors')}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent align="center" className="w-56">
