@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { i18nService } from '../../services/i18n';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { Skill } from '../../types/skill';
+import { isCoreSkill } from '@shared/skills/constants';
 import MarkdownContent from '../MarkdownContent';
 
 interface SkillDocumentDialogProps {
@@ -148,7 +149,8 @@ export function SkillDocumentDialog({
           <div className="flex shrink-0 items-center gap-2">
             <Switch
               checked={skill.enabled}
-              disabled={readOnly}
+              disabled={readOnly || isCoreSkill(skill.id)}
+              title={isCoreSkill(skill.id) ? i18nService.t('skillCoreAlwaysOn') : undefined}
               aria-label={skill.displayName || skill.name}
               onCheckedChange={() => onToggle(skill.id)}
             />

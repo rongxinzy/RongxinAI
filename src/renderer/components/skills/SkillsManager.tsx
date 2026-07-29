@@ -18,6 +18,7 @@ import { resolveLocalizedText, skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { setSkills } from '../../store/slices/skillSlice';
 import { MarketplaceSkill, Skill } from '../../types/skill';
+import { isCoreSkill } from '@shared/skills/constants';
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import { ListPagination } from '../common/ListPagination';
@@ -289,6 +290,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   const batchToggleInstalled = async (enabled: boolean) => {
     const ids = [...selectedVisibleIds].filter(id => {
       const skill = skills.find(item => item.id === id);
+      // Core skills cannot be disabled; exclude them from disable batches.
+      if (!enabled && isCoreSkill(id)) return false;
       return skill?.enabled !== enabled;
     });
     if (ids.length === 0) return;

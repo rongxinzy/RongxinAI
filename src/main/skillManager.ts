@@ -10,6 +10,7 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { t } from './i18n';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
+import { isCoreSkill } from '../shared/skills/constants';
 import {
   parseModelScopeSkillUrl,
   resolveModelScopeSkillInstallSource,
@@ -1673,6 +1674,10 @@ export class SkillManager {
   }
 
   setSkillEnabled(id: string, enabled: boolean): SkillRecord[] {
+    // Core skills cannot be disabled; ignore attempts to turn them off.
+    if (isCoreSkill(id) && !enabled) {
+      return this.listSkills();
+    }
     const state = this.loadSkillStateMap();
     state[id] = { ...state[id], enabled };
     this.saveSkillStateMap(state);
@@ -1684,6 +1689,8 @@ export class SkillManager {
     const state = this.loadSkillStateMap();
     const uniqueIds = [...new Set(ids)];
     for (const id of uniqueIds) {
+      // Core skills cannot be disabled; skip them on disable batches.
+      if (!enabled && isCoreSkill(id)) continue;
       state[id] = { ...state[id], enabled };
     }
     this.saveSkillStateMap(state);
@@ -2630,7 +2637,8 @@ export class SkillManager {
         ...SKILL_ICON_FILE_NAMES.map(fileName => path.join(dir, fileName)),
       ].find(filePath => fs.existsSync(filePath));
       const defaultEnabled = defaults[id]?.enabled ?? true;
-      const enabled = state[id]?.enabled ?? defaultEnabled;
+      // Core skills back first-class product entries and are always enabled.
+      const enabled = isCoreSkill(id) ? true : (state[id]?.enabled ?? defaultEnabled);
       const pinned = state[id]?.pinned ?? false;
       return {
         id,
