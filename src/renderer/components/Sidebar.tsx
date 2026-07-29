@@ -607,12 +607,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
         </div>
-        <div className="relative min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1 flex-col">
           {workMode !== WorkMode.Chat && renderSearchControl()}
 
           <div
             ref={agentScrollContainerRef}
-            className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
+            className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-3 pb-10"
             onScroll={handleAgentScroll}
           >
             <div className={cn(workMode === WorkMode.Chat && 'hidden')}>
@@ -707,14 +707,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
           <div
-            className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
-              agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-          <div
-            className={`pointer-events-none absolute inset-x-0 top-[68px] z-10 h-10 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150 ${
-              agentScrollEdges.top ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={cn(
+              'pointer-events-none absolute inset-x-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150',
+              workMode === WorkMode.Chat ? 'top-0' : 'top-8',
+              agentScrollEdges.top ? 'opacity-100' : 'opacity-0',
+            )}
           />
           <div
             className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
