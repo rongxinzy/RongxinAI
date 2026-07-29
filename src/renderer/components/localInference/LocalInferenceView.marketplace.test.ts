@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { getMarketplacePageSize } from './utils/marketplace';
+import { getMarketplaceGridColumnCount, getMarketplacePageSize } from './utils/marketplace';
 
 test('marketplace page size uses the actual grid height', () => {
   expect(
@@ -45,6 +45,23 @@ test('marketplace page size remains a whole number of grid rows', () => {
   });
 
   expect(pageSize % 4).toBe(0);
+});
+
+test('grid column count uses track geometry when the last page has a partial row', () => {
+  expect(
+    getMarketplaceGridColumnCount({
+      gridWidth: 1_000,
+      cardWidth: 238,
+      columnGap: 16,
+    }),
+  ).toBe(4);
+  expect(
+    getMarketplaceGridColumnCount({
+      gridWidth: 680,
+      cardWidth: 332,
+      columnGap: 16,
+    }),
+  ).toBe(2);
 });
 
 test('marketplace search params load recommended models for an empty query and use the app cap for a search', async () => {
@@ -101,6 +118,7 @@ test('marketplace only keeps installable models in the visible list', async () =
         { id: 'a', repoId: 'Qwen/A-GGUF', installed: false },
         { id: 'b', repoId: 'Qwen/B-GGUF', installed: true },
         { id: 'c', repoId: 'Qwen/C-GGUF', installed: false, installedPath: '/models/Qwen/C.gguf' },
+        { id: 'duplicate-a', repoId: 'Qwen/A-GGUF', installed: false },
       ],
       new Map([['/models/Qwen/C.gguf', 'C']]),
     ).map(model => model.id),

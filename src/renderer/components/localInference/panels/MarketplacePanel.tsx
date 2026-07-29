@@ -27,6 +27,7 @@ import { localInferenceMutedTextClass, MARKETPLACE_PAGE_SIZE } from '../constant
 import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
+  getMarketplaceGridColumnCount,
   getMarketplaceInstallProgress,
   getMarketplacePageSize,
 } from '../utils/marketplace';
@@ -119,8 +120,15 @@ export function MarketplacePanel({
         : 0;
       const cards = Array.from(grid.children) as HTMLElement[];
       const cardRects = cards.map(card => card.getBoundingClientRect());
-      const firstRowTop = Math.min(...cardRects.map(rect => rect.top));
-      const columnCount = cardRects.filter(rect => Math.abs(rect.top - firstRowTop) < 1).length;
+      const cardHeight = Math.max(...cardRects.map(rect => rect.height));
+      const cardWidth = Math.max(...cardRects.map(rect => rect.width));
+      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
+      const columnGap = Number.parseFloat(gridStyle.columnGap) || 0;
+      const columnCount = getMarketplaceGridColumnCount({
+        gridWidth: grid.clientWidth,
+        cardWidth,
+        columnGap,
+      });
       const gridTop = gridRect.top - viewportRect.top;
       const panelTop = panel.getBoundingClientRect().top - viewportRect.top;
       const nextPanelMinHeight = Math.max(
@@ -135,11 +143,11 @@ export function MarketplacePanel({
         gridTop,
         paginationHeight,
         contentPaddingBottom,
+        cardHeight,
+        rowGap,
       ].join(':');
       if (layoutSignature === layoutSignatureRef.current) return;
 
-      const cardHeight = Math.max(...cardRects.map(rect => rect.height));
-      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
       const availableGridHeight =
         contentViewport.clientHeight - gridTop - paginationHeight - contentPaddingBottom;
       const nextPageSize = getMarketplacePageSize({
@@ -341,7 +349,7 @@ export function MarketplacePanel({
               const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
               return (
                 <MarketplaceModelCard
-                  key={model.id}
+                  key={model.repoId || model.id}
                   model={model}
                   loading={loading}
                   installing={installing}

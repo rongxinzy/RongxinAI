@@ -51,7 +51,12 @@ export function getInstallableMarketplaceModels(
   models: MarketplaceModel[],
   installedModelPathMap: Map<string, string>,
 ): MarketplaceModel[] {
+  const seenModelKeys = new Set<string>();
   return models.filter(model => {
+    const modelKey = model.repoId.trim() || model.id.trim();
+    if (!modelKey || seenModelKeys.has(modelKey)) return false;
+    seenModelKeys.add(modelKey);
+
     const installedModelName = model.installedPath
       ? installedModelPathMap.get(model.installedPath)
       : undefined;
@@ -162,4 +167,26 @@ export function getMarketplacePageSize({
     Math.max(1, Math.floor((availableGridHeight + rowGap) / (cardHeight + rowGap))),
   );
   return rows * Math.floor(columnCount);
+}
+
+export function getMarketplaceGridColumnCount({
+  gridWidth,
+  cardWidth,
+  columnGap,
+}: {
+  gridWidth: number;
+  cardWidth: number;
+  columnGap: number;
+}): number {
+  if (
+    !Number.isFinite(gridWidth) ||
+    !Number.isFinite(cardWidth) ||
+    !Number.isFinite(columnGap) ||
+    gridWidth <= 0 ||
+    cardWidth <= 0
+  ) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round((gridWidth + columnGap) / (cardWidth + columnGap)));
 }
