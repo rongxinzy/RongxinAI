@@ -148,6 +148,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     currentAgent?.model ?? '',
   );
 
+  // Agent-backed chat sessions (skills attached, or persisted on the session)
+  // execute via the agent runtime, so the prompt input must use work-style
+  // agent model/control semantics instead of direct-chat ones — otherwise the
+  // model selector would bind to the direct-chat default model while the
+  // engine actually runs the agent model.
+  const isAgentBackedChat =
+    workMode === WorkMode.Chat &&
+    resolveChatExecution({ activeSkillIds, session: currentSession }) === ChatExecution.Agent;
+
   const buildApiConfigNotice = (
     error?: string,
   ): { noticeI18nKey: string; noticeExtra?: string } => {
@@ -1127,11 +1136,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleStopSession = async () => {
     if (!currentSession) return;
-    if (
-      workMode === WorkMode.Chat &&
-      resolveChatExecution({ activeSkillIds, session: currentSession }) === ChatExecution.Direct
-    ) {
-      directChatAbortControllersRef.current.get(currentSession.id)?.abort();
+    // Stop the transport that actually started: a live direct-chat stream is
+    // controlled by its per-session AbortController, so check for one first
+    // instead of re-deriving the transport from mutable skill state (the user
+    // can attach skills mid-stream, which would otherwise misroute the stop
+    // to the engine and leave the direct stream running).
+    const directChatController = directChatAbortControllersRef.current.get(currentSession.id);
+    if (directChatController) {
+      directChatController.abort();
       dispatch(
         updateSessionStatus({
           sessionId: currentSession.id,
@@ -1321,7 +1333,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onNewChat={onNewChat}
           updateBadge={updateBadge}
           workMode={workMode}
-          isDirectChat={workMode === WorkMode.Chat}
+          isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
           localThinkingEnabled={localThinkingEnabled}
           onLocalThinkingEnabledChange={setLocalThinkingEnabled}
           inlineQuestionPermission={inlineQuestionPermission}
@@ -1391,8 +1403,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }}
                 showFolderSelector={workMode !== WorkMode.Chat}
                 showModelSelector
-                isDirectChat={workMode === WorkMode.Chat}
-                showLocalThinkingToggle={workMode === WorkMode.Chat}
+                isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
+                showLocalThinkingToggle={workMode === WorkMode.Chat && !isAgentBackedChat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}

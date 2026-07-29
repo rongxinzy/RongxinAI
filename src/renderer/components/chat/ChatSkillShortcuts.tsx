@@ -33,7 +33,9 @@ const ChatSkillShortcuts: React.FC = () => {
 
   const handleSelect = (entry: ChatSkillShortcut) => {
     if (isStreaming) return;
-    const skill = skills.find(s => s.id === entry.skillId);
+    // Require the skill to be enabled — disabled skills must not be
+    // re-activated through the shortcut (matches SkillsPopover filtering).
+    const skill = skills.find(s => s.id === entry.skillId && s.enabled);
     if (!skill) {
       window.dispatchEvent(
         new CustomEvent('app:showToast', { detail: i18nService.t('chatSkillUnavailable') }),
