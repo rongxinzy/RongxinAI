@@ -55,12 +55,14 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
+import type { McpRegistryId } from '../mcp/constants';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
   onShowSkills?: () => void;
-  onShowConnectors?: () => void;
+  onShowMcp?: (registryId?: McpRegistryId) => void;
+  onShowMcpMarketplace?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
@@ -72,7 +74,8 @@ export interface CoworkViewProps {
 const CoworkView: React.FC<CoworkViewProps> = ({
   onRequestAppSettings,
   onShowSkills,
-  onShowConnectors,
+  onShowMcp,
+  onShowMcpMarketplace,
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,
@@ -1331,7 +1334,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         <CoworkSessionViewport
           sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
-          onManageConnectors={() => onShowConnectors?.()}
+          onConfigureConnector={registryId => onShowMcp?.(registryId)}
+          onOpenConnectorMarketplace={() => onShowMcpMarketplace?.()}
           permissionMode={config.permissionMode}
           onPermissionModeChange={(mode: CoworkPermissionMode) => {
             void coworkService.updateConfig({ permissionMode: mode });
@@ -1418,7 +1422,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}
-                onManageConnectors={() => onShowConnectors?.()}
+                onConfigureConnector={registryId => onShowMcp?.(registryId)}
+                onOpenConnectorMarketplace={() => onShowMcpMarketplace?.()}
                 showPermissionModeSelector={workMode !== WorkMode.Chat}
                 permissionMode={config.permissionMode}
                 onPermissionModeChange={(mode: CoworkPermissionMode) => {

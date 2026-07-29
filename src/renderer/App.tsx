@@ -12,9 +12,10 @@ import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
-import ExpertView, { EXPERT_TAB, type ExpertTab } from './components/expert/ExpertView';
+import ExpertView, { type ExpertTab } from './components/expert/ExpertView';
 import { LocalInferenceView } from './components/localInference';
 import { McpView } from './components/mcp';
+import type { McpRegistryId } from './components/mcp/constants';
 import { ScheduledTasksView } from './components/scheduledTasks';
 import Settings, { type SettingsOpenOptions } from './components/Settings';
 import Sidebar from './components/Sidebar';
@@ -60,6 +61,8 @@ const App: React.FC = () => {
     'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert'
   >('cowork');
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
+  const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
+  const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -332,7 +335,15 @@ const App: React.FC = () => {
     setMainView('scheduledTasks');
   }, []);
 
-  const handleShowMcp = useCallback(() => {
+  const handleShowMcp = useCallback((registryId?: McpRegistryId) => {
+    setMcpOpenRegistryId(registryId);
+    setMcpOpenMarketplace(false);
+    setMainView('mcp');
+  }, []);
+
+  const handleShowMcpMarketplace = useCallback(() => {
+    setMcpOpenRegistryId(undefined);
+    setMcpOpenMarketplace(true);
     setMainView('mcp');
   }, []);
 
@@ -342,11 +353,6 @@ const App: React.FC = () => {
 
   const handleShowExpert = useCallback(() => {
     setExpertInitialTab(undefined);
-    setMainView('expert');
-  }, []);
-
-  const handleShowExpertConnectors = useCallback(() => {
-    setExpertInitialTab(EXPERT_TAB.Mcp);
     setMainView('expert');
   }, []);
 
@@ -817,6 +823,8 @@ const App: React.FC = () => {
                   onNewChat={handleNewChat}
                   onUseMcp={handleTryMcp}
                   updateBadge={null}
+                  openRegistryId={mcpOpenRegistryId}
+                  openMarketplace={mcpOpenMarketplace}
                 />
               ) : mainView === 'expert' ? (
                 <ExpertView
@@ -834,7 +842,8 @@ const App: React.FC = () => {
                 <CoworkView
                   onRequestAppSettings={handleShowSettings}
                   onShowSkills={handleShowSkills}
-                  onShowConnectors={handleShowExpertConnectors}
+                  onShowMcp={handleShowMcp}
+                  onShowMcpMarketplace={handleShowMcpMarketplace}
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}

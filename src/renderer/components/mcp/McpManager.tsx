@@ -20,7 +20,12 @@ import {
 import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import { ListPagination } from '../common/ListPagination';
-import { McpTab as McpTabValue, MCP_PAGE_SIZE, type McpTab as McpTabType } from './constants';
+import {
+  McpTab as McpTabValue,
+  MCP_PAGE_SIZE,
+  type McpRegistryId,
+  type McpTab as McpTabType,
+} from './constants';
 import { McpManagerToolbar } from './McpManagerToolbar';
 import { filterMcpItems, useMcpSearchQuery } from './mcpSearch';
 import { McpOfficialConnectDialog } from './McpOfficialConnectDialog';
@@ -129,6 +134,8 @@ interface McpManagerProps {
   onTabChange?: (tab: McpTabType) => void;
   hideTabControl?: boolean;
   onUseMcp?: (prompt?: string) => void;
+  openRegistryId?: McpRegistryId;
+  openMarketplace?: boolean;
 }
 
 const McpManager: React.FC<McpManagerProps> = ({
@@ -136,6 +143,8 @@ const McpManager: React.FC<McpManagerProps> = ({
   onTabChange,
   hideTabControl = false,
   onUseMcp,
+  openRegistryId,
+  openMarketplace = false,
 }) => {
   const dispatch = useDispatch();
   const servers = useSelector((state: RootState) => state.mcp.servers);
@@ -178,6 +187,13 @@ const McpManager: React.FC<McpManagerProps> = ({
     }
     onTabChange?.(tab);
   };
+
+  useEffect(() => {
+    if (!openRegistryId && !openMarketplace) return;
+    setActiveTab(McpTabValue.Marketplace);
+    setActiveCategory('all');
+    setSearchQuery('');
+  }, [openMarketplace, openRegistryId]);
 
   useEffect(() => {
     let isActive = true;
@@ -360,7 +376,7 @@ const McpManager: React.FC<McpManagerProps> = ({
 
   const filteredMarketplace = useMemo(() => {
     let entries = filterMcpItems(dynamicRegistry, searchQuery, entry =>
-      [entry.name, entry.transportType, entry.category, getRegistryEntryDescription(entry)].join(
+      [entry.id, entry.name, entry.transportType, entry.category, getRegistryEntryDescription(entry)].join(
         ' ',
       ),
     );

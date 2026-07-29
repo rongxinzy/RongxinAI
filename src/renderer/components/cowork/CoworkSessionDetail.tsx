@@ -55,6 +55,7 @@ import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
+import type { McpRegistryId } from '../mcp/constants';
 import type { CaptureRect } from './helpers/exportUtils';
 import {
   composeExportCanvas,
@@ -85,7 +86,8 @@ import AskUserQuestionCard from './AskUserQuestionCard';
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
-  onManageConnectors?: () => void;
+  onConfigureConnector?: (registryId?: McpRegistryId) => void;
+  onOpenConnectorMarketplace?: () => void;
   permissionMode?: CoworkPermissionMode;
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   onContinue: (
@@ -153,7 +155,8 @@ class ArtifactPanelErrorBoundary extends React.Component<
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onManageSkills,
-  onManageConnectors,
+  onConfigureConnector,
+  onOpenConnectorMarketplace,
   permissionMode,
   onPermissionModeChange,
   onContinue,
@@ -1464,7 +1467,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 size="large"
                 remoteManaged={remoteManaged}
                 onManageSkills={remoteManaged ? undefined : onManageSkills}
-                onManageConnectors={remoteManaged ? undefined : onManageConnectors}
+                onConfigureConnector={remoteManaged ? undefined : onConfigureConnector}
+                onOpenConnectorMarketplace={
+                  remoteManaged ? undefined : onOpenConnectorMarketplace
+                }
                 showPermissionModeSelector={workMode === 'work'}
                 permissionMode={permissionMode}
                 onPermissionModeChange={onPermissionModeChange}
