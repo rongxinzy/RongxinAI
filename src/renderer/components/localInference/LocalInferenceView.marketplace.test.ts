@@ -20,6 +20,14 @@ test('marketplace page size uses the actual grid height', () => {
   ).toBe(16);
   expect(
     getMarketplacePageSize({
+      availableGridHeight: 1_000,
+      cardHeight: 124,
+      columnCount: 4,
+      rowGap: 12,
+    }),
+  ).toBe(20);
+  expect(
+    getMarketplacePageSize({
       availableGridHeight: 0,
       cardHeight: 124,
       columnCount: 4,

@@ -109,7 +109,6 @@ export function MarketplacePanel({
 
     const updatePageSize = () => {
       const gridStyle = window.getComputedStyle(grid);
-      const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
       const viewportRect = contentViewport.getBoundingClientRect();
       const gridRect = grid.getBoundingClientRect();
       const pagination = paginationRef.current;
@@ -118,6 +117,10 @@ export function MarketplacePanel({
       const contentPaddingBottom = content
         ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
         : 0;
+      const cards = Array.from(grid.children) as HTMLElement[];
+      const cardRects = cards.map(card => card.getBoundingClientRect());
+      const firstRowTop = Math.min(...cardRects.map(rect => rect.top));
+      const columnCount = cardRects.filter(rect => Math.abs(rect.top - firstRowTop) < 1).length;
       const gridTop = gridRect.top - viewportRect.top;
       const panelTop = panel.getBoundingClientRect().top - viewportRect.top;
       const nextPanelMinHeight = Math.max(
@@ -135,8 +138,7 @@ export function MarketplacePanel({
       ].join(':');
       if (layoutSignature === layoutSignatureRef.current) return;
 
-      const cards = Array.from(grid.children);
-      const cardHeight = Math.max(...cards.map(card => card.getBoundingClientRect().height));
+      const cardHeight = Math.max(...cardRects.map(rect => rect.height));
       const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
       const availableGridHeight =
         contentViewport.clientHeight - gridTop - paginationHeight - contentPaddingBottom;

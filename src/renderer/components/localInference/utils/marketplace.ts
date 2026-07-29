@@ -7,6 +7,7 @@ import {
 import { i18nService } from '../../../services/i18n';
 import {
   MARKETPLACE_INITIAL_MODEL_COUNT,
+  MARKETPLACE_MAX_PAGE_ROWS,
   MARKETPLACE_PAGE_SIZE,
   MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
 } from '../constants';
@@ -156,6 +157,9 @@ export function getMarketplacePageSize({
     return MARKETPLACE_PAGE_SIZE;
   }
 
-  const rows = Math.max(1, Math.floor((availableGridHeight + rowGap) / (cardHeight + rowGap)));
+  const rows = Math.min(
+    MARKETPLACE_MAX_PAGE_ROWS,
+    Math.max(1, Math.floor((availableGridHeight + rowGap) / (cardHeight + rowGap))),
+  );
   return rows * Math.floor(columnCount);
 }
