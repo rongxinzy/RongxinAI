@@ -50,8 +50,8 @@ export function ModelLaunchLogSidebar({
   const [isEntered, setIsEntered] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isFullscreenExitPending, setIsFullscreenExitPending] = useState(false);
-  const [isFullscreenClosePending, setIsFullscreenClosePending] = useState(false);
-  const [isFullscreenLayoutReleasing, setIsFullscreenLayoutReleasing] = useState(false);
+  const [isClosePending, setIsClosePending] = useState(false);
+  const [isLayoutReleasing, setIsLayoutReleasing] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
@@ -78,8 +78,8 @@ export function ModelLaunchLogSidebar({
 
   useEffect(() => {
     if (state.visible) {
-      setIsFullscreenClosePending(false);
-      setIsFullscreenLayoutReleasing(false);
+      setIsClosePending(false);
+      setIsLayoutReleasing(false);
       setSidebarWidth(getMaxSidebarWidth(containerWidth));
       setIsPresent(true);
       const frame = window.requestAnimationFrame(() => {
@@ -90,59 +90,50 @@ export function ModelLaunchLogSidebar({
     }
 
     setIsEntered(false);
-    if (isFullscreen) {
-      setIsFullscreenClosePending(true);
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setIsPresent(false);
-    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [containerWidth, isFullscreen, isFullscreenClosePending, state.visible]);
+    if (!isPresent) return;
+    setIsClosePending(true);
+  }, [containerWidth, isPresent, state.visible]);
 
   const isPanelEntered = state.visible && isEntered;
   const isPanelClosing = !state.visible && isPresent;
-  const isVisualFullscreen =
-    isFullscreen || isFullscreenExitPending || isFullscreenClosePending || isFullscreenLayoutReleasing;
+  const isPanelOverlayActive =
+    isFullscreen || isFullscreenExitPending || isClosePending || isLayoutReleasing || isPanelClosing;
   const isCompact = containerWidth > 0 && containerWidth < MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT;
-  const isFullscreenCloseTransition = isVisualFullscreen && isPanelClosing;
+  const isPanelCloseTransition = isPanelClosing;
 
   useEffect(() => {
     if (!isFullscreenExitPending) return;
 
     const timeout = window.setTimeout(() => {
       setIsFullscreenExitPending(false);
-      setIsFullscreenLayoutReleasing(true);
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
 
     return () => window.clearTimeout(timeout);
   }, [isFullscreenExitPending]);
 
   useEffect(() => {
-    if (!isFullscreenClosePending) return;
+    if (!isClosePending) return;
 
     const timeout = window.setTimeout(() => {
       if (state.visible) return;
       setIsPresent(false);
-      setIsFullscreenClosePending(false);
-      setIsFullscreenLayoutReleasing(true);
-      onFullscreenChange(false);
+      setIsClosePending(false);
+      setIsLayoutReleasing(true);
+      if (isFullscreen) onFullscreenChange(false);
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS + MODEL_LAUNCH_LOG_TRANSITION_FALLBACK_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [isFullscreenClosePending, onFullscreenChange, state.visible]);
+  }, [isClosePending, isFullscreen, onFullscreenChange, state.visible]);
 
   useEffect(() => {
-    if (!isFullscreenLayoutReleasing) return;
+    if (!isLayoutReleasing) return;
 
     const timeout = window.setTimeout(() => {
-      setIsFullscreenLayoutReleasing(false);
+      setIsLayoutReleasing(false);
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS + MODEL_LAUNCH_LOG_TRANSITION_FALLBACK_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [isFullscreenLayoutReleasing]);
+  }, [isLayoutReleasing]);
 
   const handleToggleFullscreen = () => {
     if (isFullscreen) {
@@ -157,7 +148,7 @@ export function ModelLaunchLogSidebar({
 
   const handleClose = () => {
     setIsFullscreenExitPending(false);
-    if (isFullscreen) setIsFullscreenClosePending(true);
+    setIsClosePending(true);
     onClose();
   };
 
@@ -211,27 +202,27 @@ export function ModelLaunchLogSidebar({
 
   const handleSidebarTransitionEnd = (event: ReactTransitionEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'transform') return;
-    if (!isFullscreenClosePending || state.visible) return;
+    if (!isClosePending || state.visible) return;
 
     setIsPresent(false);
-    setIsFullscreenClosePending(false);
-    setIsFullscreenLayoutReleasing(true);
-    onFullscreenChange(false);
+    setIsClosePending(false);
+    setIsLayoutReleasing(true);
+    if (isFullscreen) onFullscreenChange(false);
   };
 
   const handleLayoutReleaseTransitionEnd = (event: ReactTransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'width') return;
-    setIsFullscreenLayoutReleasing(false);
+    setIsLayoutReleasing(false);
   };
 
   return (
     <>
-      {isVisualFullscreen ? (
+      {isPanelOverlayActive ? (
         <div
           aria-hidden="true"
           className="shrink-0 transition-[width] ease-in-out"
           style={{
-            width: isFullscreenLayoutReleasing ? 0 : sidebarWidth,
+            width: isLayoutReleasing ? 0 : sidebarWidth,
             transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
           }}
           onTransitionEnd={handleLayoutReleaseTransitionEnd}
@@ -244,34 +235,34 @@ export function ModelLaunchLogSidebar({
         className={cn(
           'flex h-full bg-background ease-in-out',
           'overflow-hidden transition-[width,transform]',
-          isVisualFullscreen
+          isPanelOverlayActive
             ? 'absolute inset-y-0 right-0 z-30 shadow-xl'
             : isCompact
               ? 'absolute inset-y-0 right-0 z-20 shadow-xl'
               : 'relative shrink-0',
         )}
         style={{
-          width: isFullscreen || isFullscreenClosePending
+          width: isFullscreen
             ? '100%'
-            : isFullscreenExitPending
+            : isFullscreenExitPending || isClosePending || isPanelClosing
               ? sidebarWidth
               : isPanelEntered
                 ? sidebarWidth
                 : 0,
           transform:
-            (isFullscreen || isFullscreenClosePending) && !state.visible
+            isPanelClosing
               ? 'translateX(100%)'
               : 'translateX(0)',
           transitionProperty: !isPresent
             ? 'none'
-            : isFullscreenCloseTransition
+            : isPanelCloseTransition
               ? 'transform'
               : 'width',
           transitionTimingFunction: 'ease-in-out',
           transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
         }}
       >
-        {isPresent && !isVisualFullscreen ? (
+        {isPresent && !isPanelOverlayActive ? (
           <div
             role="separator"
             aria-orientation="vertical"
