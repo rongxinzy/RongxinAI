@@ -20,7 +20,6 @@ import {
   type CSSProperties,
   type DragEvent,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -49,10 +48,7 @@ import {
   XiaomiIcon,
   ZhipuIcon,
 } from '../../icons/providers';
-import {
-  LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS,
-  localInferenceMutedTextClass,
-} from '../constants';
+import { localInferenceMutedTextClass } from '../constants';
 import {
   readLocalModelOrder,
   reconcileLocalModelOrder,
@@ -84,12 +80,9 @@ const MODEL_PAGE_SIZE_WITH_LOG = 8;
 const MODEL_PAGE_SIZE_WITH_SINGLE_COLUMN_LOG = 4;
 const MODEL_PAGE_GRID_COLUMNS_WITH_LOG = 2;
 const MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG = 1;
-const MODEL_PAGE_GRID_COLUMNS_WIDE = 4;
 const MODEL_CARD_MIN_WIDTH = 280;
 const MODEL_GRID_COLUMN_GAP = 12;
 const MODEL_GRID_TWO_COLUMN_MIN_WIDTH = MODEL_CARD_MIN_WIDTH * 2 + MODEL_GRID_COLUMN_GAP;
-const MODEL_CARD_LAYOUT_TRANSITION_SECONDS =
-  LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS / 1000;
 const modelCardActionClassName =
   'relative z-20 transition-[opacity,transform] duration-200 ease-out group-hover/card:translate-x-0 group-hover/card:opacity-100 group-hover/card:pointer-events-auto';
 const modelCardHiddenActionClassName = 'pointer-events-none translate-x-1 opacity-0';
@@ -137,28 +130,11 @@ type ModelCardProps = {
   onDragEnd: () => void;
   renderLoadButton?: (props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
   onOpenLaunchLog: (modelName: string) => void;
-  frozenWidth?: number | null;
-  transitionOffset?: ModelCardTransitionOffset | null;
 };
 
 type ModelCardEntry = {
   model: LlamaCppModel;
   runningModel?: LlamaCppRunningModel;
-};
-
-type FrozenModelCardLayout = {
-  id: number;
-  width: number;
-  height: number;
-  columnGap: number;
-  rowGap: number;
-  sourceColumns: number;
-  targetColumns: number;
-};
-
-type ModelCardTransitionOffset = {
-  x: number;
-  y: number;
 };
 
 export function ModelsPanel({
@@ -182,18 +158,11 @@ export function ModelsPanel({
   const [modelOrder, setModelOrder] = useState<string[]>(readLocalModelOrder);
   const [draggedModelName, setDraggedModelName] = useState<string | null>(null);
   const [modelPage, setModelPage] = useState(1);
-  const [logPanelLayoutVisible, setLogPanelLayoutVisible] = useState(logPanelVisible);
+  const logPanelLayoutVisible = logPanelVisible;
   const [logPanelGridColumns, setLogPanelGridColumns] = useState(MODEL_PAGE_GRID_COLUMNS_WITH_LOG);
   const [modelGridWidth, setModelGridWidth] = useState(0);
-  const [frozenLayout, setFrozenLayout] = useState<FrozenModelCardLayout | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
-  const previousLogPanelVisibleRef = useRef(logPanelVisible);
   const previousModelsPerPageRef = useRef<number | null>(null);
-  const modelCardTransitionIdRef = useRef(0);
-  const latestGridLayoutRef = useRef<Pick<
-    FrozenModelCardLayout,
-    'width' | 'height' | 'columnGap' | 'rowGap' | 'sourceColumns'
-  > | null>(null);
   const availableModels = useMemo(
     () => mergeVisibleModels(localModels, runningModels),
     [localModels, runningModels],
@@ -222,50 +191,13 @@ export function ModelsPanel({
   const currentModelPage = Math.min(modelPage, totalModelPages);
   const modelGridClassName = logPanelLayoutVisible
     ? logPanelGridColumns === MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG
-      ? 'grid-cols-1'
-      : 'grid-cols-2'
-    : 'grid-cols-2 2xl:grid-cols-4';
+      ? 'grid-cols-1 mx-auto w-full max-w-5xl'
+      : 'grid-cols-2 mx-auto w-full max-w-5xl'
+    : 'grid-cols-2 mx-auto w-full max-w-5xl';
   const visibleModelCards = modelCards.slice(
     (currentModelPage - 1) * modelsPerPage,
     currentModelPage * modelsPerPage,
   );
-
-  useLayoutEffect(() => {
-    if (previousLogPanelVisibleRef.current === logPanelVisible) return undefined;
-
-    const measuredLayout = latestGridLayoutRef.current ?? measureModelGridLayout(gridRef.current);
-    previousLogPanelVisibleRef.current = logPanelVisible;
-
-    if (measuredLayout) {
-      modelCardTransitionIdRef.current += 1;
-      const targetColumns = getTargetModelGridColumns(
-        logPanelVisible,
-        measuredLayout.sourceColumns,
-      );
-      setFrozenLayout({
-        id: modelCardTransitionIdRef.current,
-        ...measuredLayout,
-        targetColumns,
-      });
-      setLogPanelGridColumns(targetColumns);
-    }
-    setLogPanelLayoutVisible(logPanelVisible);
-
-    const timeout = window.setTimeout(() => {
-      setFrozenLayout(null);
-      const nextLayout = measureModelGridLayout(gridRef.current);
-      if (nextLayout) latestGridLayoutRef.current = nextLayout;
-    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [logPanelVisible]);
-
-  useLayoutEffect(() => {
-    if (frozenLayout !== null) return;
-
-    const measuredLayout = measureModelGridLayout(gridRef.current);
-    if (measuredLayout) latestGridLayoutRef.current = measuredLayout;
-  });
 
   useEffect(() => {
     const grid = gridRef.current;
@@ -284,11 +216,11 @@ export function ModelsPanel({
   }, [modelCards.length]);
 
   useEffect(() => {
-    if (!logPanelLayoutVisible || modelGridWidth <= 0 || frozenLayout !== null) return;
+    if (!logPanelLayoutVisible || modelGridWidth <= 0) return;
 
     const targetColumns = getResponsiveLogPanelGridColumns(modelGridWidth);
     if (targetColumns !== logPanelGridColumns) setLogPanelGridColumns(targetColumns);
-  }, [frozenLayout, logPanelGridColumns, logPanelLayoutVisible, modelGridWidth]);
+  }, [logPanelGridColumns, logPanelLayoutVisible, modelGridWidth]);
 
   useEffect(() => {
     const previousModelsPerPage = previousModelsPerPageRef.current;
@@ -362,15 +294,11 @@ export function ModelsPanel({
           <>
             <div
               ref={gridRef}
-              className={cn(
-                'grid w-full auto-rows-min content-start gap-3',
-                frozenLayout ? 'justify-start' : modelGridClassName,
-              )}
-              style={getFrozenModelGridStyle(frozenLayout)}
+              className={cn('grid w-full auto-rows-min content-start gap-3', modelGridClassName)}
             >
-              {visibleModelCards.map(({ model, runningModel }, index) => (
+              {visibleModelCards.map(({ model, runningModel }) => (
                 <ModelCard
-                  key={frozenLayout ? `${model.name}:${frozenLayout.id}` : model.name}
+                  key={model.name}
                   model={model}
                   runningModel={runningModel}
                   preference={modelPreferences[model.name]}
@@ -389,8 +317,6 @@ export function ModelsPanel({
                     renderLoadButton ? props => renderLoadButton(model, props) : undefined
                   }
                   onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
-                  frozenWidth={frozenLayout?.width}
-                  transitionOffset={getModelCardTransitionOffset(index, frozenLayout)}
                 />
               ))}
             </div>
@@ -444,82 +370,10 @@ export function ModelsPanel({
   );
 }
 
-function getFrozenModelGridStyle(
-  layout: FrozenModelCardLayout | null,
-): CSSProperties | undefined {
-  if (!layout) return undefined;
-
-  return {
-    gridTemplateColumns: `repeat(${layout.targetColumns}, ${layout.width}px)`,
-  };
-}
-
-function getModelCardTransitionOffset(
-  index: number,
-  layout: FrozenModelCardLayout | null,
-): ModelCardTransitionOffset | null {
-  if (!layout) return null;
-
-  const sourcePosition = getModelCardGridPosition(index, layout.sourceColumns);
-  const targetPosition = getModelCardGridPosition(index, layout.targetColumns);
-  const x = (sourcePosition.column - targetPosition.column) * (layout.width + layout.columnGap);
-  const y = (sourcePosition.row - targetPosition.row) * (layout.height + layout.rowGap);
-
-  if (x === 0 && y === 0) return null;
-  return { x, y };
-}
-
-function getModelCardGridPosition(index: number, columns: number): { column: number; row: number } {
-  const normalizedColumns = Math.max(1, columns);
-  return {
-    column: index % normalizedColumns,
-    row: Math.floor(index / normalizedColumns),
-  };
-}
 function getResponsiveLogPanelGridColumns(width: number): number {
   return width >= MODEL_GRID_TWO_COLUMN_MIN_WIDTH
     ? MODEL_PAGE_GRID_COLUMNS_WITH_LOG
     : MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG;
-}
-
-function getTargetModelGridColumns(logPanelVisible: boolean, sourceColumns?: number): number {
-  if (logPanelVisible) {
-    return Math.max(
-      MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG,
-      Math.floor((sourceColumns ?? MODEL_PAGE_GRID_COLUMNS_WITH_LOG) / 2),
-    );
-  }
-  return window.matchMedia('(min-width: 1536px)').matches
-    ? MODEL_PAGE_GRID_COLUMNS_WIDE
-    : MODEL_PAGE_GRID_COLUMNS_WITH_LOG;
-}
-
-function measureModelGridLayout(
-  grid: HTMLDivElement | null,
-): Pick<FrozenModelCardLayout, 'width' | 'height' | 'columnGap' | 'rowGap' | 'sourceColumns'> | null {
-  const firstCard = grid?.querySelector<HTMLElement>(
-    '[data-local-inference-model-card-frame="true"]',
-  );
-  if (!grid || !firstCard) return null;
-
-  const cardRect = firstCard.getBoundingClientRect();
-  const gridStyle = window.getComputedStyle(grid);
-  const sourceColumns = gridStyle.gridTemplateColumns
-    .split(' ')
-    .filter(Boolean)
-    .length;
-  return {
-    width: cardRect.width,
-    height: cardRect.height,
-    columnGap: parseCssPixelValue(gridStyle.columnGap),
-    rowGap: parseCssPixelValue(gridStyle.rowGap),
-    sourceColumns: Math.max(1, sourceColumns),
-  };
-}
-
-function parseCssPixelValue(value: string): number {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function ModelCard({
@@ -539,17 +393,9 @@ function ModelCard({
   onDragEnd,
   renderLoadButton,
   onOpenLaunchLog,
-  frozenWidth,
-  transitionOffset,
 }: ModelCardProps) {
   const isRunning = Boolean(runningModel);
   const reduceMotion = useReducedMotion();
-  const layoutTransition = reduceMotion
-    ? { duration: 0 }
-    : {
-        duration: MODEL_CARD_LAYOUT_TRANSITION_SECONDS,
-        ease: [0.4, 0, 0.2, 1] as const,
-      };
   const hoverTransition = reduceMotion
     ? { duration: 0 }
     : { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const };
@@ -573,19 +419,13 @@ function ModelCard({
   return (
     <motion.div
       data-local-inference-model-card-frame="true"
-      className={cn(
-        'relative h-full w-full transform-gpu',
-        transitionOffset && 'will-change-transform',
-      )}
-      initial={transitionOffset ?? { x: 0, y: 0 }}
-      animate={{ x: 0, y: 0 }}
-      style={frozenWidth ? { width: frozenWidth } : undefined}
+      className="relative h-full w-full transform-gpu"
       whileHover={
         reduceMotion || loadingModel || unloading || dragging
           ? undefined
           : { scale: 1.02, zIndex: 1 }
       }
-      transition={{ x: layoutTransition, y: layoutTransition, scale: hoverTransition }}
+      transition={{ scale: hoverTransition }}
     >
       <Card
         size="sm"
