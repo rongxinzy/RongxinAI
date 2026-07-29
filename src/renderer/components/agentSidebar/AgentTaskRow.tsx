@@ -1,5 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import { Checkbox } from '@shared/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
 import {
   DropdownMenu,
@@ -22,6 +21,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { BatchSelectionCheckbox } from './BatchSelectionCheckbox';
 import { AgentSidebarIndicator } from './constants';
 import { formatAgentTaskRelativeTime } from './time';
 import type { AgentSidebarTaskNode } from './types';
@@ -121,12 +121,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
       aria-selected={isSelected}
     >
       {isBatchMode && (
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={() => onToggleSelection()}
-          onClick={e => e.stopPropagation()}
-          className="h-3.5 w-3.5 shrink-0"
-        />
+        <BatchSelectionCheckbox checked={isSelected} onToggleSelection={onToggleSelection} />
       )}
 
       {isRenaming ? (
