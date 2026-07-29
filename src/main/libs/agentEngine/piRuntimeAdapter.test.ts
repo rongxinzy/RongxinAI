@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => {
   const mockSession = {
     prompt: vi.fn().mockResolvedValue(undefined),
+    steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     abortBash: vi.fn(),
     reload: vi.fn().mockResolvedValue(undefined),
@@ -154,6 +155,11 @@ vi.mock('../claudeSettings', () => ({
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import {
+  PiAssistantStopReason,
+  PiBuiltinFileToolName,
+  PiContentBlockType,
+} from './piWriteTokenLimit';
 
 describe('PiRuntimeAdapter', () => {
   let adapter: PiRuntimeAdapter;
@@ -452,17 +458,27 @@ describe('PiRuntimeAdapter', () => {
     it('should return text when Chat mode is set', async () => {
       await adapter.startSession('test', 'Hello', { confirmationMode: 'text' });
       expect(adapter.getSessionConfirmationMode('test')).toBe('text');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.appendSystemPromptOverride()).toEqual([PiAskUserQuestionSystemPrompt]);
     });
   });
 
   // ── Model updates ──
 
   describe('patchSession', () => {
-    it('should call setModel when model is provided', async () => {
+    it('should update the model and reload its write budget when the output limit changes', async () => {
       await adapter.startSession('test', 'Hello');
-      await adapter.patchSession('test', { model: 'llamacpp/qwen-local-2' });
+      await adapter.patchSession('test', { model: 'openai/gpt-5.2' });
       expect(mockSession.setModel).toHaveBeenCalled();
-      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('llamacpp/qwen-local-2');
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('openai/gpt-5.2');
+      expect(mockSession.reload).toHaveBeenCalledOnce();
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.appendSystemPromptOverride()[1]).toContain('8000 characters');
     });
 
     it('should not call setModel when no model in patch', async () => {
@@ -492,7 +508,10 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         appendSystemPromptOverride: () => string[];
       };
-      expect(loaderOptions.appendSystemPromptOverride()).toEqual([PiAskUserQuestionSystemPrompt]);
+      expect(loaderOptions.appendSystemPromptOverride()).toEqual([
+        PiAskUserQuestionSystemPrompt,
+        expect.stringContaining('## Large File Writes'),
+      ]);
     });
 
     it('resolves a Pi AskUserQuestion tool call with the renderer response', async () => {
@@ -508,7 +527,10 @@ describe('PiRuntimeAdapter', () => {
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{
           name: string;
-          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<{
+          execute: (
+            toolCallId: string,
+            params: Record<string, unknown>,
+          ) => Promise<{
             content: Array<{ text: string }>;
           }>;
         }>;
@@ -797,6 +819,29 @@ describe('PiRuntimeAdapter', () => {
       expect(updates[updates.length - 1]).toBe('Hello world');
       // No emitted content should ever contain a duplicated prefix.
       expect(updates.some(c => c.includes('HelHello') || c.includes('HelloHello'))).toBe(false);
+    });
+
+    it('should steer a truncated built-in write into the chunked workflow', async () => {
+      await adapter.startSession('test', 'Write a large file');
+
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          stopReason: PiAssistantStopReason.Length,
+          content: [
+            {
+              type: PiContentBlockType.ToolCall,
+              id: 'write-1',
+              name: PiBuiltinFileToolName.Write,
+              arguments: { path: 'large.md', content: 'partial' },
+            },
+          ],
+        },
+      });
+
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('2048 characters'));
     });
 
     it('should mark an answer as final only after the agent run ends', async () => {

@@ -24,30 +24,44 @@ import {
   SUBAGENT_PARALLEL_LIMIT,
   type PiSubagentToolDeps,
 } from './piSubagentTool';
+import { PiMessageRole, PiSubagentEventType } from './piSubagentExecution';
 
 // ── Mock sessions ──
 
 interface MockSubSession {
   prompt: ReturnType<typeof vi.fn>;
+  steer: ReturnType<typeof vi.fn>;
   abort: ReturnType<typeof vi.fn>;
   subscribe: ReturnType<typeof vi.fn>;
   emit(event: unknown): void;
 }
 
 const assistantEndEvent = (text: string) => ({
-  type: 'message_end',
-  message: { role: 'assistant', content: text, stopReason: 'stop' },
+  type: PiSubagentEventType.MessageEnd,
+  message: { role: PiMessageRole.Assistant, content: text, stopReason: 'stop' },
 });
+
+const agentSettledEvent = () => ({ type: PiSubagentEventType.AgentSettled });
+
+const errorEvent = (errorMessage: string) => ({
+  type: PiSubagentEventType.Error,
+  message: { errorMessage },
+});
+
+/** Drive a successful run: final assistant message followed by agent_settled. */
+function emitCompletion(session: MockSubSession, text: string): void {
+  session.emit(assistantEndEvent(text));
+  session.emit(agentSettledEvent());
+}
 
 /** A session that immediately completes with the given output when prompted. */
 function createAutoSession(output: string): MockSubSession {
   const listeners: Array<(event: unknown) => void> = [];
-  return {
+  const session: MockSubSession = {
     prompt: vi.fn(async () => {
-      for (const listener of listeners) {
-        listener(assistantEndEvent(output));
-      }
+      emitCompletion(session, output);
     }),
+    steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn((listener: (event: unknown) => void) => {
       listeners.push(listener);
@@ -59,6 +73,7 @@ function createAutoSession(output: string): MockSubSession {
       }
     },
   };
+  return session;
 }
 
 /** A session that stays pending until emit() drives its events. */
@@ -66,6 +81,7 @@ function createManualSession(): MockSubSession {
   const listeners: Array<(event: unknown) => void> = [];
   return {
     prompt: vi.fn(() => new Promise<void>(() => {})),
+    steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn((listener: (event: unknown) => void) => {
       listeners.push(listener);
@@ -99,7 +115,11 @@ function buildTool(depsOverride: Partial<PiSubagentToolDeps> = {}): {
   const deps: PiSubagentToolDeps = {
     getPiAgentsDir: () => '/nonexistent-pi-agents',
     presetId: undefined,
-    resolvedModel: { model: { provider: 'test', id: 'test-model' }, modelRuntime: null },
+    resolvedModel: {
+      model: { provider: 'test', id: 'test-model' },
+      modelRuntime: null,
+      maxOutputTokens: 4096,
+    },
     workspaceRoot: '/tmp/workspace',
     createPiResourceLoader: vi.fn(async () => ({})),
     ...depsOverride,
@@ -185,6 +205,7 @@ describe('buildPiSubagentTool', () => {
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
         expect.stringContaining('research subagent'),
+        4096,
       );
     });
 
@@ -214,6 +235,7 @@ describe('buildPiSubagentTool', () => {
         expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
           '/tmp/workspace',
           'You are the team researcher override.',
+          4096,
         );
 
         // The custom member agent runs with its own system prompt.
@@ -221,6 +243,7 @@ describe('buildPiSubagentTool', () => {
         expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
           '/tmp/workspace',
           'You are a custom team member.',
+          4096,
         );
       } finally {
         fs.rmSync(agentsDir, { recursive: true, force: true });
@@ -245,7 +268,7 @@ describe('buildPiSubagentTool', () => {
       hoisted.mockCreateAgentSession.mockImplementation(async () => {
         const session = createManualSession();
         session.prompt.mockImplementation(async () => {
-          session.emit({ type: 'error', message: { errorMessage: 'model exploded' } });
+          session.emit(errorEvent('model exploded'));
         });
         return { session };
       });
@@ -278,15 +301,15 @@ describe('buildPiSubagentTool', () => {
       expect(sessions).toHaveLength(SUBAGENT_PARALLEL_LIMIT);
 
       // Completing one run unblocks exactly one queued task.
-      sessions[0].emit(assistantEndEvent('done 0'));
+      emitCompletion(sessions[0], 'done 0');
       await vi.waitFor(() => expect(sessions).toHaveLength(SUBAGENT_PARALLEL_LIMIT + 1));
 
       for (const session of sessions.slice(1)) {
-        session.emit(assistantEndEvent('done'));
+        emitCompletion(session, 'done');
       }
       // The last queued task starts once another worker frees up.
       await vi.waitFor(() => expect(sessions).toHaveLength(tasks.length));
-      sessions[sessions.length - 1].emit(assistantEndEvent('done'));
+      emitCompletion(sessions[sessions.length - 1], 'done');
 
       const result = await promise;
       expect(result.content[0].text).toContain('6/6 subagents succeeded');
@@ -297,9 +320,9 @@ describe('buildPiSubagentTool', () => {
         const session = createManualSession();
         session.prompt.mockImplementation(async (task: string) => {
           if (task.includes('doomed')) {
-            session.emit({ type: 'error', message: { errorMessage: 'boom' } });
+            session.emit(errorEvent('boom'));
           } else {
-            session.emit(assistantEndEvent(`ok: ${task}`));
+            emitCompletion(session, `ok: ${task}`);
           }
         });
         return { session };
@@ -335,7 +358,7 @@ describe('buildPiSubagentTool', () => {
         const session = createManualSession();
         session.prompt.mockImplementation(async (task: string) => {
           promptedTasks.push(task);
-          session.emit(assistantEndEvent(output));
+          emitCompletion(session, output);
         });
         return { session };
       });
@@ -363,7 +386,7 @@ describe('buildPiSubagentTool', () => {
         const session = createManualSession();
         session.prompt.mockImplementation(async (task: string) => {
           promptedTasks.push(task);
-          session.emit(assistantEndEvent('done'));
+          emitCompletion(session, 'done');
         });
         return { session };
       });
@@ -377,7 +400,7 @@ describe('buildPiSubagentTool', () => {
       hoisted.mockCreateAgentSession.mockImplementation(async () => {
         const session = createManualSession();
         session.prompt.mockImplementation(async () => {
-          session.emit({ type: 'error', message: { errorMessage: 'step failed' } });
+          session.emit(errorEvent('step failed'));
         });
         return { session };
       });

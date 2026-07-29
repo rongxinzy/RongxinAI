@@ -34,6 +34,7 @@ declare module '@earendil-works/pi-coding-agent' {
   export function createAgentSession(options?: Record<string, unknown>): Promise<{
     session: {
       prompt(text: string): Promise<void>;
+      steer(text: string): Promise<void>;
       abort(): Promise<void>;
       reload(): Promise<void>;
       setModel(model: unknown): Promise<void>;

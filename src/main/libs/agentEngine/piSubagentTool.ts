@@ -20,6 +20,8 @@
 import * as fs from 'fs';
 import path from 'path';
 
+import { runPiSubagent, type PiSubagentSession } from './piSubagentExecution';
+
 // ── Constants ──
 
 export const PiSubagentToolName = 'subagent';
@@ -38,27 +40,12 @@ const CHAIN_PREVIOUS_PLACEHOLDER = '{previous}';
 
 // ── Types ──
 
-interface PiSubagentContentBlock {
-  type: string;
-  text?: string;
-  thinking?: string;
-}
-
-interface PiSubagentEvent {
-  type: string;
-  message?: {
-    role: string;
-    content: string | PiSubagentContentBlock[];
-    stopReason?: string;
-    errorMessage?: string;
-  };
-}
-
-/** Minimal Pi AgentSession surface used by subagent runs. */
-export interface PiSubagentSession {
-  prompt(text: string): Promise<void>;
+/**
+ * Sub-session surface used here: the runPiSubagent session contract plus
+ * abort() for cleanup after the run settles.
+ */
+interface PiSubagentSubSession extends PiSubagentSession {
   abort(): Promise<void>;
-  subscribe(listener: (event: PiSubagentEvent) => void): () => void;
 }
 
 /**
@@ -68,7 +55,7 @@ export interface PiSubagentSession {
  */
 interface PiSubagentModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{
-    session: PiSubagentSession;
+    session: PiSubagentSubSession;
   }>;
 }
 
@@ -76,6 +63,8 @@ export interface PiSubagentResolvedModel {
   model: Record<string, unknown>;
   /** Opaque model runtime handle, forwarded to sub-session options when set. */
   modelRuntime: unknown;
+  /** Output token budget of the resolved model; drives write-token-limit recovery. */
+  maxOutputTokens: number;
 }
 
 export interface PiSubagentToolDeps {
@@ -86,7 +75,11 @@ export interface PiSubagentToolDeps {
   resolvedModel: PiSubagentResolvedModel;
   workspaceRoot?: string;
   /** Builds the per-session Pi resource loader for a subagent system prompt. */
-  createPiResourceLoader(cwd: string, systemPrompt: string): Promise<unknown>;
+  createPiResourceLoader(
+    cwd: string,
+    systemPrompt: string,
+    maxOutputTokens: number,
+  ): Promise<unknown>;
 }
 
 interface SubagentProfile {
@@ -229,59 +222,11 @@ function resolveAgentProfiles(deps: PiSubagentToolDeps): SubagentProfile[] {
 
 // ── Sub-session execution ──
 
-function extractAssistantText(message: { content: string | PiSubagentContentBlock[] }): string {
-  if (Array.isArray(message.content)) {
-    const text = message.content
-      .filter(block => block.type === 'text' && block.text)
-      .map(block => block.text!)
-      .join('\n');
-    return text || '(no output)';
-  }
-  if (typeof message.content === 'string') {
-    return message.content || '(no output)';
-  }
-  return '(no output)';
-}
+/** runPiSubagent reports run failures inline; classify them for the ok flag. */
+const FAILURE_OUTPUT_PREFIXES = ['Error:', '(subagent timed out'] as const;
 
-/** Run the task on a sub-session and resolve with the final assistant output. */
-function collectSubagentOutput(
-  session: PiSubagentSession,
-  task: string,
-): Promise<SubagentRunResult> {
-  return new Promise<SubagentRunResult>(resolve => {
-    const cleanup = (): void => {
-      clearTimeout(timeout);
-      unsubscribe();
-    };
-    const timeout = setTimeout(() => {
-      cleanup();
-      resolve({
-        ok: false,
-        output: `(subagent timed out after ${Math.round(SUBAGENT_TIMEOUT_MS / 1000)}s)`,
-      });
-    }, SUBAGENT_TIMEOUT_MS);
-
-    const unsubscribe = session.subscribe((event: PiSubagentEvent) => {
-      if (
-        event.type === 'error' ||
-        (event.type === 'message_end' && event.message?.stopReason === 'error')
-      ) {
-        cleanup();
-        const errorMessage = event.message?.errorMessage || 'Subagent encountered an error';
-        resolve({ ok: false, output: `Error: ${errorMessage}` });
-        return;
-      }
-      if (event.type === 'message_end' && event.message?.role === 'assistant') {
-        cleanup();
-        resolve({ ok: true, output: extractAssistantText(event.message) });
-      }
-    });
-
-    session.prompt(task).catch((err: Error) => {
-      cleanup();
-      resolve({ ok: false, output: `Error: ${err.message}` });
-    });
-  });
+function isFailureOutput(output: string): boolean {
+  return FAILURE_OUTPUT_PREFIXES.some(prefix => output.startsWith(prefix));
 }
 
 /** Run a single subagent profile on a task in an isolated Pi sub-session. */
@@ -290,7 +235,7 @@ async function runSubagent(
   profile: SubagentProfile,
   task: string,
 ): Promise<SubagentRunResult> {
-  let subSession: PiSubagentSession | null = null;
+  let subSession: PiSubagentSubSession | null = null;
   try {
     const pi = await getPiSubagentModules();
     const cwd = deps.workspaceRoot || process.cwd();
@@ -300,14 +245,22 @@ async function runSubagent(
       // No customTools: subagents must not recursively spawn sub-subagents,
       // and AskUserQuestion is reserved for the parent session.
     };
-    subOptions.resourceLoader = await deps.createPiResourceLoader(cwd, profile.systemPrompt);
+    subOptions.resourceLoader = await deps.createPiResourceLoader(
+      cwd,
+      profile.systemPrompt,
+      deps.resolvedModel.maxOutputTokens,
+    );
     if (deps.resolvedModel.modelRuntime) {
       subOptions.modelRuntime = deps.resolvedModel.modelRuntime;
     }
 
     const { session } = await pi.createAgentSession(subOptions);
     subSession = session;
-    return await collectSubagentOutput(session, task);
+    const output = await runPiSubagent(session, task, {
+      maxOutputTokens: deps.resolvedModel.maxOutputTokens,
+      timeoutMs: SUBAGENT_TIMEOUT_MS,
+    });
+    return { ok: !isFailureOutput(output), output };
   } catch (err) {
     return {
       ok: false,

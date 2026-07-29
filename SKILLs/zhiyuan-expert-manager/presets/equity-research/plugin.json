@@ -1,0 +1,66 @@
+{
+  "name": "equity-research",
+  "version": "2.0.0",
+  "description": "Evidence-led equity research expert covering company analysis, valuation, catalysts, pitches, and portfolio risk.",
+  "author": {
+    "name": "CodeBuddy Teams"
+  },
+  "expertType": "agent",
+  "agentName": "equity-research-expert",
+  "agents": ["./agents/equity-research-expert.md"],
+  "skills": [
+    "./skills/catalyst-calendar",
+    "./skills/earnings-analysis",
+    "./skills/earnings-preview",
+    "./skills/idea-generation",
+    "./skills/initiating-coverage",
+    "./skills/model-update",
+    "./skills/morning-note",
+    "./skills/sector-overview",
+    "./skills/thesis-tracker",
+    "./skills/comps-valuation",
+    "./skills/dcf-model-builder",
+    "./skills/long-short-pitch",
+    "./skills/memo-builder",
+    "./skills/company-tearsheet",
+    "./skills/event-scenario-analyzer",
+    "./skills/portfolio-risk"
+  ],
+  "displayName": {
+    "en": "Equity Research Expert",
+    "zh": "股票研究专家"
+  },
+  "profession": {
+    "en": "Equity Research Expert",
+    "zh": "股票研究专家"
+  },
+  "displayDescription": {
+    "en": "Combines company research, earnings analysis, valuation, investment pitches, and portfolio risk into sourced and assumption-transparent deliverables.",
+    "zh": "整合公司研究、财报分析、估值建模、投资推介与组合风险管理，输出来源可追溯、假设透明的专业研究成果。"
+  },
+  "categoryId": "08-FinanceInvestment",
+  "defaultInitPrompt": {
+    "zh": "请为宁德时代建立首次覆盖研究框架，先列出所需数据、来源和待验证假设。",
+    "en": "Build an initiating coverage framework for CATL, starting with required data, sources, and assumptions to validate."
+  },
+  "plugin": "equity-research",
+  "tags": [
+    { "en": "Fundamental Research", "zh": "基本面研究" },
+    { "en": "Valuation Modeling", "zh": "估值建模" },
+    { "en": "Portfolio Risk", "zh": "组合风险" }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "请为宁德时代建立首次覆盖研究框架，先列出所需数据、来源和待验证假设。",
+      "en": "Build an initiating coverage framework for CATL, starting with required data, sources, and assumptions to validate."
+    },
+    {
+      "zh": "请分析这份最新财报，区分事实、管理层表述、模型输出和你的判断。",
+      "en": "Analyze this latest earnings release, separating facts, management statements, model outputs, and your judgment."
+    },
+    {
+      "zh": "请用DCF与可比公司法评估这家公司，并给出关键假设和敏感性分析。",
+      "en": "Value this company with DCF and trading comps, including key assumptions and sensitivity analysis."
+    }
+  ]
+}
