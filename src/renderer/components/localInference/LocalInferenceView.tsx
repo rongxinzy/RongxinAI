@@ -47,7 +47,6 @@ import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
 import {
   buildMarketplaceSearchParams,
   getInstallableMarketplaceModels,
-  getMarketplacePageSize,
 } from './utils/marketplace';
 import {
   formatInstallProgressSummary,
@@ -121,6 +120,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
+  const contentViewportRef = useRef<HTMLDivElement>(null);
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [marketplaceToken, setMarketplaceToken] = useState<string | null>(null);
   useI18nLanguage();
@@ -700,7 +700,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
       )}
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]">
+        <div
+          ref={contentViewportRef}
+          className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]"
+        >
           <div className="w-full space-y-4 px-6 py-4">
             {activeTab === 'models' ? (
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -779,6 +782,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 onQueryChange={setMarketplaceQuery}
                 onSearch={handleMarketplaceSearch}
                 onInstall={handleMarketplaceInstall}
+                contentViewportRef={contentViewportRef}
               />
             </LayeredTabsContent>
           </div>
@@ -884,8 +888,6 @@ function resolveLlamaCppServiceAction(
   }
 }
 
-export const __test__getMarketplacePageSize = (viewportHeight?: number, viewportWidth?: number) =>
-  getMarketplacePageSize(viewportHeight, viewportWidth);
 export const __test__buildMarketplaceSearchParams = (
   input: Parameters<typeof buildMarketplaceSearchParams>[0],
 ) => buildMarketplaceSearchParams(input);
