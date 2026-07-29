@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: "Conduct multi-round web research on a question and produce a structured, cited report. Use when the user asks for in-depth research, a deep dive, a landscape/survey of a topic, fact-checked analysis, or a report with sources. Triggers: deep research, 深度研究, research report, 调研报告, investigate, due diligence."
+description: "Conduct multi-round web research on a question and produce a structured, cited report. Use when the user asks for in-depth research, a deep dive, a landscape/survey of a topic, fact-checked analysis, or a report with sources. Triggers: deep research, 深度调研, 深度研究, research report, 调研报告, investigate, due diligence."
 license: Apache-2.0
 metadata:
   version: "1.0"
