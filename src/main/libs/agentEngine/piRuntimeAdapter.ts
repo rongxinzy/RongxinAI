@@ -42,6 +42,7 @@ import {
   type PiAskUserQuestionInput,
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
+import { buildPiAgentLoopTool, PiAgentLoopController } from './piAgentLoop';
 import { buildPiConversationPrompt } from './piConversationContext';
 import { buildPiSubagentTool } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
@@ -127,6 +128,8 @@ interface ActivePiSession {
   aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
+  /** Long-horizon agent loop controller for this session (agent_loop tool). */
+  agentLoop: PiAgentLoopController;
 }
 
 // ── Dynamic imports ──
@@ -408,6 +411,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         customTools.push(subagentTool);
       }
 
+      // Agent loop tool: lets the LLM drive multi-iteration long-horizon
+      // loops; the controller continues the session on agent_end.
+      const agentLoop = new PiAgentLoopController();
+      customTools.push(buildPiAgentLoopTool(agentLoop));
+
       if (customTools.length > 0) {
         sessionOptions.customTools = customTools;
       }
@@ -440,6 +448,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         unsubscribe: () => {},
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
+        agentLoop,
       };
 
       // Subscribe to Pi events before sending the prompt
@@ -597,6 +606,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     // Mark the session as aborted so continueSession knows not to reuse the Pi
     // session object, which may be in an inconsistent state after abort.
     active.aborted = true;
+    active.agentLoop.stop();
 
     // Only abort the current turn — keep the session entry in activeSessions
     // so isSessionActive still reports true for IM routing, but do not reuse
@@ -909,9 +919,28 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         // Kept as an explicit no-op so it doesn't fall to the "Unhandled" default log.
         break;
 
-      case 'agent_end':
+      case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
         this.markFinalAnswer(sessionId, active);
+        // Agent loop: when the finished iteration signaled "next", continue
+        // the session with the next iteration prompt instead of completing.
+        const loopDecision = active.agentLoop.handleAgentEnd();
+        if (loopDecision.shouldContinue && loopDecision.nextPrompt) {
+          // Reset turn state (same as continueSession).
+          active.answerText = '';
+          active.thinkingText = '';
+          active.assistantMessageId = null;
+          active.thinkingMessageId = null;
+          active.thinkingLifecycle.reset();
+          active.lastCompletedAnswerMessageId = null;
+          active.lastCompletedAnswerText = '';
+          active.toolResultMessageIdByCallId.clear();
+          active.piSession.prompt(loopDecision.nextPrompt).catch(error => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.emit('error', sessionId, classifyCoworkError(message));
+          });
+          break;
+        }
         // Persist completed status to SQLite so the session shows as "completed"
         // after switching away and back (mirrors OpenClaw adapter pattern).
         if (this.store) {
@@ -919,6 +948,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         }
         this.emit('complete', sessionId, null);
         break;
+      }
 
       case 'auto_retry_start':
         // Pi is retrying after an error — silently wait
