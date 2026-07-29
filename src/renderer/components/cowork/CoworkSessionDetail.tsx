@@ -77,6 +77,7 @@ import {
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useInitialConversationPosition } from './hooks/useInitialConversationPosition';
+import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
 
@@ -859,6 +860,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   );
 
   const messages = currentSession?.messages;
+  const todoQueue = useTodoQueueLifecycle({
+    isStreaming,
+    messages: messages ?? [],
+    sessionId,
+  });
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
@@ -1168,7 +1174,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   <div className="h-20" />
                 </div>
               </ConversationContent>
-              <ConversationScrollButton />
+              <ConversationScrollButton
+                className={todoQueue.todos.length > 0 ? 'bottom-14' : undefined}
+              />
             </Conversation>
 
             {/* Turn Navigation Rail — to the left of scrollbar */}
@@ -1427,9 +1435,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {/* Input Area */}
           <div className="px-4 pb-4 shrink-0">
             <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
-              <TodoQueue messages={currentSession.messages} />
               <CoworkPromptInput
                 ref={promptInputRef}
+                topAccessory={
+                  <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
+                }
                 onSubmit={onContinue}
                 onStop={onStop}
                 isStreaming={isStreaming}

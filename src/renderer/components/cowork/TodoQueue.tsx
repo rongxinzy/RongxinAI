@@ -1,64 +1,139 @@
 import {
-  Queue,
   QueueItem,
   QueueItemContent,
   QueueItemIndicator,
-  QueueSection,
-  QueueSectionContent,
+  type QueueTodo,
 } from '@shared/components/ai-elements/queue';
-import { useMemo } from 'react';
+import { Button } from '@shared/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@shared/components/ui/collapsible';
+import { ScrollArea } from '@shared/components/ui/scroll-area';
+import { Spinner } from '@shared/components/ui/spinner';
+import { cn } from '@shared/lib/utils';
+import { CircleCheck } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import { extractTodosFromMessages } from '../../utils/todoParser';
 
 interface TodoQueueProps {
-  messages: Array<{ type: string; content: string }>;
+  isDismissing?: boolean;
+  todos: QueueTodo[];
 }
 
 /**
- * Renders a todo list parsed from the latest assistant message's markdown
- * checklist (`- [ ]` / `- [x]`). Placed above the PromptInput area, matching
- * the ai-elements official Queue + PromptInput layout.
+ * Renders one anchored surface that morphs from a compact todo summary into
+ * the complete list without moving the prompt input.
  */
-export function TodoQueue({ messages }: TodoQueueProps) {
-  const todos = useMemo(() => extractTodosFromMessages(messages), [messages]);
+export function TodoQueue({ isDismissing = false, todos }: TodoQueueProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !containerRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isDismissing) setIsOpen(false);
+  }, [isDismissing]);
 
   if (todos.length === 0) return null;
 
   const completed = todos.filter(t => t.status === 'completed').length;
   const total = todos.length;
+  const isComplete = completed === total;
+  const title = i18nService.t('coworkTodosTitle');
+  const motionDuration = prefersReducedMotion ? 0 : 0.22;
 
   return (
-    <Queue
-      className="mx-auto max-h-[150px] w-[95%] rounded-b-none border-input border-b-0 overflow-y-auto group
-      [&::-webkit-scrollbar]:w-1
-      [&::-webkit-scrollbar-thumb]:rounded-full
-      [&::-webkit-scrollbar-thumb]:bg-transparent
-      [&::-webkit-scrollbar-track]:bg-transparent
-      group-hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/20
-    "
+    <div
+      ref={containerRef}
+      className={cn(
+        'absolute bottom-2 left-1/2 z-30 max-w-[calc(100vw-3rem)] -translate-x-1/2 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
+        isDismissing && 'pointer-events-none translate-y-1 opacity-0',
+      )}
     >
-      <QueueSection>
-        <QueueSectionContent>
-          <div className="flex items-center gap-2 px-1 py-0.5 text-xs text-muted-foreground">
-            <span>
-              {completed}/{total} {i18nService.t('coworkTodoCompleted')}
-            </span>
-          </div>
-          {todos.map(todo => (
-            <QueueItem key={todo.id}>
-              <div className={todo.status === 'completed' ? 'opacity-40' : ''}>
-                <div className="flex items-center gap-2">
-                  <QueueItemIndicator completed={todo.status === 'completed'} />
-                  <QueueItemContent completed={todo.status === 'completed'}>
-                    {todo.title}
-                  </QueueItemContent>
-                </div>
-              </div>
-            </QueueItem>
-          ))}
-        </QueueSectionContent>
-      </QueueSection>
-    </Queue>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <div
+          className={cn(
+            'overflow-hidden rounded-xl border border-border bg-background shadow-md transition-[width] duration-200 ease-out motion-reduce:transition-none',
+            isOpen ? 'w-80 max-w-[90vw]' : 'w-48 max-w-[calc(100vw-3rem)]',
+          )}
+        >
+          <CollapsibleTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-todo-queue-trigger="true"
+                className="w-full px-3"
+              >
+                {isComplete ? (
+                  <CircleCheck data-icon="inline-start" className="text-muted-foreground" />
+                ) : (
+                  <Spinner data-icon="inline-start" className="text-muted-foreground" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
+                  {title}
+                </span>
+                <span className="shrink-0 text-muted-foreground">
+                  {completed}/{total}
+                </span>
+              </Button>
+            }
+          />
+          <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: motionDuration, ease: 'easeOut' }}
+              className="px-2 pb-2"
+            >
+              <ScrollArea className="max-h-64">
+                <ul>
+                  {todos.map(todo => (
+                    <QueueItem key={todo.id} className="px-2 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <QueueItemIndicator
+                          completed={todo.status === 'completed'}
+                          className="mt-0"
+                        />
+                        <QueueItemContent
+                          completed={todo.status === 'completed'}
+                          className="line-clamp-none"
+                        >
+                          {todo.title}
+                        </QueueItemContent>
+                      </div>
+                    </QueueItem>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </motion.div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+    </div>
   );
 }

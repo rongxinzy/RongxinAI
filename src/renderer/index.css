@@ -748,6 +748,13 @@ select::-ms-expand {
   color: var(--zy-foreground);
 }
 
+/* The todo trigger stays visually continuous with its surface in every state. */
+[data-todo-queue-trigger='true'],
+[data-todo-queue-trigger='true']:hover,
+[data-todo-queue-trigger='true'][aria-expanded='true'] {
+  background-color: transparent !important;
+}
+
 /* Base UI select popup dimensions use runtime CSS variables. */
 [data-slot='select-content'] {
   width: var(--anchor-width) !important;
