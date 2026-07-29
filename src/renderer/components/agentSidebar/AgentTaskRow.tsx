@@ -23,6 +23,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { AgentSidebarIndicator } from './constants';
+import OverflowingSessionTitle from './OverflowingSessionTitle';
 import { formatAgentTaskRelativeTime } from './time';
 import type { AgentSidebarTaskNode } from './types';
 
@@ -144,7 +145,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
           className="min-w-0 flex-1 border border-border bg-background px-1.5 py-0.5 text-[14px] font-normal"
         />
       ) : (
-        <span className="min-w-0 flex-1 truncate">{task.title}</span>
+        <OverflowingSessionTitle title={task.title} />
       )}
 
       {!isBatchMode && !isRenaming && (
