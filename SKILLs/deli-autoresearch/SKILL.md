@@ -2,7 +2,7 @@
 name: deli-autoresearch
 description: "A protocol framework for long-horizon autonomous research tasks. Targets three empirically-observed failure modes — cognitive loops, stalling, runtime fragility — by prescribing state management, stall detection, and watchdog mechanisms. Use when the user asks for academic research, literature surveys, paper writing, or any unattended multi-day research task. Triggers: academic research, 学术研究, literature review, 文献综述, paper writing, 论文写作, ICLR survey, autonomous research."
 metadata:
-  version: "1.0"
+  version: "1.1"
   category: research
 ---
 
@@ -11,6 +11,20 @@ metadata:
 # Deli_AutoResearch
 
 This skill is a protocol framework for long-horizon autonomous tasks (days to weeks). It ships no executable code; instead it prescribes a set of battle-tested conventions: how state is persisted, how stalls are detected, how guardians are layered, and what constraints bind agent behavior. Implementation details are left to the adopter's environment.
+
+## 0. Runtime Mapping (this environment)
+
+The protocol's abstract mechanisms map onto concrete tools here:
+
+| Protocol mechanism | Concrete tool |
+|--------------------|---------------|
+| Orchestrator loop (`/loop`) | `agent_loop` tool — start a goal-mode loop, one iteration per research cycle |
+| Work agent (`Agent tool`) | `subagent` tool — single / parallel / chain delegation to researcher-scout-planner-reviewer profiles |
+| Fresh session per iteration | each `subagent` call is an isolated session with no shared conversation memory |
+| Durable heartbeat watchdog | cron/scheduled tasks on the OpenClaw gateway path (IM/自动化); in Work sessions, `agent_loop` carries the iteration cadence instead |
+| Nudge / direction injection | the parent session steers between loop iterations by editing state files |
+
+State files and logs below are tool-agnostic: they are what makes every iteration resumable.
 
 ## 1. Motivation
 
@@ -62,16 +76,20 @@ Log line format: {"ts":"...", "source":"...", "level":"info|warn|error|decision"
 
     # 1. Initialize the task directory, write state/task_spec.md and an initial progress.json
 
-    # 2. Start the orchestrator loop:
-    /loop 2h check all tasks under : (1) read progress.json;
-    (2) if stale_count>=3 generate a fresh direction; (3) launch a work agent
-    via the Agent tool (with explicit goal and completion criteria);
-    (4) write results back to state files. Zero interaction.
+    # 2. Start the orchestrator loop with the agent_loop tool (goal mode):
+    #    goal = "every task's progress.json advances each iteration".
+    #    Each iteration: (1) read progress.json for all tasks;
+    #    (2) if stale_count>=3 generate a fresh direction; (3) launch a work agent
+    #    via the subagent tool (with explicit goal and completion criteria);
+    #    (4) write results back to state files; (5) call agent_loop next.
+    #    Zero interaction.
 
-    # 3. Register a durable heartbeat watchdog (survives across sessions):
-    hourly patrol: write a timestamp; check each loop's last_seen against interval×3,
-    restart if exceeded; check each task's progress for stalls over 2h, nudge if stalled.
-    Zero interaction.
+    # 3. On the OpenClaw gateway path (IM/scheduled tasks), register a durable
+    # heartbeat watchdog (survives across sessions):
+    # hourly patrol: write a timestamp; check each loop's last_seen against interval×3,
+    # restart if exceeded; check each task's progress for stalls over 2h, nudge if stalled.
+    # Zero interaction. In Work sessions, agent_loop itself is the cadence — keep
+    # iterations short enough that a stalled one is visible in the session.
 
 ## 6. Stall Detection & Pivoting
 
@@ -100,14 +118,16 @@ Stall detection: if progress has no update for over 2 hours and the last output 
 
 ## 8. Subagent Scheduling Patterns
 
+All patterns below are expressed with the `subagent` tool: one call per work agent, `parallel` mode for fan-out, `chain` mode for staged pipelines (later steps receive earlier output via `{previous}`).
+
 | Pattern | Use | Key idea |
 |---------|-----|----------|
 | A Goal-driven | research iteration | inject tried directions, require verifiable findings, write back to findings.jsonl |
-| B Parallel exploration | complex sub-problems | fire multiple agents in one message: investigation, refutation, cross-domain analogy |
-| C Experiment run | long compute jobs | start minute-level polling right after submit: auto-diagnose errors, fix, resubmit |
-| D Verification | post-iteration QA | an independent subagent audits the evidence chain of findings |
+| B Parallel exploration | complex sub-problems | one `subagent` parallel call: investigation, refutation, cross-domain analogy |
+| C Experiment run | long compute jobs | `chain` mode: submit → minute-level polling → auto-diagnose errors, fix, resubmit |
+| D Verification | post-iteration QA | an independent `reviewer` subagent audits the evidence chain of findings |
 
-A subagent prompt should include: background, a verifiable deliverable, working directory, file/line caps, and completion criteria.
+A subagent task prompt should include: background, a verifiable deliverable, working directory, file/line caps, and completion criteria.
 
 ## 9. Engineering Constraints
 
