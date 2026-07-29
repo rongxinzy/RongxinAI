@@ -1569,6 +1569,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // Security scan
     zhiyuanGuardEnabled: '安全防护中',
+    securityPhraseGuard: '安全防护中',
+    securityPhraseSkillScan: '技能安装前安全扫描',
+    securityPhraseCommandBlock: '危险命令实时拦截',
+    securityPhraseApproval: '敏感操作需你确认',
+    securityPhraseLocalWatch: '本地环境持续守护',
     securityScanTitle: '技能安全扫描',
     securityRisk_safe: '风险评估',
     securityRisk_low: '风险评估',
@@ -4101,6 +4106,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // Security scan
     zhiyuanGuardEnabled: 'Security Active',
+    securityPhraseGuard: 'Security active',
+    securityPhraseSkillScan: 'Skills scanned before install',
+    securityPhraseCommandBlock: 'Dangerous commands blocked',
+    securityPhraseApproval: 'Sensitive actions need approval',
+    securityPhraseLocalWatch: 'Watching over your workspace',
     securityScanTitle: 'Skill Security Scan',
     securityRisk_safe: 'Risk Assessment',
     securityRisk_low: 'Risk Assessment',
