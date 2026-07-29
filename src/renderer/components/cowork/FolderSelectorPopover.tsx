@@ -2,17 +2,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
-import { Clock, Folder, FolderPlus } from 'lucide-react';
+import { Clock, Folder, FolderOpen, FolderX, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { getCompactFolderName } from '../../utils/path';
+import CreateProjectDialog from './CreateProjectDialog';
 
 interface FolderSelectorPopoverProps {
   /** Trigger element (typically a Button) */
@@ -37,6 +39,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   align = 'start',
 }) => {
   const [open, setOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [recentFolders, setRecentFolders] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,7 +62,19 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
     }
   }, [open]);
 
-  const handleAddFolder = useCallback(async () => {
+  const handleCreateProject = useCallback(() => {
+    setOpen(false);
+    setCreateDialogOpen(true);
+  }, []);
+
+  const handleProjectCreated = useCallback(
+    (path: string) => {
+      onSelectFolder(path);
+    },
+    [onSelectFolder],
+  );
+
+  const handleUseExistingFolder = useCallback(async () => {
     setOpen(false);
     try {
       const result = await window.electron.dialog.selectDirectory();
@@ -76,6 +91,25 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
       }
     } catch (error) {
       console.error('Failed to select directory:', error);
+    }
+  }, [onSelectFolder]);
+
+  const handleUseNoFolder = useCallback(async () => {
+    setOpen(false);
+    try {
+      const result = await window.electron.project.ensureScratchDir();
+      if (result.success && result.path) {
+        onSelectFolder(result.path);
+      } else {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('projectCreateFailed') }),
+        );
+      }
+    } catch (error) {
+      console.error('Failed to ensure scratch directory:', error);
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', { detail: i18nService.t('projectCreateFailed') }),
+      );
     }
   }, [onSelectFolder]);
 
@@ -99,42 +133,64 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger render={children as React.ReactElement} />
-      <DropdownMenuContent side={side} align={align} className="w-56">
-        {/* Add Folder option */}
-        <DropdownMenuItem onClick={handleAddFolder}>
-          <FolderPlus className="h-4 w-4 text-muted-foreground" />
-          <span>{i18nService.t('addFolder')}</span>
-        </DropdownMenuItem>
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger render={children as React.ReactElement} />
+        <DropdownMenuContent side={side} align={align} className="w-56">
+          {/* New blank project */}
+          <DropdownMenuItem onClick={handleCreateProject}>
+            <Plus className="h-4 w-4 text-muted-foreground" />
+            <span>{i18nService.t('createBlankProject')}</span>
+          </DropdownMenuItem>
 
-        {/* Recent Folders submenu */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{i18nService.t('recentFolders')}</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="max-h-28 overflow-y-auto">
-            {isLoading ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                {i18nService.t('loading')}
-              </div>
-            ) : recentFolders.length === 0 ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                {i18nService.t('noRecentFolders')}
-              </div>
-            ) : (
-              recentFolders.map((folder, index) => (
-                <DropdownMenuItem key={index} onClick={() => handleSelectRecentFolder(folder)}>
-                  <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{truncatePath(folder)}</span>
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {/* Use existing folder (native picker) */}
+          <DropdownMenuItem onClick={() => void handleUseExistingFolder()}>
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            <span>{i18nService.t('useExistingFolder')}</span>
+          </DropdownMenuItem>
+
+          {/* Scratch workspace without a folder */}
+          <DropdownMenuItem onClick={() => void handleUseNoFolder()}>
+            <FolderX className="h-4 w-4 text-muted-foreground" />
+            <span>{i18nService.t('useNoFolder')}</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          {/* Recent Folders submenu */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>{i18nService.t('recentFolders')}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="max-h-28 overflow-y-auto">
+              {isLoading ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  {i18nService.t('loading')}
+                </div>
+              ) : recentFolders.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  {i18nService.t('noRecentFolders')}
+                </div>
+              ) : (
+                recentFolders.map((folder, index) => (
+                  <DropdownMenuItem key={index} onClick={() => handleSelectRecentFolder(folder)}>
+                    <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{truncatePath(folder)}</span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <CreateProjectDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreated={handleProjectCreated}
+      />
+    </>
   );
 };
 

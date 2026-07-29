@@ -378,6 +378,16 @@ export const CoworkBootstrapWriteSchema = {
   output: IpcResult({}),
 };
 
+// ─── Project (working directory helpers) ────────────────────────────────────
+
+export const ProjectCreateDirectorySchema = {
+  input: z.object({
+    name: z.string().min(1),
+    baseDir: z.string().min(1).optional(),
+  }),
+  output: IpcResult({ path: z.string() }),
+};
+
 // ─── Dialog ─────────────────────────────────────────────────────────────────
 
 export const DialogSelectFileSchema = {

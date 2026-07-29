@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { FolderPlus } from 'lucide-react';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch } from 'react-redux';
 
@@ -15,6 +15,7 @@ import {
 } from '../../store/slices/coworkSlice';
 import { CoworkSessionStatusValue } from '../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
+import CreateProjectDialog from '../cowork/CreateProjectDialog';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
 import WorkspaceTreeNode from './WorkspaceTreeNode';
@@ -102,10 +103,16 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     }, 0);
   };
 
-  const handleCreateWorkspace = async () => {
-    const result = await window.electron.dialog.selectDirectory();
-    if (!result.success || !result.path) return;
-    const workspace = await workspaceService.ensureWorkspace(result.path);
+  const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+
+  const handleCreateWorkspace = () => {
+    // Align with 「进入项目工作 → 新建空白项目」: open the create-project
+    // dialog instead of the native directory picker.
+    setIsCreateProjectOpen(true);
+  };
+
+  const handleProjectCreated = async (projectPath: string) => {
+    const workspace = await workspaceService.ensureWorkspace(projectPath);
     if (workspace) await workspaceService.selectWorkspace(workspace.id);
   };
 
@@ -135,6 +142,11 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
 
   return (
     <div className="pb-3" role="tree" aria-label={i18nService.t('workspaces')}>
+      <CreateProjectDialog
+        open={isCreateProjectOpen}
+        onOpenChange={setIsCreateProjectOpen}
+        onCreated={path => void handleProjectCreated(path)}
+      />
       <div className="sticky top-0 z-30 flex h-10 items-center justify-between bg-surface-raised px-1.5">
         <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
           {i18nService.t('workspaces')}

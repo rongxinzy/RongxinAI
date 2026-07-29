@@ -45,11 +45,12 @@ import {
   type CoworkSessionExpertSnapshot,
   CoworkSessionExpertSource,
 } from '../shared/cowork/sessionExperts';
-import { ApiIpc, CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
+import { ApiIpc, CoworkStreamIpc, McpIpc, ProjectIpc, SkillsIpc } from '../shared/ipc/channels';
 import {
   ApiFetchSchema,
   ApiStreamSchema,
   CoworkSessionStartSchema,
+  ProjectCreateDirectorySchema,
 } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
 import { ProviderName } from '../shared/providers';
@@ -4068,6 +4069,65 @@ if (!gotTheLock) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to rename workspace',
+      };
+    }
+  });
+
+  // Project working-directory helpers
+  const getDefaultProjectBaseDir = () =>
+    path.join(app.getPath('documents'), 'ZhiYuanAgent', 'Workspaces');
+
+  ipcMain.handle(ProjectIpc.GetDefaultBaseDir, async () => {
+    try {
+      return { success: true, path: getDefaultProjectBaseDir() };
+    } catch (error) {
+      return {
+        success: false,
+        path: null,
+        error: error instanceof Error ? error.message : 'Failed to resolve default project path',
+      };
+    }
+  });
+
+  ipcMain.handle(ProjectIpc.CreateDirectory, async (_event, rawOptions: unknown) => {
+    try {
+      const options = ProjectCreateDirectorySchema.input.parse(rawOptions);
+      const name = options.name.trim();
+      if (!name || /[\\/:*?"<>|]/.test(name) || name === '.' || name === '..') {
+        return { success: false, path: null, code: 'invalid-name', error: 'Invalid project name' };
+      }
+      const baseDir = options.baseDir?.trim() || getDefaultProjectBaseDir();
+      const targetPath = path.join(baseDir, name);
+      if (fs.existsSync(targetPath)) {
+        return {
+          success: false,
+          path: null,
+          code: 'already-exists',
+          error: 'A directory with this name already exists',
+        };
+      }
+      await fs.promises.mkdir(targetPath, { recursive: true });
+      console.log('[Project] created project directory:', targetPath);
+      return { success: true, path: targetPath };
+    } catch (error) {
+      return {
+        success: false,
+        path: null,
+        error: error instanceof Error ? error.message : 'Failed to create project directory',
+      };
+    }
+  });
+
+  ipcMain.handle(ProjectIpc.EnsureScratchDir, async () => {
+    try {
+      const scratchDir = path.join(os.homedir(), '.zhiyuan', 'scratch');
+      await fs.promises.mkdir(scratchDir, { recursive: true });
+      return { success: true, path: scratchDir };
+    } catch (error) {
+      return {
+        success: false,
+        path: null,
+        error: error instanceof Error ? error.message : 'Failed to ensure scratch directory',
       };
     }
   });
