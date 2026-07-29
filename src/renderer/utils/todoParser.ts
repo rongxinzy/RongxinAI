@@ -1,5 +1,19 @@
 import type { QueueTodo } from '@shared/components/ai-elements/queue';
 
+interface TodoSourceMessage {
+  id?: string;
+  type: string;
+  content: string;
+  timestamp?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ExtractedTodoList {
+  sourceMessageId: string;
+  sourceTimestamp: number;
+  todos: QueueTodo[];
+}
+
 /** Regex: markdown checklist lines — "- [ ] text" or "- [x] text" */
 const CHECKLIST_RE = /^-\s*\[([ xX])\]\s+(.+)$/;
 
@@ -64,15 +78,46 @@ export function parseTodosFromText(content: string): QueueTodo[] {
  * and returns the first checklist found. This keeps the todo-list visible
  * during later turns when the current answer hasn't output a checklist yet.
  */
-export function extractTodosFromMessages(
-  messages: Array<{ type: string; content: string; metadata?: Record<string, unknown> }>,
-): QueueTodo[] {
+export function extractTodosFromMessages(messages: TodoSourceMessage[]): QueueTodo[] {
+  return extractLatestTodoListFromMessages(messages)?.todos ?? [];
+}
+
+function extractTodoListFromMessage(
+  message: TodoSourceMessage,
+  fallbackIndex: number,
+): ExtractedTodoList | null {
+  const todos = parseTodosFromText(message.content);
+  if (todos.length === 0) return null;
+
+  return {
+    sourceMessageId: message.id ?? `todo-source-${fallbackIndex}`,
+    sourceTimestamp: message.timestamp ?? fallbackIndex,
+    todos,
+  };
+}
+
+/** Parses only the newest non-thinking assistant message. */
+export function extractTodoListFromLatestAssistantMessage(
+  messages: TodoSourceMessage[],
+): ExtractedTodoList | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.type !== 'assistant' || message.metadata?.isThinking) continue;
+    return extractTodoListFromMessage(message, i);
+  }
+  return null;
+}
+
+/** Returns the newest checklist together with the message that owns it. */
+export function extractLatestTodoListFromMessages(
+  messages: TodoSourceMessage[],
+): ExtractedTodoList | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.type !== 'assistant') continue;
     if (msg.metadata?.isThinking) continue;
-    const todos = parseTodosFromText(msg.content);
-    if (todos.length > 0) return todos;
+    const todoList = extractTodoListFromMessage(msg, i);
+    if (todoList) return todoList;
   }
-  return [];
+  return null;
 }
