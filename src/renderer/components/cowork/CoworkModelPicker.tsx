@@ -1,6 +1,7 @@
 import {
   ModelSelectorName,
 } from '@shared/components/ai-elements/model-selector';
+import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
 import {
   Command,
   CommandEmpty,
@@ -10,6 +11,7 @@ import {
   CommandList,
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
+import { ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ProviderIcon } from '../../providers/uiRegistry';
@@ -61,7 +63,7 @@ export function CoworkModelPicker({
       <PopoverTrigger
         nativeButton={false}
         render={
-          <span className="inline-flex max-w-[200px] cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-shadow duration-200 hover:shadow-md">
+          <PromptInputButton className="max-w-[200px] gap-1 px-2 text-sm hover:bg-surface-raised">
             {selectedModel ? (
               <>
                 <ModelProviderIcon
@@ -72,7 +74,8 @@ export function CoworkModelPicker({
             ) : (
               <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
             )}
-          </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          </PromptInputButton>
         }
       />
       <PopoverContent
