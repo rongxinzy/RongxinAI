@@ -697,7 +697,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           <LocalInferenceToastView toast={toast} onClose={dismissToast} />
         </div>
       )}
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]">
           <div className="w-full space-y-4 px-6 py-4">
             {activeTab === 'models' ? (
@@ -753,6 +753,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onOpenLaunchLog={launchLogs.openPanelForModel}
                   showRegisteredModelsTitle={false}
                   logPanelVisible={launchLogs.state.visible}
+                  logPanelModelName={launchLogs.state.modelName}
                 />
             </LayeredTabsContent>
             <LayeredTabsContent
