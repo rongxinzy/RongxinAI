@@ -3,13 +3,13 @@ name: deep-research
 description: "Conduct multi-round web research on a question and produce a structured, cited report. Use when the user asks for in-depth research, a deep dive, a landscape/survey of a topic, fact-checked analysis, or a report with sources. Triggers: deep research, 深度调研, 深度研究, research report, 调研报告, investigate, due diligence."
 license: Apache-2.0
 metadata:
-  version: "1.0"
+  version: "1.1"
   category: research
   sources:
     - https://github.com/ComposioHQ/awesome-claude-skills/tree/master/content-research-writer
 ---
 
-<!-- Adapted from content-research-writer (Apache-2.0), original source: https://github.com/ComposioHQ/awesome-claude-skills/tree/master/content-research-writer. Rewritten as a deep-research workflow: question clarification, search planning, multi-round retrieval, cross-source validation, and cited report synthesis. Pure-prompt skill: no scripts, no external dependencies. -->
+<!-- Adapted from content-research-writer (Apache-2.0), original source: https://github.com/ComposioHQ/awesome-claude-skills/tree/master/content-research-writer. Rewritten as a deep-research workflow: question clarification, parallel subagent fan-out, loop-driven gap filling, cross-source validation, and cited report synthesis. Pure-prompt skill: no scripts, no external dependencies. -->
 
 # Deep Research
 
@@ -17,14 +17,14 @@ This skill turns a single question into a rigorous, multi-round research process
 
 ## When to Use This Skill
 
-- The user asks for in-depth research, a deep dive, or a 深度研究/调研 on a topic
+- The user asks for in-depth research, a deep dive, or a 深度调研 on a topic
 - The question needs current information from multiple sources, not a one-shot answer
 - The user wants a report with verifiable citations, not an off-the-cuff summary
 - Comparing options, surveying a landscape, or doing due diligence
 
 Do **not** use this skill for simple fact lookups — a single web search is faster and enough.
 
-## Composition with Web Search
+## Composition with Retrieval Tools
 
 This skill contains no search scripts. Use whatever retrieval tools are available in the current environment, in this order of preference:
 
@@ -32,48 +32,41 @@ This skill contains no search scripts. Use whatever retrieval tools are availabl
 2. Built-in web search / web fetch tools exposed by the runtime.
 3. The `browser` tool for login-gated or heavily dynamic pages that plain fetching cannot handle.
 
-Never claim to have searched or read a page unless you actually invoked one of these tools. If no retrieval tool is available in the current mode, say so plainly and produce the best report you can from prior knowledge, clearly marked as unverified.
+Never claim to have searched or read a page unless a retrieval tool was actually invoked. If no retrieval tool is available in the current mode, say so plainly and produce the best report you can from prior knowledge, clearly marked as unverified.
 
-## Workflow
+## Delegation Protocol (mandatory)
+
+Deep research is **not** a solo 2–3 round search. When the `subagent` tool is available, you MUST fan the work out and drive it in loops. Stopping after a couple of quick search rounds is a protocol violation.
 
 ### 1. Clarify the Research Question
 
-Before searching, pin down what a good answer looks like:
+Pin down what a good answer looks like:
 
-- **Core question**: restate it in one sentence. If the request is genuinely ambiguous or too broad to research meaningfully, ask 1–3 targeted clarifying questions; otherwise proceed with a stated interpretation.
-- **Scope**: time range (e.g. "as of today"), geography, industry, depth (quick brief vs. exhaustive survey).
-- **Deliverable**: report length and any required sections.
+- **Core question**: restate it in one sentence. If the request is genuinely ambiguous, ask 1–3 targeted clarifying questions; otherwise proceed with a stated interpretation.
+- **Scope**: time range, geography, industry, depth (brief vs. exhaustive survey).
+- **Deliverable**: report length and required sections.
 
-State your interpretation of the question at the top of the work so the user can correct course early.
+State your interpretation at the top of the work so the user can correct course early.
 
-### 2. Plan Search Angles
+### 2. Plan Angles, Then Fan Out in Parallel
 
-Decompose the question into 3–7 sub-questions or angles. Typical angles:
+Decompose the question into 3–5 **meaningfully different** angles (definitions/background, current landscape and key players, recent developments, primary data and statistics, contrarian views and limitations). Then launch **one `researcher` subagent per angle in a single `subagent` parallel call** — do not research the angles one by one yourself.
 
-- Definitions, background, and how things work
-- Current state, key players, and market/landscape data
-- Recent developments and news
-- Data, statistics, and primary sources (official docs, filings, papers)
-- Contrarian views, criticism, limitations, and open problems
+Each delegation task must be self-contained: the angle, the core question for context, the time range, the languages to search in, and the required output — a list of findings where each finding carries a source URL, publisher, date, and a one-line takeaway.
 
-Turn each angle into concrete search queries in the language most likely to have good sources (for global topics, search in both English and the user's language).
+### 3. Cross-Validate the Returns
 
-### 3. Run Multiple Search Rounds
+When the parallel researchers return:
 
-Work in rounds, not one batch of queries:
+- Merge their source inventories; deduplicate by URL.
+- Require **at least two independent sources** for any load-bearing claim. Mark single-source claims.
+- Prefer primary sources over aggregators; check publication dates on fast-moving topics.
+- When sources conflict, report the conflict and the credibility of each side — never silently pick one.
+- Read the few most load-bearing pages yourself; do not relay snippet-level claims as verified.
 
-- **Round 1 — breadth**: run the planned queries, skim results, and build a source inventory (title, publisher, date, URL, one-line takeaway).
-- **Round 2 — depth**: open and read the most promising pages. Follow leads: names, numbers, and claims that need verification or detail.
-- **Round 3+ — gap filling**: after drafting an outline, search specifically for what is missing, weakly supported, or contradicted.
+### 4. Loop on the Gaps
 
-Keep a running notes list of facts, each tagged with its source URL. Stop searching when new rounds stop changing the picture — usually 2–4 rounds, not dozens.
-
-### 4. Cross-Validate Facts
-
-- Require **at least two independent sources** for any load-bearing claim (statistics, dates, named facts). Mark single-source claims as such.
-- Prefer primary sources (official documentation, standards, filings, papers, first-party announcements) over aggregators and content farms; check publication dates and prefer recent ones for fast-moving topics.
-- When sources conflict, do not silently pick one — report the conflict and the credibility of each side.
-- Distinguish facts, expert opinions, and your own inferences. Never invent a citation, URL, quote, or number.
+Draft the report outline and audit it for gaps: unsupported claims, missing sub-questions, contradictions left unresolved. If material gaps remain, start an `agent_loop` (goal mode, goal = "all load-bearing claims in the outline are supported by 2+ independent sources") and use each iteration to attack the remaining gaps — with fresh `subagent` delegations where the gap needs new retrieval. Declare `done` only when the goal holds or the iterations stop changing the picture. Respect the loop's iteration cap; if it trips, deliver the report with the gaps explicitly listed.
 
 ### 5. Synthesize the Report
 
@@ -116,6 +109,8 @@ Citation rules:
 
 Before delivering, check:
 
+- [ ] The research was fanned out to parallel `researcher` subagents (or, if the tool is unavailable, the report says so and explains the degraded process)
+- [ ] Material gaps were attacked in `agent_loop` iterations, not abandoned after one round
 - [ ] The report answers the question actually asked, in the user's language
 - [ ] Load-bearing claims have 2+ independent sources or are flagged as single-source
 - [ ] Every citation maps to a real, retrieved URL

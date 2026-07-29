@@ -42,8 +42,9 @@ import {
   type PiAskUserQuestionInput,
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
+import { buildPiAgentLoopTool, PiAgentLoopController } from './piAgentLoop';
 import { buildPiConversationPrompt } from './piConversationContext';
-import { runPiSubagent } from './piSubagentExecution';
+import { buildPiSubagentTool } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import type {
@@ -132,6 +133,8 @@ interface ActivePiSession {
   aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
+  /** Long-horizon agent loop controller for this session (agent_loop tool). */
+  agentLoop: PiAgentLoopController;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
 }
 
@@ -390,37 +393,45 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         customTools.push(mcpProxyTool);
       }
 
-      // Subagent tool: register if the session agent is a Team Lead
+      // Subagent tool: registered for every cowork session. When the session
+      // agent is a Team Lead from a package, its presetId additionally exposes
+      // the team member agents alongside the built-in profiles.
+      let subagentPresetId: string | undefined;
       if (this.store) {
         const candidateAgentIds = options.expertIds?.length
           ? options.expertIds
           : options.agentId
             ? [options.agentId]
             : [];
-        const agent = candidateAgentIds
+        const leadAgent = candidateAgentIds
           .map(agentId => this.store?.getAgent(agentId))
           .find(
             candidate =>
               candidate?.source === CoworkSessionExpertSource.Package && candidate.presetId,
           );
-        if (agent && agent.source === CoworkSessionExpertSource.Package && agent.presetId) {
-          // Check if any member agents exist for this team
-          const allAgents = this.store.listAgents();
-          const hasMembers = allAgents.some(
-            a => a.source === CoworkSessionExpertSource.Member && a.presetId === agent.presetId,
-          );
-          if (hasMembers) {
-            const subagentTool = this.buildSubagentTool(
-              agent.presetId,
-              resolvedModel,
-              options.workspaceRoot,
-            );
-            if (subagentTool) {
-              customTools.push(subagentTool);
-            }
-          }
-        }
+        subagentPresetId = leadAgent?.presetId;
       }
+      const subagentTool = buildPiSubagentTool({
+        getPiAgentsDir: () => this.getPiAgentsDir(),
+        presetId: subagentPresetId,
+        resolvedModel,
+        workspaceRoot,
+        createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens) =>
+          this.createPiResourceLoader(pi, cwd, {
+            systemPrompt,
+            skillIds: undefined,
+            maxOutputTokens,
+            fileToolsEnabled: true,
+          }),
+      });
+      if (subagentTool) {
+        customTools.push(subagentTool);
+      }
+
+      // Agent loop tool: lets the LLM drive multi-iteration long-horizon
+      // loops; the controller continues the session on agent_end.
+      const agentLoop = new PiAgentLoopController();
+      customTools.push(buildPiAgentLoopTool(agentLoop));
 
       if (customTools.length > 0) {
         sessionOptions.customTools = customTools;
@@ -454,6 +465,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         unsubscribe: () => {},
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
+        agentLoop,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
       };
 
@@ -618,6 +630,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     // Mark the session as aborted so continueSession knows not to reuse the Pi
     // session object, which may be in an inconsistent state after abort.
     active.aborted = true;
+    active.agentLoop.stop();
 
     // Only abort the current turn — keep the session entry in activeSessions
     // so isSessionActive still reports true for IM routing, but do not reuse
@@ -936,9 +949,28 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         // Kept as an explicit no-op so it doesn't fall to the "Unhandled" default log.
         break;
 
-      case 'agent_end':
+      case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
         this.markFinalAnswer(sessionId, active);
+        // Agent loop: when the finished iteration signaled "next", continue
+        // the session with the next iteration prompt instead of completing.
+        const loopDecision = active.agentLoop.handleAgentEnd();
+        if (loopDecision.shouldContinue && loopDecision.nextPrompt) {
+          // Reset turn state (same as continueSession).
+          active.answerText = '';
+          active.thinkingText = '';
+          active.assistantMessageId = null;
+          active.thinkingMessageId = null;
+          active.thinkingLifecycle.reset();
+          active.lastCompletedAnswerMessageId = null;
+          active.lastCompletedAnswerText = '';
+          active.toolResultMessageIdByCallId.clear();
+          active.piSession.prompt(loopDecision.nextPrompt).catch(error => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.emit('error', sessionId, classifyCoworkError(message));
+          });
+          break;
+        }
         // Persist completed status to SQLite so the session shows as "completed"
         // after switching away and back (mirrors OpenClaw adapter pattern).
         if (this.store) {
@@ -946,6 +978,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         }
         this.emit('complete', sessionId, null);
         break;
+      }
 
       case 'auto_retry_start':
         // Pi is retrying after an error — silently wait
@@ -1505,170 +1538,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const homedir = os.homedir();
     const configDir = process.env.PI_CODING_AGENT_DIR || path.join(homedir, '.pi', 'agent');
     return path.join(configDir, 'agents');
-  }
-
-  /**
-   * Build a subagent tool that delegates tasks to Team members.
-   *
-   * Team Lead agents use this tool to schedule member agents. Each member's
-   * markdown definition (synced to pi agents dir during registration) is read
-   * and used as the system prompt for a sub-session.
-   *
-   * Currently supports single mode (agent + task). Parallel and chain modes
-   * will be added in Phase 3 follow-up.
-   */
-  private buildSubagentTool(
-    presetId: string,
-    resolvedModel: PiResolvedModel,
-    workspaceRoot?: string,
-  ): Record<string, unknown> | null {
-    const piAgentsDir = this.getPiAgentsDir();
-    const prefix = `${presetId}--`;
-
-    // Collect available member agents from pi agents directory
-    const availableAgents: Array<{ id: string; filePath: string }> = [];
-    if (fs.existsSync(piAgentsDir)) {
-      for (const entry of fs.readdirSync(piAgentsDir)) {
-        if (entry.startsWith(prefix) && entry.endsWith('.md')) {
-          // Extract agent ID from filename: <presetId>--<agentId>.md
-          const agentId = entry.slice(prefix.length, -3); // Remove prefix and .md
-          availableAgents.push({ id: agentId, filePath: path.join(piAgentsDir, entry) });
-        }
-      }
-    }
-
-    if (availableAgents.length === 0) return null;
-
-    const agentList = availableAgents.map(a => `  - ${a.id}`).join('\n');
-    const { model, modelRuntime, maxOutputTokens } = resolvedModel;
-
-    return {
-      name: 'subagent',
-      label: 'Subagent',
-      description:
-        'Delegate tasks to specialized team members with isolated context. ' +
-        'Available members:\n' +
-        agentList +
-        '\n\n' +
-        'Use {agent, task} for single-member delegation. ' +
-        'The member will execute independently and return results to you.',
-      parameters: {
-        type: 'object',
-        properties: {
-          agent: {
-            type: 'string',
-            description: `Name of the team member to delegate to. Available: ${availableAgents.map(a => a.id).join(', ')}`,
-          },
-          task: {
-            type: 'string',
-            description: 'Complete, self-contained task description with all necessary context.',
-          },
-        },
-        required: ['agent', 'task'],
-        additionalProperties: false,
-      },
-
-      execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-        const agentId = typeof params.agent === 'string' ? params.agent.trim() : '';
-        const task = typeof params.task === 'string' ? params.task.trim() : '';
-
-        if (!agentId || !task) {
-          return {
-            content: [{ type: 'text', text: 'Both "agent" and "task" parameters are required.' }],
-            details: {},
-          };
-        }
-
-        // Find the agent MD file
-        const agentFile = availableAgents.find(a => a.id === agentId);
-        if (!agentFile) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Unknown agent "${agentId}". Available agents: ${availableAgents.map(a => a.id).join(', ') || 'none'}`,
-              },
-            ],
-            details: {},
-          };
-        }
-
-        // Read agent system prompt from MD file
-        let systemPrompt: string;
-        try {
-          const content = fs.readFileSync(agentFile.filePath, 'utf-8');
-          // Strip YAML frontmatter to get body as system prompt
-          const bodyMatch = content.match(/^---\n.*?\n---\n(.*)/s);
-          systemPrompt = bodyMatch ? bodyMatch[1].trim() : content;
-        } catch (err) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Failed to read agent definition for "${agentId}": ${err instanceof Error ? err.message : String(err)}`,
-              },
-            ],
-            details: {},
-          };
-        }
-
-        // Create a sub-session for the member agent
-        const pi = await getPiModules();
-        let subSession: PiSession | null = null;
-
-        try {
-          const subOptions: Record<string, unknown> = {
-            cwd: workspaceRoot || process.cwd(),
-            model,
-          };
-          subOptions.resourceLoader = await this.createPiResourceLoader(
-            pi,
-            subOptions.cwd as string,
-            {
-              systemPrompt,
-              skillIds: undefined,
-              maxOutputTokens,
-              fileToolsEnabled: true,
-            },
-          );
-          if (modelRuntime) {
-            subOptions.modelRuntime = modelRuntime;
-          }
-
-          const { session } = await pi.createAgentSession(subOptions);
-          subSession = session;
-
-          const finalOutput = await runPiSubagent(session, task, {
-            maxOutputTokens,
-            timeoutMs: 120_000,
-          });
-
-          return {
-            content: [{ type: 'text', text: finalOutput }],
-            details: { agentId },
-          };
-        } catch (err) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Subagent "${agentId}" failed: ${err instanceof Error ? err.message : String(err)}`,
-              },
-            ],
-            details: { agentId },
-          };
-        } finally {
-          // Clean up sub-session
-          if (subSession) {
-            try {
-              await subSession.abort();
-            } catch {
-              // Ignore cleanup errors
-            }
-          }
-        }
-      },
-    };
   }
 }
 
