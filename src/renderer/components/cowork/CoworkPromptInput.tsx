@@ -59,8 +59,7 @@ import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
 import PermissionModeMenu from './PermissionModeMenu';
-import { PromptActionMenu } from './PromptActionMenu';
-import type { McpRegistryId } from '../mcp/constants';
+import PromptPlusMenu from './PromptPlusMenu';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -161,8 +160,7 @@ interface CoworkPromptInputProps {
   showFolderSelector?: boolean;
   showModelSelector?: boolean;
   onManageSkills?: () => void;
-  onConfigureConnector?: (registryId?: McpRegistryId) => void;
-  onOpenConnectorMarketplace?: () => void;
+  onManageConnectors?: () => void;
   /** Work mode: show the 请求权限/全部允许 selector in the toolbar */
   showPermissionModeSelector?: boolean;
   permissionMode?: CoworkPermissionMode;
@@ -191,8 +189,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       showFolderSelector = false,
       showModelSelector = false,
       onManageSkills,
-      onConfigureConnector,
-      onOpenConnectorMarketplace,
+      onManageConnectors,
       showPermissionModeSelector = false,
       permissionMode,
       onPermissionModeChange,
@@ -1227,14 +1224,17 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               )}
               {isPlusToolbar && (
                 <>
-                  <PromptActionMenu
-                    onAddFile={handleAddFile}
-                    selectedExpertIds={selectedExpertIds}
-                    onSelectedExpertIdsChange={setSelectedExpertIds}
+                  <PromptPlusMenu
+                    onAddFile={() => {
+                      void handleAddFile();
+                    }}
                     onManageSkills={handleManageSkills}
-                    onConfigureConnector={onConfigureConnector}
-                    onOpenConnectorMarketplace={onOpenConnectorMarketplace}
-                    showExperts={isWorkVariant && !isDirectChat}
+                    onManageConnectors={() => onManageConnectors?.()}
+                    experts={
+                      isWorkVariant && !isDirectChat
+                        ? { selectedExpertIds, onChange: setSelectedExpertIds }
+                        : undefined
+                    }
                     disabled={disabled || isStreaming || isAddingFile}
                   />
                   {isWorkVariant && (

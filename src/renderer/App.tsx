@@ -842,8 +842,7 @@ const App: React.FC = () => {
                 <CoworkView
                   onRequestAppSettings={handleShowSettings}
                   onShowSkills={handleShowSkills}
-                  onShowMcp={handleShowMcp}
-                  onShowMcpMarketplace={handleShowMcpMarketplace}
+                  onShowConnectors={handleShowMcpMarketplace}
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
