@@ -4,6 +4,7 @@
   "defaults": {
     "docx": { "order": 10, "enabled": true },
     "web-search": { "order": 15, "enabled": true },
+    "deep-research": { "order": 16, "enabled": true },
     "xlsx": { "order": 20, "enabled": true },
     "pptx": { "order": 30, "enabled": true },
     "pdf": { "order": 40, "enabled": true },

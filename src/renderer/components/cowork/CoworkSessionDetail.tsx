@@ -1456,7 +1456,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 onManageSkills={remoteManaged ? undefined : onManageSkills}
                 showModelSelector={true}
                 isDirectChat={isDirectChat}
-                showLocalThinkingToggle={workMode === 'chat'}
+                showLocalThinkingToggle={isDirectChat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
                 sessionId={currentSession?.id}

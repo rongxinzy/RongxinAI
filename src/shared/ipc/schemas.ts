@@ -11,6 +11,8 @@
 
 import { z } from 'zod';
 
+import { CoworkSessionMode } from '../cowork/constants';
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Standard error envelope. */
@@ -152,6 +154,7 @@ export const CoworkSessionStartSchema = {
     cwd: z.string().optional(),
     systemPrompt: z.string().optional(),
     title: z.string().optional(),
+    mode: z.enum([CoworkSessionMode.Work, CoworkSessionMode.Chat]).optional(),
     activeSkillIds: z.array(z.string()).optional(),
     workspaceId: z.string().optional(),
     agentId: z.string().optional(),

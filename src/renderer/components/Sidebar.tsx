@@ -29,6 +29,7 @@ import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
 import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
+import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -58,7 +59,7 @@ const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
-  'w-full inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4';
+  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4';
 const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-black/3 dark:bg-white/4`;
 const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 
@@ -401,7 +402,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className={sidebarNavItemClassName}
               >
                 <Pencil className={sidebarCreateIconClassName} />
-                {workMode === WorkMode.Chat ? i18nService.t('newChat') : '新建任务'}
+                {workMode === WorkMode.Chat ? i18nService.t('newChat') : i18nService.t('newTask')}
               </Button>
             </div>
             {workMode !== WorkMode.Chat && (
@@ -499,6 +500,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {workMode === WorkMode.Chat && (
               <>
+                <ChatSkillShortcuts />
                 <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
                   <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
                     {i18nService.t('chatRecentTitle')}

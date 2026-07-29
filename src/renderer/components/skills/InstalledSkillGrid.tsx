@@ -9,6 +9,7 @@ import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { Skill } from '../../types/skill';
+import { isCoreSkill } from '@shared/skills/constants';
 
 interface InstalledSkillGridProps {
   skills: Skill[];
@@ -87,7 +88,8 @@ export function InstalledSkillGrid({
               </Button>
               <Switch
                 checked={skill.enabled}
-                disabled={readOnly}
+                disabled={readOnly || isCoreSkill(skill.id)}
+                title={isCoreSkill(skill.id) ? i18nService.t('skillCoreAlwaysOn') : undefined}
                 aria-label={
                   skill.enabled
                     ? i18nService.t('skillBatchDisable')

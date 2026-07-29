@@ -5,9 +5,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
+import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
+import {
+  buildChatAgentSystemPrompt,
+  ChatExecution,
+  resolveChatExecution,
+} from '../../services/chatExecutionRouter';
+import { resolveSkillPlaceholderKey } from '../chat/constants';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
@@ -141,6 +148,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     currentAgentId,
     currentAgent?.model ?? '',
   );
+
+  // Agent-backed chat sessions (skills attached, or persisted on the session)
+  // execute via the agent runtime, so the prompt input must use work-style
+  // agent model/control semantics instead of direct-chat ones — otherwise the
+  // model selector would bind to the direct-chat default model while the
+  // engine actually runs the agent model.
+  const isAgentBackedChat =
+    workMode === WorkMode.Chat &&
+    resolveChatExecution({ activeSkillIds, session: currentSession }) === ChatExecution.Agent;
 
   const buildApiConfigNotice = (
     error?: string,
@@ -308,6 +324,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       // Capture active skill IDs before clearing them
       const sessionSkillIds = [...activeSkillIds];
 
+      // Chat sessions with skills attached execute via the agent runtime while
+      // staying tagged as chat sessions; plain chat streams directly (direct LLM).
+      const isChatAgentExecution =
+        workMode === WorkMode.Chat &&
+        resolveChatExecution({ activeSkillIds: sessionSkillIds }) === ChatExecution.Agent;
+
       const tempSession: CoworkSession = {
         id: tempSessionId,
         title: fallbackTitle,
@@ -347,10 +369,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         totalMessages: 1,
       };
 
-      // Chat sessions use the temporary session as their UI identity
+      // Direct chat sessions use the temporary session as their UI identity
       // until the direct model stream finishes. Add it to the sidebar now so
       // the user's message is visible in history immediately after submit.
-      if (workMode === WorkMode.Chat) {
+      // Agent-backed chat sessions follow the work flow: the temp session is
+      // replaced by the real engine-created session (tagged mode: 'chat').
+      if (workMode === WorkMode.Chat && !isChatAgentExecution) {
         dispatch(addSession(tempSession));
       } else {
         // Work sessions are added after the backend creates their real session.
@@ -359,8 +383,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       // Clear quick action selection after starting session
       dispatch(clearSelection());
 
-      // Chat mode: direct LLM via apiService, skip PI/OpenClaw
-      if (workMode === WorkMode.Chat) {
+      // Direct chat: stream from the configured LLM via apiService, skip the agent runtime
+      if (workMode === WorkMode.Chat && !isChatAgentExecution) {
         const abortController = new AbortController();
         directChatAbortControllersRef.current.set(tempSessionId, abortController);
         const assistantMsgId = `msg-${now}-assistant`;
@@ -656,19 +680,33 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         return;
       }
 
-      // Work mode: use coworkService (PI/OpenClaw engines)
-      // Combine skill prompt with system prompt.
-      // OpenClaw loads skills natively via skills.load.extraDirs, so skip the
-      // auto-routing prompt to avoid injecting Claude SDK tool-calling instructions
-      // that confuse non-Claude models (e.g. kimi-k2.5 falls back to text-based
-      // tool calls, producing empty tool names and err=true failures).
+      // Engine path: work sessions, and chat sessions with skills attached
+      // (agent-backed chat). The engine loads skills natively via
+      // skills.load.extraDirs, so skip the auto-routing prompt to avoid
+      // injecting Claude SDK tool-calling instructions that confuse non-Claude
+      // models (e.g. kimi-k2.5 falls back to text-based tool calls, producing
+      // empty tool names and err=true failures).
       const isExpertAgent =
         currentAgent?.source === CoworkSessionExpertSource.Package ||
         currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
       const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt =
-        [skillPrompt, baseSystemPrompt].filter(p => p?.trim()).join('\n\n') || undefined;
+      // Combine skill prompt with system prompt. Including skillPrompt here is
+      // what lets chat-mode skill submissions reach the model (issue #117).
+      const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
+
+      // Agent-backed chat hides the folder selector, so the engine relies on
+      // the configured default working directory. Bail out early with a toast
+      // when no working directory is available at all.
+      if (isChatAgentExecution && !currentWorkspacePath) {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: i18nService.t('chatAgentWorkingDirectoryRequired'),
+          }),
+        );
+        dispatch(clearCurrentSession());
+        return;
+      }
 
       // Start the actual session immediately with fallback title
       const sessionModelOverride = currentAgentSelectedModel
@@ -690,6 +728,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         title: fallbackTitle,
         cwd: currentWorkspacePath || undefined,
         systemPrompt: combinedSystemPrompt,
+        // Agent-backed chat stays tagged as a chat session so it remains in
+        // the Chat sidebar list; work sessions keep the default work mode.
+        mode: isChatAgentExecution ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
         activeSkillIds: sessionSkillIds,
         workspaceId: currentWorkspaceId || undefined,
         agentId: currentAgentId,
@@ -741,8 +782,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     if (!currentSession) return;
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
 
-    // Chat mode: direct LLM via apiService
-    if (workMode === WorkMode.Chat) {
+    // Direct chat: stream from the configured LLM via apiService. Chat
+    // sessions that are agent-backed (skills attached now or persisted on the
+    // session) fall through to the engine continue path below.
+    if (
+      workMode === WorkMode.Chat &&
+      resolveChatExecution({ activeSkillIds, session: currentSession }) === ChatExecution.Direct
+    ) {
       continuingSessionIdsRef.current.add(currentSession.id);
       const abortController = new AbortController();
       directChatAbortControllersRef.current.set(currentSession.id, abortController);
@@ -1065,7 +1111,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       return;
     }
 
-    // Work mode: use coworkService
+    // Engine path: work sessions and agent-backed chat sessions
     continuingSessionIdsRef.current.add(currentSession.id);
     try {
       const sessionSkillIds = [...activeSkillIds];
@@ -1074,8 +1120,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
       const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt =
-        [skillPrompt, baseSystemPrompt].filter(p => p?.trim()).join('\n\n') || undefined;
+      const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
 
       await coworkService.continueSession({
         sessionId: currentSession.id,
@@ -1092,8 +1137,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleStopSession = async () => {
     if (!currentSession) return;
-    if (workMode === WorkMode.Chat) {
-      directChatAbortControllersRef.current.get(currentSession.id)?.abort();
+    // Stop the transport that actually started: a live direct-chat stream is
+    // controlled by its per-session AbortController, so check for one first
+    // instead of re-deriving the transport from mutable skill state (the user
+    // can attach skills mid-stream, which would otherwise misroute the stop
+    // to the engine and leave the direct stream running).
+    const directChatController = directChatAbortControllersRef.current.get(currentSession.id);
+    if (directChatController) {
+      directChatController.abort();
       dispatch(
         updateSessionStatus({
           sessionId: currentSession.id,
@@ -1283,7 +1334,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onNewChat={onNewChat}
           updateBadge={updateBadge}
           workMode={workMode}
-          isDirectChat={workMode === WorkMode.Chat}
+          isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
           localThinkingEnabled={localThinkingEnabled}
           onLocalThinkingEnabledChange={setLocalThinkingEnabled}
           inlineQuestionPermission={inlineQuestionPermission}
@@ -1342,7 +1393,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 disabled={false}
                 placeholder={
                   workMode === WorkMode.Chat
-                    ? i18nService.t('chatPlaceholder')
+                    ? i18nService.t(resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder')
                     : i18nService.t('coworkPlaceholder')
                 }
                 size="large"
@@ -1353,8 +1404,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }}
                 showFolderSelector={workMode !== WorkMode.Chat}
                 showModelSelector
-                isDirectChat={workMode === WorkMode.Chat}
-                showLocalThinkingToggle={workMode === WorkMode.Chat}
+                isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
+                showLocalThinkingToggle={workMode === WorkMode.Chat && !isAgentBackedChat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}
