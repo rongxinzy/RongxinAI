@@ -38,6 +38,7 @@ import {
 import {
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
+  CoworkPermissionMode,
   CoworkSessionMode,
 } from '../shared/cowork/constants';
 import {
@@ -4211,6 +4212,7 @@ if (!gotTheLock) {
             skillIds: runtimeSkillIds,
             workspaceRoot: taskWorkingDirectory,
             confirmationMode: 'modal',
+            autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
             agentId: options.agentId,
             expertIds: expertSnapshots.map(expert => expert.expertId),
@@ -4265,6 +4267,7 @@ if (!gotTheLock) {
         systemPrompt?: string;
         activeSkillIds?: string[];
         expertIds?: string[];
+        permissionMode?: CoworkPermissionMode;
         imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
       },
     ) => {
@@ -4354,6 +4357,7 @@ if (!gotTheLock) {
             agentId: existingSession?.agentId,
             expertIds: existingSession?.experts.map(expert => expert.expertId),
             modelOverride: existingSession?.modelOverride,
+            autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
           })
           .catch(error => {
             console.error('[Cowork] continue error:', error);
@@ -5405,6 +5409,7 @@ if (!gotTheLock) {
         memoryGuardLevel?: 'strict' | 'standard' | 'relaxed';
         memoryUserMemoriesMaxItems?: number;
         skipMissedJobs?: boolean;
+        permissionMode?: CoworkPermissionMode;
         embeddingEnabled?: boolean;
         embeddingProvider?: string;
         embeddingModel?: string;
@@ -5452,6 +5457,11 @@ if (!gotTheLock) {
             : undefined;
         const normalizedSkipMissedJobs =
           typeof config.skipMissedJobs === 'boolean' ? config.skipMissedJobs : undefined;
+        const normalizedPermissionMode =
+          config.permissionMode === CoworkPermissionMode.Ask ||
+          config.permissionMode === CoworkPermissionMode.AllowAll
+            ? config.permissionMode
+            : undefined;
         const normalizedEmbedding = normalizeEmbeddingConfig(config);
         const normalizedConfig: Parameters<CoworkStore['setConfig']>[0] = {
           ...config,
@@ -5463,6 +5473,7 @@ if (!gotTheLock) {
           memoryGuardLevel: normalizedMemoryGuardLevel,
           memoryUserMemoriesMaxItems: normalizedMemoryUserMemoriesMaxItems,
           skipMissedJobs: normalizedSkipMissedJobs,
+          permissionMode: normalizedPermissionMode,
           ...normalizedEmbedding,
         };
         const previousConfig = getCoworkStore().getConfig();

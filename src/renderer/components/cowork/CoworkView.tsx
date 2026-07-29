@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
@@ -60,6 +60,7 @@ import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSel
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
   onShowSkills?: () => void;
+  onShowConnectors?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
@@ -71,6 +72,7 @@ export interface CoworkViewProps {
 const CoworkView: React.FC<CoworkViewProps> = ({
   onRequestAppSettings,
   onShowSkills,
+  onShowConnectors,
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,
@@ -736,6 +738,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         agentId: currentAgentId,
         expertIds,
         modelOverride: sessionModelOverride,
+        permissionMode: config.permissionMode,
         imageAttachments,
       });
 
@@ -1128,6 +1131,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
         expertIds,
+        permissionMode: config.permissionMode,
         imageAttachments,
       });
     } finally {
@@ -1327,6 +1331,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         <CoworkSessionViewport
           sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
+          onManageConnectors={() => onShowConnectors?.()}
+          permissionMode={config.permissionMode}
+          onPermissionModeChange={(mode: CoworkPermissionMode) => {
+            void coworkService.updateConfig({ permissionMode: mode });
+          }}
           onContinue={handleContinueSession}
           onStop={handleStopSession}
           isSidebarCollapsed={isSidebarCollapsed}
@@ -1409,6 +1418,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}
+                onManageConnectors={() => onShowConnectors?.()}
+                showPermissionModeSelector={workMode !== WorkMode.Chat}
+                permissionMode={config.permissionMode}
+                onPermissionModeChange={(mode: CoworkPermissionMode) => {
+                  void coworkService.updateConfig({ permissionMode: mode });
+                }}
               />
             </div>
           </div>

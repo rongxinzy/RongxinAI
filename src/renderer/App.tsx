@@ -12,7 +12,7 @@ import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
-import ExpertView from './components/expert/ExpertView';
+import ExpertView, { EXPERT_TAB, type ExpertTab } from './components/expert/ExpertView';
 import { LocalInferenceView } from './components/localInference';
 import { McpView } from './components/mcp';
 import { ScheduledTasksView } from './components/scheduledTasks';
@@ -59,6 +59,7 @@ const App: React.FC = () => {
   const [mainView, setMainView] = useState<
     'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert'
   >('cowork');
+  const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -340,6 +341,12 @@ const App: React.FC = () => {
   }, []);
 
   const handleShowExpert = useCallback(() => {
+    setExpertInitialTab(undefined);
+    setMainView('expert');
+  }, []);
+
+  const handleShowExpertConnectors = useCallback(() => {
+    setExpertInitialTab(EXPERT_TAB.Mcp);
     setMainView('expert');
   }, []);
 
@@ -821,11 +828,13 @@ const App: React.FC = () => {
                   onCreateSkillByChat={handleCreateSkillByChat}
                   onTrySkill={handleTrySkill}
                   onUseMcp={handleTryMcp}
+                  initialTab={expertInitialTab}
                 />
               ) : mainView === 'localInference' ? null : (
                 <CoworkView
                   onRequestAppSettings={handleShowSettings}
                   onShowSkills={handleShowSkills}
+                  onShowConnectors={handleShowExpertConnectors}
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}

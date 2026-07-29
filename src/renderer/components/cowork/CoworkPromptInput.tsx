@@ -11,11 +11,12 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
+import { ChevronDown, Folder, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import { CoworkPermissionMode } from '../../../shared/cowork/constants';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -37,13 +38,13 @@ import {
   setDefaultSelectedModel,
   setSelectedModel,
 } from '../../store/slices/modelSlice';
-import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
+import { setSkills } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getCompactFolderName } from '../../utils/path';
-import { ActiveSkillBadge, SkillsButton } from '../skills';
+import { ActiveSkillBadge } from '../skills';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
@@ -53,7 +54,8 @@ import AttachmentCard from './AttachmentCard';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
-import SessionExpertPicker from './SessionExpertPicker';
+import PermissionModeMenu from './PermissionModeMenu';
+import PromptPlusMenu from './PromptPlusMenu';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -154,6 +156,11 @@ interface CoworkPromptInputProps {
   showFolderSelector?: boolean;
   showModelSelector?: boolean;
   onManageSkills?: () => void;
+  onManageConnectors?: () => void;
+  /** Work mode: show the 请求权限/全部允许 selector in the toolbar */
+  showPermissionModeSelector?: boolean;
+  permissionMode?: CoworkPermissionMode;
+  onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   sessionId?: string;
   /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
   remoteManaged?: boolean;
@@ -178,6 +185,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       showFolderSelector = false,
       showModelSelector = false,
       onManageSkills,
+      onManageConnectors,
+      showPermissionModeSelector = false,
+      permissionMode,
+      onPermissionModeChange,
       sessionId,
       remoteManaged = false,
       showLocalThinkingToggle = false,
@@ -621,13 +632,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       selectedExpertIds,
     ]);
 
-    const handleSelectSkill = useCallback(
-      (skill: Skill) => {
-        dispatch(toggleActiveSkill(skill.id));
-      },
-      [dispatch],
-    );
-
     const handleManageSkills = useCallback(() => {
       if (onManageSkills) {
         onManageSkills();
@@ -1061,6 +1065,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       window.addEventListener('config-updated', syncFromConfig);
       return () => window.removeEventListener('config-updated', syncFromConfig);
     }, []);
+    // Unified Kimi-style toolbar: "+" menu (+ permission selector in work mode)
+    // on the left, model picker + submit on the right. remoteManaged sessions
+    // keep the minimal read-only layout (model picker + thinking toggle only).
+    const isPlusToolbar = !remoteManaged;
+    const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     return (
       <div className="relative">
         {attachments.length > 0 && (
@@ -1092,7 +1101,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         <PromptInput
           multiple
           className={cn(
-            'shadow-elevated rounded-2xl transition-shadow **:data-[slot=input-group]:rounded-2xl',
+            'shadow-elevated rounded-3xl transition-shadow **:data-[slot=input-group]:rounded-3xl',
             isDraggingFiles && 'ring-2 ring-primary',
           )}
           onDragEnter={handleDragEnter}
@@ -1117,11 +1126,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               onChange={e => setValue(e.currentTarget.value)}
               placeholder={placeholder}
               disabled={disabled}
+              className="min-h-20"
             />
           </PromptInputBody>
           <PromptInputFooter className="flex-wrap">
             <PromptInputTools className="min-w-0 flex-1 flex-wrap">
-              {showModelSelector && (
+              {!isPlusToolbar && showModelSelector && (
                 <CoworkModelPicker
                   models={availableModels}
                   selectedModel={effectiveSelectedModel}
@@ -1132,75 +1142,65 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   }}
                 />
               )}
-              {showFolderSelector && (
-                <>
-                  <FolderSelectorPopover
-                    onSelectFolder={handleFolderSelect}
-                    side="top"
-                    align="start"
-                  >
-                    <PromptInputButton
-                      className={`gap-1.5 hover:bg-surface-raised ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
-                    >
-                      <Folder className="h-4 w-4 shrink-0" />
-                      <span className="max-w-[150px] truncate text-xs">
-                        {truncatePath(workingDirectory)}
-                      </span>
-                      {workingDirectory && (
-                        <span
-                          role="button"
-                          tabIndex={-1}
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleFolderSelect('');
-                          }}
-                          className="shrink-0 ml-0.5 p-0.5 rounded hover:bg-surface-raised transition-colors"
-                        >
-                          <X className="h-3 w-3" />
-                        </span>
-                      )}
-                    </PromptInputButton>
-                  </FolderSelectorPopover>
-                  {showFolderRequiredWarning && (
-                    <div className="absolute left-0 top-full mt-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
-                      {i18nService.t('coworkSelectFolderFirst')}
-                    </div>
-                  )}
-                </>
+              {!isPlusToolbar && (
+                <LocalThinkingToggle
+                  model={effectiveSelectedModel}
+                  visible={showLocalThinkingToggle}
+                  enabled={localThinkingEnabled}
+                  disabled={disabled || isStreaming}
+                  onEnabledChange={onLocalThinkingEnabledChange}
+                />
               )}
-              <LocalThinkingToggle
-                model={effectiveSelectedModel}
-                visible={showLocalThinkingToggle}
-                enabled={localThinkingEnabled}
-                disabled={disabled || isStreaming}
-                onEnabledChange={onLocalThinkingEnabledChange}
-              />
-              {!remoteManaged && (
-                <PromptInputButton
-                  onClick={handleAddFile}
-                  disabled={disabled || isStreaming || isAddingFile}
-                  className="hover:bg-surface-raised"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </PromptInputButton>
-              )}
-              {!remoteManaged && (
+              {isPlusToolbar && (
                 <>
-                  <SkillsButton
-                    onSelectSkill={handleSelectSkill}
+                  <PromptPlusMenu
+                    onAddFile={() => {
+                      void handleAddFile();
+                    }}
                     onManageSkills={handleManageSkills}
+                    onManageConnectors={() => onManageConnectors?.()}
+                    experts={
+                      isWorkVariant && !isDirectChat
+                        ? { selectedExpertIds, onChange: setSelectedExpertIds }
+                        : undefined
+                    }
+                    disabled={disabled || isStreaming || isAddingFile}
                   />
-                  <ActiveSkillBadge />
-                  {!isDirectChat && (
-                    <SessionExpertPicker
-                      selectedExpertIds={selectedExpertIds}
-                      onChange={setSelectedExpertIds}
+                  {isWorkVariant && (
+                    <PermissionModeMenu
+                      value={permissionMode ?? CoworkPermissionMode.Ask}
+                      onChange={mode => onPermissionModeChange?.(mode)}
                       disabled={disabled || isStreaming}
                     />
                   )}
+                  <ActiveSkillBadge />
                 </>
               )}
             </PromptInputTools>
+            {isPlusToolbar && (showLocalThinkingToggle || showModelSelector) && (
+              <div className="flex items-center gap-1.5">
+                {!isWorkVariant && (
+                  <LocalThinkingToggle
+                    model={effectiveSelectedModel}
+                    visible={showLocalThinkingToggle}
+                    enabled={localThinkingEnabled}
+                    disabled={disabled || isStreaming}
+                    onEnabledChange={onLocalThinkingEnabledChange}
+                  />
+                )}
+                {showModelSelector && (
+                  <CoworkModelPicker
+                    models={availableModels}
+                    selectedModel={effectiveSelectedModel}
+                    open={modelSelectorOpen}
+                    onOpenChange={setModelSelectorOpen}
+                    onSelect={model => {
+                      void handleModelSelect(model);
+                    }}
+                  />
+                )}
+              </div>
+            )}
             <PromptInputSubmit
               className={isStreaming ? 'relative z-20' : undefined}
               status={isStreaming ? 'streaming' : 'ready'}
@@ -1208,6 +1208,39 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             />
           </PromptInputFooter>
         </PromptInput>
+        {showFolderSelector && (
+          <div className="relative mt-1.5 flex justify-center">
+            <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="center">
+              <PromptInputButton
+                className={`gap-1.5 rounded-md text-muted-foreground hover:bg-surface-raised hover:text-foreground ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+              >
+                <Folder className="h-3.5 w-3.5 shrink-0" />
+                <span className="max-w-[200px] truncate text-xs">
+                  {truncatePath(workingDirectory)}
+                </span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
+                {workingDirectory && (
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleFolderSelect('');
+                    }}
+                    className="shrink-0 ml-0.5 p-0.5 rounded hover:bg-surface-raised transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+              </PromptInputButton>
+            </FolderSelectorPopover>
+            {showFolderRequiredWarning && (
+              <div className="absolute bottom-full mb-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
+                {i18nService.t('coworkSelectFolderFirst')}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   },

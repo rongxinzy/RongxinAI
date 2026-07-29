@@ -10,3 +10,15 @@ export const CoworkSessionMode = {
 } as const;
 
 export type CoworkSessionMode = (typeof CoworkSessionMode)[keyof typeof CoworkSessionMode];
+
+/**
+ * Desktop permission mode for cowork sessions.
+ * Ask: the agent requests authorization before acting (current behavior).
+ * AllowAll: tools execute without asking for authorization.
+ */
+export const CoworkPermissionMode = {
+  Ask: 'ask',
+  AllowAll: 'allowAll',
+} as const;
+
+export type CoworkPermissionMode = (typeof CoworkPermissionMode)[keyof typeof CoworkPermissionMode];

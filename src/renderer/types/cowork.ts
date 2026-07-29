@@ -1,5 +1,5 @@
 // Cowork image attachment for vision-capable models
-import type { CoworkSessionMode } from '../../shared/cowork/constants';
+import type { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
 
 export interface CoworkImageAttachment {
@@ -116,6 +116,7 @@ export interface CoworkConfig {
   memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
   memoryUserMemoriesMaxItems: number;
   skipMissedJobs: boolean;
+  permissionMode: CoworkPermissionMode;
   embeddingEnabled: boolean;
   embeddingProvider: string;
   embeddingModel: string;
@@ -138,6 +139,7 @@ export type CoworkConfigUpdate = Partial<
     | 'memoryGuardLevel'
     | 'memoryUserMemoriesMaxItems'
     | 'skipMissedJobs'
+    | 'permissionMode'
     | 'embeddingEnabled'
     | 'embeddingProvider'
     | 'embeddingModel'
@@ -241,6 +243,7 @@ export interface CoworkStartOptions {
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
+  permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
 }
 
@@ -251,6 +254,7 @@ export interface CoworkContinueOptions {
   systemPrompt?: string;
   activeSkillIds?: string[];
   expertIds?: string[];
+  permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
 }
 

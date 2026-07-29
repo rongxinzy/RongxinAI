@@ -467,6 +467,7 @@ class CoworkService {
       systemPrompt: options.systemPrompt,
       activeSkillIds: options.activeSkillIds,
       expertIds: options.expertIds,
+      permissionMode: options.permissionMode,
       imageAttachments: options.imageAttachments,
     });
     if (!result.success) {

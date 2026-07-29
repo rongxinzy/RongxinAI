@@ -34,7 +34,7 @@ import {
   StoreIpc,
   WindowIpc,
 } from '../shared/ipc/channels';
-import type { CoworkSessionMode } from '../shared/cowork/constants';
+import type { CoworkPermissionMode, CoworkSessionMode } from '../shared/cowork/constants';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
@@ -418,6 +418,7 @@ contextBridge.exposeInMainWorld('electron', {
       agentId?: string;
       expertIds?: string[];
       modelOverride?: string;
+      permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Start, options),
 
@@ -427,6 +428,7 @@ contextBridge.exposeInMainWorld('electron', {
       systemPrompt?: string;
       activeSkillIds?: string[];
       expertIds?: string[];
+      permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 
@@ -483,6 +485,7 @@ contextBridge.exposeInMainWorld('electron', {
       memoryGuardLevel?: 'strict' | 'standard' | 'relaxed';
       memoryUserMemoriesMaxItems?: number;
       skipMissedJobs?: boolean;
+      permissionMode?: CoworkPermissionMode;
       embeddingEnabled?: boolean;
       embeddingProvider?: string;
       embeddingModel?: string;

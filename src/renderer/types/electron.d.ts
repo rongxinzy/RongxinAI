@@ -2,7 +2,7 @@ import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
-import type { CoworkSessionMode } from '../../shared/cowork/constants';
+import type { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
 import type {
   LlamaCppCancelInstallResult,
   LlamaCppImportModelFilesResult,
@@ -115,6 +115,7 @@ interface CoworkConfig {
   memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
   memoryUserMemoriesMaxItems: number;
   skipMissedJobs: boolean;
+  permissionMode: CoworkPermissionMode;
   embeddingEnabled: boolean;
   embeddingProvider: string;
   embeddingModel: string;
@@ -137,6 +138,7 @@ type CoworkConfigUpdate = Partial<
     | 'memoryGuardLevel'
     | 'memoryUserMemoriesMaxItems'
     | 'skipMissedJobs'
+    | 'permissionMode'
     | 'embeddingEnabled'
     | 'embeddingProvider'
     | 'embeddingModel'
@@ -724,6 +726,7 @@ interface IElectronAPI {
       workspaceId?: string;
       agentId?: string;
       expertIds?: string[];
+      permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => Promise<{
       success: boolean;
@@ -738,6 +741,7 @@ interface IElectronAPI {
       systemPrompt?: string;
       activeSkillIds?: string[];
       expertIds?: string[];
+      permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => Promise<{
       success: boolean;

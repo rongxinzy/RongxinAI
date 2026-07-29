@@ -9,6 +9,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
+import type { CoworkPermissionMode } from '../../../shared/cowork/constants';
+
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
   getArtifactTypeFromExtension,
@@ -83,6 +85,9 @@ import AskUserQuestionCard from './AskUserQuestionCard';
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
+  onManageConnectors?: () => void;
+  permissionMode?: CoworkPermissionMode;
+  onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   onContinue: (
     prompt: string,
     skillPrompt?: string,
@@ -148,6 +153,9 @@ class ArtifactPanelErrorBoundary extends React.Component<
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onManageSkills,
+  onManageConnectors,
+  permissionMode,
+  onPermissionModeChange,
   onContinue,
   onStop,
   isSidebarCollapsed,
@@ -1454,6 +1462,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 size="large"
                 remoteManaged={remoteManaged}
                 onManageSkills={remoteManaged ? undefined : onManageSkills}
+                onManageConnectors={remoteManaged ? undefined : onManageConnectors}
+                showPermissionModeSelector={workMode === 'work'}
+                permissionMode={permissionMode}
+                onPermissionModeChange={onPermissionModeChange}
                 showModelSelector={true}
                 isDirectChat={isDirectChat}
                 showLocalThinkingToggle={isDirectChat}
