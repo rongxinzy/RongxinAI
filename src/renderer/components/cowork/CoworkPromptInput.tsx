@@ -48,6 +48,7 @@ import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { ActiveSkillBadge } from '../skills';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
@@ -59,7 +60,6 @@ import FolderSelectorPopover from './FolderSelectorPopover';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
-import { PlusMenuSkillsIcon } from './plusMenuIcons';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -294,28 +294,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
     const skills = useSelector((state: RootState) => state.skill.skills);
-    const selectedSkills = useMemo(
-      () =>
-        activeSkillIds
-          .map(id => skills.find(skill => skill.id === id))
-          .filter((skill): skill is Skill => skill !== undefined),
-      [activeSkillIds, skills],
-    );
-    const skillTokensRef = useRef<HTMLDivElement>(null);
-    const [skillTokenWidth, setSkillTokenWidth] = useState(0);
-
-    useEffect(() => {
-      const tokenContainer = skillTokensRef.current;
-      if (!tokenContainer || selectedSkills.length === 0) {
-        setSkillTokenWidth(0);
-        return;
-      }
-      const updateWidth = () => setSkillTokenWidth(tokenContainer.getBoundingClientRect().width);
-      updateWidth();
-      const observer = new ResizeObserver(updateWidth);
-      observer.observe(tokenContainer);
-      return () => observer.disconnect();
-    }, [selectedSkills]);
     const currentAgentSelectedModel = useAgentSelectedModel(
       currentAgentId,
       currentAgent?.model ?? '',
@@ -1153,46 +1131,15 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           {isStreaming && !disabled && (
             <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-input/50 dark:bg-input/80" />
           )}
-          {selectedSkills.length > 0 && (
-            <div
-              ref={skillTokensRef}
-              className="absolute left-2 top-1 z-10 flex max-w-[45%] items-center gap-1 overflow-hidden"
-            >
-              {selectedSkills.map(skill => (
-                <span
-                  key={skill.id}
-                  className="group inline-flex min-w-0 shrink items-center gap-1 rounded-md bg-muted py-1 pl-1 pr-1.5 text-sm text-foreground"
-                >
-                  <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground group-hover:hidden" />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="hidden size-4 shrink-0 rounded-sm p-0 group-hover:inline-flex hover:bg-background"
-                    onClick={() => dispatch(toggleActiveSkill(skill.id))}
-                    title={i18nService.t('clearSkill')}
-                  >
-                    <X className="size-3" />
-                  </Button>
-                  <span className="truncate">{skill.name}</span>
-                </span>
-              ))}
-            </div>
-          )}
           <PromptInputBody>
             <PromptInputTextarea
               ref={textareaRef}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               onChange={e => setValue(e.currentTarget.value)}
-              placeholder={selectedSkills.length > 0 ? '' : placeholder}
+              placeholder={placeholder}
               disabled={disabled}
               className="min-h-20"
-              style={
-                skillTokenWidth > 0
-                  ? { paddingLeft: `${Math.ceil(skillTokenWidth) + 12}px` }
-                  : undefined
-              }
             />
           </PromptInputBody>
           <PromptInputFooter className="flex-wrap">
@@ -1239,6 +1186,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       disabled={disabled || isStreaming}
                     />
                   )}
+                  <ActiveSkillBadge />
                 </>
               )}
             </PromptInputTools>
