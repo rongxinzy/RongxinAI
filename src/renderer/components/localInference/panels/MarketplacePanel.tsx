@@ -113,11 +113,7 @@ export function MarketplacePanel({
       const viewportRect = contentViewport.getBoundingClientRect();
       const gridRect = grid.getBoundingClientRect();
       const pagination = paginationRef.current;
-      const paginationStyle = pagination ? window.getComputedStyle(pagination) : null;
-      const paginationHeight = pagination
-        ? pagination.getBoundingClientRect().height +
-          (Number.parseFloat(paginationStyle?.marginTop ?? '') || 0)
-        : 0;
+      const paginationHeight = pagination ? pagination.getBoundingClientRect().height : 0;
       const content = contentViewport.firstElementChild as HTMLElement | null;
       const contentPaddingBottom = content
         ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
