@@ -33,6 +33,8 @@ export const classicDark: ThemeDefinition = {
     'model-tag-violet-background': 'oklch(0.3 0.06 300)',
     'model-tag-violet-foreground': 'oklch(0.83 0.08 300)',
     'model-tag-violet-border': 'oklch(0.42 0.08 300)',
+    'skill-blue-background': 'oklch(0.3 0.05 256)',
+    'skill-blue-foreground': 'oklch(0.78 0.13 256)',
     'model-tag-green-background': 'oklch(0.29 0.05 155)',
     'model-tag-green-foreground': 'oklch(0.84 0.08 155)',
     'model-tag-green-border': 'oklch(0.39 0.07 155)',

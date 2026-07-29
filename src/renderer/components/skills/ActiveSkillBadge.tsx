@@ -1,4 +1,3 @@
-import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Puzzle, X } from 'lucide-react';
 import React from 'react';
@@ -32,7 +31,7 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
   const ShortcutIcon = shortcut?.icon;
 
   return (
-    <Badge variant="outline" className="gap-1.5 pl-1.5 pr-1 text-foreground">
+    <span className="inline-flex h-6 items-center gap-1.5 rounded-full pl-1.5 pr-1 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)">
       {skill?.iconUrl ? (
         <img
           src={resolveSkillIconUrl(skill.iconUrl)}
@@ -40,20 +39,20 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
           className="size-3.5 object-contain"
         />
       ) : ShortcutIcon ? (
-        <ShortcutIcon className="size-3.5 text-muted-foreground" />
+        <ShortcutIcon className="size-3.5" />
       ) : (
-        <Puzzle className="size-3.5 text-muted-foreground" />
+        <Puzzle className="size-3.5" />
       )}
       <span className="max-w-24 truncate">{label}</span>
       <button
         type="button"
         onClick={onRemove}
         title={i18nService.t('clearSkill')}
-        className="ml-0.5 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-(--zy-skill-blue-foreground)/10"
       >
         <X className="size-3" />
       </button>
-    </Badge>
+    </span>
   );
 };
 

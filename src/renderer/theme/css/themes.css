@@ -40,6 +40,8 @@
   --zy-model-tag-green-background: oklch(0.96 0.025 155);
   --zy-model-tag-green-foreground: oklch(0.45 0.1 155);
   --zy-model-tag-green-border: oklch(0.89 0.05 155);
+  --zy-skill-blue-background: oklch(0.9567 0.0211 252.5);
+  --zy-skill-blue-foreground: oklch(0.6234 0.2055 256.39);
   --zy-scroll-thumb: oklch(0.709 0.01 56.259);
   --zy-scroll-thumb-hover: oklch(0.553 0.013 58.071);
   --zy-gradient-1: oklch(0.97 0.001 106.424);
@@ -100,6 +102,8 @@
   --zy-model-tag-green-background: oklch(0.29 0.05 155);
   --zy-model-tag-green-foreground: oklch(0.84 0.08 155);
   --zy-model-tag-green-border: oklch(0.39 0.07 155);
+  --zy-skill-blue-background: oklch(0.3 0.05 256);
+  --zy-skill-blue-foreground: oklch(0.78 0.13 256);
   --zy-scroll-thumb: oklch(0.553 0.013 58.071);
   --zy-scroll-thumb-hover: oklch(0.709 0.01 56.259);
   --zy-gradient-1: oklch(0.268 0.007 34.298);
