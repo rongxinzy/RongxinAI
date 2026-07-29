@@ -66,6 +66,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const [open, setOpen] = useState(false);
   const [mcpLoading, setMcpLoading] = useState(false);
   const [pendingServerId, setPendingServerId] = useState<string | null>(null);
+  const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
 
   const skills = useSelector((state: RootState) => state.skill.skills);
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
@@ -74,6 +75,15 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
 
   const enabledSkills = useMemo(() => skills.filter(skill => skill.enabled), [skills]);
+  const serverRegistryIds = useMemo(
+    () =>
+      mcpServers
+        .map(server => server.registryId ?? server.id)
+        .filter((id, index, ids) => ids.indexOf(id) === index)
+        .sort()
+        .join(','),
+    [mcpServers],
+  );
 
   const availableExperts = useMemo(
     () =>
@@ -120,6 +130,34 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
       cancelled = true;
     };
   }, [open, dispatch]);
+
+  useEffect(() => {
+    if (!open || !serverRegistryIds) return;
+    let cancelled = false;
+
+    const loadServerIcons = async () => {
+      const marketplace = await mcpService.fetchMarketplace();
+      if (!marketplace || cancelled) return;
+
+      const requestedIds = serverRegistryIds.split(',');
+      const iconEntries = marketplace.registry.filter(
+        entry => requestedIds.includes(entry.id) && entry.iconPath,
+      );
+      const loadedIcons = await Promise.all(
+        iconEntries.map(async entry => [entry.id, await mcpService.loadIcon(entry.iconPath!)] as const),
+      );
+      if (cancelled) return;
+
+      setServerIcons(
+        Object.fromEntries(loadedIcons.flatMap(([id, icon]) => (icon ? [[id, icon]] : []))),
+      );
+    };
+
+    void loadServerIcons();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, serverRegistryIds]);
 
   const handleToggleServer = useCallback(
     async (serverId: string, enabled: boolean) => {
@@ -260,7 +298,15 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                     void handleToggleServer(server.id, !server.enabled);
                   }}
                 >
-                  <PlusMenuServerGlyphIcon className="size-4" />
+                  {serverIcons[server.registryId ?? server.id] ? (
+                    <img
+                      src={serverIcons[server.registryId ?? server.id]}
+                      alt=""
+                      className="size-4 object-contain"
+                    />
+                  ) : (
+                    <PlusMenuServerGlyphIcon className="size-4" />
+                  )}
                   <span className="truncate">{server.name}</span>
                   <Switch
                     size="sm"
