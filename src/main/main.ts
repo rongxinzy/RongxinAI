@@ -4073,6 +4073,22 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle(WorkspaceIpc.Delete, async (_event, id: string) => {
+    try {
+      if (typeof id !== 'string' || !id.trim()) {
+        return { success: false, error: 'Workspace id is required' };
+      }
+      const deletedSessionIds = getCoworkStore().deleteWorkspace(id);
+      console.log(`[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`);
+      return { success: true, deletedSessionIds };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to remove workspace',
+      };
+    }
+  });
+
   // Project working-directory helpers
   const getDefaultProjectBaseDir = () =>
     path.join(app.getPath('documents'), 'ZhiYuanAgent', 'Workspaces');

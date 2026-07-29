@@ -1,8 +1,9 @@
 import { Button } from '@shared/components/ui/button';
-import { Folder, Pencil } from 'lucide-react';
+import { Folder, Pencil, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { isScratchWorkspacePath } from '../../utils/path';
 import AgentTaskRow from './AgentTaskRow';
 import ExpandAgentTasksRow from './ExpandAgentTasksRow';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
@@ -13,6 +14,7 @@ interface WorkspaceTreeNodeProps {
   selectedIds: Set<string>;
   onToggleExpanded: (workspaceId: string) => void;
   onCreateTask: (workspace: WorkspaceSidebarNode) => void;
+  onRemoveWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onRetryLoadTasks: (workspaceId: string) => void;
   onLoadMoreTasks: (workspaceId: string) => void;
   onCollapseTasks: (workspaceId: string) => void;
@@ -34,6 +36,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   selectedIds,
   onToggleExpanded,
   onCreateTask,
+  onRemoveWorkspace,
   onRetryLoadTasks,
   onLoadMoreTasks,
   onCollapseTasks,
@@ -49,6 +52,8 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const [shouldRenderTasks, setShouldRenderTasks] = useState(workspace.isExpanded);
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
   const previousExpandedRef = useRef(workspace.isExpanded);
+  // The scratch workspace (「无项目」) is not removable — it always exists.
+  const canRemove = typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
 
   useEffect(() => {
     let frame = 0;
@@ -95,10 +100,21 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             variant="ghost"
             size="icon-xs"
             onClick={() => onCreateTask(workspace)}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-[0.3] hover:opacity-[0.46]"
+            className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-[0.3] hover:opacity-[0.46] ${canRemove ? 'right-7' : 'right-1.5'}`}
             aria-label={i18nService.t('myAgentSidebarNewTask')}
           >
             <Pencil className="size-3.5" />
+          </Button>
+        )}
+        {canRemove && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => onRemoveWorkspace?.(workspace)}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-[0.3] hover:text-destructive hover:opacity-[0.46]"
+            aria-label={i18nService.t('removeProject')}
+          >
+            <Trash2 className="size-3.5" />
           </Button>
         )}
       </div>

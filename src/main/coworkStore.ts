@@ -676,6 +676,30 @@ export class CoworkStore {
     return this.getWorkspace(id);
   }
 
+  /**
+   * Removes a workspace row and every session that belongs to it. Files on
+   * disk are never touched. Returns the ids of the deleted sessions so the
+   * renderer can drop them from its in-memory state.
+   */
+  deleteWorkspace(id: string): string[] {
+    const rows = this.db
+      .prepare('SELECT id FROM cowork_sessions WHERE workspace_id = ?')
+      .all(id) as { id: string }[];
+    const sessionIds = rows.map(row => row.id);
+    for (const sessionId of sessionIds) {
+      this.markMemorySourcesInactiveBySession(sessionId);
+    }
+    if (sessionIds.length > 0) {
+      const placeholders = sessionIds.map(() => '?').join(',');
+      this.db
+        .prepare(`DELETE FROM cowork_sessions WHERE id IN (${placeholders})`)
+        .run(...sessionIds);
+    }
+    this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+    this.markOrphanImplicitMemoriesStale();
+    return sessionIds;
+  }
+
   createSession(
     title: string,
     cwd: string,

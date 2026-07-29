@@ -408,6 +408,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(WorkspaceIpc.Ensure, options),
     renameWorkspace: (id: string, name: string) =>
       ipcRenderer.invoke(WorkspaceIpc.Rename, id, name),
+    deleteWorkspace: (id: string) => ipcRenderer.invoke(WorkspaceIpc.Delete, id),
     startSession: (options: {
       prompt: string;
       cwd?: string;

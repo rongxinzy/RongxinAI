@@ -717,6 +717,13 @@ interface IElectronAPI {
       workspace?: import('../../shared/workspace').Workspace;
       error?: string;
     }>;
+    deleteWorkspace: (
+      id: string,
+    ) => Promise<{
+      success: boolean;
+      deletedSessionIds?: string[];
+      error?: string;
+    }>;
     startSession: (options: {
       prompt: string;
       cwd?: string;
