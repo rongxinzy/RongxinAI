@@ -43,7 +43,9 @@ import {
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
 import { buildPiConversationPrompt } from './piConversationContext';
+import { runPiSubagent } from './piSubagentExecution';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
+import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -57,6 +59,7 @@ import type {
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 interface PiSession {
   prompt(text: string): Promise<void>;
+  steer(text: string): Promise<void>;
   abort(): Promise<void>;
   abortBash(): void;
   reload(): Promise<void>;
@@ -68,6 +71,9 @@ interface PiContentBlock {
   type: string;
   text?: string;
   thinking?: string;
+  id?: string;
+  name?: string;
+  arguments?: Record<string, unknown>;
 }
 
 interface PiEvent {
@@ -126,6 +132,7 @@ interface ActivePiSession {
   aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
+  writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
 }
 
 // ── Dynamic imports ──
@@ -152,6 +159,8 @@ interface PiResourceLoader {
 interface PiResourceState {
   systemPrompt: string;
   skillIds: string[] | undefined;
+  maxOutputTokens: number;
+  fileToolsEnabled: boolean;
 }
 
 interface PiModelRuntime {
@@ -167,6 +176,7 @@ interface PiModelRuntime {
 type PiResolvedModel = {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
+  maxOutputTokens: number;
   requestOptions?: {
     apiKey?: string;
   };
@@ -345,20 +355,23 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const resourceState: PiResourceState = {
         systemPrompt: basePrompt,
         skillIds: normalizeSkillIds(options.skillIds),
+        maxOutputTokens: DEFAULT_PI_MAX_TOKENS,
+        fileToolsEnabled: options.confirmationMode !== 'text',
       };
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
       // default resource loader supplies the Pi Coding Assistant identity,
       // so override that loader per session to keep expert contexts isolated.
-      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState);
-      sessionOptions.resourceLoader = resourceLoader;
-
       // Resolve model early — needed by both MCP proxy and subagent tool
       const resolvedModel = await resolvePiModel(pi, options.modelOverride);
+      resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
       sessionOptions.model = resolvedModel.model;
       if (resolvedModel.modelRuntime) {
         sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
+
+      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState);
+      sessionOptions.resourceLoader = resourceLoader;
 
       // Build custom tools: MCP proxy + optional subagent for Team Leads.
       // Each call creates a distinct tool instance for this Pi session, so its
@@ -441,6 +454,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         unsubscribe: () => {},
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
+        writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
       };
 
       // Subscribe to Pi events before sending the prompt
@@ -547,6 +561,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     active.lastCompletedAnswerMessageId = null;
     active.lastCompletedAnswerText = '';
     active.toolResultMessageIdByCallId.clear();
+    active.writeTokenLimitRecovery.reset();
 
     // Emit user message (persisted to SQLite, same as startSession).
     const userMsg: CoworkMessage = {
@@ -579,9 +594,14 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     try {
       const pi = await getPiModules();
       const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime);
-      active.modelRuntime = resolvedModel.modelRuntime;
       const model = resolvedModel.model;
       await active.piSession.setModel(model);
+      active.modelRuntime = resolvedModel.modelRuntime;
+      active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens);
+      if (active.resourceState.maxOutputTokens !== resolvedModel.maxOutputTokens) {
+        active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
+        await active.piSession.reload();
+      }
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
     } catch (err) {
       console.warn('[PiRuntime] Failed to update model via patchSession:', err);
@@ -686,7 +706,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       systemPromptOverride: () => resourceState.systemPrompt,
       // Pi bypasses tool promptGuidelines when systemPromptOverride is non-empty.
       // Append this policy so it remains present for both default and custom prompts.
-      appendSystemPromptOverride: (): string[] => [PiAskUserQuestionSystemPrompt],
+      appendSystemPromptOverride: (): string[] => [
+        PiAskUserQuestionSystemPrompt,
+        ...(resourceState.fileToolsEnabled
+          ? [createPiLargeFileWriteSystemPrompt(resourceState.maxOutputTokens)]
+          : []),
+      ],
     });
     await resourceLoader.reload();
     return resourceLoader;
@@ -790,6 +815,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
       case 'message_end': {
         if (event.message?.role === 'assistant') {
+          active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
           if (event.message.stopReason === 'error') {
             const { thinking } = extractStreamingSnapshot(event.message);
             if (thinking && thinking !== active.thinkingText) {
@@ -1493,7 +1519,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
    */
   private buildSubagentTool(
     presetId: string,
-    resolvedModel: { model: Record<string, unknown>; modelRuntime: PiModelRuntime | null },
+    resolvedModel: PiResolvedModel,
     workspaceRoot?: string,
   ): Record<string, unknown> | null {
     const piAgentsDir = this.getPiAgentsDir();
@@ -1514,7 +1540,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     if (availableAgents.length === 0) return null;
 
     const agentList = availableAgents.map(a => `  - ${a.id}`).join('\n');
-    const { model, modelRuntime } = resolvedModel;
+    const { model, modelRuntime, maxOutputTokens } = resolvedModel;
 
     return {
       name: 'subagent',
@@ -1598,7 +1624,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           subOptions.resourceLoader = await this.createPiResourceLoader(
             pi,
             subOptions.cwd as string,
-            { systemPrompt, skillIds: undefined },
+            {
+              systemPrompt,
+              skillIds: undefined,
+              maxOutputTokens,
+              fileToolsEnabled: true,
+            },
           );
           if (modelRuntime) {
             subOptions.modelRuntime = modelRuntime;
@@ -1607,48 +1638,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           const { session } = await pi.createAgentSession(subOptions);
           subSession = session;
 
-          // Collect the final output from the sub-session
-          const finalOutput = await new Promise<string>((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              resolve('(subagent timed out after 120s)');
-            }, 120_000);
-
-            const unsubscribe = session.subscribe((event: PiEvent) => {
-              if (event.type === 'message_end' && event.message?.role === 'assistant') {
-                clearTimeout(timeout);
-                unsubscribe();
-
-                const msg = event.message;
-                if (Array.isArray(msg.content)) {
-                  const textBlocks = msg.content
-                    .filter((b: PiContentBlock) => b.type === 'text' && b.text)
-                    .map((b: PiContentBlock) => b.text!)
-                    .join('\n');
-                  resolve(textBlocks || '(no output)');
-                } else if (typeof msg.content === 'string') {
-                  resolve(msg.content || '(no output)');
-                } else {
-                  resolve('(no output)');
-                }
-              }
-
-              if (
-                event.type === 'error' ||
-                (event.type === 'message_end' && event.message?.stopReason === 'error')
-              ) {
-                clearTimeout(timeout);
-                unsubscribe();
-                const errorMsg = event.message?.errorMessage || 'Subagent encountered an error';
-                resolve(`Error: ${errorMsg}`);
-              }
-            });
-
-            // Send the task
-            session.prompt(task).catch((err: Error) => {
-              clearTimeout(timeout);
-              unsubscribe();
-              reject(err);
-            });
+          const finalOutput = await runPiSubagent(session, task, {
+            maxOutputTokens,
+            timeoutMs: 120_000,
           });
 
           return {
@@ -1837,6 +1829,7 @@ async function resolvePiModel(
         ? (registeredModel as Record<string, unknown>)
         : customModel),
     modelRuntime,
+    maxOutputTokens: resolution.providerMetadata.maxTokens || DEFAULT_PI_MAX_TOKENS,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
 }
