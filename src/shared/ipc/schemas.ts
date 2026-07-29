@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 
-import { CoworkSessionMode } from '../cowork/constants';
+import { CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -160,6 +160,7 @@ export const CoworkSessionStartSchema = {
     agentId: z.string().optional(),
     expertIds: z.array(z.string().min(1)).max(16).optional(),
     modelOverride: z.string().optional(),
+    permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
   }),
   output: IpcResult({
@@ -183,6 +184,7 @@ export const CoworkSessionContinueSchema = {
     systemPrompt: z.string().optional(),
     activeSkillIds: z.array(z.string()).optional(),
     expertIds: z.array(z.string().min(1)).max(16).optional(),
+    permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
   }),
   output: IpcResult({ engineStatus: z.object({}).passthrough().optional() }),

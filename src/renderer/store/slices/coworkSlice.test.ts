@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import { CoworkPermissionMode } from '../../../shared/cowork/constants';
 import { CoworkSessionStatusValue } from '../../types/cowork';
 import coworkReducer, {
   addMessage,
@@ -60,6 +61,7 @@ test('setConfig preserves loaded OpenClaw session policy', () => {
       memoryGuardLevel: 'strict',
       memoryUserMemoriesMaxItems: 12,
       skipMissedJobs: false,
+      permissionMode: CoworkPermissionMode.Ask,
       embeddingEnabled: false,
       embeddingProvider: 'openai',
       embeddingModel: '',

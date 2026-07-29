@@ -151,6 +151,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 1. 同一容器内，子元素圆角 ≤ 父元素圆角，视觉上保持同心。
 2. 禁止任意值圆角（`rounded-[7px]` 等）；刻度不满足时优先改设计，其次扩展刻度。
 3. 拼接控件（ButtonGroup 等）相邻边圆角归零，由统一的 CSS 规则处理（参考 `index.css` 中 button-group 段）。
+4. **唯一例外：主输入框（hero prompt input）容器允许 `rounded-3xl`。** 它是产品的中心舞台元素，更大的圆角是有意的识别特征；此例外不推广到其他容器。
 
 ## 阴影
 
@@ -280,6 +281,18 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 5. **整行可点**：点击目标是整个控件区域，不只是滑块。
 
 这套语言推广到所有开关/切换类组件：中性的轨道、明确的滑动反馈、文字层级表达选中态、200ms 内的动效。
+
+## 组件范式范例：工具栏触发按钮
+
+输入框工具栏上的选择器/触发按钮（参照实现：`PermissionModeMenu`、`CoworkModelPicker`）是**工具栏按钮的质感基准**，新做同类按钮（下拉选择器、菜单触发器、工具栏动作）时一律使用，不自造变体：
+
+1. **统一用 ghost `PromptInputButton`**（ai-elements）：无边框、无背景、无阴影，静止时完全融入工具栏。
+2. **hover 用背景表达**：`hover:bg-surface-raised`，200ms 内过渡；不用边框、阴影或颜色变化做 hover 信号。
+3. **下拉触发器带尾部箭头**：`ChevronDown`（`h-3.5 w-3.5 text-muted-foreground`），表明"点开有菜单"；纯动作按钮（如「+」）只放图标，不加箭头。
+4. **内容从左到右**：可选的前置图标（`size-4` 或供应商标识）→ `text-sm` 文字 → 尾部箭头；文字过长用 `max-w` + `truncate` 截断。
+5. **成对出现时必须同构**：同一工具栏里的多个选择器（如权限选择器与模型选择器）共享完全相同的尺寸、间距与状态样式。
+
+禁止：给工具栏触发按钮加 `border`（包括 `border-input`）、用 `rounded-full` 胶囊、用阴影作为 hover 反馈——这些是已被否决的变体。
 
 ## 交互状态
 

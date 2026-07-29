@@ -79,6 +79,8 @@ export type CoworkContinueOptions = {
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
+  /** Forwarded to startSession when the runtime has to recreate the session. */
+  autoApprove?: boolean;
 };
 
 export interface CoworkRuntime {

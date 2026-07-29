@@ -9,7 +9,7 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { removeSessionFromState, removeSessionsFromState } from './coworkDeleteState';
 
 export interface DraftAttachment {
@@ -69,6 +69,7 @@ const initialState: CoworkState = {
     memoryGuardLevel: 'strict',
     memoryUserMemoriesMaxItems: 12,
     skipMissedJobs: true,
+    permissionMode: CoworkPermissionMode.Ask,
     embeddingEnabled: false,
     embeddingProvider: 'openai',
     embeddingModel: '',

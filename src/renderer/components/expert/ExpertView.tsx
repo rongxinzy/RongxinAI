@@ -23,15 +23,17 @@ interface ExpertViewProps {
   onCreateSkillByChat?: () => void;
   onTrySkill?: (skillId: string) => void;
   onUseMcp?: (prompt?: string) => void;
+  /** Tab to open on mount (view remounts on every navigation, so this takes effect each time) */
+  initialTab?: ExpertTab;
 }
 
-const EXPERT_TAB = {
+export const EXPERT_TAB = {
   Experts: 'experts',
   Skills: 'skills',
   Mcp: 'mcp',
 } as const;
 
-type ExpertTab = (typeof EXPERT_TAB)[keyof typeof EXPERT_TAB];
+export type ExpertTab = (typeof EXPERT_TAB)[keyof typeof EXPERT_TAB];
 
 const EXPERT_TAB_ORDER: ExpertTab[] = [EXPERT_TAB.Experts, EXPERT_TAB.Skills, EXPERT_TAB.Mcp];
 
@@ -44,9 +46,10 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   onCreateSkillByChat,
   onTrySkill,
   onUseMcp,
+  initialTab,
 }) => {
   const isMac = window.electron.platform === 'darwin';
-  const [activeTab, setActiveTab] = useState<ExpertTab>(EXPERT_TAB.Experts);
+  const [activeTab, setActiveTab] = useState<ExpertTab>(initialTab ?? EXPERT_TAB.Experts);
   const [tabDirection, setTabDirection] = useState(1);
   const expertTabs = [
     { value: EXPERT_TAB.Experts, label: i18nService.t('expert') },

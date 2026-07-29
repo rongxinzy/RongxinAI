@@ -10,7 +10,9 @@ import { normalizeAgentAvatarIcon } from '../shared/agent/avatar';
 import {
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
+  CoworkPermissionMode,
   CoworkSessionMode,
+  type CoworkPermissionMode as CoworkPermissionModeType,
   type CoworkSessionMode as CoworkSessionModeType,
 } from '../shared/cowork/constants';
 import type {
@@ -85,6 +87,11 @@ function parseBooleanConfig(value: string | undefined, fallback: boolean): boole
   if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off')
     return false;
   return fallback;
+}
+
+function normalizePermissionMode(value: string | undefined): CoworkPermissionModeType {
+  if (value === CoworkPermissionMode.Ask || value === CoworkPermissionMode.AllowAll) return value;
+  return CoworkPermissionMode.Ask;
 }
 
 function clampMemoryUserMemoriesMaxItems(value: number): number {
@@ -508,6 +515,7 @@ export interface CoworkConfig {
   memoryGuardLevel: CoworkMemoryGuardLevel;
   memoryUserMemoriesMaxItems: number;
   skipMissedJobs: boolean;
+  permissionMode: CoworkPermissionModeType;
   embeddingEnabled: boolean;
   embeddingProvider: string;
   embeddingModel: string;
@@ -529,6 +537,7 @@ export type CoworkConfigUpdate = Partial<
     | 'memoryGuardLevel'
     | 'memoryUserMemoriesMaxItems'
     | 'skipMissedJobs'
+    | 'permissionMode'
     | 'embeddingEnabled'
     | 'embeddingProvider'
     | 'embeddingModel'
@@ -1535,6 +1544,7 @@ export class CoworkStore {
       'memoryGuardLevel',
       'memoryUserMemoriesMaxItems',
       'skipMissedJobs',
+      'permissionMode',
       'embeddingEnabled',
       'embeddingProvider',
       'embeddingModel',
@@ -1568,6 +1578,7 @@ export class CoworkStore {
         Number(cfg.get('memoryUserMemoriesMaxItems')),
       ),
       skipMissedJobs: parseBooleanConfig(cfg.get('skipMissedJobs'), true),
+      permissionMode: normalizePermissionMode(cfg.get('permissionMode')),
       embeddingEnabled: parseBooleanConfig(cfg.get('embeddingEnabled'), DEFAULT_EMBEDDING_ENABLED),
       embeddingProvider: cfg.get('embeddingProvider') || DEFAULT_EMBEDDING_PROVIDER,
       embeddingModel: cfg.get('embeddingModel') || DEFAULT_EMBEDDING_MODEL,
@@ -1621,6 +1632,9 @@ export class CoworkStore {
     }
     if (config.skipMissedJobs !== undefined) {
       this.upsertConfig('skipMissedJobs', config.skipMissedJobs ? '1' : '0', now);
+    }
+    if (config.permissionMode !== undefined) {
+      this.upsertConfig('permissionMode', normalizePermissionMode(config.permissionMode), now);
     }
     if (config.embeddingEnabled !== undefined) {
       this.upsertConfig('embeddingEnabled', config.embeddingEnabled ? '1' : '0', now);
