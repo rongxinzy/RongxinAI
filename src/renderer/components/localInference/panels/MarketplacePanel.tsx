@@ -7,14 +7,14 @@ import {
   InputGroupInput,
 } from '@shared/components/ui/input-group';
 import { Eye, EyeOff, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
 import { EmptyState } from '../components/Common';
 import { MarketplaceModelCard } from '../components/MarketplaceModelCard';
-import { localInferenceMutedTextClass } from '../constants';
+import { localInferenceMutedTextClass, MARKETPLACE_PAGE_SIZE } from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
@@ -37,6 +37,7 @@ export function MarketplacePanel({
   onQueryChange,
   onSearch,
   onInstall,
+  contentViewportRef,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -51,46 +52,24 @@ export function MarketplacePanel({
   onQueryChange: (v: string) => void;
   onSearch: () => void;
   onInstall: (model: MarketplaceModel) => Promise<void>;
+  contentViewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [tokenModalOpen, setTokenModalOpen] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenInputVisible, setTokenInputVisible] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(getMarketplacePageSize);
+  const [pageSize, setPageSize] = useState(MARKETPLACE_PAGE_SIZE);
   const pageRef = useRef(page);
   const pageSizeRef = useRef(pageSize);
   const resizeFrameRef = useRef<number | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const paginationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     pageRef.current = page;
   }, [page]);
-
-  useEffect(() => {
-    const updatePageSize = () => {
-      const nextPageSize = getMarketplacePageSize();
-      const currentPageSize = pageSizeRef.current;
-      if (nextPageSize === currentPageSize) return;
-
-      const firstVisibleIndex = (pageRef.current - 1) * currentPageSize;
-      const nextPage = Math.floor(firstVisibleIndex / nextPageSize) + 1;
-      pageSizeRef.current = nextPageSize;
-      pageRef.current = nextPage;
-      setPageSize(nextPageSize);
-      setPage(nextPage);
-    };
-    const handleResize = () => {
-      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-      resizeFrameRef.current = requestAnimationFrame(updatePageSize);
-    };
-
-    updatePageSize();
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (tokenModalOpen) setTokenInput(savedToken ?? '');
@@ -108,6 +87,67 @@ export function MarketplacePanel({
     () => installableModels.slice(pageStart, pageStart + pageSize),
     [installableModels, pageStart, pageSize],
   );
+
+  useLayoutEffect(() => {
+    const contentViewport = contentViewportRef.current;
+    const panel = panelRef.current;
+    const grid = gridRef.current;
+    if (!contentViewport || !panel || !grid || visibleModels.length === 0) return;
+
+    const updatePageSize = () => {
+      const cards = Array.from(grid.children);
+      const cardHeight = Math.max(...cards.map(card => card.getBoundingClientRect().height));
+      const gridStyle = window.getComputedStyle(grid);
+      const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
+      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
+      const pagination = paginationRef.current;
+      const paginationStyle = pagination ? window.getComputedStyle(pagination) : null;
+      const paginationHeight = pagination
+        ? pagination.getBoundingClientRect().height +
+          (Number.parseFloat(paginationStyle?.marginTop ?? '') || 0)
+        : 0;
+      const content = contentViewport.firstElementChild as HTMLElement | null;
+      const contentPaddingBottom = content
+        ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
+        : 0;
+      const availableGridHeight =
+        contentViewport.getBoundingClientRect().bottom -
+        grid.getBoundingClientRect().top -
+        paginationHeight -
+        contentPaddingBottom;
+      const nextPageSize = getMarketplacePageSize({
+        availableGridHeight,
+        cardHeight,
+        columnCount,
+        rowGap,
+      });
+      const currentPageSize = pageSizeRef.current;
+      if (nextPageSize === currentPageSize) return;
+
+      const firstVisibleIndex = (pageRef.current - 1) * currentPageSize;
+      const nextPage = Math.floor(firstVisibleIndex / nextPageSize) + 1;
+      pageSizeRef.current = nextPageSize;
+      pageRef.current = nextPage;
+      setPageSize(nextPageSize);
+      setPage(nextPage);
+    };
+    const schedulePageSizeUpdate = () => {
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(updatePageSize);
+    };
+
+    const resizeObserver = new ResizeObserver(schedulePageSizeUpdate);
+    resizeObserver.observe(contentViewport);
+    resizeObserver.observe(panel);
+    resizeObserver.observe(grid);
+    if (paginationRef.current) resizeObserver.observe(paginationRef.current);
+    schedulePageSizeUpdate();
+
+    return () => {
+      resizeObserver.disconnect();
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+    };
+  }, [contentViewportRef, page, pageCount, visibleModels.length]);
 
   useEffect(() => {
     setPage(1);
@@ -170,7 +210,7 @@ export function MarketplacePanel({
   );
 
   return (
-    <div className="space-y-4">
+    <div ref={panelRef} className="flex flex-col gap-4">
       <div
         className={
           hasSearched
@@ -252,7 +292,10 @@ export function MarketplacePanel({
         <EmptyState title={i18nService.t('marketplaceNoModels')} className="min-h-[620px]" />
       ) : (
         <div className="flex flex-col">
-          <div className="grid auto-rows-min content-start gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <div
+            ref={gridRef}
+            className="grid auto-rows-min content-start gap-3 md:grid-cols-2 2xl:grid-cols-4"
+          >
             {visibleModels.map(model => {
               const progress = getMarketplaceInstallProgress(installProgress, model);
               const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
@@ -269,7 +312,10 @@ export function MarketplacePanel({
             })}
           </div>
           {pageCount > 1 && (
-            <div className="mx-auto mt-6 flex items-center justify-center gap-3">
+            <div
+              ref={paginationRef}
+              className="sticky bottom-0 z-10 mt-6 flex items-center justify-center gap-3 bg-background py-2"
+            >
               <Button
                 type="button"
                 onClick={() => setPage(value => Math.max(1, value - 1))}

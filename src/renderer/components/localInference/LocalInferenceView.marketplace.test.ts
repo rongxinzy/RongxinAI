@@ -1,23 +1,31 @@
 import { expect, test } from 'vitest';
+import { getMarketplacePageSize } from './utils/marketplace';
 
-test('marketplace page size adapts to the viewport height', async () => {
-  const module = await import('./LocalInferenceView');
-  const getMarketplacePageSize = (
-    module as {
-      __test__getMarketplacePageSize?: (viewportHeight?: number, viewportWidth?: number) => number;
-    }
-  ).__test__getMarketplacePageSize;
-
-  expect(typeof getMarketplacePageSize).toBe('function');
-  if (!getMarketplacePageSize) return;
-
-  expect(getMarketplacePageSize(740, 1024)).toBe(6);
-  expect(getMarketplacePageSize(740, 1536)).toBe(8);
-  expect(getMarketplacePageSize(820, 1280)).toBe(8);
-  expect(getMarketplacePageSize(900, 1536)).toBe(16);
-  expect(getMarketplacePageSize(959, 1536)).toBe(16);
-  expect(getMarketplacePageSize(960, 1536)).toBe(24);
-  expect(getMarketplacePageSize(1152, 2048)).toBe(24);
+test('marketplace page size uses the actual grid height', () => {
+  expect(
+    getMarketplacePageSize({
+      availableGridHeight: 668,
+      cardHeight: 124,
+      columnCount: 4,
+      rowGap: 12,
+    }),
+  ).toBe(20);
+  expect(
+    getMarketplacePageSize({
+      availableGridHeight: 532,
+      cardHeight: 124,
+      columnCount: 4,
+      rowGap: 12,
+    }),
+  ).toBe(16);
+  expect(
+    getMarketplacePageSize({
+      availableGridHeight: 0,
+      cardHeight: 124,
+      columnCount: 4,
+      rowGap: 12,
+    }),
+  ).toBe(8);
 });
 
 test('marketplace search params load recommended models for an empty query and use the app cap for a search', async () => {
