@@ -342,7 +342,7 @@ export function MarketplacePanel({
         <div className="flex flex-1 flex-col">
           <div
             ref={gridRef}
-            className="grid auto-rows-min content-start gap-3 md:grid-cols-2 2xl:grid-cols-4"
+            className="mx-auto grid w-full max-w-5xl auto-rows-min content-start gap-3 md:grid-cols-2"
           >
             {visibleModels.map(model => {
               const progress = getMarketplaceInstallProgress(installProgress, model);
