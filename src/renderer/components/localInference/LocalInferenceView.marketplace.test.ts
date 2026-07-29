@@ -28,6 +28,17 @@ test('marketplace page size uses the actual grid height', () => {
   ).toBe(8);
 });
 
+test('marketplace page size remains a whole number of grid rows', () => {
+  const pageSize = getMarketplacePageSize({
+    availableGridHeight: 668,
+    cardHeight: 124,
+    columnCount: 4,
+    rowGap: 12,
+  });
+
+  expect(pageSize % 4).toBe(0);
+});
+
 test('marketplace search params load recommended models for an empty query and use the app cap for a search', async () => {
   const module = await import('./LocalInferenceView');
   const buildMarketplaceSearchParams = (

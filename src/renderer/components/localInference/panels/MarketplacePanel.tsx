@@ -6,7 +6,16 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@shared/components/ui/input-group';
-import { Eye, EyeOff, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
@@ -60,9 +69,11 @@ export function MarketplacePanel({
   const [tokenInputVisible, setTokenInputVisible] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(MARKETPLACE_PAGE_SIZE);
+  const [panelMinHeight, setPanelMinHeight] = useState<number | null>(null);
   const pageRef = useRef(page);
   const pageSizeRef = useRef(pageSize);
   const resizeFrameRef = useRef<number | null>(null);
+  const layoutSignatureRef = useRef<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const paginationRef = useRef<HTMLDivElement>(null);
@@ -94,12 +105,13 @@ export function MarketplacePanel({
     const grid = gridRef.current;
     if (!contentViewport || !panel || !grid || visibleModels.length === 0) return;
 
+    layoutSignatureRef.current = null;
+
     const updatePageSize = () => {
-      const cards = Array.from(grid.children);
-      const cardHeight = Math.max(...cards.map(card => card.getBoundingClientRect().height));
       const gridStyle = window.getComputedStyle(grid);
       const columnCount = gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length;
-      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
+      const viewportRect = contentViewport.getBoundingClientRect();
+      const gridRect = grid.getBoundingClientRect();
       const pagination = paginationRef.current;
       const paginationStyle = pagination ? window.getComputedStyle(pagination) : null;
       const paginationHeight = pagination
@@ -110,17 +122,36 @@ export function MarketplacePanel({
       const contentPaddingBottom = content
         ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
         : 0;
+      const gridTop = gridRect.top - viewportRect.top + contentViewport.scrollTop;
+      const panelTop =
+        panel.getBoundingClientRect().top - viewportRect.top + contentViewport.scrollTop;
+      const nextPanelMinHeight = Math.max(
+        0,
+        Math.floor(contentViewport.clientHeight - panelTop - contentPaddingBottom),
+      );
+      setPanelMinHeight(value => (value === nextPanelMinHeight ? value : nextPanelMinHeight));
+      const layoutSignature = [
+        contentViewport.clientWidth,
+        contentViewport.clientHeight,
+        columnCount,
+        gridTop,
+        paginationHeight,
+        contentPaddingBottom,
+      ].join(':');
+      if (layoutSignature === layoutSignatureRef.current) return;
+
+      const cards = Array.from(grid.children);
+      const cardHeight = Math.max(...cards.map(card => card.getBoundingClientRect().height));
+      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
       const availableGridHeight =
-        contentViewport.getBoundingClientRect().bottom -
-        grid.getBoundingClientRect().top -
-        paginationHeight -
-        contentPaddingBottom;
+        contentViewport.clientHeight - gridTop - paginationHeight - contentPaddingBottom;
       const nextPageSize = getMarketplacePageSize({
         availableGridHeight,
         cardHeight,
         columnCount,
         rowGap,
       });
+      layoutSignatureRef.current = layoutSignature;
       const currentPageSize = pageSizeRef.current;
       if (nextPageSize === currentPageSize) return;
 
@@ -142,19 +173,23 @@ export function MarketplacePanel({
     resizeObserver.observe(grid);
     if (paginationRef.current) resizeObserver.observe(paginationRef.current);
     schedulePageSizeUpdate();
+    window.addEventListener('resize', schedulePageSizeUpdate);
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener('resize', schedulePageSizeUpdate);
       if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
     };
-  }, [contentViewportRef, page, pageCount, visibleModels.length]);
+  }, [contentViewportRef, hasSearched, marketplaceError, models, pageCount, visibleModels.length]);
 
   useEffect(() => {
+    pageRef.current = 1;
     setPage(1);
   }, [query]);
 
   useEffect(() => {
     if (page > pageCount) {
+      pageRef.current = pageCount;
       setPage(pageCount);
     }
   }, [page, pageCount]);
@@ -186,8 +221,12 @@ export function MarketplacePanel({
     }
   };
 
-  const handleNextPage = async () => {
-    setPage(value => Math.min(pageCount, value + 1));
+  const handleNextPage = () => {
+    setPage(value => {
+      const nextPage = Math.min(pageCount, value + 1);
+      pageRef.current = nextPage;
+      return nextPage;
+    });
   };
 
   const tokenSettingsButton = (
@@ -210,7 +249,11 @@ export function MarketplacePanel({
   );
 
   return (
-    <div ref={panelRef} className="flex flex-col gap-4">
+    <div
+      ref={panelRef}
+      className="flex flex-col gap-4"
+      style={panelMinHeight === null ? undefined : { minHeight: panelMinHeight }}
+    >
       <div
         className={
           hasSearched
@@ -291,7 +334,7 @@ export function MarketplacePanel({
       ) : !hasSearched ? null : installableModels.length === 0 ? (
         <EmptyState title={i18nService.t('marketplaceNoModels')} className="min-h-[620px]" />
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-1 flex-col">
           <div
             ref={gridRef}
             className="grid auto-rows-min content-start gap-3 md:grid-cols-2 2xl:grid-cols-4"
@@ -314,28 +357,41 @@ export function MarketplacePanel({
           {pageCount > 1 && (
             <div
               ref={paginationRef}
-              className="sticky bottom-0 z-10 mt-6 flex items-center justify-center gap-3 bg-background py-2"
+              className="sticky bottom-0 z-10 mt-auto flex items-center justify-center gap-6 bg-background pb-2 pt-6"
             >
               <Button
                 type="button"
-                onClick={() => setPage(value => Math.max(1, value - 1))}
+                onClick={() => {
+                  setPage(value => {
+                    const previousPage = Math.max(1, value - 1);
+                    pageRef.current = previousPage;
+                    return previousPage;
+                  });
+                }}
                 disabled={currentPage <= 1}
-                variant="outline"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={i18nService.t('skillMarketplacePrevPage')}
+                title={i18nService.t('skillMarketplacePrevPage')}
               >
-                {i18nService.t('skillMarketplacePrevPage')}
+                <ChevronLeft />
               </Button>
-              <span
-                className={`inline-flex h-8 min-w-16 items-center justify-center text-sm ${localInferenceMutedTextClass}`}
-              >
-                {currentPage}/{pageCount} {i18nService.t('marketplacePageUnit')}
+              <span className="inline-flex h-7 items-center justify-center text-sm text-foreground">
+                {i18nService
+                  .t('marketplacePageSummary')
+                  .replace('{page}', String(currentPage))
+                  .replace('{total}', String(pageCount))}
               </span>
               <Button
                 type="button"
                 onClick={() => void handleNextPage()}
                 disabled={currentPage >= pageCount}
-                variant="outline"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={i18nService.t('skillMarketplaceNextPage')}
+                title={i18nService.t('skillMarketplaceNextPage')}
               >
-                {i18nService.t('skillMarketplaceNextPage')}
+                <ChevronRight />
               </Button>
             </div>
           )}
