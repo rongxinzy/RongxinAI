@@ -207,7 +207,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 禁用态                     | `opacity-50`（配合 `pointer-events-none`）                                                          |
 | 非激活的分段选项           | `opacity-50` + 激活时恢复（参见下方范例）                                                           |
 | 加载骨架闪烁               | `animate-shimmer` 内置                                                                              |
-| 模态遮罩                   | `bg-black/40` + `backdrop-blur-sm`（`.modal-backdrop`）                                             |
+| 模态遮罩                   | `bg-black/10`（`.modal-backdrop` 与共享 Dialog/Sheet overlay），只变暗、**不使用 backdrop-blur**     |
 | 其余一切"让颜色变浅"的需求 | **禁止用 opacity 实现**，改用对应的弱档 token（`text-secondary`、`border-subtle`、`primary-muted`） |
 
 原因：opacity 会让元素与背后的内容混色，在明暗两套主题下表现不一致；token 才能在两套主题中各自取到正确的值。

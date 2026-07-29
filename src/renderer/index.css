@@ -530,9 +530,9 @@ select::-ms-expand {
   border-top-width: 1px;
 }
 
-/* Modal backdrop */
+/* Modal backdrop: dim only, no blur (Kimi-style — the content stays sharp) */
 .modal-backdrop {
-  @apply bg-black/40 backdrop-blur-sm;
+  @apply bg-black/10;
   animation: fade-in 0.2s ease-out;
 }
 
