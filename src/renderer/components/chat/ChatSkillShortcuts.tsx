@@ -1,5 +1,4 @@
 import { cn } from '@shared/lib/utils';
-import { FileText, Globe, Presentation, Table, Telescope } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -8,22 +7,7 @@ import { RootState } from '../../store';
 import { selectIsStreaming } from '../../store/selectors/coworkSelectors';
 import { clearCurrentSession } from '../../store/slices/coworkSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
-
-// Quick-skill shortcut entries shown above the chat session list.
-const CHAT_SKILL_SHORTCUTS = [
-  { id: 'ppt', skillId: 'pptx', icon: Presentation, labelKey: 'chatSkillPpt' },
-  {
-    id: 'deep-research',
-    skillId: 'deep-research',
-    icon: Telescope,
-    labelKey: 'chatSkillDeepResearch',
-  },
-  { id: 'docs', skillId: 'docx', icon: FileText, labelKey: 'chatSkillDocs' },
-  { id: 'website', skillId: 'frontend-design', icon: Globe, labelKey: 'chatSkillWebsite' },
-  { id: 'sheets', skillId: 'xlsx', icon: Table, labelKey: 'chatSkillSheets' },
-] as const;
-
-type ChatSkillShortcut = (typeof CHAT_SKILL_SHORTCUTS)[number];
+import { CHAT_SKILL_SHORTCUTS, ChatSkillShortcut } from './constants';
 
 const ChatSkillShortcuts: React.FC = () => {
   const dispatch = useDispatch();

@@ -1,12 +1,61 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Puzzle, X } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
+import { resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
 import { clearSelection } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
+import type { Skill } from '../../types/skill';
+import { findChatSkillShortcut } from '../chat/constants';
+
+interface SkillChipProps {
+  skillId: string;
+  skill?: Skill;
+  onRemove: (e: React.MouseEvent) => void;
+}
+
+/**
+ * Removable chip for one active skill. Core skills (the Chat quick-skill
+ * entries) show their semantic label (PPT / 深度研究 / …) and icon; other
+ * skills fall back to displayName/name with their own icon or a puzzle
+ * glyph.
+ */
+const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
+  const shortcut = findChatSkillShortcut(skillId);
+  const label = shortcut
+    ? i18nService.t(shortcut.labelKey)
+    : skill?.displayName || skill?.name || skillId;
+  const ShortcutIcon = shortcut?.icon;
+
+  return (
+    <Badge variant="outline" className="gap-1.5 pl-1.5 pr-1 text-foreground">
+      {skill?.iconUrl ? (
+        <img
+          src={resolveSkillIconUrl(skill.iconUrl)}
+          alt=""
+          className="size-3.5 object-contain"
+        />
+      ) : ShortcutIcon ? (
+        <ShortcutIcon className="size-3.5 text-muted-foreground" />
+      ) : (
+        <Puzzle className="size-3.5 text-muted-foreground" />
+      )}
+      <span className="max-w-24 truncate">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        title={i18nService.t('clearSkill')}
+        className="ml-0.5 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <X className="size-3" />
+      </button>
+    </Badge>
+  );
+};
 
 const ActiveSkillBadge: React.FC = () => {
   const dispatch = useDispatch();
@@ -45,43 +94,19 @@ const ActiveSkillBadge: React.FC = () => {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {showQuickActionFallback && quickActionSkillId && (
-        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-transparent">
-          <Puzzle className="h-3.5 w-3.5 text-primary" />
-          <span className="max-w-20 truncate text-xs font-medium text-primary">
-            {quickActionSkillId}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={handleRemoveQuickAction}
-            className="ml-0.5 size-auto rounded p-0.5 hover:bg-surface-raised transition-colors"
-            title={i18nService.t('clearSkill')}
-          >
-            <X className="size-3 text-primary" />
-          </Button>
-        </div>
+        <SkillChip
+          skillId={quickActionSkillId}
+          skill={skills.find(s => s.id === quickActionSkillId)}
+          onRemove={handleRemoveQuickAction}
+        />
       )}
       {activeSkills.map(skill => (
-        <div
+        <SkillChip
           key={skill.id}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-muted border border-transparent"
-        >
-          <Puzzle className="h-3.5 w-3.5 text-primary" />
-          <span className="max-w-20 truncate text-xs font-medium text-primary">
-            {skill.name}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={e => handleRemoveSkill(e, skill.id)}
-            className="ml-0.5 size-auto rounded p-0.5 hover:bg-surface-raised transition-colors"
-            title={i18nService.t('clearSkill')}
-          >
-            <X className="size-3 text-primary" />
-          </Button>
-        </div>
+          skillId={skill.id}
+          skill={skill}
+          onRemove={e => handleRemoveSkill(e, skill.id)}
+        />
       ))}
       {activeSkills.length > 1 && (
         <Button
