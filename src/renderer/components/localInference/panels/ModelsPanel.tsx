@@ -86,6 +86,9 @@ const MODEL_PAGE_SIZE_WITH_SINGLE_COLUMN_LOG = 4;
 const MODEL_PAGE_GRID_COLUMNS_WITH_LOG = 2;
 const MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG = 1;
 const MODEL_PAGE_GRID_COLUMNS_WIDE = 4;
+const MODEL_CARD_MIN_WIDTH = 280;
+const MODEL_GRID_COLUMN_GAP = 12;
+const MODEL_GRID_TWO_COLUMN_MIN_WIDTH = MODEL_CARD_MIN_WIDTH * 2 + MODEL_GRID_COLUMN_GAP;
 const MODEL_CARD_LAYOUT_TRANSITION_SECONDS =
   LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS / 1000;
 const modelCardActionClassName =
@@ -182,6 +185,7 @@ export function ModelsPanel({
   const [modelPage, setModelPage] = useState(1);
   const [logPanelLayoutVisible, setLogPanelLayoutVisible] = useState(logPanelVisible);
   const [logPanelGridColumns, setLogPanelGridColumns] = useState(MODEL_PAGE_GRID_COLUMNS_WITH_LOG);
+  const [modelGridWidth, setModelGridWidth] = useState(0);
   const [frozenLayout, setFrozenLayout] = useState<FrozenModelCardLayout | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const previousLogPanelVisibleRef = useRef(logPanelVisible);
@@ -263,6 +267,29 @@ export function ModelsPanel({
     const measuredLayout = measureModelGridLayout(gridRef.current);
     if (measuredLayout) latestGridLayoutRef.current = measuredLayout;
   });
+
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+
+    const updateGridWidth = () => {
+      const width = Math.round(grid.getBoundingClientRect().width);
+      setModelGridWidth(currentWidth => (currentWidth === width ? currentWidth : width));
+    };
+    updateGridWidth();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const resizeObserver = new ResizeObserver(updateGridWidth);
+    resizeObserver.observe(grid);
+    return () => resizeObserver.disconnect();
+  }, [modelCards.length]);
+
+  useEffect(() => {
+    if (!logPanelLayoutVisible || modelGridWidth <= 0 || frozenLayout !== null) return;
+
+    const targetColumns = getResponsiveLogPanelGridColumns(modelGridWidth);
+    if (targetColumns !== logPanelGridColumns) setLogPanelGridColumns(targetColumns);
+  }, [frozenLayout, logPanelGridColumns, logPanelLayoutVisible, modelGridWidth]);
 
   useEffect(() => {
     const previousModelsPerPage = previousModelsPerPageRef.current;
@@ -449,6 +476,11 @@ function getModelCardGridPosition(index: number, columns: number): { column: num
     column: index % normalizedColumns,
     row: Math.floor(index / normalizedColumns),
   };
+}
+function getResponsiveLogPanelGridColumns(width: number): number {
+  return width >= MODEL_GRID_TWO_COLUMN_MIN_WIDTH
+    ? MODEL_PAGE_GRID_COLUMNS_WITH_LOG
+    : MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG;
 }
 
 function getTargetModelGridColumns(logPanelVisible: boolean, sourceColumns?: number): number {
