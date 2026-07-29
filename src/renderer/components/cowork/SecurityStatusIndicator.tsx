@@ -1,7 +1,23 @@
-import { ShieldCheck } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+
+/** Custom shield-check glyph, drawn in the same family as the plus-menu icons. */
+const GuardShieldIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+    className={className}
+  >
+    <path d="M8 1.7l5.2 2v4.1c0 3.3-2.2 5.4-5.2 6.6-3-1.2-5.2-3.3-5.2-6.6V3.7z" />
+    <path d="M5.7 7.5l1.7 1.7 3.1-3.3" />
+  </svg>
+);
 
 const PHRASE_KEYS = [
   'securityPhraseGuard',
@@ -35,6 +51,7 @@ const SecurityStatusIndicator: React.FC = () => {
   const isTyping = typedLength < currentPhrase.length;
 
   // Type the current phrase character by character, then hold.
+  // typedLength must be a dependency so the effect re-runs after each tick.
   useEffect(() => {
     if (reducedMotion) return;
     if (isTyping) {
@@ -43,7 +60,7 @@ const SecurityStatusIndicator: React.FC = () => {
     }
     const holdTimer = window.setTimeout(() => setIsFadingOut(true), HOLD_MS);
     return () => window.clearTimeout(holdTimer);
-  }, [isTyping, reducedMotion]);
+  }, [isTyping, typedLength, reducedMotion]);
 
   // After the fade-out, advance to the next phrase and start typing again.
   useEffect(() => {
@@ -66,7 +83,7 @@ const SecurityStatusIndicator: React.FC = () => {
 
   return (
     <div className="flex items-center gap-1.5 mr-2 px-2.5 py-1">
-      <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-success" />
+      <GuardShieldIcon className="h-3.5 w-3.5 shrink-0 text-success" />
       <span
         className={`whitespace-nowrap text-xs text-success transition-opacity duration-200 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
         style={{ minWidth: `${minWidthEm}em` }}
