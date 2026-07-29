@@ -13,7 +13,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Box, Clock3, Play, Settings2, Square } from 'lucide-react';
+import { Box, Clock3, Settings2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   type ComponentType,
@@ -668,6 +668,7 @@ function ModelCard({
               type="button"
               variant="outline"
               size="sm"
+              className="cursor-pointer hover:bg-background hover:shadow-lg hover:shadow-foreground/10"
               disabled={buttonsDisabled}
               onClick={onConfigureContext}
             >
@@ -723,12 +724,12 @@ function ModelCard({
                 type="button"
                 variant="danger"
                 size="sm"
+                className="h-8 min-w-16 px-3"
                 isDisabled={buttonsDisabled}
                 data-local-inference-model-action-button="true"
                 data-local-inference-unload-button="true"
                 onClick={onUnload}
               >
-                <Square data-icon="inline-start" />
                 {i18nService.t('close')}
               </Button21st>
             ) : renderLoadButton ? (
@@ -737,11 +738,11 @@ function ModelCard({
               <Button21st
                 type="button"
                 size="sm"
+                className="h-8 min-w-16 px-3"
                 isDisabled={buttonsDisabled}
                 data-local-inference-model-action-button="true"
                 onClick={onLoadModel}
               >
-                <Play data-icon="inline-start" />
                 {i18nService.t('start')}
               </Button21st>
             )}
