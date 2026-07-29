@@ -11,16 +11,27 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
-import { Cog, Paperclip, Plug, Plus, Puzzle, UsersRound } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
+import { resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
 import { toggleActiveSkill } from '../../store/slices/skillSlice';
+import {
+  PlusMenuConnectorsIcon,
+  PlusMenuExpertGlyphIcon,
+  PlusMenuExpertsIcon,
+  PlusMenuFilesIcon,
+  PlusMenuManageIcon,
+  PlusMenuServerGlyphIcon,
+  PlusMenuSkillGlyphIcon,
+  PlusMenuSkillsIcon,
+} from './plusMenuIcons';
 
 interface PromptPlusMenuExpertsProps {
   selectedExpertIds: string[];
@@ -151,13 +162,13 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             onAddFile();
           }}
         >
-          <Paperclip />
+          <PlusMenuFilesIcon className="size-4" />
           <span className="truncate">{i18nService.t('filesAndImages')}</span>
         </DropdownMenuItem>
 
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Puzzle />
+            <PlusMenuSkillsIcon className="size-4" />
             <span className="truncate">{i18nService.t('skills')}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-56">
@@ -171,13 +182,22 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                   closeOnClick={false}
                   onCheckedChange={() => dispatch(toggleActiveSkill(skill.id))}
                 >
-                  <span className="truncate">{skill.name}</span>
+                  {skill.iconUrl ? (
+                    <img
+                      src={resolveSkillIconUrl(skill.iconUrl)}
+                      alt=""
+                      className="size-4 object-contain"
+                    />
+                  ) : (
+                    <PlusMenuSkillGlyphIcon className="size-4" />
+                  )}
+                  <span className="truncate">{skill.displayName || skill.name}</span>
                 </DropdownMenuCheckboxItem>
               ))
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onManageSkills}>
-              <Cog />
+              <PlusMenuManageIcon className="size-4" />
               <span className="truncate">{i18nService.t('manageSkills')}</span>
             </DropdownMenuItem>
           </DropdownMenuSubContent>
@@ -186,7 +206,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
         {experts && (availableExperts.length > 0 || experts.selectedExpertIds.length > 0) && (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <UsersRound />
+              <PlusMenuExpertsIcon className="size-4" />
               <span className="truncate">{i18nService.t('sessionExperts')}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-56">
@@ -197,6 +217,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                   closeOnClick={false}
                   onCheckedChange={() => handleToggleExpert(expert.id)}
                 >
+                  <PlusMenuExpertGlyphIcon className="size-4" />
                   <span className="truncate">{expert.name}</span>
                 </DropdownMenuCheckboxItem>
               ))}
@@ -209,6 +230,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                     closeOnClick={false}
                     onCheckedChange={() => handleToggleExpert(expertId)}
                   >
+                    <PlusMenuExpertGlyphIcon className="size-4" />
                     <span className="truncate">
                       {expertSnapshotNames.get(expertId) ?? expertId}
                     </span>
@@ -220,7 +242,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
 
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Plug />
+            <PlusMenuConnectorsIcon className="size-4" />
             <span className="truncate">{i18nService.t('connectors')}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-56">
@@ -238,6 +260,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                     void handleToggleServer(server.id, !server.enabled);
                   }}
                 >
+                  <PlusMenuServerGlyphIcon className="size-4" />
                   <span className="truncate">{server.name}</span>
                   <Switch
                     size="sm"
@@ -250,7 +273,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onManageConnectors}>
-              <Cog />
+              <PlusMenuManageIcon className="size-4" />
               <span className="truncate">{i18nService.t('manageConnectors')}</span>
             </DropdownMenuItem>
           </DropdownMenuSubContent>
