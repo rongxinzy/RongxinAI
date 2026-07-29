@@ -82,6 +82,7 @@ import AskUserQuestionCard from './AskUserQuestionCard';
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
+  onManageConnectors?: () => void;
   onContinue: (
     prompt: string,
     skillPrompt?: string,
@@ -147,6 +148,7 @@ class ArtifactPanelErrorBoundary extends React.Component<
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onManageSkills,
+  onManageConnectors,
   onContinue,
   onStop,
   isSidebarCollapsed,
@@ -1444,6 +1446,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 size="large"
                 remoteManaged={remoteManaged}
                 onManageSkills={remoteManaged ? undefined : onManageSkills}
+                onManageConnectors={remoteManaged ? undefined : onManageConnectors}
                 showModelSelector={true}
                 isDirectChat={isDirectChat}
                 showLocalThinkingToggle={workMode === 'chat'}

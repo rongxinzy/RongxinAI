@@ -53,6 +53,7 @@ import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSel
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
   onShowSkills?: () => void;
+  onShowMcp?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
@@ -64,6 +65,7 @@ export interface CoworkViewProps {
 const CoworkView: React.FC<CoworkViewProps> = ({
   onRequestAppSettings,
   onShowSkills,
+  onShowMcp,
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,
@@ -1276,6 +1278,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         <CoworkSessionViewport
           sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
+          onManageConnectors={() => onShowMcp?.()}
           onContinue={handleContinueSession}
           onStop={handleStopSession}
           isSidebarCollapsed={isSidebarCollapsed}
@@ -1358,6 +1361,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                 onManageSkills={() => onShowSkills?.()}
+                onManageConnectors={() => onShowMcp?.()}
               />
             </div>
           </div>

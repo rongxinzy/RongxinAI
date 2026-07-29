@@ -1636,6 +1636,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // MCP 服务
     mcpServers: 'MCP',
     connectors: '连接器',
+    manageConnectors: '管理连接器',
     connectorsDescription: '连接常用服务，让智能体在需要时查询信息、处理文件和完成更多任务。',
     mcpDescription: '配置和管理 MCP（Model Context Protocol）服务器，为您的智能体扩展工具能力',
     searchMcpServers: '搜索连接器',
@@ -1658,6 +1659,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpHeaderKey: '键',
     mcpHeaderValue: '值',
     noMcpServersAvailable: '暂无 MCP 服务',
+    noMatchingConnectors: '未找到匹配的连接器',
     mcpDeleteConfirm: '确定删除 MCP 服务"{name}"吗？',
     mcpDeleteFailed: '删除 MCP 服务失败',
     mcpCreateFailed: '创建 MCP 服务失败',
@@ -4139,6 +4141,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // MCP Servers
     mcpServers: 'MCP',
     connectors: 'Connectors',
+    manageConnectors: 'Manage Connectors',
     connectorsDescription:
       'Connect the services you use so your agent can find information, work with files, and get more done when needed.',
     mcpDescription:
@@ -4163,6 +4166,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpHeaderKey: 'Key',
     mcpHeaderValue: 'Value',
     noMcpServersAvailable: 'No MCP servers configured',
+    noMatchingConnectors: 'No matching connectors found',
     mcpDeleteConfirm: 'Delete MCP server "{name}"?',
     mcpDeleteFailed: 'Failed to delete MCP server',
     mcpCreateFailed: 'Failed to create MCP server',

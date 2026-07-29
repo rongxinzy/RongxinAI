@@ -11,7 +11,7 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
+import { Cable, Folder, Paperclip, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -44,6 +44,7 @@ import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { getCompactFolderName } from '../../utils/path';
 import { ActiveSkillBadge, SkillsButton } from '../skills';
+import ConnectorsPopover from '../mcp/ConnectorsPopover';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
@@ -154,6 +155,7 @@ interface CoworkPromptInputProps {
   showFolderSelector?: boolean;
   showModelSelector?: boolean;
   onManageSkills?: () => void;
+  onManageConnectors?: () => void;
   sessionId?: string;
   /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
   remoteManaged?: boolean;
@@ -177,6 +179,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       showFolderSelector = false,
       showModelSelector = false,
       onManageSkills,
+      onManageConnectors,
       sessionId,
       remoteManaged = false,
       showLocalThinkingToggle = false,
@@ -631,6 +634,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         onManageSkills();
       }
     }, [onManageSkills]);
+
+    const handleManageConnectors = useCallback(() => {
+      if (onManageConnectors) {
+        onManageConnectors();
+      }
+    }, [onManageConnectors]);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const isComposing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
@@ -1183,6 +1192,15 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               )}
               {!remoteManaged && (
                 <>
+                  <ConnectorsPopover onManageConnectors={handleManageConnectors}>
+                    <PromptInputButton
+                      disabled={disabled || isStreaming}
+                      tooltip={i18nService.t('connectors')}
+                      className="hover:bg-surface-raised"
+                    >
+                      <Cable className="h-4 w-4" />
+                    </PromptInputButton>
+                  </ConnectorsPopover>
                   <SkillsButton
                     onSelectSkill={handleSelectSkill}
                     onManageSkills={handleManageSkills}

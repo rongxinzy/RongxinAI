@@ -826,6 +826,7 @@ const App: React.FC = () => {
                 <CoworkView
                   onRequestAppSettings={handleShowSettings}
                   onShowSkills={handleShowSkills}
+                  onShowMcp={handleShowMcp}
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onNewChat={handleNewChat}
