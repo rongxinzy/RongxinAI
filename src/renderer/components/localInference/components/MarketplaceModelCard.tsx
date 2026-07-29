@@ -160,7 +160,7 @@ export function MarketplaceModelCard({
           ) : null}
 
           <motion.div
-            className="col-start-1 row-start-3 flex min-w-0 self-end flex-wrap items-center gap-1.5 pr-1"
+            className="col-start-1 row-start-3 flex min-w-0 self-end items-center gap-1.5 overflow-hidden pr-1"
             animate={
               progress
                 ? { filter: 'blur(4px)', opacity: 0.45 }
