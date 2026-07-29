@@ -161,6 +161,7 @@ interface CoworkPromptInputProps {
   localThinkingEnabled?: boolean;
   onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
   isDirectChat?: boolean;
+  topAccessory?: React.ReactNode;
 }
 
 const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
@@ -183,6 +184,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       localThinkingEnabled,
       onLocalThinkingEnabledChange,
       isDirectChat = false,
+      topAccessory,
     } = props;
     const dispatch = useDispatch();
     const controller = usePromptInputController();
@@ -1086,6 +1088,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             </Button>
           </div>
         )}
+        {topAccessory && <div className="relative">{topAccessory}</div>}
         <PromptInput
           multiple
           className={cn(
