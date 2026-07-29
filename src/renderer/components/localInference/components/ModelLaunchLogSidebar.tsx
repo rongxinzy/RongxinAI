@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { LocalInferenceLogViewer } from './LocalInferenceLogViewer';
 import { cn } from '@shared/lib/utils';
 import { Download, X } from 'lucide-react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
@@ -11,6 +11,7 @@ import {
   LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
 } from '../../../../shared/llamacpp';
+import fullscreenIconUrl from '../../../assets/localInference/model-launch-log-fullscreen.svg';
 import { i18nService } from '../../../services/i18n';
 import { LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS } from '../constants';
 import type { ModelLaunchLogPanelState } from '../hooks/useModelLaunchLogs';
@@ -35,14 +36,19 @@ type ProcessOutputLogDetail = {
 
 export function ModelLaunchLogSidebar({
   state,
+  isFullscreen,
+  onFullscreenChange,
   onClose,
 }: {
   state: ModelLaunchLogPanelState;
+  isFullscreen: boolean;
+  onFullscreenChange: (fullscreen: boolean) => void;
   onClose: () => void;
 }) {
   const [isPresent, setIsPresent] = useState(state.visible);
   const [isEntered, setIsEntered] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [isFullscreenExitPending, setIsFullscreenExitPending] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
@@ -81,14 +87,42 @@ export function ModelLaunchLogSidebar({
     setIsEntered(false);
     const timeout = window.setTimeout(() => {
       setIsPresent(false);
+      if (isFullscreen) onFullscreenChange(false);
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [containerWidth, state.visible]);
+  }, [containerWidth, isFullscreen, onFullscreenChange, state.visible]);
 
   const isPanelEntered = state.visible && isEntered;
-  const isPanelPresent = state.visible || isPresent;
+  const isPanelClosing = !state.visible && isPresent;
+  const isVisualFullscreen = isFullscreen || isFullscreenExitPending;
   const isCompact = containerWidth > 0 && containerWidth < MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT;
+  useEffect(() => {
+    if (!isFullscreenExitPending) return;
+
+    const timeout = window.setTimeout(() => {
+      setIsFullscreenExitPending(false);
+    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [isFullscreenExitPending]);
+
+  const handleToggleFullscreen = () => {
+    if (isFullscreen) {
+      setIsFullscreenExitPending(true);
+      onFullscreenChange(false);
+      return;
+    }
+
+    setIsFullscreenExitPending(false);
+    onFullscreenChange(true);
+  };
+
+  const handleClose = () => {
+    setIsFullscreenExitPending(false);
+    onClose();
+  };
+
   const handleDownloadLogs = () => {
     if (state.logs.length === 0) return;
 
@@ -138,71 +172,97 @@ export function ModelLaunchLogSidebar({
   };
 
   return (
-    <aside
-      aria-hidden={!state.visible}
-      ref={sidebarRef}
-      className={cn(
-        'flex h-full border-l bg-background ease-in-out',
-        'overflow-hidden transition-[width,border-color]',
-        isCompact ? 'absolute inset-y-0 right-0 z-20 shadow-xl' : 'relative shrink-0',
-        isPanelPresent ? 'border-border' : 'border-transparent',
-      )}
-      style={{
-        width: isPanelEntered ? sidebarWidth : 0,
-        transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
-      }}
-    >
-      {isPresent ? (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={i18nService.t('localInferenceModelLaunchLogsResize')}
-          className={cn(
-            'absolute inset-y-0 left-0 z-40 flex w-3 -translate-x-1/2 cursor-col-resize touch-none items-center justify-center',
-            'after:h-full after:w-px after:bg-transparent after:transition-colors after:duration-200 hover:after:bg-border',
-            isResizing && 'after:bg-border',
-          )}
-          onPointerDown={handleResizePointerDown}
-        />
+    <>
+      {isVisualFullscreen ? (
+        <div aria-hidden="true" className="shrink-0" style={{ width: sidebarWidth }} />
       ) : null}
-      {isPresent ? (
-        <div
-          className={cn(
-            'flex h-full shrink-0 flex-col overflow-hidden transition-[transform,opacity] ease-in-out',
-            isPanelEntered ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0',
-          )}
-          style={{
-            width: sidebarWidth,
-            transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
-          }}
-        >
+      <aside
+        aria-hidden={!state.visible}
+        ref={sidebarRef}
+        className={cn(
+          'flex h-full bg-background ease-in-out',
+          'overflow-hidden transition-[width]',
+          isVisualFullscreen
+            ? 'absolute inset-y-0 right-0 z-30 shadow-xl'
+            : isCompact
+              ? 'absolute inset-y-0 right-0 z-20 shadow-xl'
+              : 'relative shrink-0',
+        )}
+        style={{
+          width: isFullscreen
+            ? '100%'
+            : isFullscreenExitPending
+              ? sidebarWidth
+              : isPanelEntered
+                ? sidebarWidth
+                : 0,
+          transitionProperty: 'width',
+          transitionTimingFunction: 'ease-in-out',
+          transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
+        }}
+      >
+        {isPresent && !isVisualFullscreen ? (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={i18nService.t('localInferenceModelLaunchLogsResize')}
+            className={cn(
+              'absolute inset-y-0 left-0 z-40 flex w-3 -translate-x-1/2 cursor-col-resize touch-none items-center justify-center',
+              'after:h-full after:w-px after:bg-transparent after:transition-colors after:duration-200 hover:after:bg-border',
+              isResizing && 'after:bg-border',
+            )}
+            onPointerDown={handleResizePointerDown}
+          />
+        ) : null}
+        {isPresent ? (
+          <div
+            className={cn(
+              'flex h-full shrink-0 flex-col overflow-hidden transition-[transform,opacity] ease-in-out',
+              isFullscreen && isPanelClosing
+                ? 'translate-x-full opacity-0'
+                : isPanelEntered || isPanelClosing
+                  ? 'translate-x-0 opacity-100'
+                  : 'translate-x-8 opacity-0',
+            )}
+            style={{
+              width: '100%',
+              transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
+            }}
+          >
 
-          <div className="min-h-0 flex-1 overflow-hidden p-2">
-            <LocalInferenceLogViewer
-              toolbar={<ModelLaunchLogSidebarToolbar
-                state={state}
-                onDownloadLogs={handleDownloadLogs}
-                onClose={onClose}
-              />}
-              key={state.sessionId ?? state.modelName ?? 'local-inference-log'}
-              text={getLogOutput(state)}
-              className="h-full rounded-none border-0"
-            />
+            <div className="min-h-0 flex-1 overflow-hidden p-2">
+              <LocalInferenceLogViewer
+                toolbar={<ModelLaunchLogSidebarToolbar
+                  state={state}
+                  isFullscreen={isFullscreen}
+                  onDownloadLogs={handleDownloadLogs}
+                  onToggleFullscreen={handleToggleFullscreen}
+                  onClose={handleClose}
+                />}
+                key={state.sessionId ?? state.modelName ?? 'local-inference-log'}
+                text={getLogOutput(state)}
+                className="h-full rounded-lg border-0"
+              />
 
+            </div>
           </div>
-        </div>
-      ) : null}
-    </aside>
+        ) : null}
+      </aside>
+    </>
   );
 }
 
 function ModelLaunchLogSidebarToolbar({
   state,
+  isFullscreen,
   onDownloadLogs,
+  onToggleFullscreen,
   onClose,
 }: {
   state: ModelLaunchLogPanelState;
+  isFullscreen: boolean;
   onDownloadLogs: () => void;
+  onToggleFullscreen: () => void;
   onClose: () => void;
 }) {
   return (
@@ -235,6 +295,19 @@ function ModelLaunchLogSidebarToolbar({
           type="button"
           variant="ghost"
           size="icon-sm"
+          aria-label={i18nService.t(
+            isFullscreen
+              ? 'localInferenceModelLaunchLogsExitFullscreen'
+              : 'localInferenceModelLaunchLogsFullscreen',
+          )}
+          onClick={onToggleFullscreen}
+        >
+          <FullscreenButtonIcon />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
           aria-label={i18nService.t('close')}
           data-local-inference-launch-close-button="true"
           onClick={onClose}
@@ -243,6 +316,28 @@ function ModelLaunchLogSidebarToolbar({
         </Button>
       </div>
     </header>
+  );
+}
+function FullscreenButtonIcon() {
+  const maskStyle: CSSProperties = {
+    WebkitMaskImage: `url("${fullscreenIconUrl}")`,
+    WebkitMaskPosition: 'center',
+    WebkitMaskRepeat: 'no-repeat',
+    WebkitMaskSize: 'contain',
+    backgroundColor: 'currentColor',
+    maskImage: `url("${fullscreenIconUrl}")`,
+    maskPosition: 'center',
+    maskRepeat: 'no-repeat',
+    maskSize: 'contain',
+  };
+
+  return (
+    <span
+      aria-hidden="true"
+      data-icon="inline-start"
+      className="inline-block size-4 shrink-0 bg-current"
+      style={maskStyle}
+    />
   );
 }
 function clampSidebarWidth(width: number, maxWidth = getMaxSidebarWidth()): number {

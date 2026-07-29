@@ -102,7 +102,7 @@ export function LocalInferenceLogViewer({ text, className, toolbar }: LocalInfer
   return (
     <div
       className={cn(
-        'flex min-h-0 h-full flex-col overflow-hidden rounded-xl border border-border bg-surface',
+        'flex min-h-0 h-full flex-col overflow-hidden rounded-lg border border-border bg-surface',
         className,
       )}
       data-local-inference-log-viewer

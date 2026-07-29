@@ -125,6 +125,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceToken, setMarketplaceToken] = useState<string | null>(null);
   useI18nLanguage();
   const launchLogs = useModelLaunchLogs();
+  const [launchLogFullscreen, setLaunchLogFullscreen] = useState(false);
   const marketplaceSearchRef = useRef<number>(0);
   const loadingModelNameRef = useRef<string | null>(null);
   const marketplaceQueryRef = useRef(marketplaceQuery);
@@ -753,8 +754,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   }}
                   onOpenLaunchLog={launchLogs.openPanelForModel}
                   showRegisteredModelsTitle={false}
-                  logPanelVisible={launchLogs.state.visible}
-                  logPanelModelName={launchLogs.state.modelName}
+                  logPanelVisible={launchLogs.state.visible && !launchLogFullscreen}
+                  logPanelModelName={launchLogFullscreen ? null : launchLogs.state.modelName}
                 />
             </LayeredTabsContent>
             <LayeredTabsContent
@@ -782,7 +783,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             </LayeredTabsContent>
           </div>
         </div>
-        <ModelLaunchLogSidebar state={launchLogs.state} onClose={launchLogs.closePanel} />
+        <ModelLaunchLogSidebar
+          state={launchLogs.state}
+          isFullscreen={launchLogFullscreen}
+          onFullscreenChange={setLaunchLogFullscreen}
+          onClose={launchLogs.closePanel}
+        />
         </div>
       </Tabs>
 
